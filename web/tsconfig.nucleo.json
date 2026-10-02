@@ -1,0 +1,22 @@
+{
+  // O núcleo sem extensão nenhuma, para conferir na sua máquina sem apagar nada
+  // (`npm run typecheck:nucleo`). `@/extensoes/instaladas` vira a lista vazia,
+  // e qualquer `@/extensoes/<nome>` fora do registro (os arquivos soltos da
+  // pasta) deixa de existir: um import de extensão esquecido no núcleo quebra
+  // aqui.
+  // Os arquivos das extensões e os testes delas ficam de fora. A prova
+  // definitiva é o job «Frontend sem extensões» do CI, que APAGA as extensões
+  // (scripts/sem_extensoes.sh) e roda tipos, testes e build.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "@/extensoes/instaladas": ["./extensoes/nenhuma.ts"],
+      "@/extensoes/tipos": ["./extensoes/tipos.ts"],
+      "@/extensoes/limite": ["./extensoes/limite.tsx"],
+      "@/extensoes/nenhuma": ["./extensoes/nenhuma.ts"],
+      "@/extensoes/*": ["./extensoes/sem-extensoes-no-nucleo/*"],
+      "@/*": ["./*"]
+    }
+  },
+  "exclude": ["node_modules", "extensoes/instaladas.ts", "extensoes/*/**", "__tests__/extensoes/**"]
+}

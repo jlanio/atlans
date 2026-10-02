@@ -1,0 +1,45 @@
+# requirements-dev.in — ferramentas de desenvolvimento que não entram na
+# imagem da API (o Dockerfile.api instala só o requirements.txt). Edite AQUI; o
+# requirements-dev.txt é gerado daqui, com hash (python scripts/travar_python.py).
+#   pip install --require-hashes -r requirements.txt -r requirements-dev.txt
+#   ruff check .
+# O CI (job "Backend (Python)") instala os dois locks: a versão local e a do CI
+# são a mesma, e uma regra nova do ruff só chega junto com a troca deste pin.
+#
+# O que as ferramentas têm em comum com a API (rich, requests, packaging...) sai
+# na MESMA versão do lock da API: o script compila este arquivo com
+# `--constraint requirements.txt`. Sem isso, instalar as duas coisas no mesmo
+# ambiente trocaria pacotes da API por baixo dos testes. A restrição vai pela
+# linha de comando, e não num `-c` aqui, por causa do Dependabot (ver PARES em
+# scripts/travar_python.py).
+
+ruff==0.16.8
+
+# Auditoria de vulnerabilidades conhecidas (job "Auditoria de dependências" do
+# CI, que por ora só informa). Local, o mesmo comando do CI — os locks já trazem
+# tudo com hash, então nada é resolvido nem instalado:
+#   pip-audit -r requirements.txt --disable-pip
+#   pip-audit -r executor/requirements-full.txt --disable-pip
+pip-audit==2.10.1
+
+# Varredura de segredos (job "Secrets scan" do CI e hook do pre-commit). Antes
+# o CI a instalava direto do PyPI, sem hash.
+detect-secrets==1.5.0
+
+# Hooks do pre-commit (.pre-commit-config.yaml): todos `repo: local` com
+# `language: system`, rodando estas versões travadas. Um hook de repositório
+# remoto resolveria as próprias dependências no PyPI, sem hash, a cada
+# instalação.
+pre-commit==4.6.2
+pre-commit-hooks==6.0.0
+
+# Só o Windows usa (o `build`, do pip-tools, pede o colorama lá), e o lock sai do
+# Linux, que não o vê. Sem ele aqui, quem commita do Windows não instala este
+# lock: o --require-hashes recusa dependência que não está no arquivo.
+colorama==0.4.6
+
+# Geração dos locks (scripts/travar_python.py): o pip-compile produz o formato
+# que o Dependabot sabe atualizar; o uv resolve com data de corte para a
+# quarentena de 14 dias (o pip-compile não filtra por data).
+pip-tools==7.6.1
+uv==0.12.17

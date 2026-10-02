@@ -1,0 +1,275 @@
+/* desktop/src/renderer/index.css
+   ─────────────────────────────────────────────────────────────────────────
+   Design system do Atlans Studio, portado de web/app/globals.css.
+
+   **Somente tema escuro.** O app é uma ferramenta de infraestrutura que fica
+   aberta em segundo plano; um visual só, sempre consistente, dispensa metade
+   dos tokens e todo o código de detecção de tema. Os valores abaixo são os do
+   bloco `.dark` do web — quem usa os dois reconhece a mesma paleta.
+
+   Os tokens são COPIADOS, não importados: `web/` é um app Next.js com 2 GB de
+   node_modules, e transformá-lo em pacote publicável só para compartilhar
+   variáveis CSS acoplaria o release do desktop ao do frontend.
+
+   Fonte da verdade das regras: .interface-design/system.md.
+   ───────────────────────────────────────────────────────────────────────── */
+@import "tailwindcss";
+
+/* Mesma biblioteca de animação do web (globals.css importa a mesma linha).
+   É de onde vêm `animate-in`, `fade-in-0`, `zoom-in-95` e `slide-in-from-*` —
+   os nomes que a tabela de Animações do system.md usa para descrever a entrada
+   de diálogo, painel e popover. Sem ela, essas classes simplesmente não
+   existiam aqui, e o app inteiro trocava de tela por corte seco. */
+@import "tw-animate-css";
+
+/* `dark:` vale SEMPRE.
+
+   Por padrão o Tailwind liga `dark:` a `prefers-color-scheme`, e o app não
+   segue mais o tema do sistema — num Windows em tema claro os `dark:` das
+   cores de status (StatusBadge, Logs, GeoSync) simplesmente não aplicariam, e
+   um badge verde-claro apareceria sobre o fundo escuro. Redefinir o variante
+   aqui mantém os componentes portados do web idênticos ao original, sem
+   varrer 18 classes à mão. */
+@custom-variant dark (&);
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans-app);
+  --font-mono: var(--font-mono-app);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  color-scheme: dark;
+  --radius: 0.5rem;
+
+  /* Geist não é embarcada: o app roda offline e buscar fonte da rede violaria
+     a CSP do renderer (`default-src 'none'`). A pilha começa pela Segoe UI
+     Variable do Windows 11, a mais próxima em métrica e peso. */
+  --font-sans-app: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Monoespaçada, em ordem de preferência para LER:
+       Cascadia Mono   — a do Windows Terminal, sem ligaduras (ver .log abaixo)
+       Cascadia Code   — mesma família, com ligaduras; só se a Mono não existir
+       Consolas        — sempre presente no Windows, o piso garantido
+     JetBrains Mono e Fira Code entram na frente porque quem desenvolve costuma
+     tê-las instaladas, e as duas têm zero cortado e altura-x maior — o que
+     decide legibilidade num painel de log de 12px. */
+  --font-mono-app: "JetBrains Mono", "Fira Code", "Cascadia Mono", "Cascadia Code",
+                   Consolas, ui-monospace, "Courier New", monospace;
+
+  /* Paleta escura do Atlans Studio — levemente aquecida. */
+  --background: oklch(0.188 0.008 55);
+  --foreground: oklch(0.93 0.004 70);
+
+  --card: oklch(0.215 0.008 55);
+  --card-foreground: oklch(0.93 0.004 70);
+
+  --popover: oklch(0.168 0.008 55);
+  --popover-foreground: oklch(0.93 0.004 70);
+
+  --primary: oklch(0.68 0.16 44);
+  --primary-foreground: oklch(0.99 0 0);
+
+  --secondary: oklch(0.285 0.008 55);
+  --secondary-foreground: oklch(0.93 0.004 70);
+
+  --muted: oklch(0.270 0.008 55);
+  --muted-foreground: oklch(0.60 0.008 60);
+
+  --accent: oklch(0.270 0.008 55);
+  --accent-foreground: oklch(0.93 0.004 70);
+
+  --destructive: oklch(0.65 0.21 22);
+
+  /* Aviso — o único tom que ainda era `yellow-500` cru, repetido em oito
+     arquivos. O valor é o `--exec-unknown` do tema escuro, que a tabela de
+     Execução no canvas (system.md) já calibrou contra este mesmo fundo: amarelo
+     sRGB puro destoa da paleta OKLCH aquecida, e sem token cada tela escolhia
+     sozinha entre `yellow-500`, `yellow-400` e `amber-500`. */
+  --warning: oklch(0.80 0.14 76);
+  --warning-foreground: oklch(0.20 0.02 60);
+
+  --border: oklch(1 0 0 / 9%);
+  --input: oklch(1 0 0 / 13%);
+  --ring: oklch(0.68 0.16 44 / 50%);
+
+  --sidebar: oklch(0.148 0.008 55);
+  --sidebar-foreground: oklch(0.90 0.004 70);
+  --sidebar-accent: oklch(0.255 0.008 55);
+  --sidebar-border: oklch(1 0 0 / 8%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    /* A janela não rola: cada painel tem o próprio scroll, como no app web. */
+    overflow: hidden;
+    /* Selecionar texto de UI ao arrastar é ruído; log e áreas de conteúdo
+       reabilitam com `select-text`. */
+    user-select: none;
+  }
+
+  /* Tipografia do painel de log.
+     ─────────────────────────────────────────────────────────────────────
+     Log não é código-fonte, e as escolhas divergem:
+
+     - `font-variant-ligatures: none` — a ligadura que junta `->` num glifo só
+       ajuda a ler expressões, mas num traceback ou num caminho de arquivo ela
+       ESCONDE quantos caracteres existem de fato. `!=`, `>>`, `--` são
+       exatamente o que se está tentando conferir.
+     - `"zero"` e `"ss01"` — zero cortado, onde a fonte oferecer. Distinguir
+       `0` de `O` importa em id de execução e hash.
+     - `tnum` — dígitos de largura fixa, para a coluna de horário não dançar.
+     - `line-height` folgado: linhas coladas viram uma parede de texto, e a
+       varredura vertical é o modo como o log é lido. */
+  .log {
+    font-variant-ligatures: none;
+    font-feature-settings: "zero" 1, "ss01" 1, "tnum" 1;
+    font-size: 12px;
+    line-height: 1.55;
+    letter-spacing: 0.005em;
+  }
+
+  /* Barra de rolagem discreta. A padrão do Chromium destoa bastante num app
+     escuro, e aparece em quatro áreas roláveis diferentes. */
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+    background-clip: content-box;
+  }
+}
+
+/* ── Movimento ───────────────────────────────────────────────────────────────
+   Regra de uso, para não virar enfeite: uma animação daqui sempre responde a
+   uma MUDANÇA DE ESTADO que o usuário precisaria notar — a tela trocou, um
+   alerta entrou, um número mudou, uma execução terminou. Nada anima porque
+   ficou bonito; num app que fica aberto o dia inteiro em segundo plano,
+   movimento sem significado vira ruído periférico.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* Esqueleto de carregamento — copiado do web (globals.css), inclusive a
+   duração. O gradiente corre sobre um fundo `bg-accent/60`; é o `background-position`
+   que anima, não o layout. */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.animate-skeleton-shimmer {
+  animation: skeleton-shimmer 1.8s linear infinite;
+}
+
+/* Número que mudou. Curto de propósito: o Painel atualiza a cada segundo, e
+   qualquer coisa mais longa que isso deixaria dois pulsos sobrepostos. */
+@keyframes valor-muda {
+  0%   { color: var(--primary); }
+  100% { color: inherit; }
+}
+.animate-valor-muda {
+  animation: valor-muda 900ms cubic-bezier(.22, 1, .36, 1);
+}
+
+/* Batida do LED de "conectado". Não é um `animate-ping` (que dispara um anel
+   para fora, e a 1 Hz vira estroboscópio na barra de status): é a mesma
+   respiração do canvas do web, só na opacidade. */
+@keyframes pulso-vivo {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+.animate-pulso-vivo {
+  animation: pulso-vivo 2.4s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+
+/* Barra de progresso indeterminada — quando há trabalho mas não se sabe
+   quantos nós. Substitui a barra vazia, que é indistinguível de "parado". */
+@keyframes progresso-indeterminado {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}
+.animate-progresso-indeterminado {
+  animation: progresso-indeterminado 1.4s cubic-bezier(.45, 0, .55, 1) infinite;
+}
+
+/* ── prefers-reduced-motion ──────────────────────────────────────────────────
+   O web tem este bloco; aqui não havia nenhum, e o app já usava `animate-spin`,
+   `animate-ping` e `animate-pulse`.
+
+   A regra é a mesma do canvas do web: degrada para o QUADRO INFORMATIVO, nunca
+   para nada. Cada estado precisa continuar distinguível sem movimento — um LED
+   que só existia enquanto piscava desaparece como informação se apagar junto
+   com a animação. Transições de cor e opacidade ficam: não deslocam nada.
+   ───────────────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  /* `!important` porque `animation` também é declarada nas utilitárias do
+     tw-animate-css, de mesma especificidade e emitidas depois. */
+  .animate-skeleton-shimmer,
+  .animate-valor-muda,
+  .animate-pulso-vivo,
+  .animate-progresso-indeterminado,
+  .animate-ping,
+  .animate-pulse {
+    animation: none !important;
+  }
+
+  /* Congelados no quadro que informa: o esqueleto continua sendo um bloco
+     visível, o LED continua aceso, o pulso de valor não pinta nada. */
+  .animate-skeleton-shimmer { background-position: 0 0; }
+  .animate-pulso-vivo { opacity: 1; }
+  .animate-ping { opacity: 0.6; }
+
+  /* O spinner é o único que NÃO some: ele é o único sinal de "aguarde" em
+     botões que ficam desabilitados durante a operação. Fica girando devagar,
+     o suficiente para não parecer travado. */
+  .animate-spin { animation: spin 2.4s linear infinite !important; }
+
+  /* Entrada e saída do tw-animate-css: sem deslocamento nem escala, só o
+     esmaecimento — que é o que separa "apareceu" de "sempre esteve lá". */
+  [data-slot] { animation-duration: 1ms !important; }
+  .animate-in, .animate-out {
+    animation-duration: 140ms !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-exit-scale: 1 !important;
+  }
+}

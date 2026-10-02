@@ -1,0 +1,91 @@
+# Prefeitura Salvador — camadas
+
+Geoportal: [[Geosserviços/Prefeitura Salvador/Secretaria Municipal da Fazenda de Salvador — SEFAZ|Secretaria Municipal da Fazenda de Salvador — SEFAZ]]
+
+Total: **84** camadas, organizadas em 1 grupo(s).
+
+## BAPSalvador (84)
+- `BAPSalvador:acesso_11` — 3 -  EMU 1.1 Acesso
+- `BAPSalvador:aer_pista_ponto_pouso_a` — 4 - AER Pista Ponto de Pouso
+- `BAPSalvador:area_cdgv_preliminar` — 4 - _Vetores - CDGV Salvador (Área Preliminar)
+- `BAPSalvador:cbge_area_de_propriedade_particular_a` — 4 - CBGE Área de Propriedade Particular
+- `BAPSalvador:cbge_area_duto_a` — 4 - CBGE Área Duto
+- `BAPSalvador:cbge_area_nao_edificada_a` — 4 - CBGE Área Não Edificada
+- `BAPSalvador:cbge_area_uso_especifico_a` — 4 - CBGE Área de Uso Específico
+- `BAPSalvador:cbge_canteiro_central_a` — 4 - CBGE Canteiro Central
+- `BAPSalvador:cbge_cemiterio_a` — 4 - CBGE Cemitério
+- `BAPSalvador:cbge_delimitacao_fisica_l` — 4 - CBGE Delimitação Física
+- `BAPSalvador:cbge_deposito_geral_a` — 4 - CBGE Depósito Geral
+- `BAPSalvador:cbge_espelho_dagua_a` — 4 - CBGE Espelho D'Água
+- `BAPSalvador:cbge_estacionamento_a` — 4 - CBGE Estacionamento
+- `BAPSalvador:cbge_largo_a` — 4 - CBGE Largo
+- `BAPSalvador:cbge_meio_fio_l` — 4 - CBGE Meio Fio
+- `BAPSalvador:cbge_passeio_a` — 4 - CBGE Passeio
+- `BAPSalvador:cbge_poste_p` — 4 - CBGE Poste
+- `BAPSalvador:cbge_praca_a` — 4 - CBGE Praça
+- `BAPSalvador:cbge_quadra_a` — 4 - CBGE Quadra
+- `BAPSalvador:cbge_trecho_arruamento_a` — 4 - CBGE Trecho de Arruamento
+- `BAPSalvador:dut_trecho_duto_l` — 4 - DUT Trecho de Duto
+- `BAPSalvador:edf_edificacao_cobertura_a` — 4 - EDF Edficação Cobertura
+- `BAPSalvador:edf_edificacao_total` — 4 - EDF Edificação (A)
+- `BAPSalvador:edf_edificacao_total_p` — 4 - EDF Edificação (P)
+- `BAPSalvador:edf_marquise_a` — 4 - EDF Edificação Marquise
+- `BAPSalvador:edf_teto_pavimento_a` — 4 - EDF Teto Pavimento
+- `BAPSalvador:emu_acesso_a` — 4 - EMU Acesso
+- `BAPSalvador:emu_ciclovia_a` — 4 - EMU Ciclovia
+- `BAPSalvador:emu_elevador_a` — 4 - EMU Elevador
+- `BAPSalvador:emu_escadaria_a` — 4 - EMU Escadaria
+- `BAPSalvador:emu_poste_sinalizacao_p` — 4 - EMU Poste de Sinalização
+- `BAPSalvador:emu_rampa_a` — 4 - EMU Rampa
+- `BAPSalvador:enc_antena_comunic_p` — 4 - ENC Antena Comunicação
+- `BAPSalvador:enc_grupo_transformadores_a` — 4 - ENC Grupo de Transformadores
+- `BAPSalvador:enc_torre_comunic_p` — 4 - ENC Torre de Comunicação
+- `BAPSalvador:enc_torre_energia_p` — 4 - ENC Torre de Energia
+- `BAPSalvador:escadaria_11` — 3 - EMU 1.1 Escadaria
+- `BAPSalvador:estacionamento_11` — 3 - CBGE 1.1 Estacionamento
+- `BAPSalvador:fer_trecho_ferroviario_l` — 4 - FER Trecho Ferroviário
+- `BAPSalvador:hdv_atracadouro_terminal_a` — 4 - HDV Atracadouro Terminal
+- `BAPSalvador:hdv_sinalizacao_p` — 4 - HDV Sinalização Hidroviária
+- `BAPSalvador:hid_area_umida_a` — 4 - HID Área Úmida
+- `BAPSalvador:hid_banco_areia_a` — 4 - HID Banco de Areia
+- `BAPSalvador:hid_barragem_a` — 4 - HID Barragem
+- `BAPSalvador:hid_canal_a` — 4 - HID Canal
+- `BAPSalvador:hid_dique_a` — 4 - HID Dique Polígono
+- `BAPSalvador:hid_dique_l` — 4 - HID Dique Linha
+- `BAPSalvador:hid_ilha_a` — 4 - HID Ilha
+- `BAPSalvador:hid_massa_dagua_a` — 4 - HID Massa D'água
+- `BAPSalvador:hid_quebramar_molhe_a` — 4 - HID Quebramar Molhe
+- `BAPSalvador:hid_queda_dagua_l` — 4 - HID Queda D'água
+- `BAPSalvador:hid_rocha_em_agua_a` — 4 - HID Rocha em Água
+- `BAPSalvador:hid_sumidouro_vertedouro_p` — 4 - HID Sumidouro/Vertedouro
+- `BAPSalvador:hid_trecho_drenagem_l` — 4 - HID Trecho Drenagem
+- `BAPSalvador:hid_vala_a` — 4 - HID Vala Polígono
+- `BAPSalvador:hid_vala_l` — 4 - HID Vala Linha
+- `BAPSalvador:laz_arquibancada_a` — 4 - LAZ Aquibancada
+- `BAPSalvador:laz_campo_quadra_a` — 4 - LAZ Campo Quadra
+- `BAPSalvador:laz_deque_a` — 4 - LAZ Deque
+- `BAPSalvador:laz_piscina_a` — 4 - LAZ Piscina
+- `BAPSalvador:laz_pista_competicao_a` — 4 - LAZ Pista de Competição
+- `BAPSalvador:passagem_elevada_viaduto_11` — 3 - TRA 1.1 Passagem Elevada ou Viaduto
+- `BAPSalvador:passeio_11` — 3 - CBGE 1.1 Passeio
+- `BAPSalvador:ponte_11` — 3 - TRA 1.1 Ponte
+- `BAPSalvador:rel_aterro_a` — 4 - REL Aterro
+- `BAPSalvador:rel_corte_a` — 4 - REL Corte Polígono
+- `BAPSalvador:rel_corte_l` — 4 - REL Corte Linha
+- `BAPSalvador:rel_curva_nivel_l` — 4 - REL Curva de Nível
+- `BAPSalvador:rel_ponto_cotado_altimetrico_p` — 4 - REL Ponto Cotado Altimétrico
+- `BAPSalvador:rel_rocha_a` — 4 - REL Rocha
+- `BAPSalvador:rel_terreno_exposto_a` — 4 - REL Terreno Exposto
+- `BAPSalvador:tra_passagem_elevada_viaduto_a` — 4 - TRA Passagem Elevada ou Viaduto
+- `BAPSalvador:tra_patio_a` — 4 - TRA Pátio
+- `BAPSalvador:tra_ponte_a` — 4 - TRA Ponte(A)
+- `BAPSalvador:tra_ponte_l` — 4 - TRA Ponte(L)
+- `BAPSalvador:tra_travessia_pedestre_a` — 4 - TRA Travessia de Pedestre
+- `BAPSalvador:tra_travessia_pedestre_l` — 4 - TRA Travessia de Pedestre(L)
+- `BAPSalvador:tra_trilha_picada_l` — 4 - TRA Trilha Picada
+- `BAPSalvador:tra_tunel_a` — 4 - tra Tunel
+- `BAPSalvador:tra_tunel_a1` — 4 - TRA Túnel
+- `BAPSalvador:trecho_arruamento_1.1` — 3 - CBGE 1.1 Trecho de Arruamento
+- `BAPSalvador:veg_vegetacao_total` — 4 - VER Vegetação
+- `BAPSalvador:ver_arvore_isolada_p` — 4 - VER Árvore Isolada
+- `BAPSalvador:ver_jardim_a` — 4 - VER Jardim

@@ -1,0 +1,129 @@
+# .github/workflows/executor-docker.yml
+# Build da imagem Docker do executor Atlans e upload como asset na Release.
+#
+# Trigger: push de tag executor/v* (ex: executor/v1.0.0)
+# Saída:   GitHub Release com atlans-executor-docker-amd64.tar.gz nos assets.
+
+name: Executor Docker — Build & Release
+
+on:
+  push:
+    tags:
+      - 'executor/v*'
+
+jobs:
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # necessário para criar release e upload de assets
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      # ── Extrair versão da tag ──────────────────────────────────────────
+      # Antes do build: a imagem declara a versão da tag (+ o commit), a mesma
+      # do nome da release.
+      - name: Extract version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/executor/}" >> $GITHUB_OUTPUT
+
+      # ── Build da imagem ────────────────────────────────────────────────
+      - name: Build executor image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: Dockerfile.executor
+          push: false
+          load: true
+          tags: atlans-executor:latest
+          # Versão que o painel mostra (executor/versao.py): a da tag + o commit.
+          build-args: |
+            EXECUTOR_COMMIT=${{ github.sha }}
+            EXECUTOR_BASE=${{ steps.version.outputs.VERSION }}
+          cache-from: type=gha,scope=executor
+          cache-to: type=gha,scope=executor,mode=max
+
+      # ── Exportar como .tar.gz ──────────────────────────────────────────
+      - name: Export image to tar.gz
+        run: |
+          docker save atlans-executor:latest | gzip > /tmp/atlans-executor-docker-amd64.tar.gz
+          echo "SIZE=$(du -h /tmp/atlans-executor-docker-amd64.tar.gz | cut -f1)" >> $GITHUB_ENV
+          echo "Imagem exportada: $(du -h /tmp/atlans-executor-docker-amd64.tar.gz | cut -f1)"
+
+      # ── Criar Release com asset ────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          name: "Executor Docker ${{ steps.version.outputs.VERSION }}"
+          body: |
+            ## Atlans Executor — Docker Image
+
+            Imagem Docker do executor Atlans para execução em VMs e servidores.
+
+            **Tamanho:** ${{ env.SIZE }}
+            **Arquitetura:** linux/amd64
+
+            ### Como usar
+
+            ```bash
+            # 1. Baixe o asset atlans-executor-docker-amd64.tar.gz
+
+            # 2. Carregue a imagem
+            docker load < atlans-executor-docker-amd64.tar.gz
+
+            # 3. Faca a matricula DENTRO da imagem, gravando o cert mTLS e as chaves no
+            #    volume que o container vai usar (o ID e o OTP vem do painel, em Executores):
+            docker run --rm -v atlans-executor-data:/data atlans-executor:latest \
+              python -m executor enroll --executor-id=<ID> --otp=<OTP> \
+                --server=https://agents.<dominio> --cert-dir=/data/certs
+
+            # 4. Crie o .env do executor:
+            mkdir -p ~/atlans-executor
+            cat > ~/atlans-executor/.env << 'EOF'
+            EXECUTOR_ID=<o mesmo ID>
+            EXECUTOR_SERVER_URL=wss://agents.<dominio>
+            EXECUTOR_PUBLIC_SERVER_URL=https://<dominio>
+            EXECUTOR_CERT_DIR=/data/certs
+            EOF
+
+            # 5. Inicie o container (as chaves ficam em /data/certs, onde a matricula as gravou)
+            docker run -d \
+              --name atlans-executor \
+              --restart on-failure \
+              --env-file ~/atlans-executor/.env \
+              -e EXECUTOR_ARTIFACTS_DIR=/data/artifacts \
+              -e EXECUTOR_DASHBOARD=off \
+              -e LOG_COLOR=never \
+              -v atlans-executor-data:/data \
+              atlans-executor:latest
+            ```
+
+            O mesmo, com o compose do repositório: `docker compose -f docker-compose.executor.yml`
+            (ver `executor/README.md`, «Docker»).
+
+            **Já rodava o executor com o nome antigo (`atlas-executor`)?** A imagem, o
+            container e o volume mudaram de nome (`atlans-`). Pelo compose, o próximo
+            `up -d` recria o container e o volume é o mesmo. Pelo `docker run`, pare e
+            remova o antigo (`docker rm -f atlas-executor`) e mantenha o volume que já
+            tem a matrícula: `-v atlas-executor-data:/data` no passo 5, em vez de criar
+            um novo.
+          files: /tmp/atlans-executor-docker-amd64.tar.gz
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Upload como artifact (backup) ──────────────────────────────────
+      - name: Upload artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: atlans-executor-docker
+          path: /tmp/atlans-executor-docker-amd64.tar.gz
+          retention-days: 30

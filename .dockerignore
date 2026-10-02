@@ -1,0 +1,49 @@
+# Dependências
+node_modules
+.venv
+__pycache__
+*.pyc
+**/__pycache__
+**/*.pyc
+
+# Logs e debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Builds locais
+.next
+dist/
+build/
+
+# Configurações locais — em qualquer pasta: o `COPY executor/` levava o
+# executor/.env da máquina que builda para dentro da imagem, legível por todos.
+.env
+**/.env
+.env.local
+agent/.env
+agent/agent_key.pem
+agent-config/
+.vscode/
+.idea/
+
+# Docker e Git
+.dockerignore
+Dockerfile*
+.git
+# ...menos o que diz qual commit está sendo buildado (executor/versao.py): a
+# ref atual, sem objetos nem config.
+!.git/HEAD
+!.git/packed-refs
+!.git/refs
+
+# Dados locais e dev
+*.db
+tests/
+notebooks/
+
+# Monorepos (caso use)
+.cache/
+turbo/
+pnpm-lock.yaml

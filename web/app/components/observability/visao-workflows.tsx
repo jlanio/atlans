@@ -1,0 +1,223 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { TbChevronRight, TbHierarchy3 } from "react-icons/tb"
+import { Button } from "@/app/components/ui/button"
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/app/components/ui/dialog"
+import { Skeleton } from "@/app/components/ui/skeleton"
+import { Switch } from "@/app/components/ui/switch"
+import { CartaoDeEstado } from "@/app/components/shared/estados"
+import { SeloAssistente } from "@/app/components/shared/selo-assistente"
+import { StatusBadge } from "@/app/components/shared/StatusBadge"
+import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPILHADA } from "@/app/components/shared/tabela-empilhada"
+import { cn } from "@/lib/utils"
+import type { IWorkflowMetricsRow } from "@/service/types"
+import { successRateColor } from "@/utils/formatters"
+import { formatarDuracao, formatarInicio, formatarInteiro, formatarPercentual, rotuloDaCategoria } from "@/lib/formatos"
+
+interface Props {
+  linhas: IWorkflowMetricsRow[]
+  carregando: boolean
+  /** Só admin vê o interruptor: `PUT /admin/workflows/{id}/status` é admin-only. */
+  isAdmin: boolean
+  onVerExecucoes: (workflowHash: string) => void
+  /**
+   * Chamado depois da confirmação (ao desligar) ou direto (ao ligar). Devolver
+   * `false` — ou rejeitar — desfaz o interruptor; o toast é de quem chama, que
+   * tem a mensagem da API.
+   */
+  onAlternarAtivo: (workflowHash: string, ativo: boolean) => void | boolean | Promise<void | boolean>
+}
+
+/**
+ * Visão "Por workflow" (spec §4.3): a lista que a aba Workflows antiga não
+ * era. A ordem vem do backend (`total_runs` desc, nome asc), e o interruptor
+ * pede confirmação só ao DESLIGAR — é isso que para execuções agendadas.
+ */
+export function VisaoWorkflows({ linhas, carregando, isAdmin, onVerExecucoes, onAlternarAtivo }: Props) {
+  // Reflexo imediato do interruptor até o próximo refetch; some quando a lista
+  // nova chega, porque ela já traz o valor gravado.
+  const [overrides, setOverrides] = useState<Record<string, boolean>>({})
+  useEffect(() => { setOverrides({}) }, [linhas])
+  const [confirmando, setConfirmando] = useState<IWorkflowMetricsRow | null>(null)
+  const [salvando, setSalvando] = useState(false)
+
+  async function aplicar(wf: IWorkflowMetricsRow, ativo: boolean) {
+    setOverrides(prev => ({ ...prev, [wf.workflow_hash]: ativo }))
+    setSalvando(true)
+    let ok = true
+    try {
+      ok = (await onAlternarAtivo(wf.workflow_hash, ativo)) !== false
+    } catch {
+      ok = false
+    }
+    setSalvando(false)
+    if (!ok) {
+      setOverrides(prev => {
+        const clone = { ...prev }
+        delete clone[wf.workflow_hash]
+        return clone
+      })
+    }
+    setConfirmando(null)
+  }
+
+  function aoAlternar(wf: IWorkflowMetricsRow, proximo: boolean) {
+    if (proximo) void aplicar(wf, true)
+    else setConfirmando(wf)
+  }
+
+  if (carregando && linhas.length === 0) {
+    return (
+      <div className="flex flex-col rounded-lg border bg-card shadow-xs" aria-busy="true" aria-label="Carregando workflows">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="flex items-center gap-4 border-b px-4 py-3 last:border-0">
+            <div className="flex flex-1 flex-col gap-1.5"><Skeleton className="h-4 w-44" /><Skeleton className="h-3 w-24" /></div>
+            <Skeleton className="h-4 w-12" /><Skeleton className="h-4 w-12" /><Skeleton className="h-4 w-20" />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (linhas.length === 0) {
+    return (
+      <CartaoDeEstado
+        icone={TbHierarchy3}
+        titulo="Nenhum workflow no escopo"
+        descricao="Crie um workflow, ou troque o workspace do filtro."
+      />
+    )
+  }
+
+  return (
+    <div className="flex flex-col rounded-lg border bg-card shadow-xs">
+      <div className="overflow-x-auto rounded-t-lg">
+        <table className="w-full text-sm max-md:block md:min-w-[860px]">
+          <thead className={CABECALHO_DE_COLUNAS}>
+            <tr className="border-b bg-muted/40 text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+              <th scope="col" className="px-3 py-2 text-left">Workflow</th>
+              <th scope="col" className="px-3 py-2 text-right">Execuções</th>
+              <th scope="col" className="px-3 py-2 text-right">Sucesso</th>
+              <th scope="col" className="px-3 py-2 text-right">Duração típica</th>
+              <th scope="col" className="px-3 py-2 text-left">Última</th>
+              <th scope="col" className="px-3 py-2 text-left">Falhas</th>
+              {isAdmin && <th scope="col" className="px-3 py-2 text-center">Ativo</th>}
+              <th scope="col" className="w-8 px-2 py-2"><span className="sr-only">Abrir</span></th>
+            </tr>
+          </thead>
+          <tbody className="max-md:block">
+            {linhas.map(wf => {
+              const ativo = overrides[wf.workflow_hash] ?? wf.active
+              const ultimoErro = wf.last_error?.trim() || null
+              const categoria = rotuloDaCategoria(wf.last_error_category)
+              const erroTexto = ultimoErro ? (categoria ? `${categoria} · ${ultimoErro}` : ultimoErro) : null
+              return (
+                <tr
+                  key={wf.workflow_hash}
+                  onClick={() => onVerExecucoes(wf.workflow_hash)}
+                  className={cn(
+                    "cursor-pointer border-b transition-colors last:border-0 hover:bg-accent/50",
+                    !ativo && "text-muted-foreground",
+                    LINHA_EMPILHADA,
+                  )}
+                >
+                  <td className={cn("px-3 py-2.5 align-middle", DESTAQUE_DA_FICHA)}>
+                    <div className="flex min-w-0 flex-col">
+                      <div className="flex min-w-0 items-center gap-1.5">
+                        {/* O botão é o alvo do teclado; a linha inteira é o do mouse. */}
+                        <button
+                          type="button"
+                          onClick={e => { e.stopPropagation(); onVerExecucoes(wf.workflow_hash) }}
+                          aria-label={`Ver execuções de ${wf.workflow_name}`}
+                          className="truncate text-left font-medium text-foreground outline-none hover:underline focus-visible:ring-[3px] focus-visible:ring-ring/50 rounded-sm max-md:min-h-10"
+                          title={wf.workflow_name}
+                        >
+                          {wf.workflow_name}
+                        </button>
+                        <SeloAssistente origem={wf.origem} />
+                      </div>
+                      <span className="truncate text-[11.5px] text-muted-foreground">
+                        {wf.workspace_name ?? "—"}{!ativo && " · desativado"}
+                      </span>
+                    </div>
+                  </td>
+                  <td data-rotulo="execuções" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
+                    {formatarInteiro(wf.total_runs)}
+                    {wf.running_runs > 0 && <span className="ml-1 text-xs text-blue-600 dark:text-blue-400">· {wf.running_runs} agora</span>}
+                  </td>
+                  <td data-rotulo="sucesso" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
+                    {wf.total_runs > 0
+                      ? <span className={cn("font-medium", successRateColor(wf.success_rate, "amber"))}>{formatarPercentual(wf.success_rate, 0)}</span>
+                      : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td data-rotulo="típica" className={cn("px-3 py-2.5 text-right align-middle tabular-nums", CELULA_COM_ROTULO)}>
+                    {formatarDuracao(wf.p50_seconds)}
+                  </td>
+                  <td data-rotulo="última" className={cn("px-3 py-2.5 align-middle whitespace-nowrap", CELULA_COM_ROTULO)}>
+                    {wf.last_run_at ? (
+                      <span className="inline-flex items-center gap-2">
+                        <span className="tabular-nums text-xs" title={wf.last_run_at}>{formatarInicio(wf.last_run_at)}</span>
+                        {wf.last_status && <span className="scale-90 origin-left"><StatusBadge status={wf.last_status} /></span>}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
+                  {/* Limite no bloco de dentro, não no <td>: `max-width` em célula
+                      de tabela não é definido pela especificação (ver a coluna
+                      Erro de tabela-execucoes.tsx). */}
+                  <td data-rotulo="falhas" className={cn("px-3 py-2.5 align-middle max-md:basis-full", CELULA_COM_ROTULO)}>
+                    <div className="flex min-w-0 max-w-[240px] items-baseline gap-2 max-md:max-w-full">
+                      <span className={cn("tabular-nums font-medium", wf.failed_runs > 0 ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}>
+                        {formatarInteiro(wf.failed_runs)}
+                      </span>
+                      {erroTexto && (
+                        <span className="truncate text-[12px] text-muted-foreground" title={erroTexto}>{erroTexto}</span>
+                      )}
+                    </div>
+                  </td>
+                  {isAdmin && (
+                    <td className="px-3 py-2.5 text-center align-middle" onClick={e => e.stopPropagation()}>
+                      {/* Alvo de toque de 40px no telefone: é a ação destrutiva da página. */}
+                      {/* <label>: o Switch é um <button>, elemento rotulável — o toque em
+                          qualquer ponto da caixa de 40px aciona o interruptor. */}
+                      <label className="inline-flex items-center justify-center max-md:min-h-10 max-md:min-w-10">
+                        <Switch
+                          checked={ativo}
+                          disabled={salvando && confirmando?.workflow_hash === wf.workflow_hash}
+                          onCheckedChange={proximo => aoAlternar(wf, proximo)}
+                          aria-label={`${ativo ? "Desativar" : "Ativar"} ${wf.workflow_name}`}
+                        />
+                      </label>
+                    </td>
+                  )}
+                  <td className="w-8 px-2 py-2.5 text-right align-middle text-muted-foreground max-md:hidden">
+                    <TbChevronRight size={14} aria-hidden="true" className="inline" />
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={!!confirmando} onOpenChange={aberto => { if (!aberto && !salvando) setConfirmando(null) }}>
+        <DialogContent closeDisabled={salvando}>
+          <DialogHeader>
+            <DialogTitle>Desativar «{confirmando?.workflow_name}»?</DialogTitle>
+            <DialogDescription>Novas execuções, inclusive agendadas, não vão rodar.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmando(null)} disabled={salvando}>Cancelar</Button>
+            <Button variant="destructive" onClick={() => confirmando && aplicar(confirmando, false)} disabled={salvando}>
+              {salvando ? "Desativando…" : "Desativar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

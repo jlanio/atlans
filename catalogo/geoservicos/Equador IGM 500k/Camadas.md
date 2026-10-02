@@ -1,0 +1,84 @@
+# Instituto Geográfico Militar — IGM — IGM 500k — camadas
+
+Geoportal: [[Geosserviços/Equador IGM 500k/Instituto Geográfico Militar — IGM — IGM 500k|Instituto Geográfico Militar — IGM — IGM 500k]]
+
+Total: **79** camadas WFS.
+- `e500k_2024:acantilado_l_2024` — acantilado_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:aeropuerto_p_2024` — aeropuerto_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:caracteristica_suelo_a_2024` — caracteristica_suelo_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:curva_nivel_l_2024` — curva_nivel_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:embalse_a_2024` — embalse_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:faro_p_2024` — faro_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:ferrocarril_l_2024` — ferrocarril_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:isla_a_2024` — isla_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:lago_laguna_a_2024` — lago_laguna_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:limite_administrativo_l_2024` — limite_administrativo_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:limite_nieve_a_2024` — limite_nieve_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:linea_costa_l_2024` — linea_costa_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:linea_transmision_electrica_l_2024` — linea_transmision_electrica_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:nombre_geografico_l_2024` — nombre_geografico_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:nombre_geografico_p_2024` — nombre_geografico_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:pista_aterrizaje_p_2024` — pista_aterrizaje_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:poblado_p_2024` — poblado_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:puente_l_2024` — puente_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:puerto_p_2024` — puerto_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:punto_acotado_cota_p_2024` — punto_acotado_cota_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:punto_desvanecido_p_2024` — punto_desvanecido_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:rio_a_2024` — rio_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:rio_l_2024` — rio_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:roca_p_2024` — roca_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:rodera_l_2024` — rodera_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:sendero_l_2024` — sendero_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:tuberia_l_2024` — tuberia_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:via_ruta_escudos` — via_ruta_escudos · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:via_ruta_l` — via_ruta_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `e500k_2024:zona_edificada_a_2024` — zona_edificada_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:aeropuerto_p` — Aeropuerto · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:caracteristica_suelo_a` — Característica del Suelo · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:curva_batimetrica_l` — Curva batimétrica · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:curva_nivel_l` — Curva de Nivel · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:embalse_a` — Embalse · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:faro_p` — Faro · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:ferrocarril_l` — Ferrocarril · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:isla_a` — Isla · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:lago_laguna_a` — Lago laguna · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:limite_administrativo_l` — Límite Político Administrativo · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:limite_maritimo_a` — Límite marítimo · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:limite_maritimo_l` — Límite marítimo · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:limite_nieve_a` — Límite de Nieve · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:linea_costa_l` — Línea costa · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:linea_transmision_electrica_l` — Línea de Transmisión Eléctrica · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:pista_aterrizaje_p` — Pista de Aterrizaje · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:poblado_p` — Poblado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:puente_l` — Puente · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:punto_acotado_cota_p` — Punto Acotado/Cota · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:punto_desvanecido_p` — Punto desvanecido · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:rio_a` — Río (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:rio_l` — Río (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:rodera_l` — Rodera (Camino de Herradura) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:sendero_l` — Sendero · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:superficie_tierra_l` — Superficie de la Tierra (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:superficie_tierra_p` — Superficie de la Tierra (Punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:tuberia_l` — Tubería · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:via_ruta_l` — Vía o Ruta · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:zona_edificada_a` — Zona Edificada · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_galapagos:acantilado_l` — Acantilado · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:aeropuerto_p` — Aeropuerto · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:arrecife_l` — Arrecife (Línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:arrecife_p` — Arrecife (Punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:curva_nivel_l` — Curva de nivel · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:faro_p` — Faro · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:isla_a` — Isla · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:lago_laguna_a` — Lago Laguna · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:linea_transmicion_electrica_l` — Línea Transmisión Eléctrica · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:pista_aterrizaje_p` — Pista Aterrizaje · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:poblado_p` — Poblado · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:punto_acotado_cota_p` — Punto Acotado Cota · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:punto_desvanecido_p` — Punto Desvanecido · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:rio_l` — Río · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:roca_l` — Roca (Línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:roca_p` — Roca (Punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:rodera_l` — Rodera · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:sendero_l` — Sendero · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:via_ruta_l` — Vía Ruta · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm_galapagos:zona_edificada_a` — Zona Edificada · CRS: `urn:ogc:def:crs:EPSG::32715`

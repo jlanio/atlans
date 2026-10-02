@@ -1,0 +1,96 @@
+# Pre-commit hooks para o repo atlans.
+#
+# Setup local (uma vez por clone), no ambiente onde você roda o `git commit`
+# (Linux, macOS ou Windows; o ambiente do backend, com os dois locks, já serve):
+#   pip install --require-hashes -r requirements-dev.txt
+#   pre-commit install
+#
+# Depois disso, todo `git commit` roda os hooks abaixo automaticamente.
+# Para rodar manualmente em todos os arquivos:
+#   pre-commit run --all-files
+#
+# Todos os hooks são `repo: local` com `language: system`: rodam as
+# ferramentas do requirements-dev.txt — pre-commit, detect-secrets e
+# pre-commit-hooks travados, com hash e com a quarentena de 14 dias (ver
+# CONTRIBUTING, "Dependências Python"). Um hook de repositório remoto, mesmo
+# fixado por SHA, trava só o código do hook: o ambiente que o pre-commit monta
+# para ele resolve as dependências no PyPI na hora, na versão mais nova do dia
+# e sem hash — medido: entravam idna e urllib3 publicados havia menos de 14
+# dias. E é justamente na máquina de quem commita que esse código roda.
+# Os ids, entradas e filtros abaixo são os dos `.pre-commit-hooks.yaml`
+# originais (detect-secrets v1.5.0, pre-commit-hooks v5.0.0).
+#
+# CI (.github/workflows/ci.yml) roda `detect-secrets scan` como safety
+# net — pega commits de devs que esqueceram o install local.
+#
+# Pra regerar o baseline depois de revisar um hit novo:
+#   detect-secrets scan --baseline .secrets.baseline
+# No Windows, prefixe com PYTHONUTF8=1: sem isso o Python abre os
+# arquivos em cp1252, engasga nos que tem acento e os pula em silencio —
+# o baseline sai sem eles e o CI (Linux, UTF-8) acusa como hits novos.
+
+repos:
+  - repo: local
+    hooks:
+      # ── Secret scanning: bloqueia commits com PAT/JWT/API keys ──────────
+      - id: detect-secrets
+        name: Detect secrets
+        entry: detect-secrets-hook
+        language: system
+        files: .*
+        args: ['--baseline', '.secrets.baseline']
+        # Locks de package manager: cheios de hashes que dao falso
+        # positivo. .secrets.baseline: self-reference. catalogo/: 22 MB de
+        # markdown gerado (nomes de camada, URLs publicas de WFS) — so ruido
+        # para o scanner; o baseline exclui a pasta pelo mesmo filtro.
+        exclude: |
+          (?x)^(
+            package-lock\.json|
+            web/package-lock\.json|
+            web/pnpm-lock\.yaml|
+            \.secrets\.baseline|
+            catalogo/.*
+          )$
+
+      # ── Higiene basica de arquivos ────────────────────────────────────
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: trailing-whitespace-fixer
+        language: system
+        types: [text]
+        stages: [pre-commit, pre-push, manual]
+        exclude: \.md$  # Markdown usa trailing space como hard break
+      - id: end-of-file-fixer
+        name: fix end of files
+        entry: end-of-file-fixer
+        language: system
+        types: [text]
+        stages: [pre-commit, pre-push, manual]
+        exclude: \.svg$
+      - id: check-yaml
+        name: check yaml
+        entry: check-yaml
+        language: system
+        types: [yaml]
+        # docker-compose usa !reset e outras tags — check-yaml valida
+        # sintaxe padrao, entao pulamos compose files. Outros YMLs sim.
+        exclude: docker-compose.*\.yml
+      - id: check-added-large-files
+        name: check for added large files
+        entry: check-added-large-files
+        language: system
+        stages: [pre-commit, pre-push, manual]
+        args: ['--maxkb=1024']  # >1MB bloqueia (usar Git LFS se preciso)
+        # catalogo/: o Atributos.md do IBGE tem 4 MB de tabelas (9.759 camadas).
+        exclude: ^catalogo/
+      - id: check-merge-conflict
+        name: check for merge conflicts
+        entry: check-merge-conflict
+        language: system
+        types: [text]
+      - id: mixed-line-ending
+        name: mixed line ending
+        entry: mixed-line-ending
+        language: system
+        types: [text]
+        args: ['--fix=lf']

@@ -1,0 +1,92 @@
+# ICMBio INDE — camadas
+
+Geoportal: [[Geosserviços/ICMBio INDE/Instituto Chico Mendes de Conservação da Biodiversidade — ICMBio|Instituto Chico Mendes de Conservação da Biodiversidade — ICMBio]]
+
+Total: **85** camadas, organizadas em 1 workspace(s).
+
+## ICMBio (85)
+- `ICMBio:amazonia_2a_atualizacao` — MMA - Áreas Prioritárias para a Conservação da Biodiversidade - Amazônia
+- `ICMBio:areas_hibridas_2a_atualizacao` — MMA - Áreas Prioritárias para a Conservação da Biodiversidade - Zonas Hìbridas
+- `ICMBio:autos_infracao_icmbio` — Autos de Infração - ICMBio
+- `ICMBio:caatinga_2a_atualizacao` — MMA - Áreas Prioritárias para a Conservação da Biodiversidade - Caatinga
+- `ICMBio:canie_052026_p` — Cavidades Naturais Subterrâneas - ICMBio
+- `ICMBio:cerrado_pantanal_2a_atualizacao` — MMA - Áreas Prioritárias para a Conservação da Biodiversidade - Cerrado e Pantanal
+- `ICMBio:compatibilidade_ivt_amazonia_062022_a` — Plano de Redução de Impactos das Infraestruturas Viárias Terrestres sobre a Biodiversidade - Amazônia (PRIM-IVT)
+- `ICMBio:compatibilidade_ivt_caatinga_062022_a` — Plano de Redução de Impactos das Infraestruturas Viárias Terrestres sobre a Biodiversidade - Caatinga (PRIM-IVT)
+- `ICMBio:compatibilidade_ivt_cerrado_062022_a` — Plano de Redução de Impactos das Infraestruturas Viárias Terrestres sobre a Biodiversidade - Cerrado (PRIM-IVT)
+- `ICMBio:compatibilidade_ivt_mata_atlantica_062022_a` — Plano de Redução de Impactos das Infraestruturas Viárias Terrestres sobre a Biodiversidade - Mata Atlântica (PRIM-IVT)
+- `ICMBio:compatibilidade_ivt_pampa_062022_a` — Plano de Redução de Impactos das Infraestruturas Viárias Terrestres sobre a Biodiversidade - Pampas (PRIM-IVT)
+- `ICMBio:compatibilidade_ivt_pantanal_062022_a` — Plano de Redução de Impactos das Infraestruturas Viárias Terrestres sobre a Biodiversidade - Pantanal (PRIM-IVT)
+- `ICMBio:embargos_icmbio` — Areas embargadas - ICMBio
+- `ICMBio:limiteucsfederais_a` — Limites das Unidades de Conservação Federais - ICMBio (Ago/2026)
+- `ICMBio:mataatlantica_2a_atualiz` — MMA - Áreas Prioritárias para Conservação da Biodiversidade - Mata Atlântica
+- `ICMBio:pampa_2a_atualizacao` — MMA - Áreas Prioritárias para Conservação da Biodiversidade - Pampa
+- `ICMBio:pan_cbc_polinizadores_c1_abrang_032023_a` — PAN Insetos Polinizadores - 1 ciclo - área de abrangência
+- `ICMBio:pan_cbc_polinizadores_c1_areas_estrat_102023_a` — PAN Insetos Polinizadores - 1 ciclo - áreas estratégicas
+- `ICMBio:pan_cecav_area_abrangencia_012023_a` — PAN Cavernas do Brasil - 1 ciclo - área de abrangência
+- `ICMBio:pan_cemave_ararinhaaz_c2_area_abrang_022023_a` — PAN Ararinha-azul - 2 ciclo - área de abrangência
+- `ICMBio:pan_cemave_avamazonia_c1_area_abrang_022023_a` — PAN Aves da Amazônia - 1 ciclo - área de abrangência
+- `ICMBio:pan_cemave_avmarinhas_c1_area_abrang_022023_a` — PAN Aves Marinhas - 1 ciclo - área de abrangência
+- `ICMBio:pan_cemave_caatinga_c2_area_abrang_022023_a` — PAN Aves da Caatinga - 2 ciclo - área de abrangência
+- `ICMBio:pan_cemave_caatinga_c2_area_estrat_022023_a` — PAN Aves da Caatinga - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_cemave_caatinga_c3_areas_estrat_112023_a` — PAN Aves da Caatinga - 3 ciclo - áreas estratégicas
+- `ICMBio:pan_cemave_cerrapanta_c1_area_abrang_022023_a` — PAN Aves do Cerrado e Pantanal - 1 ciclo - área de abrangência
+- `ICMBio:pan_cemave_cerrapanta_c1_area_estrat_022023_a` — PAN Aves do Cerrado e Pantanal - 1 ciclo - áreas estratégicas
+- `ICMBio:pan_cemave_csulinos_c2_area_abrang_022023_a` — PAN Aves dos Campos Sulinos - 2 ciclo - área de abrangência
+- `ICMBio:pan_cemave_limicolas_c2_area_abrang_022023_a` — PAN Aves Limícolas Migratórias - 2 ciclo - área de abrangência
+- `ICMBio:pan_cemave_limicolas_c2_area_estrat_022023_a` — PAN Aves Limícolas Migratórias - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_cemave_matlantica_c1_area_abrang_022023_a` — PAN Aves da Mata Atlântica - 1 ciclo - área de abrangência
+- `ICMBio:pan_cemave_matlantica_c1_area_estrat_022023_a` — PAN Aves da Mata Atlântica - 1 ciclo - áreas estratégicas
+- `ICMBio:pan_cemave_matlantica_c2_areas_estrat_012024_a` — PAN Aves da Mata Atlântica - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_cemave_patomergulhao_c3_abrang_012024_a` — PAN Pato-mergulhão - 3 ciclo - área de abrangência
+- `ICMBio:pan_cemave_planacap_c3_area_abrang_022023_a` — PAN Albatrozes e Petréis - 3 ciclo - área de abrangência
+- `ICMBio:pan_cenap_ariranha_c2_abrang_012023_a` — PAN Ariranha - 2 ciclo - Área de abrangência
+- `ICMBio:pan_cenap_ariranha_c3_abrang_012024_a` — PAN Ariranha - 3 ciclo - área de abrangência
+- `ICMBio:pan_cenap_canideos_c1_abrang_012023_a` — PAN Canídeos - 1 ciclo - área de abrangência
+- `ICMBio:pan_cenap_gfelinos_c1_abrang_012023_a` — PAN Grandes Felinos - 1 ciclo - área de abrangência
+- `ICMBio:pan_cenap_pfelinos_c2_abrang_012023_a` — PAN Pequenos Felinos - 2 ciclo - área de abrangência
+- `ICMBio:pan_cenap_pmamifaa_c1_abrang_012024_a` — PAN Pequenos Mamíferos de Áreas Abertas - 1 ciclo - área de abrangência
+- `ICMBio:pan_cenap_pmamifaa_c1_areas_estrat_012024_a` — PAN Pequenos Mamíferos de Áreas Abertas - 1 ciclo - áreas estratégicas
+- `ICMBio:pan_cenap_pmamifaf_c1_abrang_012024_a` — PAN Pequenos Mamíferos de Áreas Florestais - 1 ciclo - área de abrangência
+- `ICMBio:pan_cenap_pmamifaf_c1_areas_estrat_012024_a` — PAN Pequenos Mamíferos de Áreas Florestais - 1 ciclo - áreas estratégicas
+- `ICMBio:pan_cenap_ung_c1_abrang_012023_a` — PAN Ungulados - 1 ciclo - área de abrangência
+- `ICMBio:pan_cepam_pxsamazncs_c1_abrang_012023_a` — PAN Peixes Amazônicos - 1 ciclo - Área de abrangência
+- `ICMBio:pan_cepsul_corais_c1_area_abrangencia_042024_a` — PAN Corais - 1 ciclo - área de abrangência
+- `ICMBio:pan_cepsul_lagoasdosul_c1_abrang_012023_a` — PAN Lagoas do Sul - 1 ciclo - área de abrangência
+- `ICMBio:pan_cepta_altoparana_c1_abrang_032024_a` — PAN Alto Paraná - 1 ciclo - área de abrangência
+- `ICMBio:pan_cepta_baixoiguacu_c1_abrang_012023_a` — PAN Baixo Iguaçu - 1 ciclo - Área de abrangência
+- `ICMBio:pan_cepta_mogi_c1_abrang_012023_a` — PAN Mogi/Pardo/Sapucaí-Mirim/Grande - 1 ciclo - Área de abrangência
+- `ICMBio:pan_cepta_paraibadosul_c2_area_estrat_022024_a` — PAN Paraíba do Sul - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_cepta_paraibasul_c1_abrang_012023_a` — PAN Paraíba do Sul - 1 ciclo - Área de abrangência
+- `ICMBio:pan_cepta_paraibasul_c1_area_estrategica_082022_a` — PAN Paraíba do Sul - 1 ciclo - Áreas estratégicas
+- `ICMBio:pan_cepta_paraibasul_c2_abrang_022024_a` — PAN Paraíba do Sul - 2 ciclo - área de abrangência
+- `ICMBio:pan_cepta_pema_c1_abrang_012023_a` — PAN Peixes e Eglas da Mata Atlântica - 1 ciclo - Área de abrangência
+- `ICMBio:pan_cepta_pema_c1_area_estrategica_082022_a` — PAN Peixes e Eglas da Mata Atlântica - 1 ciclo - Áreas estratégicas
+- `ICMBio:pan_cepta_rivulideos_c2_abrang_012023_a` — PAN Rivulídeos - 2 ciclo - Área de abrangência
+- `ICMBio:pan_cepta_sfrancisco_c1_abrang_092022_a` — PAN São Francisco - 1 ciclo - área de abrangência
+- `ICMBio:pan_cepta_sfrancisco_c2_abrang_012023_a` — PAN São Francisco - 2 ciclo - CEPTA/ICMBio - Área de abrangência
+- `ICMBio:pan_cma_cetaceosmarinhos_c1_abrang_032023_a` — PAN Cetáceos Marinhos - 1 ciclo - área de abrangência
+- `ICMBio:pan_cma_mamiferosaquaticosamazonicos_c1_abrang_032023_a` — PAN Mamiferos Aquaticos Amazonicos - 1 ciclo - área de abrangência
+- `ICMBio:pan_cma_peixeboimarinho_c1_abrang_032023_a` — PAN Peixe-boi Marinho - 1 ciclo - área de abrangência
+- `ICMBio:pan_cma_toninhas_c2_abrang_032023_a` — PAN Toninhas - 2 ciclo - área de abrangência
+- `ICMBio:pan_cpb_primamaz_c1_abrang_012023_a` — PAN Primatas Amazônicos - 1 ciclo - área de abrangência
+- `ICMBio:pan_cpb_primamazonicos_c1_areas_estrat_022023_a` — PAN Primatas Amazônicos - 1 ciclo - áreas estratégicas
+- `ICMBio:pan_cpb_primmtatl_c1_abrang_012023_a` — PAN Primatas da Mata Atlântica e preguiça-de-coleira - 1 ciclo - área de abrangência
+- `ICMBio:pan_cpb_primne_c2_abrang_012023_a` — PAN Primatas do Nordeste - 2 ciclo - área de abrangência
+- `ICMBio:pan_cpb_prine_c2_areas_estrat_022023_a` — PAN Primatas do Nordeste - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_cpb_sauim_c2_abrang_012023_a` — PAN Sauim-de-coleira - 2 ciclo - área de abrangência
+- `ICMBio:pan_cpb_tata_c1_abrang_012023_a` — PAN Tamanduá-bandeira e Tatus - 1 ciclo - área de abrangência
+- `ICMBio:pan_icmbio_abrang_052024_a` — Planos de Ação Nacional para a Conservação de Espécies Ameaçadas de Extinção do ICMBio - Áreas de abrangência (mai/2024)
+- `ICMBio:pan_icmbio_areas_estrat_052024_a` — Planos de Ação Nacional para a Conservação de Espécies Ameaçadas de Extinção do ICMBio - Áreas estratégicas (mai/2024)
+- `ICMBio:pan_ran_cerradoepantanal_c1_area_abrang_022023_a` — PAN Cerrado e Pantanal - 1 ciclo - área de abrangência
+- `ICMBio:pan_ran_cerradoepantanal_c1_area_estrat_022023_a` — PAN Cerrado e Pantanal - 1 ciclo - áreas estratégicas
+- `ICMBio:pan_ran_espinhaco_c2_area_abrang_022023_a` — PAN Herpetofauna da Serra do Espinhaço - 2 ciclo - Área de abrangência
+- `ICMBio:pan_ran_espinhaco_c2_area_estrat_022023_a` — PAN Herpetofauna da Serra do Espinhaço - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_ran_nordeste_c2_area_abrang_022023_a` — PAN Herpetofauna do Nordeste - 2 ciclo - Área de abrangência
+- `ICMBio:pan_ran_nordeste_c2_area_estrat_022023_a` — PAN Herpetofauna do Nordeste - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_ran_sudeste_c2_area_abrang_022023_a` — PAN Herpetofauna da Mata Atlântica do Sudeste - 2 ciclo - Área de abrangência
+- `ICMBio:pan_ran_sul_c2_area_abrang_022023_a` — PAN Herpetofauna do Sul - 2 ciclo - Área de abrangência
+- `ICMBio:pan_ran_sul_c2_area_estrat_022023_a` — PAN Herpetofauna do Sul - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_tamar_pantamar_c2_area_estrat_022023_a` — PAN Tartarugas Marinhas - 2 ciclo - áreas estratégicas
+- `ICMBio:pan_tamar_tamar_c2_abrang_012023_a` — PAN Tartarugas Marinhas - 2 ciclo - Área de abrangência
+- `ICMBio:zcm_2a_atualiz` — MMA - Áreas Prioritárias para a Conservação da Biodiversidade - Zona Costeira e Marinha

@@ -1,0 +1,136 @@
+# Sistema de Información Territorial — SIT La Paz (Bolívia) — camadas
+
+Geoportal: [[Geosserviços/Bolivia SIT La Paz/Sistema de Información Territorial — SIT La Paz (Bolívia)|Sistema de Información Territorial — SIT La Paz (Bolívia)]]
+
+Total: **131** camadas.
+- `sit:actividadesEconomicasEBA` — Actividades Economicas EBA
+- `sit:agenciascooperacion` — AgenciasCooperacion
+- `sit:agenciasviajes` — Agencias de Viajes
+- `sit:AlumbradoPublico` — Alumbrado Publico
+- `sit:ap_municipales2018` — Areas Protegidas Municipales 2018
+- `sit:ap_nacional` — Areas Protegidas Nacional
+- `sit:ap_sector_chucura` — Area protegida Sector Chucura
+- `sit:areas_protegidas` — Areas Protegidas Municipales
+- `sit:arqueo_muyaltasensibilidad` — Areas de Interes arqueologico muy alta sencibilidad
+- `sit:arqueologico_areas_interes_2026` — Áreas de Interés por potencial Arquelógico 2026
+- `sit:arqueologico_sitios_2026` — Sitios Arqueológicos 2026
+- `sit:bancos` — Bancos
+- `sit:bibliotecas` — Bibliotecas
+- `sit:bicicleteada` — Bicicleteada
+- `sit:cajeros_atm` — Cajeros Automáticos (ATM)
+- `sit:camarasseguridad` — Camaras de Seguridad Ciudadana
+- `sit:camposdeportivos` — Campos Deportivos
+- `sit:cementerios` — cementerios
+- `sit:centrosdesarrollosocial` — CentrosDesSocial
+- `sit:centrosinfantiles` — Centros Infantiles Municipales
+- `sit:centrosreligiosos` — Centros Religiosos
+- `sit:CentrosVacunacion` — Centros de Vacunacion
+- `sit:cines` — Cines
+- `sit:clustersfinancieros` — ClusterFinanciero
+- `sit:computopresi2020` — Municipio computo elecciones2020
+- `sit:contenedoresbasura` — Contenedores de Basura
+- `sit:creditobisa_lineas` — SIM Credito BISA lineas
+- `sit:creditobisa_poligonos` — SIM Credito BISA poligonos
+- `sit:creditobisa_puntos` — SIM Credito BISA puntos
+- `sit:distribucionoxigeno` — Distribucion de Oxigeno
+- `sit:distritos2016` — Distritos Municipales 2016
+- `sit:distritos_nrocasos` — Distritos numero de casos
+- `sit:edificios` — Edificios
+- `sit:educacion_smecc` — Educacion Publica (SMECC)
+- `sit:educacionprivada` — educacion privada
+- `sit:educacionpublica` — educacion publica
+- `sit:educacionsuperior` — EducacionSuperior
+- `sit:embajadas` — Embajadas
+- `sit:entidadesfinancieras` — Entidades Financieras
+- `sit:equipamientoareas` — Areas de equipamiento
+- `sit:equipHampaturi` — Equipamiento Hampaturi
+- `sit:equipZongo` — Equipamiento Zongo
+- `sit:estacionesservicio` — Estaciones de servicios
+- `sit:estacionesteleferico` — Estaciones Teleferico
+- `sit:farmacias` — farmacias
+- `sit:farmacias_smde` — Farmacias SMDE
+- `sit:hidrantes` — Hidrantes
+- `sit:hoteleshostales` — Hoteles y Hostales
+- `sit:institucional` — InstitucionalGAMLP
+- `sit:laboratorioscovid` — Laboratorios Covid
+- `sit:lineasteleferico` — Líneas Teleférico
+- `sit:lusu_arqueologico` — Patrimonio Arqueológico Subsuelo
+- `sit:lusu_conjuntospat` — LUSU Conjuntos Patrimoniales
+- `sit:lusu_ejeteleferico` — LUSU Eje Teleferico
+- `sit:lusu_pem` — LUSU Patron Especial Mirador
+- `sit:lusu_prediospat` — LUSU Predios Patrimoniales
+- `sit:lusu_restriccionpem` — Restriccion Patron Especial Mirador
+- `sit:lusu_restricciontelef` — Restricción Construcción Teleférico
+- `sit:lusu_restriccrespre` — Restriccion Residencia Presidencial
+- `sit:lusu_teleferico2` — LUSU Líneas Teleférico
+- `sit:lusu_vigente` — LUSU Patrones
+- `sit:macrodistritos_nrocasos` — macrodistrito_nro_casos
+- `sit:manzanas` — Manzanas ciudad de La Paz
+- `sit:medioscomunicacion` — Medios de Comunicacion
+- `sit:mercados` — mercados
+- `sit:mercadosmoviles` — Mercados Moviles
+- `sit:mgr_brigadas` — mgr_brigadas
+- `sit:mgr_distritos` — mgr_resumen_distritos
+- `sit:mgr_macrodistrito` — mgr_resumen_macrodistrito
+- `sit:mgr_puntosencuentro` — mgr_puntosencuentro
+- `sit:mgr_resumen_mlp` — mgr_resumen_mlp
+- `sit:mgr_resumen_mlp_fechas` — mgr_resumen_mlp_fechas
+- `sit:mgr_zonas` — mgr_resumen_zonas
+- `sit:miradores` — miradores
+- `sit:modulospoliciales` — modulos policiales
+- `sit:museos` — museos
+- `sit:numeropuertas` — Numero Puertas
+- `sit:nv_poligonos` — Planimetrias No validadas (poligonos)
+- `sit:otbdpe` — OTBs Urbano
+- `sit:otbrural` — OTBs Rurales
+- `sit:otbs_poa` — OTBs POA SIM
+- `sit:oxigenoterapia` — oxigenoterapia
+- `sit:paradaspumakatari` — Paradas Pumakatari
+- `sit:paradaspumakatari2021` — Paradas Pumakatari 2021
+- `sit:patrimonio_estilocartilla` — Estilo cartilla en predios patrimoniales
+- `sit:permisosconstruccion` — Permisos construcción
+- `sit:pl_lineas` — Planimetria linea
+- `sit:pl_poligonos` — Planimetria Polígonos
+- `sit:pl_texto` — Texto Planimetrias
+- `sit:plataformassitram` — PlataformasSitram
+- `sit:plazasparques` — plazas parques
+- `sit:plazasparques_sit` — Plazas y Parques SITv2
+- `sit:publicidadurbana` — Publicidad Urbana Corporativa
+- `sit:puentes` — Puentes, tuneles, pasos a nivel
+- `sit:puntosdiapeaton` — Puntos Dia del Peaton
+- `sit:puntosverdes` — Medio ambiente puntos verdes
+- `sit:redistritacion` — Redistritacion Ley Municipal 166/2016
+- `sit:reporteCasosRed114` — Reporte de Casos Red 114
+- `sit:restaurantes` — Restaurantes
+- `sit:riesgo_riesgos2025opt` — Riesgos 2025
+- `sit:riosrural` — Hidrografia Zona Rural
+- `sit:riosurbano` — Rios urbano
+- `sit:rutas_recoleccion_basura_atencion` — Atencion y control de residuos
+- `sit:rutas_recoleccion_basura_lpl` — Rutas de recoleccion de basura LPL
+- `sit:rutas_recoleccion_basura_selec` — Rutas de recoleccion de basura mayor
+- `sit:rutasfumigacion` — rutasfumigacion
+- `sit:rutaspeaton` — Rutas Dia del Peaton
+- `sit:rutaspumakatari` — Rutas Pumakatari
+- `sit:rutaspumakatari2021` — Rutas Pumakatari 2021
+- `sit:salud` — salud
+- `sit:saludsiis` — Establecimientos de Salud SIIS
+- `sit:sedes_establsalud` — Establecimientos de Salud SEDES
+- `sit:sedes_redsalud` — Red de Salud La Paz
+- `sit:sedes_redsalud2016` — Red de Salud 2016
+- `sit:servicioshigienicos` — Servicios Higienicos Municipales
+- `sit:sim_proyectos2023_puntos2` — sim_proyectos2023_puntos_2
+- `sit:sim_proyectos_p` — SIM Proyectos
+- `sit:sim_proyectos_puntos` — Proyectos SIM
+- `sit:sitiosturisticos` — Sitiosde Interes Turisticos
+- `sit:smc_arqueologico` — Areas de interes arqueologico
+- `sit:supermercados` — SuperMercados
+- `sit:toponimia` — Toponimia
+- `sit:toponimia2` — Toponimia
+- `sit:tramitesterritoriales` — Tramites territoriales
+- `sit:ubicacionvias2` — Localización de vias
+- `sit:vias` — Estructura vial
+- `sit:zonas_nrocasos` — Zonas segun numero de casos
+- `sit:zonas_seguras_ae` — Zonas Seguras AE
+- `sit:zonasgu2016` — Zonas Guia Urbana
+- `sit:zonasgu2016_label` — Etiquetas zonas guia urbana
+- `sit:zonasref` — zonas_gu2016

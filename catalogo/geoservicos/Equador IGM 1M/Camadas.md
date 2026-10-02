@@ -1,0 +1,73 @@
+# Instituto Geográfico Militar — IGM — IGM 1M — camadas
+
+Geoportal: [[Geosserviços/Equador IGM 1M/Instituto Geográfico Militar — IGM — IGM 1M|Instituto Geográfico Militar — IGM — IGM 1M]]
+
+Total: **68** camadas WFS.
+- `igm:aeropuertos` — aeropuertos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:aeropuertos_anterior` — aeropuertos_anterior · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:america_del_sur_a` — america_del_sur_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:america_sur_central_a` — América del Sur / Central · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:ferrocarril` — Ferrocarril · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:islas` — Islas · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:lago_laguna` — Lago / Laguna · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:lim_costanero` — Linea de Costa · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:limite` — Límite Internacional 2012 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:limite_maritimo_l` — limite_maritimo_l · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:limite_provincial_a_2023` — limite_provincial_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:limite_provincial_l_2023` — limite_provincial_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:mar_a` — Mar · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:pista_aterrizaje_p` — pista_aterrizaje_p · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:poblados` — poblados · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:poblados_tematica` — Capitales Provinciales · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:provincias` — provincias · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:represas` — Represas · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:rio_doble` — Rio Doble · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:rio_doble_tematica` — Río (área) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:rio_torrente` — Rio Torrente · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:rio_torrente_tematica` — Río (línea) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:rodera_l_ojo` — Rodera · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:rodera_l_tematica` — Rodera · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:sendero_l_OJO` — Sendero · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:sendero_l_tematica` — Sendero · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:vias` — vias · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:vias_tematica_atrac_cult_nat_l` — Red Vial Ecuador · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:zona_edificada_a` — zona_edificada_a · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:zona_edificada_a_republica_ecuador` — Capital de la Repúbliica del Ecuador · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `igm:zona_edificada_a_tematica` — Capitales principales · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `nacional_2024:acantilado_l_2024` — acantilado_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:aeropuerto_p_2024` — aeropuerto_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:america_del_sur_a_2024` — america_del_sur_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:area_plataforma_continental_l_2024` — area_plataforma_continental_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:curva_nivel_l_2024` — curva_nivel_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:embalse_a_2024` — embalse_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:faro_p_2024` — faro_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:ferrocarril_l_2024` — ferrocarril_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:frontera_internacional_maritima_l_2024` — frontera_internacional_maritima_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:hito_p_2024` — hito_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:isla_a_2024` — isla_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:lago_laguna_a_2024` — lago_laguna_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:limite_administrativo_l_2024` — limite_administrativo_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:limite_nieve_a_2024` — limite_nieve_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:limite_provincial_l_2024` — limite_provincial_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:linea_base_l_2024` — linea_base_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:linea_costa_l_2024` — linea_costa_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:mar_territorial_a_2024` — mar_territorial_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:nombre_geografico_l` — nombre_geografico_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:nombre_geografico_p_2024` — nombre_geografico_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:ORGANIZACION_TERRITORIAL_PROVINCIAL` — limite_provincial_a_2024 · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:pista_aterrizaje_p_2024` — pista_aterrizaje_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:poblado_p_2024` — poblado_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:puente_l_2024` — puente_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:puerto_p_2024` — puerto_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:punto_acotado_p_2024` — punto_acotado_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:punto_desvanecido_p_2024` — punto_desvanecido_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:rio_a_2024` — rio_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:rio_l_2024` — rio_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:roca_p_2024` — roca_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:rodera_l_2024` — rodera_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:sendero_l_2024` — sendero_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:tuberia_l_2024` — tuberia_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:via_ruta_l_2024` — via_ruta_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:zona_contigua_a_2024` — zona_contigua_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:zona_economica_exclusiva_a_2024` — zona_economica_exclusiva_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `nacional_2024:zona_edificada_a_2024` — zona_edificada_a · CRS: `urn:ogc:def:crs:EPSG::32717`

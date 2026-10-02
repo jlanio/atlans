@@ -1,0 +1,68 @@
+# ---------- Base ----------
+FROM node:24-alpine AS base
+WORKDIR /app
+# NEXT_TELEMETRY_DISABLED: o `next build` e o `next dev` mandam telemetria de
+# uso à Vercel por padrão; nenhum build deste repositório a manda.
+ENV CI=true \
+    NPM_CONFIG_LOGLEVEL=info \
+    NPM_CONFIG_FUND=false \
+    NPM_CONFIG_AUDIT=false \
+    NPM_CONFIG_PROGRESS=false \
+    NEXT_TELEMETRY_DISABLED=1
+# Se precisa de libs nativas: descomente
+# RUN apk add --no-cache libc6-compat python3 make g++
+
+# ---------- DEV (hot-reload) ----------
+FROM base AS dev
+# O .npmrc vai junto: é ele que desliga os scripts de instalação dos pacotes
+# (ignore-scripts) — sem ele aqui, o build da imagem os rodaria.
+COPY package*.json .npmrc ./
+# npm install (em vez de npm ci) para aceitar novos pacotes sem regenerar lockfile no host
+RUN echo ">> npm install (dev)..." && npm install
+COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+# ---------- DEPS para build ----------
+FROM base AS deps
+COPY package*.json .npmrc ./
+RUN echo ">> npm ci (deps)..." && npm ci
+
+# ---------- BUILD (produção) ----------
+FROM base AS builder
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+# `public/` é opcional para o Next, mas o estágio runner copia o diretório
+# inteiro: garante que ele exista mesmo sem nenhum arquivo estático no repo.
+RUN mkdir -p public
+RUN echo ">> npm run build..." && npm run build
+
+# ---------- RUNNER (produção) ----------
+# `output: "standalone"` (next.config.ts) faz o build gerar `.next/standalone`:
+# o `server.js` e SÓ os módulos que ele importa, resolvidos por file tracing.
+# É isso que entra na imagem — e nada mais.
+#
+# A versão anterior copiava `.next` INTEIRO, e `.next/cache` (o cache do
+# webpack, ~1,4 GB) ia junto para produção sem nunca ser lido. Depois rodava
+# um segundo `npm ci --omit=dev`, que por vir DEPOIS do COPY do `.next` nunca
+# acertava o cache de camada. O tarball da imagem tinha 731 MB; as duas imagens
+# no servidor somavam 7,5 GB.
+FROM node:24-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production \
+    HOSTNAME=0.0.0.0 \
+    PORT=3000 \
+    NEXT_TELEMETRY_DISABLED=1
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+# A licenca do Atlans e os avisos de terceiros vao com a imagem (a AGPL pede a
+# licenca junto de cada copia). Vem do contexto nomeado `raiz` (a raiz do
+# repositorio): `additional_contexts` no compose, `build-contexts: raiz=.` no
+# docker/build-push-action, `--build-context raiz=.` num `docker build` dado
+# na raiz do repositorio (o comando esta no .env.example).
+COPY --from=raiz LICENSE THIRD-PARTY-NOTICES.md ./
+USER nextjs
+EXPOSE 3000
+CMD ["node", "server.js"]

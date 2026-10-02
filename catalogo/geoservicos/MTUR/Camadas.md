@@ -1,0 +1,74 @@
+# MTUR — camadas
+
+Geoportal: [[Geosserviços/MTUR/Ministério do Turismo — MTUR|Ministério do Turismo — MTUR]]
+
+Total: **67** camadas, organizadas em 1 grupo(s).
+
+## MTU (67)
+- `MTU:apoio_nautico_estruturas_se` — Turismo Náutico: Estruturas de Apoio Náutico - Região Sudeste
+- `MTU:apoio_nautico_estruturas_sul` — Turismo Náutico: Estruturas de Apoio Náutico - Região Sul
+- `MTU:area_estudo_pem_se` — Turismo Náutico: Base Cartográfica de Apoio: Área de Estudo - Região Sudeste
+- `MTU:area_piloto_pem_sul` — Turismo Náutico: Base Cartográfica de Apoio: Área de Estudo - Região Sul
+- `MTU:ataque_tubarao_se` — Ataques de Tubarão  - Região Sudeste
+- `MTU:ataque_tubarao_sul` — Ataques de Tubarão  - Região Sul
+- `MTU:atividades_esportivas_se` — Turismo Náutico: Atividades Esportivas - Região Sudeste
+- `MTU:atividades_esportivas_sul` — Turismo Náutico: Atividades Esportivas - Região Sul
+- `MTU:est_kde_2018` — Turismo Praia: KDE Estabelecimentos RAIS 2018 - Região Sul/Sudeste
+- `MTU:est_kde_2018_lin` — Turismo Praia: KDE Estabelecimentos RAIS 2018 - Região Sul/Sudeste
+- `MTU:est_kde_2022` — Turismo Praia: KDE Estabelecimentos RAIS 2022 - Região Sul/Sudeste
+- `MTU:est_kde_2022_lin` — Turismo Praia: KDE Estabelecimentos RAIS 2022 - Região Sul/Sudeste
+- `MTU:eventos_nauticos_se_pol` — Turismo Náutico: Eventos Náuticos - Região Sudeste
+- `MTU:eventos_nauticos_se_pto` — Turismo Náutico: Eventos Náuticos - Região Sudeste
+- `MTU:eventos_nauticos_sul` — Turismo Náutico: Eventos Náuticos - Região Sul
+- `MTU:eventos_nauticos_trajetos_se` — Turismo Náutico: Trajetos de Eventos Náuticos - Região Sudeste
+- `MTU:eventos_nauticos_trajetos_sul` — Turismo Náutico: Trajetos de Eventos Náuticos - Região Sul
+- `MTU:fundeadores_cruzeiros_se` — Turismo Náutico: Atracagem e Ancoragem de Navios de Cruzeiro - Região Sudeste
+- `MTU:fundeadouros_cruzeiros_sul` — Turismo Náutico: Atracagem e Ancoragem de Navios de Cruzeiro - Região Sul
+- `MTU:fundeadouros_se` — Apoio Náutico: Fundeadouros - Região Sudeste
+- `MTU:fundeadouros_sul` — Apoio Náutico: Fundeadouros - Região Sul
+- `MTU:ind_massa_sal_kde_2018` — Turismo Praia: KDE Indicador Econômico - Massa Salarial - RAIS 2018 - Região Sul/Sudeste
+- `MTU:ind_massa_sal_kde_2018_lin` — Turismo Praia: KDE Indicador Econômico - Massa Salarial - RAIS 2018 - Região Sul/Sudeste
+- `MTU:ind_massa_sal_kde_2022` — Turismo Praia: KDE Indicador Econômico - Massa Salarial - RAIS 2022 - Região Sul/Sudeste
+- `MTU:ind_massa_sal_kde_2022_lin` — Turismo Praia: KDE Indicador Econômico - Massa Salarial - RAIS 2022 - Região Sul/Sudeste
+- `MTU:linha_costa_carta_sao_santos_campos_espsanto` — Turismo Náutico: Base Cartográfica de Apoio: Linha de Costa - Região Sudeste
+- `MTU:linha_costa_carta_sao_santos_pelotas` — Turismo Náutico: Base Cartográfica de Apoio: Linha de Costa - Região Sul
+- `MTU:mergulho_se` — Pontos de Prática de Mergulho - Região Sudeste
+- `MTU:mergulho_sul` — Pontos de Prática de Mergulho - Região Sul
+- `MTU:monitoramento_baln_se` — Turismo de Praia: Pontos de Monitoramento de Balneabilidade - Região Sudeste
+- `MTU:monitoramento_baln_sul` — Turismo de Praia: Pontos de Monitoramento de Balneabilidade - Região Sul
+- `MTU:naufragios_hist_se` — Naufrágios históricos no sudeste do Brasil
+- `MTU:naufragios_hist_sul` — Naufrágios históricos no sul do Brasil
+- `MTU:observacao_fauna_se` — Pontos Notáveis de Observação de Fauna - Região Sudeste
+- `MTU:observacao_fauna_sul` — Pontos Notáveis de Observação de Fauna - Região Sul
+- `MTU:operadoras_mergulho_se` — Operadoras de Mergulho - Região Sudeste
+- `MTU:operadoras_mergulho_sul` — Operadoras de Mergulho - Região Sul
+- `MTU:patrimonio_historico_cultural_marinho_se` — Patrimônio Histórico e Cultural Marinho - Região Sudeste
+- `MTU:patrimonio_historico_cultural_marinho_se_pol` — Patrimônio Histórico e Cultural Marinho - Imaterial - Região Sudeste
+- `MTU:patrimonio_historico_cultural_marinho_sul` — Patrimônio Histórico e Cultural Marinho - Região Sul
+- `MTU:patrimonio_historico_cultural_marinho_sul_pol` — Patrimônio Histórico e Cultural Marinho - Imaterial - Região Sul
+- `MTU:portos_se` — Turismo Náutico: Instalações Portuárias - Região Sudeste
+- `MTU:portos_sul` — Turismo Náutico: Instalações Portuárias - Região Sul
+- `MTU:rais_estabelecimentos_2018_ponto` — Turismo de Praia: RAIS Estabelecimentos 2018 - Região Sul/Sudeste
+- `MTU:rais_estabelecimentos_2022_ponto` — Turismo de Praia: RAIS Estabelecimentos 2022 - Região Sul/Sudeste
+- `MTU:rais_ind_vinculos_2018_se_kernel_lin` — rais_ind_vinculos_2018_se_kernel_lin
+- `MTU:rais_indicadores_2018_ponto` — Turismo de Praia: RAIS Indicadores 2018 - Região Sul/Sudeste
+- `MTU:rais_indicadores_2022_ponto` — Turismo de Praia: RAIS Indicadores 2022 - Região Sul/Sudeste
+- `MTU:recifes_artificiais_pol` — Recifes Artificiais - Região Sul
+- `MTU:recifes_artificiais_se_pnt` — Recifes Artificiais - Região Sudeste - pnt
+- `MTU:recifes_artificiais_se_pol` — Recifes Artificiais - Região Sudeste - pol
+- `MTU:rotas_cabotagem_se` — Turismo Náutico: Rotas de Cabotagem - Região Sudeste
+- `MTU:rotas_cabotagem_sul` — Turismo Náutico: Rotas de Cabotagem - Região Sul
+- `MTU:rotas_cruzeiros_se` — Turismo Náutico: Rotas de Navios de Cruzeiro - Região Sudeste
+- `MTU:rotas_cruzeiros_sul` — Turismo Náutico: Rotas de Navios de Cruzeiro - Região Sul
+- `MTU:salva_vidas_se` — Turismo de Praia: Guaritas de Salva-Vidas - Região Sudeste
+- `MTU:salva_vidas_sul` — Turismo de Praia: Guaritas de Salva-Vidas - Região Sul
+- `MTU:sitios_arqueologicos_se` — Sítios Arqeológicos - Região Sudeste
+- `MTU:sitios_arqueologicos_sul` — Sítios Arqeológicos - Região Sul
+- `MTU:turismo_nautico_recreio_sul` — Turismo Náutico: Recreio Náutico - Região Sul
+- `MTU:turismo_nautico_se` — Turismo Náutico: Recreio Náutico - Região Sudeste
+- `MTU:turismo_praia_se` — Turismo de Praia - Região Sudeste
+- `MTU:turismo_praia_sul` — Turismo de Praia - Região Sul
+- `MTU:vista_panoramica_interesse_se` — Pontos Notáveis: Vista Panorâmica: Interesse Público - Região Sudeste
+- `MTU:vista_panoramica_interesse_sul` — Pontos Notáveis: Vista Panorâmica: Interesse Público - Região Sul
+- `MTU:vista_panoramica_se` — Pontos Notáveis: Vista Panorâmica - Região Sudeste
+- `MTU:vista_panoramica_sul` — Pontos Notáveis: Vista Panorâmica - Região Sul

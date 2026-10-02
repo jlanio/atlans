@@ -1,0 +1,78 @@
+# ── Stage 1: builder — instala dependências de compilação ────────────────────
+# Pina debian bookworm (OpenSSL 3.0, libffi 8) — requerido por cryptography>=42
+# (cryptography 46.0.5 em requirements.in). Antes era `python:3.10-slim` sem
+# tag debian, que pode rotear para bullseye e quebrar build no futuro.
+#
+# Python 3.12: o 3.10 sai de suporte em out/2026. A mesma versão do
+# Dockerfile.executor, do setup-python do CI, do runtime do app desktop
+# (desktop/python-runtime.json) e do .python-version (com ela o Dependabot
+# resolve as dependências) — subir aqui exige subir em todos.
+FROM python:3.12-slim-bookworm AS builder
+
+WORKDIR /build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq-dev gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# O requirements.txt é o LOCK (gerado do requirements.in por
+# scripts/travar_python.py): todas as dependências, diretas e transitivas, com o
+# hash de cada arquivo. `--require-hashes`: um arquivo diferente do revisado —
+# trocado no PyPI ou no caminho — não instala, e nada entra no build sem ter
+# passado por um PR. `--only-binary=:all:`: nenhum setup.py roda aqui (build de
+# sdist executa código do pacote); todas as 117 têm wheel para o bookworm.
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --require-hashes --only-binary=:all: --prefix=/install -r requirements.txt
+
+# ── Stage 2: runtime — imagem limpa sem compiladores ─────────────────────────
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+# Apenas runtime libs (libpq5 para psycopg2, sem gcc/headers)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 appuser
+
+# Copia pacotes Python compilados do builder
+COPY --from=builder /install /usr/local
+
+# Copia código da aplicação
+COPY app ./app
+COPY flow ./flow
+
+# Migrations Alembic — disponiveis no container para rodar manualmente:
+#   docker compose exec api-prod alembic upgrade head
+# ENTRYPOINT automatico foi removido em 2026-05 — ha um ciclo nas revisoes
+# que precisa ser resolvido antes de reativar (ver docs/operations.md).
+COPY alembic ./alembic
+COPY alembic.ini ./alembic.ini
+
+# O corpo da migração base-zero (20260924_0001) é LIDO EM RUNTIME de
+# scripts/init_schema.sql (`_RAIZ / "scripts" / "init_schema.sql"`). Sem esta
+# cópia, qualquer `alembic upgrade head` na imagem — banco novo, ou um deploy
+# que aplique as migrações sozinho num banco vazio — morre em FileNotFoundError
+# antes de criar o schema; em produção carimbada ninguém percebe porque o
+# upgrade nunca roda. Só o .sql: o resto de scripts/ é ferramenta de operador
+# (step-ca, bootstrap, smoke) e não pertence à imagem.
+COPY scripts/init_schema.sql ./scripts/init_schema.sql
+
+# Scripts publicos servidos via endpoints (ex.: static/install.sh em /executores/install)
+COPY static ./static
+
+# Catálogo de fontes (a cópia versionada do Vault de geosserviços). A API o
+# importa na subida (FONTES_CATALOGO_DIR, ver docs/fontes.md); sem esta cópia a
+# importação não roda em produção e o assistente fica sem catálogo.
+COPY catalogo ./catalogo
+
+# A licença do Atlans e os avisos de terceiros vão com a imagem: quem a
+# distribui distribui junto o que vai dentro dela.
+COPY LICENSE THIRD-PARTY-NOTICES.md ./
+
+RUN chown -R appuser:appuser /app
+USER appuser
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--ws", "websockets", "--ws-max-size", "16777216"]

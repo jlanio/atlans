@@ -1,0 +1,269 @@
+import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import type { IConversaResumo } from "@/service/types"
+
+/**
+ * O painel "Meu → Chats" (os "Recentes"): a linha de cada conversa, a ativa, o
+ * menu ⋯ (renomear/apagar), os estados da lista e os diálogos na paleta da
+ * Home. O hook de dados é um dublê controlável; o menu é passthrough (sem
+ * portal/pointer do Radix), então os itens ficam diretamente clicáveis.
+ */
+
+const H = vi.hoisted(() => ({
+  hook: {
+    conversas: [] as IConversaResumo[],
+    carregando: false, atualizando: false, jaCarregou: true, erro: null as string | null,
+    total: 0, carregandoMais: false,
+    recarregar: vi.fn(), carregarMais: vi.fn(), tentarDeNovo: vi.fn(), anunciar: vi.fn(),
+    renomear: vi.fn(), apagar: vi.fn(),
+  },
+  toastErro: vi.fn(),
+}))
+
+vi.mock("@/app/hooks/home/useConversas", () => ({ useConversas: () => H.hook }))
+vi.mock("@/utils/createToast", () => ({ createToast: { success: vi.fn(), error: (...a: unknown[]) => H.toastErro(...a) } }))
+// Passthrough do menu: sem portal/pointer, os itens ficam no DOM e clicáveis. O
+// `className` PASSA de propósito — é por ele que os testes de tema (`home-portal`)
+// e de alvo de toque (40px) enxergam o que o componente pediu.
+vi.mock("@/app/components/ui/dropdown-menu", () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div data-testid="menu" className={className}>{children}</div>
+  ),
+  DropdownMenuItem: ({ children, onSelect, className }: { children: React.ReactNode; onSelect?: () => void; className?: string }) => (
+    <button onClick={onSelect} className={className}>{children}</button>
+  ),
+}))
+
+import { SidebarProvider } from "@/app/components/ui/sidebar"
+import { ChatsLista } from "@/app/components/home/chats/lista"
+import { useHomeStore } from "@/app/stores/homeStore"
+
+const conversa = (extra: Partial<IConversaResumo> = {}): IConversaResumo => ({
+  id: "c1", titulo: "Focos em Rondônia", workflow_id: null, tokens_total: 0,
+  created_at: "2026-09-10T12:00:00Z", updated_at: "2026-09-10T12:00:00Z",
+  ...extra,
+})
+
+beforeAll(() => {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (q: string) => ({
+      matches: false, media: q, onchange: null,
+      addEventListener: () => {}, removeEventListener: () => {},
+      addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+    }),
+  })
+})
+
+beforeEach(() => {
+  cleanup()
+  vi.clearAllMocks()
+  Object.assign(H.hook, {
+    conversas: [conversa(), conversa({ id: "c2", titulo: "  " })],
+    carregando: false, atualizando: false, jaCarregou: true, erro: null, total: 2, carregandoMais: false,
+  })
+  useHomeStore.setState({ conversaId: null, painel: "barra", anuncioDeConversa: null })
+})
+
+function montar() {
+  return render(
+    <SidebarProvider>
+      <ChatsLista />
+    </SidebarProvider>,
+  )
+}
+
+const gatilhoDe = (rotulo: string) => screen.getByRole("button", { name: `Ações de "${rotulo}"` })
+
+describe("ChatsLista — a linha", () => {
+  it("lista as conversas; a sem título vira 'Sem título'", () => {
+    montar()
+    expect(screen.getByText("Focos em Rondônia")).toBeTruthy()
+    expect(screen.getByText("Sem título")).toBeTruthy()
+  })
+
+  it("o principal ocupa o espaço que existe e trunca — o ⋯ é irmão no flex, nunca por cima", () => {
+    // O defeito que isto tranca: o título em `nowrap` num `<button>` sem
+    // largura transbordava a linha inteira até a borda da barra, sem truncar;
+    // e o ⋯ `absolute` com `pr-7` reservado à mão tinha folga zero.
+    montar()
+    const botao = screen.getByTitle("Focos em Rondônia")
+    for (const c of ["min-w-0", "flex-1", "text-left"]) expect(botao.className).toContain(c)
+    expect(botao.querySelector("span")!.className).toContain("truncate")
+
+    // O mock do menu envolve o gatilho num <div>; no DOM real o Radix não põe
+    // wrapper. O que importa: os dois vivem na MESMA linha flex.
+    const gatilho = gatilhoDe("Focos em Rondônia")
+    const linha = botao.closest('[data-slot="linha-do-meu"]')!
+    expect(gatilho.closest('[data-slot="linha-do-meu"]')).toBe(linha)
+    expect(linha.className).toContain("flex")
+    expect(gatilho.className).not.toMatch(/\babsolute\b/)
+    expect(botao.className).not.toMatch(/\bpr-7\b/)
+  })
+
+  it("a ativa é anunciada por aria-current e pintada pela linha; clicar noutra seleciona e abre o painel", () => {
+    useHomeStore.setState({ conversaId: "c1" })
+    montar()
+    const ativa = screen.getByTitle("Focos em Rondônia")
+    expect(ativa.getAttribute("aria-current")).toBe("true")
+    expect(ativa.parentElement!.getAttribute("data-active")).toBe("true")
+    const outra = screen.getByTitle("Sem título")
+    expect(outra.hasAttribute("aria-current")).toBe(false)
+
+    fireEvent.click(outra)
+    expect(useHomeStore.getState().conversaId).toBe("c2")
+    expect(useHomeStore.getState().painel).toBe("aberto")
+  })
+
+  it("o menu herda a paleta da Home e seus itens têm alvo de 40px", () => {
+    montar()
+    const menu = screen.getAllByTestId("menu")[0]
+    expect(menu.className).toContain("home-portal")
+    for (const rotulo of ["Renomear", "Apagar"]) {
+      expect(within(menu).getByText(rotulo).className).toContain("max-md:min-h-10")
+    }
+  })
+})
+
+describe("ChatsLista — estados", () => {
+  it("esqueleto na 1ª carga", () => {
+    Object.assign(H.hook, { conversas: [], carregando: true, jaCarregou: false })
+    montar()
+    expect(screen.getByRole("status", { name: "Carregando as conversas" })).toBeTruthy()
+  })
+
+  it("erro de 1ª carga oferece 'Tentar de novo'", () => {
+    Object.assign(H.hook, { conversas: [], erro: "Não foi possível carregar as conversas.", jaCarregou: false })
+    montar()
+    expect(screen.getByRole("alert")).toBeTruthy()
+    fireEvent.click(screen.getByText("Tentar de novo"))
+    expect(H.hook.recarregar).toHaveBeenCalled()
+  })
+
+  it("lista vazia", () => {
+    Object.assign(H.hook, { conversas: [], total: 0 })
+    montar()
+    expect(screen.getByText("Nenhuma conversa ainda.")).toBeTruthy()
+  })
+
+  it("diz quantas o servidor tem e 'Ver mais' pede a página seguinte", () => {
+    Object.assign(H.hook, { total: 300 })
+    montar()
+    expect(screen.getByText(/mostrando 2 de 300/)).toBeTruthy()
+    fireEvent.click(screen.getByText("Ver mais"))
+    expect(H.hook.carregarMais).toHaveBeenCalled()
+  })
+
+  it("recarga que falha com a lista na tela vira o aviso do rodapé, não o bloco de erro", () => {
+    Object.assign(H.hook, { erro: "Não foi possível atualizar as conversas.", jaCarregou: true })
+    montar()
+    expect(screen.getByText("Focos em Rondônia")).toBeTruthy()
+    expect(screen.queryByRole("alert")).toBeNull()
+    expect(screen.getByText(/Não foi possível atualizar as conversas/)).toBeTruthy()
+  })
+
+  it("o 'Tentar de novo' do rodapé refaz o que FALHOU, não a lista inteira", () => {
+    // Depois de um "Ver mais" que caiu, recarregar tudo custava N GETs, não
+    // trazia a página que faltava e ainda devolvia a lista ao teto de 100.
+    Object.assign(H.hook, { erro: "Não foi possível carregar mais conversas.", jaCarregou: true })
+    montar()
+    fireEvent.click(within(screen.getByRole("status")).getByText("Tentar de novo"))
+    expect(H.hook.tentarDeNovo).toHaveBeenCalledTimes(1)
+    expect(H.hook.recarregar).not.toHaveBeenCalled()
+  })
+})
+
+describe("ChatsLista — renomear e apagar", () => {
+  it("Renomear abre o diálogo com o título atual, na paleta da Home", async () => {
+    montar()
+    fireEvent.click(within(screen.getAllByTestId("menu")[0]).getByText("Renomear"))
+    expect(await screen.findByDisplayValue("Focos em Rondônia")).toBeTruthy()
+    expect(document.querySelector('[data-slot="dialog-content"]')!.className).toContain("home-portal")
+  })
+
+  it("Apagar abre o DeleteDialog na paleta da Home; a falha vira toast", async () => {
+    // O `DeleteDialog` é compartilhado pelo app inteiro e nasce sem paleta: a
+    // Home tem de passar `home-portal`, senão ele abria branco sobre #050505.
+    H.hook.apagar.mockResolvedValue({ ok: false, erro: "servidor fora" })
+    montar()
+    fireEvent.click(within(screen.getAllByTestId("menu")[0]).getByText("Apagar"))
+    const dialogo = await screen.findByRole("dialog")
+    expect(within(dialogo).getByText("Apagar conversa")).toBeTruthy()
+    expect(dialogo.className).toContain("home-portal")
+
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Apagar" }))
+    await waitFor(() => expect(H.hook.apagar).toHaveBeenCalledWith("c1"))
+    await waitFor(() => expect(H.toastErro).toHaveBeenCalledWith("Não foi possível apagar a conversa", "servidor fora"))
+  })
+})
+
+describe("ChatsLista — o anúncio do stream chega à lista", () => {
+  const anuncio = { id: "c9", titulo: "Nova conversa", nova: true }
+
+  it("um anúncio depois de montar vai ao hook — é assim que a conversa nova entra sem F5", () => {
+    montar()
+    act(() => { useHomeStore.getState().anunciarConversa(anuncio) })
+    expect(H.hook.anunciar).toHaveBeenCalledTimes(1)
+    expect(H.hook.anunciar).toHaveBeenCalledWith(anuncio)
+  })
+
+  it("o que já estava na store ao montar é passado — a carga de montagem traz a verdade", () => {
+    // No telefone a lista remonta a cada abertura da gaveta; reaplicar um
+    // anúncio antigo sobre a lista recém-carregada seria trabalho em dobro.
+    useHomeStore.getState().anunciarConversa(anuncio)
+    montar()
+    expect(H.hook.anunciar).not.toHaveBeenCalled()
+  })
+
+  it("com uma carga em voo o anúncio espera, e é aplicado quando ela acaba", () => {
+    // A resposta da carga SUBSTITUI a lista: aplicado no meio, o anúncio sumia.
+    Object.assign(H.hook, { carregando: true, jaCarregou: false, conversas: [] })
+    const { rerender } = montar()
+    act(() => { useHomeStore.getState().anunciarConversa(anuncio) })
+    expect(H.hook.anunciar).not.toHaveBeenCalled()
+
+    Object.assign(H.hook, { carregando: false, jaCarregou: true, conversas: [conversa()] })
+    rerender(<SidebarProvider><ChatsLista /></SidebarProvider>)
+    expect(H.hook.anunciar).toHaveBeenCalledWith(anuncio)
+  })
+})
+
+describe("ChatsLista — apagar a conversa ativa", () => {
+  /** Apaga "c1" pelo menu e espera o diálogo fechar (o desfecho já foi aplicado). */
+  async function apagarPrimeira() {
+    fireEvent.click(within(screen.getAllByTestId("menu")[0]).getByText("Apagar"))
+    const dialogo = await screen.findByRole("dialog")
+    fireEvent.click(within(dialogo).getByRole("button", { name: "Apagar" }))
+    await waitFor(() => expect(H.hook.apagar).toHaveBeenCalledWith("c1"))
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+  }
+
+  it("apagar a ATIVA limpa a seleção — a Home fica como no botão 'Nova conversa'", async () => {
+    // Sem isto o painel seguia mostrando a conversa morta e a mensagem
+    // seguinte ia com o id apagado: 404.
+    H.hook.apagar.mockResolvedValue({ ok: true })
+    useHomeStore.setState({ conversaId: "c1" })
+    montar()
+    await apagarPrimeira()
+    expect(useHomeStore.getState().conversaId).toBeNull()
+  })
+
+  it("apagar OUTRA não mexe na seleção", async () => {
+    H.hook.apagar.mockResolvedValue({ ok: true })
+    useHomeStore.setState({ conversaId: "c2" })
+    montar()
+    await apagarPrimeira()
+    expect(useHomeStore.getState().conversaId).toBe("c2")
+  })
+
+  it("a exclusão que falha deixa a seleção como estava", async () => {
+    H.hook.apagar.mockResolvedValue({ ok: false, erro: "servidor fora" })
+    useHomeStore.setState({ conversaId: "c1" })
+    montar()
+    await apagarPrimeira()
+    expect(H.toastErro).toHaveBeenCalled()
+    expect(useHomeStore.getState().conversaId).toBe("c1")
+  })
+})

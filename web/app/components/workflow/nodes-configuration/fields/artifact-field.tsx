@@ -1,0 +1,112 @@
+import { useState, useEffect } from "react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/ui/select"
+import { Label } from "@/app/components/ui/label"
+import { TbFileImport, TbRefresh, TbInbox } from "react-icons/tb"
+import { useWorkspace } from "@/context/WorkspaceContext"
+import { GisFlowService, IArtifactItem } from "@/service/GisFlowService"
+import { dadoOuAviso } from "@/lib/respostas"
+import type { FieldProps } from "./types"
+
+type ArtifactFieldProps = FieldProps
+
+/** O seletor mostra os mais recentes, não o histórico inteiro: baixar todos os
+ *  artefatos do usuário só para escolher um prendia o modal do nó até a lista
+ *  completa chegar. */
+const LIMITE = 50
+
+const ArtifactField = ({ field, values, setNodeField }: ArtifactFieldProps) => {
+  const { current: workspace } = useWorkspace()
+  const [items, setItems] = useState<IArtifactItem[]>([])
+  const [loading, setLoading] = useState(false)
+  const [truncado, setTruncado] = useState(false)
+  // A lista não chegou: o aviso de "nenhum artefato" seria uma afirmação falsa.
+  const [falhou, setFalhou] = useState(false)
+
+  async function fetchArtifacts() {
+    if (!workspace) return
+    setLoading(true)
+    // O recorte por workspace é do SERVIDOR: filtrar no cliente obrigava a
+    // baixar os artefatos de todos os workspaces do usuário para descartar
+    // quase tudo.
+    const res = await GisFlowService.getArtifacts({
+      workspace_id: workspace.id_hash,
+      limit: LIMITE,
+    })
+    const dados = dadoOuAviso(res, "Erro ao carregar artefatos")
+    const itens = dados?.items ?? []
+    setItems(itens)
+    setTruncado((dados?.total ?? 0) > itens.length)
+    setFalhou(dados === null)
+    setLoading(false)
+  }
+
+  useEffect(() => {
+    fetchArtifacts()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workspace?.id_hash])
+
+  const selected = (values?.[field.name] as string) ?? ""
+
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center justify-between">
+        <Label htmlFor={field.name} className="flex items-center gap-1">
+          <TbFileImport className="h-3.5 w-3.5" />
+          {field.description ?? "Artefato"}
+        </Label>
+        <button
+          type="button"
+          onClick={fetchArtifacts}
+          disabled={loading}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          title="Recarregar lista"
+        >
+          <TbRefresh className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
+        </button>
+      </div>
+
+      <Select
+        value={selected || "__none__"}
+        onValueChange={value => setNodeField(field.name, value === "__none__" ? "" : value)}
+      >
+        <SelectTrigger id={field.name} className="w-full">
+          <SelectValue placeholder={loading ? "Carregando..." : "Selecione um artefato"} />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">
+            <span className="text-muted-foreground">Nenhum artefato</span>
+          </SelectItem>
+          {items.map(art => (
+            <SelectItem key={art.id_hash} value={art.id_hash}>
+              <div className="flex flex-col">
+                <span>{art.filename}</span>
+                <span className="text-xs text-muted-foreground uppercase">
+                  {art.format ?? ""}{art.workflow_name ? ` · ${art.workflow_name}` : ""}
+                </span>
+              </div>
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {truncado && !loading && (
+        <p className="text-xs text-muted-foreground mt-1">
+          Mostrando os {LIMITE} artefatos mais recentes deste workspace.
+        </p>
+      )}
+
+      {items.length === 0 && !loading && (
+        <div className="flex items-start gap-2 mt-1 px-2 py-1.5 rounded-md bg-muted/40">
+          <TbInbox className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0 mt-0.5" />
+          <p className="text-xs text-muted-foreground">
+            {falhou
+              ? "Não foi possível carregar os artefatos deste workspace. Recarregue a lista para tentar de novo."
+              : "Nenhum artefato neste workspace. Execute um workflow com um nó de Saída de Dados (destino Artefatos) para gerá-los."}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default ArtifactField

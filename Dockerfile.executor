@@ -1,0 +1,80 @@
+# Dockerfile.executor
+# Imagem Docker do executor Atlans para distribuição corporativa.
+#
+# Build (o commit do checkout vai sozinho para a versão que o painel mostra):
+#   docker build -f Dockerfile.executor -t atlans-executor:latest .
+#
+# Uso — matrícula (primeira vez, OTP + mTLS): ver executor/README.md
+#   (o onboarding é `python -m executor enroll`)
+#
+# Uso — iniciar o executor:
+#   docker compose -f docker-compose.executor.yml up -d
+
+# Pina debian bookworm (OpenSSL 3.0, libffi 8) — alinhado com Dockerfile.api.
+# Necessario para cryptography>=42 (requirements transitivo via flow/).
+# Python 3.12, o mesmo da API, do CI e do runtime do app desktop.
+FROM python:3.12-slim-bookworm
+
+WORKDIR /app
+
+# PERF: uma thread por biblioteca nativa. numpy/OpenBLAS/GDAL abrem, por padrao,
+# tantas threads quanto ha nucleos — e o executor ja roda ate
+# EXECUTOR_MAX_CONCURRENT jobs simultaneos (padrao 4, ver executor/config.py).
+# Sem este teto sao 4 x N threads disputando N nucleos: em carga numerica a
+# troca de contexto costuma custar mais que o paralelismo rende, deixando o
+# conjunto MAIS lento que single-thread.
+#
+# O paralelismo continua existindo, mas num lugar so: o semaforo de jobs, que e
+# onde ele e configuravel e observavel. Para maquinas dedicadas a poucos jobs
+# grandes, vale medir com EXECUTOR_MAX_CONCURRENT menor e estes valores maiores.
+ENV OMP_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    NUMEXPR_NUM_THREADS=1 \
+    GDAL_NUM_THREADS=1
+
+# Cria usuário não-root
+RUN useradd -m -u 1000 appuser
+
+# Instala dependências Python primeiro (aproveita cache do Docker).
+# O requirements-full.txt é o LOCK do executor (gerado do requirements-full.in
+# por scripts/travar_python.py), com o hash de cada arquivo: `--require-hashes`
+# recusa arquivo diferente do revisado, e nada entra sem ter passado por um PR.
+# `--only-binary=:all:`: nenhum setup.py roda no build — as 65 têm wheel para o
+# bookworm, com GDAL, GEOS e PROJ embutidos (pyogrio, shapely, pyproj). Por
+# isso nada vem do apt: os pacotes -dev, o gdal-bin e o build-essential que
+# ficavam aqui não eram usados (nenhuma extensão os carrega, e nenhum código
+# chama ogr2ogr), e o libgdal do Debian trazia bibliotecas GPL para uma imagem
+# que é distribuída como asset de release.
+COPY executor/requirements-full.txt ./requirements-full.txt
+RUN pip install --no-cache-dir --require-hashes --only-binary=:all: -r requirements-full.txt
+
+# Copia o engine de workflows e o código do executor
+COPY flow/ ./flow/
+COPY executor/ ./executor/
+
+# A licença do Atlans e os avisos de terceiros vão com a imagem, que é
+# distribuída como asset de release.
+COPY LICENSE THIRD-PARTY-NOTICES.md ./
+
+# Versão que o painel mostra (executor/versao.py): a do produto — a mesma do
+# app desktop — mais o commit, lido do próprio checkout: o .dockerignore deixa
+# entrar só .git/HEAD, packed-refs e refs (nada de objetos nem config), e os
+# curingas fazem o COPY passar mesmo sem .git (build de um tarball: sai só a
+# versão do produto). EXECUTOR_COMMIT e EXECUTOR_BASE, se informados, valem
+# mais — o release passa os da tag. Gravada fora da árvore do código, vence o
+# EXECUTOR_VERSION=1.0.0 que as instalações antigas têm no .env.
+COPY desktop/package.json .gi[t]/HEA[D] .gi[t]/packed-ref[s] .gi[t]/ref[s] /tmp/versao/
+ARG EXECUTOR_COMMIT=
+ARG EXECUTOR_BASE=
+RUN python -m executor.versao /tmp/versao /usr/local/share/atlans-executor/VERSAO \
+    && rm -rf /tmp/versao
+
+RUN mkdir -p /data && chown -R appuser:appuser /app /data
+USER appuser
+
+ENV PYTHONUNBUFFERED=1 \
+    LOG_COLOR=auto \
+    LOG_LEVEL=INFO
+
+CMD ["python", "-m", "executor.main"]

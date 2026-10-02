@@ -1,0 +1,76 @@
+import { Edge } from "@xyflow/react"
+
+/**
+ * Travessia do grafo para o realce de caminho.
+ *
+ * Dado um nó âncora, devolve tudo que o alimenta (ancestrais) e tudo que ele
+ * alimenta (descendentes), incluindo as arestas percorridas — o resto do canvas
+ * é esmaecido pela camada CSS.
+ */
+
+export interface FocusGraph {
+  out: Map<string, { edgeId: string; target: string }[]>
+  in: Map<string, { edgeId: string; source: string }[]>
+}
+
+export function buildFocusGraph(edges: Edge[]): FocusGraph {
+  const out: FocusGraph["out"] = new Map()
+  const inn: FocusGraph["in"] = new Map()
+
+  for (const edge of edges) {
+    const outList = out.get(edge.source)
+    if (outList) outList.push({ edgeId: edge.id, target: edge.target })
+    else out.set(edge.source, [{ edgeId: edge.id, target: edge.target }])
+
+    const inList = inn.get(edge.target)
+    if (inList) inList.push({ edgeId: edge.id, source: edge.source })
+    else inn.set(edge.target, [{ edgeId: edge.id, source: edge.source }])
+  }
+
+  return { out, in: inn }
+}
+
+export interface FocusPath {
+  nodes: Set<string>
+  edges: Set<string>
+}
+
+/**
+ * BFS para frente e para trás a partir de `nodeId`. Cada direção tem seu
+ * próprio `visited`, então um nó alcançável pelos dois lados (diamante) entra
+ * uma vez só nos conjuntos, e ciclos não travam a travessia.
+ */
+export function collectPath(graph: FocusGraph, nodeId: string): FocusPath {
+  const nodes = new Set<string>([nodeId])
+  const edges = new Set<string>()
+
+  // Descendentes
+  const forward = [nodeId]
+  const seenForward = new Set<string>([nodeId])
+  while (forward.length) {
+    const id = forward.pop()!
+    for (const { edgeId, target } of graph.out.get(id) ?? []) {
+      edges.add(edgeId)
+      nodes.add(target)
+      if (seenForward.has(target)) continue
+      seenForward.add(target)
+      forward.push(target)
+    }
+  }
+
+  // Ancestrais
+  const backward = [nodeId]
+  const seenBackward = new Set<string>([nodeId])
+  while (backward.length) {
+    const id = backward.pop()!
+    for (const { edgeId, source } of graph.in.get(id) ?? []) {
+      edges.add(edgeId)
+      nodes.add(source)
+      if (seenBackward.has(source)) continue
+      seenBackward.add(source)
+      backward.push(source)
+    }
+  }
+
+  return { nodes, edges }
+}

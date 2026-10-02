@@ -1,0 +1,262 @@
+# U.S. Geological Survey — The National Map — camadas
+
+Geoportal: [[Geosserviços/EUA USGS National Map/U.S. Geological Survey — The National Map|U.S. Geological Survey — The National Map]]
+
+Total: **229** camadas em **7** serviços ArcGIS. Cada camada é acessível por `HttpRequest` com `f=geojson`.
+
+## contours (36)
+- **Serviço:** <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 2000
+- `Contours - Small-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/0>
+- `Continental US Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/1>
+- `Continental US Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/2>
+- `Alaska Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/3>
+- `Alaska Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/4>
+- `Hawaii Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/5>
+- `Hawaii Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/6>
+- `Puerto Rico/VI Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/7>
+- `Puerto Rico/VI Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/8>
+- `Contours - 100-Foot` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/9>
+- `Index Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/10>
+- `Index Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/11>
+- `Intermediate Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/12>
+- `Intermediate Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/13>
+- `Contours - 50-Foot` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/14>
+- `Index Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/15>
+- `Index Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/16>
+- `Intermediate Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/17>
+- `Intermediate Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/18>
+- `Contours - Large-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/19>
+- `Normal Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/20>
+- `Normal Index Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/21>
+- `Normal Intermediate Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/22>
+- `Normal Supplemental Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/23>
+- `Normal Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/24>
+- `Normal Index Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/25>
+- `Normal Intermediate Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/26>
+- `Normal Supplemental Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/27>
+- `Depression Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/28>
+- `Depression Index Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/29>
+- `Depression Intermediate Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/30>
+- `Depression Supplemental Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/31>
+- `Depression Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/32>
+- `Depression Index Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/33>
+- `Depression Intermediate Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/34>
+- `Depression Supplemental Contours` — <https://carto.nationalmap.gov/arcgis/rest/services/contours/MapServer/35>
+
+## geonames (15)
+- **Serviço:** <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 2000
+- `Places (expand for more)` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/0>
+- `Incorporated Places (Civil)` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/1>
+- `Unincorporated Places (Census)` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/2>
+- `Populated Places` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/3>
+- `Physical Points (expand for more)` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/4>
+- `Landforms` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/5>
+- `Streams (Mouth)` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/6>
+- `Other Hydrographic Features` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/7>
+- `Antarctica` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/8>
+- `Cultural Points (expand for more)` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/9>
+- `Crossings` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/10>
+- `Historical Points (expand for more)` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/11>
+- `Historical Cultural-Political Points` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/12>
+- `Historical Hydrographic Points` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/13>
+- `Historical Physical Points` — <https://carto.nationalmap.gov/arcgis/rest/services/geonames/MapServer/14>
+
+## govunits (42)
+- **Serviço:** <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 2000
+- `Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/0>
+- `State or Territory Small-Scale labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/1>
+- `State or Territory Large-Scale labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/2>
+- `County or Equivalent labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/3>
+- `Incorporated Place labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/4>
+- `Unincorporated Place labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/5>
+- `Minor Civil Division labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/6>
+- `Native American Area labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/7>
+- `National Park labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/8>
+- `National Monument labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/9>
+- `National Forest labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/10>
+- `National Wilderness labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/11>
+- `National Grassland labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/12>
+- `National Cemetery labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/13>
+- `US Fish &amp; Wildlife Service labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/14>
+- `Bureau of Land Management labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/15>
+- `Military Reserve labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/16>
+- `NASA Facility labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/17>
+- `Met. Washington Airport labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/18>
+- `Congressional District labels` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/19>
+- `Features` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/20>
+- `State or Territory Small-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/21>
+- `State or Territory Large-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/22>
+- `County or Equivalent` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/23>
+- `Incorporated Place` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/24>
+- `Unincorporated Place` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/25>
+- `Minor Civil Division` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/26>
+- `Native American Area Small-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/27>
+- `Native American Area Large-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/28>
+- `National Park` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/29>
+- `National Monument` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/30>
+- `National Forest` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/31>
+- `National Wilderness` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/32>
+- `National Grassland` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/33>
+- `National Cemetery` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/34>
+- `US Fish &amp; Wildlife Service` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/35>
+- `Bureau of Land Management` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/36>
+- `Military Reserve` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/37>
+- `NASA Facility` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/38>
+- `Met. Washington Airport` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/39>
+- `Tennessee Valley Authority` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/40>
+- `Congressional District` — <https://carto.nationalmap.gov/arcgis/rest/services/govunits/MapServer/41>
+
+## map_indices (12)
+- **Serviço:** <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 2000
+- `Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/0>
+- `1x1 Degree labels` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/1>
+- `30x60 Minute (1:100K) labels` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/2>
+- `15 Minute (1:63K) labels` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/3>
+- `7.5 Minute (1:24K) labels` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/4>
+- `3.75 Minute labels` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/5>
+- `Features` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/6>
+- `1x1 Degree Index` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/7>
+- `30x60 Minute (1:100K) Index` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/8>
+- `15 Minute (1:63K) Index` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/9>
+- `7.5 Minute (1:24K) Index` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/10>
+- `3.75 Minute Index` — <https://carto.nationalmap.gov/arcgis/rest/services/map_indices/MapServer/11>
+
+## selectable_polygons (15)
+- **Serviço:** <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 2000
+- `Governmental Unit Boundaries` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/0>
+- `State or Territory (Low res)` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/1>
+- `Congressional District` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/2>
+- `County or Equivalent` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/3>
+- `Incorporated Place Feature (Cities and Towns)` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/4>
+- `Unincorporated Place Feature (Cities and Towns)` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/5>
+- `Map Indices` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/6>
+- `1x1 Degree Index` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/7>
+- `1:100K Index` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/8>
+- `1:63K Index (AK)` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/9>
+- `1:24K Index` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/10>
+- `Hydrologic Units` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/11>
+- `Region` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/12>
+- `Subregion` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/13>
+- `Subbasin` — <https://carto.nationalmap.gov/arcgis/rest/services/selectable_polygons/MapServer/14>
+
+## structures (70)
+- **Serviço:** <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 2000
+- `Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/0>
+- `Landmarks &amp; Government Buildings` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/1>
+- `Cemeteries` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/2>
+- `Post Offices` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/3>
+- `City/Town Halls` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/4>
+- `Courthouses` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/5>
+- `State Capitols` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/6>
+- `State Supreme Courts` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/7>
+- `The White House` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/8>
+- `U.S. Capitol` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/9>
+- `U.S. Supreme Court` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/10>
+- `Historic Sites/Points of Interest` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/11>
+- `National Symbols/Monuments` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/12>
+- `Medical &amp; Emergency Response` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/13>
+- `Hospitals/Medical Centers` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/14>
+- `Ambulance Services` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/15>
+- `Fire Stations/EMS Stations` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/16>
+- `Law Enforcement` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/17>
+- `Police Stations` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/18>
+- `Prisons/Correctional Facilities` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/19>
+- `Education` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/20>
+- `Colleges/Universities` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/21>
+- `Technical/Trade Schools` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/22>
+- `Schools` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/23>
+- `Recreation` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/24>
+- `Campgrounds` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/25>
+- `Trailheads` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/26>
+- `Cabins` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/27>
+- `Shelters` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/28>
+- `Picnic Areas` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/29>
+- `Headquarters` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/30>
+- `Visitor/Information Centers` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/31>
+- `Ranger Stations` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/32>
+- `Energy` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/33>
+- `Alaska Pipeline` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/34>
+- `Features` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/35>
+- `Landmarks &amp; Government Buildings` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/36>
+- `Cemeteries` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/37>
+- `Post Offices` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/38>
+- `City/Town Halls` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/39>
+- `Courthouses` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/40>
+- `State Capitols` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/41>
+- `State Supreme Courts` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/42>
+- `The White House` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/43>
+- `U.S. Capitol` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/44>
+- `U.S. Supreme Court` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/45>
+- `Historic Sites/Points of Interest` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/46>
+- `National Symbols/Monuments` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/47>
+- `Medical &amp; Emergency Response` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/48>
+- `Hospitals/Medical Centers` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/49>
+- `Ambulance Services` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/50>
+- `Fire Stations/EMS Stations` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/51>
+- `Law Enforcement` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/52>
+- `Police Stations` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/53>
+- `Prisons/Correctional Facilities` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/54>
+- `Education` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/55>
+- `Colleges/Universities` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/56>
+- `Technical/Trade Schools` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/57>
+- `Schools` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/58>
+- `Recreation` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/59>
+- `Campgrounds` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/60>
+- `Trailheads` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/61>
+- `Cabins` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/62>
+- `Shelters` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/63>
+- `Picnic Areas` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/64>
+- `Headquarters` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/65>
+- `Visitor/Information Centers` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/66>
+- `Ranger Stations` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/67>
+- `Energy` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/68>
+- `Alaska Pipeline` — <https://carto.nationalmap.gov/arcgis/rest/services/structures/MapServer/69>
+
+## transportation (39)
+- **Serviço:** <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 2000
+- `Small-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/0>
+- `Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/1>
+- `Roads 10M-Scale labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/2>
+- `Roads 1M-Scale labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/3>
+- `Ferries 1M-Scale labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/4>
+- `National Trail labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/5>
+- `Rail 1M-Scale labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/6>
+- `Features` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/7>
+- `Roads 10M-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/8>
+- `Roads 1M-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/9>
+- `Ferries 1M-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/10>
+- `National Trails` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/11>
+- `Rail 1M-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/12>
+- `Large and Medium-Scale` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/13>
+- `Labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/14>
+- `Airport labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/15>
+- `Interstate labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/16>
+- `US Route labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/17>
+- `State Route labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/18>
+- `Highway full name labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/19>
+- `Local Connecting Road labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/20>
+- `Local Road labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/21>
+- `USFS Road Shields` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/22>
+- `Ferry and Tunnel labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/23>
+- `Trail labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/24>
+- `Railroad labels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/25>
+- `Features` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/26>
+- `Airports` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/27>
+- `Airport Runways` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/28>
+- `Controlled-access Highways` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/29>
+- `Secondary Highways` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/30>
+- `Local Connecting Roads` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/31>
+- `Local Roads` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/32>
+- `Ramps` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/33>
+- `Ferries and Tunnels` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/34>
+- `4WD Roads` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/35>
+- `Closed Roads` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/36>
+- `Trails` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/37>
+- `Railroads` — <https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/38>

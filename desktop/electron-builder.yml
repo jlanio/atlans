@@ -1,0 +1,98 @@
+appId: app.atlans.executor
+productName: Atlans Executor
+copyright: Copyright © 2026 os autores do Atlans
+
+directories:
+  output: dist-installer
+  buildResources: build
+
+# Só empacota o que saiu de `npm run build`, e não o dist/main do `npm run dev`
+# (que aponta para a máquina local). Ver build/antes-de-empacotar.cjs.
+beforePack: build/antes-de-empacotar.cjs
+
+files:
+  - dist/**/*
+  - build/*.ico
+  - package.json
+  # node_modules entra pelo default do electron-builder (so as dependencies,
+  # nao as devDependencies).
+
+# O payload Python fica FORA do asar: sao ~390 MB de arquivos que o
+# interpretador precisa abrir pelo filesystem real. Dentro do asar, o
+# python.exe simplesmente nao os enxerga.
+extraResources:
+  - from: resources/python
+    to: python
+  - from: resources/executor
+    to: executor
+  - from: resources/flow
+    to: flow
+  - from: resources/payload.json
+    to: payload.json
+  # A licença do Atlans e os avisos de terceiros (scripts/payload-stage.mjs os
+  # copia para resources/). O Electron e o Chromium vão com os deles.
+  - from: resources/LICENSE.txt
+    to: LICENSE.txt
+  - from: resources/THIRD-PARTY-NOTICES.md
+    to: THIRD-PARTY-NOTICES.md
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  icon: build/icon.ico
+  # Sem elevação: a instalação é per-user, em %LOCALAPPDATA%. Pedir admin num
+  # app que não precisa disso adiciona um prompt de UAC com "Editor
+  # desconhecido" enquanto não houver certificado de assinatura.
+  requestedExecutionLevel: asInvoker
+  # Hook de assinatura. É no-op sem ATLANS_SIGN_PROVIDER no ambiente, então o
+  # build local e o do CI sem segredos saem não-assinados e funcionais. Ver
+  # build/sign.cjs para como ativar.
+  #
+  # Vai dentro de `signtoolOptions`, e não solto em `win`: o electron-builder 25
+  # ainda aceita a forma antiga, mas emite aviso de campo obsoleto a cada
+  # arquivo assinado.
+  #
+  # A extensão é `.cjs` porque o package.json declara `"type": "module"` — um
+  # `.js` seria carregado como ESM e o `exports.default` que o electron-builder
+  # procura não existiria, com um stack trace do resolvedor de módulos que não
+  # menciona ESM em lugar nenhum.
+  signtoolOptions:
+    sign: build/sign.cjs
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  allowElevation: false
+  runAfterFinish: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Atlans Executor
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  installerHeaderIcon: build/icon.ico
+  # Config, certificados e artefatos vivem em %APPDATA%/%USERPROFILE% e
+  # sobrevivem à desinstalação de propósito: reinstalar não deve exigir um novo
+  # enrollment nem apagar os artefatos de trabalho do usuário.
+  deleteAppDataOnUninstall: false
+
+# Deep link atlans://enroll?... — elimina o copiar-colar do OTP entre o painel
+# web e o app. O handler é registrado pelo NSIS na instalação; a validação de
+# origem (diálogo de confirmação + allowlist de host) é da Fase 4.
+protocols:
+  - name: Atlans Studio
+    schemes: [atlans]
+
+# O feed do auto-update gravado no app (app-update.yml) é o repositório do
+# GitHub cujas releases trazem o instalador. O dono e o nome vêm do ambiente do
+# build: no CI, o repositório que publica (.github/workflows/desktop-windows.yml),
+# e cada fork atualiza nas próprias releases. Sem as duas variáveis o build para
+# ("env ATLANS_RELEASES_DONO is not defined") em vez de gerar um app que nunca
+# atualiza: o electron-builder não as deduz do git, porque desktop/ não tem
+# .git próprio.
+publish:
+  provider: github
+  owner: ${env.ATLANS_RELEASES_DONO}
+  repo: ${env.ATLANS_RELEASES_REPO}
+  releaseType: release

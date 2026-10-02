@@ -1,0 +1,10 @@
+# Lint do Python — o job "Backend (Python)" do CI roda `ruff check` antes do
+# pytest. Por ora só as regras do pyflakes (F): nome indefinido, import
+# quebrado ou sem uso, variável sem uso, f-string sem campo. É o que pega, no
+# PR, o erro que só estouraria em produção quando o caminho rodasse. Outras
+# famílias de regras entram aos poucos, cada uma no seu PR.
+# `py312`: a versão da API, do executor, do CI e do runtime do app desktop.
+target-version = "py312"
+
+[lint]
+select = ["F"]

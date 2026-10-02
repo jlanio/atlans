@@ -1,0 +1,115 @@
+# requirements.in — as dependencias DIRETAS da API. Edite AQUI.
+#
+# O requirements.txt ao lado e GERADO daqui (pip-compile): traz tambem as
+# transitivas, todas travadas, e o hash de cada arquivo. E ele que a imagem, o
+# CI e o pip-audit instalam, com --require-hashes: nada entra no build sem ter
+# passado por um PR, e um arquivo trocado no PyPI nao instala. Depois de mexer
+# numa linha daqui, regere os locks (Linux x86_64, Python 3.12):
+#     python scripts/travar_python.py
+# O script so aceita, para o que o resolvedor escolhe sozinho, versao publicada
+# ha 14 dias ou mais — a mesma quarentena do Dependabot (.github/dependabot.yml).
+#
+# Estilo: == (exato) ao inves de >= (loose). Builds reproduziveis +
+# updates revisados em PR, em vez de patches transitivos surpresa.
+
+uvicorn[standard]==0.53.0
+fastapi==0.141.1
+websockets==17.1
+python-multipart==0.0.32
+pydantic==2.13.5
+sqlalchemy==2.0.54
+asyncpg==0.31.0
+psycopg2-binary==2.9.13
+python-dotenv==1.2.3
+httpx==0.28.1
+apscheduler==3.11.3
+geopandas==1.1.4
+# numpy, pandas e pyproj chegam pelo geopandas. Pinados na troca para o Python
+# 3.12: no 3.10 o resolvedor parava em numpy 2.2.x, pandas 2.3.x e pyproj 3.7.x,
+# porque as linhas seguintes exigem 3.11+. Soltos, o 3.12 traria numpy 2.5 e
+# pyproj 3.8 aqui, e pandas 3.0 nos dois locks
+# — versao maior, com copy-on-write e o dtype de string novo mudando o
+# comportamento dos nos em silencio. Subir cada um e PR proprio, com a suite
+# verde. Mesmas versoes em executor/requirements-full.in.
+numpy==2.5.3
+pandas==2.3.3
+pyproj==3.8.0
+# Usado por flow/executor/spill.py, pin.py e pelos nos de GeoParquet (o
+# to_parquet/read_parquet do pandas e do geopandas). Chegava de carona no
+# streamlit, que saiu; mesma versao em executor/requirements-full.in.
+pyarrow==25.0.1
+# Carta imagem (flow/nodes/outputs/carta_imagem.py): renderiza PNG/JPG/PDF no
+# executor. A linha 3.10.x era a ultima que rodava no Python 3.10 (o runtime
+# ate a troca para o 3.12); subir de linha e PR proprio. Traz pillow,
+# contourpy, cycler, fonttools, kiwisolver e pyparsing. Mesma versao em
+# executor/requirements-full.in.
+matplotlib==3.11.2
+redis==8.1.0
+croniter==6.2.4
+cachetools==7.2.0
+slowapi==0.1.10
+# Backend de contagem do slowapi. Pinado porque `RATE_LIMIT_STORAGE_URI`
+# (app/core/rate_limiter.py) passa a construir o storage Redis dele.
+limits==5.8.0
+psutil==7.2.2
+# Painel ao vivo do executor no terminal (executor/dashboard/).
+rich==15.0.0
+
+# GeoSync do executor. Importados DIRETO por executor/sync/{ignore,watcher}.py e
+# exercitados pela suite, entao precisam estar aqui e nao so no
+# executor/requirements-full.in: o CI instala apenas o lock da API.
+pathspec==1.1.1
+watchdog==6.0.0
+cryptography==50.0.1
+Jinja2==3.1.6
+jsonschema==4.26.0
+geoalchemy2==0.20.0
+
+# Auth JWT
+PyJWT==2.14.0
+# O hash de senha chama o bcrypt direto (app/core/utils/jwt_utils.py, no
+# esquema bcrypt_sha256 que o passlib definia). A pre-chave tem 44 bytes, entao
+# as versoes 4 e 5 do bcrypt (que recusam senha acima de 72 bytes) servem; o
+# tests/unit/test_hash_de_senha.py confere o hash de verdade a cada versao.
+bcrypt==5.0.0
+pydantic[email]==2.13.5
+
+# Geocodificacao
+geopy==2.5.0
+owslib==0.36.0
+
+# Testes
+pytest==9.1.1
+pytest-asyncio==1.4.0
+aiosqlite==0.22.1
+python-dateutil==2.9.0.post0
+
+# MinIO/S3
+boto3==1.43.98
+alembic==1.20.0
+
+# Email — pinar quando instalado na imagem prod (atualmente >=2.0.0 no ambiente local)
+resend==2.47.0
+
+# Sanitizacao de HTML (corpo de e-mail vindo do no SendEmail, via executor).
+# nh3 e o binding do ammonia (Rust): allowlist de verdade, com parser de HTML.
+# Substituiu um filtro de regex de blacklist que era contornavel por
+# reconstrucao — "javjavascript:ascript:" voltava a ser "javascript:" depois
+# da unica passada de remocao. Ver tests/unit/test_email_html_sanitizer.py.
+nh3==0.3.7
+
+# MCP — SDK oficial do servidor (docs/specs/mcp-server.md). O pin e verificado
+# contra o pacote real por tests/unit/test_mcp_sdk_contrato.py (identificadores,
+# Host/Origin do transporte). As transitivas abaixo sao as que o pip resolve
+# (iguais no 3.10 e no 3.12) e nao existiam no arquivo antes.
+mcp==2.2.0
+mcp-types==2.2.0
+httpx2==2.12.0
+httpcore2==2.12.0
+sse-starlette==3.4.11
+
+# Copiloto — o cliente do modelo (app/services/openrouter.py) fala com o
+# OpenRouter por HTTP puro sobre o `httpx` ja pinado acima: nenhum SDK de
+# fornecedor de modelo entra na imagem.
+opentelemetry-api==1.44.0
+typing-inspection==0.4.4

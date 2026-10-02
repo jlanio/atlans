@@ -1,0 +1,677 @@
+# Guyane SIG — camadas
+
+Geoportal: [[Geosserviços/Guiana Francesa Guyane SIG/Guyane SIG|Guyane SIG]]
+
+Total: **672** camadas WFS.
+- `administratif:CHEF_LIEU_2014` — Chef-lieu des communes de Guyane (2014) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:CIRCONSCRIPTION_1958` — Circonscriptions électorales de Guyane (1958) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:CIRCONSCRIPTION_1986` — Circonscriptions électorales de Guyane (1986) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:CIRCONSCRIPTION_2010` — Circonscriptions électorales de Guyane (2010) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:CIRCONSCRIPTION_2012` — Circonscriptions électorales de Guyane (2012) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:EPCI_CA_CC_2014` — Emprises des EPCI (communauté de communes et communauté d'agglomération) de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:SECTION_CTG_2015` — Circonscriptions électorales de la Collectivité Territoriale de Guyane (2015) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:SMCMSG_MEMBRE_2014` — Emprise des communes membres du Syndicat Mixte du Centre Médico-Sportif de la Guyane (SMCMSG) en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:SMCMSG_TOTAL_2014` — Emprise des communes membres du Syndicat Mixte du Centre Médico-Sportif de la Guyane (SMCMSG) en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:SMPNRG_MEMBRE_2014` — Emprise des communes membres du Syndicat Mixte du Parc Naturel Régional de la Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:SMPNRG_TOTAL_2014` — Emprise des communes membres du Syndicat Mixte du Parc Naturel Régional de la Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:ZOO_GUYANE_MEMBRE_2014` — Emprise des communes membres du Syndicat intercommunal du zoo de Macouria et de Montsinnery-Tonnegrande en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `administratif:ZOO_GUYANE_TOTAL_2014` — Emprise des communes membres du Syndicat intercommunal du zoo de Macouria et de Montsinnery-Tonnegrande en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `agropedo:AGROPEDO_17_01_2017` — Données agro-pédologiques de 2001 de la Guyane géo-corrigées (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `agropedo:MASQUE_AFFICHAGE_50E_AGROPEDO_17_01_2017` — Masque d'affichage de la données agro-pédologiques de la Guyane (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:EMPRISE_CAYENNE_MNT_MNS_MNH_2015` — Produits ORTHO / ALTI - Cayenne (2015) - Emprise des MNT / MNS / MNH · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:EMPRISE_MACOURIA_MNT_MNS_MNH_2015` — Produits ORTHO / ALTI - Macouria (2015) - Emprise des MNT / MNS / MNH · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:EMPRISE_MATOURY_MNT_MNS_MNH_2015` — Produits ORTHO / ALTI - Matoury (2015) - Emprise des MNT / MNS / MNH · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:EMPRISE_MONTSINERY-TONNEGRANDE_MNT_MNS_MNH_2015` — Produits ORTHO / ALTI - Montsinery-Tonnegrande (2015) - Emprise des MNT / MNS / MNH · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:EMPRISE_REMIRE-MONTJOLY_MNT_MNS_MNH_2015` — Produits ORTHO / ALTI - Rémire-Montjoly (2015) - Emprise des MNT / MNS / MNH · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:EMPRISE_ROURA_MNT_MNS_MNH_2015` — Produits ORTHO / ALTI - Roura (2015) - Emprise des MNT / MNS / MNH · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:EMPRISE_SAINT-LAURENT_MNx_2015_50CM` — Produits ORTHO / ALTI - Saint-Laurent du Maroni (2015) - Emprise des MNT / MNS / MNH · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:EMPRISE_SIMPLIFIEE_ROUTE-PETIT-SAUT_10072015` — Produits ORTHO / ALTI - route de Petit-Saut (2015) - Emprise de la zone informée · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `altimetrie:SAINT-LAURENT_2015_EMPRISE_DALLE_ALTI` — Produits ORTHO / ALTI - Saint-Laurent du Maroni (2015) - Emprise du dallage des MNT / MNS / MNH · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `bathymetrie:MONDE_SRTM30_PLUS_2012_v20_UCSD` — Bathymétrie mondiale composite · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BATI_2012` — Bâtiments du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BATI_2013` — Bâtiments du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BATI_2014` — Bâtiments du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BATI_2015` — Bâtiments du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BATI_2016` — Bâtiments du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BATI_2017` — Bâtiments du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BORNE_2012` — Bornes de limite de propriété du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BORNE_2013` — Bornes de limite de propriété du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BORNE_2014` — Bornes de limite de propriété du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BORNE_2015` — Bornes de limite de propriété du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BORNE_2016` — Bornes de limite de propriété du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_BORNE_2017` — Bornes de limite de propriété du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_COMM_2012` — Communes du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_COMM_2013` — Communes du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_COMM_2014` — Communes du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_COMM_2015` — Communes du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_COMM_2016` — Communes du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_COMM_2017` — Communes du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_HYDRO_2012` — Tronçons de cours d'eau du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_HYDRO_2013` — Tronçons de cours d'eau du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_HYDRO_2014` — Tronçons de cours d'eau du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_HYDRO_2015` — Tronçons de cours d'eau du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_HYDRO_2016` — Tronçons de cours d'eau du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_HYDRO_2017` — Tronçons de cours d'eau du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LIEU_2012` — Lieux-dits du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LIEU_2013` — Lieux-dits du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LIEU_2014` — Lieux-dits du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LIEU_2015` — Lieux-dits du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LIEU_2016` — Lieux-dits du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LIEU_2017` — Lieux-dits du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LINDIV_2012` — Linéaires divers du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LINDIV_2013` — Linéaires divers du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LINDIV_2014` — Linéaires divers du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LINDIV_2015` — Linéaires divers du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LINDIV_2016` — Linéaires divers du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_LINDIV_2017` — Linéaires divers du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_NUMVOI_2012` — Numéros de voirie du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_NUMVOI_2013` — Numéros de voirie du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_NUMVOI_2014` — Numéros de voirie du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_NUMVOI_2015` — Numéros de voirie du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_NUMVOI_2016` — Numéros de voirie du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_NUMVOI_2017` — Numéros de voirie du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PARC_2012` — Parcelles du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PARC_2013` — Parcelles du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PARC_2014` — Parcelles du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PARC_2015` — Parcelles du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PARC_2016` — Parcelles du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PARC_2017` — Parcelles du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTCANV_2012` — Points de canevas du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTCANV_2013` — Points de canevas du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTCANV_2014` — Points de canevas du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTCANV_2015` — Points de canevas du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTCANV_2016` — Points de canevas du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTCANV_2017` — Points de canevas du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTDIV_2012` — Ponctuels divers du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTDIV_2013` — Ponctuels divers du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTDIV_2014` — Ponctuels divers du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTDIV_2015` — Ponctuels divers du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTDIV_2016` — Ponctuels divers du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_PTDIV_2017` — Ponctuels divers du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SECTIO_2012` — Sections du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SECTIO_2013` — Sections du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SECTIO_2014` — Sections du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SECTIO_2015` — Sections du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SECTIO_2016` — Sections du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SECTIO_2017` — Sections du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SFDIV_2012` — Surfaciques divers du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SFDIV_2013` — Surfaciques divers du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SFDIV_2014` — Surfaciques divers du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SFDIV_2015` — Surfaciques divers du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SFDIV_2016` — Surfaciques divers du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SFDIV_2017` — Surfaciques divers du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUBSEC_2012` — Subdivisions de sections du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUBSEC_2013` — Subdivisions de sections du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUBSEC_2014` — Subdivisions de sections du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUBSEC_2015` — Subdivisions de sections du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUBSEC_2016` — Subdivisions de sections du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUBSEC_2017` — Subdivisions de sections du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUF_2012` — Subdivisions fiscales du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUF_2013` — Subdivisions fiscales du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUF_2014` — Subdivisions fiscales du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUF_2015` — Subdivisions fiscales du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUF_2016` — Subdivisions fiscales du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_SUF_2017` — Subdivisions fiscales du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_VOIE_2012` — Tronçons de voie du Cadastre de Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_VOIE_2013` — Tronçons de voie du Cadastre de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_VOIE_2014` — Tronçons de voie du Cadastre de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_VOIE_2015` — Tronçons de voie du Cadastre de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_VOIE_2016` — Tronçons de voie du Cadastre de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:EDI_VOIE_2017` — Tronçons de voie du Cadastre de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:PARCELLE_FONCIER_PUBLIC_GSPT_072013` — Référentiel foncier public de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:PARCELLE_FONCIER_PUBLIC_GSPT_28022014` — Référentiel foncier public de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:PARCELLE_FONCIER_PUBLIC_GSPT_S12017` — Référentiel foncier public de Guyane en 2017 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:PARCELLE_FONCIER_PUBLIC_GSPT_S22015` — Référentiel foncier public de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `cadastre:PARCELLE_FONCIER_PUBLIC_GSPT_S22016` — Référentiel foncier public de Guyane en 2016 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `camino_mines:camino_camino` — Titres miniers et autorisations · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `camino_mines:camino_camino2` — Titres miniers et autorisations · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `climatologie:PLUVIOMETRIE_ANNUELLE_MOYENNE_1956_1976` — Données de la Pluviométrie Annuelle Moyenne de la Guyane de 1979 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `climatologie:PLUVIOMETRIE_ANNUELLE_MOYENNE_1981_2010` — Données de la Pluviométrie Annuelle Moyenne de la Guyane de 2016 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:AWALA-YALIMAPO_CC_07022004_ZONAGE` — URBA - Awala-Yalimapo (2004-02-07) CC zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:CAYENNE_PLU_20190927_HABILLAGE_TXT` — URBA - Cayenne (2019-09-27) PLU habillage texte non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:CAYENNE_PLU_20190927_INFO_SURF` — URBA - Cayenne (2019-09-27) PLU information surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:CAYENNE_PLU_20190927_PRESCRIPTION_LIN` — URBA - Cayenne (2019-09-27) PLU prescription linéaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:CAYENNE_PLU_20190927_PRESCRIPTION_PCT` — URBA - Cayenne (2019-09-27) PLU prescription ponctuelle non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:CAYENNE_PLU_20190927_PRESCRIPTION_SURF` — URBA - Cayenne (2019-09-27) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:CAYENNE_PLU_20190927_ZONE_URBA` — URBA - Cayenne (2019-09-27) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND-SANTI_CC_23072012_CHAMP_D_ECOULEMENT_DES_CRIQUES` — URBA - Grand-santi (2012-07-23) CC champ d'écoulement des criques non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND-SANTI_CC_23072012_PERIMETRE_DE_PROTECTION_DE_LA_DECHARGE` — URBA - Grand-santi (2012-07-23) CC périmètre de protection de la décharge non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND-SANTI_CC_23072012_PERIMETRE_DE_PROTECTION_DU_FORAGE` — URBA - Grand-santi (2012-07-23) CC périmètre de protection du forage non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND-SANTI_CC_23072012_PROJET_ROUTE_ANAKONDE` — URBA - Grand-santi (2012-07-23) CC projet route anakonde non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND-SANTI_CC_23072012_SECTEURS_CONSTRUCTIBLES` — URBA - Grand-santi (2012-07-23) CC secteurs constructibles non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND-SANTI_CC_23072012_ZONE_INONDABLE` — URBA - Grand-santi (2012-07-23) CC zonage inondable non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND_SANTI_CC_20121130_HABILLAGE_LIN` — URBA - Grand-santi (2012-11-30) CC habillage linéaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND_SANTI_CC_20121130_HABILLAGE_SURF` — URBA - Grand-santi (2012-11-30) CC habillage surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND_SANTI_CC_20121130_INFO_LIN` — URBA - Grand-santi (2012-11-30) CC information linéaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND_SANTI_CC_20121130_INFO_PCT` — URBA - Grand-santi (2012-11-30) CC information ponctuelle opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND_SANTI_CC_20121130_INFO_SURF` — URBA - Grand-santi (2012-11-30) CC information surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:GRAND_SANTI_CC_20121130_SECTEUR` — URBA - Grand-santi (2012-11-30) CC secteur opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:KOUROU_PLU_20190603_HABILLAGE_SURF` — URBA - Kourou (2019-06-03) PLU habillage surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:KOUROU_PLU_20190603_INFO_SURF` — URBA - Kourou (2019-06-03) PLU information surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:KOUROU_PLU_20190603_PRESCRIPTION_LIN` — URBA - Kourou (2019-06-03) PLU prescription linéaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:KOUROU_PLU_20190603_PRESCRIPTION_PCT` — URBA - Kourou (2019-06-03) PLU prescription ponctuelle non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:KOUROU_PLU_20190603_PRESCRIPTION_SURF` — URBA - Kourou (2019-06-03) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:KOUROU_PLU_20190603_ZONE_URBA` — URBA - Kourou (2019-06-03) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MANA_PLU_17092010_EMPRISES_RESERVEES` — URBA - Mana (2010-09-17) PLU emprises réservées non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MANA_PLU_17092010_ZONAGE` — URBA - Mana (2010-09-17) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MANA_PLU_23022018_INFO_PCT` — URBA - Mana (2018-02-23) PLU information ponctuelle non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MANA_PLU_23022018_PRESCRIPTION_SURF` — URBA - Mana (2018-02-23) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MANA_PLU_23022018_ZONE_URBA` — URBA - Mana (2018-02-23) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MARIPASOULA_PLU_26062013_EMPRISES_RESERVES` — URBA - Maripasoula (2013-06-26) PLU emprises réservées non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MARIPASOULA_PLU_26062013_FORAGES_AEP` — URBA - Maripasoula (2013-06-26) PLU forages AEP non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MARIPASOULA_PLU_26062013_MONUMENTS_ET_SITES_PROTEGES` — URBA - Maripasoula (2013-06-26) PLU monuments et sites protégés non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MARIPASOULA_PLU_26062013_SECTEUR_PROTECTION_NUISANCES` — URBA - Maripasoula (2013-06-26) PLU secteur protection nuisances non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MARIPASOULA_PLU_26062013_SECTEUR_RICHESSE_SOUS_SOL` — URBA - Maripasoula (2013-06-26) PLU secteur richesse sous sol non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MARIPASOULA_PLU_26062013_SECTEUR_RISQUE_INONDATION` — URBA - Maripasoula (2013-06-26) PLU secteur risque inondation non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MARIPASOULA_PLU_26062013_ZONAGE` — URBA - Maripasoula (2013-06-26) PLU zonage non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MATOURY_PLU_05022013_EMPLACEMENTS_RESERVES` — URBA - Matoury (2013-02-05) PLU emprises réservées non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MATOURY_PLU_05022013_ZONAGE` — URBA - Matoury (2013-02-05) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MONTSINERY-TONNEGRANDE_PLU_30112011_BANDE_ETUDE` — URBA - Montsinery-Tonnegrande (2011-11-30) PLU bande étude opposable (complément) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MONTSINERY-TONNEGRANDE_PLU_30112011_EMPRISES_RESERVEES` — URBA - Montsinery-Tonnegrande (2011-11-30) PLU emprises réservées opposable (complément) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:MONTSINERY-TONNEGRANDE_PLU_30112011_ZONAGE` — URBA - Montsinery-Tonnegrande (2011-11-30) PLU zonage opposable (complément) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:REMIRE_MONTJOLY_PLU_20180627_HABILLAGE_TXT` — URBA - Rémire-Montjoly (2018-06-27) PLU habillage texte opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:REMIRE_MONTJOLY_PLU_20180627_INFO_SURF` — URBA - Rémire-Montjoly (2018-06-27) PLU information surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:REMIRE_MONTJOLY_PLU_20180627_PRESCRIPTION_SURF` — URBA - Rémire-Montjoly (2018-06-27) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:REMIRE_MONTJOLY_PLU_20180627_ZONE_URBA` — URBA - Rémire-Montjoly (2018-06-27) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:ROURA_PLU_20200219_INFO_SURF` — URBA - Roura (2020-02-19) PLU information surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:ROURA_PLU_20200219_PRESCRIPTION_SURF` — URBA - Roura (2020-02-19) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:ROURA_PLU_20200219_ZONE_URBA` — URBA - Roura (2020-02-19) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-GEORGES_PLU_24052013_EMPRISES_RESERVES` — URBA - Saint-Georges (2013-05-24) PLU emprises réservées non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-GEORGES_PLU_24052013_SECTEURS_PROTEGES_INONDATION` — URBA - Saint-Georges (2013-05-24) PLU secteurs protégés inondation non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-GEORGES_PLU_24052013_SECTEURS_PROTEGES_NUISANCES` — URBA - Saint-Georges (2013-05-24) PLU secteurs protégés nuisances non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-GEORGES_PLU_24052013_SECTEURS_PROTEGES_SOUS-SOL` — URBA - Saint-Georges (2013-05-24) PLU secteurs protégés sous-sol non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-GEORGES_PLU_24052013_ZONAGE` — URBA - Saint-Georges (2013-05-24) PLU zonage non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_08102013_EMPLACEMENTS_RESERVES` — URBA - Saint-Laurent (2013-10-08) PLU emplacements réservés non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_08102013_LIMITE_ZONES` — URBA - Saint-Laurent (2013-10-08) PLU limite zones non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_08102013_LIMITES_ZONES_DFP` — URBA - Saint-Laurent (2013-10-08) PLU limites zones DFP non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_08102013_SECTEUR_AUTORISATIONS_SDOM` — URBA - Saint-Laurent (2013-10-08) PLU autorisations SDOM non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_08102013_SECTEUR_EXPLOITATION_CARRIERE` — URBA - Saint-Laurent (2013-10-08) PLU secteur exploitation carrière non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_08102013_SECTEUR_PROTECTION_CONTRE_NUISANCES` — URBA - Saint-Laurent (2013-10-08) PLU secteur protection contre nuisances non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_08102013_SECTEUR_RISQUES_NATURELS` — URBA - Saint-Laurent (2013-10-08) PLU risques naturels non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_19032012_EMPRISES_RESERVEES` — URBA - Saint-Laurent (2012-03-19) PLU emprises réservées non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_19032012_SECTEURS_DE_RISQUES_NATURELS` — URBA - Saint-Laurent (2012-03-19) PLU secteurs de risques naturels non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT-LAURENT_PLU_19032012_ZONAGE` — URBA - Saint-Laurent (2012-03-19) PLU zonage non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT_GEORGES_PLU_20180820_PRESCRIPTION_SURF` — URBA - Saint-Georges (2018-08-20) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAINT_GEORGES_PLU_20180820_ZONE_URBA` — URBA - Saint-Georges (2018-08-20) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `du:SAUL_CC_20161004_SECTEUR` — URBA - Saül (2016-10-04) CC découpage en secteurs opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `economie:BATI_CADASTRALE_EAE_2012` — Bâti cadastrale des espaces d'activités économiques en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `economie:EAE_2012` — Espaces d'activités économiques en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `economie:EAE_COMPLEMENTAIRES_2012` — Espaces d'activités économiques complémentaires en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `economie:EAE_PRJ_2012` — Espaces d'activités économiques placés sous régime juridique en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `economie:ETABLISSEMENT_EAE_2012` — Etablissements localisés dans les espaces d'activités économiques en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `economie:PARCELLAIRE_CADASTRALE_EAE_2012` — Parcellaire cadastrale des espaces d'activités économiques en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-epci-cacl:bassin-de-retention-cacl-2025` — Bassin de rétention - CACL (2025) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-epci-cacl:bornes-a-verre-de-la-cacl-2026` — CACL - Position des bornes à verre en 2026 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el-epci-cacl:canalisation-cacl-2025` — Canalisation - CACL (2025) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-epci-cacl:canaux-de-largeur-entre-2-et-5m-cacl-2025` — Canaux de largeur entre 2 et 5m - CACL (2025) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-epci-cacl:canaux-de-largeur-superieure-a-5m-cacl-2025` — Canaux de largeur supérieure à 5m - CACL (2025) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-epci-cacl:caniveaux-cacl-2025` — Caniveaux - CACL (2025) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-epci-cacl:collecteur-enterre-cacl-2025` — Collecteur enterré - CACL (2025) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-epci-cacl:fosse-de-largeur-inferieure-2m-cacl-2025` — Fossé de largeur inférieure 2m - CACL (2025) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-epci-cacl:position-des-bornes-a-verre` — CACL - Position des bornes à verre en 2021 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el-epci-cacl:recensement-des-commerces-formels-et-informels-en-2022-cacl` — Recensement des commerces formels et informels en 2022 - CACL · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el-epci-cacl:talweg_cacl` — Talweg - CACL (2025) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:arbres-remarquables-abc-remire-montjoly` — Arbres remarquables - ABC Remire-Montjoly · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:especes-botaniques-remarquables-abc-remire-montjoly` — Espèces botaniques remarquables - ABC Remire-Montjoly · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el-gepog:especes-exotiques-envahissantes-abc-remire-montjoly` — Espèces exotiques envahissantes - ABC Remire-Montjoly · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el-gepog:nombre-d-especes-menacees-liste-rouge-regionale-uicn-pendant-la-periode-de-l-abc-de-mana-sur-10km2` — Nombre d'espèces menacées liste rouge régionale UICN pendant la période de l'ABC de Mana sur 10km² · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:nombre-d-especes-menacees-liste-rouge-regionale-uicn-sur-10km2-abc-mana` — ABC Mana - Nombre d'espèces menacées liste rouge régionale UICN sur 10km² · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:nombre-de-donnees-produites-pendant-la-periode-de-l-abc-de-mana-sur-10km2` — Nombre de données produites pendant la période de l'ABC de Mana sur 10km² · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:nombre-de-donnees-produites-sur-10km2-abc-mana` — ABC Mana - Nombre de données produites sur 10km² · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:passages-faune-potentiels-abc-remire-montjoly` — Passages faune potentiels - ABC Remire-Montjoly · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:presence-d-especes-menacees-liste-rouge-regionale-uicn-abc-mana` — ABC Mana - Présence d'espèces menacées liste rouge régionale UICN · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:principaux-passage-a-faune-identifies-abc-mana` — ABC Mana - Principaux passage à faune identifiés · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-gepog:principaux-passages-a-faune-identifies-dans-le-cadre-de-l-abc-mana` — Principaux passages à faune identifiés dans le cadre de l'ABC Mana · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-ign:bd-ortho-littorale-2018-axes-de-vol-ortho-livres` — BD ORTHO LITTORALE® 2018 –  Axes de vol ortho livrés · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-ign:bd-ortho-littorale-2018-hauteurs-d-eau-calculees` — BD ORTHO LITTORALE® 2018 –  Hauteurs d'eau calculées · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-ign:bd-ortho-littorale-2018-plan-d-assemblage` — BD ORTHO LITTORALE® 2018 – Plan d'assemblage · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-ign:bd-ortho-littorale-2018-position-des-nadirs` — BD ORTHO LITTORALE® 2018 –  Position des nadirs · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:denombrement-des-equipements-en-2021-en-guyane` — Dénombrement des équipements en 2021 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:insee-bpe-2023-guyane` — Dénombrement des équipements en 2023 en Guyane · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el-insee:rp-insee_commune_1962-1999` — Recensement de la population : historique des populations communales 1962-1999 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2006` — Recensement de la population au 1er janvier 2006 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2007` — Recensement de la population au 1er janvier 2007 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2008` — Recensement de la population au 1er janvier 2008 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2009` — Recensement de la population au 1er janvier 2009 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2010` — Recensement de la population au 1er janvier 2010 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2011` — Recensement de la population au 1er janvier 2011 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2012` — Recensement de la population au 1er janvier 2012 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2013` — Recensement de la population au 1er janvier 2013 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2014` — Recensement de la population au 1er janvier 2014 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2015` — Recensement de la population au 1er janvier 2015 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2016` — Recensement de la population au 1er janvier 2016 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2017` — Recensement de la population au 1er janvier 2017 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2018` — Recensement de la population au 1er janvier 2018 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2019` — Recensement de la population au 1er janvier 2019 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2020` — Recensement de la population au 1er janvier 2020 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-insee:rp-insee_commune_2021` — Recensement de la population au 1er janvier 2021 en Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el-meteo-france:localisation-des-stations-meteorologiques-de-guyane-2023` — Stations météorologiques de Guyane (2023) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_comite_tourisme_guyane:chambres-d-hotes-guyane` — TOURISME - Localisation des chambres d'hôtes en Guyane (2024) - archive · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:localisation-des-activites-touristiques-en-guyane-2026` — TOURISME - Localisation des activités touristiques en Guyane (2026) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:localisation-des-camps-touristiques-et-carbets-d-hotes-de-guyane-2026` — TOURISME - Localisation des camps touristiques et carbets d'hôtes de Guyane (2026) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:localisation-des-hotels-en-guyane-2026` — TOURISME - Localisation des hôtels en Guyane (2026) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:localisation-des-meubles-de-tourisme-en-guyane-2026` — TOURISME - Localisation des meublés de tourisme en Guyane (2026) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:localisation-des-organismes-et-agences-receptives-en-guyane-2026` — TOURISME - Localisation des organismes et agences réceptives en Guyane (2026) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:meubles-de-tourisme` — TOURISME - Localisation des meublés de tourisme en Guyane (2024) - archive · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:offices-de-tourisme-points-d-informations-tourisme-et-service-tourisme` — TOURISME - Localisation des Offices de tourisme, Points d'Informations Tourisme et Service Tourisme des communes de Guyane (2024) - archive · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:tourisme-localisation-des-activite-touristiques-en-guyane-2024` — TOURISME - Localisation des activités touristiques en Guyane (2024) - archive · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:tourisme-localisation-des-agences-de-voyages-et-receptifs-en-guyane-2024` — TOURISME - Localisation des agences de voyages et réceptifs en Guyane (2024) - archive · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:tourisme-localisation-des-camps-touristiques-et-carbets-d-hotes-de-guyane-2024` — TOURISME - Localisation des camps touristiques et carbets d'hôtes de Guyane (2024) - archive · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_comite_tourisme_guyane:tourisme-localisation-des-hotels-en-guyane-2024` — TOURISME - Localisation des hôtels en Guyane (2024) - archive · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_commune_apatou:adresse-base-adresse-locale-bal-de-la-commune-d-apatou` — ADRESSE - Base Adresse Locale (BAL) de la commune d'Apatou · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_apatou:base-adresse-locale-bal-de-la-commune-d-apatou-11-01-2024` — Base Adresse Locale (BAL) de la commune d'Apatou - 11/01/2024 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_awala-yalimapo:adresse-base-adresse-locale-bal-de-la-commune-d-awala-yalimapo` — ADRESSE - Base Adresse Locale (BAL) de la commune d'Awala-Yalimapo · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_awala-yalimapo:base-adresse-locale-bal-de-la-commune-d-awala-yalimapo-12-02-2025-archive` — Base Adresse Locale (BAL) de la commune d'Awala-Yalimapo - 12/02/2025 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_awala-yalimapo:carte-communale-d-awala-yalimapo-zonage-reglementaire-approuve-le-14-01-2022` — URBA - Awala-Yalimapo (2022-01-14) CC zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:adresse-base-adresse-locale-bal-de-la-commune-de-cayenne` — ADRESSE - Base Adresse Locale (BAL) de la commune de Cayenne · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:base-adresse-locale-bal-de-la-commune-de-cayenne-13-02-2025-archive` — Base Adresse Locale (BAL) de la commune de Cayenne - 13/02/2025 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:opah-de-cayenne` — Périmètre Opération Programmée d'Amélioration de l'Habitat (OPAH) - Cayenne · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:perimetre-du-nouveau-programme-national-de-renouvellement-urbain-npnru-sur-la-commune-de-cayenne` — Périmètre du Nouveau Programme National de Renouvellement Urbain (NPNRU) sur la commune de Cayenne · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:perimetre-du-programme-action-coeur-de-ville-acv-cayenne` — Périmètre du programme Action Coeur de Ville (ACV) - Cayenne · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:plan-local-d-urbanisme-de-cayenne-08-04-2022-prescription-ponctuelle-opposable` — URBA - Cayenne (2022-04-08) PLU prescription ponctuelle opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:plan-local-d-urbanisme-de-cayenne-08-04-2022-zone-urba-opposable` — URBA - Cayenne (2022-04-08) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:urba-plan-local-d-urbanisme-de-cayenne-08-04-2022-habillage-texte-opposable` — URBA - Cayenne (2022-04-08) PLU habillage texte opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:urba-plan-local-d-urbanisme-de-cayenne-08-04-2022-information-surfacique-opposable` — URBA - Cayenne (2022-04-08) PLU information surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:urba-plan-local-d-urbanisme-de-cayenne-08-04-2022-prescription-lineaire-opposable` — URBA - Cayenne (2022-04-08) PLU prescription linéaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_cayenne:urba-plan-local-d-urbanisme-de-cayenne-08-04-2022-prescription-surfacique-opposable` — URBA - Cayenne (2022-04-08) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_grand-santi:adresse-base-adresse-locale-bal-de-la-commune-de-grand-santi` — ADRESSE- Base Adresse Locale (BAL) de la commune de Grand-Santi · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_grand-santi:base-adresse-locale-bal-de-la-commune-de-grand-santi-31-01-2025-archive` — Base Adresse Locale (BAL) de la commune de Grand-Santi - 31/01/2025 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_iracoubo:base-adresse-locale-bal-de-la-commune-de-iracoubo` — Base Adresse Locale (BAL) de la commune de Iracoubo · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_iracoubo:iracoubo_info_pct_20131024` — URBA - Iracoubo (2013-10-24) CC information ponctuelle opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_iracoubo:iracoubo_info_surf_20131024` — URBA - Iracoubo (2013-10-24) CC information surfacique  opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_iracoubo:iracoubo_secteur_cc_20131024` — URBA - Iracoubo (2013-10-24) CC secteur opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_kourou:adresse-base-adresse-locale-bal-de-la-commune-de-kourou` — ADRESSE - Base Adresse Locale (BAL) de la commune de Kourou · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_kourou:plan-local-d-urbanisme-de-kourou-12-04-2024-information-surfacique-opposable` — URBA - Kourou (2024-04-12) PLU information surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_kourou:plan-local-d-urbanisme-de-kourou-12-04-2024-prescription-lineaire-opposable` — URBA - Kourou (2024-04-12) PLU prescription linéaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_kourou:plan-local-d-urbanisme-de-kourou-12-04-2024-prescription-ponctuelle-opposable` — URBA - Kourou (2024-04-12) PLU prescription ponctuelle opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_kourou:plan-local-d-urbanisme-de-kourou-12-04-2024-prescription-surfacique-opposable` — URBA - Kourou (2024-04-12) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_kourou:plan-local-d-urbanisme-de-kourou-12-04-2024-zonage-reglementaire-opposable` — URBA - Kourou (2024-04-12) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_macouria:adresse-base-adresse-locale-bal-de-la-commune-de-macouria` — ADRESSE - Base Adresse Locale (BAL) de la commune de Macouria · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_macouria:base-adresse-locale-bal-de-la-commune-de-macouria-09-04-2024-archive` — Base Adresse Locale (BAL) de la commune de Macouria - 09/04/2024 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_macouria:macouria_habillage_txt_20231031` — URBA - Macouria (2023-10-31) PLU habillage texte opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_macouria:macouria_prescription_lin_20231031` — URBA - Macouria (2023-10-31) PLU prescription linéaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_macouria:macouria_prescription_surf_20231031` — URBA - Macouria (2023-10-31) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_macouria:macouria_zone_urba_20231031` — URBA - Macouria (2023-10-31) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_macouria:opah-de-macouria` — Périmètre Opération Programmée d'Amélioration de l'Habitat (OPAH) 2021-2026 - Macouria · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:base-adresse-locale-bal-de-la-commune-de-mana` — Base Adresse Locale (BAL) de la commune de Mana · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_97306_info_surf_20250926` — URBA - Mana (2025-09-26) PLU information surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_97306_prescription_lin_20250926` — URBA - Mana (2025-09-26) PLU prescription linéaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_97306_prescription_pct_20250926` — URBA - Mana (2025-09-26) PLU prescription ponctuelle non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_97306_prescription_surf_20250926` — URBA - Mana (2025-09-26) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_97306_zone_urba_20250926` — URBA - Mana (2025-09-26) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_info_surf_20220701` — URBA - Mana (2022-07-01) PLU information surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_info_surf_20240410` — URBA - Mana (2024-10-04) PLU information surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_info_surf_20241129` — URBA - Mana (2024-11-29) PLU information surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_info_surf_20250307` — URBA - Mana (2025-03-07) PLU information surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_info_surf_20251205` — URBA - Mana (2025-12-05) PLU information surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_lin_20220701` — URBA - Mana (2022-07-01) PLU prescription linéaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_lin_20240410` — URBA - Mana (2024-10-04) PLU prescription linéaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_lin_20250307` — URBA - Mana (2025-03-07) PLU prescription linéaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_lin_20251205` — URBA - Mana (2025-12-05) PLU prescription linéraire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_pct_20220701` — URBA - Mana (2022-07-01) PLU prescription ponctuelle non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_pct_20240410` — URBA - Mana (2024-10-04) PLU prescription ponctuelle non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_pct_20250307` — URBA - Mana (2025-03-07) PLU prescription ponctuelle non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_pct_20251205` — URBA - Mana (2025-12-05) PLU prescription ponctuelle opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_surf_20220701` — URBA - Mana (2022-07-01) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_surf_20240410` — URBA - Mana (2024-10-04) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_surf_20241129` — URBA - Mana (2024-11-29) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_surf_20250307` — URBA - Mana (2025-03-07) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_prescription_surf_20251205` — URBA - Mana (2025-12-05) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_zone_urba_20220701` — URBA - Mana (2022-07-01) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_zone_urba_20240410` — URBA - Mana (2024-10-04) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_zone_urba_20250307` — URBA - Mana (2025-03-07) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:mana_zone_urba_20251205` — URBA - Mana (2025-12-05) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:plan-local-d-urbanisme-de-mana-29-11-2024-prescription-lineaire-opposable` — URBA - Mana (2024-11-29) PLU prescription linéaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:plan-local-d-urbanisme-de-mana-29-11-2024-prescription-ponctuelle-opposable` — URBA - Mana (2024-11-29) PLU prescription ponctuelle non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_mana:plan-local-d-urbanisme-de-mana-29-11-2024-zonage-reglementaire-opposable` — URBA - Mana (2024-11-29) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_maripasoula:base-adresse-locale-bal-de-la-commune-de-maripasoula` — Base Adresse Locale (BAL) de la commune de Maripasoula · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_maripasoula:maripasoula_habillage_pct_20230824` — URBA - Maripasoula (2023-08-24) PLU habillage ponctuel opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_maripasoula:maripasoula_prescription_surf_20230824` — URBA - Maripasoula (2023-08-24) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_maripasoula:maripasoula_zone_urba_20230824` — URBA - Maripasoula (2023-08-24) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_maripasoula:opah-de-maripasoula` — Périmètre Opération Programmée d'Amélioration de l'Habitat (OPAH) - Maripasoula · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_matoury:base-adresse-locale-bal-de-la-commune-de-matoury` — Base Adresse Locale (BAL) de la commune de Matoury · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_matoury:matoury_97307_prescription_surf_20240712` — URBA - Matoury (2024-07-12) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_matoury:matoury_97307_zone_urba_20240712` — URBA - Matoury (2024-07-12) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_matoury:matoury_info_surf_20211222` — URBA - Matoury (2021-12-22) PLU informations surfaciques non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_matoury:matoury_prescription_surf_20211222` — URBA - Matoury (2021-12-22) PLU prescriptions surfaciques non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_matoury:matoury_zone_urba_20211222` — URBA - Matoury (2021-12-22) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_matoury:npnru_de_matoury` — Périmètre du Nouveau Programme National de Renouvellement Urbain (NPNRU) sur la commune de Matoury · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `el_commune_matoury:reglement-local-de-publicite-rlp-matoury` — Règlement local de publicité (RLP) - Matoury · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_montsinery-tonnegrande:montsinery-tonnegrande_info_surf_20111130` — URBA - Montsinery-Tonnegrande (2011-11-30) PLU information surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_montsinery-tonnegrande:montsinery-tonnegrande_prescription_surf_20111130` — URBA - Montsinery-Tonnegrande (2011-11-30) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_montsinery-tonnegrande:montsinery-tonnegrande_zone_urba_20111130` — URBA - Montsinery-Tonnegrande (2011-11-30) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_montsinery-tonnegrande:perimetre-operation-programmee-d-amelioration-de-l-habitat-opah-2025-2030-montsinery-tonnegrande` — Périmètre Opération Programmée d'Amélioration de l'Habitat (OPAH) 2025-2030 - Montsinéry-Tonnegrande · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_ouanary:adresse-base-adresse-locale-bal-de-la-commune-de-ouanary` — ADRESSE - Base Adresse Locale (BAL) de la commune de Ouanary · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_ouanary:base-adresse-locale-bal-de-la-commune-de-ouanary-26-12-2023-archive` — Base Adresse Locale (BAL) de la commune de Ouanary - 26/12/2023 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_papaichton:base-adresse-locale-bal-de-la-commune-de-papaichton` — Base Adresse Locale (BAL) de la commune de Papaïchton · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_remire-montjoly:base-adresse-locale-bal-de-la-commune-de-remire-montjoly` — Base Adresse Locale (BAL) de la commune de Rémire-Montjoly · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_remire-montjoly:base-adresse-locale-bal-de-la-commune-de-remire-montjoly-05-12-2024-archive` — Base Adresse Locale (BAL) de la commune de Rémire-Montjoly - 05/12/2024 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_roura:adresse-base-adresse-locale-bal-de-la-commune-de-roura` — ADRESSE - Base Adresse Locale (BAL) de la commune de Roura · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_roura:base-adresse-locale-bal-de-la-commune-de-roura-28-01-2025-archive` — Base Adresse Locale (BAL) de la commune de Roura - 28/01/2025 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-elie:adresse-base-adresse-locale-bal-de-la-commune-de-saint-elie` — ADRESSE - Base Adresse Locale (BAL) de la commune de Saint-Elie · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-elie:base-adresse-locale-bal-de-la-commune-de-saint-elie-06-06-2024-archive` — Base Adresse Locale (BAL) de la commune de Saint-Elie - 06/06/2024 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-elie:saint-elie_secteur_cc_20220225` — URBA - Saint-Elie (2022-02-25) CC secteur oposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-georges:adresse-base-adresse-locale-bal-de-la-commune-de-saint-georges` — ADRESSE - Base Adresse Locale (BAL) de la commune de Saint-Georges · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-georges:saint-georges_prescription_surf_20220830` — URBA - Saint-Georges (2022-08-30) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-georges:saint-georges_zone_urba_20220830` — URBA - Saint-Georges (2022-08-30) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:nprnu_97320` — Périmètre du Nouveau Programme National de Renouvellement Urbain (NPNRU) sur la commune de Saint-Laurent du Maroni · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:perimetre-du-programme-action-coeur-de-ville-acv-saint-laurent-du-maroni` — Périmètre du programme Action Coeur de Ville (ACV) - Saint-Laurent du Maroni · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:perimetre_opah_st_laurent_du_maroni` — Périmètre Opération Programmée d'Amélioration de l'Habitat (OPAH) 2024-2029 - Saint-Laurent du Maroni · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:plan-local-d-urbanisme-de-saint-laurent-du-maroni-12-11-2024-prescription-surfacique-opposable` — URBA - Saint-Laurent (2024-11-12) PLU prescription surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:plan-local-d-urbanisme-de-saint-laurent-du-maroni-12-11-2024-zonage-reglementaire-opposable` — URBA - Saint-Laurent (2024-11-12) PLU zonage règlementaire opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:saint-laurent-du-maroni_info_surf_20230524` — URBA - Saint-Laurent (2023-05-24) PLU information surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:saint-laurent-du-maroni_prescription_surf_20230524` — URBA - Saint-Laurent (2023-05-24) PLU prescription surfacique non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:saint-laurent-du-maroni_zone_urba_20230524` — URBA - Saint-Laurent (2023-05-24) PLU zonage règlementaire non opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saint-laurent:slm_info_surf_20241112` — URBA - Saint-Laurent (2024-11-12) PLU information surfacique opposable · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saul:adresse-base-adresse-locale-bal-de-la-commune-de-saul` — ADRESSE - Base Adresse Locale (BAL) de la commune de Saül · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_saul:base-adresse-locale-bal-de-la-commune-de-saul-29-12-2023-archive` — Base Adresse Locale (BAL) de la commune de Saül - 29/12/2023 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_sinnamary:adresse-base-adresse-locale-bal-de-la-commune-de-sinnamary` — ADRESSE - Base Adresse Locale (BAL) de la commune de Sinnamary · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_commune_sinnamary:base-adresse-locale-bal-de-la-commune-de-sinnamary-22-01-2025-archive` — Base Adresse Locale (BAL) de la commune de Sinnamary - 22/01/2025 - Archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_guyane-sig:Mana_CN50cm_RGFG95` — Produits ORTHO / ALTI - Mana (2023) - Courbes de niveaux à 50 cm · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_guyane-sig:ms_parcelles_onf_classement_officiel_973` — Parcelle ONF Classement officiel · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:atlas-de-la-biodiversite-communale-de-guyane` — Atlas de la biodiversité communale de Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:corridors-aquatiques-lignes-du-srce-de-la-guyane-approuve-le-06-07-2016` — Corridors aquatiques (lignes) du SRCE de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:corridors-aquatiques-surfaces-du-srce-de-la-guyane-approuve-le-06-07-2016` — Corridors aquatiques (surfaces) du SRCE de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:corridors-ecologiques-du-srce-de-la-guyane-approuve-le-06-07-2016` — Corridors écologiques du SRCE de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:courbes-de-niveaux-a-1m` — Produits ORTHO / ALTI - Mana (2023) - Courbes de niveaux à 1m · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:etablissements-du-secondaire-colleges-et-lycees-en-2026` — Etablissements du secondaire (collèges et lycées) en 2026 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:guyanes_srtm30_plus_2012_v20_ucsd` — Bathymétrie du plateau des Guyanes · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:itineraires-de-randonnees-du-pdipr-de-la-collectivite-territoriale-de-guyane` — Itinéraires de randonnées du Plan Départemental des Itinéraires de Promenade et de Randonnée (PDIPR) de la Collectivité Territoriale de Guyane · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:operations-financees-par-la-ctg-echantillon` — Opérations financées par la CTG (échantillon) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_region-guyane:tableau-d-assemblage-des-produits` — Produits ORTHO / ALTI - Mana (2023) - Tableau d'assemblage · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `el_test:ms_oam_surf_expl_2022_s` — Surfaces exploitées par l'activité minière en Guyane 2022 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:AERODROME_2014` — Aérodrome de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:ASSEMBLEE_CONSULAIRE_2013` — Assemblées Consulaires de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:BORNE_VERRE_CACL_2013` — Point de collecte du verre de la CACL en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:COMMUNE_2013` — Mairies de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:COMMUNE_2014` — Mairies de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:CONSEIL_CONSULTATIF_2013` — Conseils Consultatifs de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:CONSEIL_GENERAL_2013` — Antennes du Conseil Général · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:CONSEIL_GENERAL_2014` — Sites du Conseil Général en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:CONSEIL_REGIONAL_2013` — Sites de la Région Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:CONSULAT_2013` — Consulats de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:DEPOT_VHU_CACL_2013` — Dépôts de véhicules hors d'usage sur la CACL en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:EPCI_2014` — Sièges des EPCI de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:EPCI_EMPRISE_2013` — Emprises des EPCI de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:EPCI_SITE_2013` — Sièges des EPCI de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:EQUIPE_RECHERCHE_DRRT_2013` — Site des équipes de recherche de la Délégations Régionales à la Recherche et à la Technologie (DRRT) en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:EQUIPE_RECHERCHE_DRRT_2014` — Site des équipes de recherche de la Délégations Régionales à la Recherche et à la Technologie (DRRT) en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:EQUIPEMENT_DJSCS_2013` — Equipements sportifs de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:EQUIPEMENT_DJSCS_2014` — Equipements sportifs de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:ETABLISSEMENT_RECTORAT_2012_2013` — Etablissement scolaire du rectorat pour la période scolaire 2012-2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:ETABLISSEMENT_RECTORAT_2013_2014` — Etablissements scolaires du rectorat pour la période scolaire 2013-2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:GENDARMERIE_2013` — Site de la gendarmerie en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:INSTITUTION_RECHERCHE_2013` — Sites des institutions de recherche en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:KAZ_TI_TRI_CACL_2013` — Points de collecte collectifs des déchets ménagers de la CACL en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:LIGNES_AERIENNES_2015` — Lignes aériennes intérieur de Guyane en 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:POINT_IGN_2013` — Points géodésiques de Guyane en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:POINT_IGN_2014` — Points géodésiques de Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:POLICE_MUNICIPALE_2013` — Site de la police municipale en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:POLICE_NATIONALE_2013` — Site de la police nationale en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:POMPIER_AEROPORT_2013` — Site des pompiers d'aéroport en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:REGION_GUYANE_2014` — Sites de la Région Guyane en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:SDIS_2013` — Site des Service Départemental d'Incendie et de Secours (SDIS) en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:SITE_TRAITEMENT_CACL_2013` — Site de traitement des déchets de la CACL en 2013 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `esp:SITE_VHU_2016` — Localisation des véhicules hors d'usage sur la Guyane (2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `fond_carte:MOSAIQUE_LANDSAT_8_2014_EMPRISE` — Mosaïque LANDSAT 8 de la Guyane, emprise (2014) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `fond_carte:MOSAIQUE_LANDSAT_8_2015_EMPRISE` — Mosaïque LANDSAT 8 de la Guyane, emprise (2015) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `foresterie:INVENTAIRE_FORESTIER_ONF_1978` — Données de l'Inventaire Forestier de la Guyane de 1978 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `foresterie:INVENTAIRE_TRAMES` — Inventaire des espèces observées sur la CACL dans le cadre du projet TRAMES Guyane (2021) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `foresterie:trame_bleue_cacl_2021` — Trame bleue de la CACL issue du projet TRAMES Guyane (2021) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `foresterie:trame_verte_cacl_2021` — Trame verte de la CACL issue du projet TRAMES Guyane (2021) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:CARRIERE_BRGM_1993_1994_surface` — Carrières des cartes lithologiques des formations superficielles du littoral de la Guyane de 1993 et 1994 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:CARRIERE_ZONE_EMPRUNT_BRGM_1993_1994` — Carrières et zones d'emprunt des cartes lithologiques des formations superficielles du littoral de la Guyane de 1993 et 1994 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:CARTE_GEOLOGIQUE_GEOYAPOCK_BRGM_2007_FAILLES` — Failles de la carte géologique de Saint-Georges de l'Oyapock - Oiapoque (projet GéOyapock) de 2007 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:CARTE_GEOLOGIQUE_GEOYAPOCK_BRGM_2007_FILONS` — Filons de la carte géologique de Saint-Georges de l'Oyapock - Oiapoque (projet GéOyapock) de 2007 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:CARTE_GEOLOGIQUE_GEOYAPOCK_BRGM_2007_vecteur` — Carte géologique de Saint-Georges de l'Oyapock - Oiapoque (projet GéOyapock) de 2007 (2017) - vecteur · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:CARTE_GEOLOGIQUE_GUYANE_BRGM_2001_vecteur` — Carte géologique de la Guyane (2ème édition) de 2001 (2017) - vecteur · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:CARTE_LITHOLOGIQUE_LITTORAL_BRGM_1993_1994` — Cartes lithologiques des formations superficielles du littoral de la Guyane de 1993 et 1994 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:FAVORABILITE_AURIFERE_FORMATIONS_GEOLOGIQUES_BRGM_2001` — Favorabilité aurifère des formations géologiques issue de la carte géologique de la Guyane (2ème édition) de 2001 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:GITES_ALLUVIONNAIRES_ORSTOM_1979` — Gîtes alluvionnaires de la carte des ressources minières de la Guyane de 1979 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:INDICES_GISEMENTS_BRGM_2006` — Carte des gisements, gîtes et indices de minéralisation de la Guyane de 2006 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:METALLOGENIE_ORSTOM_1979` — Métallogénie de la carte des ressources minières de la Guyane de 1979 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:PETITS_INDICES_MORPHOLOGIE_INDETERMINEE_ORSTOM_1979` — Petits indices de morphologie indéterminée de la carte des ressources minières de la Guyane de 1979 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:PETITS_INDICES_STRATIFORMES_ORSTOM_1979` — Petits indices stratiformes de la carte des ressources minières de la Guyane de 1979 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:PROSPECT_BRGM_2005` — Carte de localisation des prospects de l'inventaire BRGM de la Guyane de 2005 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:SCHEMA_STRUCTURAL_GUYANE_BRGM_2004` — Schéma structural de la Guyane de 2004 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `geologie:SCHEMA_STRUCTURAL_GUYANE_BRGM_2004_FAILLES` — Failles du schéma structural de la Guyane de 2004 (2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:BATI_INDIFFERENCIE` — BD TOPO®, thème Bâtiments - Bâtiments indifférenciés (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:bd_ortho_2001_emprise` — BD ORTHO® 2001 (emprise) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:bd_ortho_2006_emprise` — BD ORTHO® 2006 (emprise) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:bd_ortho_2011_emprise` — BD ORTHO® 2011 (emprise) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:CHEF_LIEU` — BD TOPO®, thème Administratif - Chefs-lieux (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:CHEMIN` — BD TOPO®, thème Réseau Routier - Chemin (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:COMMUNE` — BD TOPO®, thème Administratif - Communes (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:ROUTE` — BD TOPO®, thème Réseau Routier - Route (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:ROUTE_NOMMEE` — BD TOPO®, thème Réseau Routier - Route nommée (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:ROUTE_PRIMAIRE` — BD TOPO®, thème Réseau Routier - Route primaire (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:ROUTE_SECONDAIRE` — BD TOPO®, thème Réseau Routier - Route secondaire (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:Scan25_2006_emprise` — SCAN 25® 2006 (emprise) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:Scan500_1995_emprise` — SCAN 500® 1995 (emprise) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:Scan50_2012_emprise` — SCAN 50® 2012 (emprise) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:spot5_2008_emprise` — MOSAIQUE GUYANE 2008 (emprise) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:SURFACE_EAU` — BD TOPO®, thème Réseau Hydrographique - Surfaces d'eau (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:SURFACE_ROUTE` — BD TOPO®, thème Réseau Routier - Surface route (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:TOPONYME_COMMUNICATION` — BD TOPO®, thème Réseau Routier - Toponyme communication (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ign:TRONCON_COURS_EAU` — BD TOPO®, thème Réseau Hydrographique - Tronçons de cours d'eau (17/05/2017) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_BOURG-MARIPASOULA_ORTHO-15CM_20012016` — Produits ORTHO - Maripasoula bourg (2016) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_CAYENNE_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Cayenne (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_MACOURIA_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Macouria (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_MATOURY_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Matoury (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_MONTSINERY-TONNEGRANDE_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Montsinery-Tonnegrande (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_REMIRE-MONTJOLY_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Rémire-Montjoly (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_ROURA_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Roura (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_SAINT-LAURENT_BASTIEN_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Saint-Laurent du Maroni secteur Ilet Bastien (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_SAINT-LAURENT_BOURG_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Saint-Laurent du Maroni bourg (2016) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_SAINT-LAURENT_PIMPIN_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Saint-Laurent du Maroni secteur Pimpin (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:EMPRISE_SAINT-LAURENT_SPAROUINE_ORTHO-IMAGE_2015` — Produits ORTHO / ALTI - Saint-Laurent du Maroni secteur Sparouine (2015) - Emprise de l'ortho-image · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:ORTHO_MOSAIQUE_GUYANE-SIG_2012_EMPRISE` — Mosaïques 2012 d'orthophotographies aériennes des zones anthropisées des communes de Guyane - Emprise · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:ORTHO_MOSAIQUE_PLEIADES_1A-1B_2014_EMPRISE_V2` — Mosaïque des ortho-images Pléiades 1A/B (version 2 - 2014) - Emprise · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `ortho:ORTHO_MOSAIQUE_SPOT_6-7_2014_EMPRISE_V2` — Mosaïque des ortho-images SPOT 6/7 (version 2 - 2014) - Emprise · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:202502_EnjeuxSenbibilite_HabitatsForestiers_Saul` — Enjeux et sensibilité des habitats forestiers de Saül · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:corridors-ecologiques-de-saul-2022` — Corridors écologiques du bourg de Saül (2022) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:deforestations_minieres_tropisco_bv_maroni_suriname_2018_2024` — Sélection des déforestations Tropisco d'origines minières sur le BV du Maroni coté Suriname 2001 - 2024 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `parc-amazonien-de-guyane:enjeux-et-sensibilite-des-habitats-forestiers-de-papaichton` — Enjeux et sensibilité des habitats forestiers de Papaïchton · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:hansen_deforestations-minieres-bv-maroni-suriname` — Sélection des déforestations HANSEN d'origines minières sur le BV du Maroni coté Suriname 2001 - 2024 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `parc-amazonien-de-guyane:impact_hydro_cumule_surf_expl_leg_et_illeg__accumulation_aval_surf_expl_2023` — Surfaces minières amonts accumulées sur les hydrosystèmes · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:limites-fines-pag-2018` — Limites fines PAG 2018 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:obstacles-des-corridors-ecologiques-du-bourg-de-saul-2022` — Obstacles des corridors écologiques du bourg de Saül (2022) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:stations_virtuelles_d_accumulation_des_surfaces_minieres_deforestees` — Stations virtuelles d'accumulation des surfaces minières deforestées · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:surf_def_bv_maroni_suriname_2022` — Surfaces minières déforestées cumulées sur le BV Maroni coté Suriname 2024 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `parc-amazonien-de-guyane:synthese-ocs-2015` — Synthèse OCS 2015 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `parc-amazonien-de-guyane:zonage-du-parc-amazonien-de-guyane-fin` — Zonage du parc amazonien de Guyane (fin) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `rnnmgm---reserve-naturelle-nationale-du-mont-grand-matoury:sentier-de-lamirande-reserve-naturelle-nationale-du-mont-grand-matoury` — Sentier de Lamirande (Réserve Naturelle Nationale du Mont Grand Matoury) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `rnnmgm---reserve-naturelle-nationale-du-mont-grand-matoury:sentier-des-americains-reserve-naturelle-nationale-du-mont-grand-matoury` — Sentier des Américains (Réserve Naturelle Nationale du Mont Grand Matoury) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `rnnmgm---reserve-naturelle-nationale-du-mont-grand-matoury:sentiers-de-randonnees-de-la-reserve-naturelle-nationale-du-mont-grand-matoury` — Sentiers de randonnées de la Réserve Naturelle Nationale du Mont Grand Matoury · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `sante:HTA_COMMUNE_2014` — Prévalence de l'hypertention artérielle (HTA) dans la population agricole guyanaise affiliée à la MSA par commune de résidence en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:HTA_EPCI_2014` — Prévalence de l'hypertention artérielle (HTA) dans la population agricole guyanaise affiliée à la MSA par intercommunalité de résidence en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:MOY_AN_NAIS_RIG_2010_2012` — Nombre de naissance moyenne annuelle par commune de résidence en Guyane sur la période 2010-2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:NAISSANCE_RIG_2009` — Nombre de naissance par commune de résidence en Guyane en 2009 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:NAISSANCE_RIG_2010` — Nombre de naissance par commune de résidence en Guyane en 2010 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:NAISSANCE_RIG_2011` — Nombre de naissance par commune de résidence en Guyane en 2011 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:NAISSANCE_RIG_2012` — Nombre de naissance par commune de résidence en Guyane en 2012 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:OBE_COMMUNE_2014` — Prévalence de l'obésité dans la population agricole guyanaise affiliée à la MSA par commune de résidence en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:OBE_EPCI_2014` — Prévalence de l'obésité dans la population agricole guyanaise affiliée à la MSA par intercommunalité de résidence en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:PART_DIAB_TRAITES_POP_SECU_2014` — Part des diabétiques traités dans la population protégée en 2014 par commune de résidence · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:PROP_DIAB_TRAITES_POP_SECU_2014` — Proportion des diabétiques traités dans la population protégée en 2014 par commune de résidence · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:SUR_COMMUNE_2014` — Prévalence du surpoids dans la population agricole guyanaise affiliée à la MSA par commune de résidence en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:SUR_EPCI_2014` — Prévalence du surpoids dans la population agricole guyanaise affiliée à la MSA par intercommunalité de résidence en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:SYM_COMMUNE_2014` — Prévalence des symptômes liés à l'utilisation des produits phytosanitaires dans la population agricole guyanaise affiliée à la MSA par commune de l'exploitation agricole en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:SYM_EPCI_2014` — Prévalence des symptômes liés à l'utilisation des produits phytosanitaires dans la population agricole guyanaise affiliée à la MSA par intercommunalité de l'exploitation agricole · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:TAUX_MORTALITE_INFANTILE_2001_2011` — Taux (pour 100 000 habitants) brut de mortalité infantile sur la période 2001-2011 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:TAUX_STANDARDISE_MORTALITE_2001_2011` — Taux (pour 100 000 habitants) standardisé de mortalité sur la période 2001-2011 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:TAUX_STANDARDISE_MORTALITE_PREMATURE_2001_2011` — Taux (pour 100 000 habitants) standardisé de mortalité prématurée sur la période 2001-2011 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:TMS_COMMUNE_2014` — Prévalence des troubles musculoscquelettiques (TMS) dans la population agricole guyanaise affiliée à la MSA par commune de l'exploitation agricole en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sante:TMS_EPCI_2014` — Prévalence des troubles musculoscquelettiques (TMS) dans la population agricole guyanaise affiliée à la MSA par intercommunalité de l'exploitation agricole en 2014 · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Coupures_urbanisations` — Coupures d'urbanisation du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Destination_sols` — Destination des sols du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Emprises_zonages_reglementaires_SAR100` — Emprises des cartes de destination générale des différentes partie du territoire établies au 1/100 000ème du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Emprises_zonages_reglementaires_SMVM100` — Emprises des cartes de destination générale des différentes partie du territoire établies au 1/100 000ème du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Emprises_zonages_reglementaires_SMVM80` — Emprises des cartes de destination générale des différentes partie du territoire établies au 1/80 000ème du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Espaces_maritimes_de_conservation_durable` — Espaces maritimes de conservation durable du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Limite_SMVM` — Emprise du périmètre du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Limite_SMVM_Masque` — Masque hors SMVM habillant la carte du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Limite_SMVM_TerreOcean` — Océan et espace terrestre habillant la carte du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Limites_communes` — Limites des communes habillant le SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Ocean` — Océan habillant les cartes du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Reseau_hydrographique_principal_lineaire` — Réseau hydrographique principal (linéraire) habillant les cartes du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Reseau_hydrographique_principal_surface` — Réseau hydrographique principal (surfacique) habillant les cartes du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_Reseaux_voies_navettesfluviales` — Réseaux de voies routières, navettes fluviales et fluvio-maritimes du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SAR100_Pictogrammes` — Equipements existants ou en projet des cartes au 1/100 000ème du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SAR100_Texte` — Toponymes habillant les cartes au 1/100 000ème du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SAR500_Pictogrammes` — Equipements existants ou en projet de la carte au 1/500 000ème du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SAR500_Texte` — Toponymes habillant la carte au 1/500 000ème du SAR de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SMVM100_Pictogrammes` — Equipements existants ou en projet des agrandissements des cartes au 1/100 000ème du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SMVM100_Texte` — Toponymes habillant les agrandissements des cartes au 1/100 000ème du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SMVM250_Pictogrammes` — Equipements existants ou en projet de la carte au 1/250 000ème du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SMVM250_Texte` — Toponymes habillant la carte au 1/250 000ème du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SMVM80_Pictogrammes` — Equipements existants ou en projet des agrandissements des cartes au 1/80 000ème du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `sar:SAR_06_07_2016_SMVM80_Texte` — Toponymes habillant les agrandissements des cartes au 1/80 000ème du SMVM de la Guyane (approuvé le 06/07/2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-1-01_DS_PHR1A_201410221402408_SE1_PX_W053N04_0522_02484` — Emprise vectorielle de la zone informée Pléiades 1A (22/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-10-01_DS_PHR1B_201409251410165_SE1_PX_W053N05_0110_01804` — Emprise vectorielle de la zone informée Pléiades 1B (25/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-11-01_DS_PHR1A_201410031358466_SE1_PX_W053N05_0304_02182` — Emprise vectorielle de la zone informée Pléiades 1A (03/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-12-01_DS_PHR1A_201412251409469_FR1_PX_W055N04_0808_03298` — Emprise vectorielle de la zone informée Pléiades 1A (25/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-13-01_DS_PHR1B_201407161405318_FR1_PX_W053N05_0109_02467` — Emprise vectorielle de la zone informée Pléiades 1B (16/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-14-01_DS_PHR1A_201410011413164_SE1_PX_W054N05_0615_02258` — Emprise vectorielle de la zone informée Pléiades 1A (01/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-15-01_DS_PHR1A_201408101415221_SE1_PX_W055N04_0809_00746` — Emprise vectorielle de la zone informée Pléiades 1A (10/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-16-01_DS_PHR1B_201409061405520_SE1_PX_W055N05_0904_00822` — Emprise vectorielle de la zone informée Pléiades 1B (06/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-17-01_DS_PHR1B_201407301358173_SE1_PX_W055N05_1212_01183` — Emprise vectorielle de la zone informée Pléiades 1B (30/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-18-01_DS_PHR1A_201409261402191_FR1_PX_W053N05_0207_01107` — Emprise vectorielle de la zone informée Pléiades 1A (26/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-19-01_DS_PHR1A_201411291410523_FR1_PX_W055N03_1209_02258` — Emprise vectorielle de la zone informée Pléiades 1A (29/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-2-01_DS_PHR1A_201409261403016_FR1_PX_W053N05_0504_03164` — Emprise vectorielle de la zone informée Pléiades 1A (26/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-20-01_DS_PHR1A_201409261402099_FR1_PX_W054N05_1111_01804` — Emprise vectorielle de la zone informée Pléiades 1A (26/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-21-01_DS_PHR1B_201410091402266_SE1_PX_W055N05_0904_00822` — Emprise vectorielle de la zone informée Pléiades 1B (09/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-22-01_DS_PHR1A_201408291418329_SE1_PX_W055N03_1020_00596` — Emprise vectorielle de la zone informée Pléiades 1A (29/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-23-01_DS_PHR1B_201411301403366_FR1_PX_W055N03_1211_03694` — Emprise vectorielle de la zone informée Pléiades 1B (30/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-24-01_DS_PHR1B_201407161405439_FR1_PX_W054N05_0912_01728` — Emprise vectorielle de la zone informée Pléiades 1B (16/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-25-01_DS_PHR1B_201411301403248_FR1_PX_W054N03_0112_02710` — Emprise vectorielle de la zone informée Pléiades 1B (30/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-26-01_DS_PHR1A_201412181414070_FR1_PX_W055N04_0810_04866` — Emprise vectorielle de la zone informée Pléiades 1A (18/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-27-01_DS_PHR1A_201409241417223_SE1_PX_W055N05_1208_01409` — Emprise vectorielle de la zone informée Pléiades 1A (24/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-28-01_DS_PHR1B_201409181413564_SE1_PX_W054N05_0409_00746` — Emprise vectorielle de la zone informée Pléiades 1B (18/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-29-01_DS_PHR1A_201408291418396_SE1_PX_W055N03_1216_00596` — Emprise vectorielle de la zone informée Pléiades 1A (29/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-3-01_DS_PHR1A_201411291410363_FR1_PX_W055N04_0804_00898` — Emprise vectorielle de la zone informée Pléiades 1A (29/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-30-01_DS_PHR1A_201409241417309_FR1_PX_W055N05_1107_00672` — Emprise vectorielle de la zone informée Pléiades 1A (24/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-31-01_DS_PHR1B_201409061406439_SE1_PX_W055N03_1120_00596` — Emprise vectorielle de la zone informée Pléiades 1B (06/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-32-01_DS_PHR1A_201412061405445_FR1_PX_W054N05_1012_01728` — Emprise vectorielle de la zone informée Pléiades 1A (06/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-33-01_DS_PHR1B_201409251410366_FR1_PX_W054N05_0811_02636` — Emprise vectorielle de la zone informée Pléiades 1B (25/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-34-01_DS_PHR1B_201407161406103_FR1_PX_W054N05_1111_01804` — Emprise vectorielle de la zone informée Pléiades 1B (16/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-35-01_DS_PHR1A_201412181413086_FR1_PX_W054N05_0316_01200` — Emprise vectorielle de la zone informée Pléiades 1A (18/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-36-01_DS_PHR1A_201408291418258_SE1_PX_W055N04_0809_00822` — Emprise vectorielle de la zone informée Pléiades 1A (29/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-4-01_DS_PHR1B_201409251410478_SE1_PX_W054N05_0610_01804` — Emprise vectorielle de la zone informée Pléiades 1B (25/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-5-01_DS_PHR1A_201408291417295_SE1_PX_W055N05_1212_01200` — Emprise vectorielle de la zone informée Pléiades 1A (29/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-6-01_DS_PHR1A_201408241406178_SE1_PX_W055N05_1212_01258` — Emprise vectorielle de la zone informée Pléiades 1A (24/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-7-01_DS_PHR1A_201410221401550_FR1_PX_W053N05_0505_01728` — Emprise vectorielle de la zone informée Pléiades 1A (22/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-8-01_DS_PHR1B_201408301409470_SE1_PX_W055N05_0904_00822` — Emprise vectorielle de la zone informée Pléiades 1B (30/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SEAS_2_SO15006124-9-01_DS_PHR1B_201411281417300_FR1_PX_W054N05_0217_01956` — Emprise vectorielle de la zone informée Pléiades 1B (28/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO14014264-1-01_DS_SPOT6_201411041335340_FR1_FR1_SE1_SE1_W053N04_01140` — Emprise vectorielle de la zone informée SPOT 6 (04/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO14014923-1-01_DS_SPOT6_201409061339306_FR1_FR1_SE1_SE1_W054N04_02602` — Emprise vectorielle de la zone informée SPOT 6 (06/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO14014933-1-01_DS_SPOT6_201408301344014_FR1_FR1_SE1_SE1_W054N02_01627` — Emprise vectorielle de la zone informée SPOT 6 (30/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO14015153-1-01_DS_SPOT6_201410231329311_FR1_FR1_SE1_SE1_W052N03_01140` — Emprise vectorielle de la zone informée SPOT 6 (23/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15000975-1-01_DS_PHR1B_201407161405318_FR1_PX_W053N05_0109_02467` — Emprise vectorielle de la zone informée PLEIADE 1B (16/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO15000975-2-01_DS_PHR1B_201407161406195_FR1_PX_W053N05_0107_01048` — Emprise vectorielle de la zone informée PLEIADE 1B (16/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO15000975-3-01_DS_PHR1A_201407221410269_SE1_PX_W053N05_0107_01048` — Emprise vectorielle de la zone informée PLEIADE 1A (22/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO15000988-1-01_DS_SPOT6_201408131324281_FR1_FR1_SE1_SE1_W053N05_01627` — Emprise vectorielle de la zone informée SPOT 6 (13/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO15000988-2-01_DS_SPOT6_201408181335287_FR1_FR1_SE1_SE1_W053N05_01546` — Emprise vectorielle de la zone informée SPOT 6 (18/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO15000989-1-01_DS_SPOT6_201410111320557_FR1_FR1_SE1_SE1_W052N04_02926` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15000989-2-01_DS_SPOT6_201412071332160_FR1_FR1_SE1_SE1_W052N04_01303` — Emprise vectorielle de la zone informée SPOT 6 (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15000989-3-01_DS_SPOT6_201412071332286_FR1_FR1_SE1_SE1_W052N04_01790` — Emprise vectorielle de la zone informée SPOT 6 (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15001019-1-01_DS_SPOT7_201412011328555_FR1_FR1_SE1_SE1_W052N03_04550` — Emprise vectorielle de la zone informée SPOT 7 (01/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15001019-2-01_DS_SPOT6_201410111320557_FR1_FR1_SE1_SE1_W052N04_02926` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15001019-3-01_DS_SPOT6_201410111321172_FR1_FR1_SE1_SE1_W052N04_01790` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15001019-4-01_DS_SPOT6_201411181328519_FR1_FR1_SE1_SE1_W052N04_01140` — Emprise vectorielle de la zone informée SPOT 6 (18/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15001019-5-01_DS_SPOT6_201412071332442_FR1_FR1_SE1_SE1_W052N04_01871` — Emprise vectorielle de la zone informée SPOT 6 (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15001019-6-01_DS_SPOT6_201412071332286_FR1_FR1_SE1_SE1_W052N04_01790` — Emprise vectorielle de la zone informée SPOT 6 (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15001259-1-01_DS_SPOT6_201410091335546_FR1_FR1_SE1_SE1_W053N05_02277` — Emprise vectorielle de la zone informée SPOT 6 (09/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO15001260-1-01_DS_PHR1A_201410081409321_FR1_PX_W053N04_0921_01578` — Emprise vectorielle de la zone informée PLEIADE 1A (08/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32621`
+- `seas_2:EMPRISE_SO15002892-1-01_DS_SPOT7_201412061339556_FR1_FR1_SE1_SE1_W053N04_01140` — Emprise vectorielle de la zone informée SPOT 7 (06/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002892-2-01_DS_SPOT7_201410031332237_FR1_FR1_SE1_SE1_W053N04_01140` — Emprise vectorielle de la zone informée SPOT 7 (03/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002894-1-01_DS_SPOT6_201408131324281_FR1_FR1_SE1_SE1_W053N05_01627` — Emprise vectorielle de la zone informée SPOT 6 (13/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002894-2-01_DS_SPOT6_201408181335287_FR1_FR1_SE1_SE1_W053N05_01546` — Emprise vectorielle de la zone informée SPOT 6 (18/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002895-2-01_DS_SPOT6_201410111320557_FR1_FR1_SE1_SE1_W052N04_02926` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002895-3-01_DS_SPOT6_201412071332160_FR1_FR1_SE1_SE1_W052N04_01303` — Emprise vectorielle de la zone informée SPOT 6 (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002895-4-01_DS_SPOT6_201412071332286_FR1_FR1_SE1_SE1_W052N04_01790` — Emprise vectorielle de la zone informée SPOT 6 (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002896-1-01_DS_SPOT6_201410111320557_FR1_FR1_SE1_SE1_W052N04_02926` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002896-2-01_DS_SPOT6_201410111321172_FR1_FR1_SE1_SE1_W052N04_01790` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002896-3-01_DS_SPOT6_201411181328519_FR1_FR1_SE1_SE1_W052N04_01140` — Emprise vectorielle de la zone informée SPOT 6 (18/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002896-4-01_DS_SPOT7_201412011328555_FR1_FR1_SE1_SE1_W052N03_04550` — Emprise vectorielle de la zone informée SPOT 7 (01/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15002896-5-01_DS_SPOT6_201412071332286_FR1_FR1_SE1_SE1_W052N04_01790` — Emprise vectorielle de la zone informée SPOT 6 (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15003920-1-01_DS_PHR1B_201409251411150_SE1_PX_W053N04_0402_01048` — Emprise vectorielle de la zone informée PLEIADE 1B (25/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15003921-1-01_DS_PHR1A_201407221410269_SE1_PX_W053N05_0107_01048` — Emprise vectorielle de la zone informée PLEIADE 1A (22/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15003921-2-01_DS_PHR1B_201407161406195_FR1_PX_W053N05_0107_01048` — Emprise vectorielle de la zone informée PLEIADE 1B (16/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15003922-1-01_DS_PHR1B_201411181355475_SE1_PX_W053N04_1211_07772` — Emprise vectorielle de la zone informée PLEIADE 1B (18/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15003922-2-01_DS_PHR1B_201412071358553_SE1_PX_W053N04_1210_09058` — Emprise vectorielle de la zone informée PLEIADE 1B (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15003923-1-01_DS_PHR1A_201408261351433_SE1_PX_W052N03_0220_03903` — Emprise vectorielle de la zone informée PLEIADE 1A (26/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15003923-2-01_DS_PHR1B_201410041351479_SE1_PX_W052N03_0220_03844` — Emprise vectorielle de la zone informée PLEIADE 1B (04/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15003923-3-01_DS_PHR1B_201412021347460_FR1_PX_W052N03_0221_01276` — Emprise vectorielle de la zone informée PLEIADE 1B (02/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15005900-35-01_DS_SPOT6_201409061339306_FR1_FR1_SE1_SE1_W054N04_02602` — Emprise vectorielle de la zone informée SPOT 6 (06/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-36-01_DS_SPOT6_201409251342556_FR1_FR1_SE1_SE1_W055N05_01465` — Emprise vectorielle de la zone informée SPOT 6 (25/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-37-01_DS_SPOT6_201410281339241_FR1_FR1_SE1_SE1_W055N04_01465` — Emprise vectorielle de la zone informée SPOT 6 (28/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-38-01_DS_SPOT6_201410281339375_FR1_FR1_SE1_SE1_W054N02_05119` — Emprise vectorielle de la zone informée SPOT 6 (28/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-39-01_DS_SPOT7_201408291351162_FR1_FR1_SE1_SE1_W054N06_01465` — Emprise vectorielle de la zone informée SPOT 7 (29/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-40-01_DS_SPOT7_201408291351301_FR1_FR1_SE1_SE1_W054N06_01140` — Emprise vectorielle de la zone informée SPOT 7 (29/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-41-01_DS_SPOT7_201409121343257_FR1_FR1_SE1_SE1_W053N05_01627` — Emprise vectorielle de la zone informée SPOT 7 (12/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-42-01_DS_SPOT7_201409141328091_FR1_FR1_SE1_SE1_W053N05_01952` — Emprise vectorielle de la zone informée SPOT 7 (14/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-43-01_DS_SPOT7_201412181348121_FR1_FR1_SE1_SE1_W054N05_01790` — Emprise vectorielle de la zone informée SPOT 7 (18/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-44-01_DS_SPOT6_201410281339375_FR1_FR1_SE1_SE1_W054N02_05119` — Emprise vectorielle de la zone informée SPOT 6 (28/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-45-01_DS_SPOT6_201410111320557_FR1_FR1_SE1_SE1_W052N04_02926` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-46-01_DS_SPOT6_201410111320557_FR1_FR1_SE1_SE1_W052N04_02926` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-47-01_DS_SPOT6_201407301331520_FR1_FR1_SE1_SE1_W052N04_01627` — Emprise vectorielle de la zone informée SPOT 6 (30/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-48-01_DS_SPOT6_201410111320557_FR1_FR1_SE1_SE1_W052N04_02926` — Emprise vectorielle de la zone informée SPOT 6 (11/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-49-01_DS_SPOT6_201407301331520_FR1_FR1_SE1_SE1_W052N04_01627` — Emprise vectorielle de la zone informée SPOT 6 (30/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-50-01_DS_SPOT6_201409271328495_FR1_FR1_SE1_SE1_W052N03_01790` — Emprise vectorielle de la zone informée SPOT 6 (27/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-51-01_DS_SPOT7_201409261336254_FR1_FR1_SE1_SE1_W052N03_02845` — Emprise vectorielle de la zone informée SPOT 7 (26/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005900-52-01_DS_SPOT6_201407161340347_FR1_FR1_SE1_SE1_W053N02_03332` — Emprise vectorielle de la zone informée SPOT 6 (16/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15005907-1-01_DS_SPOT7_201503221324564_FR1_FR1_SE1_SE1_W052N03_01790` — Emprise vectorielle de la zone informée SPOT 7 (22/03/2015) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15006346-1-01_DS_PHR1B_201409251410565_SE1_PX_W054N04_0920_01502` — Emprise vectorielle de la zone informée Pléiades 1B (25/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-10-01_DS_PHR1A_201410221403268_SE1_PX_W053N03_0805_02467` — Emprise vectorielle de la zone informée Pléiades 1A (22/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-11-01_DS_PHR1A_201411031410131_SE1_PX_W052N03_0423_01728` — Emprise vectorielle de la zone informée Pléiades 1A (03/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-12-01_DS_PHR1A_201411031410228_SE1_PX_W052N03_0220_03844` — Emprise vectorielle de la zone informée Pléiades 1A (03/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-13-01_DS_PHR1B_201410161359021_SE1_PX_W053N04_1213_06640` — Emprise vectorielle de la zone informée Pléiades 1B (16/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-14-01_DS_PHR1B_201410021406391_SE1_PX_W053N04_1209_03316` — Emprise vectorielle de la zone informée Pléiades 1B (02/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-15-01_DS_PHR1B_201412071358553_SE1_PX_W053N04_1210_09058` — Emprise vectorielle de la zone informée Pléiades 1B (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-16-01_DS_PHR1A_201412011355234_SE1_PX_W053N04_1006_03240` — Emprise vectorielle de la zone informée Pléiades 1A (01/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-17-01_DS_PHR1B_201410161359338_SE1_PX_W053N04_1008_04600` — Emprise vectorielle de la zone informée Pléiades 1B (16/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-18-01_DS_PHR1B_201410161359021_SE1_PX_W053N04_1213_06640` — Emprise vectorielle de la zone informée Pléiades 1B (16/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-19-01_DS_PHR1B_201410021406391_SE1_PX_W053N04_1209_03316` — Emprise vectorielle de la zone informée Pléiades 1B (02/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-2-01_DS_PHR1B_201411301402474_FR1_PX_W054N03_1015_01183` — Emprise vectorielle de la zone informée Pléiades 1B (30/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-20-01_DS_PHR1B_201412071358553_SE1_PX_W053N04_1210_09058` — Emprise vectorielle de la zone informée Pléiades 1B (07/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-3-01_DS_PHR1B_201411301403490_FR1_PX_W054N02_0209_01048` — Emprise vectorielle de la zone informée Pléiades 1B (30/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-4-01_DS_PHR1A_201411291411058_FR1_PX_W053N02_0207_01032` — Emprise vectorielle de la zone informée Pléiades 1A (29/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-5-01_DS_PHR1A_201409071359210_FR1_PX_W053N03_1006_01804` — Emprise vectorielle de la zone informée Pléiades 1A (07/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-6-01_DS_PHR1A_201409141355355_FR1_PX_W053N03_1006_01804` — Emprise vectorielle de la zone informée Pléiades 1A (14/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-7-01_DS_PHR1A_201409071359491_FR1_PX_W053N03_0805_02408` — Emprise vectorielle de la zone informée Pléiades 1A (07/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-8-01_DS_PHR1A_201410031359504_SE1_PX_W053N03_0805_02392` — Emprise vectorielle de la zone informée Pléiades 1A (03/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15006346-9-01_DS_PHR1B_201410021407234_FR1_PX_W053N03_1006_01787` — Emprise vectorielle de la zone informée Pléiades 1B (02/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SO15007029-1-01_DS_SPOT6_201411301335592_FR1_FR1_SE1_SE1_W054N04_01952` — Emprise vectorielle de la zone informée SPOT 6 (30/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15007031-1-01_DS_SPOT6_201410281339375_FR1_FR1_SE1_SE1_W054N02_05119` — Emprise vectorielle de la zone informée SPOT 6 (28/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SO15007096-1-01_DS_PHR1A_201411151418463_SE1_PX_W054N03_0415_02938` — Emprise vectorielle de la zone informée PLEIADE 1A (15/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::32622`
+- `seas_2:EMPRISE_SPOT6_201407301331520_FR1_FR1_SE1_SE1_W052N04_01627` — Emprise vectorielle de la zone informée SPOT 6 (30/07/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT6_201408301342406_FR1_FR1_FR1_FR1_W052N05_01546` — Emprise vectorielle de la zone informée SPOT 6 (30/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT6_201409181346536_FR1_FR1_SE1_SE1_W053N05_01546` — Emprise vectorielle de la zone informée SPOT 6 (18/09/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT6_201410021339047_FR1_FR1_SE1_SE1_W053N05_01384` — Emprise vectorielle de la zone informée SPOT 6 (02/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT6_201410091335546_FR1_FR1_SE1_SE1_W053N05_02277` — Emprise vectorielle de la zone informée SPOT 6 (09/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT6_201410261354061_FR1_FR1_SE1_SE1_W052N05_01140` — Emprise vectorielle de la zone informée SPOT 6 (26/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT6_201411041335051_FR1_FR1_SE1_SE1_W053N05_01465` — Emprise vectorielle de la zone informée SPOT 6 (04/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT6_201411281351045_FR1_FR1_SE1_SE1_W054N06_01546` — Emprise vectorielle de la zone informée SPOT 6 (28/11/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT7_201408291351162_FR1_FR1_SE1_SE1_W054N06_01465` — Emprise vectorielle de la zone informée SPOT 7 (29/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT7_201408291351301_FR1_FR1_SE1_SE1_W054N06_01140` — Emprise vectorielle de la zone informée SPOT 7 (29/08/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT7_201410011347299_FR1_FR1_SE1_SE1_W053N05_01546` — Emprise vectorielle de la zone informée SPOT 7 (01/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT7_201410101328306_FR1_FR1_SE1_SE1_W053N05_01546` — Emprise vectorielle de la zone informée SPOT 7 (10/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT7_201410151339450_FR1_FR1_SE1_SE1_W053N05_01952` — Emprise vectorielle de la zone informée SPOT 7 (15/10/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT7_201412011328026_FR1_FR1_SE1_SE1_W052N05_01222` — Emprise vectorielle de la zone informée SPOT 7 (01/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISE_SPOT7_201412181347592_FR1_FR1_SE1_SE1_W054N06_01303` — Emprise vectorielle de la zone informée SPOT 7 (18/12/2014) - SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISES_IMAGES_SEAS_2014_V2` — Emprises des images SEAS GUYANE 2014 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISES_IMAGES_SEAS_2014_V3` — Emprises des images SEAS GUYANE 2014 (V3) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISES_SIMPLIFIEES_IMAGES_SEAS_2014_V3` — Emprises des images SEAS GUYANE 2014 (V3) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `seas_2:EMPRISES_SIMPLIFIEES_IMAGES_SEAS_2015` — Emprises des images SEAS GUYANE 2015 (phase II) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `systeme-d-information-sur-l-eau:stations-hydrometriques-sie-2026` — Stations hydrométriques (SIE, 2026) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `tourisme:AGENCES_VOYAGES_2016` — TOURISME - Localisation des agences de voyages et réceptifs en Guyane (2016) - archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `tourisme:CAMPS_TOURISTIQUES_2016` — TOURISME - Localisation des camps touristiques et carbets d'hôtes de Guyane (2016) - archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `tourisme:HOTELS_2016` — TOURISME - Localisation des hôtels en Guyane (2016) - archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `tourisme:LOISIRS_2016` — TOURISME - Localisation des activité touristiques en Guyane (2016) - archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `tourisme:MEUBLES_2016` — TOURISME - Localisation des meublés de tourisme et chambres d'hôtes en Guyane (2016) - archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `tourisme:OFFICES_TOURISME_2016` — TOURISME - Localisation des Offices de tourisme, Point d'Informations Tourisme et Service Tourisme des communes de Guyane (2016) - archive · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `wwf-guyane:zones-cles-de-biodiversite-prioritaires-wwf-2016` — Zones Clés de Biodiversité Prioritaires (WWF, 2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `wwf-guyane:zones-cles-de-biodiversite-wwf-2016` — Zones Clés de Biodiversité (WWF, 2016) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `zee:ZEE_CONTOUR_MARINE_REGIONS_2014` — Zone économique exclusive - Amérique du SUD, contours (2014) · CRS: `urn:ogc:def:crs:EPSG::2972`
+- `zee:ZEE_MARINE_REGIONS_2014` — Zone économique exclusive - Amérique du SUD, surfaces (2014) · CRS: `urn:ogc:def:crs:EPSG::2972`

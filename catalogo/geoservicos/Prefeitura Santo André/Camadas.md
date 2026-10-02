@@ -1,0 +1,183 @@
+# Prefeitura Santo André — camadas
+
+Geoportal: [[Geosserviços/Prefeitura Santo André/Prefeitura de Santo André — SP|Prefeitura de Santo André — SP]]
+
+Total: **176** camadas, organizadas em 1 grupo(s).
+
+## siga (176)
+- `siga:SIGA_AMB_ALTIMETRIA_NORTE_5M_S` — Altimetria Norte - 5m
+- `siga:SIGA_AMB_ALTIMETRIA_SUL_5M` — Altimetria Sul - 5m
+- `siga:SIGA_AMB_APP_LICENC_NORTE` — APP’s Licenciáveis Norte
+- `siga:SIGA_AMB_APP_LICENC_SUL` — APP’s Licenciáveis Sul
+- `siga:SIGA_AMB_APRM_B` — Subáreas APRM-B
+- `siga:SIGA_AMB_BACIAS` — Bacias Hidrográficas - Bacias
+- `siga:SIGA_AMB_CLASSIF_VEGETAL` — Classificação Vegetal
+- `siga:SIGA_AMB_DECLIVIDADE` — Declividade
+- `siga:SIGA_AMB_GEOLOGIA` — Geologia
+- `siga:SIGA_AMB_GEOMORFOLOGIA` — Geomorfologia
+- `siga:SIGA_AMB_HIDRO_EMPLASA` — Hidrografia Emplasa
+- `siga:SIGA_AMB_MACRO_BACIAS` — Bacias Hidrográficas - Macro Bacias
+- `siga:SIGA_AMB_MASSA_DAGUA_EMPLASA` — Massa D'água Emplasa
+- `siga:SIGA_AMB_PARQUES_MUNICIPAIS` — Parques Municipais
+- `siga:SIGA_AMB_RIOS_LICENC_NORTE` — Hidro Licenciável Norte
+- `siga:SIGA_AMB_RIOS_LICENC_SUL` — Hidro Licenciável Sul
+- `siga:SIGA_AMB_SUB_BACIAS` — Bacias Hidrográficas - Sub-Bacias
+- `siga:SIGA_AMB_UC_EST_ALTO_PARANAP` — Unidade de Conservação Estadual - Reserva Biológica do Alto da Serra de Paranapiacaba
+- `siga:SIGA_AMB_UC_EST_BARONESA` — Unidade de Conservação Estadual - Chácara da Baronesa
+- `siga:SIGA_AMB_UC_EST_SERRA_MAR` — Unidade de Conservação Estadual - Parque Estadual da Serra do Mar
+- `siga:SIGA_AMB_UC_MUN_NASC_PARANAP` — Unidade de Conservação Municipal - Nascentes de Paranapiacaba
+- `siga:SIGA_AMB_UC_MUN_PED_ZON_INTER` — Unidade de Conservação Municipal - Parque do Pedroso - Zoneamento Interno
+- `siga:SIGA_AMB_UC_MUN_PEDROSO_AMORT` — Unidade de Conservação Municipal - Parque do Pedroso - Zona de Amortecimento
+- `siga:SIGA_AMB_UC_MUN_PEDROSO_BACIA` — Unidade de Conservação Municipal - Parque do Pedroso - Bacias
+- `siga:SIGA_AMB_UC_MUN_PEDROSO_LIM` — Unidade de Conservação Municipal - Parque do Pedroso - Limite
+- `siga:SIGA_AMB_UGRHIS` — Bacias Hidrográficas - UGRHIs
+- `siga:SIGA_AS_ABRANG_ATEND_MULHER` — Abrangência Vem Maria
+- `siga:SIGA_AS_ABRANG_CRAS` — Abrangência CRAS
+- `siga:SIGA_AS_ABRANG_ESP_ASS_SOCIAL` — Abrangência CREAS
+- `siga:SIGA_AS_ABRANG_ESP_POP_RUA` — Abrangência Centro Pop
+- `siga:SIGA_AS_ABRANG_REF_IDOSO` — Abrangência CRISA
+- `siga:SIGA_AS_C_CONVIVENCIA` — Centro de Convivência
+- `siga:SIGA_AS_CESP_ATEND_MULHER` — Centro de Referência Atendimento à Mulher em Situação de Violência
+- `siga:SIGA_AS_CESP_ESP_ASS_SOCIAL` — Centro de Referência Especializado de Assistência Social - CREAS
+- `siga:SIGA_AS_CESP_POP_RUA` — Centro de Referência População em Situação de Rua
+- `siga:SIGA_AS_CESP_REF_IDOSO` — Centro de Referência do Idoso - CRISA
+- `siga:SIGA_AS_CRAS` — Centro de Referência de Assistência Social - CRAS
+- `siga:SIGA_AS_PROG_ATEND_PSICOSSOC` — Programas de Atendimento Psicossocial
+- `siga:SIGA_AS_SERV_ESP_ABORD_SOCIAL` — Serviços Especializados em Abordagem Social
+- `siga:SIGA_ASO_IND_VULNERAB_SOCIAL` — Índice de Vulnerabilidade Social - Assistência Social
+- `siga:SIGA_CON_TUTELAR` — Conselho Tutelar
+- `siga:SIGA_CON_TUTELAR_ABRANGENCIA` — Abrangência Conselho Tutelar
+- `siga:SIGA_CRA_FEIRAS_LIVRES` — Feiras Livres
+- `siga:SIGA_CUL_AUDITORIO_TEATRO` — Teatro e Auditório
+- `siga:SIGA_CUL_BENS_REGISTRADOS` — Bens Culturais Registrados
+- `siga:SIGA_CUL_BENS_TOMBADOS_CULT` — Bens Culturais Tombados
+- `siga:SIGA_CUL_BIBLIOTECA` — Bibliotecas do Território
+- `siga:SIGA_CUL_CENTRO_CULTURAL` — Centro Cultural
+- `siga:SIGA_CUL_CEU` — CEU
+- `siga:SIGA_CUL_EMIA` — EMIA
+- `siga:SIGA_CUL_ESCOLA_LIVRE` — Escola Livre
+- `siga:SIGA_CUL_ESPACO_EXPOSITIVO` — Espaço Expositivo
+- `siga:SIGA_CUL_TERRITORIOS_CULTURAIS` — Territórios Culturais
+- `siga:SIGA_DCI_ATEND_EMERGENCIAL` — Defesa Civil: Atendimento Emergencial
+- `siga:SIGA_DCI_EST_METEOROLOGICAS` — Estações Meteorológicas
+- `siga:SIGA_DCI_PLUVIOMETROS` — Pluviômetros
+- `siga:SIGA_DEFIS_ENTIDADES_CONVENIAD` — Entidades Conveniadas - Pessoas com Deficiência
+- `siga:SIGA_DEFIS_EQUIPAMENTO` — Equipamento - Pessoas com Deficiência
+- `siga:SIGA_DMV_AMIGOS_PRACA` — Programa Amigos da Praça
+- `siga:SIGA_DMV_SETOR_ROCAGEM` — Setor de Roçagem
+- `siga:SIGA_EDU_CESA` — CESA
+- `siga:SIGA_EDU_COMPLEXO_EDUCACIONAL` — Complexo Educacional
+- `siga:SIGA_EDU_CPFP` — Centro Público de Formação Profissional
+- `siga:SIGA_EDU_CRECHE` — Creche Municipal
+- `siga:SIGA_EDU_CRECHE_SUBVENCIONADA` — Creche Subvencionada
+- `siga:SIGA_EDU_DIRETORIA_ENSINO` — Diretoria de Ensino
+- `siga:SIGA_EDU_EMEI` — EMEI
+- `siga:SIGA_EDU_EMEIEF` — EMEIEF
+- `siga:SIGA_EDU_ENSINO_SUPERIOR` — Ensino Superior
+- `siga:SIGA_EDU_ESCOLA_PARQUE` — Escola Parque
+- `siga:SIGA_EDU_ESTADUAL` — Escola Estadual
+- `siga:SIGA_EDU_MUNICIPAL_EJA` — Escola Municipal - EJA
+- `siga:SIGA_EDU_PARTICULAR` — Escolas Particulares
+- `siga:SIGA_EDU_PROJETO_ESPECIAL` — Projetos Especiais
+- `siga:SIGA_EDU_SECRETARIA` — Secretaria de Educação
+- `siga:SIGA_ESP_CAMPOS_DISTRITAIS` — Campos Distritais
+- `siga:SIGA_ESP_EQUIPAMENTO_ESPORTE` — Equipamentos Esportivos
+- `siga:SIGA_HAB_EMPREED_HABITACIONAL` — Empreendimento Habitacional
+- `siga:SIGA_HAB_NUM_MAX_PAV_HIS` — Número Máximo de Pavimentos - Regra para HIS
+- `siga:SIGA_LIM_BAIRROS_OFICIAL` — Limite de Bairros Oficial - Leis 10.136/2018 e 10.312/2020
+- `siga:SIGA_LIM_BILLINGS_COTA_747` — Billings Cota 747
+- `siga:SIGA_LIM_DISTRITO_SUBDISTRITO` — Limite dos Distritos e Subdistrito
+- `siga:SIGA_LIM_MACROZONEAMENTO` — Macrozona Urbana e Macrozona de Proteção Ambiental
+- `siga:SIGA_LIM_MARCO_ZERO` — Marco Zero de Santo André
+- `siga:SIGA_LIM_MUNICIPAL` — Limite do município de Santo André de acordo com as cartas da EMPLASA
+- `siga:SIGA_LIM_PARQUE_ANDREENSE` — Limite Parque Andreense
+- `siga:SIGA_LIM_ZONEAMENTO` — Zoneamento: Macrozona de Proteção Ambiental e Macrozona Urbana
+- `siga:SIGA_MUR_BUS_INTERMUNICIPAL` — Linhas de Ônibus Intermunicipais
+- `siga:SIGA_MUR_BUS_MUNICIPAL` — Linhas de Ônibus Municipais
+- `siga:SIGA_MUR_CONTAG_VEICULAR` — Contagem Veicular
+- `siga:SIGA_MUR_CORREDOR_METROP_ABD` — Corredor Metropolitano ABD - EMTU
+- `siga:SIGA_MUR_CORREDORES_TRANSP` — Corredores de Transporte
+- `siga:SIGA_MUR_FERROVIA` — Ferrovia
+- `siga:SIGA_MUR_FERROVIA_ESTACOES` — Estações da Ferrovia
+- `siga:SIGA_MUR_LINHA_TURQUESA` — Linha Turquesa - CPTM
+- `siga:SIGA_MUR_LINHA_TURQUESA_ESTAC` — Estações da Linha Turquesa
+- `siga:SIGA_MUR_PASV` — PASV
+- `siga:SIGA_MUR_PONTO_RECARGA` — Pontos de Recarga - SATrans
+- `siga:SIGA_MUR_PTO_BUS_INTERMUNICIP` — Ponto de Ônibus - Intermunicipal
+- `siga:SIGA_MUR_PTO_BUS_MUNICIPAL` — Ponto de Ônibus - Municipal
+- `siga:SIGA_MUR_PTO_TAXI` — Ponto de Táxi
+- `siga:SIGA_MUR_RADARES` — Radares
+- `siga:SIGA_MUR_SEMAFORO` — Semáforos
+- `siga:SIGA_MUR_SIS_CICLOVIARIO` — Sistema Cicloviário
+- `siga:SIGA_MUR_TERMINAIS_BUS` — Terminais de Ônibus
+- `siga:SIGA_MUR_TRAVESSIAS_ELEVADAS` — Travessias Elevadas
+- `siga:SIGA_MUR_TROLEBUS_LINHA` — Linhas de Trólebus
+- `siga:SIGA_MUR_TROLEBUS_LINHA_PARADA` — Parada de Trólebus
+- `siga:SIGA_NIS_ESCOLA_OURO` — Escola de Ouro
+- `siga:SIGA_PLA_BANCA_JORNAL` — Bancas de Jornais
+- `siga:SIGA_PLA_EIV` — Planejamento: EIV's
+- `siga:SIGA_PLA_LEG_EIXO_TAMANDUATEI` — Eixo Tamanduateí
+- `siga:SIGA_PLA_LEG_SETOR_TAMANDUATEI` — Setorização do Eixo Tamanduateí
+- `siga:SIGA_PLA_LEGIS_ZEIP_PARANAP` — ZEIP - Setores de Paranapiacaba
+- `siga:SIGA_PLA_LEGISLACAO_ZEBT` — ZEBT - Zona Especial de Empreendimentos de Base Tecnológica
+- `siga:SIGA_PLA_LEGISLACAO_ZEIA` — ZEIA - Zona Especial de Interesse Ambiental
+- `siga:SIGA_PLA_LEGISLACAO_ZEIC` — ZEIC - Zona Especial de Interesse Comercial
+- `siga:SIGA_PLA_LEGISLACAO_ZEIP` — ZEIP - Zona Especial de Interesse do Patrimônio
+- `siga:SIGA_PLA_LEGISLACAO_ZEIS_A` — ZEIS A - Zona Especial de Interesse Social: A
+- `siga:SIGA_PLA_LEGISLACAO_ZEIS_B_C_D` — ZEIS B, C, D - Zona Especial de Interesse Social: B, C, D
+- `siga:SIGA_PLA_METAS_2021_24_ASSOC_SEPE` — Projetos Associados: SEPE
+- `siga:SIGA_PLA_METAS_2021_24_LINEAR_SMSU` — Projetos Lineares Associados: SMSU
+- `siga:SIGA_PLA_OUTOR_2010_2015` — Outorgas 2010-2015
+- `siga:SIGA_PLA_OUTOR_2016_2020` — Outorgas 2016-2020
+- `siga:SIGA_PLA_PADROES_OCUPACAO` — Padrões de Ocupação
+- `siga:SIGA_PLA_RESTR_ADICIONAIS` — Restrições Adicionais
+- `siga:SIGA_PLA_USO_SOLO_MZU_2020` — Uso do Solo da Macrozona Urbana - 2020
+- `siga:SIGA_PRACA_ATEND_EQUIPAMEN` — Serviços aos Cidadãos - Locais de Atendimento
+- `siga:SIGA_SAU_ATENCAO_DOMICILIAR` — Atenção Domiciliar
+- `siga:SIGA_SAU_CAPS` — CAPS
+- `siga:SIGA_SAU_CEN_ESPECIALIDADE` — Centro de Especialidades
+- `siga:SIGA_SAU_CEN_HOSPITALAR` — Centro Hospitalar Municipal
+- `siga:SIGA_SAU_CLIN_ESPECIALIZADA` — Clínicas Especializadas
+- `siga:SIGA_SAU_ESPECIALIDADE_ASSIST` — Especialidade Assistencial
+- `siga:SIGA_SAU_HOSP_ESTADUAL` — Hospital Estadual
+- `siga:SIGA_SAU_HOSP_MULHER` — Hospital da Mulher
+- `siga:SIGA_SAU_HOSP_PARTICULAR` — Hospital Particular
+- `siga:SIGA_SAU_NUPE` — NUPE
+- `siga:SIGA_SAU_PS` — Pronto Socorro
+- `siga:SIGA_SAU_TERRITORIOS` — Territórios da Saúde
+- `siga:SIGA_SAU_UNID_BASICA_SAUDE` — Unidade Básica de Saúde - UBS
+- `siga:SIGA_SAU_UPA` — UPA
+- `siga:SIGA_SEG_BOMBEIRO_AGRUPAM` — Bombeiro: Batalhões
+- `siga:SIGA_SEG_BOMBEIRO_HIDRANTE` — Bombeiro: Hidrantes
+- `siga:SIGA_SEG_CIDADA_DEPARTAMENTO` — Departamentos - Secretaria de Segurança Cidadã
+- `siga:SIGA_SEG_GCM_CORREGEDORIA` — GCM: Corregedoria
+- `siga:SIGA_SEG_GCM_DESTACAMENTO` — GCM: Destacamento
+- `siga:SIGA_SEG_GCM_INSPETORIA` — GCM: Inspetoria
+- `siga:SIGA_SEG_GCM_SEG_PATRIMONIAL` — GCM: Segurança Patrimonial
+- `siga:SIGA_SEG_PCIENT_IML` — Polícia Científica: IML
+- `siga:SIGA_SEG_PCIENT_INT_CRIMINAL` — Polícia Científica: Instituto Criminalística
+- `siga:SIGA_SEG_PCIENT_SUPERINTENDEN` — Polícia Científica: Superintendência
+- `siga:SIGA_SEG_PCIVIL_CENTRO_DETENC` — Polícia Civil: Centro de Detenção
+- `siga:SIGA_SEG_PCIVIL_DELEGACIA` — Polícia Civil: Delegacia
+- `siga:SIGA_SEG_PFEDERAL_POSTO` — Polícia Federal: Posto Policial
+- `siga:SIGA_SEG_PM_BATALHAO` — Polícia Militar: Batalhão
+- `siga:SIGA_SEG_PM_COMANDO` — Polícia Militar: Comando
+- `siga:SIGA_SEG_PM_COMPANHIA` — Polícia Militar: Companhia
+- `siga:SIGA_SEG_PM_RODOVIARIA` — Polícia Rodoviária
+- `siga:SIGA_SEM_AREA_CONTAMINADA` — Áreas Contaminadas
+- `siga:SIGA_SEM_ESTACOES_COLETA` — Estações de Coleta
+- `siga:SIGA_SEM_PISCINAO` — Piscinão
+- `siga:SIGA_SEM_PISCININHA` — Piscininhas
+- `siga:SIGA_SEM_SETOR_COL_RED_SECOS` — Setor de Coleta de Resíduos Secos
+- `siga:SIGA_SEM_SETOR_COL_RES_UMIDO` — Setor de Coleta de Resíduos Úmidos
+- `siga:SIGA_SFU_CEMITERIO` — Cemitérios
+- `siga:SIGA_TOTAL_EQUIP_BAIRRO_INVEST` — Total de Equipamento por Bairro - (Teste no SIGA INVEST)
+- `siga:SIGA_TUR_ARTE_ARQUITETURA` — Circuito de Arte, Arquitetura e Paisagismo
+- `siga:SIGA_TUR_CIRC_HOTEL` — Circuito de Hotéis
+- `siga:SIGA_TUR_CIRC_INDUSTRIA_INOVAC` — Circuito de Turismo Industrial e de Inovação
+- `siga:SIGA_TUR_CIRC_PARANAPIACABA` — Circuito de Paranapiacaba
+- `siga:SIGA_TUR_CIRC_PARQUE_LAZER` — Circuito de Parques e Lazer
+- `siga:SIGA_TUR_CIRC_PEDAGOG_CIENTIF` — Circuito Pedagógico e Científico
+- `siga:SIGA_TUR_CITY_TOUR_HISTORICO` — City Tour Histórico
+- `siga:SIGA_TUR_COMPRA` — Circuito de Compras
+- `siga:SIGA_TUR_HIST_CULTURAL` — Circuito Histórico-Cultural

@@ -1,0 +1,5604 @@
+# Ministerio del Ambiente del Perú — Geoservidor MINAM — camadas
+
+Geoportal: [[Geosserviços/Peru MINAM Geoservidor/Ministerio del Ambiente del Perú — Geoservidor MINAM|Ministerio del Ambiente del Perú — Geoservidor MINAM]]
+
+Total: **4555** camadas em **261** serviços ArcGIS, todas consumíveis por `HttpRequest` com `f=geojson`.
+
+## 02_CARACTERIZACIÓN_DEL_TERRITORIO_TUMBES (32)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/0>
+- `Botadero de Residuos Sólidos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/1>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/2>
+- `Bancos Naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/3>
+- `Fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/4>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/5>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/6>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/7>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/8>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/9>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/10>
+- `Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/11>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/12>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/13>
+- `Cuencas Hidrográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/14>
+- `Precipitación Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/15>
+- `Temperatura Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/16>
+- `Humedad Relativa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/17>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/18>
+- `Sitio Arqueológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/19>
+- `Complejo Arqueológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/20>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/21>
+- `Infraestructura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/22>
+- `Instituciones educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/23>
+- `Establecimientos de salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/24>
+- `Líneas de trasmisión eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/25>
+- `Recursos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/26>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/27>
+- `Lotes petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/28>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/29>
+- `Sitios Naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/30>
+- `Ecosistemas Degradados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/31>
+
+## Catalogo_Imagenes (18)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `MINAM Imagenes DEIMOS 2015` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/0>
+- `MINAM Imagenes Pleiades CONIDA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/1>
+- `MINAM Imagenes PeruSAT1 CONIDA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/2>
+- `MINAM Imagenes Spot CONIDA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/3>
+- `MINAM Aerotransportada y LIDAR 2011` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/4>
+- `MINAM Imagenes Hatoyama (referencial)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/5>
+- `MINAM Imagenes Ikonos 2009` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/6>
+- `MINAM Imagenes Ikonos-GeoEye 2010 (Defores)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/7>
+- `MINAM Imagenes Ikonos-GeoEye 2010 (Cambio de USo)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/8>
+- `MINAM Imagen Cuenca Rio Nieva 2010` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/9>
+- `MINAM Zona Minera Madre de Dios 2010` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/10>
+- `MINAM Imagenes LANSAT 2015 Amazonia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/11>
+- `MINAM Imagenes LANDSAT 2000-2005-2009` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/12>
+- `MINAM Imagenes RapidEye 2011-2012 Hatoyama` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/13>
+- `MINAM Vuelos DRONE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/14>
+- `PNCB Imagenes RapidEye 2011` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/15>
+- `PNCB Imagenes RapidEye 2013-2014` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/16>
+- `PNCB Imagenes SPOT 2013-2014` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Catalogo_Imagenes/MapServer/17>
+
+## CFOI_Dashboard (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Registro_historico_incendios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard/MapServer/0>
+- `CFOI_Dashboard` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard/MapServer/1>
+
+## CFOI_Dashboard_mensuales (22)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Base de datos de Incendios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/0>
+- `Cicatrices SERFOR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/1>
+- `CFOI_Setiembre 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/2>
+- `CFOI_Agosto 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/3>
+- `CFOI_Julio 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/4>
+- `CFOI_Junio 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/5>
+- `CFOI_Mayo 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/6>
+- `CFOI_Abril 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/7>
+- `CFOI_Marzo 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/8>
+- `CFOI_Febrero 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/9>
+- `CFOI_Enero 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/10>
+- `CFOI_Diciembre 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/11>
+- `CFOI_Noviembre 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/12>
+- `CFOI_Octubre 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/13>
+- `CFOI_ Setiembre 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/14>
+- `CFOI_ Agosto 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/15>
+- `CFOI_Julio 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/16>
+- `CFOI_Junio 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/17>
+- `CFOI_Mayo 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/18>
+- `CFOI_Abril 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/19>
+- `CFOI_Marzo 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/20>
+- `CFOI_Febrero 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales/MapServer/21>
+
+## CFOI_Dashboard_mensuales_base (20)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Limite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/0>
+- `Limite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/1>
+- `Limite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/2>
+- `Unidad Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/3>
+- `Areas Urbanas ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/4>
+- `Hidrografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/5>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/6>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/7>
+- `Curvas de nivel al 100,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/8>
+- `Red vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/9>
+- `Capitales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/10>
+- `Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/11>
+- `Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/12>
+- `Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/13>
+- `Tambos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/14>
+- `Centros poblados INEI` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/15>
+- `Establecimientos de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/16>
+- `Infraestructuras Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/17>
+- `Subcuencas (UH 7)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/18>
+- `Unidades Territoriales de Intevención (UTI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_base/MapServer/19>
+
+## CFOI_Dashboard_mensuales_pruebas (3)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_pruebas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Base de datos de Incendios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_pruebas/MapServer/0>
+- `Cicatrices SEERFOR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_pruebas/MapServer/1>
+- `CFOI_Setiembre 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CFOI_Dashboard_mensuales_pruebas/MapServer/2>
+
+## CS/Cambio_Climatico (18)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Riesgos por Inundación Costera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/0>
+- `Ámbito de zona Costera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/1>
+- `Consecuencias sobre los activos construidos para eventos de 5 años de periodo de retorno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/2>
+- `Consecuencias sobre los activos construidos para eventos de 25 años de periodo de retorno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/3>
+- `Consecuencias sobre los activos construidos para eventos de 50 años de periodo de retorno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/4>
+- `Consecuencias sobre los activos construidos para eventos de 100 años de periodo de retorno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/5>
+- `Riesgo por Erosión Costera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/6>
+- `Posición línea de costa en erosión extrema para periodo de retorno 5 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/7>
+- `Posición línea de costa en erosión extrema para periodo de retorno 25 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/8>
+- `Posición línea de costa en erosión extrema para periodo de retorno 50 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/9>
+- `Posición media de la línea de costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/10>
+- `Evaluación de Riesgo - Análisis de sensibilidad. ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/11>
+- `Consecuencias sobre las infraestructuras para un evento de inundación de cota de 2,5 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/12>
+- `Consecuencias sobre las infraestructuras para un evento de inundación de cota de 3 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/13>
+- `Consecuencias sobre las infraestructuras para un evento de inundación de cota de 3,5 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/14>
+- `Consecuencias sobre las infraestructuras para un evento de inundación de cota de 4 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/15>
+- `Consecuencias sobre las infraestructuras para un evento de inundación de cota de 4,5 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/16>
+- `Consecuencias sobre las infraestructuras para un evento de inundación de cota de 5 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Cambio_Climatico/MapServer/17>
+
+## CS/Desarrollo_Orientado_a_Transporte (352)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Metro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/0>
+- `Red de metro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/1>
+- `Metropolitano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/2>
+- `Estaciones Metro y BRT` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/3>
+- `Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/4>
+- `Área de Influencia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/5>
+- `Límite Final del Area de Influencia de las 4 estaciones DOT` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/6>
+- `Límites para definir el Area de Influencia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/7>
+- `Rivera Navarrete` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/8>
+- `Diagnóstico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/9>
+- `Equipamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/10>
+- `Equipamiento de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/11>
+- `Equipamiento de Seguridad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/12>
+- `Equipamiento de Administración` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/13>
+- `Equipamiento de Comercio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/14>
+- `Equipamiento Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/15>
+- `Equipamiento de Deporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/16>
+- `Equipamiento de Educación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/17>
+- `Equipamiento de Recreación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/18>
+- `Socioeconomico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/19>
+- `Economico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/20>
+- `Estratos Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/21>
+- `Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/22>
+- `Manzana ATU` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/23>
+- `Manzana PDM Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/24>
+- `Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/25>
+- `Paraderos Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/26>
+- `Semaforos Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/27>
+- `Barreras Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/28>
+- `Barreras Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/29>
+- `Ciclovias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/30>
+- `Estacionamientos Formales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/31>
+- `Estacionamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/32>
+- `Infraetructura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/33>
+- `Estaciones Electricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/34>
+- `Agua Tuberias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/35>
+- `Drenaje` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/36>
+- `Linea de Tensión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/37>
+- `Problemas potenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/38>
+- `Potencialidades` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/39>
+- `Problemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/40>
+- `Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/41>
+- `Edificabilidad Ocupacion Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/42>
+- `Lotes Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/43>
+- `Normativa Lotes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/44>
+- `Uso Actual Suelo Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/45>
+- `Potencial inmobiliario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/46>
+- `Lotes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/47>
+- `Oferta inmobiliaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/48>
+- `Rivera Navarrete` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/49>
+- `Plan Maestro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/50>
+- `Sistema Vial Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/51>
+- `Acciones Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/52>
+- `Alternativa1 Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/53>
+- `Alternativa2 Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/54>
+- `Alternativa3 Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/55>
+- `Edificios Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/56>
+- `EPAP Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/57>
+- `Equipamientos Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/58>
+- `Etapas Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/59>
+- `Formas Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/60>
+- `Lotes Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/61>
+- `Lotes Regeneracion Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/62>
+- `Zonificacion Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/63>
+- `VIS Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/64>
+- `UGU Propiedad Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/65>
+- `Retiros Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/66>
+- `Plan Especifico Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/67>
+- `Unidades Gestion Rivera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/68>
+- `Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/69>
+- `Diagnóstico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/70>
+- `Equipamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/71>
+- `Equipamiento de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/72>
+- `Equipamiento de Seguridad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/73>
+- `Equipamiento de Administración` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/74>
+- `Equipamiento de Comercio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/75>
+- `Equipamiento Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/76>
+- `Equipamiento de Deporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/77>
+- `Equipamiento de Educación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/78>
+- `Equipamiento de Recreación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/79>
+- `Socioeconomico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/80>
+- `Economico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/81>
+- `Estratos Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/82>
+- `Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/83>
+- `Manzana ATU` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/84>
+- `Manzana PDM Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/85>
+- `Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/86>
+- `Paraderos Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/87>
+- `Semaforos Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/88>
+- `Barreras Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/89>
+- `Barreras Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/90>
+- `Ciclovias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/91>
+- `Estacionamientos Formales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/92>
+- `Estacionamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/93>
+- `Vias Peatonales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/94>
+- `Gamarra Metropolitano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/95>
+- `Infraetructura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/96>
+- `Estaciones Electricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/97>
+- `Residuos Solidos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/98>
+- `Agua Tuberias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/99>
+- `Drenaje` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/100>
+- `Linea de Tensión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/101>
+- `Problemas potenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/102>
+- `Potencialidades` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/103>
+- `Problemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/104>
+- `Problemas polígono` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/105>
+- `Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/106>
+- `Edificabilidad Ocupacion Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/107>
+- `Lotes Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/108>
+- `Normativa Lotes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/109>
+- `Uso Actual Suelo Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/110>
+- `Potencial inmobiliario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/111>
+- `Lotes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/112>
+- `Oferta inmobiliaria Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/113>
+- `Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/114>
+- `Plan Maestro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/115>
+- `Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/116>
+- `Sistema Vial Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/117>
+- `Acciones Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/118>
+- `Alternativa1 Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/119>
+- `Alternativa2 Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/120>
+- `Alternativa3 Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/121>
+- `Etapas Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/122>
+- `Equipamientos Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/123>
+- `Formas Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/124>
+- `Retiros Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/125>
+- `Plan Especifico Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/126>
+- `UGU Propiedad Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/127>
+- `Unidades Gestion Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/128>
+- `EPAP Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/129>
+- `VIS Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/130>
+- `Zonificacion Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/131>
+- `Lotes Regeneracion Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/132>
+- `Lotes Regeneracion Gamarra T` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/133>
+- `Edificios Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/134>
+- `Lotes Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/135>
+- `Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/136>
+- `Sistema Vial Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/137>
+- `Equipamientos Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/138>
+- `Etapas Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/139>
+- `Formas Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/140>
+- `Retiro Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/141>
+- `Lotes Regeneracion Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/142>
+- `Plan Especifico Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/143>
+- `UGU Propiedad Barnones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/144>
+- `Unidades Gestion Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/145>
+- `EPAP Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/146>
+- `VIS Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/147>
+- `Zonificacion Barbones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/148>
+- `Perfiles de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/149>
+- `Proyecto Inversion Gamarra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/150>
+- `Carmen de la Legua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/151>
+- `Diagnóstico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/152>
+- `Equipamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/153>
+- `Equipamiento de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/154>
+- `Equipamiento de Seguridad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/155>
+- `Equipamiento de Administración` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/156>
+- `Equipamiento de Comercio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/157>
+- `Equipamiento Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/158>
+- `Equipamiento de Deporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/159>
+- `Equipamiento de Educación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/160>
+- `Equipamiento de Recreación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/161>
+- `Socioeconomico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/162>
+- `Economico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/163>
+- `Estratos Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/164>
+- `Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/165>
+- `Manzana ATU` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/166>
+- `Mza PDM Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/167>
+- `Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/168>
+- `Barreras Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/169>
+- `Barreras Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/170>
+- `Ciclovias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/171>
+- `Estacionamientos Formales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/172>
+- `Estacionamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/173>
+- `Infraetructura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/174>
+- `Estaciones Electricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/175>
+- `Agua Tuberias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/176>
+- `Drenaje` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/177>
+- `Linea de Tensión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/178>
+- `Problemas potenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/179>
+- `Potencialidades` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/180>
+- `Problemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/181>
+- `Problemas polígono` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/182>
+- `Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/183>
+- `Edificabilidad Ocupacion Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/184>
+- `Lotes Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/185>
+- `Normativa Lotes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/186>
+- `Uso Actual Suelo Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/187>
+- `Potencial inmobiliario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/188>
+- `Lotes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/189>
+- `Oferta inmobiliaria Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/190>
+- `Carmen Legua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/191>
+- `Plan Maestro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/192>
+- `Sistema Vial Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/193>
+- `Acciones Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/194>
+- `Alternativa1 Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/195>
+- `Alternativa2 Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/196>
+- `Alternativa3 Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/197>
+- `Equipamientos Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/198>
+- `Etapas Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/199>
+- `Formas Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/200>
+- `Retiros Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/201>
+- `Lotes Regeneracion Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/202>
+- `Plan Especifico Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/203>
+- `UGU Propiedad Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/204>
+- `Unidades Gestion Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/205>
+- `VIS Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/206>
+- `Zonificacion Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/207>
+- `Edificios Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/208>
+- `Lotes Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/209>
+- `Perfiles de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/210>
+- `Proyecto Inversion Carmen` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/211>
+- `Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/212>
+- `Diagnóstico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/213>
+- `Equipamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/214>
+- `Equipamiento de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/215>
+- `Equipamiento de Administración` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/216>
+- `Equipamiento de Comercio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/217>
+- `Equipamiento de Deporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/218>
+- `Equipamiento de Educación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/219>
+- `Equipamiento de Recreación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/220>
+- `Socioeconomico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/221>
+- `Economico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/222>
+- `Estratos Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/223>
+- `Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/224>
+- `Manzana ATU` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/225>
+- `Manzana PDM Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/226>
+- `Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/227>
+- `Paraderos Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/228>
+- `Semaforos Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/229>
+- `Barreras Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/230>
+- `Barreras Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/231>
+- `Ciclovias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/232>
+- `Estacionamientos Formales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/233>
+- `Estacionamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/234>
+- `Infraetructura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/235>
+- `Estaciones Electricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/236>
+- `Agua Tuberias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/237>
+- `Drenaje` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/238>
+- `Linea de Tensión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/239>
+- `Problemas potenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/240>
+- `Potencialidades` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/241>
+- `Problemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/242>
+- `Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/243>
+- `Edificabilidad Ocupacion Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/244>
+- `Lotes Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/245>
+- `Normativa Lotes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/246>
+- `Uso Actual Suelo Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/247>
+- `Potencial inmobiliario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/248>
+- `Lotes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/249>
+- `Oferta inmobiliaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/250>
+- `Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/251>
+- `Plan Maestro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/252>
+- `Sistema Vial Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/253>
+- `VIS Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/254>
+- `Zonificacion Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/255>
+- `Acciones Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/256>
+- `Alternativa1 Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/257>
+- `Alternativa2 Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/258>
+- `Alternativa3 Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/259>
+- `Equipamientos Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/260>
+- `Etapas Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/261>
+- `Formas Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/262>
+- `Retiros Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/263>
+- `Lotes Regeneracion Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/264>
+- `Plan Especifico Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/265>
+- `UGU Propiedad Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/266>
+- `Unidades Gestion Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/267>
+- `Lotes Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/268>
+- `Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/269>
+- `Perfiles de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/270>
+- `Proyecto Inversion Naranjal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/271>
+- `Estaciones Framework 3V` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/272>
+- `Modo Transporte Buffer de 800m` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/273>
+- `Isocronas de cada 10 minutos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/274>
+- `Isocronas de cada 10 minutos y la zona de 28 de Julio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/275>
+- `Isocronas de cada 30 minutos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/276>
+- `Tasa Crecimiento Poblacion BRT` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/277>
+- `Tasa Crecimiento Poblacion Metro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/278>
+- `Uso Suelo - Buffer 800m.  Estaciones Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/279>
+- `Uso Suelo Bffer 800m.  Estaciones Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/280>
+- `Zonificacion Buffer 800m. Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/281>
+- `Zonificacion Buffer 800m. Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/282>
+- `Buffer de 800m. de las estaciones de BRT y sistema de Metro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/283>
+- `Buffer de 800m. de la estación de los sistemas del BRT y Metro de la zona 28 Julio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/284>
+- `Densidad Combinada del sistema BRT` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/285>
+- `Densidad Combinada del sistema de Metro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/286>
+- `Densidad Empleos del sistema BRT` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/287>
+- `Densidad Empleos del sistema de Metro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/288>
+- `Densidad Poblacion Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/289>
+- `Densidad Poblacion Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/290>
+- `Empleo Residentes BRT` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/291>
+- `Empleo Residentes Metro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/292>
+- `Empleos Isocronas 30min` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/293>
+- `Ingreso Persona Manzana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/294>
+- `Ingresos Buffer 800m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/295>
+- `Estaciones Priorizadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/296>
+- `Priorizadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/297>
+- `Estación-Límite` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/298>
+- `Isocronas 10 mint` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/299>
+- `Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/300>
+- `Extension Metropolitano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/301>
+- `Gamarra Metropolitano Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/302>
+- `Intersecciones Semafo Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/303>
+- `Paraderos IMP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/304>
+- `Puntos AT Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/305>
+- `Puntos AT Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/306>
+- `Sentido Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/307>
+- `Bicitecnico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/308>
+- `Cruces Peatonales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/309>
+- `Estacionamientos Puntos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/310>
+- `Estaciones Teleferico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/311>
+- `Linea Teleferico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/312>
+- `Red Ciclovias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/313>
+- `Rutas Convencionales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/314>
+- `Tipos Vias Transporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/315>
+- `Congestion Vehicular` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/316>
+- `Corredores Transporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/317>
+- `Estacionamientos Regulados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/318>
+- `Estacionamientos Vias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/319>
+- `Extension Metropolitano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/320>
+- `Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/321>
+- `Equipamientos Metropolitanos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/322>
+- `ATN PDM Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/323>
+- `ATN Vigentes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/324>
+- `Centro Historico Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/325>
+- `Edificaciones Lima Callo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/326>
+- `Sectores Inmobiliario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/327>
+- `Suelo Publico Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/328>
+- `Suelo Publico Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/329>
+- `Suelo Sin Uso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/330>
+- `Zonificacion Urbana Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/331>
+- `Altura Edificios Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/332>
+- `Oferta inmobiliaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/333>
+- `La Victoria activos inmobiliarios proyectos residenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/334>
+- `Lince activos inmobiliarios proyectos residenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/335>
+- `Los Olivos activos inmobiliarios proyectos residenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/336>
+- `Callao activos inmobiliarios proyectos residenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/337>
+- `Comas activos inmobiliarios proyectos residenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/338>
+- `San Isidro activos inmobiliarios proyectos residenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/339>
+- `Proyectos residenciales estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/340>
+- `Oficinas en construcción` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/341>
+- `Oficinas San Isidro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/342>
+- `Proyectos vivienda Lima Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/343>
+- `Almacenes clase A` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/344>
+- `Submercados oficinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/345>
+- `Centros Comerciales Lima y Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/346>
+- `Callao zona comercial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/347>
+- `Callao zona industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/348>
+- `Gamarra zona comercial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/349>
+- `Distritos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/350>
+- `Zona Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Orientado_a_Transporte/MapServer/351>
+
+## CS/Desarrollo_Urbano (185)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capas Base` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/0>
+- `Área Metropolitana de Lima y Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/1>
+- `Aeropuerto Internacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/2>
+- `Infraestructructura vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/3>
+- `Red_ferroviaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/4>
+- `Red_vial_malla_OSM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/5>
+- `Islas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/6>
+- `Hidrografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/7>
+- `Lagos y lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/8>
+- `Humedales ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/9>
+- `Ríos y quebradas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/10>
+- `Huella Urbana 2021 según Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/11>
+- `Mascara de agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/12>
+- `Evolución de la Huella Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/13>
+- `Huella Urbana 1535` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/14>
+- `Huella Urbana 1615` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/15>
+- `Huella Urbana 1750` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/16>
+- `Huella Urbana 1910` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/17>
+- `Huella Urbana 1970` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/18>
+- `Huella Urbana 1981` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/19>
+- `Huella Urbana 2003` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/20>
+- `Huella Urbana 2013` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/21>
+- `Huella Urbana 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/22>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/23>
+- `Usos de Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/24>
+- `Usos Mixto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/25>
+- `Residencial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/26>
+- `Residencial Propio del Disperso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/27>
+- `No Residencial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/28>
+- `No Construido` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/29>
+- `Densidad de Vivienda (vivienda/hectáreas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/30>
+- `Grupos de transición` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/31>
+- `Densidad viviendas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/32>
+- `Áreas Verdes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/33>
+- `Areas Verdes Cualificadas (parques, plazas, etc)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/34>
+- `Accesibilidad Area Verde Cualificada. Aprox. 10 min.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/35>
+- `Áreas Naturales (No Cualificadas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/36>
+- `Condiciones Limitantes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/37>
+- `Funcionales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/38>
+- `Servidumbre Aeroportuaria Las Palmas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/39>
+- `Camino Inca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/40>
+- `Servidumbre eléctrica (LAT) 220kv` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/41>
+- `Servidumbre eléctrica (LAT) 500kv` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/42>
+- `Patrimonio Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/43>
+- `Zonas Arqueológicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/44>
+- `Centro Histórico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/45>
+- `Zonas Monumentales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/46>
+- `PTAR y Relleno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/47>
+- `Concesiones mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/48>
+- `Peligros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/49>
+- `Flujo de lodos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/50>
+- `Zonas Marginales en Riesgo No Mitigable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/51>
+- `Amenaza de Inundación de mas de 30 cm Periodo de Retorno de 100 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/52>
+- `Amenaza de Sismo- zonas IV y V con efecto de sitio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/53>
+- `Amenaza de Tsunami Periodo de Retorno 1.000 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/54>
+- `ZonasProtegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/55>
+- `Línea de Alta Marea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/56>
+- `Amortiguamiento de las Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/57>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/58>
+- `Áreas Naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/59>
+- `Áreas de Conservación Regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/60>
+- `Ecosistemas Frágiles` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/61>
+- `Zonas de Reserva de Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/62>
+- `Fajas Marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/63>
+- `Pendientes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/64>
+- `Escenarios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/65>
+- `Escenarios Tendencial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/66>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/67>
+- `Proyectos Estratégicos (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/68>
+- `Proyectos Estratégicos (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/69>
+- `Proyectadas a futuro según el escenario tendencial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/70>
+- `Evolucion Huella` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/71>
+- `Proyectos Estratégicos (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/72>
+- `Proyectos Estratégicos (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/73>
+- `Proyectadas a futuro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/74>
+- `Densidad de Viviendas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/75>
+- `Proyectos Estratégicos (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/76>
+- `Proyectos Estratégicos (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/77>
+- `Escenario Optimo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/78>
+- `Densidad de Viviendas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/79>
+- `Proyectos Oficiales (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/80>
+- `Proyectos Oficiales (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/81>
+- `Estructura ecológica exterior` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/82>
+- `Estructura ecológica en la franja de contención` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/83>
+- `Estructura Ecologica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/84>
+- `Proyectos Oficiales (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/85>
+- `Proyectos Oficiales (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/86>
+- `Estructura ecológica exterior` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/87>
+- `Estructura ecológica en la franja de contención` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/88>
+- `Proyectadas a futuro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/89>
+- `Evolución de la Huella` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/90>
+- `Proyectos Oficiales (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/91>
+- `Proyectos Oficiales (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/92>
+- `Estructura ecológica exterior` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/93>
+- `Proyectadas a futuro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/94>
+- `Estructura ecológica en la franja de contención` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/95>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/96>
+- `Proyectos Oficiales (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/97>
+- `Proyectos Oficiales (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/98>
+- `Estructura ecológica exterior` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/99>
+- `Usos del suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/100>
+- `Estructura ecológica en la franja de contención` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/101>
+- `Escenario Intermedio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/102>
+- `EI Densidad de Viviendas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/103>
+- `Proyectos Oficiales (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/104>
+- `Proyectos Oficiales (Linea)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/105>
+- `Proyectos Oficiales (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/106>
+- `Estructura ecológica en la franja de contención` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/107>
+- `Densidad viviendas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/108>
+- `Estructura ecológica exterior` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/109>
+- `EI Estructura Ecologica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/110>
+- `Proyectos Oficiales (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/111>
+- `Proyectos Oficiales (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/112>
+- `Estructura ecológica intermedia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/113>
+- `Estructura ecológica exterior` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/114>
+- `Áreas naturales y espacio público` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/115>
+- `Huella Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/116>
+- `EI Evolución de la Huella` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/117>
+- `Proyectos Oficiales (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/118>
+- `Proyectos Oficiales (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/119>
+- `Áreas naturales y espacio público` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/120>
+- `Huella Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/121>
+- `EI Unidades Homogeneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/122>
+- `Proyectos Oficiales (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/123>
+- `Proyectos Oficiales (Puntos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/124>
+- `Mejoramientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/125>
+- `Estructura ecológica exterior` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/126>
+- `Usos del suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/127>
+- `Estructura ecológica en la franja de contención` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/128>
+- `Plan de Acción` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/129>
+- `Usos del suelo Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/130>
+- `Centralidades` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/131>
+- `Escenario Intermedio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/132>
+- `Franja de contención de desarrollo urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/133>
+- `Clasificación de los suelos en los instrumentos de planificación analizados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/134>
+- `Clasificación de los suelos - Plan Met (versión aprobada por ordenanza N° 2499)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/135>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/136>
+- `Huella urbana Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/137>
+- `Huella escenario integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/138>
+- `Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/139>
+- `Clasificación de suelo fuera del Escenario Integrado propuesto por el Plan Met 2040` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/140>
+- `Clasificación de los suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/141>
+- `Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/142>
+- `Comparativa de áreas destinadas a Mejoramiento Integral de Barrios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/143>
+- `PE  de Mejoramiento Integral de barios del Plan Met 2040 y PDM Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/144>
+- `Área para Mejoramiento Integral de Barrios delEscenario Intermedio Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/145>
+- `PE  de Mejoramiento Integral de barios del Plan Met 2040 y PDM Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/146>
+- `Área para Mejoramiento Integral de Barrios delEscenario Intermedio Lima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/147>
+- `Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/148>
+- `Comparativa de centralidades del escenario integrado y los instrumentos de planificación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/149>
+- `Centralidades del Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/150>
+- `Centralidades Plan Met` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/151>
+- `Centralidades PDM Callao 2040` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/152>
+- `Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/153>
+- `Comparativa de equipamientos propuestos en instrumentos de planificación y el Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/154>
+- `Equipamientos propuestos en instrumentos de planificación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/155>
+- `Equipamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/156>
+- `Estaciones y tranferencia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/157>
+- `Estaciones Intermodales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/158>
+- `Zonas de reconversión, consolidación y nuevos desarrollos del EI` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/159>
+- `Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/160>
+- `Comparativa de zonas de reconversión, consolidación y nuevos desarrollos y los centros de equipamientos de Plan Met 2040 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/161>
+- `Centralidades de equipamiento Plan Met 2040` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/162>
+- `Zonas de reconversión, consolidación y nuevos desarrollos del EI` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/163>
+- `Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/164>
+- `Comparativa entre el cinturón de amortiguamiento de Plan Met 2040 y la franja de contención de crecimiento urbano del Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/165>
+- `Cinturón de amortiguamiento de Plan Met 2040 y PDM Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/166>
+- `Borde urbano forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/167>
+- `Franja de contención de crecimiento urbano del escenario intermedio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/168>
+- `Red TP Masivo Escenario Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/169>
+- `Escenario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/170>
+- `Comparativa de la estructura ecológica de Plan Met 2040 y el escenario integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/171>
+- `Estructura ecológica del escenario intermedio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/172>
+- `Estructura ecológica exterior` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/173>
+- `Estructura ecológica del Plan Met 2040` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/174>
+- `Escenario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/175>
+- `Comparativa de Áreas destinadas a transformación y densificación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/176>
+- `Plan Específico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/177>
+- `Densidad viviendas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/178>
+- `Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/179>
+- `Escenario Intermedio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/180>
+- `Proyectos estratégicos de transporte del Plan Met 2040` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/181>
+- `Proyecto Estrategicos de transporte (Linea)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/182>
+- `Proyecto Estrategicos de transporte (Polígono)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/183>
+- `Escenario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Desarrollo_Urbano/MapServer/184>
+
+## CS/Ecosistema_y_Biodiversidad (49)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Ecosistemas de Lima y Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/0>
+- `Matoral Andino (MA)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/1>
+- `Cardonal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/2>
+- `Desierto Costero (DC)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/3>
+- `Montañas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/4>
+- `Planicie áridas ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/5>
+- `Sin vegetación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/6>
+- `Tillandsia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/7>
+- `Valle Costero (V)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/8>
+- `Zonas productivas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/9>
+- `Agricola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/10>
+- `Mosaico pastos, cultivos y urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/11>
+- `Rios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/12>
+- `Valle de rio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/13>
+- `Litoral Costero (LC) ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/14>
+- `Acantilados o afloramiento rocosos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/15>
+- `Playas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/16>
+- `Litoral Marino (LM) ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/17>
+- `Mar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/18>
+- `Franja marina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/19>
+- `Humedal Costero (HC)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/20>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/21>
+- `Zonas pantanosas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/22>
+- `Loma Costera (LC) ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/23>
+- `Lomas Naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/24>
+- `Verde Oasis` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/25>
+- `Vegetación Efimera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/26>
+- `Lomas Intervenidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/27>
+- `Asentamientos Urbanos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/28>
+- `Zona Minera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/29>
+- `Zona Urbana (ZU)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/30>
+- `Infraestructura de Movilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/31>
+- `Infraestructura Vial y Ferroviaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/32>
+- `Infraestructura Aeroportuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/33>
+- `Infraestructura Portuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/34>
+- `Espacio Público y Parques` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/35>
+- `Infraestructura Social y Economica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/36>
+- `Zona Residencial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/37>
+- `Zona Comercial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/38>
+- `Zona Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/39>
+- `Zonas Uso Múltiple` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/40>
+- `Cuerpo de Agua Artifializado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/41>
+- `Medio Biótico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/42>
+- `Amenazadas fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/43>
+- `Amenazadas flora` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/44>
+- `Endemicas Fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/45>
+- `Endemicas Flora` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/46>
+- `Migratorias Aves` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/47>
+- `Otras especies migratorias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Ecosistema_y_Biodiversidad/MapServer/48>
+
+## CS/Límites_Juridiccionales (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/L%C3%ADmites_Juridiccionales/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Provincias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/L%C3%ADmites_Juridiccionales/MapServer/0>
+- `Distritos en el ámbito de estudio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/L%C3%ADmites_Juridiccionales/MapServer/1>
+
+## CS/Mapa (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Mapa/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Cuerpos_agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Mapa/MapServer/0>
+
+## CS/MapServicesUbigeo (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/MapServicesUbigeo/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Distritos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/MapServicesUbigeo/MapServer/0>
+
+## CS/Recurso_Hidrográfico (41)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Planta de Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/0>
+- `Planta de Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/1>
+- `Planta de Estaciones AML` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/2>
+- `Acuiferos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/3>
+- `Flujo de Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/4>
+- `Acuifero Chirilu` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/5>
+- `Chirilu Canales Marca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/6>
+- `Embalses AML` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/7>
+- `Cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/8>
+- `Cuenca Chancay Huaral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/9>
+- `Cuenca Chillon` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/10>
+- `Cuenca Lurin` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/11>
+- `Cuenca Rimac` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/12>
+- `Cuenca Canete` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/13>
+- `Cuencas AML` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/14>
+- `Canales Surco y Huatica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/15>
+- `Capas Base` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/16>
+- `Río Rimac` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/17>
+- `Canales Surco Huatica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/18>
+- `Limites Distritos Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/19>
+- `Limites Manzanas Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/20>
+- `Canales Principales y Secundarios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/21>
+- `Río Rimac` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/22>
+- `Canales Surco Huatica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/23>
+- `Secundarios Surco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/24>
+- `Secundarios Huatica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/25>
+- `Limites Distritos Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/26>
+- `Limites Manzanas Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/27>
+- `Influencia Directa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/28>
+- `Río Rimac` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/29>
+- `Canales Surco Huatica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/30>
+- `Influencia Directa Surco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/31>
+- `Influencia Directa Huatica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/32>
+- `Limites Distritos Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/33>
+- `Limites Manzanas Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/34>
+- `Areas Verdes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/35>
+- `Río Rimac` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/36>
+- `Canales Surco Huatica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/37>
+- `Parque - Áreas Verdes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/38>
+- `Limites Distritos Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/39>
+- `Limites Manzanas Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Recurso_Hidrogr%C3%A1fico/MapServer/40>
+
+## CS/Riesgos (117)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capa Base` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/0>
+- `Área Metropolitana de Lima y Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/1>
+- `Aeropuerto Internacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/2>
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/3>
+- `Areas naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/4>
+- `Áreas naturales y espacio público` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/5>
+- `Mascara` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/6>
+- `Infraestructructura vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/7>
+- `Red_ferroviaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/8>
+- `Red_vial_ambito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/9>
+- `Red vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/10>
+- `Red vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/11>
+- `Red_vial_malla_OSM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/12>
+- `Islas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/13>
+- `Hidrografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/14>
+- `Lagos y lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/15>
+- `Humedales ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/16>
+- `Ríos y quebradas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/17>
+- `Mascar de agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/18>
+- `Inventario de Edificaciones por calidad constructiva 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/19>
+- `Inventario de Infraestructura Criticas 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/20>
+- `Huella Urbana 2021 según Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/21>
+- `Sombreado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/22>
+- `Inundacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/23>
+- `Superficie Inundable para los Diferentes Eventos Analizados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/24>
+- `Periodo de Retorno en 10 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/25>
+- `Periodo de Retorno en 30 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/26>
+- `Periodo de Retorno en 50 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/27>
+- `Periodo de Retorno en 100 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/28>
+- `Periodo de Retorno en 500 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/29>
+- `Calado o profundidad de la lámina de agua (m) asociado al evento de inundación de T=100 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/30>
+- `Escenario Climático con datos Histórico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/31>
+- `Escenario Climático futuro con Cambio Climático` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/32>
+- `Velocidad del agua (m/s) asociada al evento de inundación de T=100 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/33>
+- `Escenario Climático con datos Histórico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/34>
+- `Escenario Climático futuro con Cambio Climático` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/35>
+- `Densidad de población (habitantes/hectáreas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/36>
+- `Inventario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/37>
+- `Inventario de Edificaciones según su Calidad Constructiva` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/38>
+- `Inventario de Edificaciones según su Valor Económico (MUSD $)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/39>
+- `Inventario de Infraestructuras Críticias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/40>
+- `Inventario de  Infraestructuras Críticas segun su Valor Económico (MUSD $)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/41>
+- `Inventario de infraestructuras críticas  afectadas por el evento de inundación de T=100 años  según su Valor Económico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/42>
+- `Escenario Climático con datos Histórico (MUSD $) ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/43>
+- `Escenario Climático futuro con Cambio Climático (MUSD $)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/44>
+- ` Inventario de edificaciones por calidad constructiva afectadas por el evento de inundación de T=100 Años según su Valor Económico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/45>
+- `Escenario Climático con datos Histórico (MUSD $) ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/46>
+- `Escenario Climático futuro con Cambio Climático (MUSD $) ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/47>
+- `Población Afectada T=100 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/48>
+- `Escenario Climático con datos Histórico (habitantes/hectáreas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/49>
+- `Escenario Climático futuro con Cambio Climático (habitantes/hectáreas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/50>
+- `Pérdida Económica en Edificaciones T=100 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/51>
+- `Escenario Climático con datos Histórico ($/m2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/52>
+- `Escenario Climático futuro con Cambio Climático ($/m2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/53>
+- `Pérdida de Vidas Humanas T=100 Años.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/54>
+- `Escenario Climático con datos Histórico (hab/km2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/55>
+- `Escenario Climático futuro con Cambio Climático (hab/km2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/56>
+- `Pérdida Media Anualizada de Vidas Humanas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/57>
+- `Escenario Climático con datos Histórico (hab/km2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/58>
+- `Escenario Climático futuro con Cambio Climático (hab/km2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/59>
+- `Deslizamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/60>
+- `Mapa de Peligrosidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/61>
+- `Por Caídas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/62>
+- `Por Deslizamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/63>
+- `Por Flujos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/64>
+- `Por Caídas, Deslizamientos y Flujos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/65>
+- `Nivel Peligro Máximo por Manzana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/66>
+- `Debido a Caídas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/67>
+- `Debido a Deslizamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/68>
+- `Debido a Flujos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/69>
+- `Debido al Conjunto de Caídas, Deslizamientos y Flujos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/70>
+- `Nivel de Riesgo Cualitativo por Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/71>
+- `Debido al Peligro por Caídas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/72>
+- `Debido al Peligro por Deslizamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/73>
+- `Debido al Peligro por Flujos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/74>
+- `Debido al Conjunto de Caídas, Deslizamientos y Flujos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/75>
+- `Sismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/76>
+- `Mapa de Efectos de Sitio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/77>
+- `Áreas de efectos de sitio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/78>
+- `Requisitos especiales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/79>
+- `Polígonos de aceleración PGA (Peak Ground Acceleration) en Roca con T=500 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/80>
+- `Polígono de PGA (mgal o cm/s²)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/81>
+- `Isolinea de PGA (mgal o cm/s²)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/82>
+- `Mapa de Intensidades EMS98 para el Resultado de Peligro Sísmico en Roca T=500 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/83>
+- `Inventario de Edificios y Población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/84>
+- `Número de edificios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/85>
+- `Número de habitantes (Censo Nacional de 2017)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/86>
+- `Indice de Vulnerabilidad por Manzanas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/87>
+- `Número de edificios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/88>
+- `Índices de vulnerabilidad asociados a cada manzana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/89>
+- `Tipología de Edificio por Manzanas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/90>
+- `Tipo de edificio - valor por defecto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/91>
+- `Tipos de edificios asosicados a cada manzana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/92>
+- `Daños Estructurales por Manzanas T=500 Años (unidad)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/93>
+- `Pérdidas Económicas por Distrito T=500 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/94>
+- `Población que Requiere Asistencia Médica Importante por Manzana T=500 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/95>
+- `Población que Requiere Asistencia Médica Importante por Distrito T=500 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/96>
+- `Población Gravemente Herida o Fallecida por Manzana T=500 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/97>
+- `Población Gravemente Herida o Fallecida por Distrito T=500 Años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/98>
+- `Tsunami` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/99>
+- `Superficie Inundable para los diferentes eventos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/100>
+- `Calado (cm) para el periodo de retorno 100 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/101>
+- `Calado (cm) para el periodo de retorno 250 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/102>
+- `Calado (cm) para el periodo de retorno 500 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/103>
+- `Calado (cm) para el periodo de retorno 1000 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/104>
+- `Calado para un Modelo Determinista` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/105>
+- `Inventario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/106>
+- `Edificaciones según su Calidad Constructiva` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/107>
+- `Infraestructuras Críticas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/108>
+- `Densidad viviendas (vivienda/ha)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/109>
+- `Valor Económico Inventario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/110>
+- `De las Edificaciones (MUSD $)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/111>
+- `Valor Económico Inventario de las Infraestructuras Críticas (MUSD $)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/112>
+- `Evento 1746` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/113>
+- `Mapa de Calados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/114>
+- `Valor Económico Expuesto de las Edificaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/115>
+- `Valor Económico Expuesto de las Infraestructuras Críticas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS/Riesgos/MapServer/116>
+
+## CS_Indicadores/CC_1 (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Historico de linea erosión - 5 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/0>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 5% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/1>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 5% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/2>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 50% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/3>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 50% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/4>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 95% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/5>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 95% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/6>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 5% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/7>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 5% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/8>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 50% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/9>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 50% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/10>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 95% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/11>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 95% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_1/MapServer/12>
+
+## CS_Indicadores/CC_2 (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Histório línea erosión - 25 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/0>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 5% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/1>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 5% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/2>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 50% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/3>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 50% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/4>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 95% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/5>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 95% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/6>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 5% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/7>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 5% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/8>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 50% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/9>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 50% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/10>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 95% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/11>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 95% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_2/MapServer/12>
+
+## CS_Indicadores/CC_3 (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Histórico línea erosión - 50 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/0>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 5% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/1>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 5% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/2>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 50% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/3>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 50% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/4>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 95% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/5>
+- `Linea erosión (año 2050-SPP2-4.5 Percentil 95% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/6>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 5% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/7>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 5% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/8>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 50% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/9>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 50% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/10>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 95% Confianza Baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/11>
+- `Linea erosión (año 2050-SPP5-8.5 Percentil 95% Confianza Media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_3/MapServer/12>
+
+## CS_Indicadores/CC_4 (5)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_4/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Histórico activos construidos - Evento de El Niño (1997/98)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_4/MapServer/0>
+- `Activos construidos (SSP2 RCP4.5 Percentil del 95% Confianza baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_4/MapServer/1>
+- `Activos construidos (SSP2 RCP4.5 Percentil del 95% Confianza media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_4/MapServer/2>
+- `Activos construidos (SSP5 RCP8.5 Percentil del 95% Confianza baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_4/MapServer/3>
+- `Activos construidos (SSP5 RCP8.5 Percentil del 95% Confianza media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_4/MapServer/4>
+
+## CS_Indicadores/CC_5 (6)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_5/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Activos construidos para un evento de inundación de cota de 2,5m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_5/MapServer/0>
+- `Activos construidos para un evento de inundación de cota de 3m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_5/MapServer/1>
+- `Activos construidos para un evento de inundación de cota de 3,5m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_5/MapServer/2>
+- `Activos construidos para un evento de inundación de cota de 4m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_5/MapServer/3>
+- `Activos construidos para un evento de inundación de cota de 4,5m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_5/MapServer/4>
+- `Activos construidos para un evento de inundación de cota de 5m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_5/MapServer/5>
+
+## CS_Indicadores/CC_6 (5)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_6/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Histórico activos construidos de tsunami - 500 años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_6/MapServer/0>
+- `Activos construidos de tsunami (SSP2 RCP4.5 Percentil del 95% Confianza baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_6/MapServer/1>
+- `Activos construidos de tsunami (SSP2 RCP4.5 Percentil del 95% Confianza media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_6/MapServer/2>
+- `Activos construidos de tsunami (SSP5 RCP8.5 Percentil del 95% Confianza baja)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_6/MapServer/3>
+- `Activos construidos de tsunami (SSP5 RCP8.5 Percentil del 95% Confianza media)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_6/MapServer/4>
+
+## CS_Indicadores/CC_7 (6)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_7/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Infraestructuras para un evento de inundación de cota de 2,5 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_7/MapServer/0>
+- `Infraestructuras para un evento de inundación de cota de 3 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_7/MapServer/1>
+- `Infraestructuras para un evento de inundación de cota de 3,5 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_7/MapServer/2>
+- `Infraestructuras para un evento de inundación de cota de 4 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_7/MapServer/3>
+- `Infraestructuras para un evento de inundación de cota de 4,5 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_7/MapServer/4>
+- `Infraestructuras para un evento de inundación de cota de 5 m.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/CC_7/MapServer/5>
+
+## CS_Indicadores/DOT_Rangos_Ingresos (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Rangos_Ingresos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Rangos_Ingresos/MapServer/0>
+- `Ingresos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Rangos_Ingresos/MapServer/1>
+
+## CS_Indicadores/DOT_Regimen_Tenencia (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Regimen_Tenencia/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Regimen_Tenencia/MapServer/0>
+- `Régimen de tenencia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Regimen_Tenencia/MapServer/1>
+
+## CS_Indicadores/DOT_Tipos_Viviendas (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Tipos_Viviendas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Tipos_Viviendas/MapServer/0>
+- `Tipo de Viviendas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Tipos_Viviendas/MapServer/1>
+
+## CS_Indicadores/DOT_Uso_Actual_Detalle (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Uso_Actual_Detalle/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Uso_Actual_Detalle/MapServer/0>
+- `Clasificación Uso de suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Uso_Actual_Detalle/MapServer/1>
+
+## CS_Indicadores/DOT_Uso_Actual_Predominantes (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Uso_Actual_Predominantes/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Uso_Actual_Predominantes/MapServer/0>
+- `Uso actual del suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Uso_Actual_Predominantes/MapServer/1>
+
+## CS_Indicadores/DOT_Viviendas_Abastecimiento_Agua (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Viviendas_Abastecimiento_Agua/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Viviendas_Abastecimiento_Agua/MapServer/0>
+- `Viviendas por tipo de abastecimiento de agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Viviendas_Abastecimiento_Agua/MapServer/1>
+
+## CS_Indicadores/DOT_Viviendas_Conexion_Servicio_Higienico (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Viviendas_Conexion_Servicio_Higienico/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Estaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Viviendas_Conexion_Servicio_Higienico/MapServer/0>
+- `Viviendas por conexión del servicio higiénico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DOT_Viviendas_Conexion_Servicio_Higienico/MapServer/1>
+
+## CS_Indicadores/DU_Areas_Verdes_Generales (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Areas_Verdes_Generales/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Areas_Verdes_Generales/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Areas_Verdes_Generales/MapServer/1>
+
+## CS_Indicadores/DU_Crecimiento_Anual (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Crecimiento_Anual/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Crecimiento_Anual/MapServer/0>
+- `Huella Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Crecimiento_Anual/MapServer/1>
+
+## CS_Indicadores/DU_Crecimiento_Poblacion (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Crecimiento_Poblacion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Crecimiento_Poblacion/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Crecimiento_Poblacion/MapServer/1>
+
+## CS_Indicadores/DU_Deficit_Cuantitativo (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Deficit_Cuantitativo/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Deficit_Cuantitativo/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Deficit_Cuantitativo/MapServer/1>
+
+## CS_Indicadores/DU_Densidad_Bruta_Poblacion (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Bruta_Poblacion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Bruta_Poblacion/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Bruta_Poblacion/MapServer/1>
+
+## CS_Indicadores/DU_Densidad_Neta_Construida (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Neta_Construida/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Neta_Construida/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Neta_Construida/MapServer/1>
+
+## CS_Indicadores/DU_Densidad_Neta_Poblacion (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Neta_Poblacion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Neta_Poblacion/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Densidad_Neta_Poblacion/MapServer/1>
+
+## CS_Indicadores/DU_Distribucion_Areas_Verdes (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Distribucion_Areas_Verdes/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Distribucion_Areas_Verdes/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Distribucion_Areas_Verdes/MapServer/1>
+
+## CS_Indicadores/DU_Distribucion_Espacios_Publicos (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Distribucion_Espacios_Publicos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Distribucion_Espacios_Publicos/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Distribucion_Espacios_Publicos/MapServer/1>
+
+## CS_Indicadores/DU_Espacios_Publicos (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Espacios_Publicos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Espacios_Publicos/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Espacios_Publicos/MapServer/1>
+
+## CS_Indicadores/DU_Espacios_Urbanos_Predominantes (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Espacios_Urbanos_Predominantes/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Espacios_Urbanos_Predominantes/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Espacios_Urbanos_Predominantes/MapServer/1>
+
+## CS_Indicadores/DU_Poblacion_Urbana_Municipio (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Poblacion_Urbana_Municipio/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Poblacion_Urbana_Municipio/MapServer/0>
+- `Huella Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Poblacion_Urbana_Municipio/MapServer/1>
+
+## CS_Indicadores/DU_Porcentaje_Poblacion_Asentamientos (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Poblacion_Asentamientos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Poblacion_Asentamientos/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Poblacion_Asentamientos/MapServer/1>
+
+## CS_Indicadores/DU_Porcentaje_Superficie_Asentamientos (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Superficie_Asentamientos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Superficie_Asentamientos/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Superficie_Asentamientos/MapServer/1>
+
+## CS_Indicadores/DU_Porcentaje_Viviendas (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Viviendas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Viviendas/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Viviendas/MapServer/1>
+
+## CS_Indicadores/DU_Porcentaje_Viviendas_Precarias (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Viviendas_Precarias/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Viviendas_Precarias/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Porcentaje_Viviendas_Precarias/MapServer/1>
+
+## CS_Indicadores/DU_Presencia_Espacio_Disperso (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Disperso/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Disperso/MapServer/0>
+- `Huella Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Disperso/MapServer/1>
+
+## CS_Indicadores/DU_Presencia_Espacio_Disperso_Continua (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Disperso_Continua/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Disperso_Continua/MapServer/0>
+- `Huella Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Disperso_Continua/MapServer/1>
+
+## CS_Indicadores/DU_Presencia_Espacio_Periurbano (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Periurbano/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Periurbano/MapServer/0>
+- `Huella Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Presencia_Espacio_Periurbano/MapServer/1>
+
+## CS_Indicadores/DU_Superficie_Residencial_Ocupada (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Superficie_Residencial_Ocupada/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Superficie_Residencial_Ocupada/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Superficie_Residencial_Ocupada/MapServer/1>
+
+## CS_Indicadores/DU_Vacios_Urbanos (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Vacios_Urbanos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Vacios_Urbanos/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Vacios_Urbanos/MapServer/1>
+
+## CS_Indicadores/DU_Viviendas_Desocupadas (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Viviendas_Desocupadas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Viviendas_Desocupadas/MapServer/0>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/DU_Viviendas_Desocupadas/MapServer/1>
+
+## CS_Indicadores/ECO (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/ECO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sectores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/ECO/MapServer/0>
+- `Ecosistemas AML Callao 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/ECO/MapServer/1>
+
+## CS_Indicadores/R_1 (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_1/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Índice Pérdidas Económicas Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_1/MapServer/0>
+
+## CS_Indicadores/R_2 (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_2/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Índice de fatalidad por riesgo de Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_2/MapServer/0>
+
+## CS_Indicadores/R_3 (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_3/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Porcentaje de viviendas e infraestructura críticas en áreas de peligrosidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_3/MapServer/0>
+
+## CS_Indicadores/R_4 (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_4/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Índice de pérdidas económicas por riesgo de sismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_4/MapServer/0>
+
+## CS_Indicadores/R_5 (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_5/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Índice de fatalidad por riesgo de sismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_5/MapServer/0>
+
+## CS_Indicadores/R_6 (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_6/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Índice de pérdidas económicas por riesgo de tsunami ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/R_6/MapServer/0>
+
+## CS_Indicadores/RH_Consumo_Agua_Subterraneo (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/RH_Consumo_Agua_Subterraneo/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Consumo agua subterraneo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/RH_Consumo_Agua_Subterraneo/MapServer/0>
+
+## CS_Indicadores/RH_Demanda_Agua (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/RH_Demanda_Agua/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Demanda agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/RH_Demanda_Agua/MapServer/0>
+
+## CS_Indicadores/RH_Oferta_Hidrica (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/RH_Oferta_Hidrica/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Oferta hidrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/CS_Indicadores/RH_Oferta_Hidrica/MapServer/0>
+
+## DASH_CFOI (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/DASH_CFOI/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CFOI PRUEBA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/DASH_CFOI/MapServer/0>
+
+## GEOLOMAS_final (14)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Límite de los distritos de Lima Metropolitana (INEI, 2017)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/0>
+- `Ordenanzas distritales de lomas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/1>
+- `Ordenanzas distritales de lomas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/2>
+- `Ordenanza MDI 2016` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/3>
+- `Monumentos arqueológicos delimitados (Min. Cultura, 2021)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/4>
+- `Áreas Naturales Protegidas (Sernanp, 2021)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/5>
+- `Comunidades campesinas (Minagri)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/6>
+- `Lomas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/7>
+- `Lomas anuales de Lima (Mun. Lima, 2013)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/8>
+- `Ecosistemas frágiles de lomas del Perú (Serfor)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/9>
+- `Ecosistemas de lomas del Perú (Minam, 2018)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/10>
+- `Frecuencia de aparición de lomas (Eba Lomas, 2021)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/11>
+- `Estructura ecológica de Lima (Mun. Lima, 2014)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/12>
+- `Zonificación de usos del suelo metropolitano (Instituto Metropolitano de Lima)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/GEOLOMAS_final/MapServer/13>
+
+## hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados (24)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/0>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/1>
+- `Concesiones Hidroelectricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/2>
+- `Lotes petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/3>
+- `Concesiones Electricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/4>
+- `Fajas marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/5>
+- `Areas de ConservacionRegional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/6>
+- `ANP Nacional Definitivas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/7>
+- `Sitios ramsar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/8>
+- `Zonas marino costeras RM 189-2015` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/9>
+- `ZMC_Lambayeque_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/10>
+- `ZMC_Paita_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/11>
+- `ZMC_Pisco_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/12>
+- `ZMC_ISLAY_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/13>
+- `ZMC_ILo_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/14>
+- `ZMC_Tumbes_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/15>
+- `ZMC_Huarmey_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/16>
+- `ZMC_Trujillo_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/17>
+- `ZMC_HUACHO_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/18>
+- `ZMC_Talara_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/19>
+- `ZMC_Casma_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/20>
+- `ZMC_Tacna_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/21>
+- `ZMC_Canete` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/22>
+- `ZMC_Sechura_MC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_derechos_otorgados/MapServer/23>
+
+## hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental (29)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Geomorfología costera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/0>
+- `Procesos_morfo_p` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/1>
+- `Procesos_morfo_l` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/2>
+- `Merge_geo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/3>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/4>
+- `Areas degradadas (2021)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/5>
+- `Servicios ecosistémicos de regulación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/6>
+- `Retención de agua (WRI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/7>
+- `Regulación de riesgos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/8>
+- `Erosión de suelos (RUSLE)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/9>
+- `Zonificación Ecológica y Economica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/10>
+- `Amazonas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/11>
+- `Arequipa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/12>
+- `Ayacucho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/13>
+- `Cajamarca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/14>
+- `Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/15>
+- `Cusco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/16>
+- `Huánuco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/17>
+- `Huancavelíca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/18>
+- `Junín` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/19>
+- `Lambayeque` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/20>
+- `Madre de Dios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/21>
+- `Moquegua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/22>
+- `Piura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/23>
+- `Puno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/24>
+- `San Martin` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/25>
+- `Tacna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/26>
+- `Tumbes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/27>
+- `Ucayali` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_fisico_ambiental/MapServer/28>
+
+## hiroambienplanificacion/caracterizacion_territorio_irma (140)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `IRMA Malanche` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/0>
+- `Medidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/1>
+- `M_Ensanchamiento_de_puente__ordenamiento_vial_y_evaluación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/2>
+- `M_Ensanchamiento_de_puente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/3>
+- `M_Dispersores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/4>
+- `M_Forestación_asociada_a_dispersores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/5>
+- `M_Muros_de_protección_y_control_de_velocidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/6>
+- `M_Encausamiento_y_ensanchamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/7>
+- `M_Espacios_de_gestión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/8>
+- `M_Control_mantenimiento_cauce_natural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/9>
+- `M_Medidas_de_gestión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/10>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/11>
+- `M_Tipo_gestión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/12>
+- `Temáticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/13>
+- `BIO_COBERTURA_USO_ACTUAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/14>
+- `BIO_ECOSISTEMAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/15>
+- `ECO_CATASTRO_MINERO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/16>
+- `FIS_SUELOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/17>
+- `FIS_PENDIENTE.tif` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/18>
+- `FIS_GEOLOGÍA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/19>
+- `FIS_GEOMORFOLOGÍA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/20>
+- `Peligros_Vulnerabilidad_Riesgos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/21>
+- `Peligros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/22>
+- `PEL_FLUJO_DE_DETRITOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/23>
+- `IRMA Chillón` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/24>
+- `Medidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/25>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/26>
+- `Temáticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/27>
+- `BIO_ANP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/28>
+- `BIO_COBER_VEGETAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/29>
+- `BIO_ECORREGIONES` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/30>
+- `BIO_ECOSIST_MNE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/31>
+- `BIO_ECOSISTEMAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/32>
+- `BIO_PECUARIO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/33>
+- `BIO_UNID_MARINO_C` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/34>
+- `BIO_USO_ACTUAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/35>
+- `BIO_USO_SUELO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/36>
+- `BIO_ZONA_RESERVADA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/37>
+- `BIO_ZONAS_VIDA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/38>
+- `BIO_ZOOTECNIA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/39>
+- `ECO_ACT_ECONOMICAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/40>
+- `ECO_CATAS_MINERO_2013` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/41>
+- `ECO_PEA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/42>
+- `FIS_CLIMATICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/43>
+- `FIS_CUM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/44>
+- `FIS_FISIOGRAFICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/45>
+- `FIS_GEOLÓGICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/46>
+- `FIS_GEOMORFOLOGICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/47>
+- `FIS_HIDROGEOLOGICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/48>
+- `FIS_PENDIENTE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/49>
+- `FIS_SUELOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/50>
+- `SOC_POBREZA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/51>
+- `SOC_INDICADORES_SOCIALES` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/52>
+- `SOC_CRECIM_URBANO_DESDE40` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/53>
+- `SOC_COMUNIDADES_CAMPESINAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/54>
+- `Peligros/Vulnerabilidad/Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/55>
+- `PEL_AREA_INUNDACION` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/56>
+- `PEL_CP_DESLIZAMIENTO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/57>
+- `PEL_CP_INUNDACIONES` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/58>
+- `PEL_EMERGENCIAS_REGISTRADAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/59>
+- `VUL_INTEGRADA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/60>
+- `VUL_ECO_PRED_RURAL_10M` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/61>
+- `IRMA Lurín` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/62>
+- `Medidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/63>
+- `Peligros_Vulnerabilidad_Riesgos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/64>
+- `PEL_HUAYCOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/65>
+- `PEL_MOV_MASA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/66>
+- `PEL_NATURALES` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/67>
+- `PEL_PELIGROS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/68>
+- `PEL_Otros_peligros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/69>
+- `VUL_CASCO_URBANO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/70>
+- `VUL_ECOSISTEMA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/71>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/72>
+- `Zonas_geo_climaticas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/73>
+- `Temáticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/74>
+- `BIO_ANP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/75>
+- `BIO_AGROSTOLOGICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/76>
+- `BIO_ECOSISTEMA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/77>
+- `BIO_USOACTUAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/78>
+- `BIO_FAUNA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/79>
+- `BIO_ZOOTECNIA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/80>
+- `ECO_ACTIPRODUCTIVAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/81>
+- `ECO_CATASTRO_MINERO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/82>
+- `ECO_PEA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/83>
+- `FIS_CLIMA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/84>
+- `FIS_PRECIPITACIONES` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/85>
+- `FIS_TEMPERATURA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/86>
+- `FIS_CALIDADAIRE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/87>
+- `FIS_CALIDADAGUA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/88>
+- `FIS_CUM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/89>
+- `FIS_FISIOGRAFICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/90>
+- `FIS_GEOLOGICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/91>
+- `FIS_GEOMORFOLOGICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/92>
+- `FIS_HIDROGEOLOGICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/93>
+- `FIS_HIDROLOGICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/94>
+- `FIS_SUBCUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/95>
+- `FIS_PENDIENTES` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/96>
+- `FIS_SUELOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/97>
+- `SOC_PREDIO_RURAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/98>
+- `SOC_PREDIO_URBANO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/99>
+- `SOC_MORTALIDADINFANT` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/100>
+- `SOC_CCPP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/101>
+- `SOC_DENSIDADPOBNETA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/102>
+- `IRMA Picota` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/103>
+- `MEDIDAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/104>
+- `UNIDADES HOMOGÉNEAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/105>
+- `Zonas_BC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/106>
+- `TEMÁTICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/107>
+- `BIO_Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/108>
+- `BIO_ANP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/109>
+- `ECO_CATAS_MINERO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/110>
+- `BIO_COBER_VEGETAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/111>
+- `FIS_CLIMAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/112>
+- `FIS_DEGRADACION` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/113>
+- `FIS_FISIOGRAFIA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/114>
+- `FIS_GEOLOGIA_ACONDICIO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/115>
+- `FIS_GEOMORFOLOGIA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/116>
+- `FIS_HIDROGEOLOGIA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/117>
+- `FIS_MICROCUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/118>
+- `FIS_pendientes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/119>
+- `FIS_SUBCUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/120>
+- `FIS_SUELOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/121>
+- `SOC_CPP_URBANO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/122>
+- `SOC_CPP_RURAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/123>
+- `SOC_DIST_POB` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/124>
+- `Peligros_Vulnerabilidad_Riesgos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/125>
+- `Peligros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/126>
+- `PEL_MORFODINAMICOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/127>
+- `PEL_EROSION` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/128>
+- `PEL_GEOLOGICOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/129>
+- `PEL_INUNDACION` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/130>
+- `PEL_INUNDACIONES_TR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/131>
+- `PEL_REMOCION_EN_MASA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/132>
+- `Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/133>
+- `Riesgos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/134>
+- `IRMA Rimac` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/135>
+- `Medidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/136>
+- `Unidades Homogéneas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/137>
+- `Temáticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/138>
+- `BIO_Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_irma/MapServer/139>
+
+## hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres (291)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Susceptibilidad a fenómenos recurrentes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/0>
+- `Registros de eventos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/1>
+- `Registro de emergencias (INDECI 03/22)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/2>
+- `Puntos críticos por inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/3>
+- `Inundaciones ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/4>
+- `Susceptibilidad a inundaciones - Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/5>
+- `Movimientos en masa ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/6>
+- `Susceptibilidad a movimientos en masa - Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/7>
+- `Muy Alta, (Pendiente 25°-45°+Agua)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/8>
+- `Alta, (Pendiente 30°-45°)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/9>
+- `Media, (Pendiente 20°-30°)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/10>
+- `Baja, (Pendiente 10° a 20°)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/11>
+- `Muy Bajo, (Pendientes &lt; 5°) ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/12>
+- `Análisis de riesgo de desastres, según departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/13>
+- `Análisis de riesgo Lambayeque` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/14>
+- `Escenario de Riesgo frente a Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/15>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/16>
+- `Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/17>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/18>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/19>
+- `Vulnerabilidad de los ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/20>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/21>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/22>
+- `Riesgo de los ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/23>
+- `Escenario de Riesgo frente a Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/24>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/25>
+- `Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/26>
+- `Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/27>
+- `Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/28>
+- `Escenario de Riesgo frente a Inundación ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/29>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/30>
+- `Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/31>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/32>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/33>
+- `Vulnerabilidad de los ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/34>
+- `Vulnerabilidad de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/35>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/36>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/37>
+- `Riesgo de los ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/38>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/39>
+- `Escenario de Riesgo frente a Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/40>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/41>
+- `Remoción en masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/42>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/43>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/44>
+- `Riesgo de los ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/45>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/46>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/47>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/48>
+- `Vulnerabilidad de los ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/49>
+- `Vulnerabilidad de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/50>
+- `Análisis de riesgo Piura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/51>
+- `Escenario de Riesgo frente a Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/52>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/53>
+- `Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/54>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/55>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/56>
+- `Vulnerabilidad agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/57>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/58>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/59>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/60>
+- `Riesgo agricola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/61>
+- `Riesgo pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/62>
+- `Escenario de Riesgo frente a Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/63>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/64>
+- `Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/65>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/66>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/67>
+- `Vulnerabilidad agricola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/68>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/69>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/70>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/71>
+- `Riesgo agricola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/72>
+- `Riesgo pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/73>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/74>
+- `Escenario de Riesgo frente a Inundación y Erosión Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/75>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/76>
+- `Inundación y Erosión Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/77>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/78>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/79>
+- `Vulnerabilidad agricola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/80>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/81>
+- `Vulnerabilidad de la infraestructura vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/82>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/83>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/84>
+- `Riesgo agricola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/85>
+- `Riesgo pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/86>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/87>
+- `Escenario de Riesgo frente a Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/88>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/89>
+- `Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/90>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/91>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/92>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/93>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/94>
+- `Riesgos de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/95>
+- `Escenario de Riesgo frente a Tsunami` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/96>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/97>
+- `Tsunamis` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/98>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/99>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/100>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/101>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/102>
+- `Análisis de riesgo Ayacucho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/103>
+- `Escenario de Riesgo frente a Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/104>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/105>
+- `Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/106>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/107>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/108>
+- `Vulnerabilidad agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/109>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/110>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/111>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/112>
+- `Riesgo agricola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/113>
+- `Riesgo pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/114>
+- `Escenario de Riesgo frente a Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/115>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/116>
+- `Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/117>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/118>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/119>
+- `Vulnerabilidad agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/120>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/121>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/122>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/123>
+- `Riesgo agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/124>
+- `Riesgo pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/125>
+- `Escenario de Riesgo frente a Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/126>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/127>
+- `Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/128>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/129>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/130>
+- `Vulnerabilidad agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/131>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/132>
+- `Vulnerabilidad  Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/133>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/134>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/135>
+- `Riesgo agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/136>
+- `Riesgo Pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/137>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/138>
+- `Escenario de Riesgo frente a Inundación y Erosión Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/139>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/140>
+- `Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/141>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/142>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/143>
+- `Vulnerabilidad agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/144>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/145>
+- `Vulnerabilidad  Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/146>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/147>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/148>
+- `Riesgo agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/149>
+- `Riesgo pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/150>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/151>
+- `Escenario de Riesgo frente a Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/152>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/153>
+- `Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/154>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/155>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/156>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/157>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/158>
+- `Análisis de riesgo Cusco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/159>
+- `Escenario de Riesgo frente a Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/160>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/161>
+- `Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/162>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/163>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/164>
+- `Vulnerabilidad agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/165>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/166>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/167>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/168>
+- `Riesgo agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/169>
+- `Escenario de Riesgo frente a Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/170>
+- `Niveles de peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/171>
+- `Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/172>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/173>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/174>
+- `Vulnerabilidad agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/175>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/176>
+- `Vulnerabilidad de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/177>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/178>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/179>
+- `Riesgo Pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/180>
+- `Riesgo del gaseoducto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/181>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/182>
+- `Escenario de Riesgo frente a Inundación y Erosión Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/183>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/184>
+- `Inundación y Erosión Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/185>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/186>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/187>
+- `Vulnerabilidad agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/188>
+- `Vulnerabilidad pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/189>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/190>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/191>
+- `Shapr Ries_Agri_Inundación no contiene como indica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/192>
+- `Riesgo pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/193>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/194>
+- `Escenario de Riesgo frente a Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/195>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/196>
+- `Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/197>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/198>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/199>
+- `Vulnerabilidad de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/200>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/201>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/202>
+- `Riesgo del gaseoducto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/203>
+- `Riesgo de la Infraestructura Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/204>
+- `Análisis de riesgo Tacna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/205>
+- `Escenario de Riesgo frente a Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/206>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/207>
+- `Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/208>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/209>
+- `Vulnearabilidad Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/210>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/211>
+- `Riesgo Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/212>
+- `Escenario de Riesgo frente a Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/213>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/214>
+- `Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/215>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/216>
+- `Vulnearabilidad Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/217>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/218>
+- `Riesgo Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/219>
+- `Escenario de Riesgo frente a Inundación y Erosión Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/220>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/221>
+- `Inundación y Erosión Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/222>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/223>
+- `Vulnearabilidad Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/224>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/225>
+- `Riesgo Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/226>
+- `Escenario de Riesgo frente a Volcanes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/227>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/228>
+- `Volcanes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/229>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/230>
+- `Vulnearabilidad Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/231>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/232>
+- `Riesgo Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/233>
+- `Escenario de Riesgo frente a Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/234>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/235>
+- `Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/236>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/237>
+- `Vulnearabilidad Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/238>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/239>
+- `Riesgo Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/240>
+- `Escenario de Riesgo frente a Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/241>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/242>
+- `Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/243>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/244>
+- `Vulnearabilidad Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/245>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/246>
+- `Riesgo Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/247>
+- `Análisis de riesgo Puno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/248>
+- `Escenario de Riesgo frente a Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/249>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/250>
+- `Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/251>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/252>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/253>
+- `Vulnerabilidad Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/254>
+- `Vulnerabilidad Integral economica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/255>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/256>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/257>
+- `Riesgo Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/258>
+- `Riesgo Economico Integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/259>
+- `Escenario de Riesgo frente a Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/260>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/261>
+- `Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/262>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/263>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/264>
+- `Vulnerabilidad Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/265>
+- `Vulnerabilidad Economica Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/266>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/267>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/268>
+- `Riesgo agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/269>
+- `Riesgo Economico Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/270>
+- `Escenario de Riesgo frente a Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/271>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/272>
+- `Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/273>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/274>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/275>
+- `Vulnerabilidad Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/276>
+- `Vulnerabilidad Economica Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/277>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/278>
+- `Riesgo agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/279>
+- `Riesgo Economico Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/280>
+- `Escenario de Riesgo frente a Inundación y Erosión Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/281>
+- `Niveles de Peligro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/282>
+- `Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/283>
+- `Niveles de Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/284>
+- `Vulnerabilidad de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/285>
+- `Vulnerabilidad Economica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/286>
+- `Vulnerabilidad Economica Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/287>
+- `Niveles de Riesgo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/288>
+- `Riesgo de la población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/289>
+- `Riesgo Economico Integral` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/caracterizacion_territorio_riesgo_desastres/MapServer/290>
+
+## hiroambienplanificacion/cartografia_base (14)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Unidad Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/0>
+- `subcuencahidrografica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/1>
+- `100,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/2>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/3>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/4>
+- `Curvas de nivel al 100,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/5>
+- `Limites Politico Referenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/6>
+- `Limite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/7>
+- `Limite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/8>
+- `Limite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/9>
+- `Capitales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/10>
+- `Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/11>
+- `Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/12>
+- `Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/cartografia_base/MapServer/13>
+
+## hiroambienplanificacion/elementos_expuestos (14)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Centros poblados INEI` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/0>
+- `Establecimientos de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/1>
+- `Instituciones Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/2>
+- `Infraestructura vial y transporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/3>
+- `Transporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/4>
+- `Red Ferroviaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/5>
+- `Red vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/6>
+- `Otra Infraestructura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/7>
+- `Infraestructura para Hidrocarburos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/8>
+- `Gasoducto, oleoducto y poliducto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/9>
+- `Infraestructura eléctrica y sanitaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/10>
+- `Infraestructura eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/11>
+- `Infraestructura sanitaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/12>
+- `Áreas agrícolas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/elementos_expuestos/MapServer/13>
+
+## hiroambienplanificacion/oportunidades_inversion (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/oportunidades_inversion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Unidades hidrográficas según nivel de focalización` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/hiroambienplanificacion/oportunidades_inversion/MapServer/0>
+
+## Indicadores_T/Servicio_Grupos_Capas_Indicadores (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Indicadores_T/Servicio_Grupos_Capas_Indicadores/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Indica_22` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Indicadores_T/Servicio_Grupos_Capas_Indicadores/MapServer/0>
+
+## Linea_de_costa (6)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Linea_de_costa/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Playas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Linea_de_costa/MapServer/0>
+- `Monitoreo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Linea_de_costa/MapServer/1>
+- `Monitoreo por años` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Linea_de_costa/MapServer/2>
+- `Playas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Linea_de_costa/MapServer/3>
+- `Proyeccion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Linea_de_costa/MapServer/4>
+- `Incertidumbre` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Linea_de_costa/MapServer/5>
+
+## Loma_costera (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Loma_costera/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Loma costera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Loma_costera/MapServer/0>
+- `Distritos de Lomas costeras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Loma_costera/MapServer/1>
+
+## MONITOREO_SIDETEVA (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Red hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/0>
+- `Límite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/1>
+- `Límite de área de Monitoreo Puno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/2>
+- `Límite de área de Monitoreo Madre de Dios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/3>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/4>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/5>
+- `Superficie degradada por actividad minera Ayapata 2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/6>
+- `Superficie degradada por actividad minera Camanti 2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/7>
+- `Superficie degradada por actividad minera Madre de Dios 2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/8>
+- `Areas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/9>
+- `Zonas de Amortiguamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/MONITOREO_SIDETEVA/MapServer/10>
+
+## RUMERESE/Servicio_Merese (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/RUMERESE/Servicio_Merese/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Acuerdos_MERESE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/RUMERESE/Servicio_Merese/MapServer/0>
+
+## SENSBILIDAD_DE_ECOSISTEMAS_ANTE_EL_FUEGO (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/SENSBILIDAD_DE_ECOSISTEMAS_ANTE_EL_FUEGO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Ecosistemas Categorías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/SENSBILIDAD_DE_ECOSISTEMAS_ANTE_EL_FUEGO/MapServer/0>
+- `Ecosistemas Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/SENSBILIDAD_DE_ECOSISTEMAS_ANTE_EL_FUEGO/MapServer/1>
+
+## Servicio_activacion_quebradas (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_activacion_quebradas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Activacion de quebradas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_activacion_quebradas/MapServer/0>
+
+## Servicio_cobertura_vegetal (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_cobertura_vegetal/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Cobertura Vegetal 2015` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_cobertura_vegetal/MapServer/0>
+
+## Servicio_Degradacion_tematicas (6)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Degradacion_tematicas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Centros poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Degradacion_tematicas/MapServer/0>
+- `Vias red nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Degradacion_tematicas/MapServer/1>
+- `Vias red departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Degradacion_tematicas/MapServer/2>
+- `Vias red vecinal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Degradacion_tematicas/MapServer/3>
+- `Vias ferreas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Degradacion_tematicas/MapServer/4>
+- `Superficie agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Degradacion_tematicas/MapServer/5>
+
+## Servicio_Huellahumana (4)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Huellahumana/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Huella Humana año 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Huellahumana/MapServer/0>
+- `Huella Humana año 2018` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Huellahumana/MapServer/1>
+- `Huella Humana año 2015` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Huellahumana/MapServer/2>
+- `Huella Humana año 2012` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Huellahumana/MapServer/3>
+
+## Servicio_Indice_Humedad_Topografica (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Indice_Humedad_Topografica/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `TWI_reclasificado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Indice_Humedad_Topografica/MapServer/0>
+
+## Servicio_Linea_de_costa_2025v1 (4)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Linea_de_costa_2025v1/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Playas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Linea_de_costa_2025v1/MapServer/0>
+- `Monitoreo de linea de costa 2026 (feb)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Linea_de_costa_2025v1/MapServer/1>
+- `Linea de costa (Histórico1985 - 2026)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Linea_de_costa_2025v1/MapServer/2>
+- `Linea de referencia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Linea_de_costa_2025v1/MapServer/3>
+
+## Servicio_OMEC (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_OMEC/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Otras Medidas Efectivas de Conservación Basadas en Áreas (OMEC)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_OMEC/MapServer/0>
+
+## Servicio_Oportunidades_Inversion (65)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Cartografía base` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/0>
+- `Limite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/1>
+- `Limite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/2>
+- `Limite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/3>
+- `Unidad Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/4>
+- `Areas Urbanas ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/5>
+- `Hidrografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/6>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/7>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/8>
+- `Curvas de nivel al 100,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/9>
+- `Red vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/10>
+- `Capitales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/11>
+- `Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/12>
+- `Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/13>
+- `Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/14>
+- `Tambos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/15>
+- `Centros poblados INEI` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/16>
+- `Establecimientos de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/17>
+- `Infraestructuras Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/18>
+- `Subcuencas (UH 7)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/19>
+- `Unidades Territoriales de Intevención (UTI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/20>
+- `Tenencia de la tierra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/21>
+- `predios_rurales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/22>
+- `Concesiones Forestales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/23>
+- `Bosque de Producción Permanente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/24>
+- `Concesiones mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/25>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/26>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/27>
+- `Lotes petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/28>
+- `Fajas marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/29>
+- `Areas de ConservacionRegional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/30>
+- `ANP Nacional Definitivas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/31>
+- `Recursos potenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/32>
+- `Proyecto de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/33>
+- `Recursos turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/34>
+- `Biocomercio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/35>
+- `Sitios Arqueológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/36>
+- `Áreas de Bosque (2001-2023)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/37>
+- `Áreas agrícolas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/38>
+- `Zonificación Ecológica y Economica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/39>
+- `Amazonas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/40>
+- `Arequipa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/41>
+- `Ayacucho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/42>
+- `Cajamarca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/43>
+- `Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/44>
+- `Cusco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/45>
+- `Huánuco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/46>
+- `Huancavelíca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/47>
+- `Junín` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/48>
+- `Lambayeque` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/49>
+- `Madre de Dios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/50>
+- `Moquegua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/51>
+- `Piura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/52>
+- `Puno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/53>
+- `San Martin` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/54>
+- `Tacna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/55>
+- `Tumbes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/56>
+- `Ucayali` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/57>
+- `Servicos ecosistémicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/58>
+- `Regulación de riesgos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/59>
+- `Retención de agua (WRI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/60>
+- `Erosión de suelos (RUSLE)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/61>
+- `Zonas potenciales para la intervención` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/62>
+- `Ecosistemas, según estado - 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/63>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion/MapServer/64>
+
+## Servicio_Oportunidades_Inversion_1 (4)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_1/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Subcuencas (UH 7)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_1/MapServer/0>
+- `Unidades Territoriales de Intevención (UTI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_1/MapServer/1>
+- `Ecosistemas, según estado - 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_1/MapServer/2>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_1/MapServer/3>
+
+## Servicio_Oportunidades_Inversion_2 (3)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_2/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Regulación de riesgos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_2/MapServer/0>
+- `Retención de agua (WRI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_2/MapServer/1>
+- `Erosión de suelos (RUSLE)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_2/MapServer/2>
+
+## Servicio_Oportunidades_Inversion_3 (31)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Bocatomas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/0>
+- `Central hidroeléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/1>
+- `Tomas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/2>
+- `Pozos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/3>
+- `Presas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/4>
+- `Reservorios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/5>
+- `Proyecto de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/6>
+- `Recursos turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/7>
+- `Biocomercio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/8>
+- `Sitios Arqueológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/9>
+- `Áreas de Bosque (2001-2023)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/10>
+- `Áreas agrícolas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/11>
+- `Zonificación Ecológica y Economica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/12>
+- `Amazonas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/13>
+- `Arequipa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/14>
+- `Ayacucho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/15>
+- `Cajamarca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/16>
+- `Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/17>
+- `Cusco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/18>
+- `Huánuco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/19>
+- `Huancavelíca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/20>
+- `Junín` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/21>
+- `Lambayeque` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/22>
+- `Madre de Dios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/23>
+- `Moquegua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/24>
+- `Piura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/25>
+- `Puno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/26>
+- `San Martin` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/27>
+- `Tacna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/28>
+- `Tumbes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/29>
+- `Ucayali` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_3/MapServer/30>
+
+## Servicio_Oportunidades_Inversion_4 (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `predios_rurales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/0>
+- `Concesiones electricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/1>
+- `Concesiones Forestales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/2>
+- `Bosque de Producción Permanente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/3>
+- `Concesiones mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/4>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/5>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/6>
+- `Lotes petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/7>
+- `Fajas marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/8>
+- `Areas de ConservacionRegional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/9>
+- `ANP Nacional Definitivas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_4/MapServer/10>
+
+## Servicio_Oportunidades_Inversion_5 (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Limite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/0>
+- `Limite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/1>
+- `Limite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/2>
+- `Unidad Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/3>
+- `Areas Urbanas ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/4>
+- `Hidrografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/5>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/6>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/7>
+- `Curvas de nivel al 100,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/8>
+- `Red vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/9>
+- `Capitales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/10>
+- `Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/11>
+- `Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/12>
+- `Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/13>
+- `Centros poblados INEI` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_Oportunidades_Inversion_5/MapServer/14>
+
+## Servicio_ZonasIntervencion (44)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Plantaciones Cruzada Verde 2023-2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/0>
+- `Zonas de Intervención` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/1>
+- `GCV-Empresarial Sur (Cieneguilla)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/2>
+- `Empresa_22` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/3>
+- `Empresa_23` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/4>
+- `Empresa_24` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/5>
+- `Empresa_25` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/6>
+- `Empresa_25b` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/7>
+- `Empresa_26` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/8>
+- `Empresa_27` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/9>
+- `Empresa_28` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/10>
+- `Empresa_29` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/11>
+- `Empresa_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/12>
+- `GCV-Empresarial Sur (Pachacamac)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/13>
+- `Empresa_13` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/14>
+- `Empresa_14` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/15>
+- `Empresa_15` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/16>
+- `Empresa_16` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/17>
+- `Empresa_17` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/18>
+- `Empresa_18` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/19>
+- `Empresa_19` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/20>
+- `Empresa_20` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/21>
+- `Empresa_21` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/22>
+- `GCV-Empresarial Sur (Lurin)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/23>
+- `Empresa_1` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/24>
+- `Empresa_2` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/25>
+- `Empresa_2b` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/26>
+- `Empresa_3` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/27>
+- `Empresa_3b` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/28>
+- `Empresa_4` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/29>
+- `Empresa_4b` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/30>
+- `Empresa_5` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/31>
+- `Empresa_5b` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/32>
+- `Empresa_6` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/33>
+- `Empresa_6b` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/34>
+- `Empresa_7` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/35>
+- `Empresa_7b` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/36>
+- `Empresa_8` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/37>
+- `Empresa_8b` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/38>
+- `Empresa_9` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/39>
+- `Empresa_10` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/40>
+- `Empresa_11` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/41>
+- `Empresa_12` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/42>
+- `Distritos_Intervenidos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicio_ZonasIntervencion/MapServer/43>
+
+## ServicioActivacionQuebrada (40)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Condiciones ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/0>
+- `Unidades Hidrográficas (subcuencas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/1>
+- `Fajas Marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/2>
+- `Inventario de Peligros por Inundacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/3>
+- `Areas inundables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/4>
+- `Inventario de Peligros Geologicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/5>
+- `Areas Exposición por Movimientos en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/6>
+- `Posible Activación de Quebrada - SENAMHI 07.03.2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/7>
+- `Posible Activación de Quebrada - SENAMHI 06.03.2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/8>
+- `Posible Activación de Quebrada - SENAMHI 05.03.2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/9>
+- `Posible Activación de Quebrada - SENAMHI 04.03.2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/10>
+- `Posible Activación de Quebrada - SENAMHI 03.03.2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/11>
+- `Degradacion de ecosistemas 2019` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/12>
+- `Monitoreo de RRSS y Pasivos ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/13>
+- `Pasivos Ambientales Mineros - 2022` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/14>
+- `Pasivos Ambientales por Hidrocarburos - 2022` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/15>
+- `Infraestructuras de Resíduos Sólidos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/16>
+- `Areas Degradadas por Resíduos Sólidos No Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/17>
+- `Areas Degradadas por Resíduos Sólidos Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/18>
+- `Potenciales daños a` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/19>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/20>
+- `Red Vial Vecinal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/21>
+- `Red Vial Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/22>
+- `Red Vial Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/23>
+- `Recursos Turisticos (MINCETUR)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/24>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/25>
+- `Sitios RAMSAR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/26>
+- `Ecosistemas Sensibles` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/27>
+- `Ecosistemas Frágiles (SERFOR)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/28>
+- `Cartografía base` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/29>
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/30>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/31>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/32>
+- `Limite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/33>
+- `Limite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/34>
+- `Limite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/35>
+- `Red hidrográfica (100,000)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/36>
+- `Red hidrográfica (500,000)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/37>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/38>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioActivacionQuebrada/MapServer/39>
+
+## ServicioANP (12)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Áreas Prioritarias para la Conservación SINAMPE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/0>
+- `Zonificacion ACP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/1>
+- `Zonificacion ACR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/2>
+- `Zonificacion ANP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/3>
+- `Areas de Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/4>
+- `Zonas Reservadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/5>
+- `Areas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/6>
+- `Zonas de Amortiguamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/7>
+- `Reservas Territoriales Indigenas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/8>
+- `Bofedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/9>
+- `Sitios RAMSAR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/10>
+- `Bofedales Nacional INAIGEM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioANP/MapServer/11>
+
+## ServicioAST (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioAST/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioAST/MapServer/0>
+
+## ServicioBase (18)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/0>
+- `Centros Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/1>
+- `Cuencas Hidrográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/2>
+- `Aeropuerto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/3>
+- `Puertos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/4>
+- `Lagos y Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/5>
+- `Lago Titicaca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/6>
+- `Nombre Río` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/7>
+- `Ríos Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/8>
+- `Ríos Secundarios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/9>
+- `Vía Férrea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/10>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/11>
+- `Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/12>
+- `Provincia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/13>
+- `Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/14>
+- `Agencias bancarias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/15>
+- `Canales de regadio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/16>
+- `Clasisficación de Cuerpos Lóticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBase/MapServer/17>
+
+## ServicioBaseInea (10)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/0>
+- `Centros Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/1>
+- `Pasivos Ambientales Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/2>
+- `Sitios RAMSAR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/3>
+- `Areas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/4>
+- `Zonas de Amortiguamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/5>
+- `Lago Titicaca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/6>
+- `Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/7>
+- `Provincia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/8>
+- `Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBaseInea/MapServer/9>
+
+## ServicioBDEspeciesMINAM (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBDEspeciesMINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `TB_PROSPECCION` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBDEspeciesMINAM/MapServer/0>
+- `TB_MARCO_GEOESPACIAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioBDEspeciesMINAM/MapServer/1>
+
+## ServicioCFOI (19)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Registro Incendios 2026` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/0>
+- `Registro histórico de incendios 2000-2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/1>
+- `Informacion de interes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/2>
+- `Vias ferreas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/3>
+- `Vias red departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/4>
+- `Vias red nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/5>
+- `Vias red vecinal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/6>
+- `Sitios Ramsar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/7>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/8>
+- `Reservas Territoriales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/9>
+- `Centros poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/10>
+- `Comunidades campesinas (MIDAGRI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/11>
+- `Comunidades nativas (MIDAGRI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/12>
+- `Área de Conservación Privada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/13>
+- `Área de Conservación Regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/14>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/15>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/16>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/17>
+- `Condiciones Favorables de Incendios Set26` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioCFOI/MapServer/18>
+
+## ServicioDegradacion (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Degradación 2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/0>
+- `Degradación 2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/1>
+- `Degradación 2022` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/2>
+- `Degradación 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/3>
+- `Degradación 2020` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/4>
+- `Degradación 2019` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/5>
+- `Degradación 2018` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/6>
+- `Degradación 2017` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/7>
+- `Degradación 2016` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/8>
+- `Degradación 2015` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/9>
+- `Degradación 2014` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/10>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/11>
+- `Cobertura Vegetal 2015` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDegradacion/MapServer/12>
+
+## ServicioDGRS (96)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Infraestructura y Disposición Final de RRSS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/0>
+- `Infraestructura de Disposición Final` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/1>
+- `Distritos atendidos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/2>
+- `Servicio de disposición final` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/3>
+- `Disposición final adecuado 2018 (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/4>
+- `Reportantes al SIGERSOL 2025 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/5>
+- `Reporte 2025 al SIGERSOL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/6>
+- `Generacion y GPC 2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/7>
+- `Generación Municipal (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/8>
+- `Generación_per_cápita_de_residuos_sólidos_municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/9>
+- `Generación Domiciliaria (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/10>
+- `Generación_per_cápita_de_residuos_sólidos_domiciliarios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/11>
+- `Generación y GPC 2024` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/12>
+- `Generación Municipal (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/13>
+- `Generación per cápita de residuos sólidos municipales ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/14>
+- `Generación Domiciliaria (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/15>
+- `Generación per cápita de residuos sólidos domiciliarios ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/16>
+- `Generación y GPC 2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/17>
+- `Generación Municipal (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/18>
+- `Generación per cápita de residuos sólidos municipales ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/19>
+- `Generación Domiciliaria (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/20>
+- `Generación per cápita de residuos sólidos domiciliarios ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/21>
+- `Instrumentos de Gestión 2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/22>
+- `Cuenta_con_PIGARS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/23>
+- `Cuenta_con_PMRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/24>
+- `Cuenta_con_ECRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/25>
+- `Generación y GPC 2022` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/26>
+- `Generación Municipal (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/27>
+- `Generación per cápita de residuos sólidos municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/28>
+- `Generación Domiciliaría (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/29>
+- `Generación per cápita de residuos sólidos domiciliarios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/30>
+- `Instrumentos de Gestión 2022` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/31>
+- `Cuenta_con_PIGARS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/32>
+- `Cuenta_con_PMRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/33>
+- `Cuenta_con_ECRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/34>
+- `Generación y GPC 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/35>
+- `Generación Municipal (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/36>
+- `Generación per cápita de residuos sólidos municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/37>
+- `Generación Domiciliaría (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/38>
+- `Generación per cápita de residuos sólidos domiciliarios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/39>
+- `Instrumentos de Gestión 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/40>
+- `Cuenta_con_PIGARS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/41>
+- `Cuenta_con_PMRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/42>
+- `Cuenta_con_ECRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/43>
+- `Valorización 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/44>
+- `Programa de Segregación en la Fuente implementado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/45>
+- `Valorización Orgánico 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/46>
+- `Valorización Inorgánico 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/47>
+- `Valorización Total 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/48>
+- `Reporte 2021 al SIGERSOL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/49>
+- ` Generación de Residuos Inorgánicos 2020` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/50>
+- `Generación de Residuos Inorgánicos_PET (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/51>
+- `Generación de Residuos Inorgánicos de plásticos (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/52>
+- `Generación de Residuos Inorgánicos de cartones (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/53>
+- `Generación de Residuos Inorgánicos de papel (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/54>
+- `Generación de Residuos Inorgánicos de vidrio (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/55>
+- `Generación y GPC 2020` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/56>
+- `Generación Municipal (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/57>
+- `Generación per cápita de residuos sólidos municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/58>
+- `Generación Domiciliaría (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/59>
+- `Generación per cápita de residuos sólidos domiciliarios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/60>
+- `Instrumentos de Gestión 2020` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/61>
+- `Cuenta con PIGARS ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/62>
+- `Cuenta con PMRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/63>
+- `Cuenta con ECRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/64>
+- `Reporte 2018 al SIGERSOL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/65>
+- `Generacion y GPC 2019` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/66>
+- `Generación Municipal (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/67>
+- `Generación per cápita de residuos solidos domicilio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/68>
+- `Generación Domiciliaría (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/69>
+- `Generación per cápita de residuos sólidos domiciliarios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/70>
+- `Instrumentos de gestión 2019` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/71>
+- `Cuenta con PIGARS ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/72>
+- `Cuenta con PMRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/73>
+- `Cuenta con ECRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/74>
+- `Instrumentos de gestión 2018` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/75>
+- `Cuenta con PIGARS y/o PMRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/76>
+- `Cuenta con estudio de caracterizacion RRSS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/77>
+- `Operaciones de residuos sólidos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/78>
+- `Realiza servicio municipal de limpieza` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/79>
+- `Realiza servicio de recolección convencional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/80>
+- `Realiza servicio de barrido de calles` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/81>
+- `Realiza servicio de tratamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/82>
+- `Valorización` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/83>
+- `Programa de Segregación en la Fuente implementado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/84>
+- `Valorización inorgánico 2018 (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/85>
+- `Valorización orgánico 2018 (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/86>
+- `Valorización total 2018 (t/año)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/87>
+- `Infraestructura Sanitaria Proyectada 2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/88>
+- `Infraestructura de Disposicion Proyectado al 2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/89>
+- `Distritos atendidos con Proyección al 2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/90>
+- `Ejecución de Gastos PP036 Año 2019` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/91>
+- `Residuos no municipales 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/92>
+- `Plantas de empresas operadoras de RS según distrito Trimestre I` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/93>
+- `Plantas de empresas operadoras de RS según distrito Trimestre II` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/94>
+- `Plantas de empresas operadoras de RS según distrito Trimestre III` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDGRS/MapServer/95>
+
+## ServicioDistribucionEspecie (58)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aniba rosaeodora (palo rosa)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/0>
+- `Bursera graveolens (palo santo)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/1>
+- `Cedrela odorata (cedro)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/2>
+- `Cedrela fissilis (cedro misionero)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/3>
+- `Cedrela montana (cedro montana)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/4>
+- `Cenchrus clandestinus (pasto kikuyo)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/5>
+- `Corryocactus brevistylus (sanky)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/6>
+- `Dipteryx charapilla (charapilla)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/7>
+- `Dipteryx ferrea (shihuahuaco)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/8>
+- `Dipteryx micrantha (shihuahuaco)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/9>
+- `Dipteryx sp (shihuahuaco)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/10>
+- `Echinopsis pachanoi (san pedro)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/11>
+- `Echinopsis_peruviana (san pedro macho)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/12>
+- `Handroanthus serratifolius (tahuari amarillo)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/13>
+- `Hylocereus megalanthus (pitahaya)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/14>
+- `Melinis minutiflora (pasto gordura)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/15>
+- `Tamarix aphylla (casuarino)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/16>
+- `Opuntia soehrensii (airampo)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/17>
+- `Oroya peruviana (oroya)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/18>
+- `Lemna minor (lenteja de agua)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/19>
+- `Phragmipedium pearcei (orquidea)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/20>
+- `Phragmipedium kovachii (orquidea zapatito)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/21>
+- `Pontederia_crassipes (jacinto de agua)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/22>
+- `Prosopis limensis (huarango)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/23>
+- `Swietenia macrophylla (caoba)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/24>
+- `Arapaima gigas (paiche)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/25>
+- `Falco peregrinus (halcón peregrino)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/26>
+- `Hippocamelus antisensis (venado andino)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/27>
+- `Lagothrix flavicauda (mono choro)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/28>
+- `Leopardus jacobita (gato andino)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/29>
+- `Lepus europaeus (liebre europea)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/30>
+- `Lithobates catesbeianus (rana toro)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/31>
+- `Panthera onca (jaguar)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/32>
+- `Pecari tajacu (sajino)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/33>
+- `Penelope albipennis (pava aliblanca)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/34>
+- `Potamotrygon motoro (raya motoro)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/35>
+- `Osteoglossum bicirrhosum (arahuana)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/36>
+- `Rollandia microptera (zampullin)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/37>
+- `Rhea pennata (suri)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/38>
+- `Sternula lorata (gaviotin peruano)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/39>
+- `Tapirus pinchaque (tapir andino)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/40>
+- `Tayassu pecari (huangana)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/41>
+- `Telmatobius culeus (rana gigante)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/42>
+- `Tremarctos ornatus (oso de anteojos)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/43>
+- `Boa constrictor (boa peruana)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/44>
+- `Chelonoidis denticulatus (motelo)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/45>
+- `Chelus fimbriatus (matamata)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/46>
+- `Cnemathraupis aureodorsalis (tangara dorsidorada)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/47>
+- `Dasypus novemcinctus (armadillo de nueve bandas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/48>
+- `Hippocampus ingens (caballito del Pacífico)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/49>
+- `Lamna_nasus (marrajo sardinero)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/50>
+- `leptodactylus pascoensis (rana amazónica)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/51>
+- `Lissachatina fulica (caracol gigante)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/52>
+- `Pelecanus thagus (pelicano peruano)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/53>
+- `Phrynopus_dagmarae (rana)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/54>
+- `Telmatobius_macrostomus (rana de Junín)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/55>
+- `Trichechus_inunguis (manatí del Amazonas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/56>
+- `Vicugna vicugna (vicuña)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioDistribucionEspecie/MapServer/57>
+
+## ServicioFocalizacionIN (14)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Focalización de zonas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/0>
+- `Registro de emergencias (INDECI 03/22)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/1>
+- `Fajas marginales y puntos crítico (ANA)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/2>
+- `Fajas marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/3>
+- `Puntos criticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/4>
+- `Servicios Ecosistemicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/5>
+- `Regulacion de riesgos naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/6>
+- `Regulacion hidrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/7>
+- `Control de erosion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/8>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/9>
+- `Degradacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/10>
+- `Susceptibilidad a fenómenos recurrentes (INGEMMET)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/11>
+- `Susceptibilidad a Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/12>
+- `Susceptibilidad por movimientos en masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioFocalizacionIN/MapServer/13>
+
+## ServicioGeocostaEcosistema (3)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaEcosistema/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `ECOSISTEMA MARINO COSTERO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaEcosistema/MapServer/0>
+- `MORFOLOGIA COSTERA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaEcosistema/MapServer/1>
+- `DISTRITOS COSTEROS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaEcosistema/MapServer/3>
+
+## ServicioGeocostaErosion (4)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaErosion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `FUENTES DE SEDIMENTOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaErosion/MapServer/0>
+- `SUMIDEROS DE SEDIMENTOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaErosion/MapServer/1>
+- `MORFOLOGIA DE COSTA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaErosion/MapServer/2>
+- `NIVELES DE EROSION` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeocostaErosion/MapServer/3>
+
+## ServicioGeoINEA (10)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Infraestructura de Disposición Final` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/0>
+- `Superficie Agrícola Nacional ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/1>
+- `Clasificación Climática 1981-2010 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/2>
+- `Degradación 2020` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/3>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/4>
+- `ZEE: Zona de Recuperación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/5>
+- `Avance de la ZEE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/6>
+- `ZEE Nivel Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/7>
+- `ZEE Nivel Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/8>
+- `ZEE Nivel Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoINEA/MapServer/9>
+
+## ServicioGeoMAR (42)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Informacion de la realidad maritima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/0>
+- `OP2 Fortalecer las activ. productivas en el ámbito marítimo ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/1>
+- `Transporte aéreo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/2>
+- `Universidades carreras del ámbito maritimo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/3>
+- `Pasivos ambientales hidrocarburos - Riesgo Calidad Ambiente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/4>
+- `Pasivos ambientales mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/5>
+- `Registro certificaciones ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/6>
+- `Plataformas petroleras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/7>
+- `Derechos acuícolas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/8>
+- `Áreas con derechos acuícolas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/9>
+- `Concesiones mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/10>
+- `Lotes petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/11>
+- `Áreas de promoción (Lotes Petroleros)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/12>
+- `Zona de pesca artesanal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/13>
+- `Indicador Densidad Poblacional (PobxKm2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/14>
+- `OP3 Incrementar el comercio de manera sostenible en el ámbito marítimo ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/15>
+- `Faro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/16>
+- `Puerto marítimo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/17>
+- `Oleoducto Nor Peruano (Tramo II)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/18>
+- `Vías de comunicacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/19>
+- `Movimiento Carga Terminales 2022 (TM)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/20>
+- `OP4 Asegurar la sostenibi. de los recursos y ecosistemas en el ámbito marítimo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/21>
+- `Arrecife` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/22>
+- `Batimetría` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/23>
+- `Dinamica de Oelajes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/24>
+- `Áreas naturales protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/25>
+- `Áreas de conservación privada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/26>
+- `Áreas de conservación regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/27>
+- `Zonas reservadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/28>
+- `Humedales costeros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/29>
+- `Lomas Costeras  (Mapa de Ecosistemas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/30>
+- `Cuencas hidrográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/31>
+- `OP5 Fortalecer la seguridad en el ámbito marítimo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/32>
+- `Sitios arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/33>
+- `Paisajes culturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/34>
+- `Zonas arqueológicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/35>
+- `Límite Marítimo Peruano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/36>
+- `Indicadores de la Politica Nacional Maritima ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/37>
+- `OP4 Asegurar la sostenibi. de los recursos y ecosistemas en el ámbito marítimo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/38>
+- `% Unidades Fiscalizables en Zona Marino-Costera Supervisadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/39>
+- `% Entid. Fiscalizadas y Sancionadas de Manera Oportuna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/40>
+- `Indicador Planes ZMC MINAM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioGeoMAR/MapServer/41>
+
+## ServicioHumedales_DGDB (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioHumedales_DGDB/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Humedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioHumedales_DGDB/MapServer/0>
+
+## ServicioIdentificacionZPRRSS (47)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Consulta` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/0>
+- `Infraestructuras de Resíduos Sólidos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/1>
+- `Pasivos Ambientales Mineros - 2022` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/2>
+- `Pasivos Ambientales por Hidrocarburos - 2022` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/3>
+- `Areas Degradadas por Resíduos Sólidos No Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/4>
+- `Areas Degradadas por Resíduos Sólidos Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/5>
+- `Por restricciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/6>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/7>
+- `Aerodromo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/8>
+- `Infraestructura de educación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/9>
+- `Infraestructura de salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/10>
+- `Granjas y Plantas Avícolas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/11>
+- `Áreas urbanas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/12>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/13>
+- `Red hidrográfica (100,000)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/14>
+- `Fallas geológicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/15>
+- `Area agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/16>
+- `Exclusiones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/17>
+- `Sitio Arqueológico Declarado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/18>
+- `Zona Arqueológica Delimitado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/19>
+- `Acuiferos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/20>
+- `Fajas Marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/21>
+- `Concesiones mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/22>
+- `Comunidades campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/23>
+- `Comunidades nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/24>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/25>
+- `Zonas de amortiguamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/26>
+- `Sitios RAMSAR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/27>
+- `Ecosistemas Frágiles (SERFOR)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/28>
+- `Ecosistemas sensibles` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/29>
+- `Lotes petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/30>
+- `Valor Biocológico (ZEE)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/31>
+- `Susceptibilidad a inundaciones - Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/32>
+- `Susceptibilidad a movimientos en masa - Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/33>
+- `Muy Alta, (Pendiente 25°-45°+Agua)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/34>
+- `Alta, (Pendiente 30°-45°)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/35>
+- `Media, (Pendiente 20°-30°)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/36>
+- `Baja, (Pendiente 10° a 20°)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/37>
+- `Muy Bajo, (Pendientes &lt; 5°) ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/38>
+- `Cartografía base` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/39>
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/40>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/41>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/42>
+- `Limite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/43>
+- `Limite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/44>
+- `Limite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/45>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIdentificacionZPRRSS/MapServer/46>
+
+## ServicioIndicadores (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Indicador local, Maricultura (N° Mallas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/0>
+- `Indicador nacional, Biodiversidad (Nro. especies)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/1>
+- `Indicador nacional, Calidad de agua (CT - NMP/100ml)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/2>
+- `Indicador nacional, Calidad de agua (DBO - mgl/l)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/3>
+- `Indicador nacional, Calidad de agua (SST - mg/l)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/4>
+- `Indicador nacional, Calidad de Habitat (NMM - m)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/5>
+- `Indicador nacional, Dinámica Poblacional (% Pob. flotante)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/6>
+- `Indicador nacional, Dinamica Poblacional (% de Pob. migrante)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/7>
+- `Indicador nacional, Participación Público-Privada (Nro. actores)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/8>
+- `Indicador nacional, Presiones humanas (Densidad - Hab./ Km2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/9>
+- `Indicador nacional, Abundancia (TM)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioIndicadores/MapServer/10>
+
+## ServicioPMIZMC (68)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Cartografia Base` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/0>
+- `Capitales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/1>
+- `Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/2>
+- `Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/3>
+- `Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/4>
+- `Limites Politico Referenciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/5>
+- `Limite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/6>
+- `Limite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/7>
+- `Limite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/8>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/9>
+- `Curvas de nivel al 100,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/10>
+- `Curvas de nivel al 25,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/11>
+- `Curvas de nivel al 10,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/12>
+- `Red Hidrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/13>
+- `500,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/14>
+- `100,000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/15>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/16>
+- `Aspectos Físico Oceanográficos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/17>
+- `Límite Marítimo Peruano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/18>
+- `Batimetría` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/19>
+- `Arrecife` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/20>
+- `Dinamica de Oelajes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/21>
+- `Humedales costeros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/22>
+- `Lomas Costeras  (Mapa de Ecosistemas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/23>
+- `Cuencas hidrográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/24>
+- `Morfología línea de costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/25>
+- `Fuentes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/26>
+- `Sumideros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/27>
+- `Condiciones oceanográficas (Centro)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/28>
+- `Dinámica olajes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/29>
+- `Dirección flujo medio de energía del oleaje (º)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/30>
+- `Hs12(m)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/31>
+- `Aspectos Físico Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/32>
+- `Pasivos ambientales hidrocarburos - Riesgo Calidad Ambiente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/33>
+- `Pasivos ambientales mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/34>
+- `Registro certificaciones ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/35>
+- `Tsunami` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/36>
+- `Retorno local de sismos (Asperezas)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/37>
+- `Niveles de erosión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/38>
+- `Aspectos Socioeconómicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/39>
+- `Faro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/40>
+- `Transporte aéreo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/41>
+- `Puerto marítimo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/42>
+- `Oleoducto Nor Peruano (Tramo II)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/43>
+- `Vías de comunicacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/44>
+- `Áreas naturales protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/45>
+- `Áreas de conservación privada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/46>
+- `Áreas de conservación regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/47>
+- `Zonas reservadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/48>
+- `Sitios arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/49>
+- `Paisajes culturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/50>
+- `Zonas arqueológicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/51>
+- `Derechos acuícolas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/52>
+- `Áreas con derechos acuícolas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/53>
+- `Concesiones mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/54>
+- `Áreas de promoción (Lotes Petroleros)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/55>
+- `Zona de pesca artesanal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/56>
+- `Plataformas petroleras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/57>
+- `Centros poblados INEI` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/58>
+- `Lotes petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/59>
+- `Densidad Poblacional (PobxKm2)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/60>
+- `Planes de Manejo Integrado de Zonas Marino Costero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/61>
+- `Planes ZMC MINAM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/62>
+- `Unidad de Manejo Integrado -ZMC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/63>
+- `Indicadores de la Politica Nacional Maritima ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/64>
+- `% Unidades Fiscalizables en Zona Marino-Costera Supervisadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/65>
+- `% Entid. Fiscalizadas y Sancionadas de Manera Oportuna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/66>
+- `Movimiento Carga Terminales 2022 (TM)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioPMIZMC/MapServer/67>
+
+## ServicioProyectosRecuperacion (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioProyectosRecuperacion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Proyectos Recuperación MEF` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioProyectosRecuperacion/MapServer/0>
+
+## Servicios_ecosistémicos (4)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ecosist%C3%A9micos/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Degradacion al 2021` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ecosist%C3%A9micos/MapServer/0>
+- `SSEE Control erosión para recuperar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ecosist%C3%A9micos/MapServer/1>
+- `SSEE Regulación Hídrica para recuperar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ecosist%C3%A9micos/MapServer/2>
+- `SSEE Regulación de riesgos naturales para recuperar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ecosist%C3%A9micos/MapServer/3>
+
+## Servicios_Geomar/ServicioGeoMAR_capa_transporte_aereo (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Geomar/ServicioGeoMAR_capa_transporte_aereo/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Transporte aéreo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Geomar/ServicioGeoMAR_capa_transporte_aereo/MapServer/0>
+
+## Servicios_GeoPERU/ServicioCFOI_MINAM (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioCFOI_MINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Condiciones Favorables de Incendios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioCFOI_MINAM/MapServer/0>
+
+## Servicios_GeoPERU/ServicioCoberturaVegetal_MINAM (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioCoberturaVegetal_MINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Cobertura Vegetal 2015` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioCoberturaVegetal_MINAM/MapServer/0>
+
+## Servicios_GeoPERU/ServicioDegradacion_MINAM (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioDegradacion_MINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Degradación 2022` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioDegradacion_MINAM/MapServer/0>
+
+## Servicios_GeoPERU/ServicioEcosistemas_MINAM (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioEcosistemas_MINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioEcosistemas_MINAM/MapServer/0>
+
+## Servicios_GeoPERU/ServicioRHI_MINAM (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioRHI_MINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Registro histórico de incendios 2000-2025` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioRHI_MINAM/MapServer/0>
+
+## Servicios_GeoPERU/ServicioRRSS_MINAM (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioRRSS_MINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Infraestructura de Disposición Final` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioRRSS_MINAM/MapServer/0>
+
+## Servicios_GeoPERU/ServicioSitiosRAMSAR_MINAM (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioSitiosRAMSAR_MINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Sitios RAMSAR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_GeoPERU/ServicioSitiosRAMSAR_MINAM/MapServer/0>
+
+## Servicios_Geoquebradas/geoquebradas (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Geoquebradas/geoquebradas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Geoquebradas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Geoquebradas/geoquebradas/MapServer/0>
+- `Geoquebradas historico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Geoquebradas/geoquebradas/MapServer/1>
+
+## Servicios_Geoquebradas/geoquebradas_prcesamiento (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Geoquebradas/geoquebradas_prcesamiento/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Geoquebradas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Geoquebradas/geoquebradas_prcesamiento/MapServer/0>
+- `Geoquebradas historico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Geoquebradas/geoquebradas_prcesamiento/MapServer/1>
+
+## Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `16_Diversidad genética` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/0>
+- `17_Concentración de diversidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/1>
+- `MARCO DE CONCENTRACION DE ESPECIES PRIORISADAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/2>
+- `18_Diversidad florística` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/3>
+- `PROSPECCIONES DE ESPECIES PRIORIZADAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/4>
+- `19_Diversidad de fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/5>
+- `20_Diversidad hidrobiológica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/6>
+- `21_Ecosistemas continentales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/7>
+- `MAPA DE ECOSISTEMAS CON DISTRITOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/8>
+- `MAPA DE ECOSISTEMAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/9>
+- `ANP CON ECOREGION ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/10>
+- `ANP CON ECOZONAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/11>
+- `22_Ecosistemas marinos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_DIVERSIDAD_BIOLOGICA/MapServer/12>
+
+## Servicios_INPN/SER_ECOSISTEMICO (23)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `23_Secuestro y almacenamiento de carbono` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/0>
+- `24_Biomasa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/1>
+- `25_Belleza paisajística` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/2>
+- `ANP NACIONAL DEFINITIVAS CON DISTRITOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/3>
+- `ANP NACIONAL DEFINITIVAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/4>
+- `AREAS DE CONSERVACION REGIONAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/5>
+- `AREAS DE CONSERVACION PRIVADA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/6>
+- `26_Recreación, turismo, ciencia y educación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/7>
+- `ZONAS RESERVADAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/8>
+- `ZONIFICACION DE ANP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/9>
+- `ZONAS AMORTIUAMIENTO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/10>
+- `ZONIFICACION DE ACR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/11>
+- `ZONIFICACION DE ACP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/12>
+- `RESERVA DE BIOSFERA TRANSFRONTERIZA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/13>
+- `GEORUTAS HUAYNAPUTINA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/14>
+- `CONTRATO DE SERVICIO TURISTICO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/15>
+- `27_Valores espirituales y religiosos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/16>
+- `28_Provisión de recursos naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/17>
+- `CONTRATOS DE APROVECHAMIENTO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/18>
+- `CONCESION` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/19>
+- `AUTORIZACION EN PREDIO PRIVADO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/20>
+- `ACUERDO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/21>
+- `ACUERDOS DE ACTIVIDAD MENOR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_ECOSISTEMICO/MapServer/22>
+
+## Servicios_INPN/SER_INDICADORES (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- ` CARTOGRAFIA BASE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/0>
+- `ECOREGION NATURAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/1>
+- `ECOZONAS ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/2>
+- `CUENCAS HIDROGRAFICAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/3>
+- `LIMITE DISTRITAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/4>
+- `INDICADORES NACIONAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/5>
+- `INDICADOR NACIONAL SERVICIOS ECOSISTEMICOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/6>
+- `INDICADOR NACIONAL DIVERSIDAD BIOLOGICA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/7>
+- `INDICADOR NACIONAL RECURSOS NATURALES` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/8>
+- `INDICADORES CUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/9>
+- `INDICADORES SERVICIOS ECOSISTEMICOS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/10>
+- `INDICADORES DIVERSIDAD BIOLOGICA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/11>
+- `INDICADORES RECURSOS NATURALES` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_INDICADORES/MapServer/12>
+
+## Servicios_INPN/SER_RECURSOS_NATURALES (34)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `1_Fuentes de agua superficial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/0>
+- `SITIOS RAMSAR2 CON CUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/1>
+- `LACOS Y COCHAS CON CUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/2>
+- `INVENTARIO DE GLACIALES CON CUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/3>
+- `INVENTARIO DE BOFEDADELES 2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/4>
+- `HUMEDALES COSTERO CON CUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/5>
+- `AGUA PANTANO BOFEDALES CON CUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/6>
+- `2_Fuentes de agua subterránea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/7>
+- `HIDROQUIMICA CON CUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/8>
+- `HIDROGEOLOGICO POLIGONO CON CUENCAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/9>
+- `3_Suelos según su taxonomía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/10>
+- `4_Tierras por su capacidad de uso mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/11>
+- `5_Zonas con potencial hidrocarburífero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/12>
+- `CUENCAS _SEDIMENTARIAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/13>
+- `6_Zonas con potencial hidroeléctrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/14>
+- `CONCESIONES ELECTRICAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/15>
+- `7_Zonas con potencial eólico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/16>
+- `8_Zonas con alto potencial solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/17>
+- `9_Zonas geotermales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/18>
+- `REGION GEOTERMAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/19>
+- `LOTES GEOTERMIA ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/20>
+- `10_Zonas con potencial minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/21>
+- `YACIMIENTOS MINEROS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/22>
+- `ROCAS Y MENAS GEOQUIMICAS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/23>
+- `FRANJAS METALOGENICAS ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/24>
+- `CATASTRO MINERO WGS84 17` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/25>
+- `CATASTRO MINERO WGS84 18` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/26>
+- `CATASTRO MINERO WGS84 17` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/27>
+- `11_Potencial forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/28>
+- `12_Potencial faunístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/29>
+- `DISTRIBUCION ESPECIES DE FAUNA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/30>
+- `13_Potencial hidrobiológico continental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/31>
+- `14_Biomasa marina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/32>
+- `15_Recurso genético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_INPN/SER_RECURSOS_NATURALES/MapServer/33>
+
+## Servicios_LitoralPlayas (37)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Ubicacion de playas - MINSA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/0>
+- `6_1_MINSA_Ubicacion_Playas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/1>
+- `Recursos Turísticos - MINCETUR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/2>
+- `6_16_MINCETUR_Recursos_Turisticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/3>
+- `Fuentes Contaminantes - ANA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/4>
+- `6_17_ANA_Fuentes_contaminates` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/5>
+- `Derecho de uso de Agua - Vertimiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/6>
+- `6_7_ANA_DUA_Acuicola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/7>
+- `6_7_ANA_DUA_Agrario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/8>
+- `6_7_ANA_DUA_Transporte` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/9>
+- `6_7_ANA_DUA_Domestico_Poblacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/10>
+- `6_7_ANA_DUA_Energetico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/11>
+- `6_7_ANA_DUA_Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/12>
+- `6_7_ANA_DUA_Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/13>
+- `6_7_ANA_DUA_Otros_usos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/14>
+- `6_7_ANA_DUA_Pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/15>
+- `6_7_ANA_DUA_Pesquero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/16>
+- `6_7_ANA_DUA_Poblacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/17>
+- `6_7_ANA_DUA_Recreativo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/18>
+- `6_7_ANA_DUA_Turistico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/19>
+- `6_7_ANA_VERT_Aguas_Residuales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/20>
+- `Pasivos Ambientales - MINAM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/21>
+- `6_3_MINEM_Pasivos_ambientales_mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/22>
+- `6_3_MINEM_Pasivos_ambientales_hidrocarburos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/23>
+- `Áreas degradadas - OEFA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/24>
+- `6_2_OEFA_Areas_degradadas_RRSS_Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/25>
+- `6_2_OEFA_Areas_degradadas_RRSS_No_Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/26>
+- `Otra información` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/27>
+- `6_18_SERNARP_Area_amortiguamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/28>
+- `6_18_SERNARP_ANP` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/29>
+- `6_18_SERNARP_Area_conservacion_privada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/30>
+- `6_18_SERNARP_Area_conservacion_regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/31>
+- `Ecosistemas Fragiles - SERFOR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/32>
+- `6_12_SERFOR_Ecosistemas_Fragiles` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/33>
+- `Situacion ambiental -MINAM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/34>
+- `6_10_MINAM_Sitios_Ramsar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/35>
+- `6_10_MINAM_Mapa_ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_LitoralPlayas/MapServer/36>
+
+## Servicios_OGC/Peru_MINAM_0101 (16)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `ZEE_Amazonas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/0>
+- `ZEE_Arequipa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/1>
+- `ZEE_Cajamarca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/2>
+- `ZEE_Piura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/3>
+- `ZEE_Moquegua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/4>
+- `ZEE_Madre_de_Dios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/5>
+- `ZEE_Junin` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/6>
+- `ZEE_Huanuco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/7>
+- `ZEE_Lambayeque` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/8>
+- `ZEE_Tacna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/9>
+- `ZEE_Puno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/10>
+- `ZEE_Ayacucho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/11>
+- `ZEE_Huancavelica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/12>
+- `ZEE_San_Martin` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/13>
+- `ZEE_Cusco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/14>
+- `ZEE_Ucayali` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0101/MapServer/15>
+
+## Servicios_OGC/Peru_MINAM_0102 (3)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0102/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Tem_distribucion_humedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0102/MapServer/0>
+- `Tem_Sitios_Ramsar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0102/MapServer/1>
+- `Tem_Ecorregiones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0102/MapServer/2>
+
+## Servicios_OGC/Peru_MINAM_0102a (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0102a/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Tem_CUT_MINAM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0102a/MapServer/0>
+
+## Servicios_OGC/Peru_MINAM_0103 (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0103/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Tem_Infraestructura_Sanitaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0103/MapServer/0>
+- `Tem_RegistroIncendiosCV` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0103/MapServer/1>
+
+## Servicios_OGC/Peru_MINAM_0104 (3)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0104/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Tem_AlertasTempranasDeforestacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0104/MapServer/0>
+- `Tem_unidades_manejo_integrado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0104/MapServer/1>
+- `Tem_cicatrices_quema_anp` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0104/MapServer/2>
+
+## Servicios_OGC/Peru_MINAM_0105 (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0105/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Tem_Erosion_Niveles` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0105/MapServer/0>
+- `Tem_CFOI` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0105/MapServer/1>
+
+## Servicios_OGC/Peru_MINAM_0106 (3)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0106/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Tem_Agrobiodiversidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0106/MapServer/0>
+- `Tem_distribucion_especies_fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0106/MapServer/1>
+- `Tem_distribucion_especies_flora` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0106/MapServer/2>
+
+## Servicios_OGC/Peru_MINAM_0107 (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0107/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `MINAM_Imagenes_PeruSAT1 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0107/MapServer/0>
+- `MINAM_Imagenes_SPOT` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_OGC/Peru_MINAM_0107/MapServer/1>
+
+## Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Proyectos de Cooperación_VMGA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/0>
+- `Intervensiones de la DGCA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/1>
+- `Intervensiones de la DGPIGA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/2>
+- `Intervensiones de la DGRS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/3>
+- `Intervensiones de la UE 003` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/4>
+- `Proyectos de Cooperación_VMDERN` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/5>
+- `Iintervenciones de la DGOTGIRN` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/6>
+- `Iintervenciones de la DGEFA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/7>
+- `Iintervenciones del PNCBMCC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/8>
+- `Iintervenciones de la DGCCD` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/9>
+- `Iintervenciones de la DGDB` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_ProyectosMINAM/Servicios_intervenciones_MINAM/MapServer/10>
+
+## Servicios_Riesgos_DGCCD/Exposicion (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CA13_Exp_Agricultura_SistemasProductivos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/0>
+- `CA14_Exp_Agua_DisponibilidadHidrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/1>
+- `CA15_Exp_Bosques_Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/2>
+- `CA16_Exp_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/3>
+- `CA17_Exp_Pesca_Acuicultura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/4>
+- `CA18_Exp_Pesca_Artesanal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/5>
+- `CA19_Exp_Pesca_Artesanal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/6>
+- `CA20_Exp_Pesca_Artesanal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/7>
+- `CA21_Exp_Pesca_Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/8>
+- `CA22_Exp_Salud_Poblacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/9>
+- `CA23_Exp_Salud_Servicios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Exposicion/MapServer/10>
+
+## Servicios_Riesgos_DGCCD/INGENIAR_Exposición (5)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Exposici%C3%B3n/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `ING_71_Exposición_Salud_Centros_Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Exposici%C3%B3n/MapServer/0>
+- `ING_72_Exposición_Saneamiento_Red_Acueducto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Exposici%C3%B3n/MapServer/1>
+- `ING_73_Exposición_Saneamiento_Red_Alcantarillado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Exposici%C3%B3n/MapServer/2>
+- `ING_74_Exposición_Saneamiento_Puntos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Exposici%C3%B3n/MapServer/3>
+- `ING_75_Exposición_Vias_Red_Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Exposici%C3%B3n/MapServer/4>
+
+## Servicios_Riesgos_DGCCD/INGENIAR_Peligro (2)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Peligro/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `ING_55_Peligros_Número_de_curva` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Peligro/MapServer/0>
+- `ING_55_Peligros_Suelo_Textura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_Peligro/MapServer/1>
+
+## Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A (9)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `ING_229_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/0>
+- `ING_230_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/1>
+- `ING_231_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/2>
+- `ING_232_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/3>
+- `ING_233_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/4>
+- `ING_234_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/5>
+- `ING_235_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/6>
+- `ING_236_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/7>
+- `ING_237_Incendio_perdidas_relativas_dpto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_A/MapServer/8>
+
+## Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B (34)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-BR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/0>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-G26_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/1>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-G45_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/2>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-G70_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/3>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)_G85_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/4>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)_M26_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/5>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)_M45_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/6>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)_M70_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/7>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)_M85_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/8>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-G26_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/9>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-G45_50 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/10>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-G70_50 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/11>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-G85_50 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/12>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-M26_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/13>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-M45_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/14>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-M70_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/15>
+- `Riesgo_(Red_Acueducto_Risk_Deslizamientos)-M85_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/16>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-BR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/17>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-G26_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/18>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-G45_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/19>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-G70_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/20>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)_G85_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/21>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)_M26_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/22>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)_M45_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/23>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)_M70_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/24>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)_M85_30 ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/25>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-G26_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/26>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-G45_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/27>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-G70_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/28>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-G85_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/29>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-M26_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/30>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-M45_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/31>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-M70_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/32>
+- `Riesgo_(Red_Vial_Risk_Deslizamiento)-M85_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_B/MapServer/33>
+
+## Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C (17)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Riesgo_Salud_Risk_Huaicos_clima_base` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/0>
+- `Riesgo_Salud_Risk_Huaicos_GFDL26_2030` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/1>
+- `Riesgo_Salud_Risk_Huaicos_GFDL45_2030` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/2>
+- `Riesgo_Salud_Risk_Huaicos_GFDL70_2030` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/3>
+- `Riesgo_Salud_Risk_Huaicos_GFDL85_2030` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/4>
+- `Riesgo_Salud_Risk_Huaicos_MPI26_2030` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/5>
+- `Riesgo_Salud_Risk_Huaicos_MPI45_2030` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/6>
+- `Riesgo_Salud_Risk_Huaicos_MPI70_2030` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/7>
+- `Riesgo_Salud_Risk_Huaicos_MPI85_2030` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/8>
+- `Riesgo_Salud_Risk_Huaicos_GFDL26_2050` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/9>
+- `Riesgo_Salud_Risk_Huaicos_GFDL45_2050` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/10>
+- `Riesgo_Salud_Risk_Huaicos_GFDL70_2050` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/11>
+- `Riesgo_Salud_Risk_Huaicos_GFDL85_2050` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/12>
+- `Riesgo_Salud_Risk_Huaicos_MPI26_2050` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/13>
+- `Riesgo_Salud_Risk_Huaicos_MPI45_2050` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/14>
+- `Riesgo_Salud_Risk_Huaicos_MPI70_2050` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/15>
+- `Riesgo_Salud_Risk_Huaicos_MPI85_2050` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/INGENIAR_RIEGO_C/MapServer/16>
+
+## Servicios_Riesgos_DGCCD/Limite_Distrital (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Limite_Distrital/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Limite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Limite_Distrital/MapServer/0>
+
+## Servicios_Riesgos_DGCCD/Peligro (12)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CA01_Inund_act` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/0>
+- `CA02_Inund_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/1>
+- `CA03_Inund_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/2>
+- `CA04_MovMasa_act` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/3>
+- `CA05_MovMasa_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/4>
+- `CA06_MovMasa_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/5>
+- `CA07_RetrGlac_act` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/6>
+- `CA08_RetrGlac_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/7>
+- `CA09_RetrGlac_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/8>
+- `CA10_Seq_act` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/9>
+- `CA11_Seq_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/10>
+- `CA12_Seq_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Peligro/MapServer/11>
+
+## Servicios_Riesgos_DGCCD/Precip_temp (9)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CA135_camb_pp_act` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/0>
+- `CA136_camb_pp_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/1>
+- `CA137_camb_pp_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/2>
+- `CA138_dif_tmax_act` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/3>
+- `CA139_dif_tmax_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/4>
+- `CA140_dif_tmax_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/5>
+- `CA141_dif_tmin_act` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/6>
+- `CA142_dif_tmin_30` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/7>
+- `CA143_dif_tmin_50` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Precip_temp/MapServer/8>
+
+## Servicios_Riesgos_DGCCD/RiesgoA (27)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CA33_PE_INAct_Agricultura_SistemasProductivos_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/0>
+- `CA34_PE_IN30_Agricultura_SistemasProductivos_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/1>
+- `CA35_PE_IN50_Agricultura_SistemasProductivos_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/2>
+- `CA36_PE_INAct_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/3>
+- `CA37_PE_IN30_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/4>
+- `CA38_PE_IN50_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/5>
+- `CA39_PE_INAct_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/6>
+- `CA40_PE_IN30_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/7>
+- `CA41_PE_IN50_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/8>
+- `CA42_PE_INAct_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/9>
+- `CA43_PE_IN30_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/10>
+- `CA44_PE_IN50_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/11>
+- `CA45_PE_INAct_Pesca_Acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/12>
+- `CA46_PE_IN30_Pesca_Acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/13>
+- `CA47_PE_IN50_Pesca_Acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/14>
+- `CA48_PE_INAct_Pesca_Artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/15>
+- `CA49_PE_IN30_Pesca_Artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/16>
+- `CA50_PE_IN50_Pesca_Artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/17>
+- `CA51_PE_INAct_Pesca_Industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/18>
+- `CA52_PE_IN30_Pesca_Industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/19>
+- `CA53_PE_IN50_Pesca_Industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/20>
+- `CA54_PE_INAct_Salud_Poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/21>
+- `CA55_PE_IN30_Salud_Poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/22>
+- `CA56_PE_IN50_Salud_Poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/23>
+- `CA57_PE_INAct_Salud_Servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/24>
+- `CA58_PE_IN30_Salud_Servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/25>
+- `CA59_PE_IN50_Salud_Servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoA/MapServer/26>
+
+## Servicios_Riesgos_DGCCD/RiesgoB (27)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CA60_PE_MMAct_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/0>
+- `CA61_PE_MM30_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/1>
+- `CA62_PE_MM50_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/2>
+- `CA63_PE_MMAct_Agua_DispHidrica_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/3>
+- `CA64_PE_MM30_Agua_DispHidrica_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/4>
+- `CA65_PE_MM50_Agua_DispHidrica_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/5>
+- `CA66_PE_MMAct_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/6>
+- `CA67_PE_MM30_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/7>
+- `CA68_PE_MM50_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/8>
+- `CA69_PE_MMAct_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/9>
+- `CA70_PE_MM30_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/10>
+- `CA71_PE_MM50_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/11>
+- `CA72_PE_MMAct_Pesca_acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/12>
+- `CA73_PE_MM30_Pesca_acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/13>
+- `CA74_PE_MM50_Pesca_acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/14>
+- `CA75_PE_MMAct_Pesca_artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/15>
+- `CA76_PE_MM30_Pesca_artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/16>
+- `CA77_PE_MM50_Pesca_artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/17>
+- `CA78_PE_MMAct_Pesca_Industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/18>
+- `CA79_PE_MM30_Pesca_industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/19>
+- `CA80_PE_MM50_Pesca_industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/20>
+- `CA81_PE_MMAct_Salud_poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/21>
+- `CA82_PE_MM30_Salud_poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/22>
+- `CA83_PE_MM50_Salud_poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/23>
+- `CA84_PE_MMAct_Salud_servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/24>
+- `CA85_PE_MM30_Salud_servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/25>
+- `CA86_PE_MM50_Salud_servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoB/MapServer/26>
+
+## Servicios_Riesgos_DGCCD/RiesgoC (21)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CA87_PE_RGAct_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/0>
+- `CA88_PE_RG30_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/1>
+- `CA89_PE_RG50_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/2>
+- `CA90_PE_RGAct_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/3>
+- `CA91_PE_RG30_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/4>
+- `CA92_PE_RG50_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/5>
+- `CA93_PE_RGAct_Pesca_acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/6>
+- `CA94_PE_RG30_Pesca_acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/7>
+- `CA95_PE_RG50_Pesca_acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/8>
+- `CA96_PE_RGAct_Pesca_artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/9>
+- `CA97_PE_RG30_Pesca_artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/10>
+- `CA98_PE_RG50_Pesca_artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/11>
+- `CA99_PE_RGAct_Pesca_industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/12>
+- `CA100_PE_RG30_Pesca_industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/13>
+- `CA101_PE_RG50_Pesca_industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/14>
+- `CA102_PE_RGAct_Salud_poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/15>
+- `CA103_PE_RG30_Salud_poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/16>
+- `CA104_PE_RG50_Salud_poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/17>
+- `CA105_PE_RGAct_Salud_servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/18>
+- `CA106_PE_RG30_Salud_servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/19>
+- `CA107_PE_RG50_Salud_servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoC/MapServer/20>
+
+## Servicios_Riesgos_DGCCD/RiesgoD (27)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CA108_PE_SEAct_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/0>
+- `CA109_PE_SE30_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/1>
+- `CA110_PE_SE50_Agricultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/2>
+- `CA111_PE_SEAct_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/3>
+- `CA112_PE_SE30_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/4>
+- `CA113_PE_SE50_Agua_DispHidrica_cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/5>
+- `CA114_PE_SEAct_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/6>
+- `CA115_PE_SE30_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/7>
+- `CA116_PE_SE50_Bosques_Eco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/8>
+- `CA117_PE_SEAct_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/9>
+- `CA118_PE_SE30_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/10>
+- `CA119_PE_SE50_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/11>
+- `CA120_PE_SEAct_Pesca_acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/12>
+- `CA121_PE_SE30_Pesca_Acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/13>
+- `CA122_PE_SE50_Pesca_acuicultura_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/14>
+- `CA123_PE_SEAct_Pesca_artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/15>
+- `CA124_PE_SE30_Pesca_Artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/16>
+- `CA125_PE_SE50_Pesca_artesanal_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/17>
+- `CA126_PE_SEAct_Pesca_industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/18>
+- `CA127_PE_SE30_Pesca_Industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/19>
+- `CA128_PE_SE50_Pesca_industrial_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/20>
+- `CA129_PE_SEAct_Salud_poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/21>
+- `CA130_PE_SE30_Salud_Poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/22>
+- `CA131_PE_SE50_Salud_poblacion_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/23>
+- `CA132_PE_SEAct_Salud_servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/24>
+- `CA133_PE_SE30_Salud_Servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/25>
+- `CA134_PE_SE50_Salud_servicios_prov` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/RiesgoD/MapServer/26>
+
+## Servicios_Riesgos_DGCCD/Vulnerabilidad (9)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CA24_Vul_Agricultura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/0>
+- `CA25_Vul_Agua_DispHidri` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/1>
+- `CA26_Vul_Bosques_Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/2>
+- `CA27_Vul_Bosques_Sociedad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/3>
+- `CA28_Vul_Pesca_Acuicultura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/4>
+- `CA29_Vul_Pesca_Artesanal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/5>
+- `CA30_Vul_Pesca_Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/6>
+- `CA31_Vul_Salud_Poblacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/7>
+- `CA32_Vul_Salud_Servicios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/Servicios_Riesgos_DGCCD/Vulnerabilidad/MapServer/8>
+
+## ServiciosGeneticos_Bioseguridad (143)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Colecciones Ex situ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/0>
+- `Especie Quinua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/1>
+- `Especie Kiwicha` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/2>
+- `Acciones Vigilancia OVM (12.05.2021)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/3>
+- `OVM Algodón` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/4>
+- `OVM Alfalfa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/5>
+- `OVM Maiz` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/6>
+- `OVM Soya` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/7>
+- `Prospección de Cultivo - Ají` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/8>
+- `Especie annuum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/9>
+- `Especie annuum var. glabriusculum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/10>
+- `Especie baccatum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/11>
+- `Especie baccatum var. baccatum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/12>
+- `Especie chinense` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/13>
+- `Especie dimorphum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/14>
+- `Especie frutescens` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/15>
+- `Especie geminifolium` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/16>
+- `Especie hookerianum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/17>
+- `Especie piuranum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/18>
+- `Especie pubescens` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/19>
+- `Especie rhomboideum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/20>
+- `Especie tovarii` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/21>
+- `Prospección de Cultivo - Algodón` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/22>
+- `Gossypium barbadense` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/23>
+- `Gossypium hirsutum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/24>
+- `Gossypium raimondii` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/25>
+- `Prospección de Cultivo - Papa (Cultivada)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/26>
+- `Solanum ajanhuiri Juz. et Buk.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/27>
+- `Solanum chaucha Juz. et Buk.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/28>
+- `Solanum curtilobum Juz. et Buk.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/29>
+- `Solanum juzepczukii Buk.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/30>
+- `Solanum phureja Juz. et Buk.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/31>
+- `Solanum stenotomum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/32>
+- `Solanum tuberosum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/33>
+- `Prospección de Cultivo - Frijol` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/34>
+- `Especie augusti` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/35>
+- `Especie ccocineus` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/36>
+- `Especie debouckii` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/37>
+- `Especie dumosus` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/38>
+- `Especie lunatus` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/39>
+- `Especie pachyrrhizoides` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/40>
+- `Especie vulgaris` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/41>
+- `Prospección de Cultivo - Calabaza-Zapallo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/42>
+- `Cucurbita ficifolia Bouché` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/43>
+- `Cucurbita maxima Duchesne` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/44>
+- `Cucurbita moschata Duchesne` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/45>
+- `Cucurbita pepo L.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/46>
+- `Prospección de Cultivo - Papaya` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/47>
+- `Carica papaya L.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/48>
+- `Jacaratia spinosa (Aubl.) A.DC.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/49>
+- `Vasconcellea candicans (A. Gray) A. DC.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/50>
+- `Vasconcellea heilbornii var. pentagona Badillo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/51>
+- `Vasconcellea monoica (Desf.) A.DC.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/52>
+- `Vasconcellea parviflora A.DC.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/53>
+- `Vasconcellea pubescens A.DC.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/54>
+- `Vasconcellea sp.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/55>
+- `Vasconcellea stipulata (V.M.Badillo) V.M.Badillo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/56>
+- `Vasconvellea cauliflora (Jacq.) A.DC.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/57>
+- `Prospección de Cultivo - Tomate` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/58>
+- `arcanum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/59>
+- `chilense` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/60>
+- `chmielewskii` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/61>
+- `corneliomulleri` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/62>
+- `habrochaites` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/63>
+- `huaylasense` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/64>
+- `lycopersicoides` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/65>
+- `lycopersicum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/66>
+- `lycopersicum var. cerasiforme` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/67>
+- `neorickii` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/68>
+- `ochranthum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/69>
+- `pennellii` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/70>
+- `peruvianum` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/71>
+- `pimpinellifolium` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/72>
+- `Prospección de Cultivo - Maiz` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/73>
+- `Alazan` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/74>
+- `Alemán` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/75>
+- `Amarillo huancabamba` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/76>
+- `Ancashino` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/77>
+- `Arequipeño` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/78>
+- `Arizona` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/79>
+- `Blanco Semidentado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/80>
+- `Blanco harinoso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/81>
+- `Cabanita` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/82>
+- `Canchero Norteño` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/83>
+- `Chancayano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/84>
+- `Chaparreño` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/85>
+- `Chullpi` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/86>
+- `Colorado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/87>
+- `Confite` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/88>
+- `Confite Morocho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/89>
+- `Confite puneño` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/90>
+- `Confite puntiagudo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/91>
+- `Coruca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/92>
+- `Cubano amarillo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/93>
+- `Cuzco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/94>
+- `Cuzco cristalino amarillo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/95>
+- `Cuzco gigante` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/96>
+- `Granada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/97>
+- `Granada Blanco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/98>
+- `Huachano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/99>
+- `Huancavelicano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/100>
+- `Huarmaca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/101>
+- `Huayleño` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/102>
+- `Kculli` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/103>
+- `Lambayeque` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/104>
+- `Marañón` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/105>
+- `Mochero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/106>
+- `Morocho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/107>
+- `Morocho cajabambino` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/108>
+- `Morocho norteño` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/109>
+- `Pagaladroga` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/110>
+- `Pardo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/111>
+- `Paro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/112>
+- `Perla` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/113>
+- `Piricinco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/114>
+- `Piscorunto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/115>
+- `Rabo de zorro` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/116>
+- `Rienda` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/117>
+- `Sabanero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/118>
+- `San Gerónimo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/119>
+- `San Gerónimo Huancavelicano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/120>
+- `Shajatu` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/121>
+- `Tumbesino` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/122>
+- `Tusilla` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/123>
+- `Uchuquilla` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/124>
+- `Umutu` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/125>
+- `Prospección de Cultivo - Yuca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/126>
+- `Manihot peruviana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/127>
+- `Manihot anomala subsp. pavoniana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/128>
+- `Manihot brachyloba` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/129>
+- `Manihot esculenta` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/130>
+- `Manihot leptophylla` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/131>
+- `Concentración de Diversidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/132>
+- `Algodón` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/133>
+- `Maiz` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/134>
+- `Tomate` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/135>
+- `Frijol` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/136>
+- `Ají` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/137>
+- `Papaya` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/138>
+- `Yuca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/139>
+- `Calabaza - Zapallo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/140>
+- `Papa Cultivada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/141>
+- `Papa Silvestre` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServiciosGeneticos_Bioseguridad/MapServer/142>
+
+## ServicioTematico (40)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Conservacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/0>
+- `Puntos de Acopio RAEE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/1>
+- `Sitios Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/2>
+- `Sitios Prioritarios SINANPE - Nivel Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/3>
+- `Areas de Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/4>
+- `Areas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/5>
+- `Zonas de Amortiguamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/6>
+- `Reservas Territoriales Indigenas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/7>
+- `Biologico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/8>
+- `Distribucion especies` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/9>
+- `Sitios RAMSAR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/10>
+- `Lomas Costeras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/11>
+- `Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/12>
+- `Peligros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/13>
+- `Botaderos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/14>
+- `Pasivos Ambientales Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/15>
+- `Pasivos Ambientales Hidrocarburos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/16>
+- `Infraestructura Sanitaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/17>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/18>
+- `Concesiones Forestales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/19>
+- `Productos Forestales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/20>
+- `Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/21>
+- `Fauna Silvestre` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/22>
+- `Maderables ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/23>
+- `Reforestación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/24>
+- `Ecoturismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/25>
+- `Lote Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/26>
+- `Infraestructura Educativa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/27>
+- `Infraestructura Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/28>
+- `Territorio y Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/29>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/30>
+- `Precipitacion Niño 82-83` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/31>
+- `Precipitacion Norma Multianual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/32>
+- `Temperatura Maxima Multianual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/33>
+- `Frecuencia de Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/34>
+- `Clasificación Climática` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/35>
+- `Susceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/36>
+- `Bosque de Produccion Permanente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/37>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/38>
+- `Comunidades CampesinasC` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematico/MapServer/39>
+
+## ServicioTematicoPIRRGGB (14)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Conservacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/0>
+- `Zonas Prioritarias Conservacion` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/1>
+- `Area de Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/2>
+- `Sinampe` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/3>
+- `Zonas de Amortiguamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/4>
+- `Biologico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/5>
+- `Humedales RAMSAR` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/6>
+- `Lomas Costeras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/7>
+- `Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/8>
+- `Pasivos Ambientales Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/9>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/10>
+- `Territorio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/11>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/12>
+- `Lote Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioTematicoPIRRGGB/MapServer/13>
+
+## ServicioUbigeo (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioUbigeo/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Ubigeo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioUbigeo/MapServer/0>
+
+## ServicioVulnerabilidad (5)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioVulnerabilidad/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Peligros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioVulnerabilidad/MapServer/0>
+- `Evento sismicos (IGP)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioVulnerabilidad/MapServer/1>
+- `Peligros geologicos (INGEMMET)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioVulnerabilidad/MapServer/2>
+- `Intensidad sismica (IGP)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioVulnerabilidad/MapServer/3>
+- `Susceptibilidad Generalizado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioVulnerabilidad/MapServer/4>
+
+## ServicioZEE (19)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `ZEE_Amazonas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/0>
+- `ZEE_Arequipa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/1>
+- `ZEE_Ayacucho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/2>
+- `ZEE_Cajamarca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/3>
+- `ZEE_Callao` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/4>
+- `ZEE_Piura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/5>
+- `ZEE_Madre de Dios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/6>
+- `ZEE_Moquegua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/7>
+- `ZEE_Junin` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/8>
+- `ZEE_Huanuco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/9>
+- `ZEE_Lambayeque` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/10>
+- `ZEE_Puno` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/11>
+- `ZEE_Huancavelica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/12>
+- `ZEE_San Martin` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/13>
+- `ZEE_Cusco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/14>
+- `ZEE_Tacna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/15>
+- `ZEE_Tumbes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/16>
+- `ZEE_Ucayali` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/17>
+- `BAS_LIM_DEPARTAMENTO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ServicioZEE/MapServer/18>
+
+## ZEE/01_CAR_BASE_HCA (16)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital de Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/0>
+- `Capital de Provincia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/1>
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/2>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/3>
+- `Red Vial Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/4>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/5>
+- `Laguna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/6>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/7>
+- `Canal Choclococha` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/8>
+- `Bofedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/9>
+- `Curva de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/10>
+- `Línea Férrea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/11>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/12>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/13>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/14>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/01_CAR_BASE_HCA/MapServer/15>
+
+## ZEE/02_CARAC_TERR_HCA (54)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/0>
+- `Pasivos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/1>
+- `Operaciones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/2>
+- `Tierras de Protección` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/3>
+- `Tierras Aptas para Producción Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/4>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/5>
+- `Inventario de Peligros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/6>
+- `Botadero de Relleno Sanitario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/7>
+- `Calidad de Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/8>
+- `Problemas Ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/9>
+- `Conflicto Socioambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/10>
+- `Desertificación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/11>
+- `Deforestación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/12>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/13>
+- `Fauna Silvestre / Punto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/14>
+- `Fauna Silvestre / Polígono` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/15>
+- `Pisos Altitudinales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/16>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/17>
+- `Agrodiversidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/18>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/19>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/20>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/21>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/22>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/23>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/24>
+- `Pliegamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/25>
+- `Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/26>
+- `Capacidad de Uso Mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/27>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/28>
+- `Sequia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/29>
+- `Oferta Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/30>
+- `Cuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/31>
+- `Subcuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/32>
+- `Precipitación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/33>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/34>
+- `Comunidad Campesina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/35>
+- `Etnias / Lenguas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/36>
+- `Patrimonio Cultural / Punto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/37>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/38>
+- `Índice de Desarrollo Humano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/39>
+- `Pobreza` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/40>
+- `Red Eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/41>
+- `Intituciones Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/42>
+- `Saneamiento Básico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/43>
+- `Entidades Financieras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/44>
+- `Recursos Energéticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/45>
+- `Concesión Hidroeléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/46>
+- `Concesiones Mineras Metálica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/47>
+- `Concesiones Mineras No Metálica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/48>
+- `Infraestructura de Riego` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/49>
+- `Infraestructura de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/50>
+- `Infraestructura de Telecomunicaciones ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/51>
+- `Recursos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/52>
+- `Corredor Económico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/02_CARAC_TERR_HCA/MapServer/53>
+
+## ZEE/05_MODELO_DIGITAL_DE_ELEVACIÓN (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/05_MODELO_DIGITAL_DE_ELEVACI%C3%93N/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `DEM_LLB_LL1.tif` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/05_MODELO_DIGITAL_DE_ELEVACI%C3%93N/MapServer/0>
+
+## ZEE/BD_ZEE_CAR_BASE (23)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital de Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/0>
+- `Capital de Provincia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/1>
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/2>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/3>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/4>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/5>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/6>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/7>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/8>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/9>
+- `Laguna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/10>
+- `Islas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/11>
+- `Complejo Orillares` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/12>
+- `Lecho de Rio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/13>
+- `Red Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/14>
+- `Dinámica olajes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/15>
+- `Dirección flujo medio de energía del oleaje (º)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/16>
+- `Hs12(m)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/17>
+- `Fuentes y sumideros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/18>
+- `Fuentes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/19>
+- `Sumideros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/20>
+- `Morfología línea de costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/21>
+- `Batimetría` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CAR_BASE/MapServer/22>
+
+## ZEE/BD_ZEE_CARAC_TERR (33)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/0>
+- `Pasivos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/1>
+- `Zonas Degradadas por RRSS Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/2>
+- `Zonas Degradadas por RRSS no Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/3>
+- `Infraestructura de RRSS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/4>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/5>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/6>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/7>
+- `Sitios Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/8>
+- `Camino Qapac Ñan` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/9>
+- `Zona Arqueológica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/10>
+- `Comunidad Campesina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/11>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/12>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/13>
+- `Pliegues` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/14>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/15>
+- `Metalogenia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/16>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/17>
+- `Unidad Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/18>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/19>
+- `Capacidad de Uso Mayor del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/20>
+- `Geomorfología Costera al 25 000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/21>
+- `Caracterización física de la Costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/22>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/23>
+- `Proyectos de Inversión Pública` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/24>
+- `Yacimientos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/25>
+- `Infraestructura Eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/26>
+- `Concesiones Eléctricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/27>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/28>
+- `Lotes Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/29>
+- `Superficie Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/30>
+- `Área Natural Protegida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/31>
+- `Fajas Marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_CARAC_TERR/MapServer/32>
+
+## ZEE/BD_ZEE_DIM_EVAL_T (10)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Registro de Emergencias Periodo  2003/2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/0>
+- `Puntos Críticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/1>
+- `Peligros Geológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/2>
+- `Susceptibilidad por Movimiento en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/3>
+- `Susceptibilidad por Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/4>
+- `Zona de Retención de Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/5>
+- `Erosión de Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/6>
+- `Erosion de la Costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/7>
+- `Zona Potencial para Infraestructura de RRSS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/8>
+- `Degradación de Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_DIM_EVAL_T/MapServer/9>
+
+## ZEE/BD_ZEE_LA_LIBERTAD (69)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `CARTOGRAFÍA BÁSICA` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/0>
+- `Capital de Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/1>
+- `Capital de Provincia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/2>
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/3>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/4>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/5>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/6>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/7>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/8>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/9>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/10>
+- `Red Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/11>
+- `Laguna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/12>
+- `Islas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/13>
+- `Complejo Orillares` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/14>
+- `Lecho de Rio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/15>
+- `Dinámica olajes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/16>
+- `Dirección flujo medio de energía del oleaje (º)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/17>
+- `Hs12(m)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/18>
+- `Fuentes y sumideros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/19>
+- `Fuentes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/20>
+- `Sumideros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/21>
+- `Batimetría` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/22>
+- `Morfología línea de costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/23>
+- `CARACTERIZACIÓN DEL TERRITORIO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/24>
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/25>
+- `Pasivos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/26>
+- `Zonas Degradadas por RRSS Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/27>
+- `Zonas Degradadas por RRSS no Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/28>
+- `Infraestructura de RRSS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/29>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/30>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/31>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/32>
+- `Sitios Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/33>
+- `Camino Qapac Ñan` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/34>
+- `Zona Arqueológica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/35>
+- `Comunidad Campesina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/36>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/37>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/38>
+- `Pliegues` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/39>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/40>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/41>
+- `Unidad Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/42>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/43>
+- `Capacidad de Uso Mayor del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/44>
+- `Geomorfología Costera al 25 000` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/45>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/46>
+- `Yacimientos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/47>
+- `Infraestructura Eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/48>
+- `Concesiones Eléctricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/49>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/50>
+- `Lotes Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/51>
+- `Metalogenia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/52>
+- `Superficie Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/53>
+- `Área Natural Protegida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/54>
+- `Fajas Marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/55>
+- `DIMENSIÓN DE EVALUACIÓN TERRITORIAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/56>
+- `Registro de Emergencias Periodo  2003/2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/57>
+- `Puntos Críticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/58>
+- `Peligros Geológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/59>
+- `Susceptibilidad por Movimiento en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/60>
+- `Susceptibilidad por Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/61>
+- `Zona de Retención de Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/62>
+- `Erosión de Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/63>
+- `Erosion de la Costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/64>
+- `Caracterización física de la Costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/65>
+- `Zona Potencial para Infraestructura de RRSS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/66>
+- `Degradación de Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/67>
+- `Mapa de Sombras_LLB.tif` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LA_LIBERTAD/MapServer/68>
+
+## ZEE/BD_ZEE_LLB_COM_1 (6)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LLB_COM_1/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `DIMENSIÓN DE EVALUACIÓN TERRITORIAL` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LLB_COM_1/MapServer/0>
+- `Susceptibilidad por Movimiento en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LLB_COM_1/MapServer/1>
+- `Susceptibilidad por Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LLB_COM_1/MapServer/2>
+- `Zona de Retención de Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LLB_COM_1/MapServer/3>
+- `Zona Potencial para Infraestructura de RRSS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LLB_COM_1/MapServer/4>
+- `Degradación de Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/BD_ZEE_LLB_COM_1/MapServer/5>
+
+## ZEE/DIMENCIÓN_DE_EVALUACIÓN_TERRITORIAL (8)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer/0>
+- `Recursos Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer/1>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer/2>
+- `Potencial Socioeconómico ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer/3>
+- `Recursos Minero Metálicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer/4>
+- `Recursos Minero No Metálicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer/5>
+- `Conflictos de Uso del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer/6>
+- `Susceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL/MapServer/7>
+
+## ZEE/EVALUACIÓN_TERRITORIAL (4)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Puntos Críticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL/MapServer/0>
+- `Resgistro de Emergencias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL/MapServer/1>
+- `SM Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL/MapServer/2>
+- `SM Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL/MapServer/3>
+
+## ZEE/EVALUACIÓN_TERRITORIAL_CABALLOCOCHA (4)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL_CABALLOCOCHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Puntos Críticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL_CABALLOCOCHA/MapServer/0>
+- `Resgistro de Emergencias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL_CABALLOCOCHA/MapServer/1>
+- `SM Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL_CABALLOCOCHA/MapServer/2>
+- `SM Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/EVALUACI%C3%93N_TERRITORIAL_CABALLOCOCHA/MapServer/3>
+
+## ZEE/MAPA_BASE_CABALLOCOCHA (10)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/0>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/1>
+- `Proyectos de inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/2>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/3>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/4>
+- `Establecimientos de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/5>
+- `Institusiones Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/6>
+- `Red Hidrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/7>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/8>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_BASE_CABALLOCOCHA/MapServer/9>
+
+## ZEE/MAPA_DEM_LLB (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_DEM_LLB/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Modelo de Elevación Digital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_DEM_LLB/MapServer/0>
+
+## ZEE/MAPA_SOMBRAS (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_SOMBRAS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Mapa de Sombras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_SOMBRAS/MapServer/0>
+
+## ZEE/MAPA_SOMBRAS_GEO_NAD (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_SOMBRAS_GEO_NAD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Mapa de Sombra _P02` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MAPA_SOMBRAS_GEO_NAD/MapServer/0>
+
+## ZEE/MEDIO_BIOLÓGICO_CABALLOCOCHA (5)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_BIOL%C3%93GICO_CABALLOCOCHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Bosque de Producción Permanente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_BIOL%C3%93GICO_CABALLOCOCHA/MapServer/0>
+- `Covetura Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_BIOL%C3%93GICO_CABALLOCOCHA/MapServer/1>
+- `Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_BIOL%C3%93GICO_CABALLOCOCHA/MapServer/2>
+- `Eosistemas Frágiles` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_BIOL%C3%93GICO_CABALLOCOCHA/MapServer/3>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_BIOL%C3%93GICO_CABALLOCOCHA/MapServer/4>
+
+## ZEE/MEDIO_FÍSICO_CABALLOCOCHA (3)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_F%C3%8DSICO_CABALLOCOCHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capacidad de Uso Mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_F%C3%8DSICO_CABALLOCOCHA/MapServer/0>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_F%C3%8DSICO_CABALLOCOCHA/MapServer/1>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_F%C3%8DSICO_CABALLOCOCHA/MapServer/2>
+
+## ZEE/MEDIO_SOCIOECONÓMICO_CABALLOCOCHA (5)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_SOCIOECON%C3%93MICO_CABALLOCOCHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Área Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_SOCIOECON%C3%93MICO_CABALLOCOCHA/MapServer/0>
+- `Área Natural_Protegida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_SOCIOECON%C3%93MICO_CABALLOCOCHA/MapServer/1>
+- `Áreas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_SOCIOECON%C3%93MICO_CABALLOCOCHA/MapServer/2>
+- `Concesiones Forestales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_SOCIOECON%C3%93MICO_CABALLOCOCHA/MapServer/3>
+- `Concesiones Eléctricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE/MEDIO_SOCIOECON%C3%93MICO_CABALLOCOCHA/MapServer/4>
+
+## ZEE_VISOR/01_CARACTERIZACIÓN_DEL_TERRITORIO_HUANCAVELICA (54)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/0>
+- `Pasivos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/1>
+- `Operaciones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/2>
+- `Calidad de Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/3>
+- `Desertificación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/4>
+- `Deforestación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/5>
+- `Botadero de Relleno Sanitario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/6>
+- `Problemas Ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/7>
+- `Conflicto Socioambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/8>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/9>
+- `Fauna Silvestre / Punto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/10>
+- `Fauna Silvestre / Polígono` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/11>
+- `Pisos Altitudinales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/12>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/13>
+- `Agrodiversidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/14>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/15>
+- `Tierras de Protección` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/16>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/17>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/18>
+- `Pliegamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/19>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/20>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/21>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/22>
+- `Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/23>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/24>
+- `Sequia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/25>
+- `Oferta Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/26>
+- `Cuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/27>
+- `Subcuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/28>
+- `Precipitación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/29>
+- `Capacidad de Uso Mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/30>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/31>
+- `Comunidad Campesina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/32>
+- `Etnias / Lenguas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/33>
+- `Patrimonio Cultural / Punto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/34>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/35>
+- `Proyectos de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/36>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/37>
+- `Tierras Aptas para Producción Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/38>
+- `Índice de Desarrollo Humano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/39>
+- `Pobreza` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/40>
+- `Red Eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/41>
+- `Instituciones Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/42>
+- `Saneamiento Básico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/43>
+- `Entidades Financieras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/44>
+- `Recursos Energéticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/45>
+- `Concesión Hidroeléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/46>
+- `Concesiones Mineras Metálicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/47>
+- `Concesiones Mineras No Metálicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/48>
+- `Infraestructura de Riego` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/49>
+- `Infraestructura de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/50>
+- `Infraestructura de Telecomunicaciones ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/51>
+- `Recursos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/52>
+- `Corredor Económico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARACTERIZACI%C3%93N_DEL_TERRITORIO_HUANCAVELICA/MapServer/53>
+
+## ZEE_VISOR/01_CARTOGRAFÍA_BASE_HUANCAVELICA (16)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital de Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/0>
+- `Capital de Provincia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/1>
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/2>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/3>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/4>
+- `Red Vial Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/5>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/6>
+- `Laguna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/7>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/8>
+- `Canal Choclococha` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/9>
+- `Bofedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/10>
+- `Curva de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/11>
+- `Línea Férrea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/12>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/13>
+- `Límte Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/14>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_CARTOGRAF%C3%8DA_BASE_HUANCAVELICA/MapServer/15>
+
+## ZEE_VISOR/01_DIMENCIÓN_DE_EVALUACIÓN_TERRITORIAL_HUANCAVELICA (9)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/0>
+- `Recursos Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/1>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/2>
+- `Potencial Socioeconómico ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/3>
+- `Recursos Minero Metálicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/4>
+- `Recursos Minero No Metálicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/5>
+- `Conflictos de Uso del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/6>
+- `Susceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/7>
+- `Inventario de Peligros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_DIMENCI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_HUANCAVELICA/MapServer/8>
+
+## ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_HUANCAVELICA (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_HUANCAVELICA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Zonificación Ecológica y Económica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_HUANCAVELICA/MapServer/0>
+
+## ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/0>
+- `Potencial Forestal No Maderable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/1>
+- `Potencial para Energía Solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/2>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/3>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/4>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/5>
+- `Potencial Hidrocarburos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/6>
+- `Potencial para Expansión Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/7>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/8>
+- `Susceptibilidad a Tsunamis` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/9>
+- `Movimientos en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/10>
+- `Susceptibilidad Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/11>
+- `Susceptibilidad Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/12>
+- `Áreas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/13>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/14>
+
+## ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1 (14)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/0>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/1>
+- `Potencial para Energía Solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/2>
+- `Potencial para Expansión Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/3>
+- `Potencial Forestal No Maderable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/4>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/5>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/6>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/7>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/8>
+- `Susceptibilidad a Tsunamis` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/9>
+- `Susceptibilidad Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/10>
+- `Susceptibilidad Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/11>
+- `Áreas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/12>
+- `Movimientos en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv1/MapServer/13>
+
+## ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2 (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Acuicola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/0>
+- `Potencial Agricola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/1>
+- `Potencial Hidrocarburos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/2>
+- `Potencia Energia Solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/3>
+- `Potencial Expansion Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/4>
+- `Potencial Forestal No Maderable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/5>
+- `Potencial Minero No Metalico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/6>
+- `Potencial Minero Metalico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/7>
+- `Potencial Turistico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/8>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/9>
+- `Susceptibilidad a Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/10>
+- `Susceptibilidad a Sismos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/11>
+- `Susceptibilidad Tsunami` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/12>
+- `Movimientos en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/13>
+- `Areas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/01_POTENCIALIDADES_Y_LIMITACIONES_TUMBESv2/MapServer/14>
+
+## ZEE_VISOR/02_CARACTERIZACIÓN_DEL_TERRITORIO_TUMBES (32)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/0>
+- `Botadero de Residuos Sólidos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/1>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/2>
+- `Bancos Naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/3>
+- `Fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/4>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/5>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/6>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/7>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/8>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/9>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/10>
+- `Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/11>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/12>
+- `Cuencas Hidrográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/13>
+- `Precipitación Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/14>
+- `Temperatura Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/15>
+- `Humedad Relativa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/16>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/17>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/18>
+- `Sitio Arqueológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/19>
+- `Complejo Arqueológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/20>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/21>
+- `Proyectos de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/22>
+- `Instituciones educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/23>
+- `Establecimientos de salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/24>
+- `Líneas de trasmisión eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/25>
+- `Recursos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/26>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/27>
+- `Lotes petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/28>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/29>
+- `Sitios Naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/30>
+- `Ecosistemas Degradados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TUMBES/MapServer/31>
+
+## ZEE_VISOR/02_CARTOGRAFIA_BÁSICA_TUMBES (12)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/2>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/3>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/4>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/5>
+- `Quebrada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/6>
+- `Rios Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/7>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/8>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/9>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/10>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_CARTOGRAFIA_B%C3%81SICA_TUMBES/MapServer/11>
+
+## ZEE_VISOR/02_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_TUMBES (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencialidades Socioeconómicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/0>
+- `Aptitud Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/1>
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/2>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/3>
+- `Valor Productivo de los Recursos Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/4>
+- `Valor Productivo de los Recursos No Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/5>
+- `Conflictos de Uso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/6>
+- `Peligro por Movimiento en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/7>
+- `Peligro por Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/8>
+- `Peligro por Impacto Sísmico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/9>
+- `Peligro por Tsunami` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TUMBES/MapServer/10>
+
+## ZEE_VISOR/02_POTENCIALIDADES_Y_LIMITACIONES_TUMBES (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Zonificación Ecológica y Económica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/02_POTENCIALIDADES_Y_LIMITACIONES_TUMBES/MapServer/0>
+
+## ZEE_VISOR/03_CARACTERIZACIÓN_DEL_TERRITORIO_AYACUCHO (32)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/0>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/1>
+- `Fauna Endémica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/2>
+- `Flora Endémica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/3>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/4>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/5>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/6>
+- `Geologia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/7>
+- `Geomorfologia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/8>
+- `Fisiografia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/9>
+- `Pendientes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/10>
+- `Metalogenetico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/11>
+- `Hidrogeologia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/12>
+- `Balance Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/13>
+- `Cabeceras de Cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/14>
+- `Precipitación Multianual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/15>
+- `Temperatura Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/16>
+- `Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/17>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/18>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/19>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/20>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/21>
+- `Sistios Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/22>
+- `Monumentos Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/23>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/24>
+- `Proyecto de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/25>
+- `Evidencias Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/26>
+- `Área de Conservación Privada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/27>
+- `Área de Conservación Regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/28>
+- `Áreas Naturales Protegidas ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/29>
+- `Concesiones Hidroelectricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/30>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AYACUCHO/MapServer/31>
+
+## ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/2>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/3>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/4>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/5>
+- `Red Vial Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/6>
+- `Red Vial Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/7>
+- `Red Vial Vecinal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/8>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/9>
+- `Rios Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/10>
+- `Laguna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/11>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/12>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/13>
+- `Limite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_CARTOGRAFIA_BASE_AYACUCHO/MapServer/14>
+
+## ZEE_VISOR/03_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_AYACUCHO (8)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer/0>
+- `Vocación Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer/1>
+- `Conflicto de Uso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer/2>
+- `Valor Historico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer/3>
+- `Valor de Recursos Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer/4>
+- `Valor de Tecursos No Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer/5>
+- `Peligros Potenciales Múltiples` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer/6>
+- `Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AYACUCHO/MapServer/7>
+
+## ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO (14)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/0>
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/1>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/2>
+- `Potencial Piscícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/3>
+- `Potencial Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/4>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/5>
+- `Potencial Forestal No Maderable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/6>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/7>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/8>
+- `Peligro Susceptiblidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/9>
+- `Peligro Sequía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/10>
+- `Peligro Helada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/11>
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/12>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_POTENCIALIDADES_Y_LIMITACIONES_AYACUCHO/MapServer/13>
+
+## ZEE_VISOR/03_ZEE_INTEGRADA_AYACUCHO (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_ZEE_INTEGRADA_AYACUCHO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `ZEE Integrada Ayacucho` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/03_ZEE_INTEGRADA_AYACUCHO/MapServer/0>
+
+## ZEE_VISOR/04_CARACTERIZACIÓN_DEL_TERRITORIO_ICA (23)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/0>
+- `Ecosistemas Degradados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/1>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/2>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/3>
+- `Mapa Regional de Ecosistemas ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/4>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/5>
+- `Geologia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/6>
+- `Pliegues` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/7>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/8>
+- `Geomorfologia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/9>
+- `Hidrogeología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/10>
+- `Acuiferos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/11>
+- `Franjas Metalogeneticas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/12>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/13>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/14>
+- `Proyectos de Inversión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/15>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/16>
+- `Áreas de Conservación Regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/17>
+- `Pozos / Bocatomas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/18>
+- `Represas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/19>
+- `Yacimientos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/20>
+- `Fajas Marginales / Puntos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/21>
+- `Fajas Marginales / Linea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARACTERIZACI%C3%93N_DEL_TERRITORIO_ICA/MapServer/22>
+
+## ZEE_VISOR/04_CARTOGRAFÍA_BASE_ICA (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital de Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/1>
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/2>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/3>
+- `Red Vial Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/4>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/5>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/6>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/7>
+- `Cauce Principal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/8>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/9>
+- `Islas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/10>
+- `Arrecife` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/11>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/12>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/13>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_CARTOGRAF%C3%8DA_BASE_ICA/MapServer/14>
+
+## ZEE_VISOR/04_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_ICA (3)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_ICA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Puntos Críticos Inundables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_ICA/MapServer/0>
+- `Peligros por Remosión en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_ICA/MapServer/1>
+- `Áreas Inundables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/04_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_ICA/MapServer/2>
+
+## ZEE_VISOR/05_CARACTERIZACIÓN_TERRITORIAL_LA_LIBERTAD (53)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/0>
+- `Peligros geológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/1>
+- `Zona degradada por pasivos mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/2>
+- `Zona de relaves mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/3>
+- `Zona degradada por RR.SS. Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/4>
+- `Zona degradada por RR.SS. No Municipales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/5>
+- `Zona de Infraestructura de RRSS` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/6>
+- `Degradación de los suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/7>
+- `Erosión de los suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/8>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/9>
+- `Bancos naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/10>
+- `Área de Conservación Regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/11>
+- `Área de Conservación Privada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/12>
+- `Áreas Naturales protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/13>
+- `Zona de Amortiguamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/14>
+- `Concesiones de Conservación y Manejo de Fauna Silvestre` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/15>
+- `Sitios Prioritarios para la Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/16>
+- `Ecosistemas Frágiles (SERFOR)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/17>
+- `Ecosistemas (MINAM)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/18>
+- `Provincias de Humedad (SENAMHI)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/19>
+- `Zonas de vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/20>
+- `Capacidad de retención del Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/21>
+- `Fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/22>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/23>
+- `Sitio arqueológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/24>
+- `Camino Inca (Qapac_Ñan)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/25>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/26>
+- `Zonas arqueológicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/27>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/28>
+- `Pliegues` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/29>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/30>
+- `Anomalías espectrales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/31>
+- `Fajas marginales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/32>
+- `Pisos altitudinales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/33>
+- `Franjas Metalogenéticas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/34>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/35>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/36>
+- `Hidrogeología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/37>
+- `Tipos de clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/38>
+- `Unidades hidrográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/39>
+- `Capacidad de Uso Mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/40>
+- `Geomorfología Costa (1:25,000)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/41>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/42>
+- `Proyectos de Inversión Pública` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/43>
+- `Categoria de Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/44>
+- `Establecimientos de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/45>
+- `Instituciones educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/46>
+- `Ámbito Censo Agrario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/47>
+- `Infraestructura Eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/48>
+- `Yacimientos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/49>
+- `Concesiones mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/50>
+- `Concesiones eléctricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/51>
+- `Lotes Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARACTERIZACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/52>
+
+## ZEE_VISOR/05_CARTOGRAFÍA_BASE_LA_LIBERTAD (17)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital de Departamento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/0>
+- `Capital provincia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/1>
+- `Capital de distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/2>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/3>
+- `Bofedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/4>
+- `Hidrografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/5>
+- `Red vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/6>
+- `Curvas de nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/7>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/8>
+- `Unidades Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/9>
+- `Área_Urbana` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/10>
+- `Cauce principal del río` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/11>
+- `Línea de costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/12>
+- `Batimetría` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/13>
+- `Límite departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/14>
+- `Límite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/15>
+- `Límite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_CARTOGRAF%C3%8DA_BASE_LA_LIBERTAD/MapServer/16>
+
+## ZEE_VISOR/05_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_LA_LIBERTAD (20)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Vulnerabilidad y Riesgos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/0>
+- `Registro de emergencias 2003 - 2023` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/1>
+- `Erosion de la Costa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/2>
+- `Vulnerabilidad de la Población` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/3>
+- `Vulnerabilidad Líneas vitales (Vías)` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/4>
+- `Vulnerabilidad Actividades económicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/5>
+- `Susceptibilidad a la ocurrencia de Incendios Forestales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/6>
+- `Susceptibilidad a la ocurrencia de Innundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/7>
+- `Susceptibilidad a la ocurrencia de Movimientos en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/8>
+- `Recursos Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/9>
+- `Zona de aptitud agropecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/10>
+- `Zona acuícola Marina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/11>
+- `Potencial eólico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/12>
+- `Potencial solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/13>
+- `Potencialidades socioeconómicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/14>
+- `Capital Social Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/15>
+- `Capital de Infraestructura fisica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/16>
+- `Capital Financiero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/17>
+- `Aptitud Urbana e Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/18>
+- `Zonas con potencial para ubicar RR.SS.` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LA_LIBERTAD/MapServer/19>
+
+## ZEE_VISOR/05_MAPA_DE_SOMBRAS_LA_LIBERTAD (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_MAPA_DE_SOMBRAS_LA_LIBERTAD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Mapa de Sombras GEO` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/05_MAPA_DE_SOMBRAS_LA_LIBERTAD/MapServer/0>
+
+## ZEE_VISOR/06_CARACTERIZACIÓN_DEL_TERRITORIO_AREQUIPA (24)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/0>
+- `Botaderos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/1>
+- `Pasivos Ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/2>
+- `Relave Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/3>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/4>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/5>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/6>
+- `Geologia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/7>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/8>
+- `Pendiente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/9>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/10>
+- `Precipitación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/11>
+- `Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/12>
+- `Cuencas Hidrográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/13>
+- `Temperatura Promedio` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/14>
+- `Volcanes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/15>
+- `Capacidad de Uso Mayor de Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/16>
+- `Uso Actual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/17>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/18>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/19>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/20>
+- `Recursos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/21>
+- `Yacimientos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/22>
+- `Concesiones Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AREQUIPA/MapServer/23>
+
+## ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/2>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/3>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/4>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/5>
+- `Red Férrea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/6>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/7>
+- `Salar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/8>
+- `Ríos Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/9>
+- `Islas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/10>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/11>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/12>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/13>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_CARTOGRAFIA_BASE_DE_AREQUIPA/MapServer/14>
+
+## ZEE_VISOR/06_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_AREQUIPA (8)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer/0>
+- `Recursos Naturales No Renovables  Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer/1>
+- `Recursos Naturales No Renovables  Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer/2>
+- `Peligro por Ocurrencia de Sequia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer/3>
+- `Peligro por Ocurrencia de Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer/4>
+- `Potencial Productivo del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer/5>
+- `Potencial Hídrico Subterráneo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer/6>
+- `Potencial de Energía Geotermal ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AREQUIPA/MapServer/7>
+
+## ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA (17)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Hídrico Subterráneo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/0>
+- `Potencial  Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/1>
+- `Potencial Pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/2>
+- `Potencial Geotermal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/3>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/4>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/5>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/6>
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/7>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/8>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/9>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/10>
+- `Áreas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/11>
+- `Peligro Remosión en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/12>
+- `Peligro Sequía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/13>
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/14>
+- `Peligro Helada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/15>
+- `Potencial total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/06_POTENCIALIDADES_Y_LIMITACIONES_AREQUIPA/MapServer/16>
+
+## ZEE_VISOR/07_CARACTERIZACIÓN_DEL_TERRITORIO_TACNA (58)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/0>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/1>
+- `Propuestas de Áreas de Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/2>
+- `Ecosistemas Costeros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/3>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/4>
+- `Redes de Conectividad Biológica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/5>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/6>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/7>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/8>
+- `Gemorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/9>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/10>
+- `Volcanes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/11>
+- `Pozos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/12>
+- `Manantiales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/13>
+- `Fuente Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/14>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/15>
+- `Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/16>
+- `Precipitación Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/17>
+- `Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/18>
+- `Cuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/19>
+- `Sub Cuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/20>
+- `Temperatura Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/21>
+- `Capacidad de Uso Mayor de Tierras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/22>
+- `Hidrogeología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/23>
+- `Falla` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/24>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/25>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/26>
+- `Iglesias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/27>
+- `Sitios Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/28>
+- `Monumentos Históricos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/29>
+- `Restos Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/30>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/31>
+- `Área de Conservación Regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/32>
+- `Represa / Reservorio / Embalse` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/33>
+- `Atractivo Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/34>
+- `Recurso Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/35>
+- `Vulnerabilidad Social ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/36>
+- `Vulnerabilidad Económica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/37>
+- `Infraestructura Turística` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/38>
+- `Áreas Bajo Riego` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/39>
+- `Infraestructura de Riego` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/40>
+- `Sitios Prioritarios para la Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/41>
+- `Infraestructura Educación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/42>
+- `Índice de Desarrollo Humano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/43>
+- `Infraestructura Financiera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/44>
+- `Conflicto de Uso del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/45>
+- `Bancos Naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/46>
+- `Central Hidroeléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/47>
+- `Cobertura Eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/48>
+- `Cobertura de Agua Potable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/49>
+- `Corredores Económicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/50>
+- `Crecimiento Poblacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/51>
+- `Micro y Pequeña Empresa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/52>
+- `Capital Financiero Producción Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/53>
+- `Capital Financiero Producción Minera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/54>
+- `Capital Financiero Producción Pecuaria` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/55>
+- `Capital Financiero Producción Turístico / Comercial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/56>
+- `Uso Actual de Tierras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARACTERIZACI%C3%93N_DEL_TERRITORIO_TACNA/MapServer/57>
+
+## ZEE_VISOR/07_CARTOGRAFÍA_BASE_TACNA (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/0>
+- `Capital Provincial ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/1>
+- `Centros Poblados ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/2>
+- `Volcanes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/3>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/4>
+- `Quebradas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/5>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/6>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/7>
+- `Zona Rural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/8>
+- `Humedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/9>
+- `Graciares` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/10>
+- `Zona Nival` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/11>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/12>
+- `Límite Provincial ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/13>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CARTOGRAF%C3%8DA_BASE_TACNA/MapServer/14>
+
+## ZEE_VISOR/07_CPOTENCIALIDADES_Y_LIMITACIONES_TACNA (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CPOTENCIALIDADES_Y_LIMITACIONES_TACNA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Zonificación Ecológica y Económica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_CPOTENCIALIDADES_Y_LIMITACIONES_TACNA/MapServer/0>
+
+## ZEE_VISOR/07_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_TACNA (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Económico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/0>
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/1>
+- `Potencial Agrario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/2>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/3>
+- `Potencial Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/4>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/5>
+- `Potencial Acuicola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/6>
+- `Potencial Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/7>
+- `Valor Productivo de los Recursos Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/8>
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/9>
+- `Conflictos de Uso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/10>
+- `Peligros Múltiples` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/11>
+- `Peligo por Remoción en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_TACNA/MapServer/12>
+
+## ZEE_VISOR/07_ZEE_INTEGRADA_TACNA (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_ZEE_INTEGRADA_TACNA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `ZEE Integrada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/07_ZEE_INTEGRADA_TACNA/MapServer/0>
+
+## ZEE_VISOR/08_CARACTERIZACIÓN_DEL_TERRITORIO_MOQUEGUA (37)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/0>
+- `Puntos de Vertimientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/1>
+- `Área de Recuperación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/2>
+- `Conflicto Socioambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/3>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/4>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/5>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/6>
+- `Fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/7>
+- `Banco Natural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/8>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/9>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/10>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/11>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/12>
+- `Clasisifcación Climática` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/13>
+- `Cuencas y Subcuencas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/14>
+- `Zona Marino Costera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/15>
+- `Capacidad de Uso Mayor de Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/16>
+- `Aspecto Cultura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/17>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/18>
+- `Lengua Principal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/19>
+- `Patrimonio Cultural Inmaterial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/20>
+- `Patrimonio Cultural Inmueble` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/21>
+- `Paisaje Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/22>
+- `Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/23>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/24>
+- `Asociaciones Productivas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/25>
+- `Circuitos Comerciales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/26>
+- `Circuitos Turisticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/27>
+- `Recursos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/28>
+- `Instituciones Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/29>
+- `Centros de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/30>
+- `Estructura Demográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/31>
+- `Densidad Poblacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/32>
+- `Tendencias Demográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/33>
+- `Población Económicamente Activa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/34>
+- `Índice de Desarrollo Humano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/35>
+- `Incidencia de Pobreza` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARACTERIZACI%C3%93N_DEL_TERRITORIO_MOQUEGUA/MapServer/36>
+
+## ZEE_VISOR/08_CARTOGRAFÍA_BASE_MOQUEGUA (18)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/0>
+- `Capital de Provincia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/1>
+- `Capital de Distrito` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/2>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/3>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/4>
+- `Vía Ferrea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/5>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/6>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/7>
+- `Río Principal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/8>
+- `Laguna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/9>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/10>
+- `Represas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/11>
+- `Embalses` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/12>
+- `Terminal Portuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/13>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/14>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/15>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/16>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_CARTOGRAF%C3%8DA_BASE_MOQUEGUA/MapServer/17>
+
+## ZEE_VISOR/08_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_MOQUEGUA (17)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/0>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/1>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/2>
+- `Importancia Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/3>
+- `Potencial Hidrológico de Agua Subterránea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/4>
+- `Potencial Pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/5>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/6>
+- `Potencial Geotérmico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/7>
+- `Capacidad de Soporte Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/8>
+- `Conflicto de Uso de Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/9>
+- `Recursos Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/10>
+- `Potencial Energía Solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/11>
+- `Actividad Volcánica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/12>
+- `Peligro por Tsunami` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/13>
+- `Peligro por Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/14>
+- `Probabilidad de Impacto Sísmico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/15>
+- `Peligro por Remosión en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MOQUEGUA/MapServer/16>
+
+## ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA (18)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Peligro Actividad Volcánica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/0>
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/1>
+- `Peligro Remosión en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/2>
+- `Peligro Sísmico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/3>
+- `Peligro Tsunami` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/4>
+- `Potencial Agrícola y Pastos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/5>
+- `Potencial Biecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/6>
+- `Potencial Energía Solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/7>
+- `Potencial Geotérmico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/8>
+- `Potencial Hídrico Subterráneo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/9>
+- `Potencial Hídrico Superficial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/10>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/11>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/12>
+- `Potencial Pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/13>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/14>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/15>
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/16>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/08_POTENCIALIDADES_Y_LIMITACIONES_MOQUEGUA/MapServer/17>
+
+## ZEE_VISOR/09_CARACTERIZACIÓN_DEL_TERRITORIO_PIURA (44)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/0>
+- `Minería Informal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/1>
+- `Zonas Deforestadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/2>
+- `Zonas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/3>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/4>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/5>
+- `Sistemas Ecológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/6>
+- `Pisos Ecológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/7>
+- `Bosque Seco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/8>
+- `Biodiversidad Marina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/9>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/10>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/11>
+- `Geomorfologia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/12>
+- `Hidrogeología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/13>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/14>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/15>
+- `Acuíferos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/16>
+- `Corrientes Marinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/17>
+- `Unidad Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/18>
+- `Sub Cuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/19>
+- `Capacidad de Uso Mayo de Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/20>
+- `Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/21>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/22>
+- `Patrimonio Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/23>
+- `Paisaje Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/24>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/25>
+- `Proyectos de Inversión ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/26>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/27>
+- `Potencial Eólico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/28>
+- `Potencial Solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/29>
+- `Potencial Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/30>
+- `Concesiones Mineras Metálicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/31>
+- `Concesiones Mineras No Metálicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/32>
+- `Concesiones Petroleras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/33>
+- `Centrales Hidroeléctricas ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/34>
+- `Infraestructura Educativa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/35>
+- `Infraestructura de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/36>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/37>
+- `ANP Illescas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/38>
+- `Flujos Económicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/39>
+- `Infraestructura Productiva` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/40>
+- `Rutas de Ecoturismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/41>
+- `Turismo  / Puntos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/42>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARACTERIZACI%C3%93N_DEL_TERRITORIO_PIURA/MapServer/43>
+
+## ZEE_VISOR/09_CARTOGRAFIA_BÁSICA_PIURA (10)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/2>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/3>
+- `Red Vial ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/4>
+- `Río Principal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/5>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/6>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/7>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/8>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_CARTOGRAFIA_B%C3%81SICA_PIURA/MapServer/9>
+
+## ZEE_VISOR/09_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_PIURA (16)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/0>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/1>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/2>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/3>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/4>
+- `Aptitud Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/5>
+- `Patrimonio Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/6>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/7>
+- `Recursos Naturales Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/8>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/9>
+- `Peligros Múltiples` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/10>
+- `Vulnerabilidad frente a Sequía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/11>
+- `Vulnerabilidad frente a Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/12>
+- `Vulnerabilidad frente a deslizamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/13>
+- `Vulnerabilidad frente a Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/14>
+- `Vulnerabilidad por Erosión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PIURA/MapServer/15>
+
+## ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA (18)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Peligro Deslizamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/0>
+- `Peligro Erosión` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/1>
+- `Peligro Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/2>
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/3>
+- `Peligro Sequía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/4>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/5>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/6>
+- `Potencial Energético No convencional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/7>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/8>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/9>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/10>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/11>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/12>
+- `Potencial Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/13>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/14>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/15>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/16>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/09_POTENCIALIDADES_Y_LIMITACIONES_PIURA/MapServer/17>
+
+## ZEE_VISOR/10_CARACTERIZACIÓN_DEL_TERRITORIO_LAMBAYEQUE (25)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/0>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/1>
+- `Flora Endémica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/2>
+- `Corredor Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/3>
+- `Comunidad Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/4>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/5>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/6>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/7>
+- `Batimetría` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/8>
+- `Cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/9>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/10>
+- `Litología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/11>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/12>
+- `Isoyetas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/13>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/14>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/15>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/16>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/17>
+- `Conceciones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/18>
+- `Lote de Hidrocarburos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/19>
+- `Áreas Potenciales Urbano Industriales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/20>
+- `Índice de Desarrollo Humano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/21>
+- `Demografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/22>
+- `Desnutrición Crónica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/23>
+- `Incidencia de Pobreza` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARACTERIZACI%C3%93N_DEL_TERRITORIO_LAMBAYEQUE/MapServer/24>
+
+## ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE (8)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer/0>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer/1>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer/2>
+- `Red Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer/3>
+- `Islas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer/4>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer/5>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer/6>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_CARTOGRAFIA_BASE_LAMBAYEQUE/MapServer/7>
+
+## ZEE_VISOR/10_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_LAMBAYEQUE (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/0>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/1>
+- `Potencial Energértico Renovable No Convencional ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/2>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/3>
+- `Potencial Productivo Agropecuario Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/4>
+- `Potencial Turístico Natural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/5>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/6>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/7>
+- `Valor Productivo de los Recursos Naturales Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/8>
+- `Conflictos de Uso de Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/9>
+- `Peligro por Remosión en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/10>
+- `Peligro por Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/11>
+- `Peligro por Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_LAMBAYEQUE/MapServer/12>
+
+## ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE (17)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/0>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/1>
+- `Potencial Energético Renovable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/2>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/3>
+- `Potencial Hidrobiológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/4>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/5>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/6>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/7>
+- `Potencial Turístico Natural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/8>
+- `Potencial Agroforestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/9>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/10>
+- `Peligro Helada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/11>
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/12>
+- `Peligro Movimiento en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/13>
+- `Peligro Sequía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/14>
+- `Susceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/15>
+- `Potencial total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/10_POTENCIALIDADES_Y_LIMITACIONES_LAMBAYEQUE/MapServer/16>
+
+## ZEE_VISOR/11_CARACTERIZACIÓN_DEL_TERRITORIO_JUNIN (52)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/0>
+- `Zonas Ambientalmente Críticas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/1>
+- `Pasivos Ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/2>
+- `Botaderos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/3>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/4>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/5>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/6>
+- `Regiones Naturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/7>
+- `Pisos Basales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/8>
+- `Fauna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/9>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/10>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/11>
+- `Metalogenia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/12>
+- `Falla Regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/13>
+- `Buzamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/14>
+- `Pliegues` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/15>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/16>
+- `Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/17>
+- `Hidrogeología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/18>
+- `Geodinámica Externa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/19>
+- `Cuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/20>
+- `Subcuenca Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/21>
+- `Precipitación Media` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/22>
+- `Temperatura Medina` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/23>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/24>
+- `Capacidad de Uso Mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/25>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/26>
+- `Manifestaciones Culturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/27>
+- `Paisajes Culturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/28>
+- `Enfermedades Endémicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/29>
+- `Etnias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/30>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/31>
+- `Zonas Arqueológicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/32>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/33>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/34>
+- `Recursos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/35>
+- `Infraestructura Productiva` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/36>
+- `Central Hidroeléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/37>
+- `Líneas de Transmición Eléctrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/38>
+- `Canales de Riego` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/39>
+- `Piscigranjas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/40>
+- `Áreas Bajo Riego` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/41>
+- `Derechos Mineros Metálicos ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/42>
+- `Derechos Mineros No Metálicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/43>
+- `Lotes Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/44>
+- `Cobertura de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/45>
+- `Instituciones Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/46>
+- `Densidad Poblacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/47>
+- `Índice de Desarrollo Humano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/48>
+- `Pobreza` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/49>
+- `Aalfabetismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/50>
+- `Educación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARACTERIZACI%C3%93N_DEL_TERRITORIO_JUNIN/MapServer/51>
+
+## ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN (20)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/2>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/3>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/4>
+- `Puertos  / Aeropuertos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/5>
+- `Vias Nacionales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/6>
+- `Vías Departamentales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/7>
+- `Vías Vecinales ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/8>
+- `Vía Férrea` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/9>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/10>
+- `Ríos Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/11>
+- `Nevados ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/12>
+- `Lago` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/13>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/14>
+- `Bofedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/15>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/16>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/17>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/18>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_CARTOGRAFIA_BASE_JUNIN/MapServer/19>
+
+## ZEE_VISOR/11_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_JUNIN (12)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/0>
+- `Potencial Forestal Maderable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/1>
+- `Potencial Hidrobiológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/2>
+- `Capacidad de Uso Mayor de Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/3>
+- `Susceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/4>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/5>
+- `Aptitud Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/6>
+- `Conflicto de Uso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/7>
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/8>
+- `Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/9>
+- `Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/10>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_JUNIN/MapServer/11>
+
+## ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/0>
+- `Potencial Biecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/1>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/2>
+- `Potencial Forestal Maderero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/3>
+- `Potencial Hidrobiológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/4>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/5>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/6>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/7>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/8>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/9>
+- `Potencial Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/10>
+- `Susceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/11>
+- `Potencial total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/11_POTENCIALIDADES_Y_LIMITACIONES_JUNIN/MapServer/12>
+
+## ZEE_VISOR/12_CARACTERIZACIÓN_DEL_TERRITORIO_AMAZONAS (25)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/0>
+- `Deforestación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/1>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/2>
+- `Zona Reservada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/3>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/4>
+- `Ecosistema Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/5>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/6>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/7>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/8>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/9>
+- `Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/10>
+- `Capacidad de Uso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/11>
+- `Cuenca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/12>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/13>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/14>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/15>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/16>
+- `Proyectos de Inversión Pública` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/17>
+- `Áreas de Conservación Privada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/18>
+- `Áreas de Conservación Regional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/19>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/20>
+- `Oleoducto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/21>
+- `Catastro Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/22>
+- `Lotes Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/23>
+- `Uso Acrtual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARACTERIZACI%C3%93N_DEL_TERRITORIO_AMAZONAS/MapServer/24>
+
+## ZEE_VISOR/12_CARTOGRAFÍA_BÁSICA_AMAZONAS (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `MAPA BASE` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/0>
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/1>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/2>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/3>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/4>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/5>
+- `Aeropuerto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/6>
+- `Red Vial Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/7>
+- `Red Vial Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/8>
+- `Red Vial Vecinal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/9>
+- `Rios Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/10>
+- `Red Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/11>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/12>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/13>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_CARTOGRAF%C3%8DA_B%C3%81SICA_AMAZONAS/MapServer/14>
+
+## ZEE_VISOR/12_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_AMAZONAS (9)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/0>
+- `Aptitud Productiva` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/1>
+- `Aptitud Piscicola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/2>
+- `Vocación Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/3>
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/4>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/5>
+- `Conflicto de Uso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/6>
+- `Degradación de Ecosistemas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/7>
+- `Vulnerabilidad` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_AMAZONAS/MapServer/8>
+
+## ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS (10)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Histórico cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/0>
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/1>
+- `Vulnerabilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/2>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/3>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/4>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/5>
+- `Áreas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/6>
+- `Potencial Piscícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/7>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/8>
+- `zee_regional.SDE.Pot_total_amaz` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/12_POTENCIALIDADES_Y_LIMITACIONES_AMAZONAS/MapServer/9>
+
+## ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO (26)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/0>
+- `Pasivos Ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/1>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/2>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/3>
+- `Zona de vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/4>
+- `Especies Hidrobiológicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/5>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/6>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/7>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/8>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/9>
+- `Cobertura Uso de Tierra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/10>
+- `Capacidad de uso mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/11>
+- `Precipitación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/12>
+- `Temperatura máxima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/13>
+- `Metalogenético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/14>
+- `Altitud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/15>
+- `Unidad Hidrográfica 6` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/16>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/17>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/18>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/19>
+- `Sitios arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/20>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/21>
+- `Areas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/22>
+- `Nivel de pobreza` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/23>
+- `Canales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/24>
+- `Red eléctrica ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARACTERIZACION_DEL_TERRITORIO_HUANUCO/MapServer/25>
+
+## ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/0>
+- `Capital provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/1>
+- `Capital distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/2>
+- `Centros poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/3>
+- `Casco urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/4>
+- `Curvas de nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/5>
+- `Red vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/6>
+- `Red hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/7>
+- `Rios principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/8>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/9>
+- `Límite distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/10>
+- `Límite provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/11>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_CARTOGRAFIA_BASE_HUANUCO/MapServer/12>
+
+## ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO (19)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/0>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/1>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/2>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/3>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/4>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/5>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/6>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/7>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/8>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/9>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/10>
+- `Potencial Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/11>
+- `Fragilidad Ecológica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/12>
+- `Peligro Sequía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/13>
+- `Peligro Helada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/14>
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/15>
+- `Peligro Movimiento en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/16>
+- `Susceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/17>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_DIMENSION_DE_EVALUACION_TERRITORIAL_HUANUCO/MapServer/18>
+
+## ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO (19)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/0>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/1>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/2>
+- `Potencial Hídrico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/3>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/4>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/5>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/6>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/7>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/8>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/9>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/10>
+- `Potencial Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/11>
+- `Fragilidad Ecológica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/12>
+- `Peligro Sequía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/13>
+- `Peligro Helada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/14>
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/15>
+- `Peligro Movimiento en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/16>
+- `Susceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/17>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/13_ZEE_POTENCIALIDADES_Y_LIMITACIONES_HUANUCO/MapServer/18>
+
+## ZEE_VISOR/14_CARACTERIZACIÓN_TERRITORIAL_PUNO (60)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/0>
+- `Pasivo Ambiental Minero-Puntos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/1>
+- `Pasivo Ambiental Minero-Área` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/2>
+- `Áreas deforestadas-Quema` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/3>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/4>
+- `Covertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/5>
+- `Fauna Íctica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/6>
+- `Fauna Íctica Rios` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/7>
+- `Fauna Silvestre` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/8>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/9>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/10>
+- `Comunidades Campecinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/11>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/12>
+- `Patrimonio Natural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/13>
+- `Patrimonio Material Inmueble Histórico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/14>
+- `Patrimonio Material Inmueble Argeológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/15>
+- `Patrimonio Material Inmueble Arqueológico Nacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/16>
+- `Patrimonio Cultural Inmaterial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/17>
+- `Qhapac Ñan` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/18>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/19>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/20>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/21>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/22>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/23>
+- `Metalogenia` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/24>
+- `Pendiente` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/25>
+- `Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/26>
+- `Capacidad de Uso Mayor del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/27>
+- `Cuencas Sedimentarias` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/28>
+- `Horas de Sol` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/29>
+- `Precipitación Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/30>
+- `Humendad Relativa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/31>
+- `Temperatura Media Anual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/32>
+- `Velocidad de Viento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/33>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/34>
+- `Producción de Alfaalfa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/35>
+- `Producción de Avena Forrajera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/36>
+- `Producción de Avena Grano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/37>
+- `Producción de Café` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/38>
+- `Producción de Cañihua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/39>
+- `Producción de Cebada Forrajera` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/40>
+- `Producción de Haba Grano Seco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/41>
+- `Producción de Haba Grano verde` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/42>
+- `Producción de Cebada Grano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/43>
+- `Producción de Maiz Amilaceo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/44>
+- `Producción de Mashua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/45>
+- `Producción de Naranja` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/46>
+- `Producción de Oca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/47>
+- `Producción de Olluco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/48>
+- `Producción de Papa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/49>
+- `Producción de Quinua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/50>
+- `Producción de Tarwi` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/51>
+- `Producción de Trigo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/52>
+- `Producción de Yuca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/53>
+- `Conseciones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/54>
+- `Concesiones Hidrocarburos ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/55>
+- `Catastro Acuicola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/56>
+- `Pozos Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/57>
+- `Institusiones Educativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/58>
+- `Establecimiento de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARACTERIZACI%C3%93N_TERRITORIAL_PUNO/MapServer/59>
+
+## ZEE_VISOR/14_CARTOGRAFÍA_BASE_PUNO (21)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/2>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/3>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/4>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/5>
+- `Puentes` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/6>
+- `Aeropuertos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/7>
+- `Puertos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/8>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/9>
+- `Lago Titicaca` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/10>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/11>
+- `Islas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/12>
+- `Rios Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/13>
+- `Red Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/14>
+- `Bofedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/15>
+- `Cordilleras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/16>
+- `Glaciar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/17>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/18>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/19>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_CARTOGRAF%C3%8DA_BASE_PUNO/MapServer/20>
+
+## ZEE_VISOR/14_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_PUNO (19)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/0>
+- `Vocación Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/1>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/2>
+- `Valor de Recursos Renoblables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/3>
+- `Peligros Potenciales Multiples` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/4>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/5>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/6>
+- `Potencial Pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/7>
+- `Potencial Turistico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/8>
+- `Potencial Hidrobiológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/9>
+- `Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/10>
+- `Geodinámica Interna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/11>
+- `Erosión Actual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/12>
+- `Suceptibilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/13>
+- `Potencial Minero Metalico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/14>
+- `Potencial Minero No Metalico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/15>
+- `Potencial Hidrocarburo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/16>
+- `Submodelo CUM` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/17>
+- `Conflicto de Uso` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_PUNO/MapServer/18>
+
+## ZEE_VISOR/14_POTENCIALIDADES_Y_LIMITACIONES_PUNO (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_POTENCIALIDADES_Y_LIMITACIONES_PUNO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Zonificación Ecológica Económica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/14_POTENCIALIDADES_Y_LIMITACIONES_PUNO/MapServer/0>
+
+## ZEE_VISOR/15_CARACTERIZACIÓN_DEL_TERRITORIO_CAJAMARCA (50)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/0>
+- `Aguas Termales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/1>
+- `Minería Informal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/2>
+- `Deforestación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/3>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/4>
+- `Flora Endémica ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/5>
+- `Fauna Endémica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/6>
+- `Pisos Altitudinales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/7>
+- `Ecorregiones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/8>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/9>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/10>
+- `Importancia Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/11>
+- `Propuestas de Áreas para la Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/12>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/13>
+- `Geodínámica Externa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/14>
+- `Rumbos y Buzamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/15>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/16>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/17>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/18>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/19>
+- `Suelos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/20>
+- `Temperaturas Mínimas ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/21>
+- `Precipitación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/22>
+- `Unidades Hidrográficas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/23>
+- `Capacidad Uso Mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/24>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/25>
+- `Desertificación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/26>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/27>
+- `Patrimonio Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/28>
+- `Comunidades Campesinas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/29>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/30>
+- `Grupos Idiomáticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/31>
+- `Qapac Ñan` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/32>
+- `Agroecología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/33>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/34>
+- `Minas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/35>
+- `Hidrocarburos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/36>
+- `Catastro Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/37>
+- `Recursos Mineral Industrial ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/38>
+- `Centrales Hidroeléctricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/39>
+- `Presas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/40>
+- `Puerto Fluvial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/41>
+- `Camales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/42>
+- `Siatema Nacional de Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/43>
+- `Índice de Desarrollo Humano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/44>
+- `Densidad Poblacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/45>
+- `Anlafabetismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/46>
+- `Centros Educativos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/47>
+- `Mercados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/48>
+- `Servicios de Salud` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CAJAMARCA/MapServer/49>
+
+## ZEE_VISOR/15_CARTOGRAFÍA_BÁSE_CAJAMARCA (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/2>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/3>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/4>
+- `Lagunas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/5>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/6>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/7>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/8>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/9>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_CARTOGRAF%C3%8DA_B%C3%81SE_CAJAMARCA/MapServer/10>
+
+## ZEE_VISOR/15_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_CAJAMARCA (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aptitud Urbano Industrial ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/0>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/1>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/2>
+- `Potencial Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/3>
+- `Potencial Minero Metálico ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/4>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/5>
+- `Potencial de Radiación Solar` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/6>
+- `Potencial de Recursos Energéticos No Convencionales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/7>
+- `Potencial Eólico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/8>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/9>
+- `Conflicto de Uso de la Tierra` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/10>
+- `Peligros por Geodinámica Externa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/11>
+- `Peligros por Inundaciones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/12>
+- `Peligro por Sequías` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/13>
+- `Peligros por Heladas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_CAJAMARCA/MapServer/14>
+
+## ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA (15)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/0>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/1>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/2>
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/3>
+- `Potencial Energético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/4>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/5>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/6>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/7>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/8>
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/9>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/10>
+- `Peligro Helada` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/11>
+- `Peligro Sequía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/12>
+- `Vulnerabilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/13>
+- `Potencial total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/15_POTENCIALIDADES_Y_LIMITACIONES__CAJAMARCA/MapServer/14>
+
+## ZEE_VISOR/16_CARACTERIZACIÓN_DEL_TERRITORIO__MADRE_DE_DIOS (27)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/0>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/1>
+- `Fauna / Mamíferos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/2>
+- `Fauna / Aves` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/3>
+- `Cobertura Forestal ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/4>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/5>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/6>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/7>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/8>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/9>
+- `Cuencas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/10>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/11>
+- `Capacidad de Uso Mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/12>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/13>
+- `sitios_arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/14>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/15>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/16>
+- `Sitios Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/17>
+- `Reserva de Estado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/18>
+- `Reserva Nacional Tambopata` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/19>
+- `Parque Nacional  Bahuaja Sonene` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/20>
+- `Parque Nacional Alto Purús` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/21>
+- `Parque Nacional del Manu` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/22>
+- `Reserva Comunal Amarakaeri` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/23>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/24>
+- `Frentes Económicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/25>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARACTERIZACI%C3%93N_DEL_TERRITORIO__MADRE_DE_DIOS/MapServer/26>
+
+## ZEE_VISOR/16_CARTOGRAFÍA_BÁSICA_MADRE_DE_DIOS (7)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARTOGRAF%C3%8DA_B%C3%81SICA_MADRE_DE_DIOS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARTOGRAF%C3%8DA_B%C3%81SICA_MADRE_DE_DIOS/MapServer/0>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARTOGRAF%C3%8DA_B%C3%81SICA_MADRE_DE_DIOS/MapServer/1>
+- `Centro Poblado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARTOGRAF%C3%8DA_B%C3%81SICA_MADRE_DE_DIOS/MapServer/2>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARTOGRAF%C3%8DA_B%C3%81SICA_MADRE_DE_DIOS/MapServer/3>
+- `Ríos Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARTOGRAF%C3%8DA_B%C3%81SICA_MADRE_DE_DIOS/MapServer/4>
+- `Red Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARTOGRAF%C3%8DA_B%C3%81SICA_MADRE_DE_DIOS/MapServer/5>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_CARTOGRAF%C3%8DA_B%C3%81SICA_MADRE_DE_DIOS/MapServer/6>
+
+## ZEE_VISOR/16_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_MADRE_DE_DIOS (5)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MADRE_DE_DIOS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MADRE_DE_DIOS/MapServer/0>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MADRE_DE_DIOS/MapServer/1>
+- `Aptitud Productiva` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MADRE_DE_DIOS/MapServer/2>
+- `Aptitud Psicicola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MADRE_DE_DIOS/MapServer/3>
+- `Aptitud Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_MADRE_DE_DIOS/MapServer/4>
+
+## ZEE_VISOR/16_POTENCIALIDADES_Y_LIMITACIONES_MADRE_DE_DIOS (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_POTENCIALIDADES_Y_LIMITACIONES_MADRE_DE_DIOS/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Zonificación Ecológica Económica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/16_POTENCIALIDADES_Y_LIMITACIONES_MADRE_DE_DIOS/MapServer/0>
+
+## ZEE_VISOR/17_CARACTERIZACIÓN_DE_TERRITORIO_SAN_MARTIN (21)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/0>
+- `Déficit Exceso de Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/1>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/2>
+- `Endemismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/3>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/4>
+- `Estaciones Climáticas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/5>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/6>
+- `Plegamientos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/7>
+- `Isotermas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/8>
+- `Isoyetas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/9>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/10>
+- `Turismo con Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/11>
+- `Turismo / Restos Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/12>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/13>
+- `Áreas Protegidas / Turismo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/14>
+- `Atractivos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/15>
+- `Circuitos Turísticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/16>
+- `Concesiones Forestales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/17>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/18>
+- `Derechos Mineros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/19>
+- `Lotes Petroleros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARACTERIZACI%C3%93N_DE_TERRITORIO_SAN_MARTIN/MapServer/20>
+
+## ZEE_VISOR/17_CARTOGRAFÍA_BASE_SAN_MARTIN (7)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARTOGRAF%C3%8DA_BASE_SAN_MARTIN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARTOGRAF%C3%8DA_BASE_SAN_MARTIN/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARTOGRAF%C3%8DA_BASE_SAN_MARTIN/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARTOGRAF%C3%8DA_BASE_SAN_MARTIN/MapServer/2>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARTOGRAF%C3%8DA_BASE_SAN_MARTIN/MapServer/3>
+- `Ríos Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARTOGRAF%C3%8DA_BASE_SAN_MARTIN/MapServer/4>
+- `Red Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARTOGRAF%C3%8DA_BASE_SAN_MARTIN/MapServer/5>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_CARTOGRAF%C3%8DA_BASE_SAN_MARTIN/MapServer/6>
+
+## ZEE_VISOR/17_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL_SAN_MARTÍN (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_SAN_MART%C3%8DN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencialidades` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL_SAN_MART%C3%8DN/MapServer/0>
+
+## ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MARTÍN (8)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Vulnerabilidad Física` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer/0>
+- `Potencial Turistíco` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer/1>
+- `Potencial Forestal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer/2>
+- `Potencial Bioecoloógico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer/3>
+- `Potencial Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer/4>
+- `Potencial Piscícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer/5>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer/6>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/17_POTENCIALIDADES_Y_LIMITACIONES_SAN_MART%C3%8DN/MapServer/7>
+
+## ZEE_VISOR/18_CARACTERIZACIÓN_DEL_TERRITORIO_UCAYALI (34)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/0>
+- `Puntos de Muestreo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/1>
+- `Características Físicoquímicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/2>
+- `Estaciones Meteorológicas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/3>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/4>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/5>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/6>
+- `Tipo de Bosque` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/7>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/8>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/9>
+- `Pliegues` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/10>
+- `Fallas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/11>
+- `Rumbo y Buzamiento` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/12>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/13>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/14>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/15>
+- `Temperatura Mínima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/16>
+- `Temperatura Media` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/17>
+- `Temperatura Máxima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/18>
+- `Capacidad de Uso de Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/19>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/20>
+- `Iglesias / Plaza / Museos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/21>
+- `Restos Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/22>
+- `Patrones Culturales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/23>
+- `Patrimonio Material Mueble` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/24>
+- `Patrimonio Material Inmueble` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/25>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/26>
+- `Aspecto Socioambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/27>
+- `Recursos Turísiticos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/28>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/29>
+- `Reservas Territoriales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/30>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/31>
+- `Uso Actual del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/32>
+- `Conflicto de Uso de Tierras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARACTERIZACI%C3%93N_DEL_TERRITORIO_UCAYALI/MapServer/33>
+
+## ZEE_VISOR/18_CARTOGRAFÍA_BASE_UCAYALI (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capitales Distritales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/0>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/1>
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/2>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/3>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/4>
+- `Cuerpo de Agua` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/5>
+- `Ríos Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/6>
+- `Red Hidrográfica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/7>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/8>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/9>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_CARTOGRAF%C3%8DA_BASE_UCAYALI/MapServer/10>
+
+## ZEE_VISOR/18_DIMENSIÓN_DE_EVALUACIÓN_TERRITORIAL__UCAYALI (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/0>
+- `Potencial Hidrobiológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/1>
+- `Potencial Forestal Maderable ` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/2>
+- `Potencial Agropecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/3>
+- `Potencial Acuicola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/4>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/5>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/6>
+- `Aptitud Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/7>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/8>
+- `Valor Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/9>
+- `Aptitud Productiva de los Recursos Naturales Renovables` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/10>
+- `Peligro de Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/11>
+- `Susceptibilidad por Remosión en Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_DIMENSI%C3%93N_DE_EVALUACI%C3%93N_TERRITORIAL__UCAYALI/MapServer/12>
+
+## ZEE_VISOR/18_POTENCIALIDADES_Y_LIMITACIONES_UCAYALI (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_POTENCIALIDADES_Y_LIMITACIONES_UCAYALI/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Zonificación Ecológica y Ecológica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/18_POTENCIALIDADES_Y_LIMITACIONES_UCAYALI/MapServer/0>
+
+## ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO (21)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/0>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/1>
+- `Fauna Silvestre` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/2>
+- `Humedales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/3>
+- `Zonas de Vida` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/4>
+- `Zonas de Conservación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/5>
+- `Ecosistemas Marino Costeros` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/6>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/7>
+- `Geodinámica Externa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/8>
+- `Geotectónico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/9>
+- `Geomorfología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/10>
+- `Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/11>
+- `Capacidad de Uso Mayor` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/12>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/13>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/14>
+- `Necesidades Básicas Insatisfechas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/15>
+- `Conglomerado` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/16>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/17>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/18>
+- `Uso Marino` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/19>
+- `Uso Actual` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARACTERIZACION_DEL_TERRITORIO_CALLAO/MapServer/20>
+
+## ZEE_VISOR/19_CARTOGRAFÍA_BASE_CALLAO (9)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Casco Urbano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/0>
+- `Rios Principales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/1>
+- `Red Vial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/2>
+- `Curvas de Nivel` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/3>
+- `Faja Marginal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/4>
+- `Infraestructura` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/5>
+- `Batimetría / Punto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/6>
+- `Batimetría / Polígono` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/7>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_CARTOGRAF%C3%8DA_BASE_CALLAO/MapServer/8>
+
+## ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO (12)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/0>
+- `Potencial Comercial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/1>
+- `Potencial Forestal y Reforestación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/2>
+- `Potencial Hidrobiológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/3>
+- `Potencial Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/4>
+- `Potencial Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/5>
+- `Potencial Pecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/6>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/7>
+- `Áreas Contaminadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/8>
+- `Peligro Tsunami` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/9>
+- `Susceptibilidad Sísmica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/10>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_DIMENSION_DE_EVALUACION_TERRITORIAL_CALLAO/MapServer/11>
+
+## ZEE_VISOR/19_POTENCIALIDADES_Y_LIMITACIONES (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_POTENCIALIDADES_Y_LIMITACIONES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Zonificación Ecológica Económica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/19_POTENCIALIDADES_Y_LIMITACIONES/MapServer/0>
+
+## ZEE_VISOR/20_CARACTERIZACIÓN_DEL_TERRITORIO_CUSCO (28)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Aspecto Ambiental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/0>
+- `Conflictos Ambientales` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/1>
+- `Aspecto Biológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/2>
+- `Cobertura Vegetal` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/3>
+- `Distribución Ecológica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/4>
+- `Ecoregiones` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/5>
+- `Aspecto Físico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/6>
+- `Geología` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/7>
+- `Fisiografía` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/8>
+- `Clima` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/9>
+- `Cuencas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/10>
+- `Capacidad de Uso Mayor del Suelo` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/11>
+- `Aspecto Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/12>
+- `Sitios Arqueológicos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/13>
+- `Comunidades Nativas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/14>
+- `Aspecto Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/15>
+- `Subestaciones Eléctricas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/16>
+- `Ejes / Corredores` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/17>
+- `Articulación y Dinámica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/18>
+- `Sistemas urbanos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/19>
+- `Concesiones Mineras` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/20>
+- `Lotes de Hidrocarburos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/21>
+- `Gasoducto` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/22>
+- `Recurso Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/23>
+- `Infrestructura Turística` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/24>
+- `Áreas Naturales Protegidas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/25>
+- `Densidad Poblacional` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/26>
+- `Índice de Desarrollo Humano` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARACTERIZACI%C3%93N_DEL_TERRITORIO_CUSCO/MapServer/27>
+
+## ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Capital Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/0>
+- `Capital Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/1>
+- `Capital Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/2>
+- `Centros Poblados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/3>
+- `Aerodromos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/4>
+- `Sistemas urbanos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/5>
+- `Principales Ríos` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/6>
+- `Red Hídrica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/7>
+- `Laguna` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/8>
+- `Nevados` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/9>
+- `Límite Distrital` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/10>
+- `Límite Provincial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/11>
+- `Límite Departamental` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_CARTOGRAFIA_BASE_CUSCO/MapServer/12>
+
+## ZEE_VISOR/20_POTENCIALIDADES_Y_LIMITACIONES_CUSCO (1)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_POTENCIALIDADES_Y_LIMITACIONES_CUSCO/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Zonificación Ecológica y Económica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/20_POTENCIALIDADES_Y_LIMITACIONES_CUSCO/MapServer/0>
+
+## ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/0>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/1>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/2>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/3>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/4>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/5>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/6>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/7>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/8>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/9>
+- `Áreas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/10>
+- `Susceptibilidad Sísmica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/11>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES/MapServer/12>
+
+## ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2 (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/0>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/1>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/2>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/3>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/4>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/5>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/6>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/7>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/8>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/9>
+- `Áreas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/10>
+- `Susceptibilidad Sísmica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/11>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V2/MapServer/12>
+
+## ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3 (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/0>
+- `Potencial Agrícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/1>
+- `Potencial Socioeconómico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/2>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/3>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/4>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/5>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/6>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/7>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/8>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/9>
+- `Áreas Degradadas` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/10>
+- `Susceptibilidad Sísmica` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/11>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Huancavelica_POTENCIALIDADES_Y_LIMITACIONES_V3/MapServer/12>
+
+## ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1 (11)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/0>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/1>
+- `Potencial Económico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/2>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/3>
+- `Potencial Minero` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/4>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/5>
+- `Potencial Hidroenergético` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/6>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/7>
+- `Potencial Agrario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/8>
+- `Peligros Múltiples` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/9>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Tacna_POTENCIALIDADES_Y_LIMITACIONESv1/MapServer/10>
+
+## ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES (13)
+- **Serviço:** <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 1000
+- `Peligro Inundación` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/0>
+- `Peligro Remoción Masa` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/1>
+- `Potencial Acuícola` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/2>
+- `Potencial Agropecuario` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/3>
+- `Potencial Bioecológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/4>
+- `Potencial Forestal Maderable` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/5>
+- `Potencial Hidrobiológico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/6>
+- `Potencial Minero Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/7>
+- `Potencial Minero No Metálico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/8>
+- `Potencial Total` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/9>
+- `Potencial Turístico` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/10>
+- `Potencial Urbano Industrial` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/11>
+- `Valor Histórico Cultural` — <https://geoservidorperu.minam.gob.pe/arcgis/rest/services/ZEE_VISOR/Ucayali_POTENCIALIDADES_Y_LIMITACIONES/MapServer/12>

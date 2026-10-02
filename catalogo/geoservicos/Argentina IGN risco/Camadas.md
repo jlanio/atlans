@@ -1,0 +1,71 @@
+# IGN — IG-GIRD — IGN risco — camadas
+
+Geoportal: [[Geosserviços/Argentina IGN risco/IGN — IG-GIRD — IGN risco|IGN — IG-GIRD — IGN risco]]
+
+Total: **66** camadas WFS.
+- `ign_riesgo:anticipando_crecida_areas_alturas_mdt_2015` — Áreas entre curvas de nivel MDT 2015 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_casas_relevadas` — Casas relevadas Proyecto Anticipando la Crecida · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_cuencas_ideba` — Cuencas Proyecto Anticipando la Crecida (IDEBA) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_curvas_nivel_mdt_2015` — Curvas de nivel MDT ACUMAR 2015 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_emas` — EMAS Estaciones meteorológicas automáticas Proyecto Anticipando la Crecida · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_escuelas` — Escuelas Proyecto Anticipando la Crecida · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_lugares_estrategicos` — Lugares estratégicos Anticipando la Crecida · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_pluviometros_2025` — Pluviómetros Anticipando la Crecida · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_reglas_alturas` — Reglas de alturas de ríos y arroyos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:anticipando_crecida_subcuenca_acumar` — Subcuencas ACUMAR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:barrios_renabap_2023` — Registro Barrios Populares RENABAP 2023 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:cant_poblacion_radio_indec` — Cantidad de población por radio, CNPHyV 2010 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:comunidades_indigenas_2023` — Comunidades indigenas INAI 2023 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:cuencas_cohife` — Cuencas República Argentina COHIFE · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:deis_morbilidad` — Indicadores de morbilidad DEIS · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:deis_mortalidad_infantil_materna_2020` — Mortalidad infantil y materna DEIS 2020 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:dengue_zika_salud` — Registros de Dengue y Zika por Departamento (2020) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:dengue_zika_salud_18` — Registros de Dengue y Zika por Departamento (2018) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:dengue_zika_salud_19` — Registros de Dengue y Zika por Departamento (2019) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:dengue_zika_salud_21` — Registros de Dengue y Zika por Departamento (2021) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:dengue_zika_salud_22` — Registros de Dengue y Zika por Departamento (2022) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:dengue_zika_salud_23` — Registros de Dengue y Zika por Departamento (2023) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:dengue_zika_salud_24` — Registros de Dengue y Zika por Departamento (2024) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:dens_poblacion_radio_indec` — Densidad de población por radio, CNPHyV 2010 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:densidad_departamentos_indec_2022` — Densidad de población por departamento, CNPHyV 2022 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:desinventar_biologico_riesgo` — Amenazas biológicas, registros DESINVENTAR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:desinventar_fisico_quimico_riesgo` — Amenazas físico químicas, registros DESINVENTAR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:desinventar_geodinamicas_riesgo` — Amenazas geodinámicas , registros DESINVENTAR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:desinventar_hidrometeorologico_riesgo` — Amenazas hidrometeorológicas, registros DESINVENTAR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:estrato_socioeconomico` — Estrato socioeconómico 2010 (Poblaciones, CONICET-ODSA) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:exposicion_peligrosidad_sismica` — Exposición de viviendas a peligrosidad sísmica, año 2022 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:incidencia_riesgo_exclusion` — Incidencia del riesgo de exclusión social 2010 (Poblaciones, CONICET-ODSA) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:indec_cobertura_salud_2010` — Cobertura de salud INDEC 2010 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:indec_cobertura_salud_2022` — Cobertura de salud INDEC 2022 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:indec_hogares_nbi_2010` — Hogares NBI INDEC 2010 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:indec_personas_dificultad_limitaciones_riesgo` — Personas con dificultades y/o limitaciones permanentes INDEC 2010 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:inmat_indec_22` — Hogares por calidad de los materiales de la vivienda 2022 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:inpres_sismos` — Sismos INPRES · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:inpres_sismos_zonificacion` — Sismos INPRES zonificación · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:ivsd_2010` — IVSD 2010 Departamentos (PIRNA) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:ivsd_2010_amba_pirna` — IVSD 2010 Radio censal AMBA (PIRNA) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:ivsd_2022_depto` — IVSD 2022 Departamentos (Proyecto ARG19003: Plan Nacional de Adaptación al Cambio Climático, MAyDS) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:ivsd_2022_pcia` — IVSD 2022 Provincias (Proyecto ARG19003: Plan Nacional de Adaptación al Cambio Climático, MAyDS) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:ivsd_2024_depto` — IVSD 2024 Departamentos (Proyecto ARG19003: Plan Nacional de Adaptación al Cambio Climático, MAyDS) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:mayds_incendios_provincia` — Registro de incendios por provincia 1993-2019 MAyDS · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:mayds_pnmf_regiones` — Regiones del Servicio Nacional de Manejo del Fuego (SNMF) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:mayds_sup_afectada_2022` — Superficie afectada por incendios, año 2022 MAyDS · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:poblacion_departamentos_indec_2022_definitivos` — Población por departamento CNPHyV 2022 (definitivos) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:poblacion_provincias_indec_2022_definitivos` — Población por provincia CNPHyV 2022 (definitivos) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:presas_azud` — Presas, azud · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:puertos_alturas_riesgo` — Puertos alturas de alerta y evacuación Prefectura Naval Argentina · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:puertos_alturas_rios` — Registros de Puertos de la Cuenca del Plata, días de alerta y días de evacuación (2024) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:puntos_aproximados_protocolos_remocion_masa` — Protocolos activados de remoción en masa, SEGEMAR-IGN (puntos aproximados) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:regiones_forestales` — Regiones forestales UMSEF 2015 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:riesgo_ambiental` — Riesgo ambiental de Dengue CONAE 2023 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:riesgo_seguridad_alimentaria` — Riesgo de inseguridad alimentaria 2010 (Poblaciones, CONICET-ODSA) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:segemar_riesgo_volcanico_2025` — Volcanes SEGEMAR riesgo relativo. 2025 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:segemar_volcanes_exposicion_2025` — Volcanes SEGEMAR Exposición 2025 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:segemar_volcanes_peligrosidad_2025` — Volcanes SEGEMAR Peligrosidad 2025 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:sinagir_amenazas_fisico_quimicas_riesgo` — Niveles de exposición, amenazas físico-químicas SINAGIR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:sinagir_amenazas_geodinamicas_riesgo` — Niveles de exposición, amenazas geodinámicas SINAGIR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:sinagir_amenazas_hidrometeorologicas_riesgo` — Niveles de exposición, amenazas hidrometeorológicas SINAGIR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:sinagir_regiones_riesgo` — Regiones SINAGIR · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:smn_estaciones_meteorologicas` — Estaciones meteorológicas SMN · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:viviendas_departamentos_indec_2022_definitivos` — Viviendas por departamento CNPHyV 2022 (definitivos) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign_riesgo:viviendas_provincias_indec_2022_definitivos` — Viviendas por provincia CNPHyV 2022 (definitivos) · CRS: `urn:ogc:def:crs:EPSG::4326`

@@ -1,0 +1,679 @@
+# GEOBASES ES — camadas
+
+Geoportal: [[Geosserviços/GEOBASES ES/Sistema Integrado de Bases Geoespaciais do Espírito Santo — GEOBASES|Sistema Integrado de Bases Geoespaciais do Espírito Santo — GEOBASES]]
+
+Total: **672** camadas, organizadas em 1 grupo(s).
+
+## geonode (672)
+- `geonode:_2019_02_es_epsg_31984` — MONITOR DA SECA ES - FEV/2019
+- `geonode:_2019_03_es_epsg_31984` — MONITOR DA SECA ES - MAR/2019
+- `geonode:_2019_04_es_epsg_31984` — MONITOR DA SECA ES - ABR/2019
+- `geonode:_2019_05_es_epsg_31984` — MONITOR DA SECA ES - MAI/2019
+- `geonode:_2019_06_es_epsg_31984` — MONITOR DA SECA ES - JUN/2019
+- `geonode:_2019_07_es_epsg_31984` — MONITOR DA SECA ES - JUL/2019
+- `geonode:_2019_08_es_epsg_31984` — MONITOR DA SECA ES - AGO/2019
+- `geonode:_2019_09_es_epsg_31984` — MONITOR DA SECA ES - SET/2019
+- `geonode:_2019_10_24_uc_federais_es_31984` — MMA - SNUC - UNIDADES DE CONSERVAÇÃO FEDERAIS - ES
+- `geonode:_2019_10_25_iema_rppns` — IEMA - RPPN's ES
+- `geonode:_2019_10_25_iema_ucs_estaduais` — IEMA - UNIDADES DE CONSERVAÇÃO ESTADUAIS
+- `geonode:_2019_10_es_epsg_31984` — MONITOR DA SECA ES - OUT/2019
+- `geonode:_2019_11_es_epsg_31984` — MONITOR DA SECA ES - NOV/2019
+- `geonode:_2019_12_es_epsg_31984` — MONITOR DA SECA ES - DEZ/2019
+- `geonode:_2020_01_es_epsg_31984` — MONITOR DA SECA ES - JAN/2020
+- `geonode:_2020_01_icmbio_cecav_cavernas_es` — ICMBIO - CECAV - CAVERNAS ES
+- `geonode:_2020_02_ms_es_epsg_31984` — MONITOR DA SECA ES - FEV/2020
+- `geonode:_2020_03_ms_es_epsg_31984` — MONITOR DA SECA ES - MAR/2020
+- `geonode:_2020_04_ms_es_epsg_31984` — MONITOR DA SECA ES - ABR/2020
+- `geonode:_2020_05_ms_es_epsg_31984` — MONITOR DA SECA ES - MAI/2020
+- `geonode:_2020_06_ms_es_epsg_31984` — MONITOR DA SECA ES - JUN/2020
+- `geonode:_2020_07_ms_es_epsg_31984` — MONITOR DA SECA ES - JUL/2020
+- `geonode:_2020_08_ms_es_epsg_31984` — MONITOR DA SECA ES -AGO/2020
+- `geonode:_2020_09_ms_es_epsg_31984` — MONITOR DA SECA ES - SET/2020
+- `geonode:_2020_10_ms_es_epsg_31984` — MONITOR DA SECA ES - OUT/2020
+- `geonode:_2020_11_esgas_es_ramais` — ES GÁS - RAMAIS ES
+- `geonode:_2020_11_esgas_es_rede_distribuicao` — ES GÁS - REDE DE DISTRIBUIÇÃO ES
+- `geonode:_2020_11_ms_es_epsg_31984` — MONITOR DA SECA ES - NOV/2020
+- `geonode:_2020_12_ms_es_epsg_31984` — MONITOR DA SECA ES - DEZ/2020
+- `geonode:_2021_01_ms_es_epsg_31984` — MONITOR DA SECA ES - JAN/2021
+- `geonode:_2021_02_ms_es_epsg_31984` — MONITOR DA SECA ES - FEV/2021
+- `geonode:_2021_03_ms_es_epsg_31984` — MONITOR DA SECA ES - MAR/2021
+- `geonode:_2021_04_ms_es_epsg_31984` — MONITOR DA SECA ES - ABR/2021
+- `geonode:_2021_macro_rh_es` — IBGE - DNH250 - MACRO - ES
+- `geonode:_2021_meso_rh_es` — IBGE - DNH250 - MESO - ES
+- `geonode:_2021_micro_rh_es` — IBGE - DNH250 - MICRO - ES
+- `geonode:a__1994_comun_urbanas_rurais_es` — IJSN - COMUNIDADES URBANAS E RURAIS - ES
+- `geonode:a__2007_nv_base_urb_altimetria` — NOVA VENÉCIA - BASE URBANA 2007 - ALTIMETRIA
+- `geonode:a__2007_nv_base_urb_bueiro` — NOVA VENÉCIA - BASE URBANA 2007 - BUEIRO
+- `geonode:a__2007_nv_base_urb_campo_futebol_quadras_espor` — NOVA VENÉCIA - BASE URBANA 2007 - CAMPO DE FUTEBOL - QUADRAS DE ESPORTE
+- `geonode:a__2007_nv_base_urb_cemiterio` — NOVA VENÉCIA - BASE URBANA 2007 - CEMITÉRIO
+- `geonode:a__2007_nv_base_urb_cercas_muros` — NOVA VENÉCIA - BASE URBANA 2007 - CERCAS - MUROS
+- `geonode:a__2007_nv_base_urb_corte_aterro_barranco` — NOVA VENÉCIA - BASE URBANA 2007 - CORTE - ATERRO - BARRANCO
+- `geonode:a__2007_nv_base_urb_edificacoes_principais` — NOVA VENÉCIA - BASE URBANA 2007 - EDIFICAÇÕES PRINCIPAIS
+- `geonode:a__2007_nv_base_urb_hidrografia_linha` — NOVA VENÉCIA - BASE URBANA 2007 - HIDROGRAFIA - LINHA
+- `geonode:a__2007_nv_base_urb_hidrografia_poligono` — NOVA VENÉCIA - BASE URBANA 2007 - HIDROGRAFIA - POLÍGONO
+- `geonode:a__2007_nv_base_urb_limite_restituicao` — NOVA VENÉCIA - BASE URBANA 2007 - LIMITE DA RESTITUIÇÃO
+- `geonode:a__2007_nv_base_urb_logradouro` — NOVA VENÉCIA - BASE URBANA 2007 - LOGRADOURO
+- `geonode:a__2007_nv_base_urb_movimento_terra` — NOVA VENÉCIA - BASE URBANA 2007 - MOVIMENTO DE TERRA
+- `geonode:a__2007_nv_base_urb_ponte` — NOVA VENÉCIA - BASE URBANA 2007 - PONTE
+- `geonode:a__2007_nv_base_urb_ponto_cotado` — NOVA VENÉCIA - BASE URBANA 2007 - PONTO COTADO
+- `geonode:a__2007_nv_base_urb_pontos_de_apoio_planialtime` — NOVA VENÉCIA - BASE URBANA 2007 - PONTOS DE APOIO PLANIALTIMÉTRICOS
+- `geonode:a__2007_nv_base_urb_vias` — NOVA VENÉCIA - BASE URBANA 2007 - VIAS - LINHAS
+- `geonode:a__2007_nv_base_urb_vias_poligonos` — NOVA VENÉCIA - BASE URBANA 2007 - VIAS - POLÍGONOS
+- `geonode:a__2021_IBC_municipios_indicadores_normalizados` — ANATEL - ÍNDICE BRASILEIRO DE CONECTIVIDADE - ES - 2021
+- `geonode:a__2022_06_03_anac_aerodromos_privados_es` — ANAC - AERÓDROMOS CIVIS PRIVADOS - ES
+- `geonode:a__2022_IBC_municipios_indicadores_normalizados` — ANATEL - ÍNDICE BRASILEIRO DE CONECTIVIDADE - ES - 2022
+- `geonode:a__2023_IBC_municipios_indicadores_normalizados` — ANATEL - ÍNDICE BRASILEIRO DE CONECTIVIDADE - ES - 2023
+- `geonode:a__2024_areas_queimadas_es_epsg_31984_utf_8` — IDAF - OCORRÊNCIAS DE QUEIMADAS ES - 2024
+- `geonode:a__2024_sesa_coord_armadilhas_aedes_es` — SESA - LOCALIZAÇÃO DAS ARMADILHAS PARA AEDES AEGYPTI NO ES - 2024
+- `geonode:a__32_ES_faces_de_logradouros_2019_31984` — IBGE - FACE DE LOGRADOUROS - 2019
+- `geonode:abes_irrad_difusa_2017` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - ANUAL - ES
+- `geonode:abes_irrad_difusa_2017_01` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - JANEIRO - ES
+- `geonode:abes_irrad_difusa_2017_02` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - FEVEREIRO - ES
+- `geonode:abes_irrad_difusa_2017_03` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - MARÇO - ES
+- `geonode:abes_irrad_difusa_2017_04` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - ABRIL - ES
+- `geonode:abes_irrad_difusa_2017_05` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - MAIO - ES
+- `geonode:abes_irrad_difusa_2017_06` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - JUNHO - ES
+- `geonode:abes_irrad_difusa_2017_07` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - JULHO - ES
+- `geonode:abes_irrad_difusa_2017_08` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - AGOSTO - ES
+- `geonode:abes_irrad_difusa_2017_09` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - SETEMBRO - ES
+- `geonode:abes_irrad_difusa_2017_10` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - OUTUBRO - ES
+- `geonode:abes_irrad_difusa_2017_11` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - NOVEMBRO - ES
+- `geonode:abes_irrad_difusa_2017_12` — INPE - LABREN - ABES - IRRADIAÇÃO DIFUSA - DEZEMBRO - ES
+- `geonode:abes_irrad_direta_2017` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - ANUAL - ES
+- `geonode:abes_irrad_direta_2017_01` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - JANEIRO - ES
+- `geonode:abes_irrad_direta_2017_02` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - FEVEREIRO - ES
+- `geonode:abes_irrad_direta_2017_03` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - MARÇO - ES
+- `geonode:abes_irrad_direta_2017_04` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - ABRIL - ES
+- `geonode:abes_irrad_direta_2017_05` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - MAIO - ES
+- `geonode:abes_irrad_direta_2017_06` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - JUNHO - ES
+- `geonode:abes_irrad_direta_2017_07` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - JULHO - ES
+- `geonode:abes_irrad_direta_2017_08` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - AGOSTO - ES
+- `geonode:abes_irrad_direta_2017_09` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - SETEMBRO - ES
+- `geonode:abes_irrad_direta_2017_10` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - OUTUBRO - ES
+- `geonode:abes_irrad_direta_2017_11` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - NOVEMBRO - ES
+- `geonode:abes_irrad_direta_2017_12` — INPE - LABREN - ABES - IRRADIAÇÃO DIRETA NORMAL - DEZEMBRO - ES
+- `geonode:abes_irrad_global_2017` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - ANUAL - ES
+- `geonode:abes_irrad_global_2017_01` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - JANEIRO - ES
+- `geonode:abes_irrad_global_2017_02` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - FEVEREIRO - ES
+- `geonode:abes_irrad_global_2017_03` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - MARÇO - ES
+- `geonode:abes_irrad_global_2017_04` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - ABRIL - ES
+- `geonode:abes_irrad_global_2017_05` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - MAIO - ES
+- `geonode:abes_irrad_global_2017_06` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - JUNHO - ES
+- `geonode:abes_irrad_global_2017_07` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - JULHO - ES
+- `geonode:abes_irrad_global_2017_08` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - AGOSTO - ES
+- `geonode:abes_irrad_global_2017_09` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - SETEMBRO - ES
+- `geonode:abes_irrad_global_2017_10` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - OUTUBRO - ES
+- `geonode:abes_irrad_global_2017_11` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - NOVEMBRO - ES
+- `geonode:abes_irrad_global_2017_12` — INPE - LABREN - ABES - IRRADIAÇÃO GLOBAL - DEZEMBRO - ES
+- `geonode:abes_irrad_inclinada_2017` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - ANUAL - ES
+- `geonode:abes_irrad_inclinada_2017_01` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - JANEIRO - ES
+- `geonode:abes_irrad_inclinada_2017_02` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - FEVEREIRO - ES
+- `geonode:abes_irrad_inclinada_2017_03` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - MARÇO - ES
+- `geonode:abes_irrad_inclinada_2017_04` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - ABRIL - ES
+- `geonode:abes_irrad_inclinada_2017_05` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - MAIO - ES
+- `geonode:abes_irrad_inclinada_2017_06` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - JUNHO - ES
+- `geonode:abes_irrad_inclinada_2017_07` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - JULHO - ES
+- `geonode:abes_irrad_inclinada_2017_08` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - AGOSTO - ES
+- `geonode:abes_irrad_inclinada_2017_09` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - SETEMBRO - ES
+- `geonode:abes_irrad_inclinada_2017_10` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - OUTUBRO - ES
+- `geonode:abes_irrad_inclinada_2017_11` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - NOVEMBRO - ES
+- `geonode:abes_irrad_inclinada_2017_12` — INPE - LABREN - ABES - IRRADIAÇÃO INCLINADA - DEZEMBRO - ES
+- `geonode:abes_irrad_par_2017` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - ANUAL - ES
+- `geonode:abes_irrad_par_2017_01` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - JANEIRO - ES
+- `geonode:abes_irrad_par_2017_02` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - FEVEREIRO - ES
+- `geonode:abes_irrad_par_2017_03` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - MARÇO - ES
+- `geonode:abes_irrad_par_2017_04` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - ABRIL - ES
+- `geonode:abes_irrad_par_2017_05` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - MAIO - ES
+- `geonode:abes_irrad_par_2017_06` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - JUNHO - ES
+- `geonode:abes_irrad_par_2017_07` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - JULHO - ES
+- `geonode:abes_irrad_par_2017_08` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - AGOSTO - ES
+- `geonode:abes_irrad_par_2017_09` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - SETEMBRO - ES
+- `geonode:abes_irrad_par_2017_10` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - OUTUBRO - ES
+- `geonode:abes_irrad_par_2017_11` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - NOVEMBRO - ES
+- `geonode:abes_irrad_par_2017_12` — INPE - LABREN - ABES - IRRADIAÇÃO PAR - DEZEMBRO - ES
+- `geonode:acrescido_marinha` — SPU - TERRENOS ACRESCIDOS DE MARINHA - ES
+- `geonode:aerogeradores_sg_10_0_193dd` — SECTIDES - AEOL - ES - AEROGERADORES  SG 10.0-193DD-193DD
+- `geonode:aerogeradores_wec_265_20mw` — SECTIDES - AEOL - ES - AEROGERADORES WEC 265 20MW
+- `geonode:AGERH_Bacias_hidrogr_ficas_2022` — AGERH - BACIAS HIDROGRÁFICAS ES
+- `geonode:agerh_cursos_dagua_es_q90` — AGERH - CURSOS D'ÁGUA ES - Q90
+- `geonode:ai_riqueza_es` — SECTIDES - AEOL - ES - AI RIQUEZA
+- `geonode:aldeiaspoint_es_epsg_31984` — FUNAI - ALDEIAS INDÍGENAS - PONTO - ES
+- `geonode:ana_agerh_outorga_es` — ANA-AGERH - OUTORGA DE RECURSOS HÍDRICOS - ES
+- `geonode:ana_bho_massas_dagua_es_2019` — ANA - BHO - MASSAS D'ÁGUA ES - 2019
+- `geonode:ana_captacao_atend_mun_es_epsg_31984` — ANA - ABASTECIMENTO URBANO DE ÁGUA - CAPTAÇÃO - ES
+- `geonode:ana_snirh_adutora_es_epsg_31984` — ANA - ABASTECIMENTO URBANO DE ÁGUA - ADUTORAS - ES
+- `geonode:ana_snirh_diagnostico_abast_urb` — ANA - ABASTECIMENTO URBANO DE ÁGUA - DIAGNÓSTICO - ES
+- `geonode:ana_trechos_inundaveis_es_epsg_31984` — ANA - VULNERABILIDADE A INUNDAÇÕES - ES
+- `geonode:anac_aerodromos_civis_publicos_es_EPSG_31984` — ANAC - AERÓDROMOS CIVIS PÚBLICOS - ES
+- `geonode:anatel_ddd_municipios_es_epsg_31984` — ANATEL - DDD DOS MUNICÍPIOS CAPIXABAS
+- `geonode:aneel_edp_arat_epsg_31984` — aneel_edp_arat_epsg_31984
+- `geonode:aneel_edp_conj_epsg_31984` — aneel_edp_conj_epsg_31984
+- `geonode:aneel_edp_ponnot_epsg_31984` — aneel_edp_ponnot_epsg_31984
+- `geonode:aneel_edp_ssdat_epsg_31984` — aneel_edp_ssdat_epsg_31984
+- `geonode:aneel_edp_ssdbt_epsg_31984` — aneel_edp_ssdbt_epsg_31984
+- `geonode:aneel_edp_ssdmt_epsg_31984` — aneel_edp_ssdmt_epsg_31984
+- `geonode:aneel_edp_sub_epsg_31984` — aneel_edp_sub_epsg_31984
+- `geonode:aneel_edp_uncrat_epsg_31984` — aneel_edp_uncrat_epsg_31984
+- `geonode:aneel_edp_uncrbt_epsg_31984` — aneel_edp_uncrbt_epsg_31984
+- `geonode:aneel_edp_uncrmt_epsg_31984` — aneel_edp_uncrmt_epsg_31984
+- `geonode:aneel_edp_unremt_epsg_31984` — aneel_edp_unremt_epsg_31984
+- `geonode:aneel_edp_unseat_epsg_31984` — aneel_edp_unseat_epsg_31984
+- `geonode:aneel_edp_unsemt_epsg_31984` — aneel_edp_unsemt_epsg_31984
+- `geonode:aneel_edp_untrat_epsg_31984` — aneel_edp_untrat_epsg_31984
+- `geonode:aneel_edp_untrmt_epsg_31984` — aneel_edp_untrmt_epsg_31984
+- `geonode:aneel_elfsm_arat_epsg_31984` — aneel_elfsm_arat_epsg_31984
+- `geonode:aneel_elfsm_conj_epsg_31984` — aneel_elfsm_conj_epsg_31984
+- `geonode:aneel_elfsm_ponnot_epsg_31984` — aneel_elfsm_ponnot_epsg_31984
+- `geonode:aneel_elfsm_ssdat_epsg_31984` — aneel_elfsm_ssdat_epsg_31984
+- `geonode:aneel_elfsm_ssdbt_epsg_31984` — aneel_elfsm_ssdbt_epsg_31984
+- `geonode:aneel_elfsm_sub_epsg_31984` — aneel_elfsm_sub_epsg_31984
+- `geonode:aneel_elfsm_uncrmt_epsg_31984` — aneel_elfsm_uncrmt_epsg_31984
+- `geonode:aneel_elfsm_unremt_epsg_31984` — aneel_elfsm_unremt_epsg_31984
+- `geonode:aneel_elfsm_unseat_epsg_31984` — aneel_elfsm_unseat_epsg_31984
+- `geonode:aneel_elfsm_unsemt_epsg_31984` — aneel_elfsm_unsemt_epsg_31984
+- `geonode:aneel_elfsm_untrat_epsg_31984` — aneel_elfsm_untrat_epsg_31984
+- `geonode:aneel_elfsm_untrmt_epsg_31984` — aneel_elfsm_untrmt_epsg_31984
+- `geonode:anm_proc_minerarios_es_31984` — ANM - PROCESSOS MINERÁRIOS ES
+- `geonode:antaq_portos_publicos_es_epsg_4326` — ANTAQ - PORTOS PÚBLICOS - ES
+- `geonode:antaq_terminais_uso_privado_es` — ANTAQ - PORTOS PRIVADOS - ES
+- `geonode:APPS_1` — CAR - ES - APP
+- `geonode:AREA_CONSOLIDADA_1` — CAR - ES - ÁREA CONSOLIDADA
+- `geonode:AREA_IMOVEL_1` — CAR - ES - ÁREA DO IMÓVEL
+- `geonode:area_urbanizada` — IJSN - ÁREA URBANIZADA
+- `geonode:areas_identificacao_direta` — SPU - ÁREAS DE IDENTIFICAÇÃO DIRETA
+- `geonode:areas_prioritarias` — IEMA - ÁREAS PRIORITÁRIAS
+- `geonode:arqueologia_es` — SECTIDES - AEOL - ES - ARQUEOLOGIA
+- `geonode:asb_cemiterio_p_31984` — IBGE - BC100 - ES - CEMITÉRIO
+- `geonode:asb_cesan_est_elev_agua_1712` — CESAN - ESTAÇÃO ELEVADORA DE ÁGUA
+- `geonode:asb_cesan_est_elev_esgoto_1712` — CESAN - ESTAÇÃO ELEVADORA ESGOTO
+- `geonode:asb_cesan_est_trat_agua_1712_1` — CESAN - ESTAÇÃO TRATAMENTO DE ÁGUA
+- `geonode:asb_cesan_est_trat_esgoto_1712` — CESAN - ESTAÇÃO DE TRATAMENTO DE ESGOTO
+- `geonode:asb_cesan_red_recalq_esgo_1712_1` — CESAN - REDE RECALQUE DE ESGOTO
+- `geonode:asb_cesan_rede_agua_bruta_1712` — CESAN - REDE DE ÁGUA BRUTA
+- `geonode:asb_cesan_rede_agua_tratada_1712` — CESAN - REDE DE ÁGUA TRATADA
+- `geonode:asb_cesan_rede_coleto_esg_1712` — CESAN - REDE COLETORA DE ESGOTO
+- `geonode:asb_cesan_rede_emiss_agua_1712` — CESAN - REDE EMISSORA DE ESGOTO
+- `geonode:asb_cesan_rotas_biossolido` — CESAN - PROJETO BIOSSÓLIDOS - ROTAS
+- `geonode:asb_ijsn_cemiterio` — IJSN - CEMITÉRIOS
+- `geonode:asb_solicitacao_de_biossolido` — CESAN - BIOSSÓLIDO - SOLICITAÇÃO
+- `geonode:assentamentos_incra_seag_es` — IDAF - SEAG - INCRA - ASSENTAMENTOS - ES
+- `geonode:blocos_exploratorios_es` — SECTIDES - AEOL - ES - BLOCOS EXPLORATÓRIOS
+- `geonode:cadastro_atingidos_chuvas_mar24` — CADASTRO DE BENEFICIÁRIOS
+- `geonode:campos_de_producao_es` — SECTIDES - AEOL - ES - CAMPOS DE PRODUÇÃO
+- `geonode:campos_exploratorios_es` — SECTIDES - AEOL - ES - CAMPOS EXPLORATÓRIOS
+- `geonode:cec_areas_tombadas_es` — CEC - ÁREAS TOMBADAS - ES
+- `geonode:cemaden_est_fluvi_16_04_06` — CEMADEN - ESTAÇÕES FLUVIOMÉTRICAS
+- `geonode:cemaden_est_pluvi_16_04_08` — CEMADEN - ESTAÇÕES PLUVIOMÉTRICAS
+- `geonode:cesan_hidrantes_es_epsg_31984_utf8` — CESAN - HIDRANTES ES
+- `geonode:ciclorrotas` — IJSN - CICLORROTAS
+- `geonode:Ciclovias_PracadoPapa_Anchieta3` — IJSN - CICLOVIA PRAÇA DO PAPA - SANTUÁRIO ANCHIETA
+- `geonode:cnes_estab_saude_sobre_cprm_setores_de_risco_` — SESA - VIGIDESASTRES - ESTABELECIMENTOS DE SAÚDE SOBRE SETORES DE RISCO - ES
+- `geonode:cnes_tbestabelecimento_es_epsg_31984` — CNES - ESTABELECIMENTOS DE SAÚDE ES
+- `geonode:cnes_tbestabelecimento_publicos_es_epsg_31984` — CNES - ESTABELECIMENTOS DE SAÚDE PÚBLICOS ES
+- `geonode:corredores_ecologicos` — IEMA - CORREDORES ECOLÓGICOS
+- `geonode:cprm_afloramento_rochoso_es_srg2000_24s` — CPRM - AFLORAMENTOS ROCHOSOS ES
+- `geonode:cprm_batimetria_srtm_30_a_es_epsg_4674` — CPRM - BATIMETRIA ES - POLÍGONO
+- `geonode:cprm_batimetria_srtm_30_es_l_epsg_4674` — CPRM - BATIMETRIA ES - LINHA
+- `geonode:cprm_estrutura_es_srg2000_24s` — CPRM - GEODIVERSIDADE ES - ESTRUTURA
+- `geonode:cprm_litologia_es_srg2000_24s` — CPRM - GEODIVERSIDADE ES - LITOLOGIA
+- `geonode:cprm_setores_de_risco_es_epsg_31984` — CPRM - SETORES DE RISCO - ES
+- `geonode:cprm_siagas_pocos_es` — CPRM - SIAGAS - POÇOS ES
+- `geonode:cprm_suscept_inundacao_es_epsg_31984` — CPRM - SUSCETIBILIDADE À INUNDAÇÃO - ES
+- `geonode:CROQUI_Marinalva_Laiber_Atualizado` — CROQUI_Marinalva_Laiber_Atualizado
+- `geonode:CROQUI_Marinalva_Laiber_Atualizado0` — CROQUI_Marinalva_Laiber_Atualizado
+- `geonode:ct` — SEAMA - LAGESA - PERS-2019 - COLETA E TRANSPORTE DE RESÍDUOS - CT
+- `geonode:curvas_nivel_mimoso_do_sul` — MIMOSO DO SUL - CURVAS DE NÍVEL
+- `geonode:data_das_imagens_voo_aerofotogrametrico_es_2012_2015` — IEMA - MAPES 2012-2015 - DATA DE AQUISIÇÃO DAS IMAGENS
+- `geonode:dc_abrigos_temp_160226` — DEFESA CIVIL ES - ABRIGOS TEMPORÁRIOS
+- `geonode:dc_area_espera_160226` — DEFESA CIVIL ES - ÁREA DE ESPERA
+- `geonode:dc_areas_inundacao_sul_es_2024_03_22` — DEFESA CIVIL - MIMOSO DO SUL - ÁREAS DE INUNDAÇÃO
+- `geonode:DC_AREAS_RISCO_ES_2018_UTF8` — DEFESA CIVIL ES - ÁREAS DE RISCO
+- `geonode:dc_compdec_16_03_18` — DEFESA CIVIL ES - ÁREAS DE RISCO - COMPDEC
+- `geonode:dc_entrega_donativos_160226` — DEFESA CIVIL ES - ENTREGA DE DONATIVOS
+- `geonode:dc_heliponto_160226` — DEFESA CIVIL ES - HELIPONTOS
+- `geonode:dc_movimento_massa_160226` — DEFESA CIVIL ES - MOVIMENTO DE MASSA
+- `geonode:dc_posto_comando_160226` — DEFESA CIVIL ES - POSTO DE COMANDO
+- `geonode:dc_rhm_equipamento_dc_16_04_08` — DEFESA CIVIL ES - PLUVIÔMETRO / SIRENE
+- `geonode:dc_sdrb_risco_geologic_151019` — DEFESA CIVIL / SEDURB - RISCO GEOLÓGICO
+- `geonode:dc_sedurb_risco_inund_atu` — DEFESA CIVIL / SEDURB - RISCO DE INUNDAÇÃO
+- `geonode:def_civil_cnes_estabelecimentos_es` — DEFESA CIVIL - CNES - ESTABELECIMENTOS DE SAÚDE ES
+- `geonode:der_rodovias_es_epsg_31984` — DER - RODOVIAS ES
+- `geonode:dnit_rodovias_es_31984` — DNIT - RODOVIAS FEDERAIS ES
+- `geonode:dnit_vmda_modelagem_2022_es_utf8_epsg_31984` — DNIT - MODELAGEM DO VMDA DE RODOVIAS - ES - 2022
+- `geonode:dnit_vw_postos_prf_epsg_31984_utf8` — DNIT - PRF - POSTOS ES
+- `geonode:duto_nao_identificado_es` — SECTIDES - AEOL - ES - DUTO NÃO IDENTIFICADO
+- `geonode:dutos_de_escoamento_es` — SECTIDES - AEOL - ES - DUTOS DE ESCOAMENTO
+- `geonode:eco_edif_agropec_ext_vegetal_pesca_p_31984` — IBGE - BC100 - ES - EDIFICAÇÃO AGROPECUÁRIA OU DE EXTRATIVISMO VEGETAL OU PESCA
+- `geonode:eco_ext_mineral_a_31984` — IBGE - BC100 - ES -  EXTRATIVISMO MINERAL
+- `geonode:edifi_ensino_2019` — IJSN - SEDU - EDIFICAÇÕES DE ENSINO - ES
+- `geonode:edifi_ensino_20190` — edifi_ensino_2019
+- `geonode:edificacoes_assistencia_social` — EDIFICAÇÕES DE ASSISTÊNCIA SOCIAL
+- `geonode:edificacoes_religiosas` — EDIFICAÇÕES RELIGIOSAS
+- `geonode:edificacoes_seguranca` — SESP - EDIFICAÇÕES DE SEGURANÇA
+- `geonode:EDP_AT_138_UTF8_EPSG_31984` — EDP_AT_138_UTF8_EPSG_31984
+- `geonode:EDP_AT_69_UTF8_EPSG_31984` — EDP_AT_69_UTF8_EPSG_31984
+- `geonode:edp_estacao_transformadora_cliente_epsg_31984` — EDP - ES - ESTAÇÃO TRANSFORMADORA CLIENTE
+- `geonode:edp_estacao_transformadora_distribuicao_epsg_` — EDP - ES - ESTAÇÃO TRANSFORMADORA DISTRIBUIÇÃO
+- `geonode:edp_poste_epsg_31984` — EDP - ES - POSTES
+- `geonode:edp_rede_baixa_tensao_epsg_31984` — EDP - ES - REDE DE BAIXA TENSÃO
+- `geonode:edp_rede_media_tensao_epsg_31984` — EDP - ES - REDE DE MÉDIA TENSÃO
+- `geonode:edp_rede_subterranea_es_epsg_31984` — EDP - REDE SUBTERRÂNEA - ES
+- `geonode:edp_religadora_epsg_31984` — EDP - ES - RELIGADORA
+- `geonode:edp_torre_epsg_31984` — EDP - ES - TORRE
+- `geonode:edp_transformador_distribuicao_epsg_31984` — EDP - ES - TRANSFORMADOR DE DISTRIBUIÇÃO
+- `geonode:edp_unidade_consumidora_epsg_31984` — EDP - ES - UNIDADE CONSUMIDORA
+- `geonode:edu_edif_ensino_p_31984` — IBGE - BC100 - ES -  EDIFICAÇÃO DE ENSINO
+- `geonode:edu_edif_ensino_p_319840` — edu_edif_ensino_p_31984
+- `geonode:efvm_estacoes_ferroviarias_passageiros_es_utf` — VALE - EFVM - ESTAÇÕES FERROVIÁRIAS DE PASSAGEIROS - ES
+- `geonode:elfsm_ponnot_epsg_31984` — ELFSM - ES - POSTES
+- `geonode:elfsm_ssdat_epsg_31984` — ELFSM - ES - REDE DE ALTA TENSÃO
+- `geonode:elfsm_ssdbt_epsg_31984` — ELFSM - ES - REDE DE BAIXA TENSÃO
+- `geonode:elfsm_ssdmt_epsg_31984` — ELFSM - ES - REDE DE MÉDIA TENSÃO
+- `geonode:elfsm_ucbt_epsg_31984` — ELFSM - ES - UNIDADE CONSUMIDORA DE BAIXA TENSÃO
+- `geonode:elfsm_unsemt_epsg_31984` — ELFSM - ES - UNIDADE SECCIONADORA DE MÉDIA TENSÃO
+- `geonode:elfsm_untrd_epsg_31984` — ELFSM - ES - UNIDADE TRANFORMADORA
+- `geonode:embrapa_lvmto_solos_es_epsg_31984` — EMBRAPA - SOLOS ES - SiBCS 1999
+- `geonode:enc_est_gerad_energia_eletrica_p_31984` — IBGE - BC100 - ES - ESTAÇÃO GERADORA DE ENERGIA ELÉTRICA
+- `geonode:enc_grupo_transformadores_p_31984` — IBGE - BC100 - ES -  GRUPO DE TRANSFORMADORES
+- `geonode:enc_hidreletrica_p_31984` — IBGE - BC100 - ES - HIDRELÉTRICA
+- `geonode:enc_termeletrica_p_31984` — IBGE - BC100 - ES - TERMELÉTRICA
+- `geonode:enc_trecho_energia_l_31984_1` — IBGE - BC100 - ES - TRECHO DE ENERGIA
+- `geonode:epe_areas_da_uniao` — EPE - ÁREAS DA UNIÃO - ES
+- `geonode:epe_areas_sob_contrato` — EPE - ÁREAS SOB CONTRATO - ES
+- `geonode:epe_bases_de_combustiveis` — EPE - BASES DE COMBUSTÍVEIS - ES
+- `geonode:epe_bases_de_glp` — EPE - BASES DE GLP - ES
+- `geonode:epe_cgh_base_existente` — EPE - CGH BASE EXISTENTE - ES
+- `geonode:epe_dutos_de_escoamento` — EPE - GASODUTOS DE ESCOAMENTO - ES
+- `geonode:epe_estacoes_de_compressao` — EPE - ESTAÇÕES DE COMPRESSÃO
+- `geonode:epe_gasodutos_de_distribuicao` — EPE - GASODUTOS DE DISTRIBUIÇÃO - ES
+- `geonode:epe_gasodutos_de_transporte` — EPE - GASODUTOS DE TRANSPORTE - ES
+- `geonode:epe_historico_de_blocos_ofertados_modalidade_rodada` — EPE - HISTÓRICO DE BLOCOS OFERTADOS MODALIDADE RODADA - ES
+- `geonode:epe_linhas_de_transmissao_base_existente` — EPE - LINHAS DE TRANSMISSÃO - BASE EXISTENTE - ES
+- `geonode:epe_linhas_de_transmissao_expansao_planejada` — EPE - LINHAS DE TRANSMISSÃO - EXPANSÃO PLANEJADA - ES
+- `geonode:epe_pch_base_existente` — EPE - PCH - BASE EXISTENTE - ES
+- `geonode:epe_pch_expansao_planejada` — EPE - PCH - EXPANSÃO PLANEJADA - ES
+- `geonode:epe_plantas_de_biogas` — EPE - PLANTAS DE BIOGÁS - ES
+- `geonode:epe_plantas_de_etanol` — EPE - PLANTAS DE ETANOL - ES
+- `geonode:epe_polos_de_processamento_de_gas_natural` — EPE - POLOS DE PROCESSAMENTO DE GÁS NATURAL - ES
+- `geonode:epe_pontos_de_entrega_de_gas_natural` — EPE - PONTOS DE ENTREGA DE GÁS NATURAL - ES
+- `geonode:epe_subestacoes_base_existente` — EPE - SUBESTAÇÕES BASE EXISTENTE - ES
+- `geonode:epe_subestacoes_expansao_planejada` — EPE - SUBESTAÇÕES EXPANSÃO PLANEJADA - ES
+- `geonode:epe_terminais_de_petroleo_e_derivados` — EPE - TERMINAIS DE PETRÓLEO E DERIVADOS - ES
+- `geonode:epe_terminais_gnl` — EPE - TERMINAIS DE GNL - ES
+- `geonode:epe_uhe_base_existente` — EPE - UHE BASE EXISTENTE - ES
+- `geonode:epe_ute_biomassa_base_existente` — EPE - UTE BIOMASSA BASE EXISTENTE - ES
+- `geonode:epe_ute_fossil_base_existente` — EPE - UTE FÓSSIL BASE EXISTENTE - ES
+- `geonode:es_articulacao10x10km` — IEMA - MAPES-2012-2015 - ARTICULAÇÃO 10x10 KM
+- `geonode:es_nomes_municipios` — ES - NOMES DOS MUNICÍPIOS
+- `geonode:esgas_posto_combustivel` — ES GÁS - POSTOS DE COMBUSTÍVEL
+- `geonode:esgas_rede_de_transporte_tag` — REDE DE TRANSPORTE TAG
+- `geonode:espiritosanto_estrutura_31984` — CPRM - GEOLOGIA ESTRUTURA ES
+- `geonode:espiritosanto_lito_31984` — CPRM - LITOLOGIA  ES
+- `geonode:espiritosanto_rec_min_31984` — CPRM - OCORRÊNCIAS MINERAIS ES
+- `geonode:eta` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS DOS SERVIÇOS PÚBLICOS DE SANEAMENTO - RSPS - ETA
+- `geonode:ete` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS DOS SERVIÇOS PÚBLICOS DE SANEAMENTO - RSPS - ETE
+- `geonode:Faz_Sao_Domingos_certificada` — INCRA - PA SOLANGE DE ASSIS TEIXEIRA
+- `geonode:fitofisionomia_mt_atlantica` — IEMA - FITOFISIONOMIA MATA ATLÂNTICA
+- `geonode:floresta_plantada_norteES_2025` — floresta_plantada_norteES_2025
+- `geonode:FRUCAF_UNIDADE_FARIAS` — FRUCAF_UNIDADE_FARIAS
+- `geonode:FRUCAFE_ESTUFA_CITROS` — FRUCAFE_ESTUFA_CITROS
+- `geonode:FRUCAFE_MATRIZES_CITROS` — FRUCAFE_MATRIZES_CITROS
+- `geonode:FRUCAFE_NOVA_POLIGONAL` — FRUCAFE_NOVA_POLIGONAL
+- `geonode:gasoduto_es` — SECTIDES - AEOL - ES - GASODUTO
+- `geonode:geobases_agent_prod` — SEEDES - AGENTES DE INOVAÇÃO
+- `geonode:geobases_event_prod` — SEEDES - EVENTOS DE INOVAÇÃO
+- `geonode:geobases_space_prod` — SEEDES - ESPAÇOS DE INOVAÇÃO
+- `geonode:geoft_bho_ach_otto_nivel_03_es` — ANA - BHO250 - ACH - OTTO NÍVEL 03 - ES
+- `geonode:geoft_bho_ach_otto_nivel_04_es` — ANA - BHO250 - ACH - OTTO NÍVEL 04 - ES
+- `geonode:geoft_bho_ach_otto_nivel_05_es` — ANA - BHO250 - ACH - OTTO NÍVEL 05 - ES
+- `geonode:geoft_bho_ach_otto_nivel_06_es` — ANA - BHO250 - ACH - OTTO NÍVEL 06 - ES
+- `geonode:geoft_bho_area_drenagem_es` — ANA - BHO250 - ÁREA DE DRENAGEM - ES
+- `geonode:geoft_bho_ponto_drenagem_es` — ANA - BHO250 - PONTO DE DRENAGEM - ES
+- `geonode:geoft_bho_trecho_drenagem_es` — ANA - BHO250 - TRECHO DE DRENAGEM - ES
+- `geonode:hid_banco_areia_a_31984` — IBGE - BC100 - ES - BANCO DE AREIA
+- `geonode:hid_barragem_l_31984` — IBGE - BC100 - ES - BARRAGEM
+- `geonode:hid_corredeira_a_31984` — IBGE - BC100 - ES - CORREDEIRA - ÁREA
+- `geonode:hid_corredeira_l_31984` — IBGE - BC100 - ES - CORREDEIRA-LINHA
+- `geonode:hid_corredeira_p_31984_1` — IBGE - BC100 - ES - CORREDEIRA - PONTO
+- `geonode:hid_ilha_a_31984` — IBGE - BC100 - ES - ILHA
+- `geonode:hid_massa_dagua_a_31984` — IBGE - BC100 - ES -  MASSA D'ÁGUA
+- `geonode:hid_quebramar_molhe_l_31984` — IBGE - BC100 - ES - QUEBRA MAR OU MOLHE
+- `geonode:hid_queda_dagua_l_31984` — IBGE - BC100 - ES - QUEDA D'ÁGUA
+- `geonode:hid_queda_dagua_p_31984` — IBGE - BC100 - ES - QUEDA D'ÁGUA-PONTO
+- `geonode:hid_trecho_drenagem_l_31984` — IBGE - BC100 - ES - TRECHO DE DRENAGEM
+- `geonode:hid_trecho_massa_dagua_a_31984` — IBGE - BC100 - ES - TRECHO DE MASSA D'ÁGUA
+- `geonode:HIDROGRAFIA_1` — CAR - ES - HIDROGRAFIA
+- `geonode:hidrovias_es` — SECTIDES - AEOL - ES - HIDROVIAS
+- `geonode:ibge_bdia_vege_area_contato_uf_es_epsg_31984` — IBGE - BDIA - VEGETAÇÃO ÁREA DE CONTATO- ES - 1:250.000
+- `geonode:ibge_cd2022_bairros_epsg_31984` — IBGE - CENSO 2022 - DADOS AGREGADOS POR BAIRROS - ES
+- `geonode:ibge_cd2022_setores_epsg_31984` — IBGE - CENSO 2022 - DADOS AGREGADOS POR SETORES - ES
+- `geonode:ibge_cd2022_setores_soma_especie_coord_epsg_3` — IBGE - CENSO 2022 - DADOS AGREGADOS POR SETORES E TIPOS DE ENDEREÇOS - ES
+- `geonode:ibge_clima_v1_es_epsg_31984` — IBGE - CLIMA ES
+- `geonode:ibge_coord_end_es_censo_2022_epsg_31984` — IBGE - CENSO 2022 - COORDENADAS DOS ENDEREÇOS - ES
+- `geonode:ibge_face_logradouros` — IBGE - FACE DE LOGRADOUROS
+- `geonode:ibge_geomorfologia_es_2023_bff_1km_epsg_31984` — IBGE - GEOMORFOLOGIA ES - 2023
+- `geonode:ibge_hidrogeologia_es` — IBGE - HIDROGEOLOGIA ES
+- `geonode:ibge_limite_zee_maritimos_es` — IBGE - LIMITES TERRITORIAIS MARÍTIMOS - ES
+- `geonode:ibge_localidades_es_2010_v1_31984` — IBGE - LOCALIDADES ES - 2010
+- `geonode:ibge_mapa_indice_es_cartas_topo_100000` — IBGE - MAPA ÍNDICE CARTAS TOPOGRÁFICAS 1:100.000 - ES
+- `geonode:ibge_mapa_indice_es_cartas_topo_50000` — IBGE - MAPA ÍNDICE CARTAS TOPOGRÁFICAS 1:50.000 - ES
+- `geonode:ibge_rede_geodesica` — IBGE - REDE GEODÉSICA
+- `geonode:ibge_sedes_municipais_2015_31984_p` — IBGE - SEDES MUNICIPAIS - ES
+- `geonode:ibge_setores_censitarios_es_2010_31984` — IBGE - SETORES CENSITÁRIOS ES - 2010
+- `geonode:idaf_atp_smr_gedsiv` — IDAF - GEDSIV - ATP SMR
+- `geonode:idaf_cad_plantio_nativas_req` — IDAF - CADASTRO DE PLANTIO DE ESPÉCIES NATIVAS NO ES
+- `geonode:idaf_gedsiv_unid_consolidacao` — IDAF - GEDSIV - UNIDADE DE CONSOLIDAÇÃO
+- `geonode:idaf_gedsiv_unid_producao` — IDAF - GEDSIV - UNIDADE DE PRODUÇÃO
+- `geonode:idaf_gelcof_barragens_licenciadas` — IDAF - GELCOF - BARRAGENS LICENCIADAS
+- `geonode:idaf_gelcof_cad_barragens_disp_licmto` — IDAF - BARRAGENS COM CADASTRO DE DISPENSA DE LICENCIAMENTO AMBIENTAL
+- `geonode:idaf_gelcof_fiscalizacao_2018_2024` — IDAF - GELCOF - FISCALIZAÇÃO - PONTO - 2018 A 2024
+- `geonode:idaf_gelcof_fiscalizacao_area` — IDAF - PMA - FISCALIZAÇÕES AMBIENTAIS/FLORESTAIS - ÁREA
+- `geonode:idaf_gelcof_licencas_exct_barragem` — IDAF - ATIVIDADE LICENCIADAS (EXCETO BARRAGEM)
+- `geonode:idaf_limite_municipal_2018_11` — IDAF - LIMITES MUNICIPAIS
+- `geonode:idaf_subgeo_legitimacao_terras` — IDAF - GETCAR - LEGITIMAÇÃO DE TERRAS - ES
+- `geonode:iema_fiscalizacao_ambiental_utf8_epsg_31984` — IEMA - FISCALIZAÇÃO AMBIENTAL
+- `geonode:ijsn_arruamento_atualiz_2020_epsg_31984` — IJSN - ARRUAMENTO - ES
+- `geonode:ijsn_ibge_localidades` — IJSN - IBGE - LOCALIDADES
+- `geonode:ijsn_limite_bairro_1970` — IJSN - BAIRROS 1970 - ES
+- `geonode:ijsn_limite_bairro_2020_UTF8` — IJSN - BAIRROS - ES
+- `geonode:ijsn_map_uso_solo_es_2019_20200` — IJSN - MAPEAMENTO USO DO SOLO ES - 2019-2020
+- `geonode:ijsn_pib_mun_es_precos_correntes_2002_2021` — IJSN - PIB DOS MUNICÍPIOS A PREÇOS CORRENTES - 2021
+- `geonode:ijsn_praias_es_p_epsg_31984` — IJSN - PRAIAS ES - PONTO
+- `geonode:ijsn_ufes_geomorfologia_es_epsg_31984` — ijsn_ufes_geomorfologia_es_epsg_31984
+- `geonode:incaper_areas_vocac_uva_inverno` — INCAPER - ÁREAS APTAS AO CULTIVO DE UVAS PARA A PRODUÇÃO DE VINHOS FINOS DE INVERNO
+- `geonode:incra_assentamentos_es_31984` — INCRA - ASSENTAMENTOS - ES
+- `geonode:incra_incaper_solos_es_2016_epsg_31984_utf8` — INCRA - INCAPER - SOLOS ES - 2016
+- `geonode:incra_quilombolas_es_31984` — INCRA - QUILOMBOLAS - ES
+- `geonode:incra_sigef_privado_es_31984` — INCRA - SIGEF PRIVADO - ES
+- `geonode:incra_sigef_publico_es_31984` — INCRA - SIGEF PÚBLICO - ES
+- `geonode:incra_snci_privado_es_31984` — INCRA - SNCI PRIVADO - ES
+- `geonode:incra_snci_publico_es_31984` — INCRA - SNCI PÚBLICO - ES
+- `geonode:inpe_focos_es_todosats_anual_1998__` — INPE - BDQUEIMADAS - FOCOS DE QUEIMADAS - ES - DESDE 1998
+- `geonode:IPAJM_Edificacoes_Ensino_KML` — IPAJM_Edificacoes_Ensino_KML
+- `geonode:ITANGUA_MANCHA_INUNDACAO_CEN_ATUAL` — ITANGUÁ - MANCHA INUNDAÇÃO CENÁRIO ATUAL
+- `geonode:ITANGUA_MANCHA_INUNDACAO_CEN_FUTURO_TR25` — ITANGUÁ - MANCHA INUNDAÇÃO CENÁRIO FUTURO - TR25
+- `geonode:Lim_Macrorregiao0` — IJSN - LIMITES MACRORREGIÕES ADMINISTRATIVAS ES
+- `geonode:lim_microrregiao_es_lei_11174_2020_09_25` — IJSN - LIMITES MICRORREGIÕES ADMINISTRATIVAS ES
+- `geonode:limite_distrital_2018_alt_novembro` — IDAF - LIMITES DISTRITAIS
+- `geonode:limite_es_2017_out` — IDAF - LIMITE ES
+- `geonode:linha_de_costa_1970_sul` — IJSN - ANÁLISE DA VARIAÇÃO DA LINHA DE COSTA - ES - 1970
+- `geonode:linha_de_costa_2005` — IJSN - ANÁLISE DA VARIAÇÃO DA LINHA DE COSTA - ES - 2005
+- `geonode:linha_de_costa_2008` — IJSN - ANÁLISE DA VARIAÇÃO DA LINHA DE COSTA - ES - 2008
+- `geonode:linha_limite_terreno_marinha` — SPU - LINHA LIMITE DE TERRENO DE MARINHA - ES
+- `geonode:linha_preamar_media` — SPU - LINHA DO PREAMAR MÉDIA - 1831 - ES
+- `geonode:linhas_cabotagem_es` — SECTIDES - AEOL - ES - LINHAS DE CABOTAGEM
+- `geonode:linhas_transmissao_existentes` — SECTIDES - AEOL - ES - LINHAS DE TRANSMISSÃO EXISTENTES
+- `geonode:linhas_transmissao_planejada` — SECTIDES - AEOL - ES - LINHAS DE TRANSMISSÃO PLANEJADAS
+- `geonode:loc_aglomerado_rural_isolado_p_31984` — IBGE - BC100 - ES - AGLOMERADO RURAL ISOLADO
+- `geonode:loc_area_edificada_a_31984` — IBGE - BC100 - ES - ÁREA EDIFICADA
+- `geonode:loc_area_urbana_isolada_p_31984` — IBGE - BC100 - ES - ÁREA URBANA ISOLADA
+- `geonode:loc_capital_p_31984` — IBGE - BC100 - ES - CAPITAL
+- `geonode:loc_cidade_p_31984` — IBGE - BC100 - ES - CIDADE
+- `geonode:loc_vila_p_31984` — IBGE - BC100 - ES - VILA
+- `geonode:lotes` — lotes pontal de camburi
+- `geonode:meses_secos` — INCAPER - UCG - MESES SECOS ES
+- `geonode:mma_cnuc_uc_es_utf8_epsg_31984` — MMA - CNUC - UNIDADES DE CONSERVAÇÃO - ES
+- `geonode:monitor_de_secas_es_epsg_31984_utf_8` — MONITOR DE SECAS ES - DESDE MAR/2019
+- `geonode:ottobacias_n_4` — OTTOBACIAS NÍVEL 4
+- `geonode:ottobacias_n_5` — OTTOBACIAS NÍVEL 5
+- `geonode:ottobacias_n_6` — OTTOBACIAS NÍVEL 6
+- `geonode:ottobacias_n_7` — OTTOBACIAS NÍVEL 7
+- `geonode:parque_cafeeiro_norteES_2025` — parque_cafeeiro_norteES_2025
+- `geonode:PDAP_BUBU_CURSOS_DAGUA` — CURSOS D'ÁGUA DA BACIA DO RIO BUBU - PDAP CARIACICA
+- `geonode:PDAP_BUBU_SUBBACIAS` — SUBBACIAS DA BACIA DO RIO BUBU - PDAP CARIACICA
+- `geonode:pdui_aeroportos` — PDUI - AEROPORTOS
+- `geonode:pdui_areas_priorit_conservacao` — PDUI - ÁREAS PRIORITÁRIAS PARA CONSERVAÇÃO DA BIODIVERSIDADE
+- `geonode:pdui_areas_publicas_cariacica` — PDUI - ÁREAS PÚBLICAS EM CARIACICA
+- `geonode:pdui_balneabilidade` — PDUI - BALNEABILIDADE
+- `geonode:pdui_cariacica_macrozon` — PDUI - MACROZONEAMENTO DO PDM DE CARIACICA
+- `geonode:pdui_cariacica_mov_pendular_entrada` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM CARIACICA - ENTRADA
+- `geonode:pdui_cariacica_mov_pendular_saida` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM CARIACICA - SAÍDA
+- `geonode:pdui_centralidades` — PDUI - CENTRALIDADES E POLOS DE ATRAÇÃO
+- `geonode:pdui_comites_bacia_rmgv` — PDUI - COMITÊS DE BACIAS HIDROGRÁFICAS QUE ABRANGEM A RMGV
+- `geonode:pdui_conj_habitacionais` — PDUI - CONJUNTOS HABITACIONAIS PÓS 1970
+- `geonode:pdui_correspondencia_zoneamento` — PDUI - CORRESPONDÊNCIA ZONEAMENTO
+- `geonode:pdui_dom_abastecimento_agua` — PDUI - PERCENTUAL DE DOMICÍLIOS COM ABASTECIMENTO DE ÁGUA
+- `geonode:pdui_dom_iluminacao_publica` — PDUI - PERCENTUAL DE DOMICÍLIOS COM ILUMINAÇÃO PÚBLICA
+- `geonode:pdui_dom_rede_esgoto` — PDUI - PERCENTUAL DE DOMICÍLIOS COM REDE DE ESGOTO
+- `geonode:pdui_fundao_macrozon` — PDUI - MACROZONEAMENTO DO PDM DE FUNDÃO
+- `geonode:pdui_fundao_mov_pendular_entrada` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM FUNDÃO - ENTRADA
+- `geonode:pdui_fundao_mov_pendular_saida` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM FUNDÃO - SAÍDA
+- `geonode:pdui_guarapari_macrozon` — PDUI - MACROZONEAMENTO DO PDM DE GUARAPARI
+- `geonode:pdui_guarapari_mov_pendular_entrada` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM GUARAPARI - ENTRADA
+- `geonode:pdui_guarapari_mov_pendular_saida` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM GUARAPARI - SAÍDA
+- `geonode:pdui_idh_2010` — PDUI - ÍNDICE DE DESENVOLVIMENTO HUMANO 2010
+- `geonode:pdui_linhas_transcol` — PDUI - LINHAS DO SISTEMA TRANSCOL
+- `geonode:pdui_media_renda_mensal` — PDUI - RENDA MÉDIA DOS DOMICÍLIOS
+- `geonode:pdui_monit_qlde_agua` — PDUI - MONITORAMENTO QUALITATIVO DE ÁGUAS INTERIORES DA RMGV
+- `geonode:pdui_mov_pendular_entrada_ponto` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES NA RMGV - ENTRADA
+- `geonode:pdui_mov_pendular_saida_ponto` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES NA RMGV - SAÍDA
+- `geonode:pdui_parques_urbanos` — PDUI - PARQUES E PRAÇAS URBANOS
+- `geonode:pdui_pdm_cariacica` — PDUI - ZONEAMENTO DO PDM DE CARIACICA
+- `geonode:pdui_pdm_fundao` — PDUI - ZONEAMENTO DO PDM DE FUNDÃO
+- `geonode:pdui_pdm_guarapari` — PDUI - ZONEAMENTO DO PDM DE GUARAPARI
+- `geonode:pdui_pdm_serra` — PDUI - ZONEAMENTO DO PDM DE SERRA
+- `geonode:pdui_pdm_viana` — PDUI - ZONEAMENTO DO PDM DE VIANA
+- `geonode:pdui_pdm_vila_velha` — PDUI - ZONEAMENTO DO PDM DE VILA VELHA
+- `geonode:pdui_pdm_vitoria` — PDUI - ZONEAMENTO DO PDU DE VITÓRIA
+- `geonode:PDUI_PesquisaOD2007_geral` — PDUI - PESQUISA ORIGEM-DESTINO 2007 - GERAL
+- `geonode:PDUI_PesquisaOD2007_MotivoCompras` — PDUI - PESQUISA ORIGEM-DESTINO 2007 - MOTIVO COMPRAS
+- `geonode:PDUI_PesquisaOD2007_MotivoEstudo` — PDUI - PESQUISA ORIGEM-DESTINO 2007 - MOTIVO ESTUDO
+- `geonode:PDUI_PesquisaOD2007_MotivoLazer` — PDUI - PESQUISA ORIGEM-DESTINO 2007 - MOTIVO LAZER
+- `geonode:PDUI_PesquisaOD2007_MotivoSaude` — PDUI - PESQUISA ORIGEM-DESTINO 2007 - MOTIVO SAÚDE
+- `geonode:PDUI_PesquisaOD2007_MotivoTrabalho` — PDUI - PESQUISA ORIGEM-DESTINO 2007 - MOTIVO TRABALHO
+- `geonode:PDUI_PesquisaOD2007_Total` — PDUI - PESQUISA ORIGEM-DESTINO 2007 - TOTAL
+- `geonode:PDUI_PesquisaOD2007_Zn_destino` — PDUI - PESQUISA ORIGEM-DESTINO 2007 - ZONA DE DESTINO
+- `geonode:pdui_portos` — PDUI - PORTOS
+- `geonode:pdui_rodovias_rmgv` — PDUI - REDE DE RODOVIAS DA RMGV
+- `geonode:pdui_serra_hierarquia_viaria` — PDUI - HIERARQUIA VIÁRIA DE SERRA
+- `geonode:pdui_serra_macrozon` — PDUI - MACROZONEAMENTO DO PDM DE SERRA
+- `geonode:pdui_serra_mov_pendular_entrada` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM SERRA - ENTRADA
+- `geonode:pdui_serra_mov_pendular_saida` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM SERRA - SAÍDA
+- `geonode:pdui_serra_plano_viario` — PDUI - PLANO VIÁRIO DE SERRA
+- `geonode:pdui_serra_setores_escorregamento` — PDUI - SETORES COM RISCO DE ESCORREGAMENTO EM SERRA
+- `geonode:pdui_serra_setores_inundacao` — PDUI - SETORES COM RISCO DE INUNDAÇÃO EM SERRA
+- `geonode:pdui_uc_serra` — PDUI - UNIDADES DE CONSERVAÇÃO EM SERRA
+- `geonode:pdui_uc_uso_sustentavel` — PDUI - UNIDADES DE CONSERVAÇÃO DE USO SUSTENTÁVEL NA RMGV
+- `geonode:pdui_unidades_geomorfologicas` — PDUI - UNIDADES GEOMORFOLÓGICAS
+- `geonode:pdui_viana_macrozon` — PDUI - MACROZONEAMENTO DO PDM DE VIANA
+- `geonode:pdui_viana_mov_pendular_entrada` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM VIANA - ENTRADA
+- `geonode:pdui_viana_mov_pendular_saida` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM VIANA - SAÍDA
+- `geonode:pdui_viana_risco_geo` — PDUI - ÁREAS DE RISCO GEOLÓGICO EM VIANA
+- `geonode:pdui_viana_zonas_inundacao` — PDUI - ZONAS DE INUNDAÇÃO EM VIANA
+- `geonode:pdui_vila_velha_macrozon` — PDUI - MACROZONEAMENTO DO PDM DE VILA VELHA
+- `geonode:pdui_vila_velha_mov_pendular_entrada` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM VILA VELHA - ENTRADA
+- `geonode:pdui_vila_velha_mov_pendular_saida` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM VILA VELHA - SAÍDA
+- `geonode:pdui_vitoria_macrozon` — PDUI - MACROZONEAMENTO DO PDU DE VITÓRIA
+- `geonode:pdui_vitoria_mov_pendular_entrada` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM VITÓRIA - ENTRADA
+- `geonode:pdui_vitoria_mov_pendular_saida` — PDUI - MOVIMENTO PENDULAR DE TRABALHADORES EM VITÓRIA - SAÍDA
+- `geonode:pdui_zee_vitoria` — PDUI - ZONEAMENTO ECOLÓGICO ECONÔMICO DE VITÓRIA
+- `geonode:pdui_zims_dinam_urbana` — PDUI - ZIMS DE DINAMIZAÇÃO URBANA
+- `geonode:pdui_zims_mob_urbana` — PDUI - ZIMS DE MOBILIDADE URBANA
+- `geonode:pdui_zims_quali_ambiental_urbana` — PDUI - ZIMS DE QUALIDADE AMBIENTAL E URBANA
+- `geonode:pdui_zona_costeira` — PDUI - ZONA COSTEIRA
+- `geonode:PMRR_CARIACICA_SETORES_RISCO` — PMRR_CARIACICA_SETORES_RISCO
+- `geonode:poligonal_es_01_votu_winds` — SECTIDES - AEOL - ES - POLIGONAL ES-01-VOTU WINDS
+- `geonode:poligonal_es_02_vitoria_offshore` — SECTIDES - AEOL - ES - POLIGONAL ES-02-VITORIA OFFSHORE
+- `geonode:poligonal_es_03_quesnelia` — SECTIDES - AEOL - ES - POLIGONAL ES-03-QUESNELIA
+- `geonode:POLIGONAL_USUCAPIAO` — POLIGONAL_USUCAPIAO
+- `geonode:POLIGONAL_USUCAPIAO0` — POLIGONAL_USUCAPIAO
+- `geonode:POLIGONAL_USUCAPIAO1` — POLIGONAL_USUCAPIAO
+- `geonode:Poligono_Pignaton` — Poligono_Pignaton
+- `geonode:PONTOS_1` — CAR - ES - PONTO DO IMÓVEL
+- `geonode:Pontos_Cotados_ES_Parte_01` — Pontos-Cotados_ES_Parte_01
+- `geonode:Pontos_Cotados_ES_Parte_02` — Pontos-Cotados_ES_Parte_02
+- `geonode:Pontos_Cotados_ES_Parte_03` — Pontos-Cotados_ES_Parte_03
+- `geonode:portos_es` — SECTIDES - AEOL - ES - PORTOS
+- `geonode:prf_acidentes_2023_todas_causas_tipos_epsg_31` — PRF - ACIDENTES 2023 - TODAS AS CAUSAS E TIPOS - ES
+- `geonode:prf_acidentes_2024_todas_causas_tipos_epsg_31` — PRF - ACIDENTES 2024 - TODAS AS CAUSAS E TIPOS - ES
+- `geonode:PROESAM_ADN_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - ÁGUA DOCE DO NORTE
+- `geonode:PROESAM_ARA_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - ARACRUZ
+- `geonode:PROESAM_BEP_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - BOA ESPERANÇA
+- `geonode:PROESAM_BJN_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - BOM JESUS DO NORTE
+- `geonode:PROESAM_BSF_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - BARRA DE SÃO FRANCISCO
+- `geonode:PROESAM_BXG_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - BAIXO GUANDÚ
+- `geonode:PROESAM_CCT_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - CONCEIÇÃO DO CASTELO
+- `geonode:PROESAM_CLT_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - COLATINA
+- `geonode:PROESAM_DGM_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - DOMINGOS MARTINS
+- `geonode:PROESAM_DRP_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - DORES DO RIO PRETO
+- `geonode:PROESAM_ECO_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - ECOPORANGA
+- `geonode:PROESAM_GVL_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - GOVERNADOR LINDENBERG
+- `geonode:PROESAM_IBC_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - IBIRAÇÚ
+- `geonode:PROESAM_IUN_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - IÚNA
+- `geonode:PROESAM_JGR_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - JAGUARÉ
+- `geonode:PROESAM_JNV_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - JOÃO NEIVA
+- `geonode:PROESAM_MCR_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - MUCURICI
+- `geonode:PROESAM_MRF_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - MARECHAL FLORIANO
+- `geonode:PROESAM_PBL_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - PONTO BELO
+- `geonode:PROESAM_PIU_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - PIÚMA
+- `geonode:PROESAM_PRK_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - PRESIDENTE KENNEDY
+- `geonode:PROESAM_RBN_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - RIO BANANAL
+- `geonode:PROESAM_RNS_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - RIO NOVO DO SUL
+- `geonode:PROESAM_SDN_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - SÃO DOMINGOS DO NORTE
+- `geonode:PROESAM_SJC_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - SÃO JOSÉ DO CALÇADO
+- `geonode:PROESAM_SMJ_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - SANTA MARIA DE JETIBÁ
+- `geonode:PROESAM_SOO_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - SOORETAMA
+- `geonode:PROESAM_SRC_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - SÃO ROQUE DO CANAÃ
+- `geonode:PROESAM_VGA_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - VARGEM ALTA
+- `geonode:PROESAM_VIA_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - VIANA
+- `geonode:PROESAM_VNI_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - VENDA NOVA DO IMIGRANTE
+- `geonode:PROESAM_VPV_LICENCAS_AMBIENTAIS_P` — PROESAM - LICENÇAS AMBIENTAIS - VILA PAVÃO
+- `geonode:raa` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS AGROSSILVOPASTORIS E AGROINDUSTRIAIS - RAA
+- `geonode:rcc` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS DA CONSTRUÇÃO CIVIL - RCC
+- `geonode:RDSM_Piraqu_A_e_Piraqu_Mirim` — RDSM_Piraqu_A_e_Piraqu_Mirim
+- `geonode:rede_obs_hidrometeorologicas` — REDE DE OBSERVAÇÕES HIDROMETEOROLÓGICAS
+- `geonode:rel_elemento_fisiografico_natural_l_31984` — IBGE - BC100 - ES - ELEMENTO FISIOGRÁFICO NATURAL-LINHA
+- `geonode:rel_elemento_fisiografico_natural_p_31984` — IBGE - BC100 - ES -  ELEMENTO FISIOGRÁFICO NATURAL-PONTO
+- `geonode:RESERVA_LEGAL_1` — CAR - ES - RESERVA LEGAL
+- `geonode:ri` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS INDUSTRIAIS - RI
+- `geonode:RICARDO_MALACARNE_LOTE_DANIEL` — RICARDO_MALACARNE_LOTE_DANIEL
+- `geonode:RISCO_INUND_PROG_COM_OBRAS_BUBU_2044` — RISCO_INUND_PROG_COM_OBRAS_BUBU_2044
+- `geonode:RISCO_INUND_PROG_SEM_OBRAS_BUBU_2044` — RISCO_INUND_PROG_SEM_OBRAS_BUBU_2044
+- `geonode:rm_poligono` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS DE MINERAÇÃO - RM - ÁREA
+- `geonode:rm_pontos` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS DE MINERAÇÃO - RM - PONTOS
+- `geonode:rodovias_mapbiomas` — SECTIDES - AEOL - ES - RODOVIAS MAPBIOMAS
+- `geonode:rst` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS DE SERVIÇOS DE TRANSPORTES - RST
+- `geonode:rsu` — SEAMA - LAGESA - PERS-2019 - RESÍDUOS SÓLIDOS URBANOS - RSU
+- `geonode:seama_reflor_areas_elegiveis` — SEAMA - REFLORESTAR - ÁREAS ELEGÍVEIS - 2025
+- `geonode:seama_reflor_areas_prioritarias` — SEAMA - REFLORESTAR - ÁREAS PRIORITÁRIAS - 2025
+- `geonode:sedurb_pdap_pmrr_bacia_alegre_sirgas2000` — sedurb-pdap-pmrr-bacia_alegre_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacia_bom_jesus_norte_sirgas` — sedurb-pdap-pmrr-bacia_bom_jesus_norte_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacia_joao_neiva_sirgas2000` — sedurb-pdap-pmrr-bacia_joao_neiva_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacia_santa_maria_jetiba_sir` — sedurb-pdap-pmrr-bacia_santa_maria_jetiba_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_afonso_claudio_sirgas` — sedurb-pdap-pmrr-bacias_afonso_claudio_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_castelo_sirgas2000` — sedurb-pdap-pmrr-bacias_castelo_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_domingos_martins_sirg` — sedurb-pdap-pmrr-bacias_domingos_martins_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_guacui_sirgas2000` — sedurb-pdap-pmrr-bacias_guacui_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_ibatiba_sirgas2000` — sedurb-pdap-pmrr-bacias_ibatiba_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_iconha_sirgas2000` — sedurb-pdap-pmrr-bacias_iconha_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_marechal_floriano_sir` — sedurb-pdap-pmrr-bacias_marechal_floriano_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_mimoso_sul_sirgas2000` — sedurb-pdap-pmrr-bacias_mimoso_sul_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_rio_novo_sul_sirgas20` — sedurb-pdap-pmrr-bacias_rio_novo_sul_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_santa_leopoldina_sirg` — sedurb-pdap-pmrr-bacias_santa_leopoldina_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_santa_teresa_sirgas20` — sedurb-pdap-pmrr-bacias_santa_teresa_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_vargem_alta_sirgas200` — sedurb-pdap-pmrr-bacias_vargem_alta_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bacias_viana_sirgas2000` — sedurb-pdap-pmrr-bacias_viana_sirgas2000
+- `geonode:sedurb_pdap_pmrr_barragem_1_ibatiba_sirgas200` — sedurb-pdap-pmrr-barragem_1_ibatiba_sirgas2000
+- `geonode:sedurb_pdap_pmrr_barragem_2_ibatiba_sirgas200` — sedurb-pdap-pmrr-barragem_2_ibatiba_sirgas2000
+- `geonode:sedurb_pdap_pmrr_barragem_afonso_claudio_sirg` — sedurb-pdap-pmrr-barragem_afonso_claudio_sirgas2000
+- `geonode:sedurb_pdap_pmrr_barragem_alegre_sirgas2000` — sedurb-pdap-pmrr-barragem_alegre_sirgas2000
+- `geonode:sedurb_pdap_pmrr_barragem_mimoso_sul_sirgas20` — sedurb-pdap-pmrr-barragem_mimoso_sul_sirgas2000
+- `geonode:sedurb_pdap_pmrr_barragem_santa_maria_jetiba_` — sedurb-pdap-pmrr-barragem_santa_maria_jetiba_sirgas2000
+- `geonode:sedurb_pdap_pmrr_barragem_santa_teresa_sirgas` — sedurb-pdap-pmrr-barragem_santa_teresa_sirgas2000
+- `geonode:sedurb_pdap_pmrr_barragem_viana_sirgas2000` — sedurb-pdap-pmrr-barragem_viana_sirgas2000
+- `geonode:sedurb_pdap_pmrr_bomba_bom_jesus_norte_sirgas` — sedurb-pdap-pmrr-bomba_bom_jesus_norte_sirgas2000
+- `geonode:sedurb_pdap_pmrr_canal_drenagem_domingos_mart` — sedurb-pdap-pmrr-canal_drenagem_domingos_martins_sirgas2000
+- `geonode:sedurb_pdap_pmrr_canal_joao_neiva_sirgas2000` — sedurb-pdap-pmrr-canal_joao_neiva_sirgas2000
+- `geonode:sedurb_pdap_pmrr_canal_viana_sirgas2000` — sedurb-pdap-pmrr-canal_viana_sirgas2000
+- `geonode:sedurb_pdap_pmrr_casa_bomba_viana_sirgas2000` — sedurb-pdap-pmrr-casa_bomba_viana_sirgas2000
+- `geonode:sedurb_pdap_pmrr_casa_bombeamento_guacui_sirg` — sedurb-pdap-pmrr-casa_bombeamento_guacui_sirgas2000
+- `geonode:sedurb_pdap_pmrr_derrocagem_alegre_sirgas2000` — sedurb-pdap-pmrr-derrocagem_alegre_sirgas2000
+- `geonode:sedurb_pdap_pmrr_derrocagem_guacui_sirgas2000` — sedurb-pdap-pmrr-derrocagem_guacui_sirgas2000
+- `geonode:sedurb_pdap_pmrr_derrocagem_marechal_floriano` — sedurb-pdap-pmrr-derrocagem_marechal_floriano_sirgas2000
+- `geonode:sedurb_pdap_pmrr_derrocagem_mimoso_sul_sirgas` — sedurb-pdap-pmrr-derrocagem_mimoso_sul_sirgas2000
+- `geonode:sedurb_pdap_pmrr_derrocagem_rio_novo_sul_sirg` — sedurb-pdap-pmrr-derrocagem_rio_novo_sul_sirgas2000
+- `geonode:sedurb_pdap_pmrr_derrocagem_vargem_alta_sirga` — sedurb-pdap-pmrr-derrocagem_vargem_alta_sirgas2000
+- `geonode:sedurb_pdap_pmrr_desapropriacao_castelo_sirga` — sedurb-pdap-pmrr-desapropriacao_castelo_sirgas2000
+- `geonode:sedurb_pdap_pmrr_desapropriacao_iconha_sirgas` — sedurb-pdap-pmrr-desapropriacao_iconha_sirgas2000
+- `geonode:sedurb_pdap_pmrr_desapropriacao_joao_neiva_si` — sedurb-pdap-pmrr-desapropriacao_joao_neiva_sirgas2000
+- `geonode:sedurb_pdap_pmrr_desapropriacao_santa_teresa_` — sedurb-pdap-pmrr-desapropriacao_santa_teresa_sirgas2000
+- `geonode:sedurb_pdap_pmrr_desapropriacao_vargem_alta_s` — sedurb-pdap-pmrr-desapropriacao_vargem_alta_sirgas2000
+- `geonode:sedurb_pdap_pmrr_desapropriacao_viana_sirgas2` — sedurb-pdap-pmrr-desapropriacao_viana_sirgas2000
+- `geonode:sedurb_pdap_pmrr_dique_viana_sirgas2000` — sedurb-pdap-pmrr-dique_viana_sirgas2000
+- `geonode:sedurb_pdap_pmrr_pedologia_afonso_claudio_sir` — sedurb-pdap-pmrr-pedologia_afonso_claudio_sirgas2000
+- `geonode:sedurb_pdap_pmrr_pedologia_alegre_sirgas2000` — sedurb-pdap-pmrr-pedologia_alegre_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_alegre_sirga` — sedurb-pdap-pmrr-risco_geologico_alegre_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_bom_jesus_no` — sedurb-pdap-pmrr-risco_geologico_bom_jesus_norte_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_castelo_sirg` — sedurb-pdap-pmrr-risco_geologico_castelo_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_domingos_mar` — sedurb-pdap-pmrr-risco_geologico_domingos_martins_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_guacui_sirga` — sedurb-pdap-pmrr-risco_geologico_guacui_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_ibatiba_sirg` — sedurb-pdap-pmrr-risco_geologico_ibatiba_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_ibatiba_sirg0` — sedurb-pdap-pmrr-risco_geologico_ibatiba_sirgas20001
+- `geonode:sedurb_pdap_pmrr_risco_geologico_iconha_sirga` — sedurb-pdap-pmrr-risco_geologico_iconha_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_joao_neiva_s` — sedurb-pdap-pmrr-risco_geologico_joao_neiva_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_marechal_flo` — sedurb-pdap-pmrr-risco_geologico_marechal_floriano_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_mimoso_sul_s` — sedurb-pdap-pmrr-risco_geologico_mimoso_sul_sirgas2000
+- `geonode:sedurb_pdap_pmrr_risco_geologico_rio_novo_sul` — sedurb-pdap-pmrr-risco_geologico_rio_novo_sul_sirgas2000
+- `geonode:sedurb_pdap_pmrr_zoneamento_zona_protecao_amb` — sedurb-pdap-pmrr-zoneamento_zona_protecao_ambiental_bom_jesus_norte_sirgas2000
+- `geonode:sesp_ijsn_un_seguranca` — SESP-IJSN - UNIDADES DE SEGURANÇA - ES
+- `geonode:sgb_un_geologico_ambientais_es_epsg_31984` — SGB - UNIDADES GEOLÓGICO AMBIENTAIS - ES
+- `geonode:sinduscon_empreendimentos_acabamento` — SINDUSCON - 44º CENSO IMOBILIÁRIO - ACABAMENTO
+- `geonode:sinduscon_empreendimentos_concluidos` — SINDUSCON - 44º CENSO IMOBILIÁRIO - CONCLUÍDOS
+- `geonode:sinduscon_empreendimentos_estrutura` — SINDUSCON - 44º CENSO IMOBILIÁRIO - ESTRUTURA
+- `geonode:sinduscon_empreendimentos_fundacao` — SINDUSCON - 44º CENSO IMOBILIÁRIO - FUNDAÇÃO
+- `geonode:sinduscon_empreendimentos_planta` — SINDUSCON - 44º CENSO IMOBILIÁRIO - IMÓVEIS NA PLANTA
+- `geonode:sinduscon_lancamentos_2sem_2024` — SINDUSCON - 44º CENSO IMOBILIÁRIO - LANÇAMENTOS 2º SEMESTRE 2024
+- `geonode:snirh_inundacoes_2003_2015_es_epsg_31984` — SNIRH - INUNDAÇÕES - 2003 - 2015
+- `geonode:snirh_secas_2003_2015_es_epsg_31984` — SNIRH - SECAS - 2003 - 2015
+- `geonode:spu_destinacao_aguas_pub_federais_es_epsg_319` — spu_destinacao_aguas_pub_federais_es_epsg_31984_a
+- `geonode:spu_lpm_es_epsg_31984_l` — spu_lpm_es_epsg_31984_l
+- `geonode:spu_ltm_es_epsg_31984_l` — spu_ltm_es_epsg_31984_l
+- `geonode:spu_tagp_es_epsg_31984_a` — spu_tagp_es_epsg_31984_a
+- `geonode:spu_terreno_acrescido_de_marinha_marginal_es_` — spu_terreno_acrescido_de_marinha_marginal_es_epsg_31984_a
+- `geonode:subestacoes_existentes` — SECTIDES - AEOL - ES - SUBESTAÇÕES EXISTENTES
+- `geonode:subestacoes_planejadas` — SECTIDES - AEOL - ES - SUBESTAÇÕES PLANEJADAS
+- `geonode:SUSCET_INUND_ATUAL_BUBU_2024` — SUSCET_INUND_ATUAL_BUBU_2024
+- `geonode:SUSCET_INUND_PROG_COM_OBRAS_BUBU_2044` — SUSCET_INUND_PROG_COM_OBRAS_BUBU_2044
+- `geonode:SUSCET_INUND_PROG_SEM_OBRAS_BUBU_2044` — SUSCET_INUND_PROG_SEM_OBRAS_BUBU_2044
+- `geonode:tatd_poligonos_disposicao` — SEAMA - LAGESA - PERS-2019 - TRATAMENTO, ARMAZENAMENTO, TRANSBORDO E DESTINAÇÃO FINAL DE RESÍDUOS - TATD - DISPOSIÇÃO
+- `geonode:tatd_poligonos_disposicao_buffer_1000m` — SEAMA - LAGESA - PERS-2019 - TRATAMENTO, ARMAZENAMENTO, TRANSBORDO E DESTINAÇÃO FINAL DE RESÍDUOS - TATD - DISPOSIÇÃO - BUFFER 1.000 M
+- `geonode:tatd_poligonos_transbordo` — SEAMA - LAGESA - PERS-2019 - TRATAMENTO, ARMAZENAMENTO, TRANSBORDO E DESTINAÇÃO FINAL DE RESÍDUOS - TATD - TRANSBORDO
+- `geonode:tatd_poligonos_transbordo_buffer_500m` — SEAMA - LAGESA - PERS-2019 - TRATAMENTO, ARMAZENAMENTO, TRANSBORDO E DESTINAÇÃO FINAL DE RESÍDUOS - TATD - TRANSBORDO - BUFFER 500 M
+- `geonode:tatd_pontos` — SEAMA - LAGESA - PERS-2019 - TRATAMENTO, ARMAZENAMENTO, TRANSBORDO E DESTINAÇÃO FINAL DE RESÍDUOS - TATD - PONTOS
+- `geonode:TERRENO_COMPLETO` — TERRENO_COMPLETO
+- `geonode:TERRENO_COMPLETO0` — TERRENO_COMPLETO
+- `geonode:terreno_marinha` — SPU - TERRENOS DE MARINHA - ES
+- `geonode:tra_arruamento_l_31984` — IBGE - BC100 - ES - ARRUAMENTO-LINHA
+- `geonode:tra_dnit_ferrovias_2017` — DNIT - FERROVIAS
+- `geonode:tra_edif_const_portuaria_p_31984` — IBGE - BC100 - ES - EDIFICAÇÃO OU CONSTRUÇÃO PORTUÁRIA
+- `geonode:tra_ijsn_ciclovias` — IJSN - CICLOVIAS
+- `geonode:tra_ijsn_estradas_vicinais` — IJSN - ESTRADAS VICINAIS
+- `geonode:tra_passag_elevada_viaduto_p_31984` — IBGE - BC100 - ES - PASSAGEM ELEVADA OU VIADUTO - PONTO
+- `geonode:tra_passagem_nivel_p_31984` — IBGE - BC100 - ES - PASSAGEM EM NÍVEL - PONTO
+- `geonode:tra_pista_ponto_pouso_l_31984` — IBGE - BC100 - ES - PISTA OU PONTO DE POUSO - LINHA
+- `geonode:tra_pista_ponto_pouso_p_31984` — IBGE - BC100 - ES - PISTA OU PONTO DE POUSO - PONTO
+- `geonode:tra_ponte_l_31984` — IBGE - BC100 - ES - PONTE LINHA
+- `geonode:tra_ponte_p_31984` — IBGE - BC100 - ES - PONTE PONTO
+- `geonode:tra_sinalizacao_p_31984` — IBGE - BC100 - ES - SINALIZAÇÃO
+- `geonode:tra_trecho_ferroviario_l_31984` — IBGE - BC100 - ES - TRECHO FERROVIÁRIO
+- `geonode:tra_trecho_rodoviario_l_31984` — IBGE - BC100 - ES - TRECHO RODOVIÁRIO
+- `geonode:tra_tunel_l_31984` — IBGE - BC100 - ES - TÚNEL LINHA
+- `geonode:transpetro_dutos` — TRANSPETRO - DUTOS
+- `geonode:transpetro_estacao` — TRANSPETRO - ESTAÇÃO
+- `geonode:transpetro_marco_km` — TRANSPETRO - MARCO DE KM
+- `geonode:transpetro_terminal_1` — TRANSPETRO - TERMINAL
+- `geonode:transpetro_un_tratamento_gas_1` — TRANSPETRO - UNIDADE DE TRATAMENTO DE GÁS
+- `geonode:trecho_drenagem` — IBGE - TRECHO DE DRENAGEM - CARTAS TOPOGRÁFICAS 50.000 - 100.000
+- `geonode:unidades_de_produ_o_beatriz_carline` — unidades_de_produ_o_beatriz_carline
+- `geonode:unidades_de_produ_o_beatriz_carline0` — unidades_de_produ_o_beatriz_carline
+- `geonode:USO_RESTRITO_1` — CAR - ES - USO RESTRITO
+- `geonode:vege_area_uf_es_epsg_31984` — IBGE - BDIA - VEGETAÇÃO - ES - 1:250.000
+- `geonode:VEGETACAO_NATIVA_1` — CAR - ES - VEGETAÇÃO NATIVA
+- `geonode:vw_edocs_geoedocs` — GEOBASES - FEIÇÕES GEO E-DOCS
+- `geonode:vw_geo_ti_documentos_sii_sirgas2000polygon_es_epsg_31984` — FUNAI - TERRAS INDÍGENAS - ES
+- `geonode:ZEEC_ES_Limites_Maritimos_Milhas_Nauticas`
+- `geonode:zeec_es_maritimo`
+- `geonode:ZEEC_ES_municipios`
+- `geonode:ZEEC_ES_Municipios` — ZEEC_ES_Municipios
+- `geonode:zn_amortecimento_ucs_estaduais` — IEMA - ZONAS DE AMORTECIMENTO UC'S ESTADUAIS
+- `geonode:zonas_naturais_1` — INCAPER - ZONAS NATURAIS ES

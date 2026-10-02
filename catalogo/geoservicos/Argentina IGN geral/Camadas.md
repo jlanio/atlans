@@ -1,0 +1,197 @@
+# Instituto Geográfico Nacional — IGN — IGN geral — camadas
+
+Geoportal: [[Geosserviços/Argentina IGN geral/Instituto Geográfico Nacional — IGN — IGN geral|Instituto Geográfico Nacional — IGN — IGN geral]]
+
+Total: **192** camadas WFS.
+- `ign:area_de_montana` — Área de montaña · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:area_protegida` — Área protegida · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:area_vuelos_dsr_sig` — Área de vuelos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:area_vuelos_vant_sig` — Área de vuelos VANT · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_actividad_agropecuaria_AJ110` — Invernadero, vivero, huerta · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_actividad_agropecuaria_AL270` — Establecimiento agropecuario · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_aguas_continentales_041101` — Embalse rural · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_aguas_continentales_BH020` — Canal · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_aguas_continentales_BH130` — Embalse · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_aguas_continentales_BH140` — Corriente de agua · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_aguas_continentales_intermitente` — Espejo de agua intermitente · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_aguas_continentales_perenne` — Espejo de agua perenne · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_asentamientos_y_edificios_020105` — Planta urbana · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_equipamiento_AL030` — Cementerio · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_equipamiento_AL170` — Espacio verde · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_estructura_asociada_010601` — Zona de extracción minera · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_extraccion_AA012` — Cantera · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_extraccion_AA052` — Yacimiento de hidrocarburo · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_fabricacion_y_procesamiento_AC070` — Área de fabricación y procesamiento · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_fabricacion_y_procesamiento_AC507` — Planta de tratamiento de efluentes cloacales · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_fabricacion_y_procesamiento_BH220` — Planta potabilizadora de agua · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_geomorfologia_050202` — Meseta · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_geomorfologia_DB560` — Médano, duna · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_gestion_de_residuos_AB000` — Vertedero, basurero · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_gestion_de_residuos_AB030` — Planta de tratamiento de residuos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_gestion_de_residuos_relleno_sanitario` — Relleno sanitario · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_glaciologia_050705` — Barrera de hielo · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_glaciologia_BJ020` — Morena, morrena · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_zona_costera_BA030` — Isla · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_zona_costera_playa_areana` — Playa de arena · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_zona_costera_playa_grava` — Playa de grava · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:areas_de_zona_costera_playa_restinga` — Playa de restinga · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:ayuda_a_la_navegacion_BC020` — Boya · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:ayuda_a_la_navegacion_BC050` — Faro · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:ayuda_a_la_navegacion_BC101` — Baliza · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:bahra_base_antartica` — Base antártica · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:bahra_paraje` — Paraje · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:cartas_100000` — Cartas 1:100.000 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:cartas_50000` — Cartas 1:50.000 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:cartas_500000` — Cartas 1:500.000 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:complejos_fronterizos` — Complejos Fronterizos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:controles_AH070` — Puesto de Control · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:cultura_y_religion_AL021` — Edificio de cultura · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:cultura_y_religion_AL330` — Edificio religioso · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:departamento` — Departamento · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:doscientas_millas_sector_antartico` — 200 millas desde la costa del sector antártico · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:edafologia_afloramiento_rocoso` — Afloramiento rocoso · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:edafologia_arenal` — Arenal · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:edafologia_barrial_barrizal` — Barrial, Barrizal · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:edafologia_cumbre_rocosa` — Cumbre rocosa · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:edafologia_pedregal` — Pedregal · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:edafologia_salina` — Salina, Salar, Salitral, Boratera · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:edafologia_sedimento_fluvial` — Sedimento Fluvial · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:estructuras_operativas_y_defensivas_090101` — Institución penitenciaria · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:estructuras_operativas_y_defensivas_090102` — Cuartel de bomberos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:estructuras_operativas_y_defensivas_FA517` — Edificio de seguridad · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:gobiernoslocales_2022` — Gobierno Local · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:gravimetria_bacara` — Red gravimétrica BACARA · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:gravimetria_igsn71` — Red gravimétrica IGSN 71 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:gravimetria_raga` — Red gravimétrica RAGA · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:gravimetria_rpo` — Red gravimétrica de Primer Orden · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:gravimetria_rso` — Red gravimétrica de Segundo Orden · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:gravimetria_rto` — Red gravimétrica de Tercer Orden · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:hitos_internacionales` — Hitos internacionales · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:hitos_interprovinciales` — Hitos interprovinciales · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:infraestructura_de_transporte_030801` — Estación de peaje · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:infraestructura_de_transporte_030803` — Indicador de kilómetros · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:infraestructura_de_transporte_AQ125` — Estación de ómnibus · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:infraestructura_de_transporte_AQ170` — Estación de servicio · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:infraestructura_de_transporte_AQ180` — Estación de pesaje · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:instalacion_militar_SU001` — Instalación militar · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:linea_de_limite_070110` — Límite interdepartamental o de partido · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:linea_de_limite_070111` — Límite interprovincial · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:linea_de_limite_070114` — Límite de área protegida · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:linea_de_limite_FA004` — Límite internacional · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:linea_limite_maritimos` — Límites de espacios marítimos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_aguas_continentales_BH010` — Acueducto · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_aguas_continentales_BH020` — Canal · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_aguas_continentales_BH030` — Acequia, zanja, zanjón · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_aguas_continentales_BI020` — Muro de embalse · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_aguas_continentales_intermitentes` — Corriente de agua intermitente · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_aguas_continentales_perenne` — Corriente de agua perenne · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_cruces_y_enlaces_AQ040` — Puente · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_energia_AT030` — Línea de transmisión eléctrica · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_estructura_asociada_ducto_subterraneo` — Ducto · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_050204` — Sierra · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_050205` — Cordillera · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_050206` — Cordón · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_050207` — Cuchilla · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_050208` — Cuesta · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_barranca` — Barranca · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_CA010` — lineas_hipsometricas · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_CA020` — Filo · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_CA025` — Valle · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_DB001` — Lugar geomorfológico · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_geomorfologia_DB200` — Quebrada, cañadón, garganta · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_mareas_y_corrientes_040601` — Accidente submarino · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_puertos_y_muelles_BB041` — Rompeolas · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_puertos_y_muelles_BB190` — Muelle · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_transporte_aereo_GB055` — Pista · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_transporte_ferroviario_AN010` — Ferrocarril · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_de_zona_costera_BA040` — Accidente costero · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_terrestres_070401` — Círculo polar · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_terrestres_070402` — Trópico · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:lineas_terrestres_070403` — Ecuador · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:localidad_bahra` — Localidad · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:mar_territorial_argentino` — Mar Territorial argentino · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:mareas_y_corrientes_BG020` — Mareógrafo · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:mde` — Modelo Digital de Elevaciones · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:municipio` — Gobierno Local · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:nivelacion_alta_precision` — Red de nivelación de Alta Precisión · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:nivelacion_precision` — Red de nivelación de Precisión · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:nivelacion_topografica` — Red de nivelación Topográfica · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:pais` — País · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:pasos_de_fronteras_internacionales` — Pasos de Fronteras Internacionales · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:plantacion_permanente_KB025` — Plantación permanente · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:plataforma_continental` — Plataforma Continental · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:provincia` — Provincia · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_actividad_agropecuaria_AJ050` — Molino viento · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_actividad_agropecuaria_AJ110` — Invernadero, vivero, huerta · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_aguas_continentales_041101` — Embalse rural · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_aguas_continentales_BH051` — Dique · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_aguas_continentales_BH170` — Fuente natural · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_aguas_continentales_BH180` — Catarata, cascada, salto · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_almacenamiento_y_logistica_AM070` — Tanque de combustible · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_almacenamiento_y_logistica_AM080` — Tanque de agua elevado · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_asentamientos_y_edificios_020101` — Edificio Gubernamental · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_asentamientos_y_edificios_020102` — Edificio de comunicaciones · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_asentamientos_y_edificios_020108` — Tapera · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_asentamientos_y_edificios_AL015` — Edificación · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_asentamientos_y_edificios_AL201` — Sitio de interés · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_asentamientos_y_edificios_ruina` — Ruinas · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_ciencia_y_educacion_020601` — Establecimiento educativo · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_ciencia_y_educacion_020602` — Universidad · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_ciencia_y_educacion_AL295` — Centro Científico · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_comunicacion_AT010` — Antena · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_comunicacion_AT080` — Torre de telecomunicaciones · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_cruces_y_enlaces_AQ040` — Puente · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_cruces_y_enlaces_AQ065` — Alcantarilla · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_cruces_y_enlaces_AQ130` — Tunel · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_cruces_y_enlaces_BH070` — Vado · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_energia_AD010` — Central eléctrica · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_energia_AD030` — Planta transformadora · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_equipamiento_AH030` — Refugio · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_equipamiento_AL030` — Cementerio · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_equipamiento_AL130` — Monumento · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_estructura_asociada_AA051` — Cámara de válvulas · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_estructura_asociada_AJ080` — Galpón, tinglado · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_estructura_asociada_AQ116` — Planta de bombeo de agua · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_extraccion_AA010` — Mina · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_extraccion_AA050` — Pozo hidrocarburos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_fabricacion_y_procesamiento_AC000` — Fábrica · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_fabricacion_y_procesamiento_AC507` — Planta de tratamiento de efluentes cloacales · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_fabricacion_y_procesamiento_BH220` — Planta potabilizadora de agua · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_geomorfologia_050203` — Mogote · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_geomorfologia_CA030` — Punto acotado · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_geomorfologia_DB120` — Abra, paso, portillo, portezuelo · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_geomorfologia_NA100` — Cerro · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_gestion_de_residuos_AB030` — Planta de tratamiento de residuos · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_glaciologia_BJ030` — Glaciar · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_obstrucciones_BD130` — Roca · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_puertos_y_muelles_BB005` — Puerto · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_puertos_y_muelles_BB041` — Rompeolas · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_recreacion_020401` — Centro de esquí · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_recreacion_AK040` — Instalación deportiva y de esparcimiento · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_transporte_aereo_GB001` — Aeródromo · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_transporte_aereo_GB005` — Aeropuerto · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_transporte_aereo_GB035` — Helipuerto · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:puntos_de_transporte_ferroviario_AN070` — Estación de ferrocarril · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:ramsac` — Red de estaciones GPS/GNSS RAMSAC · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:ramsac_ntrip` — Red RAMSAC-NTRIP · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:red_densificacion_posgar` — Red geodésica Densificación POSGAR07 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:red_pasma` — Red geodésica PASMA · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:red_posgar` — Red geodésica POSGAR07 · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:red_provincial` — Red geodésica Provincial · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:salud_020801` — Edificio de salud · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:sin_vegetacion_061001` — Desmonte · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:sublocalidad_entidad_bahra` — Sublocalidad · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:terreno_para_cultivo_EA010` — Terreno para cultivo · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vegetacion_arborea_060301` — Bosque artificial · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vegetacion_arborea_060302` — Monte · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vegetacion_arborea_AK120` — Parque artificial · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vegetacion_arborea_EC015` — Bosque, selva · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vegetacion_arbustiva_EB015` — Estepa arbustiva · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vegetacion_hidrofila_ED020` — Pajonal, juncal, totoral · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vial_AP010` — Huella · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vial_AP050` — Senda rural · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vial_nacional` — Red vial nacional · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vial_provincial` — Red vial provincial · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:vial_terciaria` — Red vial terciaria · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:zona_contigua_argentina` — Zona Contigua argentina · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ign:zona_economica_exclusiva_argentina` — Zona Económica Exclusiva argentina · CRS: `urn:ogc:def:crs:EPSG::4326`

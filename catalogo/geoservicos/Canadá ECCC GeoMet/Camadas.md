@@ -1,0 +1,100 @@
+# Environment and Climate Change Canada — GeoMet — camadas
+
+Geoportal: [[Geosserviços/Canadá ECCC GeoMet/Environment and Climate Change Canada — GeoMet|Environment and Climate Change Canada — GeoMet]]
+
+Total: **95** camadas WFS.
+- `ec-msc:AQHI-OBS` — AQHI - Observations · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:CaLDAS-NSRPS_Footprint` — CaLDAS-NSRPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:CanSIPS_Footprint` — CanSIPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:CAPS_3km_Thickness-Contour_1000to500mb` — CAPS - Thickness between 1000mb and 500mb (contour) [m] [experimental] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:CIOPS-East_Footprint` — CIOPS-East footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:CIOPS-SalishSea_Footprint` — CIOPS-SalishSea footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:CIOPS-West_Footprint` — CIOPS-West footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:CoastalFloodingRiskIndex` — Coastal Flooding Risk Index · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Current-Alerts` — Current Weather Alerts [experimental] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:CURRENT_CONDITIONS` — Current Conditions · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS-WEonG_Footprint` — GDPS-WEonG footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS_15km_HighLowPressure_MSL` — GDPS - High and low pressure systems at mean sea level [hPa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS_15km_Pressure-PVU-1-Contour` — GDPS - Pressure at 1 Potential Vorticity Unit (PVU) (contour) [Pa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS_15km_Pressure-PVU-1.5-Contour` — GDPS - Pressure at 1.5 Potential Vorticity Unit (PVU) (contour) [Pa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS_15km_Pressure-PVU-2-Contour` — GDPS - Pressure at 2 Potential Vorticity Unit (PVU) (contour) [Pa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS_15km_Thickness-Contour_1000to500mb` — GDPS - Thickness between 1000mb and 500mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS_15km_Thickness-Contour_1000to850mb` — GDPS - Thickness between 1000mb and 850mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS_15km_Thickness-Contour_850to700mb` — GDPS - Thickness between 850mb and 700mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPS_Footprint` — GDPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDPSP_Footprint` — GDSPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GDWPS_Footprint` — GDWPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GEPS_Footprint` — GEPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GEWPS_Footprint` — GEWPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:GIOPS_Footprint` — GIOPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPA.06F_WATERSHED` — HRDPA Watershed - Precipitation - 6-hour accumulation [mm] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPA.06P_WATERSHED` — HRDPA Watershed - Precipitation - 6-hour accumulation [mm] (preliminary) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPA.24F_WATERSHED` — HRDPA Watershed - Precipitation - 24-hour accumulation [mm] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPA.24P_WATERSHED` — HRDPA Watershed - Precipitation - 24-hour accumulation [mm] (preliminary) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPA_Footprint` — HRDPA footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPS-Continental_Footprint` — HRDPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPS-WEonG_Footprint` — HRDPS-WEonG footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPS.CONTINENTAL_DZ-CONTOUR` — HRDPS.CONTINENTAL - Thickness between 1000mb and 500mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPS.CONTINENTAL_DZ_1000-850mb-CONTOUR` — HRDPS.CONTINENTAL - Thickness between 1000 mb and 850 mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPS.CONTINENTAL_DZ_850-700mb-CONTOUR` — HRDPS.CONTINENTAL - Thickness between 850 mb and 700 mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HRDPS.CONTINENTAL_HighLowPressure_MSL` — HRDPS.CONTINENTAL - High and low pressure systems at mean sea level [hPa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Hurricane-Cyclones` — Hurricane Forecast Location · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Hurricane-ErrorCone` — Hurricane Track Forecast Error · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Hurricane-Tracks` — Hurricane Line Segments · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Hurricane-WindRadii` — Hurricane Wind Forecast Wind Radii · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HURRICANE_CENTRE` — Hurricane Forecast Location [deprecated] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HURRICANE_ERR` — Hurricane Track Forecast Error [deprecated] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HURRICANE_LINE` — Hurricane Line Segments [deprecated] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HURRICANE_RAD` — Hurricane Wind Forecast Wind Radii [deprecated] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:HURRICANE_RESPONSE_ZONE` — Hurricane Response Zone · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Marine-Standard-Forecast-Zones` — Marine Standard Forecast Zones (hybrid) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:METNOTES` — MetNotes · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Public-Standard-Forecast-Zones` — Public Standard Forecast Zones (hybrid) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Radar-Coverage_SfcPrecipType` — Dynamic radar coverage for surface precipitation type · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Radar-Coverage_SfcPrecipType-Inverted` — Inverted dynamic radar coverage for surface precipitation type · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RADAR_COVERAGE_RRAI` — Dynamic radar coverage for rain · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RADAR_COVERAGE_RRAI.INV` — Inverted dynamic radar coverage for rain · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RADAR_COVERAGE_RSNO` — Dynamic radar coverage for snow · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RADAR_COVERAGE_RSNO.INV` — Inverted dynamic radar coverage for snow · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_Footprint` — RAQDPS-FW footprint (Cumulative Effects) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2013` — Wildfire hotspots Cumulative Effects products (2013) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2014` — Wildfire hotspots Cumulative Effects products (2014) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2015` — Wildfire hotspots Cumulative Effects products (2015) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2016` — Wildfire hotspots Cumulative Effects products (2016) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2017` — Wildfire hotspots Cumulative Effects products (2017) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2018` — Wildfire hotspots Cumulative Effects products (2018) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2019` — Wildfire hotspots Cumulative Effects products (2019) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2020` — Wildfire hotspots Cumulative Effects products (2020) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2021` — Wildfire hotspots Cumulative Effects products (2021) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2022` — Wildfire hotspots Cumulative Effects products (2022) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2023` — Wildfire hotspots Cumulative Effects products (2023) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS-FW.CE_HOTSPOTS.2024` — Wildfire hotspots Cumulative Effects products (2024) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RAQDPS_Footprint` — RAQDPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDAQA.CE_Footprint` — RDAQA footprint (Cumulative Effects) · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDAQA_Footprint` — RDAQA footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDPS_10km_HighLowPressure_MSL` — RDPS - High and low pressure systems at mean sea level [hPa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDPS_10km_Pressure-PVU-1-Contour` — RDPS - Pressure at 1 Potential Vorticity Unit (PVU) (contour) [Pa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDPS_10km_Pressure-PVU-1.5-Contour` — RDPS - Pressure at 1.5 Potential Vorticity Unit (PVU) (contour) [Pa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDPS_10km_Pressure-PVU-2-Contour` — RDPS - Pressure at 2 Potential Vorticity Unit (PVU) (contour) [Pa] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDPS_10km_Thickness-Contour_1000to500mb` — RDPS - Thickness between 1000mb and 500mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDPS_10km_Thickness-Contour_1000to850mb` — RDPS - Thickness between 1000mb and 850mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDPS_10km_Thickness-Contour_850to700mb` — RDPS - Thickness between 850mb and 700mb (contour) [m] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDPS_Footprint` — RDPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDWPS-Erie_Footprint` — RDWPS-Lake Erie footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDWPS-Huron-Michigan_Footprint` — RDWPS-Lake Huron-Michigan footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDWPS-National_Footprint` — RDWPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDWPS-Ontario_Footprint` — RDWPS-Lake Ontario footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RDWPS-Superior_Footprint` — RDWPS-Lake Superior footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:RESPS_Footprint` — RESPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:REWPS_Footprint` — REWPS footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:SWOB-Marine-Stations` — SWOB Stations - Marine · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:SWOB-Partner-Stations` — SWOB Stations - Partners · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:SWOB-Surface-Stations` — SWOB Stations · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Thunderstorm-Outlook_Atlantic` — Thunderstorm Outlook - Atlantic [experimental] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Thunderstorm-Outlook_BC-YT` — Thunderstorm Outlook - British Columbia/Yukon [experimental] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Thunderstorm-Outlook_NWT` — Thunderstorm Outlook - Northwest Territories [experimental] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Thunderstorm-Outlook_ON` — Thunderstorm Outlook - Ontario [experimental] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Thunderstorm-Outlook_Prairies` — Thunderstorm Outlook - Prairies [experimental] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:Thunderstorm-Outlook_QC` — Thunderstorm Outlook - Quebec [experimental] · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:WCPS-Ocean-Atm_Footprint` — WCPS-Ocean-Atmosphere footprint · CRS: `urn:ogc:def:crs:EPSG::4326`
+- `ec-msc:WildfireHotspots` — Wildfire hotspots ingested by RAQDPS · CRS: `urn:ogc:def:crs:EPSG::4326`

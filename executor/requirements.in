@@ -1,0 +1,40 @@
+# executor/requirements.in
+# Dependências mínimas do executor Atlas (cliente autônomo, instalação manual
+# pela CLI). Edite AQUI; o executor/requirements.txt é gerado daqui, travado e
+# com o hash de cada arquivo (python scripts/travar_python.py). É ele que se
+# instala — `pip install -r executor/requirements.txt`, de preferência num venv;
+# o pip confere os hashes sozinho.
+#
+# Antes eram pisos (>=), e cada máquina baixava a versão mais nova de tudo na
+# hora da instalação: sem revisão e sem quarentena, a porta de entrada de uma
+# versão maliciosa recém-publicada. Agora as versões vêm do lock completo: o
+# script compila este arquivo com `--constraint executor/requirements-full.txt`
+# (pela linha de comando, e não num `-c` aqui, por causa do Dependabot — ver
+# PARES em scripts/travar_python.py). São as mesmas do Docker e do app desktop,
+# e só mudam por PR.
+
+# WebSocket client
+websockets
+
+# HTTP client assíncrono (autenticação + registro de chave)
+httpx
+
+# Certificados CA (resolve SSL no macOS onde Python não usa o keychain do sistema)
+certifi
+
+# Criptografia (X25519, Ed25519, AES-256-GCM, HKDF)
+cryptography
+
+# Variáveis de ambiente
+python-dotenv
+
+# Métricas de sistema (CPU, RAM, disco)
+psutil
+
+# Painel ao vivo no terminal. Opcional na prática: sem ele o executor sobe
+# normalmente e mantém o log linha a linha (ver EXECUTOR_DASHBOARD no README).
+rich
+
+# Flow engine (instalado via pip install -e . na raiz do repo)
+# ou via PYTHONPATH apontando para a raiz
+OWSLib

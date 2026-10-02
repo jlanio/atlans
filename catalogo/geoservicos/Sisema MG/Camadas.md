@@ -1,0 +1,1433 @@
+# Sisema MG — camadas
+
+Geoportal: [[Geosserviços/Sisema MG/Sistema Estadual de Meio Ambiente e Recursos Hídricos de Minas Gerais — Sisema|Sistema Estadual de Meio Ambiente e Recursos Hídricos de Minas Gerais — Sisema]]
+
+Total: **1426** camadas, organizadas em 1 grupo(s).
+
+## IDE (1426)
+- `IDE:ide_0101_bu_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do rio Buranhém
+- `IDE:ide_0101_do_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Doce
+- `IDE:ide_0101_gd_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Grande
+- `IDE:ide_0101_ib_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Itabapoana
+- `IDE:ide_0101_in_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Itanhém
+- `IDE:ide_0101_ip_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Itapemirim
+- `IDE:ide_0101_iu_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Itaúnas
+- `IDE:ide_0101_jq_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Jequitinhonha
+- `IDE:ide_0101_ju_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Jucuruçu
+- `IDE:ide_0101_mu_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Mucuri
+- `IDE:ide_0101_pa_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Pardo
+- `IDE:ide_0101_pe_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Peruípe
+- `IDE:ide_0101_pj_hidro_otto_lin` — Ottotrechos da bacia hidrográfica dos Rios Piracicaba e Jaguari
+- `IDE:ide_0101_pn_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Paranaíba
+- `IDE:ide_0101_ps_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio Paraíba do Sul
+- `IDE:ide_0101_sf_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do rio São Francisco
+- `IDE:ide_0101_sm_hidro_otto_lin` — Ottotrechos da bacia hidrográfica do Rio São Mateus
+- `IDE:ide_0102_bu_otto_bacia_pol` — Ottobacia do Rio Buranhém
+- `IDE:ide_0102_do_otto_bacia_pol` — Ottobacia do Rio Doce
+- `IDE:ide_0102_gd_otto_bacia_pol` — Ottobacia do Rio Grande
+- `IDE:ide_0102_ib_otto_bacia_pol` — Ottobacia do Rio Itabapoana
+- `IDE:ide_0102_in_otto_bacia_pol` — Ottobacia do Rio Itanhém
+- `IDE:ide_0102_ip_otto_bacia_pol` — Ottobacia do Rio Itapemirim
+- `IDE:ide_0102_iu_otto_bacia_pol` — Ottobacia do Rio Itaúnas
+- `IDE:ide_0102_jq_otto_bacia_pol` — Ottobacia do Rio Jequitinhonha
+- `IDE:ide_0102_ju_otto_bacia_pol` — Ottobacia do Rio Jucuruçu
+- `IDE:ide_0102_mu_otto_bacia_pol` — Ottobacia do Rio Mucuri
+- `IDE:ide_0102_pa_otto_bacia_pol` — Ottobacia do Rio Pardo
+- `IDE:ide_0102_pe_otto_bacia_pol` — Ottobacia do Rio Peruípe
+- `IDE:ide_0102_pj_otto_bacia_pol` — Ottobacia dos Rios Piracicaba e Jaguari
+- `IDE:ide_0102_pn_otto_bacia_pol` — Ottobacia do Rio Paranaíba
+- `IDE:ide_0102_ps_otto_bacia_pol` — Ottobacia do Rio Paraíba do Sul
+- `IDE:ide_0102_sf_otto_bacia_pol` — Ottobacia do Rio São Francisco
+- `IDE:ide_0102_sm_otto_bacia_pol` — Ottobacia do Rio São Mateus
+- `IDE:ide_0103_mg_massa_dagua_bho_pol` — Massas d'água
+- `IDE:ide_0104_mg_hidrografia_principal_lin` — Principais trechos hidrográficos de Minas Gerais
+- `IDE:ide_0105_mg_ch_exutorio_pto` — Exultório ottocodificado das Circunscrições Hidrográficas (CHs)
+- `IDE:ide_0201_mg_curvas_nivel_30m_lin` — Curvas de nível (equidistância de 30m)
+- `IDE:ide_0201_mg_ponto_cotado_altimetrico_pto` — Ponto cotado altimétrico
+- `IDE:ide_0202_mg_pico_pto` — Picos (FJP)
+- `IDE:ide_0202_mg_picos_ibge_pto` — Picos (IBGE)
+- `IDE:ide_0203_mg_geomorfologia_ibge_pol` — Geomorfologia 1:250.000 (IBGE, 2026)
+- `IDE:ide_0301_mg_cobertura_florestal__2009_pol` — Inventário florestal
+- `IDE:ide_0301_mg_cobertura_mata_atlantica_2019_lote1_pol` — Cobertura vegetal da mata atlântica (2019) - Lote 1
+- `IDE:ide_0301_mg_cobertura_mata_atlantica_2019_lote2_pol` — Cobertura vegetal da mata atlântica (2019) - Lote 2
+- `IDE:ide_0301_mg_cobertura_mata_atlantica_2019_lote3_pol` — Cobertura vegetal da mata atlântica (2019) - Lote 3
+- `IDE:ide_0302_mg_limite_biomas_ibge_pol` — Limite dos biomas — IBGE, 2025
+- `IDE:ide_0303_mg_pivo_central_irrigacao_pol` — Pivô central para irrigação
+- `IDE:ide_0401_mg_malha_viaria_rmbh_lin` — Malha viária da RMBH
+- `IDE:ide_0401_mg_rodovias_lin` — Rodovias estaduais e federais de Minas Gerais
+- `IDE:ide_0401_mg_trecho_rodoviario_ibge_lin` — Principais trechos rodoviários de Minas Gerais
+- `IDE:ide_0402_mg_ferrovias_lin` — Ferrovias de Minas Gerais
+- `IDE:ide_0403_mg_aerodromos_pto` — Aeródromos (DECEA)
+- `IDE:ide_0404_mg_eclusas_pto` — Eclusas
+- `IDE:ide_0404_mg_hidrovias_lin` — Hidrovias
+- `IDE:ide_0404_mg_porto_terminal_pto` — Portos e terminais hidroviários
+- `IDE:ide_0405_mg_eixos_dutoviarios_lin` — Eixos dutoviários
+- `IDE:ide_0406_mg_estacoes_brt_rmbh_pto` — Estações de Bus Rapid Transit (BRT) da RMBH
+- `IDE:ide_0406_mg_linhas_onibus_mun_rmbh_lin` — Linhas de ônibus intramunicipais da RMBH
+- `IDE:ide_0406_mg_linhas_onibus_rmbh_lin` — Linhas de ônibus metropolitanas da RMBH
+- `IDE:ide_0406_mg_rodoviarias_rmbh_pto` — Terminais rodoviários da RMBH
+- `IDE:ide_0407_mg_est_metro_rmbh_pto` — Estações de Metrô da RMBH
+- `IDE:ide_0407_mg_metro_rmbh_lin` — Linhas metroviárias da RMBH
+- `IDE:ide_0501_mg_aproveitamentos_hidreletricos_pto` — Aproveitamentos Hidrelétricos (AHEs)
+- `IDE:ide_0501_mg_centrais_geradoras_hidreletricas_pto` — Centrais Geradoras Hidrelétricas (CGHs)
+- `IDE:ide_0501_mg_distribuidoras_energia_pol` — Distribuidoras de energia por município
+- `IDE:ide_0501_mg_linhas_transmissao_ons_lin` — Linhas de transmissão de energia
+- `IDE:ide_0501_mg_pequenas_centrais_hidreletricas_pto` — Pequenas Centrais Hidrelétricas (PCHs)
+- `IDE:ide_0501_mg_usinas_eolIcas_pto` — Usinas Eólicas (UEEs)
+- `IDE:ide_0501_mg_usinas_fotovoltaicas_pto` — Usinas Fotovoltaicas (UFVs)
+- `IDE:ide_0501_mg_usinas_hidreletricas_pto` — Usinas Hidrelétricas (UHEs)
+- `IDE:ide_0501_mg_usinas_termeletricas_pto` — Usinas Termelétricas (UTEs)
+- `IDE:ide_0601_mg_loc_at_sanit_peq_porte_pto` — Localização dos aterros sanitários de pequeno porte
+- `IDE:ide_0601_mg_loc_at_sanit_pto` — Localização dos aterros sanitários
+- `IDE:ide_0601_mg_loc_disp_final_rsu_pol` — Local de disposição final de RSU pelo município
+- `IDE:ide_0601_mg_loc_est_trbd_rsu_pto` — Localização das estações de transbordo de resíduos
+- `IDE:ide_0601_mg_loc_lixao_pto` — Localização dos aterros controlados/lixões
+- `IDE:ide_0601_mg_loc_utc_pto` — Localização das Unidades de Triagem e Compostagem (UTCs)
+- `IDE:ide_0601_mg_tipol_disp_final_rsu_pol` — Tipologia de destinação final de RSU por município
+- `IDE:ide_0602_mg_cons_pub_intermun_rsu_pol` — Consórcios públicos intermunicipais de RSU
+- `IDE:ide_0603_mg_ete_pto` — Estações de Tratamento de Esgoto (ETEs)
+- `IDE:ide_0604_mg_col_selet_2020_pol` — Municípios com serviço de coleta seletiva instituido (2020)
+- `IDE:ide_0604_mg_irsu_2020_pol` — Índice de Gerenciamento de Resíduos Sólidos Urbanos - IRSU (2020)
+- `IDE:ide_0604_mg_pmgirs_2020_pol` — Municípios com Plano Municipal de Gestão Integrada de Resíduos instituído (2020)
+- `IDE:ide_0604_mg_pmsb_2020_pol` — Municípios com plano municipal de saneamento básico instituído (2020)
+- `IDE:ide_0605_mg_con_pc_agua_2022_pol` — Consumo médio per capita de água por município (2022)
+- `IDE:ide_0605_mg_perc_poptot_abast_agua_2022_pol` — Percentual da população total do município atendida por abastecimento de água (2022)
+- `IDE:ide_0605_mg_perc_popurb_abast_agua_2022_pol` — Percentual da população urbana do município atendida por abastecimento de água (2022)
+- `IDE:ide_0605_mg_perc_popurb_col_esgoto_2022_pol` — Percentual da população urbana do município atendida por coleta de esgoto (2022)
+- `IDE:ide_0605_mg_perc_popurb_trat_esgoto_2022_pol` — Percentual da população urbana do município atendida por tratamento de esgoto (2022)
+- `IDE:ide_0605_mg_prest_serv_abast_agua_2022_pol` — Prestador do serviço de abastecimento de água no município (2022)
+- `IDE:ide_0605_mg_prest_serv_col_trat_esgot_2022_pol` — Prestador dos serviços de coleta e tratamento de esgoto no município (2022)
+- `IDE:ide_0901_mg_localidades_pto` — Localidades
+- `IDE:ide_0902_mg_sede_municipal_pto` — Sedes municipais
+- `IDE:ide_0903_mg_vila_pto` — Vilas
+- `IDE:ide_1001_mg_rede_altimetrica_pto` — Rede altimétrica
+- `IDE:ide_1002_mg_marcos_pto` — Marcos
+- `IDE:ide_1003_mg_articulacao_1000000_pol` — Articulação das folhas do Mapeamento Topográfico Sistemático – 1:1.000.000
+- `IDE:ide_1003_mg_articulacao_100000_pol` — Articulação das folhas do Mapeamento Topográfico Sistemático – 1:100.000
+- `IDE:ide_1003_mg_articulacao_250000_pol` — Articulação das folhas do Mapeamento Topográfico Sistemático – 1:250.000
+- `IDE:ide_1003_mg_articulacao_25000_pol` — Articulação das folhas do Mapeamento Topográfico Sistemático – 1:25.000
+- `IDE:ide_1003_mg_articulacao_50000_pol` — Articulação das folhas do Mapeamento Topográfico Sistemático – 1:50.000
+- `IDE:ide_1003_mg_articulacao_topodata_pol` — Articulação Topodata - 1:250.000
+- `IDE:ide_1003_mg_fusos_utm_pol` — Fusos UTM
+- `IDE:ide_1003_mg_grade_cbers_pol` — Grade CBERS
+- `IDE:ide_1003_mg_grade_landsat_pol` — Grade Landsat
+- `IDE:ide_1003_mg_grade_sentinel2_pol` — Grade Sentinel 2
+- `IDE:ide_1101_mg_unidade_federacao_pol` — Limite de Minas Gerais
+- `IDE:ide_1102_mg_reg_geograficas_imediatas_pol` — Regiões geográficas imediatas de Minas Gerais
+- `IDE:ide_1102_mg_reg_geograficas_intermediarias_pol` — Regiões geográficas intermediárias de Minas Gerais
+- `IDE:ide_1103_mg_municipios_pol` — Municípios de Minas Gerais
+- `IDE:ide_1104_mg_lim_reg_metrop_pol` — Limites das regiões metropolitanas de Minas Gerais
+- `IDE:ide_1104_mg_mun_reg_metrop_pol` — Municípios das regiões metropolitanas de Minas Gerais
+- `IDE:ide_1105_mg_distritos_pol` — Distritos de Minas Gerais
+- `IDE:ide_1106_mg_setores_censit_intermed_pol` — Setores censitários intermediários (classificados por tipo de ocupação)
+- `IDE:ide_1106_mg_setores_censitarios_pol` — Setores Censitários (Censo 2022)
+- `IDE:ide_1107_mg_assentamentos_rurais_pol` — Assentamentos rurais
+- `IDE:ide_1108_mg_circunscricoes_hidrograficas_pol` — Circunscrições Hidrográficas (CHs)
+- `IDE:ide_1108_mg_ief_regionais_pol` — Unidades Regionais de Florestas e Biodiversidade (URFBio)
+- `IDE:ide_1108_mg_mun_uras_pol` — Municípios de MG por Unidade Regional de Regularização Ambiental (URA)
+- `IDE:ide_1108_mg_mun_urfbio_pol` — Municípios de MG por Unidade Regional de Florestas e Biodiversidade (URFBio)
+- `IDE:ide_1108_mg_municipios_ch_pol` — Municípios de MG por Circunscrição Hidrográfica (CH)
+- `IDE:ide_1108_mg_unidades_estrategicas_gestao_recursos_hidricos_pol` — Unidades Estratégicas de Gestão de Recursos Hídricos (UEG)
+- `IDE:ide_1108_mg_ura_pol` — Unidades Regionais de Regularização Ambiental (URA)
+- `IDE:ide_1109_mg_area_atuacao_sudene_pol` — Área de atuação da Sudene em MG
+- `IDE:ide_1109_mg_mun_semiarido_pol` — Municípios de MG localizados no semiárido
+- `IDE:ide_1109_mg_mun_sudene_pol` — Municípios de MG localizados na área de atuação da Sudene
+- `IDE:ide_1109_mg_semiarido_pol` — Limite do semiárido em MG
+- `IDE:ide_1401_mg_areas_urbanizadas_2005_pol` — Áreas urbanizadas em MG (2005)
+- `IDE:ide_1401_mg_areas_urbanizadas_2015_pol` — Áreas urbanizadas em MG (2015)
+- `IDE:ide_1401_mg_areas_urbanizadas_2019_pol` — Áreas urbanizadas em MG (2019)
+- `IDE:ide_1401_mg_areas_urbanizadas_2022_pol` — Áreas urbanizadas em MG (2022)
+- `IDE:ide_1501_mg_amostras_solos_pto` — Amostras de solos
+- `IDE:ide_1502_mg_mapa_solos_pol` — Mapa de solos de Minas Gerais
+- `IDE:ide_1504_mg_capacidade_agua_solos_pol` — Capacidade de retenção de água nos solos
+- `IDE:ide_1504_mg_infil_solos_pol` — Capacidade de infiltração dos solos
+- `IDE:ide_1504_mg_solos_aptidao_agricola_pol` — Aptidão agrícola das terras
+- `IDE:ide_1601_mg_zon_clima_koppen_pol` — Zoneamento climático conforme Köppen-Geiger
+- `IDE:ide_1601_mg_zonas_climaticas_pol` — Zonas climáticas
+- `IDE:ide_1602_mg_cap_adap_2015_pol` — Capacidade de adaptação geral às mudanças climáticas (2015)
+- `IDE:ide_1602_mg_cap_adap_2017_pol` — Capacidade de adaptação geral às mudanças climáticas (2017)
+- `IDE:ide_1602_mg_cap_adap_2024_pol` — Capacidade de adaptação geral às mudanças climáticas (2024)
+- `IDE:ide_1602_mg_expo_2015_pol` — Exposição geral às mudanças climáticas (2015)
+- `IDE:ide_1602_mg_expo_2017_pol` — Exposição geral às mudanças climáticas (2017)
+- `IDE:ide_1602_mg_expo_2024_pol` — Exposição geral às mudanças climáticas (2024)
+- `IDE:ide_1602_mg_impc_2015_pol` — IMPC - Índice Mineiro de Pressão Climática (2015)
+- `IDE:ide_1602_mg_impc_2017_pol` — IMPC - Índice Mineiro de Pressão Climática (2017)
+- `IDE:ide_1602_mg_impc_2024_pol` — IMPC - Índice Mineiro de Pressão Climática (2024)
+- `IDE:ide_1602_mg_imvc_2015_pol` — IMVC - Índice Mineiro de Vulnerabilidade Climática (2015)
+- `IDE:ide_1602_mg_imvc_2017_pol` — IMVC - Índice Mineiro de Vulnerabilidade Climática (2017)
+- `IDE:ide_1602_mg_imvc_2024_pol` — IMVC - Índice Mineiro de Vulnerabilidade Climática (2024)
+- `IDE:ide_1602_mg_sensib_2015_pol` — Sensibilidade geral às mudanças climáticas (2015)
+- `IDE:ide_1602_mg_sensib_2017_pol` — Sensibilidade geral às mudanças climáticas (2017)
+- `IDE:ide_1602_mg_sensib_2024_pol` — Sensibilidade geral às mudanças climáticas (2024)
+- `IDE:ide_160301_mg_direcao_pred_vento_ncb_1961_1990_pto` — Normais Climatológicas do Brasil - Direção predominante do vento (1961-1990)
+- `IDE:ide_160301_mg_insolacao_total_ncb_1961_1990_pto` — Normais Climatológicas do Brasil - Insolação total (1961-1990)
+- `IDE:ide_160301_mg_precip_acumulada_ncb_1961_1990_pto` — Normais Climatológicas do Brasil - Precipitação acumulada (1961-1990)
+- `IDE:ide_160301_mg_pressao_atmosferica_ncb_1961_1991_pto` — Normais Climatológicas do Brasil - Pressão atmosférica (1961-1990)
+- `IDE:ide_160301_mg_temp_maxima_ncb_1961_1990_pto` — Normais Climatológicas do Brasil - Temperatura máxima (1961-1990)
+- `IDE:ide_160301_mg_temp_minima_ncb_1961_1990_pto` — Normais Climatológicas do Brasil - Temperatura mínima (1961-1990)
+- `IDE:ide_160301_mg_umidade_relativa_ar_ncb_1961_1990_pto` — Normais Climatológicas do Brasil - Umidade relativa do ar (1961-1990)
+- `IDE:ide_160302_mg_direcao_pred_vento_ncb_1991_2020_pto` — Normais Climatológicas do Brasil - Direção predominante do vento (1991-2020)
+- `IDE:ide_160302_mg_insolacao_total_ncb_1991_2020_pto` — Normais Climatológicas do Brasil - Insolação total (1991-2020)
+- `IDE:ide_160302_mg_precip_acumulada_ncb_1991_2020_pto` — Normais Climatológicas do Brasil - Precipitação acumulada (1991-2020)
+- `IDE:ide_160302_mg_pressao_atmosferica_ncb_1991_2020_pto` — Normais Climatológicas do Brasil - Pressão atmosférica (1991-2020)
+- `IDE:ide_160302_mg_temp_maxima_ncb_1991_2020_pto` — Normais Climatológicas do Brasil - Temperatura máxima (1991-2020)
+- `IDE:ide_160302_mg_temp_minima_ncb_1991_2020_pto` — Normais Climatológicas do Brasil - Temperatura mínima (1991-2020)
+- `IDE:ide_160302_mg_umidade_relativa_ncb_1991_2020_pto` — Normais Climatológicas do Brasil - Umidade relativa do ar (1991-2020)
+- `IDE:ide_1604_mg_anomalia_hidrologica_2020_2021_pol` — Anomalias hidrológicas 2020-2021
+- `IDE:ide_1604_mg_anomalia_hidrologica_pol` — Anomalias hidrológicas 2021-2022
+- `IDE:ide_1701_mg_compart_tect_pol` — Compartimentação tectônica
+- `IDE:ide_1701_mg_mapa_geologico_pol` — Mapeamento geológico
+- `IDE:ide_1702_mg_estruturas_lin` — Estruturas geológicas
+- `IDE:ide_1703_mg_unid_geologico_ambientais_pol` — Geodiversidade - unidades geológico-ambientais
+- `IDE:ide_1704_mg_aquiferos_pol` — Aquíferos
+- `IDE:ide_1704_mg_cont_hidrogeo_lin` — Contatos hidroestatigráficos
+- `IDE:ide_1704_mg_hidrogeologia_pol` — Mapa hidrogeológico de Minas Gerais
+- `IDE:ide_1704_mg_vuln_nat_cont_aquif_pol` — Vulnerabilidade natural à contaminação de aquíferos
+- `IDE:ide_1705_mg_risco_erosao_pol` — Risco de erosão e movimento de massa
+- `IDE:ide_1705_mg_risco_movimento_filito_pol` — Risco de movimento de filito
+- `IDE:ide_1705_mg_risco_subsidencia_carstica_pol` — Risco de subsidência cárstica
+- `IDE:ide_1706_mg_ocor_minerais_pto` — Ocorrências minerais
+- `IDE:ide_1706_mg_processos_minerarios_pol` — Processos minerários ativos
+- `IDE:ide_1801_mg_especies_catalogadas_pol` — Número de espécies catalogadas por município
+- `IDE:ide_1801_mg_ocorrencia_especies_pto` — Registro de ocorrência de espécies
+- `IDE:ide_1802_mg_ocorrencia_alipiopsitta_xanthops_pol` — Ocorrência natural - Alipiopsitta Xanthops
+- `IDE:ide_1802_mg_ocorrencia_amazona_aestiva_pol` — Ocorrência natural - Amazona Aestiva
+- `IDE:ide_1802_mg_ocorrencia_amazona_amazonica_pol` — Ocorrência natural - Amazona Amazonica
+- `IDE:ide_1802_mg_ocorrencia_amazona_vinacea_pol` — Ocorrência natural -  Amazona Vinacea
+- `IDE:ide_1802_mg_ocorrencia_amazonetta_brasiliensis_pol` — Ocorrência natural - Amazonetta Brasiliensis
+- `IDE:ide_1802_mg_ocorrencia_antilophia_galeata_pol` — Ocorrência natural - Antilophia Galeata
+- `IDE:ide_1802_mg_ocorrencia_ara_ararauna_pol` — Ocorrência natural - Ocorrencia Ara Ararauna
+- `IDE:ide_1802_mg_ocorrencia_aratinga_auricapillus_pol` — Ocorrência natural - Aratinga Auricapillus
+- `IDE:ide_1802_mg_ocorrencia_arremon_flavirostris_pol` — Ocorrência natural - Arremon Flavirostris
+- `IDE:ide_1802_mg_ocorrencia_asio_clamator_pol` — Ocorrência natural - Asio Clamator
+- `IDE:ide_1802_mg_ocorrencia_athene_cunicularia_pol` — Ocorrência natural - Athene Cunicularia
+- `IDE:ide_1802_mg_ocorrencia_brotogeris_chiriri_pol` — Ocorrência natural - Brotogeris Chiriri
+- `IDE:ide_1802_mg_ocorrencia_caracara_plancus_pol` — Ocorrência natural - Caracara Plancus
+- `IDE:ide_1802_mg_ocorrencia_cariama_cristata_pol` — Ocorrência natural - Cariama Cristata
+- `IDE:ide_1802_mg_ocorrencia_chrysomus_ruficapillus_pol` — Ocorrência natural - Chrysomus Ruficapillus
+- `IDE:ide_1802_mg_ocorrencia_colaptes_melanochloros_pol` — Ocorrência natural - Colaptes Melanochloros
+- `IDE:ide_1802_mg_ocorrencia_columbina_picui_pol` — Ocorrência natural - Columbina Picui
+- `IDE:ide_1802_mg_ocorrencia_columbina_squammata_pol` — Ocorrência natural - Columbina Squammata
+- `IDE:ide_1802_mg_ocorrencia_columbina_talpacoti_pol` — Ocorrência natural - Columbina Talpacoti
+- `IDE:ide_1802_mg_ocorrencia_coragyps_atratus_pol` — Ocorrência natural - Coragyps Atratus
+- `IDE:ide_1802_mg_ocorrencia_coryphospingus_cucullatus_pol` — Ocorrência natural - Coryphospingus Cucullatus
+- `IDE:ide_1802_mg_ocorrencia_coryphospingus_pileatus_pol` — Ocorrência natural - Coryphospingus Pileatus
+- `IDE:ide_1802_mg_ocorrencia_crax_fasciolata_pol` — Ocorrência natural - Crax Fasciolata
+- `IDE:ide_1802_mg_ocorrencia_cyanocorax cyanopogon_pol` — Ocorrência natural - Cyanocorax Cyanopogon
+- `IDE:ide_1802_mg_ocorrencia_cyanocorax_cristatellus_pol` — Ocorrência natural - Cyanocorax Cristatellus
+- `IDE:ide_1802_mg_ocorrencia_cyanoloxia_brissonii_pol` — Ocorrência natural - Cyanoloxia Brissonii
+- `IDE:ide_1802_mg_ocorrencia_cypsnagra_hirundinacea_pol` — Ocorrência natural - Cypsnagra Hirundinacea
+- `IDE:ide_1802_mg_ocorrencia_dacnis_cayana_pol` — Ocorrência natural - Dacnis Cayana
+- `IDE:ide_1802_mg_ocorrencia_dendrocygna_viduata_pol` — Ocorrência natural - Dendrocygna Viduata
+- `IDE:ide_1802_mg_ocorrencia_especies_avifauna_geral_pol` — Ocorrência de espécies da avifauna (camada única com a ocorrência das 95 espécies)
+- `IDE:ide_1802_mg_ocorrencia_eupsittula_aurea_pol` — Ocorrência natural - Eupsittula Aurea
+- `IDE:ide_1802_mg_ocorrencia_eupsittula_cactorum_pol` — Ocorrência natural - Eupsittula Cactorum
+- `IDE:ide_1802_mg_ocorrencia_falco_femoralis_pol` — Ocorrência natural - Falco Femoralis
+- `IDE:ide_1802_mg_ocorrencia_falco_sparverius_pol` — Ocorrência natural - Falco Sparverius
+- `IDE:ide_1802_mg_ocorrencia_forpus_xanthopterygius_pol` — Ocorrência natural - Forpus Xanthopterygius
+- `IDE:ide_1802_mg_ocorrencia_gallinula_galeata_pol` — Ocorrência natural - Gallinula Galeata
+- `IDE:ide_1802_mg_ocorrencia_glaucidium_brasilianum_pol` — Ocorrência natural - Glaucidium Brasilianum
+- `IDE:ide_1802_mg_ocorrencia_gnorimopsar_chopi_pol` — Ocorrência natural - Gnorimopsar Chopi
+- `IDE:ide_1802_mg_ocorrencia_icterus_jamacaii_pol` — Ocorrência natural - Icterus Jamacaii
+- `IDE:ide_1802_mg_ocorrencia_icterus_pyrrhopterus_pol` — Ocorrência natural - Icterus Pyrrhopterus
+- `IDE:ide_1802_mg_ocorrencia_megascops_choliba_pol` — Ocorrência natural - Megascops Choliba
+- `IDE:ide_1802_mg_ocorrencia_milvago_chimachima_pol` — Ocorrência natural - Milvago Chimachima
+- `IDE:ide_1802_mg_ocorrencia_mimus_saturninus_pol` — Ocorrência natural - Mimus Saturninus
+- `IDE:ide_1802_mg_ocorrencia_molothrus_bonariensis_pol` — Ocorrência natural - Molothrus Bonariensis
+- `IDE:ide_1802_mg_ocorrencia_molothrus_oryzivorus_pol` — Ocorrência natural -  Molothrus Oryzivorus
+- `IDE:ide_1802_mg_ocorrencia_neothraupis_fasciata_pol` — Ocorrência natural - Neothraupis Fasciata
+- `IDE:ide_1802_mg_ocorrencia_paroaria_dominicana_pol` — Ocorrência natural - Paroaria Dominicana
+- `IDE:ide_1802_mg_ocorrencia_patagioenas_picazuro_pol` — Ocorrência natural - Patagioenas Picazuro
+- `IDE:ide_1802_mg_ocorrencia_penelope_superciliaris_pol` — Ocorrência natural - Penelope Superciliaris
+- `IDE:ide_1802_mg_ocorrencia_piaya_cayana_pol` — Ocorrência natural - Piaya Cayana
+- `IDE:ide_1802_mg_ocorrencia_pilherodius_pileatus_pol` — Ocorrência natural - Pilherodius Pileatus
+- `IDE:ide_1802_mg_ocorrencia_pionus_maximiliani_pol` — Ocorrência natural - Pionus Maximiliani
+- `IDE:ide_1802_mg_ocorrencia_pitangus_sulphuratus_pol` — Ocorrência natural - Pitangus Sulphuratus
+- `IDE:ide_1802_mg_ocorrencia_primolius_maracana_pol` — Ocorrência natural - Primolius Maracana
+- `IDE:ide_1802_mg_ocorrencia_psittacara_leucophthalmus_pol` — Ocorrência natural - Psittacara Leucophthalmus
+- `IDE:ide_1802_mg_ocorrencia_ramphastos_dicolorus_pol` — Ocorrência natural - Ramphastos Dicolorus
+- `IDE:ide_1802_mg_ocorrencia_ramphastos_toco_pol` — Ocorrência natural - Ramphastos Toco
+- `IDE:ide_1802_mg_ocorrencia_ramphocelus_bresilius_pol` — Ocorrência natural - Ramphocelus Bresilius
+- `IDE:ide_1802_mg_ocorrencia_rupornis_magnirostris_pol` — Ocorrência natural - Rupornis Magnirostris
+- `IDE:ide_1802_mg_ocorrencia_saltator_coerulescens_pol` — Ocorrência natural - Saltator Coerulescens
+- `IDE:ide_1802_mg_ocorrencia_saltator_similis_pol` — Ocorrência natural - Saltator Similis
+- `IDE:ide_1802_mg_ocorrencia_saltatricula_atricollis_pol` — Ocorrência natural - Saltatricula Atricollis
+- `IDE:ide_1802_mg_ocorrencia_schistochlamys_melanopis_pol` — Ocorrência natural - Schistochlamys Melanopis
+- `IDE:ide_1802_mg_ocorrencia_schistochlamys_ruficapillus_pol` — Ocorrência natural - Schistochlamys Ruficaphillus
+- `IDE:ide_1802_mg_ocorrencia_sicalis_flaveola_pol` — Ocorrência natural - Sicalis Flaveola
+- `IDE:ide_1802_mg_ocorrencia_sicalis_luteola_pol` — Ocorrência natural - Sicalis Luteola
+- `IDE:ide_1802_mg_ocorrencia_spinus_magellanicus_pol` — Ocorrência natural - Spinus Magellanicus
+- `IDE:ide_1802_mg_ocorrencia_sporophila_albogularis_pol` — Ocorrência natural - Sporophila Albogularis
+- `IDE:ide_1802_mg_ocorrencia_sporophila_angolensis_pol` — Ocorrência natural - Sporophila Angolensis
+- `IDE:ide_1802_mg_ocorrencia_sporophila_ardesiaca_pol` — Ocorrência natural - Sporophila Ardesiaca
+- `IDE:ide_1802_mg_ocorrencia_sporophila_bouvreuil_pol` — Ocorrência natural - Sporophila Bouvreuil
+- `IDE:ide_1802_mg_ocorrencia_sporophila_caerulescens_pol` — Ocorrência natural - Sporophila Caerulescens
+- `IDE:ide_1802_mg_ocorrencia_sporophila_collaris_pol` — Ocorrência natural - Sporophila Collaris
+- `IDE:ide_1802_mg_ocorrencia_sporophila_falcirostris_pol` — Ocorrência natural - Sporophila Falcirostris
+- `IDE:ide_1802_mg_ocorrencia_sporophila_frontalis_pol` — Ocorrência natural - Sporophila Frontalis
+- `IDE:ide_1802_mg_ocorrencia_sporophila_leucoptera_pol` — Ocorrência natural - Sporophila Leucoptera
+- `IDE:ide_1802_mg_ocorrencia_sporophila_lineola_pol` — Ocorrência natural - Sporophila Lineota
+- `IDE:ide_1802_mg_ocorrencia_sporophila_maximiliani_pol` — Ocorrência natural - Sporophila Maximiliani
+- `IDE:ide_1802_mg_ocorrencia_sporophila_nigricollis_pol` — Ocorrência natural - Sporophila Nigricollis
+- `IDE:ide_1802_mg_ocorrencia_sporophila_plumbea_pol` — Ocorrência natural - Sporophila Plumbea
+- `IDE:ide_1802_mg_ocorrencia_tachyphonus_coronatus_pol` — Ocorrência natural - Tachyphonus Coronatus
+- `IDE:ide_1802_mg_ocorrencia_tachyphonus_rufus_pol` — Ocorrência natural - Tachyphonus Rufus
+- `IDE:ide_1802_mg_ocorrencia_tangara_cayana_pol` — Ocorrência natural - Tangara Cayana
+- `IDE:ide_1802_mg_ocorrencia_tangara_ornata_pol` — Ocorrência natural - Tangara Ornata
+- `IDE:ide_1802_mg_ocorrencia_tangara_palmarum_pol` — Ocorrência natural - Tangara Palmarum
+- `IDE:ide_1802_mg_ocorrencia_tangara_sayaca_pol` — Ocorrência natural - Tangara Sayaca
+- `IDE:ide_1802_mg_ocorrencia_tangara_seledon_pol` — Ocorrência natural - Tangara Seledon_pol
+- `IDE:ide_1802_mg_ocorrencia_tersina_viridis_pol` — Ocorrência natural - Tersina Viridis
+- `IDE:ide_1802_mg_ocorrencia_tiaris_fuliginosus_pol` — Ocorrência natural - Tiaris Fuliginosus
+- `IDE:ide_1802_mg_ocorrencia_turdus_albicollis_pol` — Ocorrência natural - Turdus Albicollis
+- `IDE:ide_1802_mg_ocorrencia_turdus_amaurochalinus_pol` — Ocorrência natural - Turdus Amaurochalinus
+- `IDE:ide_1802_mg_ocorrencia_turdus_leucomelas_pol` — Ocorrência natural - Turdus Leucomelas
+- `IDE:ide_1802_mg_ocorrencia_turdus_rufiventris_pol` — Ocorrência natural - Turdus Rufiventris
+- `IDE:ide_1802_mg_ocorrencia_tyto_furcata_pol` — Ocorrência natural - Tyto Furcata
+- `IDE:ide_1802_mg_ocorrencia_volatinia_jacarina_pol` — Ocorrência natural - Volatinia Jacarina
+- `IDE:ide_1802_mg_ocorrencia_zonotrichia_capensis_pol` — Ocorrência natural - Zonotrichia Capensis
+- `IDE:ide_1803_mg_mun_cad_sist_id_animais_pol` — Municípios cadastrados no sistema estadual de identificação de animais domésticos
+- `IDE:ide_1803_mg_mun_integrantes_conheca_seu_amigo_pol` — Municípios integrantes do programa "Conheça seu amigo"
+- `IDE:ide_1804_estimativa_populacao_caes_gatos_pol` — Estimativa de população de cães e gatos
+- `IDE:ide_1804_estimativa_populacao_canina_pol` — Estimativa de população canina
+- `IDE:ide_1804_estimativa_populacao_felina_pol` — Estimativa de população felina
+- `IDE:ide_1804_mg_microchips_ident_caes_gatos_sit_rua_municipio_pol` — Microchips distribuídos para identificação de cães e gatos em situação de rua
+- `IDE:ide_1804_mg_municipios_conv_assinados_manejo_etico_pol` — Municípios com convênios assinados para manejo ético populacional
+- `IDE:ide_1804_mg_num_org_sociedade_civil_mun_pol` — Número de Organizações da Sociedade Civil de proteção animal por município
+- `IDE:ide_1804_mg_numero_animais_castrados_municipio_pol` — Número de animais castrados por município através de convênios
+- `IDE:ide_1804_mg_ocorrencia_especie_faveiros_pto` — Áreas de ocorrência de faveiros
+- `IDE:ide_1804_mg_protetores_animais_independentes_pol` — Número de protetores de animais independentes por município
+- `IDE:ide_1804_prioridade_politicas_publicas_pol` — Prioridade para políticas públicas de fauna doméstica
+- `IDE:ide_1804_proporcao_pop_caes_gatos_humanos_pol` — Proporção da população de cães e gatos em relação a humanos
+- `IDE:ide_1805_mg_pesquisa_especies_ameacadas_pto` — Registro de pesquisas sobre espécies ameaçadas em unidades de conservação (UCs)
+- `IDE:ide_1805_mg_reg_ocor_esp_flora_pto` — Registro de ocorrência de espécies da flora ameaçadas
+- `IDE:ide_1806_mg_areas_cars_prior_past_pol` — Áreas cársticas prioritárias para melhoria de pastagens
+- `IDE:ide_1806_mg_areas_cars_prior_rest_pol` — Áreas cársticas prioritárias para restauração ecológica
+- `IDE:ide_1806_mg_mun_prior_cons_espel_pol` — Prioridade para restauração ecológica e melhoria de pastagens em ambientes cársticos, por município
+- `IDE:ide_1806_mg_ottobac_prior_cons_espel_pol` — Prioridade para restauração ecológica e melhoria de pastagens em ambientes cársticos, por ottobacia de contribuição hidrográfica
+- `IDE:ide_1806_mg_ucs_prior_cons_espel_pol` — Prioridade para restauração ecológica e melhoria de pastagens em ambientes cársticos, por unidade de conservação (UCs)
+- `IDE:ide_1901_mg_barragens_rejeitos_residuos_pto` — Barragens - Ano base 2024
+- `IDE:ide_1902_mg_acr_medidas_de_controle_2025_pol` — Áreas Contaminadas Reabilitadas - Medidas de Controle
+- `IDE:ide_1902_mg_areas_contaminadas_reabilitadas_pto` — Áreas contaminadas e reabilitadas (2025)
+- `IDE:ide_1903_mg_mancha_inundacao_pae_pol` — Manchas de inundação dos Planos de Ação de Emergência de Barragens - PAEs
+- `IDE:ide_1903_mg_zas_pae_pol` — Zonas de autossalvamento dos Planos de Ação de Emergência de Barragens - PAEs
+- `IDE:ide_2001_mg_raio_protecao_cavidades_pol` — Áreas de influência de cavidades - raio de 250 metros
+- `IDE:ide_2002_mg_potencialidade_cavidades_pol` — Potencialidade de ocorrência de cavidades
+- `IDE:ide_2003_mg_terras_indigenas_pol` — Terras indígenas
+- `IDE:ide_2004_mg_raio_rest_terras_indigenas_pol` — Raios de restrição à terras indígenas
+- `IDE:ide_2005_mg_terras_quilombolas_pol` — Terras quilombolas
+- `IDE:ide_2006_mg_raio_rest_terras_quilombolas_pol` — Raios de restrição à terras quilombolas
+- `IDE:ide_2007_mg_area_conflito_recursos_hidricos_pol` — Áreas de conflito por uso de recursos hídricos superficiais
+- `IDE:ide_2007_mg_restricao_contole_rh_sub_pol` — Áreas de conflito por uso de recursos hídricos subterrâneos (Áreas de restrição e controle de uso de águas subterrâneas)
+- `IDE:ide_2007_sf_rpe_100_pol` — DARC PANM - Comprometimento superior a 100% do Recurso Potencialmente Explotável - RPE (Áreas de restrição e controle de uso de águas subterrâneas)
+- `IDE:ide_2008_mg_bacia_enquadrada_classe_especial_pol` — Áreas de drenagem à montante de cursos d’água enquadrados em Classe Especial
+- `IDE:ide_2008_mg_trecho_enquadrada_classe_especial_lin` — Trechos de drenagem a montante de cursos d’água enquadrados em Classe Especial
+- `IDE:ide_2009_mg_rios_preservacao_permanente_pol` — Rios de Preservação Permanente - Lei nº 15.082/2004
+- `IDE:ide_2010_mg_areas_prioritarias_criacao_ucs` — Áreas prioritárias para criação de Unidades de Conservação
+- `IDE:ide_2010_mg_areas_protecao_especial_pol` — Áreas de Proteção Especial
+- `IDE:ide_2010_mg_reservas_particulares_patrimonio_natural_pol` — Reservas Particulares do Patrimônio Natural (RPPN)
+- `IDE:ide_2010_mg_unidades_conservacao_estaduais_pol` — Unidades de conservação (UCs) estaduais
+- `IDE:ide_2010_mg_unidades_conservacao_federais_pol` — Unidades de Conservação (UCs) federais
+- `IDE:ide_2010_mg_unidades_conservacao_municipais_pol` — Unidades de Conservação (UCs) Municipais
+- `IDE:ide_2011_mg_amortecimento_uc_plano_manejo_pol` — Zonas de Amortecimento de UCs definidas em plano de manejo
+- `IDE:ide_2011_mg_amortecimento_uc_raio_3km_pol` — Zonas de amortecimento de UCs definidas por raio de 3km
+- `IDE:ide_2012_mg_reserva_biosfera_caatinga_pol` — Reserva da Biosfera da Caatinga
+- `IDE:ide_2012_mg_reserva_biosfera_mata_atlantica_pol` — Reserva da Biosfera da Mata Atlântica
+- `IDE:ide_2012_mg_reserva_biosfera_serra_espinhaco_pol` — Reserva da Biosfera da Serra do Espinhaço
+- `IDE:ide_2013_mg_corredor_ecologico_espinhaco_serra_curral_pol` — Corredor ecológico Espinhaço-Serra do Curral
+- `IDE:ide_2013_mg_corredor_ecologico_serra_moeda_aredes_pol` — Corredor ecológico Serra da Moeda-Arêdes
+- `IDE:ide_2013_mg_corredor_ecologico_sossego_caratinga_pol` — Corredor ecológico Sossego-Caratinga
+- `IDE:ide_2015_mg_areas_seguranca_aeroportuaria_pol` — Áreas de segurança aeroportuária de aeródromos (Lei nº 12.725/2012)
+- `IDE:ide_2016_mg_sitios_ramsar_pol` — Sítios Ramsar
+- `IDE:ide_2017_mg_ai_patrimonio_cultural_iepha_pol` — Área de influência de impacto no Patrimônio Cultural
+- `IDE:ide_2017_mg_celebracoes_formas_expressao_iepha_pto` — Celebrações e formas de expressão registradas
+- `IDE:ide_2017_mg_lugares_iepha_pto` — Lugares registrados
+- `IDE:ide_2017_mg_saberes_iepha_pol` — Saberes registrados
+- `IDE:ide_2017_mg_tombamento_iepha_pto` — Bens tombados - Iepha
+- `IDE:ide_2017_mg_tombamento_municipal_pto` — Bens tombados - acautelamento municipal
+- `IDE:ide_2018_mg_area_abrangencia_marco_regulatorio_bacia_sao_marcos` — Área de abrangência do marco regulatório da bacia hidrográfica do rio São Marcos
+- `IDE:ide_2019_bu_enq_corpos_dagua_bu1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Buranhém
+- `IDE:ide_2019_do_enq_corpos_dagua_do1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Piranga (DO1)
+- `IDE:ide_2019_do_enq_corpos_dagua_do2_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Piracicaba (DO2)
+- `IDE:ide_2019_do_enq_corpos_dagua_do3_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do rio Santo Antônio (DO3)
+- `IDE:ide_2019_do_enq_corpos_dagua_do4_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Suaçuí Grande (DO4)
+- `IDE:ide_2019_do_enq_corpos_dagua_do5_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Caratinga (DO5)
+- `IDE:ide_2019_do_enq_corpos_dagua_do6_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica Águas do rio Manhuaçu (DO6)
+- `IDE:ide_2019_gd_enq_corpos_dagua_gd1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros do Alto rio Grande (GD1)
+- `IDE:ide_2019_gd_enq_corpos_dagua_gd2_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica das Vertentes do Rio Grande (GD2)
+- `IDE:ide_2019_gd_enq_corpos_dagua_gd3_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Entorno do Reservatório de Furnas (GD3)
+- `IDE:ide_2019_gd_enq_corpos_dagua_gd4_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Verde (GD4)
+- `IDE:ide_2019_gd_enq_corpos_dagua_gd5_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Sapucaí (GD5)
+- `IDE:ide_2019_gd_enq_corpos_dagua_gd6_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros dos rios Mogi-Guaçu e Pardo (GD6)
+- `IDE:ide_2019_gd_enq_corpos_dagua_gd7_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes do Médio rio Grande (GD7)
+- `IDE:ide_2019_gd_enq_corpos_dagua_gd8_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes do Baixo rio Grande (GD8)
+- `IDE:ide_2019_ib_enq_corpos_dagua_ib1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros do rio Itabapoana, rio São João e rio Caparaó (IB1)
+- `IDE:ide_2019_in_enq_corpos_dagua_in1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Itanhém (IN1)
+- `IDE:ide_2019_ip_enq_corpos_dagua_ip1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Itapemirim (IP1)
+- `IDE:ide_2019_iu_enq_corpos_dagua_iu1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Itaúnas (IU1)
+- `IDE:ide_2019_jq_enq_corpos_dagua_jq1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros do Alto rio Jequitinhonha (JQ1)
+- `IDE:ide_2019_jq_enq_corpos_dagua_jq2_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Araçuaí (JQ2)
+- `IDE:ide_2019_jq_enq_corpos_dagua_jq3_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros do Médio e Baixo rio Jequitinhonha (JQ3)
+- `IDE:ide_2019_ju_enq_corpos_dagua_ju1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Jucuruçu (JU1)
+- `IDE:ide_2019_mu_enq_corpos_dagua_mu1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Mucuri (MU1)
+- `IDE:ide_2019_pa_enq_corpos_dagua_pa1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Mosquito e demais afluentes mineiros do Rio Preto (PA1)
+- `IDE:ide_2019_pe_enq_corpos_dagua_pe1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Peruípe (PE1)
+- `IDE:ide_2019_pj_enq_corpos_dagua_pj1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Rios Piracicaba e Jaguari (PJ1)
+- `IDE:ide_2019_pn_enq_corpos_dagua_pn1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros do Alto rio Paranaíba (PN1)
+- `IDE:ide_2019_pn_enq_corpos_dagua_pn2_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Araguari (PN2)
+- `IDE:ide_2019_pn_enq_corpos_dagua_pn3_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros do Baixo rio Paranaíba (PN3)
+- `IDE:ide_2019_ps_enq_corpos_dagua_ps1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros dos Rios Preto e Paraíbuna (PS1)
+- `IDE:ide_2019_ps_enq_corpos_dagua_ps2_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros dos Rios Pomba e Muriaé (PS2)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf10_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Verde Grande (SF10)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes do Alto rio São Francisco (SF1)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf2_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Pará (SF2)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf3_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Paraopeba (SF3)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf4_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Entorno da represa de Três Marias (SF4)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf5_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio das Velhas (SF5)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf6_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Rios Jequitaí e Pacuí (SF6)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf7_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Paracatu (SF7)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf8_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio Urucuia (SF8)
+- `IDE:ide_2019_sf_enq_corpos_dagua_sf9_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica dos Afluentes Mineiros do Médio rio São Francisco (SF9)
+- `IDE:ide_2019_sm_enq_corpos_dagua_sm1_lin` — Enquadramento de corpos d'água da Circunscrição Hidrográfica do Rio São Mateus (SM1)
+- `IDE:ide_2020_mg_area_lei_mata_atlantica_pol` — Área de aplicação da Lei da Mata Atlântica (11.428/2006)
+- `IDE:ide_2021_mg_zon_uc_apa_cachoeira_andorinhas_pol` — Zoneamento da UC APA Cachoeira das Andorinhas
+- `IDE:ide_2021_mg_zon_uc_apa_serra_sao_jose_pol` — Zoneamento da UC APA Serra de São José
+- `IDE:ide_2021_mg_zon_uc_apa_vargem_das_flores_pol` — Zoneamento da UC APA Vargem das Flores
+- `IDE:ide_2021_mg_zon_uc_ee_agua_limpa_pol` — Zoneamento da UC Estação Ecológica Água Limpa
+- `IDE:ide_2021_mg_zon_uc_ee_mar_espanha_pol` — Zoneamento da UC Estação Ecológica Mar de Espanha
+- `IDE:ide_2021_mg_zon_uc_ee_tripui_pol` — Zoneamento da UC Estação Ecológica de Tripuí
+- `IDE:ide_2021_mg_zon_uc_pe_serra_araras_pol` — Zoneamento da UC Serra das Araras
+- `IDE:ide_2021_mg_zon_uc_reds_veredas_acari_pol` — Zoneamento da UC Reserva de Desenvolvimento Sustentável Veredas do Acari
+- `IDE:ide_2021_mg_zon_uc_revs_serra_sao_jose_pol` — Zoneamento da UC Refúgio de Vida Silvestre Serra de São José
+- `IDE:ide_2021_mg_zoneamento_uc_pe_botumirim_pol` — Zoneamento da UC Parque Estadual de Botumirim
+- `IDE:ide_2021_mg_zoneamento_uc_pe_nova_baden_pol` — Zoneamento da UC Parque Nova Baden
+- `IDE:ide_2021_mg_zoneamento_uc_pe_serra_negra_mantiqueira_pol` — Zoneamento da UC Parque Estadual Serra Negra da Mantiqueira
+- `IDE:ide_2021_mg_zoneamento_uc_pe_serra_sobrado_pol` — Zoneamento da UC Parque Estadual Serra do Sobrado
+- `IDE:ide_2021_mg_zoneamento_uc_pe_serra_verde_pol` — Zoneamento da UC Parque Serra Verde
+- `IDE:ide_2101_mg_empreendimentos_licenciados_pto` — Licenças ambientais emitidas pelo Sistema de Licenciamento Ambiental (SLA)
+- `IDE:ide_2101_mg_historico_empreendi_lic_2013_2019_pto` — Histórico de Empreendimentos Licenciados entre 2013 e 2019
+- `IDE:ide_2102_mg_licenciamento_ambiental_municipal_pol` — Municípios com competência para realização de licenciamento ambiental (Municipalização)
+- `IDE:ide_210301_nm_potencial_comprometimento_rpe_pol` — Projeto Águas do Norte de Minas (PANM) - Potencial de comprometimento do Recurso Potencialmente Explotável (RPE)
+- `IDE:ide_210301_nm_potencial_comprometimento_rpe_pto` — Projeto Águas do Norte de Minas (PANM) - Potencial de comprometimento do Recurso Potencial Explotável (RPE)
+- `IDE:ide_210303_sl_geozonas_pol` — Geozonas de Sete Lagoas
+- `IDE:ide_2103_mg_federais_ana_outorgas_pto` — Outorgas federais de direito de uso de recursos hídricos (ANA)
+- `IDE:ide_2103_mg_outorgas_uso_recursos_hidricos_pto` — Outorgas de direito de uso de recursos hídricos
+- `IDE:ide_2103_mg_uso_insignificante_recursos_hidricos_pto` — Cadastro de uso insignificante de recursos hídricos
+- `IDE:ide_2104_mg_imoveis_disponiveis_compensacao_ambiental_pto` — Imóveis disponíveis para compensação ambiental
+- `IDE:ide_2104_mg_imoveis_escriturados_ucs_ief_pol` — Imóveis escriturados em nome do IEF em Unidades de Conservação Estaduais
+- `IDE:ide_2104_mg_imoveis_regularizados_ucs_ief_pol` — Imóveis regularizados em nome do IEF em Unidades de Conservação Estaduais
+- `IDE:ide_2105_mg_area_autoriz_interv_amb_feam_pol` — Áreas autorizadas para intervenção ambiental (Feam)
+- `IDE:ide_2105_mg_area_autorizada_intervencao_ambiental_ief_pol` — Áreas autorizadas para supressão de vegetação (IEF)
+- `IDE:ide_210602_mg_imoveis_recomp_apps_declarado_car_pol` — Imóveis disponíveis para recomposição em APPs, declarado no CAR
+- `IDE:ide_210602_mg_imoveis_recomp_res_legal_declarado_car_pol` — Imóveis disponíveis para recomposição em reserva legal, conforme declarado no CAR
+- `IDE:ide_210602_mg_imoveis_recomp_uso_restrito_declarado_car_pol` — Imóveis disponíveis para recomposição em áreas de uso restrito, conforme declarado no CAR
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_amsf_pol` — CAR - APPs hídricas na URFBio Alto Médio São Francisco
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_ap_pol` — CAR - APPs hídricas na URFBio Alto Paranaíba
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_cm_pol` — CAR - APPs hídricas na URFBio Metropolitana
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_cnor_pol` — CAR - APPs hídricas na URFBio Centro-Norte
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_co_pol` — CAR - APPs hídricas na URFBio Centro-Oeste
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_cs_pol` — CAR - APPs hídricas na URFBio Centro-Sul
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_jeq_pol` — CAR - APPs hídricas na URFBio Jequitinhonha
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_mata_pol` — CAR - APPs hídricas na URFBio Mata
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_ne_pol` — CAR - APPs hídricas da URFBio Nordeste
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_no_pol` — CAR - APPs hídricas na URFBio Norte
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_nor_pol` — CAR - APPs hídricas na URFBio Noroeste
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_riodoce_pol` — CAR - APPs hídricas na URFBio Rio Doce
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_sul_pol` — CAR - APPs hídricas na URFBio Sul
+- `IDE:ide_210603_mg_hid_app_hidrica_mapcar_tm_pol` — CAR - APPs hídricas na URFBio Triângulo
+- `IDE:ide_210603_mg_hid_hidrografia_categorizada_mapcar_os04_pol` — FIP-CAR - Hidrografia - Trechos de drenagem categorizados (OS04)
+- `IDE:ide_210603_mg_hid_hidrografia_categorizada_mapcar_os12_pol` — FIP-CAR - Hidrografia - Trechos hidrográficos categorizados (OS12)
+- `IDE:ide_210603_mg_hid_massa_dagua_mapcar_os04_pol` — FIP-CAR - Hidrografia - Massa d'água (OS04)
+- `IDE:ide_210603_mg_hid_massa_dagua_mapcar_os12_pol` — FIP-CAR - Hidrografia - Massa d'água (OS12)
+- `IDE:ide_210603_mg_hid_trecho_drenagem_mapcar_os04_lin` — FIP-CAR - Hidrografia - Trechos de drenagem (OS04)
+- `IDE:ide_210603_mg_hid_trecho_drenagem_mapcar_os12_lin` — FIP-CAR - Hidrografia - Trechos de drenagem (OS12)
+- `IDE:ide_210603_mg_hid_trecho_massa_dagua_mapcar_os04_pol` — FIP-CAR - Hidrografia - Massas d'água de trechos de drenagem (OS04)
+- `IDE:ide_210603_mg_hid_trecho_massa_dagua_mapcar_os12_pol` — FIP-CAR - Hidrografia - Massas d'água de trechos de drenagem (OS12)
+- `IDE:ide_210603_mg_rel_app_altitude_1800_mapcar_os11_pol` — FIP-CAR - Relevo - APP de altitude (OS11)
+- `IDE:ide_210603_mg_rel_app_borda_chapada_mapcar_os04_pol` — FIP-CAR - Relevo - APP de borda de chapada (OS04)
+- `IDE:ide_210603_mg_rel_app_borda_chapada_mapcar_os11_pol` — FIP-CAR - Relevo - APP de borda de chapada (OS11)
+- `IDE:ide_210603_mg_rel_app_declividade_mapcar_os04_pol` — FIP-CAR - Relevo - APP de declividade (OS04)
+- `IDE:ide_210603_mg_rel_app_declividade_mapcar_os11_pol` — FIP-CAR - Relevo - APP de declividade (OS11)
+- `IDE:ide_210603_mg_rel_app_topo_morro_mapcar_os04_pol` — FIP-CAR - Relevo - APP de topo de morro (OS 04)
+- `IDE:ide_210603_mg_rel_app_topo_morro_mapcar_os11_pol` — FIP-CAR - Relevo - APP de topo de morro (OS11)
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_amsf_pol` — CAR - Áreas de uso restrito na URFBio Alto Médio São Francisco
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_ap_pol` — CAR - Áreas de uso restrito na URFBio Alto Paranaíba
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_cm_pol` — CAR - Áreas de uso restrito na URFBio Metropolitana
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_cnor_pol` — CAR - Áreas de uso restrito na URFBio Centro-Norte
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_co_pol` — CAR - Áreas de uso restrito na URFBio Centro-Oeste
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_cs_pol` — CAR - Áreas de uso restrito na URFBio Centro-Sul
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_jeq_pol` — CAR - Áreas de uso restrito na URFBio Jequitinhonha
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_mata_pol` — CAR - Áreas de uso restrito na URFBio Mata
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_ne_pol` — CAR - Áreas de uso restrito na URFBio Nordeste
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_no_pol` — CAR - Áreas de uso restrito na URFBio Norte
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_nor_pol` — CAR - Áreas de uso restrito na URFBio Noroeste
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_riodoce_pol` — CAR - Áreas de uso restrito na URFBio Rio Doce
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_sul_pol` — CAR - Áreas de uso restrito na URFBio Sul
+- `IDE:ide_210603_mg_rel_uso_restrito_mapcar_tm_pol` — CAR - Áreas de uso restrito na URFBio Triângulo
+- `IDE:ide_210603_mg_svm_faixa_linha_transmissao_mapcar_os04_pol` — FIP-CAR - Servidão Administrativa faixas de linhas de transmissão OS04
+- `IDE:ide_210603_mg_svm_faixa_linha_transmissao_mapcar_os11_pol` — FIP-CAR - Servidão Administrativa faixas de linhas de transmissão OS11
+- `IDE:ide_210603_mg_svm_faixa_reservatorio_hidrico_mapcar_os04_pol` — FIP-CAR - Servidão Administrativa faixas de reservatórios hídricos OS04
+- `IDE:ide_210603_mg_svm_faixa_reservatorio_hidrico_mapcar_os11_pol` — FIP-CAR - Servidão Administrativa faixas de reservatórios hídricos OS11
+- `IDE:ide_210603_mg_svm_faixa_trecho_duto_mapcar_os11_lin` — FIP-CAR - Servidão Administrativa faixas de trechos de dutos OS11 (linhas)
+- `IDE:ide_210603_mg_svm_faixa_trecho_duto_mapcar_os11_pol` — FIP-CAR - Servidão Administrativa faixas de trechos de dutos OS11
+- `IDE:ide_210603_mg_svm_faixa_trecho_ferroviario_mapcar_os04_pol` — FIP-CAR - Servidão Administrativa faixas de trechos ferroviários OS04
+- `IDE:ide_210603_mg_svm_faixa_trecho_ferroviario_mapcar_os11_pol` — FIP-CAR - Servidão Administrativa faixas de trechos ferroviários OS11
+- `IDE:ide_210603_mg_svm_faixa_trecho_rodoviario_mapcar_os04_pol` — FIP-CAR - Servidão Administrativa faixas de trechos rodoviários OS04
+- `IDE:ide_210603_mg_svm_faixa_trecho_rodoviario_mapcar_os11_pol` — FIP-CAR - Servidão Administrativa faixas de trechos rodoviários OS11
+- `IDE:ide_210603_mg_svm_linha_transmissao_mapcar_os04_lin` — FIP-CAR - Servidão Administrativa faixas de linhas de transmissão OS04 (linhas)
+- `IDE:ide_210603_mg_svm_linha_transmissao_mapcar_os11_lin` — FIP-CAR - Servidão Administrativa faixas de linhas de transmissão OS11 (linhas)
+- `IDE:ide_210603_mg_svm_reservatorio_hidrico_mapcar_os04_pol` — FIP-CAR - Servidão Administrativa reservatórios hídricos OS04
+- `IDE:ide_210603_mg_svm_reservatorio_hidrico_mapcar_os11_pol` — FIP-CAR - Servidão Administrativa reservatórios hídricos OS11
+- `IDE:ide_210603_mg_svm_trecho_ferroviario_mapcar_os04_lin` — FIP-CAR - Servidão Administrativa faixas de trechos ferroviários OS04 (linhas)
+- `IDE:ide_210603_mg_svm_trecho_ferroviario_mapcar_os11_lin` — FIP-CAR - Servidão Administrativa faixas de trechos ferroviários OS11 (linhas)
+- `IDE:ide_210603_mg_svm_trecho_rodoviario_mapcar_os04_lin` — FIP-CAR - Servidão Administrativa faixas de trechos rodoviários OS04 (linhas)
+- `IDE:ide_210603_mg_svm_trecho_rodoviario_mapcar_os11_lin` — FIP-CAR - Servidão Administrativa faixas de trechos rodoviários OS11 (linhas)
+- `IDE:ide_210603_mg_svm_utilidade_publica_mapcar_os04_pol` — FIP-CAR - Servidão Administrativa utilidade pública OS04
+- `IDE:ide_210603_mg_svm_utilidade_publica_mapcar_os11_pol` — FIP-CAR - Servidão Administrativa utilidade pública OS11
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area10_pol` — FIP-Car - Uso e cobertura da terra da URFBio Rio Doce
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area11_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Mata
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area12_pol` — FIP-CAR - Uso e cobertura da terra das URFBios Centro Sul e Metropolitana
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area13_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Sul
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area1_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Norte de Minas
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area2_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Nordeste
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area3_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Noroeste
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area4_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Alto e Médio São Francisco
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area5_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Jequitinhonha
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area6_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Alto Paranaíba
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area7_pol` — FIP-Car - Uso e cobertura da terra da URFBio Centro Norte
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area8_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Triângulo
+- `IDE:ide_210603_mg_uso_cobertura_mapcar_area9_pol` — FIP-CAR - Uso e cobertura da terra da URFBio Centro Oeste
+- `IDE:ide_210604_mg_analise_car_app_amsf_pol` — ide_210604_mg_analise_car_app_amsf_pol
+- `IDE:ide_210604_mg_analise_car_app_ap_pol` — ide_210604_mg_analise_car_app_ap_pol
+- `IDE:ide_210604_mg_analise_car_app_cn_pol` — ide_210604_mg_analise_car_app_cn_pol
+- `IDE:ide_210604_mg_analise_car_app_co_pol` — ide_210604_mg_analise_car_app_co_pol
+- `IDE:ide_210604_mg_analise_car_app_cs_pol` — ide_210604_mg_analise_car_app_cs_pol
+- `IDE:ide_210604_mg_analise_car_app_doce_pol` — ide_210604_mg_analise_car_app_doce_pol
+- `IDE:ide_210604_mg_analise_car_app_jeq_pol` — ide_210604_mg_analise_car_app_jeq_pol
+- `IDE:ide_210604_mg_analise_car_app_mata_pol` — ide_210604_mg_analise_car_app_mata_pol
+- `IDE:ide_210604_mg_analise_car_app_metrop_pol` — ide_210604_mg_analise_car_app_metrop_pol
+- `IDE:ide_210604_mg_analise_car_app_ne_pol` — ide_210604_mg_analise_car_app_ne_pol
+- `IDE:ide_210604_mg_analise_car_app_no_pol` — ide_210604_mg_analise_car_app_no_pol
+- `IDE:ide_210604_mg_analise_car_app_norte_pol` — ide_210604_mg_analise_car_app_norte_pol
+- `IDE:ide_210604_mg_analise_car_app_sul_pol` — ide_210604_mg_analise_car_app_sul_pol
+- `IDE:ide_210604_mg_analise_car_app_tm_pol` — ide_210604_mg_analise_car_app_tm_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_amsf_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Alto Médio São Francisco em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_amsf_pol` — ide_210604_mg_analise_car_area_antrop_amsf_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_ap_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Alto Paranaíba em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_ap_pol` — ide_210604_mg_analise_car_area_antrop_ap_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_cn_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Centro-norte em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_cn_pol` — ide_210604_mg_analise_car_area_antrop_cn_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_co_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Centro-oeste em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_co_pol` — ide_210604_mg_analise_car_area_antrop_co_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_cs_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Centro-sul em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_cs_pol` — ide_210604_mg_analise_car_area_antrop_cs_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_doce_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Rio Doce em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_doce_pol` — ide_210604_mg_analise_car_area_antrop_doce_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_jeq_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Jequitinhonha em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_jeq_pol` — ide_210604_mg_analise_car_area_antrop_jeq_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_mata_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Mata em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_mata_pol` — ide_210604_mg_analise_car_area_antrop_mata_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_metrop_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Metropolitana em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_metrop_pol` — ide_210604_mg_analise_car_area_antrop_metrop_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_ne_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Nordeste em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_ne_pol` — ide_210604_mg_analise_car_area_antrop_ne_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_no_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Noroeste em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_no_pol` — ide_210604_mg_analise_car_area_antrop_no_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_nor_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Norte em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_nor_pol` — ide_210604_mg_analise_car_area_antrop_nor_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_sul_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Sul em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_sul_pol` — ide_210604_mg_analise_car_area_antrop_sul_pol
+- `IDE:ide_210604_mg_analise_car_area_antrop_tm_2025_pol` — Análise Dinamizada - Área antropizada da URFBio Triângulo em 2025
+- `IDE:ide_210604_mg_analise_car_area_antrop_tm_pol` — ide_210604_mg_analise_car_area_antrop_tm_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_amsf_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Alto Médio São Francisco em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_amsf_pol` — ide_210604_mg_analise_car_area_consol_amsf_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_ap_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Alto Paranaíba em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_ap_pol` — ide_210604_mg_analise_car_area_consol_ap_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_cn_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Centro-norte em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_cn_pol` — ide_210604_mg_analise_car_area_consol_cn_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_co_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Centro-oeste em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_co_pol` — ide_210604_mg_analise_car_area_consol_co_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_cs_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Centro-sul em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_cs_pol` — ide_210604_mg_analise_car_area_consol_cs_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_doce_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Rio Doce em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_doce_pol` — ide_210604_mg_analise_car_area_consol_doce_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_jeq_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Jequitinhonha em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_jeq_pol` — ide_210604_mg_analise_car_area_consol_jeq_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_mata_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Mata em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_mata_pol` — ide_210604_mg_analise_car_area_consol_mata_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_metrop_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Metropolitana em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_metrop_pol` — ide_210604_mg_analise_car_area_consol_metrop_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_ne_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Nordeste em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_ne_pol` — ide_210604_mg_analise_car_area_consol_ne_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_no_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Noroeste em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_no_pol` — ide_210604_mg_analise_car_area_consol_no_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_nor_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Norte em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_nor_pol` — ide_210604_mg_analise_car_area_consol_nor_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_sul_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Sul em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_sul_pol` — ide_210604_mg_analise_car_area_consol_sul_pol
+- `IDE:ide_210604_mg_analise_car_area_consol_tm_2025_pol` — Análise Dinamizada - Área Consolidada da URFBio Triângulo em 2025
+- `IDE:ide_210604_mg_analise_car_area_consol_tm_pol` — ide_210604_mg_analise_car_area_consol_tm_pol
+- `IDE:ide_210604_mg_analise_car_hid_amsf_pol` — ide_210604_mg_analise_car_hid_amsf_pol
+- `IDE:ide_210604_mg_analise_car_hid_ap_pol` — ide_210604_mg_analise_car_hid_ap_pol
+- `IDE:ide_210604_mg_analise_car_hid_cn_pol` — ide_210604_mg_analise_car_hid_cn_pol
+- `IDE:ide_210604_mg_analise_car_hid_co_pol` — ide_210604_mg_analise_car_hid_co_pol
+- `IDE:ide_210604_mg_analise_car_hid_cs_pol` — ide_210604_mg_analise_car_hid_cs_pol
+- `IDE:ide_210604_mg_analise_car_hid_doce_pol` — ide_210604_mg_analise_car_hid_doce_pol
+- `IDE:ide_210604_mg_analise_car_hid_jeq_pol` — ide_210604_mg_analise_car_hid_jeq_pol
+- `IDE:ide_210604_mg_analise_car_hid_mata_pol` — ide_210604_mg_analise_car_hid_mata_pol
+- `IDE:ide_210604_mg_analise_car_hid_metrop_pol` — ide_210604_mg_analise_car_hid_metrop_pol
+- `IDE:ide_210604_mg_analise_car_hid_ne_pol` — ide_210604_mg_analise_car_hid_ne_pol
+- `IDE:ide_210604_mg_analise_car_hid_no_pol` — ide_210604_mg_analise_car_hid_no_pol
+- `IDE:ide_210604_mg_analise_car_hid_nor_pol` — ide_210604_mg_analise_car_hid_nor_pol
+- `IDE:ide_210604_mg_analise_car_hid_sul_pol` — ide_210604_mg_analise_car_hid_sul_pol
+- `IDE:ide_210604_mg_analise_car_hid_tm_pol` — ide_210604_mg_analise_car_hid_tm_pol
+- `IDE:ide_210604_mg_analise_car_nasc_pto` — ide_210604_mg_analise_car_nasc_pto
+- `IDE:ide_210604_mg_analise_car_veg_2008_amsf_pol` — ide_210604_mg_analise_car_veg_2008_amsf_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_ap_pol` — ide_210604_mg_analise_car_veg_2008_ap_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_cn_pol` — ide_210604_mg_analise_car_veg_2008_cn_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_co_pol` — ide_210604_mg_analise_car_veg_2008_co_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_cs_pol` — ide_210604_mg_analise_car_veg_2008_cs_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_doce_pol` — ide_210604_mg_analise_car_veg_2008_doce_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_jeq_pol` — ide_210604_mg_analise_car_veg_2008_jeq_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_mata_pol` — ide_210604_mg_analise_car_veg_2008_mata_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_metrop_pol` — ide_210604_mg_analise_car_veg_2008_metrop_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_ne_pol` — ide_210604_mg_analise_car_veg_2008_ne_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_no_pol` — ide_210604_mg_analise_car_veg_2008_no_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_nor_pol` — ide_210604_mg_analise_car_veg_2008_nor_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_sul_pol` — ide_210604_mg_analise_car_veg_2008_sul_pol
+- `IDE:ide_210604_mg_analise_car_veg_2008_tm_pol` — ide_210604_mg_analise_car_veg_2008_tm_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_amsf_pol` — ide_210604_mg_analise_car_veg_2024_amsf_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_ap_pol` — ide_210604_mg_analise_car_veg_2024_ap_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_cn_pol` — ide_210604_mg_analise_car_veg_2024_cn_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_co_pol` — ide_210604_mg_analise_car_veg_2024_co_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_cs_pol` — ide_210604_mg_analise_car_veg_2024_cs_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_doce_pol` — ide_210604_mg_analise_car_veg_2024_doce_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_jeq_pol` — ide_210604_mg_analise_car_veg_2024_jeq_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_mata_pol` — ide_210604_mg_analise_car_veg_2024_mata_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_metrop_pol` — ide_210604_mg_analise_car_veg_2024_metrop_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_ne_pol` — ide_210604_mg_analise_car_veg_2024_ne_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_no_pol` — ide_210604_mg_analise_car_veg_2024_no_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_nor_pol` — ide_210604_mg_analise_car_veg_2024_nor_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_sul_pol` — ide_210604_mg_analise_car_veg_2024_sul_pol
+- `IDE:ide_210604_mg_analise_car_veg_2024_tm_pol` — ide_210604_mg_analise_car_veg_2024_tm_pol
+- `IDE:ide_210604_mg_analise_car_veg_2025_amsf_pol` — Análise Dinamizada - Vegetação da URFBio Alto Médio São Francisco em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_ap_pol` — Análise Dinamizada - Vegetação da URFBio Alto Paranaíba em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_cn_pol` — Análise Dinamizada - Vegetação da URFBio Centro-norte em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_co_pol` — Análise Dinamizada - Vegetação da URFBio Centro-oeste em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_cs_pol` — Análise Dinamizada - Vegetação da URFBio Centro-sul em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_doce_pol` — Análise Dinamizada - Vegetação da URFBio Rio Doce em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_jeq_pol` — Análise Dinamizada - Vegetação da URFBio Jequitinhonha em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_mata_pol` — Análise Dinamizada - Vegetação da URFBio Mata em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_metrop_pol` — Análise Dinamizada - Vegetação da URFBio Metropolitana em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_ne_pol` — Análise Dinamizada - Vegetação da URFBio Nordeste em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_no_pol` — Análise Dinamizada - Vegetação da URFBio Noroeste em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_nor_pol` — Análise Dinamizada - Vegetação da URFBio Norte em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_sul_pol` — Análise Dinamizada - Vegetação da URFBio Sul em 2025
+- `IDE:ide_210604_mg_analise_car_veg_2025_tm_pol` — Análise Dinamizada - Vegetação da URFBio Triângulo em 2025
+- `IDE:ide_2201_mg_contaminacao_toxicos_pto` — Contaminação por tóxicos - média anual (2000 a 2024)
+- `IDE:ide_2201_mg_indice_qualidade_agua_lin` — Índice de Qualidade da Água por ottotrechos de drenagem (2000 a 2024)
+- `IDE:ide_2201_mg_indice_qualidade_agua_pto` — Índice de Qualidade da Água - média anual (2000 a 2024)
+- `IDE:ide_2202_mg_estacoes_fluviometricas_pto` — Estações pluviométricas
+- `IDE:ide_2202_mg_estacoes_pluviometricas_pto` — Estações pluviométricas
+- `IDE:ide_2203_mg_rede_qualidade_ar_pto` — Qualidade do ar
+- `IDE:ide_2204_bh_iev24_11_12_co_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 11h e 12h
+- `IDE:ide_2204_bh_iev24_11_12_co_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 11h e 12h
+- `IDE:ide_2204_bh_iev24_11_12_mp_pol` — IEV 2024 - Emissões de material particulado (MP) em Contagem, por área, entre ?
+- `IDE:ide_2204_bh_iev24_11_12_mp_pto` — IEV 2024 - IEV - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 11h e 12h
+- `IDE:ide_2204_bh_iev24_11_12_nox_pol` — IEV 2024 - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 11h e 12h
+- `IDE:ide_2204_bh_iev24_11_12_nox_pto` — IEV 2024 - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 11h e 12h
+- `IDE:ide_2204_bh_iev24_12_13_co_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 12h e 13h
+- `IDE:ide_2204_bh_iev24_12_13_co_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 12h e 13h
+- `IDE:ide_2204_bh_iev24_12_13_mp_pol` — IEV 2024 - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 12h e 13h
+- `IDE:ide_2204_bh_iev24_12_13_mp_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 12h e 13h
+- `IDE:ide_2204_bh_iev24_12_13_nox_pol` — IEV 2024 - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 12h e 13h
+- `IDE:ide_2204_bh_iev24_12_13_nox_pto` — IEV 2024 - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 12h e 13h
+- `IDE:ide_2204_bh_iev24_17_18_co_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 17h e 18h
+- `IDE:ide_2204_bh_iev24_17_18_co_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 17h e 18h
+- `IDE:ide_2204_bh_iev24_17_18_mp_pol` — IEV 2024 - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 17h e 18h
+- `IDE:ide_2204_bh_iev24_17_18_mp_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 17h e 18h
+- `IDE:ide_2204_bh_iev24_17_18_nox_pol` — IEV 2024 - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 17h e 18h
+- `IDE:ide_2204_bh_iev24_17_18_nox_pto` — IEV 2024 - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 17h e 18h
+- `IDE:ide_2204_bh_iev24_18_19_co_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 18h e 19h
+- `IDE:ide_2204_bh_iev24_18_19_co_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 18h e 19h
+- `IDE:ide_2204_bh_iev24_18_19_mp_pol` — IEV 2024 - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 18h e 19h
+- `IDE:ide_2204_bh_iev24_18_19_mp_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 18h e 19h
+- `IDE:ide_2204_bh_iev24_18_19_nox_pol` — IEV 2024 - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 18h e 19h
+- `IDE:ide_2204_bh_iev24_18_19_nox_pto` — IEV 2024 - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 18h e 19h
+- `IDE:ide_2204_bh_iev24_24_co_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, no período de 24h
+- `IDE:ide_2204_bh_iev24_24_co_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, no período de 24h
+- `IDE:ide_2204_bh_iev24_24_mp_pol` — IEV 2024 - Emissões de material particulado (MP) em Belo Horizonte, por área, no período de 24h
+- `IDE:ide_2204_bh_iev24_24_mp_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Belo Horizonte, no período de 24h
+- `IDE:ide_2204_bh_iev24_24_nox_pol` — IEV 2024 - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, durante período de 24h
+- `IDE:ide_2204_bh_iev24_24_nox_pto` — IEV 2024 - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, no período de 24h
+- `IDE:ide_2204_bh_iev24_7_8_co_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 7h e 8h
+- `IDE:ide_2204_bh_iev24_7_8_co_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 7h e 8h
+- `IDE:ide_2204_bh_iev24_7_8_mp_pol` — IEV 2024 - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 7h e 8h
+- `IDE:ide_2204_bh_iev24_7_8_mp_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 7h e 8h
+- `IDE:ide_2204_bh_iev24_7_8_nox_pol` — IEV 2024 - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 7h e 8h
+- `IDE:ide_2204_bh_iev24_7_8_nox_pto` — IEV 2024 - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 7h e 8h
+- `IDE:ide_2204_bh_iev24_8_9_co_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 8h e 9h
+- `IDE:ide_2204_bh_iev24_8_9_co_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 8h e 9h
+- `IDE:ide_2204_bh_iev24_8_9_mp_pol` — IEV 2024 - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 8h e 9h
+- `IDE:ide_2204_bh_iev24_8_9_mp_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 8h e 9h
+- `IDE:ide_2204_bh_iev24_8_9_nox_pol` — IEV 2024 - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 8h e 9h
+- `IDE:ide_2204_bh_iev24_8_9_nox_pto` — IEV 2024 - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 8h e 9h
+- `IDE:ide_2204_bh_iev_co_11_12_pol` — IEV - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 11h e 12h
+- `IDE:ide_2204_bh_iev_co_11_12_pto` — IEV - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 11h e 12h
+- `IDE:ide_2204_bh_iev_co_12_13_pol` — IEV - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 12h e 13h
+- `IDE:ide_2204_bh_iev_co_12_13_pto` — IEV - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 12h e 13h
+- `IDE:ide_2204_bh_iev_co_17_18_pol` — IEV - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 17h e 18h
+- `IDE:ide_2204_bh_iev_co_17_18_pto` — IEV - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 17h e 18h
+- `IDE:ide_2204_bh_iev_co_18_19_pol` — IEV - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 18h e 19h
+- `IDE:ide_2204_bh_iev_co_18_19_pto` — IEV - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 18h e 19h
+- `IDE:ide_2204_bh_iev_co_24_pol` — IEV - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, no período de 24h
+- `IDE:ide_2204_bh_iev_co_24_pto` — IEV - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, no período de 24h
+- `IDE:ide_2204_bh_iev_co_7_8_pol` — IEV - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 7h e 8h
+- `IDE:ide_2204_bh_iev_co_7_8_pto` — IEV - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 7h e 8h
+- `IDE:ide_2204_bh_iev_co_8_9_pol` — IEV - Emissões de monóxido de carbono (CO) em Belo Horizonte, por área, entre 8h e 9h
+- `IDE:ide_2204_bh_iev_co_8_9_pto` — IEV - Emissões pontuais de monóxido de carbono (CO) em Belo Horizonte, entre 8h e 9h
+- `IDE:ide_2204_bh_iev_mp_11_12_pol` — IEV - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 11h e 12h
+- `IDE:ide_2204_bh_iev_mp_11_12_pto` — IEV - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 11h e 12h
+- `IDE:ide_2204_bh_iev_mp_12_13_pol` — IEV - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 12h e 13h
+- `IDE:ide_2204_bh_iev_mp_12_13_pto` — IEV - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 12h e 13h
+- `IDE:ide_2204_bh_iev_mp_17_18_pol` — IEV - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 17h e 18h
+- `IDE:ide_2204_bh_iev_mp_17_18_pto` — IEV - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 17h e 18h
+- `IDE:ide_2204_bh_iev_mp_18_19_pol` — IEV - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 18h e 19h
+- `IDE:ide_2204_bh_iev_mp_18_19_pto` — IEV - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 18h e 19h
+- `IDE:ide_2204_bh_iev_mp_24_pol` — IEV - Emissões de material particulado (MP) em Belo Horizonte, por área, no período de 24h
+- `IDE:ide_2204_bh_iev_mp_24_pto` — IEV - Emissões pontuais de material particulado (MP) em Belo Horizonte, no período de 24h
+- `IDE:ide_2204_bh_iev_mp_7_8_pol` — IEV - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 7h e 8h
+- `IDE:ide_2204_bh_iev_mp_7_8_pto` — IEV - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 7h e 8h
+- `IDE:ide_2204_bh_iev_mp_8_9_pol` — IEV - Emissões de material particulado (MP) em Belo Horizonte, por área, entre 8h e 9h
+- `IDE:ide_2204_bh_iev_mp_8_9_pto` — IEV - Emissões pontuais de material particulado (MP) em Belo Horizonte, entre 8h e 9h
+- `IDE:ide_2204_bh_iev_nox_11_12_pol` — IEV - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 11h e 12h
+- `IDE:ide_2204_bh_iev_nox_11_12_pto` — IEV - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 11h e 12h
+- `IDE:ide_2204_bh_iev_nox_12_13_pol` — IEV - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 12h e 13h
+- `IDE:ide_2204_bh_iev_nox_12_13_pto` — IEV - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 12h e 13h
+- `IDE:ide_2204_bh_iev_nox_17_18_pol` — IEV - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 17h e 18h
+- `IDE:ide_2204_bh_iev_nox_17_18_pto` — IEV - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 17h e 18h
+- `IDE:ide_2204_bh_iev_nox_18_19_pol` — IEV - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 18h e 19h
+- `IDE:ide_2204_bh_iev_nox_18_19_pto` — IEV - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 18h e 19h
+- `IDE:ide_2204_bh_iev_nox_24_pol` — IEV - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, durante período de 24h
+- `IDE:ide_2204_bh_iev_nox_24_pto` — IEV - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, no período de 24h
+- `IDE:ide_2204_bh_iev_nox_7_8_pol` — IEV - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 7h e 8h
+- `IDE:ide_2204_bh_iev_nox_7_8_pto` — IEV - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 7h e 8h
+- `IDE:ide_2204_bh_iev_nox_8_9_pol` — IEV - Emissões de Óxidos de Nitrogênio (NOx) em Belo Horizonte, por área, entre 8h e 9h
+- `IDE:ide_2204_bh_iev_nox_8_9_pto` — IEV - Emissões pontuais de Óxidos de Nitrogênio (NOx) em Belo Horizonte, entre 8h e 9h
+- `IDE:ide_2204_con_co_16h_17h_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Contagem, por área, entre 16h e 17h
+- `IDE:ide_2204_con_co_16h_17h_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Contagem, por área, entre 16h e 17h
+- `IDE:ide_2204_con_co_17h_18h_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Contagem, por área, entre 17h e 18h
+- `IDE:ide_2204_con_co_17h_18h_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Contagem, por área, entre 17h e 18h
+- `IDE:ide_2204_con_co_18h_19h_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Contagem, por área, entre 18h e 19h
+- `IDE:ide_2204_con_co_18h_19h_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Contagem, por área, entre 18h e 19h
+- `IDE:ide_2204_con_co_6h_7h_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Contagem, por área, entre 6h e 7h
+- `IDE:ide_2204_con_co_7h_8h_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Contagem, por área, entre 7h e 8h
+- `IDE:ide_2204_con_co_8h_9h_pol` — IEV 2024 - Emissões de monóxido de carbono (CO) em Contagem, por área, entre 8h e 9h
+- `IDE:ide_2204_con_co_8h_9h_pto` — IEV 2024 - Emissões pontuais de monóxido de carbono (CO) em Contagem, por área, entre 8h e 9h
+- `IDE:ide_2204_con_mp_16h_17h_pol` — IEV 2024 - Emissões de material particulado (MP) em Contagem, por área, entre 16h e 17h
+- `IDE:ide_2204_con_mp_16h_17h_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Contagem, por área, entre 16h e 17h
+- `IDE:ide_2204_con_mp_17h_18h_pol` — IEV 2024 - Emissões de material particulado (MP) em Contagem, por área, entre 17h e 18h
+- `IDE:ide_2204_con_mp_17h_18h_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Contagem, por área, entre 17h e 18h
+- `IDE:ide_2204_con_mp_18h_19h_pol` — IEV 2024 - Emissões de material particulado (MP) em Contagem, por área, entre 18h e 19h
+- `IDE:ide_2204_con_mp_18h_19h_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Contagem, por área, entre 18h e 19h
+- `IDE:ide_2204_con_mp_6h_7h_pol` — IEV 2024 - Emissões de material particulado (MP) em Contagem, por área, entre 6h e 7h
+- `IDE:ide_2204_con_mp_6h_7h_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Contagem, por área, entre 6h e 7h
+- `IDE:ide_2204_con_mp_7h_8h_pol` — IEV 2024 - Emissões de material particulado (MP) em Contagem, por área, entre 7h e 8h
+- `IDE:ide_2204_con_mp_7h_8h_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Contagem entre 7h e 8h
+- `IDE:ide_2204_con_mp_8h_9h_pol` — IEV 2024 - Emissões de material particulado (MP) em Contagem, por área, entre 8h e 9h
+- `IDE:ide_2204_con_mp_8h_9h_pto` — IEV 2024 - Emissões pontuais de material particulado (MP) em Contagem, por área, entre 8h e 9h
+- `IDE:ide_2204_con_nox_16h_17h_pol` — IEV 2024 - Emissões de óxido de nitrogênio (NOx) em Contagem, por área, entre 16h e 17h
+- `IDE:ide_2204_con_nox_16h_17h_pto` — IEV 2024 - Emissões pontuais de óxido de nitrogênio (NOx) em Contagem, por área, entre 16h e 17h
+- `IDE:ide_2204_con_nox_17h_18h_pol` — IEV 2024 - Emissões de óxido de nitrogênio (NOx) em Contagem, por área, entre 17h e 18h
+- `IDE:ide_2204_con_nox_17h_18h_pto` — IEV 2024 - Emissões pontuais de óxido de nitrogênio (NOx) em Contagem, por área, entre 17h e 18h
+- `IDE:ide_2204_con_nox_18h_19h_pol` — IEV 2024 - Emissões de óxido de nitrogênio (NOx) em Contagem, por área, entre 18h e 19h
+- `IDE:ide_2204_con_nox_18h_19h_pto` — IEV 2024 - Emissões pontuais de óxido de nitrogênio (NOx) em Contagem, por área, entre 18h e 19h
+- `IDE:ide_2204_con_nox_6h_7h_pol` — IEV 2024 - Emissões de óxido de nitrogênio (NOx) em Contagem, por área, entre 6h e 7h
+- `IDE:ide_2204_con_nox_6h_7h_pto` — IEV 2024 - Emissões pontuais de óxido de nitrogênio (NOx) em Contagem, por área, entre 6h e 7h
+- `IDE:ide_2204_con_nox_7h_8h_pol` — IEV 2024 - Emissões de óxido de nitrogênio (NOx) em Contagem, por área, entre 7h e 8h
+- `IDE:ide_2204_con_nox_7h_8h_pto` — IEV 2024 - Emissões pontuais de óxido de nitrogênio (NOx) em Contagem, por área, entre 7h e 8h
+- `IDE:ide_2204_con_nox_8h_9h_pol` — IEV 2024 - Emissões de óxido de nitrogênio (NOx) em Contagem, por área, entre 8h e 9h
+- `IDE:ide_2204_con_nox_8h_9h_pto` — IEV 2024 - Emissões pontuais de óxido de nitrogênio (NOx) em Contagem, por área, entre 8h e 9h
+- `IDE:ide_2301_mg_fiscalizacoes_realizadas_pto` — Fiscalizações realizadas
+- `IDE:ide_2301_mg_legado_sisfis_pto` — Histórico de fiscalizações realizadas entre 2015 e 2025
+- `IDE:ide_230202_mg_base_empresas_atendimento_acidentes_pto` — Localização das bases de empresas de atendimento a acidentes e emergências ambientais com produtos perigosos cadastradas
+- `IDE:ide_2302_mg_acidentes_ambientais_2014_pto` — Acidentes Ambientais em 2014
+- `IDE:ide_2302_mg_acidentes_ambientais_2015_pto` — Acidentes ambientais em 2015
+- `IDE:ide_2302_mg_acidentes_ambientais_2016_pto` — Acidentes ambientais em 2016
+- `IDE:ide_2302_mg_acidentes_ambientais_2017_pto` — Acidentes ambientais em 2017
+- `IDE:ide_2302_mg_acidentes_ambientais_2018_pto` — Acidentes ambientais em 2018
+- `IDE:ide_2302_mg_acidentes_ambientais_2019_pto` — Acidentes ambientais em 2019
+- `IDE:ide_2302_mg_acidentes_ambientais_2020_pto` — Acidentes ambientais em 2020
+- `IDE:ide_2302_mg_acidentes_ambientais_2021_pto` — Acidentes ambientais em 2021
+- `IDE:ide_2302_mg_acidentes_ambientais_2022_pto` — Acidentes ambientais em 2022
+- `IDE:ide_2302_mg_acidentes_ambientais_2023_pto` — Acidentes ambientais em 2023
+- `IDE:ide_2302_mg_acidentes_ambientais_2024_pto` — Acidentes ambientais em 2024
+- `IDE:ide_2302_mg_acidentes_ambientais_2025_pto` — Acidentes ambientais em 2025
+- `IDE:ide_2303_mg_diagnostico_fisc_carac_amb_rele_2021_pol` — Diagnóstico Ambiental da Fiscalização - Características ambientais relevantes (2021)
+- `IDE:ide_2303_mg_diagnostico_fisc_carac_amb_rele_2022_pol` — Diagnóstico Ambiental da Fiscalização - Características ambientais relevantes (2022)
+- `IDE:ide_2303_mg_diagnostico_fisc_carac_amb_rele_2023_pol` — Diagnóstico Ambiental da Fiscalização - Características Ambientais Relevantes (2023)
+- `IDE:ide_2303_mg_diagnostico_fisc_carac_amb_rele_2024_pol` — Diagnostico Ambiental da Fiscalização - Caracteristicas Ambientais Relevantes (2024)
+- `IDE:ide_2303_mg_diagnostico_fisc_carac_amb_rele_2025_pol` — Diagnóstico Ambiental da Fiscalização - Características ambientais relevantes (2025)
+- `IDE:ide_2303_mg_diagnostico_fisc_fatores_pressao_2021_pol` — Diagnóstico Ambiental da Fiscalização - Fatores de pressão (2021)
+- `IDE:ide_2303_mg_diagnostico_fisc_fatores_pressao_2022_pol` — Diagnóstico Ambiental da Fiscalização - Fatores de pressão (2022)
+- `IDE:ide_2303_mg_diagnostico_fisc_fatores_pressao_2023_pol` — Diagnostico Ambiental da Fiscalização - Fatores de Pressão (2023)
+- `IDE:ide_2303_mg_diagnostico_fisc_fatores_pressao_2024_pol` — Diagnostico Ambiental da Fiscalização - Fatores de Pressão (2024)
+- `IDE:ide_2303_mg_diagnostico_fisc_fatores_pressao_2025_pol` — Diagnóstico Ambiental da Fiscalização - Fatores de pressão (2025)
+- `IDE:ide_2304_mg_areas_embargadas_sisema_pol` — Áreas embargadas pelo Sisema
+- `IDE:ide_2401_mg_aptidao_edafo_cana_pol` — ZEE - Aptidão edafoclimática para a cultura da cana-de-açúcar
+- `IDE:ide_2401_mg_aptidao_edafo_eucalipto_pol` — ZEE - Aptidão edafoclimática para a cultura do eucalipto
+- `IDE:ide_2401_mg_areas_prioritarias_conservacao_pol` — ZEE - Áreas prioritárias para conservação
+- `IDE:ide_2401_mg_areas_prioritarias_recuperacao_pol` — ZEE - Áreas prioritárias para recuperação
+- `IDE:ide_2401_mg_atividades_economicas_produtivas_pol` — ZEE - Atividades econômicas produtivas
+- `IDE:ide_2401_mg_capacidade_institucional_pol` — ZEE - Capacidade institucional
+- `IDE:ide_2401_mg_condicoes_sociais_pol` — ZEE - Condições sociais
+- `IDE:ide_2401_mg_declividade_pol` — ZEE - Declividade
+- `IDE:ide_2401_mg_demografia_pol` — ZEE - Demografia
+- `IDE:ide_2401_mg_erodibilidade_pol` — ZEE - Erodibilidade do solo
+- `IDE:ide_2401_mg_erosao_atual_pol` — ZEE - Erosão atual
+- `IDE:ide_2401_mg_estrutura_fundiaria_pol` — ZEE - Estrutura fundiária
+- `IDE:ide_2401_mg_grau_conserv_flora_pol` — ZEE - Grau de conservação da flora nativa
+- `IDE:ide_2401_mg_heterogeneidade_fitofisionomias_pol` — ZEE - Heterogeneidade de fitofisionomias
+- `IDE:ide_2401_mg_icms_ecologico_pol` — ZEE - ICMS Ecológico (2006)
+- `IDE:ide_2401_mg_infra_estrutura_transportes_pol` — ZEE - Infraestrutura de transportes
+- `IDE:ide_2401_mg_integridade_fauna_pol` — ZEE - Integridade da fauna
+- `IDE:ide_2401_mg_integridade_ponderada_flora_pol` — ZEE - Integridade ponderada da flora
+- `IDE:ide_2401_mg_intensidade_chuva_pol` — ZEE - Intensidade das chuvas
+- `IDE:ide_2401_mg_mapa_pedologico_simplificado_pol` — ZEE - Mapa pedológico simplificado
+- `IDE:ide_2401_mg_nivel_compromet_agua_subterranea_pol` — ZEE - Nível de comprometimento das águas subterrâneas
+- `IDE:ide_2401_mg_nivel_compromet_agua_superficial_pol` — ZEE - Nível de comprometimento das águas superficiais
+- `IDE:ide_2401_mg_ocorrencias_minerais_pol` — ZEE - Ocorrências minerárias
+- `IDE:ide_2401_mg_ocupacao_economica_pol` — ZEE - Ocupação econômica
+- `IDE:ide_2401_mg_org_ensino_pesquisa_pol` — ZEE - Organizações de ensino e pesquisa
+- `IDE:ide_2401_mg_org_financeiras_pol` — ZEE - Organizações financeiras
+- `IDE:ide_2401_mg_org_fiscalizacao_controle_pol` — ZEE - Organizações de fiscalização e controle
+- `IDE:ide_2401_mg_org_juridicas_pol` — ZEE - Organizações jurídicas
+- `IDE:ide_2401_mg_org_segur_publica_pol` — ZEE - Organizações de segurança pública
+- `IDE:ide_2401_mg_potencialidade_comp_humano_pol` — ZEE - Potencialidade do componente humano
+- `IDE:ide_2401_mg_potencialidade_comp_institucional_pol` — ZEE - Potencialidade do componente institucional
+- `IDE:ide_2401_mg_potencialidade_comp_natural_pol` — ZEE - Potencialidade do componente natural
+- `IDE:ide_2401_mg_potencialidade_comp_produtivo_pol` — ZEE - Potencialidade do componente produtivo
+- `IDE:ide_2401_mg_potencialidade_contaminacao_agua_subterranea_pol` — ZEE - Potencialidade de contaminação da água subterrânea
+- `IDE:ide_2401_mg_potencialidade_social_pol` — ZEE - Potencialidade social
+- `IDE:ide_2401_mg_precipitacao_media_anual` — ZEE - Precipitação média anual
+- `IDE:ide_2401_mg_prioridade_conservacao_avifauna_pol` — ZEE - Prioridade para conservação da avifauna
+- `IDE:ide_2401_mg_prioridade_conservacao_flora_pol` — ZEE - Prioridade para conservação da flora
+- `IDE:ide_2401_mg_prioridade_conservacao_herpetofauna_pol` — ZEE - Prioridade para conservação da herpetofauna
+- `IDE:ide_2401_mg_prioridade_conservacao_ictiofauna_pol` — ZEE - Prioridade para conservação da ictiofauna
+- `IDE:ide_2401_mg_prioridade_conservacao_invertebrados_pol` — ZEE - Prioridade para conservação de invertebrados
+- `IDE:ide_2401_mg_prioridade_conservacao_mamiferos_pol` — ZEE - Prioridade para conservação de mamíferos
+- `IDE:ide_2401_mg_qualidade_agua_superficial_pol` — ZEE - Qualidade da água superficial
+- `IDE:ide_2401_mg_qualidade_ambiental_pol` — ZEE - Qualidade ambiental
+- `IDE:ide_2401_mg_recursos_minerais_pol` — ZEE - Recursos minerais
+- `IDE:ide_2401_mg_relevancia_reg_fito_floresta_ombrofila_pol` — ZEE - Relevância regional da fitofisionomia Floresta Ombrófila
+- `IDE:ide_2401_mg_relevancia_reg_fito_floresta_semidec_pol` — ZEE - Relevância regional da fitofisionomia Floresta Estacional Semidecidual
+- `IDE:ide_2401_mg_relevancia_reg_fitofisionomia_campo_cerrado_pol` — ZEE - Relevância regional da fitofisionomia Campo Cerrado
+- `IDE:ide_2401_mg_relevancia_reg_fitofisionomia_campo_pol` — ZEE - Relevância regional da fitofisionomia Campo
+- `IDE:ide_2401_mg_relevancia_reg_fitofisionomia_campo_rupestre_pol` — ZEE - Relevância regional da fitofisionomia Campo Rupestre
+- `IDE:ide_2401_mg_relevancia_reg_fitofisionomia_cerradao_pol` — ZEE - Relevância regional da fitofisionomia Cerradão
+- `IDE:ide_2401_mg_relevancia_reg_fitofisionomia_cerrado_pol` — Relevância regional da fitofisionomia Cerrado
+- `IDE:ide_2401_mg_relevancia_reg_fitofisionomia_floresta_decidual_pol` — ZEE - Relevância regional da fitofisionomia Floresta Estacional Decidual
+- `IDE:ide_2401_mg_relevancia_reg_fitofisionomia_vereda_pol` — ZEE - Relevância regional da fitofisionomia Vereda
+- `IDE:ide_2401_mg_rendimento_especifico_90_pol` — ZEE - Rendimento específico médio com 90% de permanência
+- `IDE:ide_2401_mg_rendimento_especifico_longo_termo_pol` — ZEE - Rendimento específico médio de longo termo
+- `IDE:ide_2401_mg_risco_ambiental_pol` — ZEE - Risco ambiental
+- `IDE:ide_2401_mg_risco_potencial_erosao_pol` — ZEE - Risco à erosão
+- `IDE:ide_2401_mg_taxa_decomposicao_materia_organica_solo_pol` — ZEE - Taxa de decomposição da matéria orgânica do solo
+- `IDE:ide_2401_mg_temperatura_media_anual_pol` — ZEE - Temperatura média anual
+- `IDE:ide_2401_mg_teor_materia_organica_solo_pol` — ZEE - Teor de matéria orgânica no solo
+- `IDE:ide_2401_mg_textura_solo_pol` — ZEE - Textura do solo
+- `IDE:ide_2401_mg_utilizacao_terras_pol` — ZEE - Índice de utilização das terras
+- `IDE:ide_2401_mg_vulnerab_natural_disponib_agua_subterranea_pol` — ZEE - Vulnerabilidade natural no contexto da disponibilidade natural de água subterrânea
+- `IDE:ide_2401_mg_vulnerab_natural_disponib_agua_superficial_pol` — ZEE - Vulnerabilidade natural associada à disponibilidade natural de água superficial
+- `IDE:ide_2401_mg_vulnerabilidade_contaminacao_ambiental_uso_solo_pol` — ZEE - Vulnerabilidade à contaminação ambiental pelo uso do solo
+- `IDE:ide_2401_mg_vulnerabilidade_degradacao_estrutural_solos_pol` — ZEE - Vulnerabilidade à degradação estrutural do solo
+- `IDE:ide_2401_mg_vulnerabilidade_natural_pol` — ZEE - Vulnerabilidade natural
+- `IDE:ide_2401_mg_vulnerabilidade_natural_recursos_hidricos_pol` — ZEE - Vulnerabilidade natural dos recursos hídricos
+- `IDE:ide_2401_mg_vulnerabilidade_solo_pol` — ZEE - Vulnerabilidade do solo
+- `IDE:ide_2401_mg_vulnerabilidade_solos_erosao_pol` — ZEE - Vulnerabilidade dos solos à erosão
+- `IDE:ide_2401_mg_zonas_ecologico_economicas_pol` — ZEE - Zonas Ecológico-econômicas
+- `IDE:ide_2401_mg_zoneamento_climatico_pol` — ZEE - Zoneamento climático a partir do índice de umidade de Thornthwaite
+- `IDE:ide_240201_mg_ribsantana_app_hid_con_ant_pol` — ZAP - Sub-bacia do Ribeirão Santana - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240201_mg_ribsantana_app_hidrica_pol` — ZAP - Sub-bacia do Ribeirão Santana - APPs hídricas
+- `IDE:ide_240201_mg_ribsantana_areas_con_ant_pol` — ZAP - Sub-bacia do Ribeirão Santana - Áreas conservadas e antropizadas
+- `IDE:ide_240201_mg_ribsantana_cadastros_uso_insignificante_pto` — ZAP - Sub-bacia do Ribeirão Santana - Cadastros de uso insignificante
+- `IDE:ide_240201_mg_ribsantana_comp_uso_up_pol` — ZAP - Sub-bacia do ribeirão Santana - Conflito entre unidades da paisagem e uso do solo
+- `IDE:ide_240201_mg_ribsantana_delimitacao_bacia_pol` — ZAP - Sub-bacia do Ribeirão Santana - Delimitação da sub-bacia
+- `IDE:ide_240201_mg_ribsantana_hidrografia_disponibilidade_lin` — ZAP - Sub-bacia do Ribeirão Santana - Situação da disponibilidade hídrica
+- `IDE:ide_240201_mg_ribsantana_nascentes_pto` — ZAP - Sub-bacia do Ribeirão Santana - Nascentes
+- `IDE:ide_240201_mg_ribsantana_outorgas_individuais_pto` — ZAP - Sub-bacia do Ribeirão Santana - Outorgas
+- `IDE:ide_240201_mg_ribsantana_unidades_paisagem_pol` — ZAP - Sub-bacia do Ribeirão Santana - Unidades de Paisagem
+- `IDE:ide_240201_mg_ribsantana_up_uso_pol` — ZAP - Sub-bacia do Ribeirão Santana - Uso e cobertura do solo
+- `IDE:ide_240202_mg_riomanso_app_con_ant_pol` — ZAP - Sub-bacia do Rio Manso - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240202_mg_riomanso_app_hid_fim_pol` — ZAP - Sub-bacia do Rio Manso - APPs hídricas
+- `IDE:ide_240202_mg_riomanso_app_nasc_pol` — ZAP - Sub-bacia do Rio Manso - APPs de Nascentes
+- `IDE:ide_240202_mg_riomanso_app_puc_pol` — ZAP - Sub-bacia do Rio Manso - PUC x APP Hídrica
+- `IDE:ide_240202_mg_riomanso_area_con_ant_pol` — ZAP - Sub-bacia do Rio Manso - Áreas conservadas e antropizadas
+- `IDE:ide_240202_mg_riomanso_delimitacao_pol` — ZAP - Sub-bacia do Rio Manso - Delimitação da sub-bacia
+- `IDE:ide_240202_mg_riomanso_hidrografia_dh_lin` — ZAP - Sub-bacia do Rio Manso - Situação da disponibilidade hídrica
+- `IDE:ide_240202_mg_riomanso_hidrografia_viabil_lin` — ZAP - Sub-bacia do Rio Manso - Viabilidade de regularização
+- `IDE:ide_240202_mg_riomanso_nascentes_pto` — ZAP - Sub-bacia do Rio Manso - Nascentes
+- `IDE:ide_240202_mg_riomanso_pot_uso_conserv_pol` — ZAP - Sub-bacia do Rio Manso - Potencial de Uso Conservacionista - PUC
+- `IDE:ide_240202_mg_riomanso_trechos_demanda_lin` — ZAP - Sub-bacia do Rio Manso - Trechos com demanda hídrica
+- `IDE:ide_240202_mg_riomanso_uso_do_solo_pol` — ZAP - Sub-bacia do Rio Manso - Uso e ocupação do solo
+- `IDE:ide_240203_santa_isabel_app_hid_con_ant_pol` — ZAP - Sub-bacia Ribeirão Santa Isabel - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240203_santa_isabel_apps_hid_pol` — ZAP - Sub-bacia Ribeirão Santa Isabel - APPs hídricas
+- `IDE:ide_240203_santa_isabel_areas_con_ant_pol` — ZAP - Sub-bacia Ribeirão Santa Isabel - Áreas conservadas e antropizadas
+- `IDE:ide_240203_santa_isabel_cad_uso_insignif_pto` — ZAP - Sub-bacia do ribeirão Santa Isabel - Cadastros de uso insignificante
+- `IDE:ide_240203_santa_isabel_delimitacao_pol` — ZAP - Sub-bacia Ribeirão Santa Isabel - Delimitação da sub-bacia
+- `IDE:ide_240203_santa_isabel_dh_situacao_lin` — ZAP - Sub-bacia Ribeirão Santa Isabel - Situação da disponibilidade hídrica
+- `IDE:ide_240203_santa_isabel_dh_trecho_lin` — ZAP - Sub-bacia Ribeirão Santa Isabel - Trechos com demanda hídrica
+- `IDE:ide_240203_santa_isabel_nascentes_pto` — ZAP - Sub-bacia do ribeirão Santa Isabel - Nascentes
+- `IDE:ide_240203_santa_isabel_outorgas_indiv_pto` — ZAP - Sub-bacia do ribeirão Santa Isabel - Outorgas individuais
+- `IDE:ide_240203_santa_isabel_unid_paisagem_pol` — ZAP - Sub-bacia Ribeirão Santa Isabel - Unidades de Paisagem
+- `IDE:ide_240203_santa_isabel_up_solo_pol` — ZAP - Sub-bacia Ribeirão Santa Isabel - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240203_santa_isabel_uso_do_solo_pol` — ZAP - Sub-bacia Ribeirão Santa Isabel - Uso e ocupação do solo
+- `IDE:ide_240204_mg_serra_da_piedade_app_hid_con_ant_pol` — ZAP - Serra da Piedade - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240204_mg_serra_da_piedade_apps_hid_pol` — ZAP - Serra da Piedade - APPs hídricas
+- `IDE:ide_240204_mg_serra_da_piedade_areas_con_ant_pol` — ZAP - Serra da Piedade - Áreas conservadas e antropizadas
+- `IDE:ide_240204_mg_serra_da_piedade_cad_uso_insignif_pto` — ZAP - Serra da Piedade - Cadastros de uso insignificante
+- `IDE:ide_240204_mg_serra_da_piedade_delimitacao_pol` — ZAP - Serra da Piedade - Delimitação da Sub-bacia
+- `IDE:ide_240204_mg_serra_da_piedade_dh_situacao_lin` — ZAP - Serra da Piedade - Situação da disponibilidade hídrica
+- `IDE:ide_240204_mg_serra_da_piedade_dh_trecho_lin` — ZAP - Serra da Piedade - Trechos com demanda hídrica
+- `IDE:ide_240204_mg_serra_da_piedade_nascentes_pto` — ZAP - Serra da Piedade - Nascentes
+- `IDE:ide_240204_mg_serra_da_piedade_outorgas_colet_pto` — ZAP - Serra da Piedade - Outorgas coletivas
+- `IDE:ide_240204_mg_serra_da_piedade_outorgas_indiv_pto` — ZAP - Serra da Piedade - Outorgas individuais
+- `IDE:ide_240204_mg_serra_da_piedade_unid_paisagem_pol` — ZAP - Serra da Piedade - Unidades da paisagem
+- `IDE:ide_240204_mg_serra_da_piedade_up_solo_pol` — ZAP - Serra da Piedade - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240204_mg_serra_da_piedade_uso_do_solo_pol` — ZAP - Serra da Piedade - Uso e ocupação do solo
+- `IDE:ide_240205_mg_altodoce_apps_hid_con_ant_pol` — ZAP - Sub-bacia Alto Doce - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240205_mg_altodoce_apps_hid_pol` — ZAP - Sub-bacia Alto Doce - APPs hídricas
+- `IDE:ide_240205_mg_altodoce_areas_con_ant_pol` — ZAP - Sub-bacia Alto Doce - Áreas conservadas e antropizadas
+- `IDE:ide_240205_mg_altodoce_cad_uso_insignif_pto` — ZAP - Sub-bacia Alto Doce - Cadastros de uso insignificante
+- `IDE:ide_240205_mg_altodoce_delimitacao_pol` — ZAP - Sub-bacia Alto Doce - Delimitação da sub-bacia
+- `IDE:ide_240205_mg_altodoce_dh_situacao_lin` — ZAP - Sub-bacia Alto Doce - Situação da disponibilidade hídrica
+- `IDE:ide_240205_mg_altodoce_dh_trechos_lin` — ZAP - Sub-bacia Alto Doce - Trechos com demanda hídrica
+- `IDE:ide_240205_mg_altodoce_dh_viabil_lin` — ZAP - Sub-bacia Alto Doce - Viabilidade de regularização
+- `IDE:ide_240205_mg_altodoce_nascentes_pto` — ZAP - Sub-bacia Alto Doce - Nascentes
+- `IDE:ide_240205_mg_altodoce_unid_de_paisagem_pol` — ZAP - Sub-bacia Alto Doce - Unidades de Paisagem
+- `IDE:ide_240205_mg_altodoce_up_solo_pol` — ZAP - Sub-bacia Alto Doce - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240205_mg_altodoce_uso_do_solo_pol` — ZAP - Sub-bacia Alto Doce - Uso e ocupação do solo
+- `IDE:ide_240206_mg_baixocarmo_apps_hid_con_ant_pol` — ZAP - Sub-bacia Baixo Carmo - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240206_mg_baixocarmo_apps_hid_pol` — ZAP - Sub-bacia Baixo Carmo - APPs hídricas
+- `IDE:ide_240206_mg_baixocarmo_areas_con_ant_pol` — ZAP - Sub-bacia Baixo Carmo - Áreas conservadas e antropizadas
+- `IDE:ide_240206_mg_baixocarmo_cad_uso_insignif_pto` — ZAP - Sub-bacia Baixo Carmo - Cadastros de uso insignificante
+- `IDE:ide_240206_mg_baixocarmo_delimitacao_pol` — ZAP - Sub-bacia Baixo Carmo - Delimitação da sub-bacia
+- `IDE:ide_240206_mg_baixocarmo_dh_situacao_lin` — ZAP - Sub-bacia Baixo Carmo - Situação da disponibilidade hídrica
+- `IDE:ide_240206_mg_baixocarmo_dh_trechos_lin` — ZAP - Sub-bacia Baixo Carmo - Trechos com demanda hídrica
+- `IDE:ide_240206_mg_baixocarmo_dh_viabil_lin` — ZAP - Sub-bacia Baixo Carmo - Viabilidade de regularização
+- `IDE:ide_240206_mg_baixocarmo_nascentes_pto` — ZAP - Sub-bacia Baixo Carmo - Nascentes
+- `IDE:ide_240206_mg_baixocarmo_outorgas_pto` — ZAP - Sub-bacia Baixo Carmo - Outorgas
+- `IDE:ide_240206_mg_baixocarmo_unid_de_paisagem_pol` — ZAP - Sub-bacia Baixo Carmo - Unidades de Paisagem
+- `IDE:ide_240206_mg_baixocarmo_up_solo_pol` — ZAP - Sub-bacia Baixo Carmo - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240206_mg_baixocarmo_uso_do_solo_pol` — ZAP - Sub-bacia Baixo Carmo - Uso e ocupação do solo
+- `IDE:ide_240207_mg_baixopiranga_apps_hid_con_ant_pol` — ZAP - Sub-bacia Baixo Piranga - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240207_mg_baixopiranga_apps_hid_pol` — ZAP - Sub-bacia Baixo Piranga - APPs hídricas
+- `IDE:ide_240207_mg_baixopiranga_areas_con_ant_pol` — ZAP - Sub-bacia Baixo Piranga - Áreas conservadas e antropizadas
+- `IDE:ide_240207_mg_baixopiranga_cad_uso_insignif_pto` — ZAP - Sub-bacia Baixo Piranga - Cadastros de uso insignificante
+- `IDE:ide_240207_mg_baixopiranga_delimitacao_pol` — ZAP - Sub-bacia Baixo Piranga - Delimitação da sub-bacia
+- `IDE:ide_240207_mg_baixopiranga_dh_situacao_lin` — ZAP - Sub-bacia Baixo Piranga - Situação da disponibilidade hídrica
+- `IDE:ide_240207_mg_baixopiranga_dh_trechos_lin` — ZAP - Sub-bacia Baixo Piranga - Trechos com demanda hídrica
+- `IDE:ide_240207_mg_baixopiranga_dh_viabil_lin` — ZAP - Sub-bacia Baixo Piranga - Viabilidade de regularização
+- `IDE:ide_240207_mg_baixopiranga_nascentes_pto` — ZAP - Sub-bacia Baixo Piranga - Nascentes
+- `IDE:ide_240207_mg_baixopiranga_outorgas_pto` — ZAP - Sub-bacia Baixo Piranga - Outorgas
+- `IDE:ide_240207_mg_baixopiranga_unid_de_paisagem_pol` — ZAP - Sub-bacia Baixo Piranga - Unidades de Paisagem
+- `IDE:ide_240207_mg_baixopiranga_up_solo_pol` — ZAP - Sub-bacia Baixo Piranga - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240207_mg_baixopiranga_uso_do_solo_pol` — ZAP - Sub-bacia Baixo Piranga - Uso e ocupação do solo
+- `IDE:ide_240208_mg_gualaxon_apps_hid_con_ant_pol` — ZAP - Sub-bacia Gualaxo do Norte - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240208_mg_gualaxon_apps_hid_pol` — ZAP - Sub-bacia Gualaxo do Norte - APPs hídricas
+- `IDE:ide_240208_mg_gualaxon_areas_con_ant_pol` — ZAP - Sub-bacia Gualaxo do Norte - Áreas conservadas e antropizadas
+- `IDE:ide_240208_mg_gualaxon_cad_uso_insignif_pto` — ZAP - Sub-bacia Gualaxo do Norte - Cadastros de uso insignificante
+- `IDE:ide_240208_mg_gualaxon_delimitacao_pol` — ZAP - Sub-bacia Gualaxo do Norte - Delimitação da sub-bacia
+- `IDE:ide_240208_mg_gualaxon_dh_situacao_lin` — ZAP - Sub-bacia Gualaxo do Norte - Situação da disponibilidade hídrica
+- `IDE:ide_240208_mg_gualaxon_dh_trechos_lin` — ZAP - Sub-bacia Gualaxo do Norte - Trechos com demanda hídrica
+- `IDE:ide_240208_mg_gualaxon_dh_viabil_lin` — ZAP - Sub-bacia Gualaxo do Norte - Viabilidade de regularização
+- `IDE:ide_240208_mg_gualaxon_ivnar_pol` — ZAP - Sub-bacia Gualaxo do Norte - Vegetação nativa em área de recarga
+- `IDE:ide_240208_mg_gualaxon_nascentes_pto` — ZAP - Sub-bacia Gualaxo do Norte - Nascentes
+- `IDE:ide_240208_mg_gualaxon_outorgas_pto` — ZAP - Sub-bacia Gualaxo do Norte - Outorgas
+- `IDE:ide_240208_mg_gualaxon_unid_de_paisagem_pol` — ZAP - Sub-bacia Gualaxo do Norte - Unidades de Paisagem
+- `IDE:ide_240208_mg_gualaxon_up_solo_pol` — ZAP - Sub-bacia Gualaxo do Norte - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240208_mg_gualaxon_uso_do_solo_pol` — ZAP - Sub-bacia Gualaxo do Norte - Uso e ocupação do solo
+- `IDE:ide_240209_mg_ipanema_app_hid_cont_ant_pol` — ZAP - Sub-bacia Ipanema - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240209_mg_ipanema_app_hid_pol` — ZAP - Sub-bacia Ipanema - APPs hídricas
+- `IDE:ide_240209_mg_ipanema_areas_con_ant_pol` — ZAP - Sub-bacia Ipanema - Áreas conservadas e antropizadas
+- `IDE:ide_240209_mg_ipanema_cad_uso_insignif_pto` — ZAP - Sub-bacia Ipanema - Cadastros de uso insignificante
+- `IDE:ide_240209_mg_ipanema_delimitacao_pol` — ZAP - Sub-bacia Ipanema - Delimitação da sub-bacia
+- `IDE:ide_240209_mg_ipanema_inat_pol` — ZAP - Sub-bacia Ipanema - Vegetação nativa em topo de morros
+- `IDE:ide_240209_mg_ipanema_isapp_pol` — ZAP - Sub-bacia Ipanema - Silvicultura em APP hídrica
+- `IDE:ide_240209_mg_ipanema_nascentes_pto` — ZAP - Sub-bacia Ipanema - Nascentes
+- `IDE:ide_240209_mg_ipanema_represas_pol` — ZAP - Sub-bacia Ipanema - Represas
+- `IDE:ide_240209_mg_ipanema_unid_de_paisagem_pol` — ZAP - Sub-bacia Ipanema - Unidades de Paisagem
+- `IDE:ide_240209_mg_ipanema_up_solo_pol` — ZAP - Sub-bacia Ipanema - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240209_mg_ipanema_uso_do_solo_pol` — ZAP - Sub-bacia Ipanema - Uso e ocupação do solo
+- `IDE:ide_240210_pn_sta_juliana_apps_hid_con_ant_pol` — ZAP - Sub-bacia do ribeirão Santa Juliana - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240210_pn_sta_juliana_apps_hid_pol` — ZAP - Sub-bacia do ribeirão Santa Juliana - APPs hídricas
+- `IDE:ide_240210_pn_sta_juliana_areas_con_ant_pol` — ZAP - Sub-bacia do ribeirão Santa Juliana - Áreas conservadas e antropizadas
+- `IDE:ide_240210_pn_sta_juliana_cad_uso_insignif_pto` — ZAP - Sub-bacia do ribeirão Santa Juliana - Cadastros de uso insignificante
+- `IDE:ide_240210_pn_sta_juliana_delimit_pol` — ZAP - Sub-bacia do ribeirão Santa Juliana - Delimitação da sub-bacia
+- `IDE:ide_240210_pn_sta_juliana_dem_lin` — ZAP - Sub-bacia do ribeirão Santa Juliana - Trechos com demanda hídrica
+- `IDE:ide_240210_pn_sta_juliana_hid_lin` — ZAP - Sub-bacia do ribeirão Santa Juliana - Hidrografia
+- `IDE:ide_240210_pn_sta_juliana_nascentes_pto` — ZAP - Sub-bacia do ribeirão Santa Juliana - Nascentes
+- `IDE:ide_240210_pn_sta_juliana_outorgas_col_pto` — ZAP - Sub-bacia do ribeirão Santa Juliana - Outorgas coletivas
+- `IDE:ide_240210_pn_sta_juliana_outorgas_ind_pto` — ZAP - Sub-bacia do ribeirão Santa Juliana - Outorgas individuais
+- `IDE:ide_240210_pn_sta_juliana_sit_dh_lin` — ZAP - Sub-bacia do ribeirão Santa Juliana - Situação da disponibilidade hídrica
+- `IDE:ide_240210_pn_sta_juliana_up_pol` — ZAP - Sub-bacia do ribeirão Santa Juliana - Unidades de paisagem
+- `IDE:ide_240210_pn_sta_juliana_up_solo_pol` — ZAP - Sub-bacia do ribeirão Santa Juliana - Conflito entre unidades de paisagem e uso do solo
+- `IDE:ide_240210_pn_sta_juliana_uso_solo_pol` — ZAP - Sub-bacia do ribeirão Santa Juliana - Uso e ocupação do solo
+- `IDE:ide_240210_pn_sta_juliana_viab_reg_lin` — ZAP - Sub-bacia do ribeirão Santa Juliana - Viabilidade de regularização de vazão
+- `IDE:ide_240211_mg_bagagem_apps_hid_con_ant_pol` — ZAP - Sub-bacia Alto Rio Bagagem - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240211_mg_bagagem_apps_hid_pol` — ZAP - Sub-bacia Alto Rio Bagagem - APPs hídricas
+- `IDE:ide_240211_mg_bagagem_areas_con_ant_pol` — ZAP - Sub-bacia Alto Rio Bagagem - Áreas conservadas e antropizadas
+- `IDE:ide_240211_mg_bagagem_cad_uso_insignif_pto` — ZAP - Sub-bacia Alto Rio Bagagem - Cadastros de uso insignificante
+- `IDE:ide_240211_mg_bagagem_delimitacao_pol` — ZAP - Sub-bacia Alto Rio Bagagem - Delimitação da sub-bacia
+- `IDE:ide_240211_mg_bagagem_dh_situacao_lin` — ZAP - Sub-bacia Alto Rio Bagagem - Situação da disponibilidade hídrica
+- `IDE:ide_240211_mg_bagagem_dh_trechos_lin` — ZAP - Sub-bacia Alto Rio Bagagem - Trechos com demanda hídrica
+- `IDE:ide_240211_mg_bagagem_dh_viabil_lin` — ZAP - Sub-bacia Alto Rio Bagagem - Viabilidade de regularização
+- `IDE:ide_240211_mg_bagagem_nascentes_pto` — ZAP - Sub-bacia Alto Rio Bagagem - Nascentes
+- `IDE:ide_240211_mg_bagagem_outorgas_colet_pto` — ZAP - Sub-bacia Alto Rio Bagagem - Outorgas coletivas
+- `IDE:ide_240211_mg_bagagem_outorgas_indiv_pto` — ZAP - Sub-bacia Alto Rio Bagagem - Outorgas individuais
+- `IDE:ide_240211_mg_bagagem_unid_de_paisagem_pol` — ZAP - Sub-bacia Alto Rio Bagagem - Unidades de Paisagem
+- `IDE:ide_240211_mg_bagagem_up_solo_pol` — ZAP - Sub-bacia Alto Rio Bagagem - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240211_mg_bagagem_uso_do_solo_pol` — ZAP - Sub-bacia Alto Rio Bagagem - Uso e ocupação do solo
+- `IDE:ide_240212_mg_mandaguari_apps_hid_con_ant_pol` — ZAP - Sub-bacia Ribeirão Mandaguari - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240212_mg_mandaguari_apps_hid_pol` — ZAP - Sub-bacia Ribeirão Mandaguari - APPs hídricas
+- `IDE:ide_240212_mg_mandaguari_areas_con_ant_pol` — ZAP - Sub-bacia Ribeirão Mandaguari - Áreas conservadas e antropizadas
+- `IDE:ide_240212_mg_mandaguari_cad_uso_insignif_pto` — ZAP - Sub-bacia Ribeirão Mandaguari - Cadastros de uso insignificante
+- `IDE:ide_240212_mg_mandaguari_delimitacao_pol` — ZAP - Sub-bacia Ribeirão Mandaguari - Delimitação da sub-bacia
+- `IDE:ide_240212_mg_mandaguari_dh_situacao_lin` — ZAP - Sub-bacia Ribeirão Mandaguari - Situação da disponibilidade hídrica
+- `IDE:ide_240212_mg_mandaguari_dh_trechos_lin` — ZAP - Sub-bacia Ribeirão Mandaguari - Trechos com demanda hídrica
+- `IDE:ide_240212_mg_mandaguari_dh_viabil_lin` — ZAP - Sub-bacia Ribeirão Mandaguari - Viabilidade de regularização
+- `IDE:ide_240212_mg_mandaguari_nascentes_pto` — ZAP - Sub-bacia Ribeirão Mandaguari - Nascentes
+- `IDE:ide_240212_mg_mandaguari_outorgas_colet_pto` — ZAP - Sub-bacia Ribeirão Mandaguari - Outorgas coletivas
+- `IDE:ide_240212_mg_mandaguari_outorgas_indiv_pto` — ZAP - Sub-bacia Ribeirão Mandaguari - Outorgas individuais
+- `IDE:ide_240212_mg_mandaguari_unid_de_paisagem_pol` — ZAP - Sub-bacia Ribeirão Mandaguari - Unidades de Paisagem
+- `IDE:ide_240212_mg_mandaguari_up_solo_pol` — ZAP - Sub-bacia Ribeirão Mandaguari - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240212_mg_mandaguari_uso_do_solo_pol` — ZAP - Sub-bacia Ribeirão Mandaguari - Uso e ocupação do solo
+- `IDE:ide_240213_mg_brejao_apps_hid_con_ant_pol` — ZAP - Sub-bacia Ribeirão do Brejão - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240213_mg_brejao_apps_hid_pol` — ZAP - Sub-bacia Ribeirão do Brejão - APPs hídricas
+- `IDE:ide_240213_mg_brejao_areas_con_ant_pol` — ZAP - Sub-bacia Ribeirão do Brejão - Áreas conservadas e antropizadas
+- `IDE:ide_240213_mg_brejao_cad_uso_insignif_pto` — ZAP - Sub-bacia Ribeirão do Brejão - Cadastros de uso insignificante
+- `IDE:ide_240213_mg_brejao_delimitacao_pol` — ZAP - Sub-bacia Ribeirão do Brejão - Delimitação da sub-bacia
+- `IDE:ide_240213_mg_brejao_dh_situacao_lin` — ZAP - Sub-bacia Ribeirão do Brejão - Situação da disponibilidade hídrica
+- `IDE:ide_240213_mg_brejao_dh_trecho_lin` — ZAP - Sub-bacia Ribeirão do Brejão - Trechos com demanda hídrica
+- `IDE:ide_240213_mg_brejao_dh_viabil_lin` — ZAP - Sub-bacia Ribeirão do Brejão - Viabilidade de regularização
+- `IDE:ide_240213_mg_brejao_nascentes_pto` — ZAP - Sub-bacia Ribeirão do Brejão - Nascentes
+- `IDE:ide_240213_mg_brejao_outorgas_indiv_pto` — ZAP - Sub-bacia Ribeirão do Brejão - Outorgas
+- `IDE:ide_240213_mg_brejao_unid_de_paisagem_pol` — ZAP - Sub-bacia Ribeirão do Brejão - Unidades de Paisagem
+- `IDE:ide_240213_mg_brejao_up_solo_pol` — ZAP - Sub-bacia Ribeirão do Brejão - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240213_mg_brejao_uso_do_solo_pol` — ZAP - Sub-bacia Ribeirão do Brejão - Uso e ocupação do solo
+- `IDE:ide_240214_mg_olhos_dagua_apps_hid_con_ant_pol` — ZAP - ribeirão Olhos D'água - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240214_mg_olhos_dagua_apps_hidricas_pol` — ZAP - ribeirão Olhos D'água - APPs hídricas
+- `IDE:ide_240214_mg_olhos_dagua_areas_con_ant_pol` — ZAP - ribeirão Olhos D'água - Áreas conservadas e antropizadas
+- `IDE:ide_240214_mg_olhos_dagua_cad_uso_insignif_pto` — ZAP - ribeirão Olhos D'água - Cadastros de uso insignificante
+- `IDE:ide_240214_mg_olhos_dagua_compart_sub-bacia_pol` — ZAP - ribeirão Olhos D'água - Compartimentação da sub-bacia
+- `IDE:ide_240214_mg_olhos_dagua_conflitos_up_uso_solo_pol` — ZAP - ribeirão Olhos D'água - Conflito entre unidades de paisagem e uso do solo
+- `IDE:ide_240214_mg_olhos_dagua_delimitacao_sub-bacia_pol` — ZAP - ribeirão Olhos D'água - Delimitação da sub-bacia
+- `IDE:ide_240214_mg_olhos_dagua_hidrografia_corrigida_lin` — ZAP - ribeirão Olhos D'água - Hidrografia corrigida
+- `IDE:ide_240214_mg_olhos_dagua_nascentes_pto` — ZAP - ribeirão Olhos D'água - Nascentes
+- `IDE:ide_240214_mg_olhos_dagua_outorgas_pto` — ZAP - ribeirão Olhos D'água - Outorgas
+- `IDE:ide_240214_mg_olhos_dagua_unid_paisagem_pol` — ZAP - ribeirão Olhos D'água - Unidades de paisagem
+- `IDE:ide_240214_mg_olhos_dagua_uso_ocup_solo_pol` — ZAP - ribeirão Olhos D'água - Uso e ocupação do solo
+- `IDE:ide_240214_mg_rib_olhos_dagua_sit_disponib_hid_pol` — ZAP - ribeirão Olhos D'água - Situação da disponibilidade hídrica
+- `IDE:ide_240214_mg_rib_olhos_dagua_trechos_demanda_hid_pol` — ZAP - ribeirão Olhos D'água - Trechos com demanda hídrica
+- `IDE:ide_240214_mg_rib_olhos_dagua_viabil_regularizacao_lin` — ZAP - ribeirão Olhos D'água - Viabilidade de regularização
+- `IDE:ide_240215_mg_areas_con_ant_pol` — ZAP - Sub-bacia do rio Preto - Áreas conservadas e antropizadas
+- `IDE:ide_240215_mg_conflito_up_uso_solo_pol` — ZAP - Sub-bacia do rio Preto - Conflitos entre unidades da paisagem e uso do solo
+- `IDE:ide_240215_mg_rio_preto_apps_con_ant_pol` — ZAP - Sub-bacia do rio Preto - APPs conservadas e antropizadas
+- `IDE:ide_240215_mg_rio_preto_apps_pol` — ZAP - Sub-bacia do rio Preto - Áreas de preservação permanente (APPs)
+- `IDE:ide_240215_mg_rio_preto_delimitacao_sub-bacia_pol` — ZAP - Sub-bacia do rio Preto - Delimitação da sub-bacia
+- `IDE:ide_240215_mg_rio_preto_hidrografia_corrigida_lin` — ZAP - Sub-bacia do rio Preto - Hidrografia corrigida
+- `IDE:ide_240215_mg_rio_preto_nascentes_pto` — ZAP - Sub-bacia do rio Preto - Nascentes
+- `IDE:ide_240215_mg_rio_preto_press_hid_mont_jus_lin` — ZAP - Sub-bacia do rio Preto - Pressão hídrica à montante e à jusante
+- `IDE:ide_240215_mg_rio_preto_pressao_hid_lin` — ZAP - Sub-bacia do rio Preto - Pressão hídrica
+- `IDE:ide_240215_mg_rio_preto_unidades_paisagem_pol` — ZAP - Sub-bacia do rio Preto - Unidades da paisagem
+- `IDE:ide_240215_mg_rio_preto_uso_ocupacao_terra_pol` — ZAP - Sub-bacia do rio Preto - Uso e ocupação da terra
+- `IDE:ide_240215_mg_rio_preto_usuarios_sup_agua_pto` — ZAP - Sub-bacia do rio Preto - Usuários de água
+- `IDE:ide_240216_sf8_rib_das_almas_apps_con_ant_pol` — ZAP - Ribeirão das Almas - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240216_sf8_rib_das_almas_apps_hidricas_pol` — ZAP - Ribeirão das Almas - APPs hídricas
+- `IDE:ide_240216_sf8_rib_das_almas_areas_con_ant_pol` — ZAP - Ribeirão das Almas - Áreas conservadas e antropizadas
+- `IDE:ide_240216_sf8_rib_das_almas_cadastros_uso_insignificante_pto` — ZAP - Ribeirão das Almas - Cadastros de uso insignificante
+- `IDE:ide_240216_sf8_rib_das_almas_conflito_up_uso_pol` — ZAP - Ribeirão das Almas - Conflito entre unidades de paisagem e uso do solo
+- `IDE:ide_240216_sf8_rib_das_almas_delimitacao_subbacia_pol` — ZAP - Ribeirão das Almas - Delimitação da sub-bacia
+- `IDE:ide_240216_sf8_rib_das_almas_demanda_hidrica_lin` — ZAP - Ribeirão das Almas - Trechos com demanda hídrica
+- `IDE:ide_240216_sf8_rib_das_almas_hidrografia_corrigida_lin` — ZAP - Ribeirão das Almas - Hidrografia corrigida
+- `IDE:ide_240216_sf8_rib_das_almas_nascentes_corrigidas_pto` — ZAP - Ribeirão das Almas - Nascentes
+- `IDE:ide_240216_sf8_rib_das_almas_outorgas_coletivas_pto` — ZAP - Ribeirão das Almas - Outorgas coletivas
+- `IDE:ide_240216_sf8_rib_das_almas_outorgas_individuais_pto` — ZAP - Ribeirão das Almas - Outorgas individuais
+- `IDE:ide_240216_sf8_rib_das_almas_situacao_disp_hidrica_lin` — ZAP - Ribeirão das Almas - Situação da disponibilidade hídrica
+- `IDE:ide_240216_sf8_rib_das_almas_unidades_paisagem_pol` — ZAP - Ribeirão das Almas - Unidades de paisagem
+- `IDE:ide_240216_sf8_rib_das_almas_uso_ocupacao_solo_pol` — ZAP - Ribeirão das Almas - Uso e ocupação do solo
+- `IDE:ide_240216_sf8_rib_das_almas_viabilidade_reg_vazao_lin` — ZAP - Ribeirão das Almas - Viabilidade de regularização de vazão
+- `IDE:ide_240217_pn2_uberabinha_apps_con_ant_pol` — ZAP - Sub-bacia do rio Uberabinha - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240217_pn2_uberabinha_apps_pol` — ZAP - Sub-bacia do rio Uberabinha - APPs hídricas
+- `IDE:ide_240217_pn2_uberabinha_areas_con_ant_pol` — ZAP - Sub-bacia do rio Uberabinha - Áreas conservadas e antropizadas
+- `IDE:ide_240217_pn2_uberabinha_cad_uso_insignif_pto` — ZAP - Sub-bacia do rio Uberabinha - Cadastros de uso insignificante
+- `IDE:ide_240217_pn2_uberabinha_delimitacao_subbacia_pol` — ZAP - Sub-bacia do rio Uberabinha - Delimitação da sub-bacia
+- `IDE:ide_240217_pn2_uberabinha_demanda_hid_lin` — ZAP - Sub-bacia do rio Uberabinha - Demanda hídrica
+- `IDE:ide_240217_pn2_uberabinha_divisao_subbacia_pol` — ZAP - Sub-bacia do rio Uberabinha - Divisão da sub-bacia
+- `IDE:ide_240217_pn2_uberabinha_hidrografia_corrigida_lin` — ZAP - Sub-bacia do rio Uberabinha - Hidrografia corrigida
+- `IDE:ide_240217_pn2_uberabinha_nascentes_corrigidas_pto` — ZAP - Sub-bacia do rio Uberabinha - Nascentes
+- `IDE:ide_240217_pn2_uberabinha_outorgas_individuais_pto` — ZAP - Sub-bacia do rio Uberabinha - Outorgas individuais
+- `IDE:ide_240217_pn2_uberabinha_situ_disp_hidrica_lin` — ZAP - Sub-bacia do rio Uberabinha - Situação da disponibilidade hídrica
+- `IDE:ide_240217_pn2_uberabinha_unidades_de_paisagem_pol` — ZAP - Sub-bacia do rio Uberabinha - Unidades de paisagem
+- `IDE:ide_240217_pn2_uberabinha_up_uso_pol` — ZAP - Sub-bacia do rio Uberabinha - Conflitos entre unidades de paisagem e uso do solo
+- `IDE:ide_240217_pn2_uberabinha_uso_ocup_solo_pol` — ZAP - Sub-bacia do rio Uberabinha - Uso e ocupação do solo
+- `IDE:ide_240217_pn2_uberabinha_viabil_reg_vazao_lin` — ZAP - Sub-bacia do rio Uberabinha - Viabilidade de regularização de vazão
+- `IDE:ide_240217_pn2_uberabinha_zoneamento_pol` — ZAP - Sub-bacia do rio Uberabinha - Zoneamento ambiental
+- `IDE:ide_240218_sf7_corrego_rico_apps_con_ant_pol` — ZAP - Sub-bacia do Córrego Rico - APPs hídricas conservadas e antropizadas
+- `IDE:ide_240218_sf7_corrego_rico_apps_pol` — ZAP - Sub-bacia do Córrego Rico - Áreas de Preservação Permanente (APPs)
+- `IDE:ide_240218_sf7_corrego_rico_areas_con_ant_pol` — ZAP - Sub-bacia do Córrego Rico - Áreas conservadas e antropizadas
+- `IDE:ide_240218_sf7_corrego_rico_conflito_puc_uso_pol` — ZAP - Sub-bacia do Córrego Rico - Conflitos entre PUC e Uso e ocupação da terra
+- `IDE:ide_240218_sf7_corrego_rico_delimitacao_subbacia_pol` — ZAP - Sub-bacia do Córrego Rico - Delimitação da sub-bacia
+- `IDE:ide_240218_sf7_corrego_rico_hidrografia_corrigida_lin` — ZAP - Sub-bacia do Córrego Rico - Hidrografia corrigida
+- `IDE:ide_240218_sf7_corrego_rico_idhs_lin` — ZAP - Sub-bacia do Córrego Rico - Índice de Demanda Hídrica Superficial (IDHS)
+- `IDE:ide_240218_sf7_corrego_rico_idhsmj_lin` — ZAP - Sub-bacia do Córrego Rico - Índice de Demanda Hídrica Superficial (IDHS) à montante e à jusante
+- `IDE:ide_240218_sf7_corrego_rico_nascentes_corrigidas_pto` — ZAP - Sub-bacia do Córrego Rico - Nascentes corrigidas
+- `IDE:ide_240218_sf7_corrego_rico_uso_e_ocupacao_da_terra_pol` — ZAP - Sub-bacia do Córrego Rico - Uso e ocupação da terra
+- `IDE:ide_240218_sf7_corrego_rico_usuarios_sub_pto` — ZAP - Sub-bacia do Córrego Rico - Usuários de água subterrâneos
+- `IDE:ide_240218_sf7_corrego_rico_usuarios_sup_pto` — ZAP - Sub-bacia do Córrego Rico - Usuários de água superficiais
+- `IDE:ide_240219_gd8_agua_comprida_apps_con_ant_pol` — ZAP - Sub-bacia do córrego Água Comprida - APPs conservadas e antropizadas
+- `IDE:ide_240219_gd8_agua_comprida_apps_pol` — ZAP - Sub-bacia do córrego Água Comprida - Áreas de Preservação Permanente (APPs)
+- `IDE:ide_240219_gd8_agua_comprida_areas_con_ant_pol` — ZAP - Sub-bacia do córrego Água Comprida - Áreas conservadas e antropizadas
+- `IDE:ide_240219_gd8_agua_comprida_conflito_puc_uso_pol` — ZAP - Sub-bacia do córrego Água Comprida - Conflitos entre PUC e Uso e ocupação da terra
+- `IDE:ide_240219_gd8_agua_comprida_delimitacao_subbacia_pol` — ZAP - Sub-bacia do córrego Água Comprida - Delimitação da sub-bacia
+- `IDE:ide_240219_gd8_agua_comprida_hidrografia_corrigida_lin` — ZAP - Sub-bacia do córrego Água Comprida - Hidrografia corrigida
+- `IDE:ide_240219_gd8_agua_comprida_nascentes_corrigdas_pto` — ZAP - Sub-bacia do córrego Água Comprida - Nascentes corrigidas
+- `IDE:ide_240219_gd8_agua_comprida_preshid_lin` — ZAP - Sub-bacia do córrego Água Comprida - Pressão hídrica a montante
+- `IDE:ide_240219_gd8_agua_comprida_preshidmj_lin` — ZAP - Sub-bacia do córrego Água Comprida - Pressão hídrica a montante e a jusante
+- `IDE:ide_240219_gd8_agua_comprida_puc_pol` — ZAP - Sub-bacia do córrego Água Comprida - Potencial de Uso Conservacionista (PUC)
+- `IDE:ide_240219_gd8_agua_comprida_uso_e_ocupacao_da_terra_pol` — ZAP - Sub-bacia do córrego Água Comprida - Uso e ocupação da terra
+- `IDE:ide_240219_gd8_agua_comprida_usuarios_sub_pto` — ZAP - Sub-bacia do córrego Água Comprida - Usuários de água subterrânea
+- `IDE:ide_240219_gd8_agua_comprida_usuarios_sup_pto` — ZAP - Sub-bacia do córrego Água Comprida - Usuários de água superficial
+- `IDE:ide_240220_sf5_jequitiba_apps_con_ant_pol` — ZAP - Sub-bacia do Rib. Jequitibá - APPs conservadas e antropizadas
+- `IDE:ide_240220_sf5_jequitiba_apps_pol` — ZAP - Sub-bacia do Rib. Jequitibá - APPs
+- `IDE:ide_240220_sf5_jequitiba_areas_con_ant_pol` — ZAP - Sub-bacia do Rib. Jequitibá - Áreas conservadas e antropizadas
+- `IDE:ide_240220_sf5_jequitiba_conf_puc_uso_pol` — ZAP - Sub-bacia do Rib. Jequitibá - Conflito entre PUC e uso da terra
+- `IDE:ide_240220_sf5_jequitiba_delimit_subbacia_pol` — ZAP - Sub-bacia do RIb. Jequitibá - Delimitação da sub-bacia
+- `IDE:ide_240220_sf5_jequitiba_hid_corrigida_lin` — ZAP - Sub-bacia do Rib. Jequitibá - Hidrografia (corrigida)
+- `IDE:ide_240220_sf5_jequitiba_idhs_lin` — ZAP - Sub-bacia do Rib. Jequitibá - Índice de Disponibilidade Hídrica Superficial (IDHS)
+- `IDE:ide_240220_sf5_jequitiba_idhs_mj_lin` — ZAP - Sub-bacia do Rib. Jequitibá - Índice de Disponibilidade Hídrica Superficial (IDHS) à montante e à jusante
+- `IDE:ide_240220_sf5_jequitiba_nasc_corrigidas_pto` — ZAP - Sub-bacia do Rib. Jequitibá - Nascentes (corrigidas)
+- `IDE:ide_240220_sf5_jequitiba_puc_pol` — ZAP - Sub-bacia do Rib. Jequitibá - Potencial de Uso Conservacionista (PUC)
+- `IDE:ide_240220_sf5_jequitiba_uso_ocup_terra_pol` — ZAP - Sub-bacia do Rib. Jequitibá - Uso e ocupação da terra
+- `IDE:ide_240220_sf5_jequitiba_usuarios_sup_pto` — ZAP - Sub-bacia do Rib. Jequitibá - Usuários de água superficial
+- `IDE:ide_240221_jq1_pedrasfeijaocruz_apps_pol` — ZAP - Sub-bacia do Ribeirão das Pedras e Córregos do Feijão e da Cruz - APPs
+- `IDE:ide_240221_jq1_pedrasfeijaocruz_delimit_pol` — ZAP - Sub-bacia do Ribeirão das Pedras, Córregos do Feijão e da Cruz - Delimitação da sub-bacia
+- `IDE:ide_240221_jq1_pedrasfeijaocruz_hid_cor_lin` — ZAP - Sub-bacia do Ribeirão das Pedras e Córregos do Feijão e da Cruz - Hidrografia corrigida
+- `IDE:ide_240221_jq1_pedrasfeijaocruz_nasc_pto` — ZAP - Sub-bacia do Ribeirão das Pedras e Córregos do Feijão e da Cruz - Nascentes corrigidas
+- `IDE:ide_240221_jq1_pedrasfeijaocruz_preshid_lin` — ZAP - Sub-bacia do Ribeirão das Pedras e Córregos do Feijão e da Cruz - Pressão hídrica à montante
+- `IDE:ide_240221_jq1_pedrasfeijaocruz_preshid_mj_lin` — ZAP - Sub-bacia do Ribeirão das Pedras e Córregos do Feijão e da Cruz - Pressão hídrica à montante e à jusante
+- `IDE:ide_240221_jq1_pedrasfeijaocruz_usuarios_sup_pto` — ZAP - Sub-bacia do Ribeirão das Pedras, Córregos do Feijão e da Cruz - Usuários de água
+- `IDE:ide_240222_op_apps_con_ant_pol` — ZAP - Ouro Preto - APPs conservadas e antropizadas
+- `IDE:ide_240222_op_apps_pol` — ZAP - Ouro Preto - APPs
+- `IDE:ide_240222_op_areas_con_ant_pol` — ZAP - Ouro Preto - Áreas conservadas e antropizadas
+- `IDE:ide_240222_op_conflito_puc_uso_pol` — ZAP - Ouro Preto - Conflito entre PUC e uso da terra
+- `IDE:ide_240222_op_degrad_pastagem_pol` — ZAP - Ouro Preto - Índice de degradação de pastagens
+- `IDE:ide_240222_op_delimitacao_subbacia_pol` — ZAP - Ouro Preto - Delimitação das sub-bacias
+- `IDE:ide_240222_op_hidrografia_corrigida_lin` — ZAP - Ouro Preto - Hidrografia corrigida
+- `IDE:ide_240222_op_nascentes_corrigidas_pto` — ZAP - Ouro Preto - Nascentes corrigidas
+- `IDE:ide_240222_op_puc_litotipo_pol` — ZAP - Ouro Preto - Potencial de Uso Conservacionista (PUC) para geologia
+- `IDE:ide_240222_op_puc_pol` — ZAP - Ouro Preto - Potencial de Uso Conservacionista (PUC)
+- `IDE:ide_240222_op_puc_solos_pol` — ZAP - Ouro Preto - Potencial de Uso Conservacionista (PUC) para solos
+- `IDE:ide_240222_op_uso_e_ocupacao_da_terra_pol` — ZAP - Ouro Preto - Uso e ocupação da terra
+- `IDE:ide_240222_op_usuarios_sub_pto` — ZAP - Ouro Preto - Usuários de água subterrânea
+- `IDE:ide_240222_op_usuarios_sup_pto` — ZAP - Ouro Preto - Usuários de água superficial
+- `IDE:ide_240223_gd3_machadinho_apps_con_ant_pol` — ZAP - Sub-bacia do ribeirão Machadinho - APPs conservadas e antropizadas
+- `IDE:ide_240223_gd3_machadinho_apps_pol` — ZAP - Sub-bacia do ribeirão Machadinho - APPs
+- `IDE:ide_240223_gd3_machadinho_areas_con_ant_pol` — ZAP - Sub-bacia do ribeirão Machadinho - Áreas conservadas e antropizadas
+- `IDE:ide_240223_gd3_machadinho_conf_puc_uso_pol` — ZAP - Sub-bacia do ribeirão Machadinho - Conflito entre PUC e uso da terra
+- `IDE:ide_240223_gd3_machadinho_hid_cor_lin` — ZAP - Sub-bacia do ribeirão Machadinho - Hidrografia corrigida
+- `IDE:ide_240223_gd3_machadinho_nasc_cor_pto` — ZAP - Sub-bacia do ribeirão Machadinho - Localização potencial de nascentes
+- `IDE:ide_240223_gd3_machadinho_preshid_m_lin` — ZAP - Sub-bacia do ribeirão Machadinho - Pressão hídrica à montante
+- `IDE:ide_240223_gd3_machadinho_preshid_mj_lin` — ZAP - Sub-bacia do ribeirão Machadinho - Pressão hídrica à montante e à jusante
+- `IDE:ide_240223_gd3_machadinho_puc_pol` — ZAP - Sub-bacia do ribeirão Machadinho - Potencial de uso conservacionista (PUC)
+- `IDE:ide_240223_gd3_machadinho_subbac_pol` — ZAP - Sub-bacia do ribeirão Machadinho - Delimitação da sub-bacia
+- `IDE:ide_240223_gd3_machadinho_uso_ocup_terra_pol` — ZAP - Sub-bacia do ribeirão Machadinho - Uso e ocupação da terra
+- `IDE:ide_240223_gd3_machadinho_usuarios_sup_pto` — ZAP - Sub-bacia do ribeirão Machadinho - Usuários de água
+- `IDE:ide_240224_do_alto_med_rio_carmo_apps_con_ant_pol` — ZAP - Sub-bacia Alto e Médio Carmo - Áreas de Preservação Permanente (APPs) hídricas conservadas e antropizadas
+- `IDE:ide_240224_do_alto_med_rio_carmo_apps_pol` — ZAP - Sub-bacia Alto e Médio Carmo - Áreas de Preservação Permanente (APPs) hídricas
+- `IDE:ide_240224_do_alto_med_rio_carmo_areas_cont_ant_pol` — ZAP - Sub-bacia Alto e Médio Carmo - Áreas conservadas e antropizadas
+- `IDE:ide_240224_do_alto_med_rio_carmo_cad_uso_insig_pto` — ZAP - Sub-bacia Alto e Médio Carmo - Cadastros de uso insignificante
+- `IDE:ide_240224_do_alto_med_rio_carmo_delimit_pol` — ZAP - Sub-bacia Alto e Médio Carmo - Delimitação da sub-bacia
+- `IDE:ide_240224_do_alto_med_rio_carmo_dh_lin` — ZAP - Sub-bacia Alto e Médio Carmo - Disponibilidade hídrica
+- `IDE:ide_240224_do_alto_med_rio_carmo_hid_cor_lin` — ZAP - Sub-bacia Alto e Médio Carmo - Hidrografia Corrigida
+- `IDE:ide_240224_do_alto_med_rio_carmo_nasc_pto` — ZAP - Sub-bacia Alto e Médio Carmo - Nascentes
+- `IDE:ide_240224_do_alto_med_rio_carmo_outorgas_pto` — ZAP - Sub-bacia Alto e Médio Carmo - Outorgas
+- `IDE:ide_240224_do_alto_med_rio_carmo_up_pol` — ZAP - Sub-bacia Alto e Médio Carmo - Unidades de Paisagem
+- `IDE:ide_240224_do_alto_med_rio_carmo_uso_solo_pol` — ZAP - Sub-bacia Alto e Médio Carmo - Uso e ocupação do solo
+- `IDE:ide_240225_do_rio_peixe_apps_con_ant_pol` — ZAP - Rio do Peixe - APPs conservadas e antropizadas
+- `IDE:ide_240225_do_rio_peixe_apps_pol` — ZAP - Rio do Peixe - Áreas de Preservação Permanente (APPs) hídricas
+- `IDE:ide_240225_do_rio_peixe_area_con_ant_pol` — ZAP - Rio do Peixe - Áreas conservadas e antropizadas
+- `IDE:ide_240225_do_rio_peixe_cad_uso_insig_pto` — ZAP - Rio do Peixe - Cadastros de uso insignificante
+- `IDE:ide_240225_do_rio_peixe_conf_up_uso_solo_pol` — ZAP - Rio do Peixe - Conflitos entre unid. paisagem e uso do solo
+- `IDE:ide_240225_do_rio_peixe_dh_lin` — ZAP - Rio do Peixe - Situação da disponibilidade hídrica
+- `IDE:ide_240225_do_rio_peixe_hid_cor_lin` — ZAP - Rio do Peixe - Hidrografia corrigida
+- `IDE:ide_240225_do_rio_peixe_nasc_pto` — ZAP - Rio do Peixe - Nascentes
+- `IDE:ide_240225_do_rio_peixe_outorgas_pto` — ZAP - Rio do Peixe - Outorgas
+- `IDE:ide_240225_do_rio_peixe_reg_vazao_lin` — ZAP - Rio do Peixe - Viabilidade de regularização de vazão
+- `IDE:ide_240225_do_rio_peixe_subbacia_pol` — ZAP - Rio do Peixe - Delimitação da sub-bacia
+- `IDE:ide_240225_do_rio_peixe_trechos_dem_hid_lin` — ZAP - Rio do Peixe - Trechos com demanda hídrica
+- `IDE:ide_240225_do_rio_peixe_up_pol` — ZAP - Rio do Peixe - Unidades de Paisagem
+- `IDE:ide_240225_do_rio_peixe_uso_solo_pol` — ZAP - Rio do Peixe - Uso e ocupação do solo
+- `IDE:ide_240226_sf5_rio_pardo_apps_con_ant_pol` — ZAP - Sub-bacia do rio Pardo - APPs conservadas e antropizadas
+- `IDE:ide_240226_sf5_rio_pardo_apps_pol` — ZAP - Sub-bacia do rio Pardo - Áreas de preservação permanente (APPs)
+- `IDE:ide_240226_sf5_rio_pardo_areas_con_ant_pol` — ZAP - Sub-bacia do rio Pardo - Áreas conservadas e antropizadas
+- `IDE:ide_240226_sf5_rio_pardo_cobertura_e_uso_da_terra_pol` — ZAP - Sub-bacia do rio Pardo - Uso e cobertura da terra
+- `IDE:ide_240226_sf5_rio_pardo_conflito_puc_uso_pol` — ZAP - Sub-bacia do rio Pardo - Conflito entre PUC e uso da terra
+- `IDE:ide_240226_sf5_rio_pardo_delimitacao_subbacia_pol` — ZAP - Sub-bacia do rio Pardo - Delimitação da sub-bacia
+- `IDE:ide_240226_sf5_rio_pardo_hidrografia_corrigida_lin` — ZAP - Sub-bacia do rio Pardo - Hidrografia corrigida
+- `IDE:ide_240226_sf5_rio_pardo_microbacias_pol` — ZAP - Sub-bacia do rio Pardo - Microbacias
+- `IDE:ide_240226_sf5_rio_pardo_nascentes_corrigidas_pto` — ZAP - Sub-bacia do rio Pardo - Nascentes corrigidas
+- `IDE:ide_240226_sf5_rio_pardo_puc_pol` — ZAP - Sub-bacia do rio Pardo - Potencial de Uso Conservacionista (PUC)
+- `IDE:ide_240226_sf5_rio_pardo_usuarios_sup_pto` — ZAP - Sub-bacia do rio Pardo - Usuários de água superficial
+- `IDE:ide_240226_sf5_rio_pardo_vigor_pastagem_pol` — ZAP - Sub-bacia do rio Pardo - Vigor da pastagem
+- `IDE:ide_24030101_mg_pn1_empreendimentos_pto` — AAI/PN1 - Empreendimentos
+- `IDE:ide_24030102_areadeestudo_pol` — AAI/PN1 - Área de estudo
+- `IDE:ide_24030103_vulnerabilidade_sintese_cenarioatual_pol` — AAI/PN1 - Vulnerabilidade Síntese - cenário atual
+- `IDE:ide_24030104_vulnerabilidade_sintese_cenariomedioprazo_pol` — AAI/PN1 - Vulnerabilidade Síntese - cenário de médio prazo
+- `IDE:ide_24030105_vulnerabilidade_sintese_cenariolongoprazo_pol` — AAI/PN1 - Vulnerabilidade Síntese - cenário de longo prazo
+- `IDE:ide_24030201_aproveitamento_hidreletrico_projetados_pto` — AAI/PN2 - Aproveitamento hidrelétrico
+- `IDE:ide_24030202_area_estudo_pol` — AAI/PN2 - Área de Estudo
+- `IDE:ide_24030204_vulnerabilidade_sintese_cenariolongoprazo_pol` — AAI/PN2 - Vulnerabilidade Síntese - cenário de longo prazo
+- `IDE:ide_24030205_vulnerabilidade_sintese_cenariomedioprazo_pol` — AAI/PN2 - Vulnerabilidade Síntese - cenário de médio prazo
+- `IDE:ide_240303_do4_suacui_grande_area_bacia_pol` — AAI - Bacia do rio Suaçuí Grande - Área de estudo
+- `IDE:ide_240303_do4_suacui_grande_compart_bacia_pol` — AAI - Bacia do rio Suaçuí Grande - Compartimentação da bacia
+- `IDE:ide_240304_sf5_parauna_area_sub_bacia_pol` — AAI - Sub-bacia do rio Paraúna - Área de estudo
+- `IDE:ide_240304_sf5_parauna_compart_bacia_pol` — AAI - Sub-bacia do rio Paraúna - Compartimentação da sub-bacia
+- `IDE:ide_2403_mg_bacias_prioritarias_elaboracao_aai_pol` — Bacias prioritárias para elaboração de AAI
+- `IDE:ide_240402_mg_inicativas_psa_pol` — Banco de iniciativas de PSA - por município
+- `IDE:ide_2404_mg_bolsa_verde_2010_pol` — Bolsa Verde - 2010
+- `IDE:ide_2404_mg_bolsa_verde_2011_pol` — Bolsa Verde - 2011
+- `IDE:ide_2404_mg_icms_ecologico_2018_pol` — ICMS Ecológico por município (2018)
+- `IDE:ide_2404_mg_icms_ecologico_2019_pol` — ICMS Ecológico por município (2019)
+- `IDE:ide_2404_mg_icms_ecologico_2020_pol` — ICMS Ecológico por município (2020)
+- `IDE:ide_2404_mg_icms_ecologico_2021_pol` — ICMS Ecológico por município (2021)
+- `IDE:ide_2404_mg_icms_ecologico_2022_pol` — ICMS Ecológico por município (2022)
+- `IDE:ide_2404_mg_icms_ecologico_2023_pol` — ICMS Ecológico por município (2023)
+- `IDE:ide_2404_mg_icms_ecologico_2024_pol` — ICMS Ecológico por município (2024)
+- `IDE:ide_2404_mg_icms_ecologico_2025_pol` — ICMS Ecológico por município (2025)
+- `IDE:ide_240502_bu_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Buranhém
+- `IDE:ide_240502_do_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Doce
+- `IDE:ide_240502_gd_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Grande
+- `IDE:ide_240502_ib_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Itabapoana
+- `IDE:ide_240502_in_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Itanhém
+- `IDE:ide_240502_ip_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Itapemirim
+- `IDE:ide_240502_iu_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Itaúnas
+- `IDE:ide_240502_jq_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Jequitinhonha
+- `IDE:ide_240502_ju_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Jucuruçu
+- `IDE:ide_240502_mg_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas para os ottotrechos de drenagem de MG
+- `IDE:ide_240502_mu_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Mucuri
+- `IDE:ide_240502_pa_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Pardo
+- `IDE:ide_240502_pe_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Peruípe
+- `IDE:ide_240502_pj_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rios Piracicaba e Jaguari
+- `IDE:ide_240502_pn_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Paranaíba
+- `IDE:ide_240502_ps_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio Paraíba do Sul
+- `IDE:ide_240502_sf_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio São Francisco
+- `IDE:ide_240502_sm_igam_reg_vazao_lin` — Regionalização de Vazão - Vazões calculadas dos ottotrechos de drenagem da bacia do rio São Mateus
+- `IDE:ide_2406_rmbh_plan_mob_2020_pol` — Planos Municipais de Mobilidade Urbana na RMBH - 2020
+- `IDE:ide_2406_rmbh_plano_diretor_2020_pol` — Planos Diretores Municipais na RMBH - 2020
+- `IDE:ide_2406_rmbh_snt_2020_pol` — Municípios Integrados ao Sistema Nacional de Trânsito na RMBH - 2020
+- `IDE:ide_240701_cesc_potencial_regeneracao_pol` — Potencial de regeneração florestal do Corredor Ecológico Sossego-Caratinga
+- `IDE:ide_240701_cesc_prioridade_restauracao_pol` — Áreas prioritárias para restauração do Corredor Ecológico Sossego-Caratinga
+- `IDE:ide_240702_mu_potencial_regeneracao_pol` — Potencial de regeneração florestal da APA Alto Mucuri
+- `IDE:ide_240702_mu_prioridade_restauracao_pol` — Áreas prioritárias para restauração da APA Alto Mucuri
+- `IDE:ide_240801_mg_idam_mediaglob_2022_pol` — Idam - Municípios abaixo e acima da média do resultado global (2022)
+- `IDE:ide_240801_mg_idam_mediaglob_2024_pol` — Idam - Municípios abaixo e acima da média do resultado global (2024)
+- `IDE:ide_240801_mg_idam_moranglob_2022_pol` — Idam - Padrões de correlação espacial do resultado global (2022)
+- `IDE:ide_240801_mg_idam_moranglob_2024_pol` — Idam - Padrões de correlação espacial para o resultado global (2024)
+- `IDE:ide_240801_mg_idamglob_2022_pol` — Idam - Resultado global (2022)
+- `IDE:ide_240801_mg_idamglob_2024_pol` — Idam - Resultado global (2024)
+- `IDE:ide_240802_mg_idam_mediaplan_2022_pol` — Idam - Municípios abaixo e acima da média do eixo Planejamento e Estrutura Ambiental (2022)
+- `IDE:ide_240802_mg_idam_mediaplan_2024_pol` — Idam - Municípios abaixo e acima da média do eixo Planejamento e Estrutura Ambiental (2024)
+- `IDE:ide_240802_mg_idam_moranplan_2022_pol` — Idam - Padrões de correlação espacial do eixo Planejamento e Estrutura Ambiental (2022)
+- `IDE:ide_240802_mg_idam_moranplan_2024_pol` — Idam - Padrões de correlação espacial do eixo Planejamento e Estrutura Ambiental (2024)
+- `IDE:ide_240802_mg_idamplan_2022_pol` — Idam - Eixo Planejamento e Estrutura Ambiental (2022)
+- `IDE:ide_240802_mg_idamplan_2024_pol` — Idam - Eixo Planejamento e Estrutura Ambiental (2024)
+- `IDE:ide_240803_mg_idam_mediaexec_2022_pol` — Idam - Municípios abaixo e acima da média do eixo Execução Ambiental (2022)
+- `IDE:ide_240803_mg_idam_mediaexec_2024_pol` — Idam - Municípios abaixo e acima da média do eixo Execução Ambiental (2024)
+- `IDE:ide_240803_mg_idam_moranexec_2022_pol` — Idam - Padrões de correlação espacial do eixo Execução Ambiental (2022)
+- `IDE:ide_240803_mg_idam_moranexec_2024_pol` — Idam - Padrões de correlação espacial do eixo Execução Ambiental (2024)
+- `IDE:ide_240803_mg_idamexec_2022_pol` — Idam - Eixo Execução Ambiental (2022)
+- `IDE:ide_240803_mg_idamexec_2024_pol` — Idam - Eixo Execução Ambiental (2024)
+- `IDE:ide_240804_mg_idam_abaurb_2022_pol` — Idam - Percentual da população urbana do município atendida por abastecimento de água (2022)
+- `IDE:ide_240804_mg_idam_cobnat_2022_pol` — Idam - Percentual de cobertura e uso da terra naturais no município (2022)
+- `IDE:ide_240804_mg_idam_colsel_2022_pol` — Idam - Existência de coleta seletiva no município (2022)
+- `IDE:ide_240804_mg_idam_colurb_2022_pol` — Idam - Percentual da população urbana do município atendida por coleta de esgoto (2022)
+- `IDE:ide_240804_mg_idam_consag_2022_pol` — Idam - Consumo médio per capita de água no município (2022)
+- `IDE:ide_240804_mg_idam_consma_2022_pol` — Idam - Existência de conselho municipal de meio ambiente no município (2022)
+- `IDE:ide_240804_mg_idam_dechid_2022_pol` — Idam - Existência de decreto associado à desastre chuvoso no município (2022)
+- `IDE:ide_240804_mg_idam_dmapu_2022_pol` — Idam - Tipologia de drenagem e manejo de águas pluviais urbanas no município (2022)
+- `IDE:ide_240804_mg_idam_doehid_2022_pol` — Idam - Percentual de internações por doenças de veiculação hídrica no município (2022)
+- `IDE:ide_240804_mg_idam_esfoma_2022_pol` — Idam - Esforço orçamentário em meio ambiente no município (2022)
+- `IDE:ide_240804_mg_idam_fundma_2022_pol` — Idam - Existência de fundo municipal de meio ambiente no município (2022)
+- `IDE:ide_240804_mg_idam_intamb_2022_pol` — Idam - Autorização para intervenção ambiental no município (2022)
+- `IDE:ide_240804_mg_idam_licamb_2022_pol` — Idam - Licenciamento ambiental instituído no município (2022)
+- `IDE:ide_240804_mg_idam_orgma_2022_pol` — Idam - Existência de órgão ou setor de meio ambiente no município (2022)
+- `IDE:ide_240804_mg_idam_pdmapu_2022_pol` — Idam - Existência de plano diretor de drenagem e manejo de águas pluviais urbanas no município (2022)
+- `IDE:ide_240804_mg_idam_pland_2022_pol` — Idam - Existência de plano diretor instituído no município (2022)
+- `IDE:ide_240804_mg_idam_pmgirs_2022_pol` — Idam - Existência de plano municipal de gestão integrada de resíduos no município (2022)
+- `IDE:ide_240804_mg_idam_pmsb_2022_pol` — Idam - Existência de plano municipal de saneamento básico no município (2022)
+- `IDE:ide_240804_mg_idam_psa_2022_pol` — Idam - Existência de pagamento por serviços ambientais no município (2022)
+- `IDE:ide_240804_mg_idam_tiprsu_2022_pol` — Idam - Situação de regularização da destinação final de RSU pelo município (2022)
+- `IDE:ide_240804_mg_idam_traurb_2022_pol` — Idam - Percentual da população urbana do município atendida por tratamento de esgoto (2022)
+- `IDE:ide_240804_mg_idam_ucsmun_2022_pol` — Idam - Percentual de UCs municipais em relação a área total do município (2022)
+- `IDE:ide_240805_mg_idam_abaurb_2024_pol` — Idam - Percentual da população urbana do município atendida por abastecimento de água (2024)
+- `IDE:ide_240805_mg_idam_cobnat_2024_pol` — Idam - Percentual de cobertura e uso da terra naturais em relação a área total do município (2024)
+- `IDE:ide_240805_mg_idam_colsel_2024_pol` — Idam - Existência de coleta seletiva no município (2024)
+- `IDE:ide_240805_mg_idam_colurb_2024_pol` — Idam - Percentual da população urbana do município atendida por coleta de esgoto (2024)
+- `IDE:ide_240805_mg_idam_consag_2024_pol` — Idam - Consumo médio per capita de água no município (2024)
+- `IDE:ide_240805_mg_idam_consma_2024_pol` — Idam - Existência de conselho municipal de meio ambiente no município (2024)
+- `IDE:ide_240805_mg_idam_dechid_2024_pol` — Idam - Existência de decreto associado à desastre chuvoso no município (2024)
+- `IDE:ide_240805_mg_idam_dmapu_2024_pol` — Idam - Tipologia de drenagem e manejo de águas pluviais urbanas no município (2024)
+- `IDE:ide_240805_mg_idam_doehid_2024_pol` — Idam - Percentual de internações por doenças de veiculação hídrica no município (2024)
+- `IDE:ide_240805_mg_idam_esfoma_2024_pol` — Idam - Esforço orçamentário em meio ambiente no município (2024)
+- `IDE:ide_240805_mg_idam_fundma_2024_pol` — Idam - Existência de fundo municipal de meio ambiente no município (2024)
+- `IDE:ide_240805_mg_idam_intamb_2024_pol` — Idam - Autorização para intervenção ambiental no município (2024)
+- `IDE:ide_240805_mg_idam_licamb_2024_pol` — Idam - Licenciamento ambiental instituído no município (2024)
+- `IDE:ide_240805_mg_idam_orgma_2024_pol` — Idam - Existência de órgão ou setor de meio ambiente no município (2024)
+- `IDE:ide_240805_mg_idam_pdmapu_2024_pol` — Idam - Existência de plano diretor de drenagem e manejo de águas pluviais urbanas no município (2024)
+- `IDE:ide_240805_mg_idam_pland_2024_pol` — Idam - Existência de plano diretor instituído no município (2024)
+- `IDE:ide_240805_mg_idam_pmgirs_2024_pol` — Idam - Existência de plano municipal de gestão integrada de resíduos no município (2024)
+- `IDE:ide_240805_mg_idam_pmsb_2024_pol` — Idam - Existência de plano municipal de saneamento básico no município (2024)
+- `IDE:ide_240805_mg_idam_psa_2024_pol` — Idam - Existência de pagamento por serviços ambientais no município (2024)
+- `IDE:ide_240805_mg_idam_tiprsu_2024_pol` — Idam - Situação de regularização da destinação final de RSU pelo município (2024)
+- `IDE:ide_240805_mg_idam_traurb_2024_pol` — Idam - Percentual da população urbana do município atendida por tratamento de esgoto (2024)
+- `IDE:ide_240805_mg_idam_ucsmun_2024_pol` — Idam - Percentual de UCs municipais em relação a área total do município (2024)
+- `IDE:ide_240901_bu1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Buranhém
+- `IDE:ide_240901_do1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Piranga
+- `IDE:ide_240901_do2_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Piracicaba
+- `IDE:ide_240901_do3_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Santo Antônio
+- `IDE:ide_240901_do4_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Suaçuí Grande
+- `IDE:ide_240901_do5_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Caratinga
+- `IDE:ide_240901_do6_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Manhuaçu
+- `IDE:ide_240901_gd1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica dos Afluentes Mineiros do Alto rio Grande
+- `IDE:ide_240901_gd2_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica Vertentes do rio Grande
+- `IDE:ide_240901_gd3_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do Entorno do Reservatório de Furnas
+- `IDE:ide_240901_gd4_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Verde
+- `IDE:ide_240901_gd5_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Sapucaí
+- `IDE:ide_240901_gd6_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica dos rios Mogi-Guaçu e Pardo
+- `IDE:ide_240901_gd7_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do Médio rio Grande
+- `IDE:ide_240901_gd8_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do Baixo rio Grande
+- `IDE:ide_240901_ib1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Itabapoana
+- `IDE:ide_240901_in1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Itanhém
+- `IDE:ide_240901_ip1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Itapemirim
+- `IDE:ide_240901_iu1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Itaúnas
+- `IDE:ide_240901_jq1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do Alto rio Jequitinhonha
+- `IDE:ide_240901_jq2_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Araçuaí
+- `IDE:ide_240901_jq3_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do Médio e Baixo rio Jequitinhonha
+- `IDE:ide_240901_ju1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Jucuruçu
+- `IDE:ide_240901_mu1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Mucuri
+- `IDE:ide_240901_pa1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Pardo
+- `IDE:ide_240901_pe1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Peruípe
+- `IDE:ide_240901_pj1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica dos rios Piracicaba e Jaguari
+- `IDE:ide_240901_pn1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Dourados e Alto rio Paranaíba
+- `IDE:ide_240901_pn2_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Araguari
+- `IDE:ide_240901_pn3_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do Baixo rio Paranaíba
+- `IDE:ide_240901_ps1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica dos rios Preto e Paraibuna
+- `IDE:ide_240901_ps2_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica dos rios Pompa e Muriaé
+- `IDE:ide_240901_sf10_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Verde Grande
+- `IDE:ide_240901_sf1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do Alto rio São Francisco
+- `IDE:ide_240901_sf2_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Pará
+- `IDE:ide_240901_sf3_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Paraopeba
+- `IDE:ide_240901_sf4_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do Entorno da Represa de Três Marias
+- `IDE:ide_240901_sf5_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio das Velhas
+- `IDE:ide_240901_sf6_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica dos rios Jequitaí e Pacuí
+- `IDE:ide_240901_sf7_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Paracatu
+- `IDE:ide_240901_sf8_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Urucuia
+- `IDE:ide_240901_sf9_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio Pandeiros
+- `IDE:ide_240901_sm1_hidrografia_fbds_lin` — FBDS - Hidrografia da Circunscrição hidrográfica do rio São Mateus
+- `IDE:ide_240902_mg_rios_duplos_fbds_pol` — FBDS - Rios duplos
+- `IDE:ide_240903_mg_nascentes_fbds_pto` — FBDS - Nascentes
+- `IDE:ide_240904_mg_massas_dagua_fbds_pol` — FBDS - Massas d'água
+- `IDE:ide_240905_bu1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Buranhém
+- `IDE:ide_240905_do1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Piranga
+- `IDE:ide_240905_do2_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Piracicaba
+- `IDE:ide_240905_do3_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Santo Antônio
+- `IDE:ide_240905_do4_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Suaçuí Grande
+- `IDE:ide_240905_do5_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Caratinga
+- `IDE:ide_240905_do6_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Manhuaçu
+- `IDE:ide_240905_gd1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica dos Afluentes Mineiros do Alto rio Grande
+- `IDE:ide_240905_gd2_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica Vertentes do rio Grande
+- `IDE:ide_240905_gd3_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do Entorno do Reservatório de Furnas
+- `IDE:ide_240905_gd4_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Verde
+- `IDE:ide_240905_gd5_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Sapucaí
+- `IDE:ide_240905_gd6_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica dos rios Mogi-Guaçu e Pardo
+- `IDE:ide_240905_gd7_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do Médio rio Grande
+- `IDE:ide_240905_gd8_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do Baixo rio Grande
+- `IDE:ide_240905_ib1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Itabapoana
+- `IDE:ide_240905_in1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Itanhém
+- `IDE:ide_240905_ip1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Itapemirim
+- `IDE:ide_240905_iu1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Itaúnas
+- `IDE:ide_240905_jq1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do Alto rio Jequitinhonha
+- `IDE:ide_240905_jq2_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Araçuaí
+- `IDE:ide_240905_jq3_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do Médio e Baixo rio Jequitinhonha
+- `IDE:ide_240905_ju1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Jucuruçu
+- `IDE:ide_240905_mu1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Mucuri
+- `IDE:ide_240905_pa1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Pardo
+- `IDE:ide_240905_pe1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Peruípe
+- `IDE:ide_240905_pj1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica dos rios Piracicaba e Jaguari
+- `IDE:ide_240905_pn1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Dourados e Alto rio Paranaíba
+- `IDE:ide_240905_pn2_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Araguari
+- `IDE:ide_240905_pn3_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do Baixo rio Paranaíba
+- `IDE:ide_240905_ps1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica dos rios Preto e Paraibuna
+- `IDE:ide_240905_ps2_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica dos rios Pompa e Muriaé
+- `IDE:ide_240905_sf10_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Verde Grande
+- `IDE:ide_240905_sf1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do Alto rio São Francisco
+- `IDE:ide_240905_sf2_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Pará
+- `IDE:ide_240905_sf3_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Paraopeba
+- `IDE:ide_240905_sf4_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do Entorno da Represa de Três Marias
+- `IDE:ide_240905_sf5_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio das Velhas
+- `IDE:ide_240905_sf6_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica dos rios Jequitaí e Pacuí
+- `IDE:ide_240905_sf7_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Paracatu
+- `IDE:ide_240905_sf8_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Urucuia
+- `IDE:ide_240905_sf9_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio Pandeiros
+- `IDE:ide_240905_sm1_apps_fbds_pol` — FBDS - Áreas de Preservação Permanente (APPs) da Circunscrição hidrográfica do rio São Mateus
+- `IDE:ide_2410_mg_areas_tratado_mata_atlantica_pol` — Áreas de Plantio do Tratado da Mata Atlântica
+- `IDE:ide_2410_mg_tratado_mata_atlantica_pol` — Plantios do Tratado da Mata Atlântica por Município
+- `IDE:ide_2411_mg_areasprioritarias_mapa_geral_pol` — PSCRMG - Áreas Prioritárias para Conservação, Restauração e Uso Sustentável da Biodiversidade e Serviços Ecossistêmicos em Minas Gerais
+- `IDE:ide_2411_mg_educacao_ambiental_pol` — PSCRMG - Municípios Prioritários para Educação Ambiental em Minas Gerais
+- `IDE:ide_2411_mg_lacunas_bio_aquatica_pol` — PSCRMG - Lacunas de conhecimento relacionados às Biodiversidade Aquática em Minas Gerais
+- `IDE:ide_2411_mg_pesquisa_conservacao_bioaquatica_ameacada_pol` — PSCRMG - Áreas prioritárias para pesquisa Aplicada à Conservação de Espécies Aquáticas Ameaçadas de extinção em Minas Gerais
+- `IDE:ide_2411_mg_pesquisa_uc_pol` — PSCRMG - Unidades de conservação estaduais prioritárias para pesquisa
+- `IDE:ide_2411_mg_prioritarias_ampliacao_rede_areas_protegidas_pol` — PSCRMG - Áreas prioritárias para ampliação da rede de áreas protegidas em Minas Gerais
+- `IDE:ide_2411_mg_prioritarias_bioaquatica_pol` — PSCRMG - Áreas prioritárias para conservação, restauração e uso sustentável da biodiversidade aquática em Minas Gerais
+- `IDE:ide_2411_mg_prioritarias_crise_climatica_pol` — PSCRMG - Áreas prioritárias para Adaptação aos efeitos da crise climática em Minas Gerais
+- `IDE:ide_2411_mg_prioritarias_mananciais_pol` — PSCRMG - Áreas prioritárias para conservação e revitalização de mananciais no Estado de Minas Gerais
+- `IDE:ide_2411_mg_prioritarias_manutencao_rios_livres_pol` — PSCRMG - Áreas Prioritárias para Estabelecimento de Rios Livres em Minas Gerais
+- `IDE:ide_2411_mg_prioritarias_oferta_hidrica_pol` — PSCRMG - Áreas Prioritárias para Conservação e Revitalização da Oferta Hídrica em Minas Gerais
+- `IDE:ide_2411_mg_prioritarias_restauracao_pol` — PSCRMG - Áreas prioritárias para restauração de ecossistemas terrestres e aquáticos em Minas Gerais
+- `IDE:ide_2411_mg_unidades_planejamento_pol` — PSCRMG - Unidades de Planejamento no estado de Minas Gerais
+- `IDE:ide_2412_mg_pmsh_areasprioritarias_indabast_uag_2023_pol` — PMSH - Áreas prioritárias - Índice de Abastecimento de Água
+- `IDE:ide_2412_mg_pmsh_areasprioritarias_indcheias_uag_2023_pol` — PMSH - Áreas prioritárias - Índice de cheias
+- `IDE:ide_2412_mg_pmsh_areasprioritarias_indconsagua_uag_2023_pol` — PMSH - Áreas prioritárias - Índice de conservação das águas
+- `IDE:ide_2412_mg_pmsh_areasprioritarias_indesgot_uag_2023_pol` — PMSH - Áreas prioritárias - Índice de esgotamento sanitário
+- `IDE:ide_2412_mg_pmsh_areasprioritarias_indfontesub_uag_2023_pol` — PMSH - Áreas prioritárias - Índice de fontes subterrâneas
+- `IDE:ide_2412_mg_pmsh_areasprioritarias_indfontesup_uag_2023_pol` — PMSH - Áreas prioritárias - Índice de fontes superficiais
+- `IDE:ide_2412_mg_pmsh_areasprioritarias_indglobal_uag_2023_pol` — PMSH - Áreas prioritárias - Índice global
+- `IDE:ide_2412_mg_pmsh_areasprioritarias_indrestagua_uag_2023_pol` — PMSH - Áreas prioritárias - Índice de restauração de água
+- `IDE:ide_250101_do_mancha_inund_fundao_pol` — Rompimento da barragem Fundão em Mariana/MG - Mancha de inundação
+- `IDE:ide_250101_mg_ar_monit_sondagem_2020_pto` — Estações Q. Ar, Monitoramento e Sondagem
+- `IDE:ide_250101_mg_area_impactada_contexto_2020_pol` — Área Impactada Contexto
+- `IDE:ide_250101_mg_estruturas_remanescentes_2020_pol` — Estruturas Remanescentes
+- `IDE:ide_250101_mg_priorizacao_fontes_degradacao_2020_pto` — Priorização de Fontes de Degradação
+- `IDE:ide_250101_mg_recuperacao_vegetal_2020_pol` — Recuperação Vegetal
+- `IDE:ide_250102_mg_estruturas_contecao_pol` — Estruturas de Contenção
+- `IDE:ide_250102_mg_impactos_ambientais_pol` — Impactos Ambientais
+- `IDE:ide_250102_mg_monitoramento_pto` — Monitoramento
+- `IDE:ide_250102_mg_obras_intervencoes_lineares_lin` — Obras e Intervenções lineares
+- `IDE:ide_250102_mg_obras_intervencoes_poligonais_pol` — Obras e Intervenções poligonais
+- `IDE:ide_250102_mg_obras_intervencoes_pontuais_pto` — Obras e Intervenções pontuais
+- `IDE:ide_250102_mg_remanejamento_pto` — Remanejamento
+- `IDE:ide_250102_mg_restauracao_pol` — Restauração
+- `IDE:ide_2603_mg_ambientacao_pto` — Comissões setoriais do programa AmbientAÇÃO
+- `IDE:ide_2604_mg_programa_educacao_ambiental_pto` — Programas de Educação Ambiental (PEA - DN 214/2017)
+- `IDE:ide_2605_mg_loc_esc_jms_pto` — Localização das escolas que participam do programa Jovens Mineiros Sustentáveis (2025)
+- `IDE:ide_2605_mg_mun_prog_jms_2022_pol` — Municípios integrantes do programa Jovens Mineiros Sustentáveis em 2022
+- `IDE:ide_2605_mg_mun_prog_jms_2023_pol` — Municípios integrantes do programa Jovens Mineiros Sustentáveis em 2023
+- `IDE:ide_2605_mg_mun_prog_jms_2024_pol` — Municípios integrantes do programa Jovens Mineiros Sustentáveis em 2024
+- `IDE:ide_2605_mg_mun_prog_jms_2025_pol` — Municípios integrantes do programa Jovens Mineiros Sustentáveis em 2025
+- `IDE:ide_2605_mg_mun_prog_jms_2026_pol` — Municípios integrantes do programa Jovens Mineiros Sustentáveis em 2026
+- `IDE:ide_2606_mg_bosque_amanha_2023_pto` — Localização das áreas com mudas plantadas do projeto Bosque do Amanhã em 2023
+- `IDE:ide_2606_mg_bosque_amanha_2024_pto` — Localização das áreas com mudas plantadas do projeto Bosque do Amanhã em 2024
+- `IDE:ide_2606_mg_bosque_amanha_2025_pto` — Localização das áreas com mudas plantadas do projeto Bosque do Amanhã em 2025
+- `IDE:ide_2606_mg_bosque_amanha_2026_pto` — Localização das áreas com mudas plantadas do projeto Bosque do Amanhã em 2026
+- `IDE:teste010092026` — Teste 010092026

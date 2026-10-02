@@ -1,0 +1,55 @@
+# Instituto Nacional de Reforma Agraria — INRA (Bolívia) — camadas
+
+Geoportal: [[Geosserviços/Bolivia INRA/Instituto Nacional de Reforma Agraria — INRA (Bolívia)|Instituto Nacional de Reforma Agraria — INRA (Bolívia)]]
+
+Total: **50** camadas.
+- `externo:proceso_saneamiento_2022` — layer_proceso_saneamiento_2022_b3lf6
+- `ne:boundary_lines` — Boundary Lines
+- `ne:coastlines` — Coastlines
+- `ne:countries` — Countries
+- `ne:disputed_areas` — Disputed Areas
+- `ne:populated_places` — Populated Places
+- `sf:archsites` — Spearfish archeological sites
+- `sf:bugsites` — Spearfish bug locations
+- `sf:restricted` — Spearfish restricted areas
+- `sf:roads` — Spearfish roads
+- `sf:streams` — Spearfish streams
+- `sinacar:layer__reservas_forestales_qmd84` — layer__reservas_forestales_qmd84
+- `sinacar:layer_amenaza_de_granizo_a9imuh` — layer_amenaza_de_granizo_a9imuh
+- `sinacar:layer_amenaza_de_helada_5gi7s` — layer_amenaza_de_helada_5gi7s
+- `sinacar:layer_amenaza_de_incendios_yfzbml` — layer_amenaza_de_incendios_yfzbml
+- `sinacar:layer_amenaza_de_inundacion_p5wxo` — layer_amenaza_de_inundacion_p5wxo
+- `sinacar:layer_amenaza_de_sequia_nsjdr` — layer_amenaza_de_sequia_nsjdr
+- `sinacar:layer_areas_protegidas_a_nivel_nacional_94l7ej` — layer_areas_protegidas_a_nivel_nacional_94l7ej
+- `sinacar:layer_areas_protegidas_nacionales_6mekb` — layer_areas_protegidas_nacionales_6mekb
+- `sinacar:layer_cumat_2n6fg` — layer_cumat_2n6fg
+- `sinacar:layer_deforestacion_5fxh4i` — layer_deforestacion_5fxh4i
+- `sinacar:layer_erosion_hidrica_l5l31` — layer_erosion_hidrica_l5l31
+- `sinacar:layer_focos_de_calor_inicial_5xbkn` — layer_focos_de_calor_inicial_5xbkn
+- `sinacar:layer_mapa_de_bosque_2022_u5bi6` — layer_mapa_de_bosque_2022_u5bi6
+- `sinacar:layer_necesidades_basicas_insatisfechas_42rhil` — layer_necesidades_basicas_insatisfechas_42rhil
+- `sinacar:layer_numero_de_casos_covid19_kxuns` — layer_numero_de_casos_covid19_kxuns
+- `sinacar:layer_plan_de_desmonte_kzo3m` — layer_plan_de_desmonte_kzo3m
+- `sinacar:layer_plan_de_gest_integ_de_bosques_y_tierra_roi2w` — layer_plan_de_gest_integ_de_bosques_y_tierra_roi2w
+- `sinacar:layer_plan_de_manejo_integral_de_bosques_uvmmpf` — layer_plan_de_manejo_integral_de_bosques_uvmmpf
+- `sinacar:layer_plan_de_uso_de_suelos_6couij` — layer_plan_de_uso_de_suelos_6couij
+- `sinacar:layer_plan_general_de_manejo_forestal_ghxaa` — layer_plan_general_de_manejo_forestal_ghxaa
+- `sinacar:layer_proceso_saneamiento_2022_b3lf6` — layer_proceso_saneamiento_2022_b3lf6
+- `sinacar:layer_proyectos_fps_qy51b` — layer_proyectos_fps_qy51b
+- `sinacar:layer_quemasincendios19_22_9vror` — layer_quemasincendios19_22_9vror
+- `sinacar:layer_quemasincendios23_25_5xk55` — layer_quemasincendios23_25_5xk55
+- `sinacar:layer_reserva_privada_de_patrimonio_natural_iodh9` — layer_reserva_privada_de_patrimonio_natural_iodh9
+- `sinacar:layer_sitios_ramsar_o_nivel_nacional_pqpn2` — layer_sitios_ramsar_o_nivel_nacional_pqpn2
+- `sinacar:layer_sitios_ramsar_ptnqwf` — layer_sitios_ramsar_ptnqwf
+- `sinacar:layer_tierra_de_produccion_forestal_permanente_tn91ll` — layer_tierra_de_produccion_forestal_permanente_tn91ll
+- `sinacar:layer_vulnerabilidad_inseguridad_alimentaria_a2ecs` — layer_vulnerabilidad_inseguridad_alimentaria_a2ecs
+- `sinacar:tierras_clasificacion` — tierras_clasificacion
+- `tiger:giant_polygon` — World rectangle
+- `tiger:poi` — Manhattan (NY) points of interest
+- `tiger:poly_landmarks` — Manhattan (NY) landmarks
+- `tiger:tiger_roads` — Manhattan (NY) roads
+- `topp:states` — USA Population
+- `topp:tasmania_cities` — Tasmania cities
+- `topp:tasmania_roads` — Tasmania roads
+- `topp:tasmania_state_boundaries` — Tasmania state boundaries
+- `topp:tasmania_water_bodies` — Tasmania water bodies

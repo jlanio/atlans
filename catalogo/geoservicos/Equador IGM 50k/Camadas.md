@@ -1,0 +1,634 @@
+# Instituto Geográfico Militar — IGM — IGM 50k — camadas
+
+Geoportal: [[Geosserviços/Equador IGM 50k/Instituto Geográfico Militar — IGM — IGM 50k|Instituto Geográfico Militar — IGM — IGM 50k]]
+
+Total: **629** camadas WFS.
+- `actualizada:abrevadero_a` — Abrevadero · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:acantilado_l` — Acantilado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:acequia_l` — Acequia (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:acueducto_canal_a` — Acueducto o Canal (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:acueducto_canal_l` — Acueducto o Canal (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:aeropuerto_a` — Aeropuerto (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:alcantarilla_l` — Alcantarilla (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:alcantarilla_p` — Alcantarilla (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:antena_parabolica_p` — Antena parabolica (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:anteplaya_a` — Anteplaya · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:area_inundacion_a` — area_inundacion_a · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:area_operaciones_navales_a` — Área Operaciones Navales · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:arrecife_a` — Arrecife · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:astillero_a` — Astillero (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:balneario_a` — Balneario · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:banco_arena_a` — Banco arena (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:boca_pozo_p` — Boca pozo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:bodega_a` — Bodega (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:bosque_a` — Bosque (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:campamento_a` — Campamento (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:campamento_militar_a` — Campamento Militar (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:campamento_p` — Campamento (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:campo_petroleo_gas_a` — Campo petroleo/gas (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:canal_navegacion_a` — Canal navegacion (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:canal_navegacion_l` — Canal navegacion (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cancha_a` — Cancha · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cantera_a` — Cantera (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cantera_p` — Cantera (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:caracteristica_suelo_a` — Caracteristica suelo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cascada_l` — Cascada (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cascada_p` — Cascada (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cementerio_a` — Cementerio · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:central_electrica_a` — Central Eléctrica (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:central_electrica_p` — Central eléctrica (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cerca_l` — Cerca · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:chimenea_p` — Chimenea (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:choza_a` — Choza (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:choza_p` — Choza (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cienaga_a` — Ciénaga · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cisterna_p` — Cisterna (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:claro_bosque_a` — Claro de bosque · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:coliseo_a` — Coliseo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:coliseo_p` — Coliseo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:complejo_comercial_a` — Complejo comercial · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:compuerta_p` — Compuerta (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:comunidad_a` — Comunidad · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:control_vehicular_p` — Control vehicular (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:corral_a` — Corral (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:crater_l` — Crater (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cultivo_a` — Cultivo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:cuneta_l` — Cuneta (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:curva_batimetrica_l` — Curva batimétrica · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:curva_nivel_l` — Curva nivel (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:desmonte_a` — Desmonte · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:difusor_colector_a` — Difusor/colector (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:dique_a` — Dique (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:dique_l` — Dique (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:duna_a` — Duna (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:duna_l` — Duna (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:edificio_a` — Edificio (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:edificio_p` — Edificio (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:embalse_a` — Embalse · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:establo_a` — Establo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:establo_p` — Establo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estacion_ferrocarril_a` — Estación de ferrocarril · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estacion_pesaje_a` — Estación de pesaje · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estacion_transbordo_a` — Estación transbordo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estacion_transbordo_p` — Estación transbordo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estacion_transporte_a` — Estación transporte (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estacionamiento_aeronaves_a` — Estacionamiento aeronaves (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estacionamiento_aeronaves_l` — Estacionamiento aeronaves (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estadio_a` — Estadio · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estanque_a` — Estanque (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estanque_p` — Estanque (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estrato_rocoso_a` — Estrato rocoso (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:estructura_no_construida_p` — Estructura no construida (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:evaporador_salino_a` — Evaporador salino (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:faro_p` — Faro · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:ferrocarril_l` — Línea de ferrocarril · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:gabarra_l` — Gabarra · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:gasolinera_a` — Gasolinera (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:glaciar_a` — Glaciar (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:glaciar_l` — Glaciar (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:granja_acuatica_a` — Granja Acuática · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:grieta_a` — Grieta (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:grieta_l` — Grieta (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:hacienda_a` — Hacienda (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:hacienda_p` — Hacienda (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:helipuerto_a` — Helipuerto (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:helipuerto_p` — Helipuerto (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:hito_p` — Hito (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:instalacion_a` — Instalación · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:instalacion_petrolera_a` — Instalación petrolera (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:instalacion_procesamiento_residuos_a` — Instalación procesamiento residuos (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:isla_a` — Isla · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:lago_laguna_a` — Lago o Laguna · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:limite_administrativo_l` — Límite Administrativo (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:limite_nieve_a` — Límite nieve (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:linea_costa_l` — Línea de costa · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:linea_telefonica_l` — Línea telefónica (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:linea_transmision_electrica_l` — Línea transmisión eléctrica · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:malecon_a` — Malecon(polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:malecon_l` — Malecón (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:manantial_p` — Manantial (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:matorral_a` — Matorral (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:mechero_p` — Mechero (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:mina_a` — Mina (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:mina_p` — Mina (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:mirador_a` — Mirador · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:monumento_a` — Monumento (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:monumento_l` — Monumento (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:monumento_p` — Monumento (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:muelle_a` — Muelle (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:muelle_l` — Muelle (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:muelle_p` — Muelle (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:muro_a` — Muro (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:muro_l` — Muro (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:naufragio_p` — Naufragio · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:nombre_geografico_l` — Nombre geográfico (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:nombre_geografico_p` — Nombre geográfico (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:nombre_sitio_p` — Nombre sitio (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:observatorio_astronomico_a` — Observatorio astronómico (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:observatorio_astronomico_p` — Observatorio astronómico (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pantano_a` — Pantano (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:parque_a` — Parque · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:parque_diversion_a` — Parque de diversión · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:parqueadero_a` — Parqueadero (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:parterre_a` — Parterre (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:paseo_maritimo_a` — Paseo marítimo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:paseo_maritimo_l` — Paseo marítimo (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:paseo_peatonal_ciclovia_l` — Paseo peatonal ciclovia (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pastizal_a` — Pastizal (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pila_mineral_a` — Pila mineral (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:piscina_a` — Piscina (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pista_aterrizaje_a` — Pista de Aterrizaje (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pista_aterrizaje_l` — Pista de Aterrizaje (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pista_carreras_a` — Pista de carreras (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pista_carreras_l` — Pista de carreras · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pista_rodadura_l` — Pista rodadura (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:planta_ensambladora_a` — Planta ensambladora (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:planta_procesamiento_a` — Planta procesamiento (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:planta_procesamiento_p` — Planta procesamiento (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:planta_tratamiento_agua_a` — Planta tratamiento agua (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:plaza_publica_a` — Plaza pública · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:plaza_toros_a` — Plaza de toros · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:poblado_p` — Poblado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pozo_agua_p` — Pozo de agua (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:pozo_p` — Pozo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:presa_a` — Presa (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:presa_l` — Presa (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:presa_p` — Presa (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:puente_l` — Puente (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:puente_p` — Puente (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:puente_peatonal_l` — Puente peatonal (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:puente_peatonal_p` — Puente peatonal (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:punto_acotado_cota_p` — Punto acotado cota (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:punto_desvanecido_p` — Punto desvanecido · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:rancho_a` — Rancho (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:rapidos_a` — Rapidos (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:recinto_ferial_a` — Recinto ferial · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:rio_a` — Río (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:rio_l` — Río (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:roca_a` — Roca (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:roca_l` — Roca (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:roca_p` — Roca (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:rodera_l` — Rodera (Camino de Herradura) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:rompeolas_a` — Rompeolas (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:rompeolas_l` — Rompeolas (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:ruinas_a` — Ruinas (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:ruinas_p` — Ruinas (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:salina_a` — Salina (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:salitral_a` — Salitral (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:sendero_l` — Sendero · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:silo_p` — Silo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:sitio_arqueologico_a` — Sitio arqueológico · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:sitio_historico_a` — Sitio histórico · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:subestacion_electrica_a` — Subestación eléctrica (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:subestacion_electrica_p` — Subestación eléctrica (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:tanque_almacenamiento_a` — Tanque almacenamiento (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:tanque_almacenamiento_p` — Tanque almacenamiento (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:tanque_decantacion_a` — Tanque decantación (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:terraplen_a` — Terraplen (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:terraplen_l` — Terraplen (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:tierra_sin_vegetacion_a` — Tierra sin vegetación · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:torre_agua_p` — Torre agua (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:torre_comunicacion_p` — Torre comunicación (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:torre_control_p` — Torre control (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:torre_no_comunicacion_p` — Torre no comunicación (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:torre_p` — Torre (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:torre_perforacion_a` — Torre perforación (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:torre_perforacion_p` — torre_perforacion_p · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:transporte_aereo_cable_l` — Transporte aéreo por cable · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:tribuna_a` — Tribuna · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:tuberia_l` — Tubería (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:tunel_l` — Tunel (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:unidad_militar_a` — Unidad militar (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:vado_l` — Vado (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:vado_p` — Vado (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:vertedero_basurero_a` — vertedero/basurero (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:vertice_geodesico_p` — Vértice geodésico · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:via_ruta_l` — Vía o Ruta (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:vivero_a` — Vivero · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:zanja_l` — Zanja (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:zona_edificada_a` — Zona Edificada · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:zona_manglar_a` — Zona de manglar · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:zona_sin_informacion_a` — Zona sin información (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `actualizada:zoologico_a` — Zoológico · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `galapagos50k:acantilado_l` — Acantilado (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:acueducto_canal_a` — Acueducto o Canal (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:acueducto_canal_l` — Acueducto o Canal (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:aeropuerto_a` — Aeropuerto · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:alcantarilla_l` — Alcantarilla (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:antena_parabolica_p` — Antena parabolica (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:anteplaya_a` — Anteplaya · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:area_cuerpo_agua_p` — Área de un cuerpo de agua · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:area_inundacion_a` — Área de inundación · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:arrecife_a` — Arrecife (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:astillero_a` — Astillero (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:balneario_a` — Balneario · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:banco_arena_a` — Banco arena (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:bodega_a` — Bodega (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:bosque_a` — Bosque · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:campo_petroleo_gas_a` — Campo petroleo/gas (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:canal_navegacion_a` — Canal navegacion (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:canal_navegacion_l` — Canal navegacion (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cancha_a` — Cancha · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cantera_a` — Cantera (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:caracteristica_suelo_a` — Caracteristica suelo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cascada_l` — Cascada (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cascada_p` — Cascada (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cementerio_a` — Cementerio · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:central_electrica_p` — Central eléctrica (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cerca_l` — Cerca · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:chimenea_p` — Chimenea (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:choza_a` — Choza (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:choza_p` — Choza (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cienaga_a` — Ciénaga · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:claro_bosque_a` — Claro de bosque · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:coliseo_a` — Coliseo · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:complejo_comercial_a` — Complejo comercial · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:comunidad_a` — Comunidad · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:corral_a` — Corral (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:crater_l` — Crater (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cultivo_a` — Cultivo · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:cuneta_l` — Cuneta (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:curva_batimetrica_l` — Curva batimétrica · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:curva_nivel_l` — Curva nivel (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:desmonte_a` — Desmonte · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:difusor_colector_a` — Difusor/colector (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:dique_a` — Dique (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:dique_l` — Dique (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:edificio_a` — Edificio (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:edificio_p` — Edificio (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:embalse_a` — Embalse · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:establo_a` — Establo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:estacion_ferrocarril_a` — Estación de ferrocarril · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:estacion_pesaje_a` — Estación de pesaje · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:estacion_transbordo_a` — Estación transbordo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:estacion_transporte_a` — Estación transporte (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:estadio_a` — Estadio · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:estanque_a` — Estanque (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:estrato_rocoso_a` — Estrato rocoso (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:evaporador_salino_a` — Evaporador salino (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:faro_p` — Faro · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:ferrocarril_l` — Ferrocarril · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:gasolinera_a` — Gasolinera · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:glaciar_a` — Glaciar (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:glaciar_l` — Glaciar (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:granja_acuatica_a` — Granja Acuática · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:grieta_a` — Grieta (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:grieta_l` — Grieta (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:hacienda_a` — Hacienda (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:hacienda_p` — Hacienda (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:helipuerto_a` — Helipuerto (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:instalacion_a` — Instalación · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:instalacion_petrolera_a` — Instalación petrolera (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:instalacion_procesamiento_residuos_a` — Instalación procesamiento residuos (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:isla_a` — Isla · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:lago_laguna_a` — Lago o Laguna · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:limite_nieve_a` — Límite nieve (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:linea_costa_l` — Línea de costa · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:linea_telefonica_l` — Línea telefónica (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:linea_transmision_electrica_l` — Línea de transmisión eléctrica · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:malecon_a` — Malecón (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:malecon_l` — Malecón (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:matorral_a` — Matorral · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:mechero_p` — Mechero (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:mina_a` — Mina (poligono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:mina_p` — Mina (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:mirador_a` — Mirador · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:monumento_a` — Monumento (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:monumento_l` — Monumento (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:monumento_p` — Monumento (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:muelle_a` — Muelle (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:muelle_l` — Muelle (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:muro_a` — Muro (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:muro_l` — Muro (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:naufragio_p` — Naufragio · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:nombre_sitio_p` — Nombre de Sitio · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:observatorio_astronomico_a` — Observatorio astronómico (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:observatorio_astronomico_p` — Observatorio astronómico (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:pantano_a` — Pantano (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:parque_a` — Parque · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:parque_diversion_a` — Parque de diversión · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:parqueadero_a` — Parqueadero (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:parterre_a` — Parterre (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:paseo_maritimo_a` — Paseo marítimo · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:pastizal_a` — Pastizal · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:pila_mineral_a` — Pila mineral (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:piscina_a` — Piscina (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:pista_aterrizaje_a` — Pista de aterrizaje (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:pista_aterrizaje_l` — Pista de aterrizaje (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:pista_carreras_a` — Pista de carreras (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:planta_ensambladora_a` — Planta ensambladora (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:planta_procesamiento_a` — Planta procesamiento (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:planta_tratamiento_agua_a` — Planta tratamiento agua (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:plaza_publica_a` — Plaza pública · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:plaza_toros_a` — Plaza de toros · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:poblado_p` — Poblado · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:pozo_agua_p` — Pozo de agua (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:pozo_p` — Pozo (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:presa_a` — Presa (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:presa_l` — Presa (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:puente_l` — Puente (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:puente_p` — Puente (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:puente_peatonal_l` — Puente peatonal (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:puente_peatonal_p` — Puente peatonal (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:punto_acotado_cota_p` — Punto acotado cota (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:punto_desvanecido_p` — Punto desvanecido · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:rancho_a` — Rancho (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:rapidos_a` — Rapidos (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:recinto_ferial_a` — Recinto ferial · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:rio_a` — Río (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:rio_l` — Río (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:roca_a` — Roca (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:roca_l` — Roca (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:roca_p` — Roca (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:rodera_l` — Rodera (Camino de Herradura) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:rompeolas_a` — Rompeolas (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:rompeolas_l` — Rompeolas (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:ruinas_a` — Ruinas (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:ruinas_p` — Ruinas (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:salina_a` — Salina (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:salitral_a` — Salitral (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:sendero_l` — Sendero · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:silo_a` — Silo (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:silo_p` — Silo (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:sitio_arqueologico_a` — Sitio arqueológico · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:sitio_historico_a` — Sitio histórico · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:subestacion_electrica_a` — Subestación eléctrica (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:subestacion_electrica_p` — Subestación eléctrica (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:tanque_almacenamiento_p` — Tanque almacenamiento (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:tanque_decantacion_a` — Tanque decantación (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:terraplen_a` — Terraplen (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:terraplen_l` — Terraplen (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:tierra_sin_vegetacion_a` — Tierra sin vegetación · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:torre_agua_p` — Torre agua (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:torre_comunicacion_p` — Torre comunicación (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:torre_control_p` — Torre control (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:torre_p` — Torre (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:torre_perforacion_a` — Torre perforación (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:torre_perforacion_p` — Torre perforación (punto) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:transporte_aereo_cable_l` — Transporte aéreo por cable · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:tribuna_a` — Tribuna (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:tuberia_l` — Tubería (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:tunel_l` — Tunel (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:vertedero_basurero_a` — vertedero/basurero (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:vertice_geodesico_p` — Vértice geodésico · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:via_ruta_l` — Vía o Ruta (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:vivero_a` — Vivero · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:zanja_l` — Zanja (línea) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:zona_edificada_a` — Zona Edificada · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:zona_manglar_a` — Zona de manglar · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:zona_sin_informacion_a` — Zona sin información (polígono) · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `galapagos50k:zoologico_a` — Zoológico · CRS: `urn:ogc:def:crs:EPSG::32715`
+- `igm:acequia_l` — acequia_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:acueducto_a` — Acueducto (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:acueducto_l` — Acueducto (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:aeropuerto_a` — Aeropuerto 50k · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:albufera_a` — Albufera (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:alcantarilla_p` — Alcantarilla · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:antena_parabolica_p` — Antena parabólica (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:area_inundacion_a` — Área inundación (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:arena_p` — Arena (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:arrecife_a` — Arrecife (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:bodega_a` — Bodega (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:bodega_p` — Bodega (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cable_aereo_l` — Cable Aéreo · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:campamento_p` — Campamento (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cancha_a` — Canchas deportivas (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cancha_p` — Canchas (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cantera_a` — Cantera (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cantera_p` — Cantera (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:caracteristica_terreno_a` — Caracteristicas del terreno · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:casa_a` — Casa (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:casa_p` — Casa (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cascada_l` — Cascada (linea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cascada_p` — Cascada (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cementerio_a` — Cementerios · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:central_electrica_a` — Central eléctrica (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:central_electrica_p` — Central eléctrica (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cerca_l` — Cercas, alambrado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:chimenea_p` — Chimenea (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:choza_a` — Choza (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:choza_p` — Choza (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cienaga_a` — Ciénaga · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:colector_p` — Colector (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:complejo_a` — Complejo (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:complejo_p` — Complejo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:compuerta_p` — Compuerta (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:comunidad_a` — Comunidad (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:comunidad_p` — Comunidad (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:corral_a` — Corral (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:cueva_p` — Cueva · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:curva_nivel_l` — Curvas de Nivel · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:desmonte_a` — Desmonte · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:edificio_a` — Edificio (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:edificio_p` — Edificio (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:embalse_a` — Embalse · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:estacion_a` — Estación de transferencia de pasajeros · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:estacion_bombeo_p` — Estación de bombeo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:estadio_a` — Estadios, Coliseos (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:estadio_p` — Estadios, Coliseos (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:estanque_a` — Estanque · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:estrato_rocoso_a` — Estrato rocoso · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:faro_p` — Faro · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:granjas_acuaticas_a` — Granja Acuática · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:hacienda_a` — Hacienda (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:hacienda_p` — Hacienda (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:helipuerto_p` — Helipuerto · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:instalacion_militar_a` — Instalación militar (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:instalacion_militar_p` — Instalacion militar (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:instalaciones_petroliferas_p` — Instalación de producción o distribución de petróleo o gas · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:isla_a` — Isla · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:lago_laguna_a` — Lago o Laguna · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:linea_costa_l` — Línea de costa · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:linea_transmision_electrica_l` — Línea de transmisión eléctrica · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:linea_tren_l` — Línea del tren · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:malecon_l` — Malecon · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:manantial_p` — Manantial / Vertiente · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:mar_a` — Océano · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:mina_a` — Mina (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:mina_p` — Mina (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:mirador_p` — Mirador · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:monumento_p` — Monumento · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:muelle_l` — Muelle (linea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:muro_contencion_l` — Muro de contención (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:muro_l` — Muro · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:nombres_areas_p` — Sitio Geográfico · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:parque_a` — Parques · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:piscina_a` — Piscina / Balneario · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:pista_aterrizaje_l` — Pista de Aterrizaje (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:pista_aterrizaje_p` — Pista de Aterrizaje (punto) · CRS: `urn:ogc:def:crs:EPSG::404000`
+- `igm:pista_carreras_a` — Pista de carreras · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:planta_tratamiento_a` — Planta de tratamiento (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:planta_tratamiento_agua_a` — Planta de tratamiento de agua (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:planta_tratamiento_agua_p` — Planta de tratamiento de agua (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:planta_tratamiento_p` — Planta de tratamiento (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:poblado_p` — Poblado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:poblado_p_mascara` — poblado_p_mascara · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:pozo_p` — Pozos (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:presa_l` — Presa (linea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:presa_p` — Presa (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:procesamiento_residuos_a` — Procesamiento de residuos (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:puente_l` — Puente (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:puente_p` — Puente (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:punto_acotado_p` — Punto Acotado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:punto_desvanecido_p` — Curso de agua desvanecido · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:rancho_p` — Rancho · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:rio_a` — Río (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:rio_l` — Río (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:roca_a` — Roca (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:roca_p` — Roca (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:rodera_l` — Rodera (Camino de Herradura) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:salina_a` — Área salina · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:sendero_l` — Sendero · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:sin_informacion_a` — Áreas sin información · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:sitio_arqueologico_a` — Sitio arqueológico (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:sitio_arqueologico_p` — Sitio arqueológico (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:subestacion_a` — Subestación (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:subestacion_p` — Subestación (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:tanque_a` — Tanque (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:tanque_decantacion_p` — Tanque de decantación (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:tanque_p` — Tanque (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:terraplen_a` — Terraplen (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:terraplen_l` — Terraplén (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:texto_descriptivo_l` — Descripción de características de una zona (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:texto_descriptivo_p` — Descripción de características de una zona (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:torre_agua_p` — Torre de agua (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:torre_comunicacion_p` — Torre de comunicación electrónica (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:torre_p` — Torre (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:torre_perforacion_p` — Torre de perforación (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:tuberia_l` — Tubería · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:tunel_l` — Túnel (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:tunel_p` — Túnel (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:vado_l` — Vado (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:vado_p` — Vado (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:valvula_p` — Válvula · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:vertedero_basurero_a` — Vertedero, basurero · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:vertice_p` — Vértices · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:via_l` — via_l · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:vivero_a` — Vivero (poligono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:vivero_p` — Vivero (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:zona_manglar_a` — Manglar · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm:zona_urbana_a` — Zona Urbana · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:acantilado_l` — Acantilado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:acequia_l` — Acequia · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:acueducto_l` — Acueducto (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:aeropuerto_a` — Aeropuerto reservado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:antena_parabolica_p` — Antena Parabólica · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:area_inundacion_a` — Area Inundación · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:arena_a` — Arena (area) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:arena_p` — Arena (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:arrecife_a` — Arrecife · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:bodega_a` — Bodega (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:bodega_p` — Bodega (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cable_aereo_l` — Cable Aéreo · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:campamento_a` — Campamento (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:campamento_militar_p` — Campamento Militar (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:campamento_p` — Campamento (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cancha_a` — Cancha (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cancha_p` — Cancha (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cantera_a` — Cantera (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cantera_p` — Cantera (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:caracteristica_terreno_a` — Característica del Terreno · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:casa_a` — Casa (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:casa_p` — Casa (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cascada_p` — Cascada · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cementerio_a` — Cementerio · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:central_electrica_a` — Central Eléctrica (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:central_electrica_p` — Central Eléctrica (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cerca_l` — Cerca · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:chimenea_p` — Chimenea · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:choza_a` — Choza (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:choza_p` — Choza (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cienaga_a` — Ciénaga · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:complejo_a` — Complejo (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:complejo_p` — Complejo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:compuerta_l` — Compuerta · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:comunidad_a` — Comunidad (Ã¡rea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:comunidad_p` — Comunidad (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:corral_a` — Corral · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:cueva_p` — Cueva · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:curva_batimetrica_l` — Curva Batimétrica · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:desmonte_a` — Desmonte · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:edificio_a` — Edificio (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:edificio_p` — Edificio (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:embalse_a` — Embalse · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:ensambladora_a` — Ensambladora · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:estacion_a` — Estación (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:estacion_bombeo_a` — Estacion Bombeo (area) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:estacion_bombeo_p` — Estación Bombeo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:estacion_ferry_p` — Estacion de Ferry · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:estadio_a` — Estadio · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:estanque_a` — Estanque · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:estrato_rocoso_a` — Estrato Rocoso · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:evaporador_salino_a` — Evaporador Salino · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:faro_p` — Faro · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:granjas_acuaticas_a` — Granja Acuática · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:hacienda_a` — Hacienda (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:hacienda_p` — Hacienda (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:helipuerto_p` — Helipuerto · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:instalacion_militar_a` — Instalacion Militar (area) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:instalacion_militar_p` — Instalación Militar (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:instalaciones_petroliferas_a` — Instalacion Petrolifera (area) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:instalaciones_petroliferas_p` — Instalaciones Petrolíferas (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:isla_a` — Isla · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:lago_laguna_a` — Lago o Laguna · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:linea_transmision_electrica_l` — Línea de Transmisión Eléctrica · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:linea_tren_l` — Línea de Tren · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:malecon_l` — Malecón · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:manantial_p` — Manantial · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:mar_a` — Mar · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:mina_a` — Mina (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:mina_p` — Mina (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:mirador_p` — Mirador · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:monumento_p` — Monumento · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:muelle_a` — Muelle (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:muelle_l` — Muelle (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:muelle_p` — Muelle (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:muro_l` — Muro · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:nombres_areas_p` — Nombres de Áreas · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:parque_a` — Parque · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:piscina_a` — Piscina · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:pista_aterrizaje_l` — Pista de Aterrizaje (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:pista_aterrizaje_p` — Pista de Aterrizaje (punto) · CRS: `urn:ogc:def:crs:EPSG::404000`
+- `igm_reservada:pista_carreras_a` — Pista de Carreras · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:planta_procesamiento_a` — Planta de Procesamiento · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:planta_tratamiento_a` — Planta de Tratamiento · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:planta_tratamiento_agua_a` — Planta de Tratamiento de Agua (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:planta_tratamiento_agua_p` — Planta de Tratamiento de Agua (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:poblado_p` — Poblado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:pozo_p` — Pozo · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:presa_l` — Presa · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:procesamiento_residuos_a` — Procesamiento de Residuos · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:puente_l` — Puente (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:puente_p` — Puente (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:punto_acotado_p` — Punto Acotado · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:punto_desvanecido_p` — Punto Desvanecido · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:rancho_p` — Rancho · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:rio_a` — Río (polígono) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:rio_l` — Río (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:roca_a` — Roca · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:rodera_l` — Rodera (Camino de Herradura) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:salina_a` — Salina · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:sendero_l` — Sendero · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:subestacion_a` — Subestación (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:subestacion_p` — Subestación (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:tanque_a` — Tanque (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:tanque_p` — Tanque (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:terraplen_l` — Terraplen · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:terreno_inundable_a` — Terreno Inundable · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:texto_descriptivo_l` — Texto Descriptivo (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:texto_descriptivo_p` — Texto Descriptivo (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:torre_comunicacion_p` — Torre de Comunicación · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:torre_control_p` — Torre de Control · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:torre_p` — Torre · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:tuberia_l` — Tubería · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:tunel_l` — Tunel · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:vado_l` — Vado (línea) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:vado_p` — Vado (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:valvula_p` — Válvula · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:vertedero_basurero_a` — Vertedero y/o Basurero · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:vertice_p` — Vértice · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:via_l` — Vía · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:vivero_a` — Vivero (área) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:vivero_p` — Vivero (punto) · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:zona_manglar_a` — Zona de Manglar · CRS: `urn:ogc:def:crs:EPSG::32717`
+- `igm_reservada:zona_urbana_a` — Zona Urbana · CRS: `urn:ogc:def:crs:EPSG::32717`

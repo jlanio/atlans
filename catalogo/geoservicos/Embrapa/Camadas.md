@@ -1,0 +1,1120 @@
+# Embrapa — camadas
+
+Geoportal: [[Geosserviços/Embrapa/Empresa Brasileira de Pesquisa Agropecuária — Embrapa|Empresa Brasileira de Pesquisa Agropecuária — Embrapa]]
+
+Total: **1113** camadas, organizadas em 1 grupo(s).
+
+## geonode (1113)
+- `geonode:_01_prioridade_tt_mun_br_com_nota_da_microregiao` — Aceitabilidade dos municípios para ações de TT em ILPF_ 1:250.000_ 2017
+- `geonode:_191204_ucs_terrestres_wgs84_1` — Unidades de Conservação
+- `geonode:_370_1` — Vegetação carta 370/Uirapuru em 1997 - Bacia do Alto Paraguai
+- `geonode:_370_a57896ee29b4c945fd9bfab40968fb12` — Solos carta 370/Uirapuru em 1997 - Bacia do Alto Paraguai
+- `geonode:_371` — Solos carta 371/Tangará da Serra em 1997 - Bacia do Alto Paraguai
+- `geonode:_371_1` — Vegetação carta 371/Tangará da Serra em 1997 - Bacia do Alto Paraguai
+- `geonode:_372` — Solos carta 372/Rosário d'Oeste em 1997 - Bacia do Alto Paraguai
+- `geonode:_372v` — Vegetação carta 372/Rosário d'Oeste em 1997 - Bacia do Alto Paraguai
+- `geonode:_373` — Solos carta 373/Paranatinga em 1997 - Bacia do Alto Paraguai
+- `geonode:_373_1` — Vegetação carta 373/Paranatinga em 1997 - Bacia do Alto Paraguai
+- `geonode:_386` — Solos carta 386/Jauru em 1997 - Bacia do Alto Paraguai
+- `geonode:_386_1` — Vegetação carta 386/Jauru em 1997 - Bacia do Alto Paraguai
+- `geonode:_387` — Solos carta 387/Barra do Bugres em 1997  - Bacia do Alto Paraguai
+- `geonode:_387_1` — Vegetação carta 387/Barra do Bugres em 1997  - Bacia do Alto Paraguai
+- `geonode:_388` — Solos carta 388/Cuiabá em 1997 - Bacia do Alto Paraguai
+- `geonode:_388_1` — Vegetação carta 388/Cuiabá em 1997 - Bacia do Alto Paraguai
+- `geonode:_389_a` — Solos carta 389/Dom Aquino em 1997 - Bacia do Alto Paraguai
+- `geonode:_389v` — Vegetação carta 389/Dom Aquino em 1997 - Bacia do Alto Paraguai
+- `geonode:_390` — Solos carta 390/General Carneiro em 1997 - Bacia do Alto Paraguai
+- `geonode:_390_1` — Vegetação carta 390/General Carneiro em 1997 - Bacia do Alto Paraguai
+- `geonode:_402` — Solos carta 402/Serra do Baú em 1997 - Bacia do Alto Paraguai
+- `geonode:_402_1` — Vegetação carta 402/Serra do Baú em 1997 - Bacia do Alto Paraguai
+- `geonode:_403` — Solos carta 403/Cáceres em 1997 - Bacia do Alto Paraguai
+- `geonode:_403_1` — Vegetação carta 403/Cáceres em 1997 - Bacia do Alto Paraguai
+- `geonode:_404v` — Vegetação carta 404/Poconé em 1997 - Bacia do Alto Paraguai
+- `geonode:_405` — Solos carta 405/Rondonópolis em 1997 - Bacia do Alto Paraguai
+- `geonode:_405_1` — Vegetação carta 405/Rondonópolis em 1997 - Bacia do Alto Paraguai
+- `geonode:_406` — Solos carta 406/Guiratinga em 1997 - Bacia do Alto Paraguai
+- `geonode:_406v` — Vegetação carta 406/Guiratinga em 1997 - Bacia do Alto Paraguai
+- `geonode:_417` — Solos carta 417/Morraria da Ínsua em 1997 - Bacia do Alto Paraguai
+- `geonode:_417_1` — Vegetação carta 417/Morraria da Ínsua em 1997 - Bacia do Alto Paraguai
+- `geonode:_418` — Solos carta 418/Ilha Camargo em 1997 - Bacia do Alto Paraguai
+- `geonode:_418_1` — Vegetação carta 418/Ilha Camargo em 1997 - Bacia do Alto Paraguai
+- `geonode:_419` — Solos carta 419/Itiquira em 1997 - Bacia do Alto Paraguai
+- `geonode:_419_1` — Vegetação carta 419/Itiquira em 1997 - Bacia do Alto Paraguai
+- `geonode:_420_1` — Vegetação carta 420/Mineiros em 1997 - Bacia do Alto Paraguai
+- `geonode:_430` — Solos carta 430/Amolar em 1997  - Bacia do Alto Paraguai
+- `geonode:_430_1` — Vegetação carta 430/Amolar em 1997  - Bacia do Alto Paraguai
+- `geonode:_431` — Solos carta 431/Porto Rolon em 1997 - Bacia do Alto Paraguai
+- `geonode:_431_1` — Vegetação carta 431/Porto Rolon em 1997- Bacia do Alto Paraguai
+- `geonode:_432` — Solos carta 432/Coxim em 1997 - Bacia do Alto Paraguai
+- `geonode:_432_1` — Vegetação carta 432/Coxim em 1997 - Bacia do Alto Paraguai
+- `geonode:_433` — Solos carta 433/Parque Nacional das Emas em 1997 - Bacia do Alto Paraguai
+- `geonode:_433v` — Vegetação carta 433/Parque Nacional das Emas em 1997 - Bacia do Alto Paraguai
+- `geonode:_443v` — Vegetação carta 443/Corumbá em 1997 - Bacia do Alto Paraguai
+- `geonode:_444` — Solos carta 444/Porto Rolon em 1997  - Bacia do Alto Paraguai
+- `geonode:_444_1` — Vegetação carta 444/Porto Carreiro em 1997  - Bacia do Alto Paraguai
+- `geonode:_445` — Solos carta 445/Camapuã em 1997 - Bacia do Alto Paraguai
+- `geonode:_445_1` — Vegetação carta 445/Camapuã em 1997 - Bacia do Alto Paraguai
+- `geonode:_446` — Solos carta 446/Paraíso em 1997 - Bacia do Alto Paraguai
+- `geonode:_446_1` — Vegetação carta 446/Paraíso em 1997 - Bacia do Alto Paraguai
+- `geonode:_456` — Solos carta 456/Aldeia Tomazia em 1997 - Bacia do Alto Paraguai
+- `geonode:_456_1` — Vegetação carta 456/Aldeia Tomazia em 1997 - Bacia do Alto Paraguai
+- `geonode:_457` — Solos carta 457/Aquidauana em 1997 - Bacia do Alto Paraguai
+- `geonode:_457_1` — Vegetação carta 457/Aquidauana em 1997 - Bacia do Alto Paraguai
+- `geonode:_458` — Solos carta 458/Campo Grande em 1997 - Bacia do Alto Paraguai
+- `geonode:_458_1` — Vegetação carta 458/Campo Grande em 1997 - Bacia do Alto Paraguai
+- `geonode:_469` — Solos carta 469/Porto Murtinho em 1997 - Bacia do Alto Paraguai
+- `geonode:_469_1` — Vegetação carta 469/Porto Murtinho em 1997 - Bacia do Alto Paraguai
+- `geonode:_470` — Solos carta 470/Jardim em 1997 - Bacia do Alto Paraguai
+- `geonode:_470_1` — Vegetação carta 470/Jardim em 1997 - Bacia do Alto Paraguai
+- `geonode:_471` — Solos carta 471/Maracaju em 1997 - Bacia do Alto Paraguai
+- `geonode:_471_1` — Vegetação carta 471/Maracaju em 1997 - Bacia do Alto Paraguai
+- `geonode:_481` — Solos carta 481/Caracol em 1997  - Bacia do Alto Paraguai
+- `geonode:_481_1` — Vegetação carta 481/Caracol em 1997 - Bacia do Alto Paraguai
+- `geonode:_482_1` — Solos carta 482/Ponta Porã em 1997 - Bacia do Alto Paraguai
+- `geonode:_482v` — Vegetação carta 482/Ponta Porã em 1997 - Bacia do Alto Paraguai
+- `geonode:a1_ilpf_regiao_norte` — Áreas prioritárias para as ações de Transferencia de Tecnologia em ILPF na Região Norte_ 1:250.000_ 2017
+- `geonode:a2_ilpf_regiao_nordeste` — Áreas prioritárias para as ações de Transferencia de Tecnologia em ILPF na Região Nordeste_ 1:250.000_ 2017
+- `geonode:a3_ilpf_regiao_sudeste_1` — Áreas prioritárias para as ações de Transferencia de Tecnologia em ILPF na Região Sudeste_ 1:250.000_ 2017
+- `geonode:a4_ilpf_regiao_sul` — Áreas prioritárias para as ações de Transferencia de Tecnologia em ILPF na Região Sul_ 1:250.000_ 2017
+- `geonode:a5_ilpf_regiao_centrooeste` — Áreas prioritárias para as ações de Transferencia de Tecnologia em ILPF na Região Centro-oeste_ 1:250.000_ 2017
+- `geonode:abacaxi_alcinopolis_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi no município de Alcinópolis - MS [CNPS]
+- `geonode:abacaxi_anastacio_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para  abacaxi no município de Anastácio - MS [CNPS]
+- `geonode:abacaxi_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi no município de Bandeirantes - MS [CNPS]
+- `geonode:abacaxi_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi no município de Camapuã - MS [CNPS]
+- `geonode:abacaxi_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi no município de Campo Grande - MS [CNPS]
+- `geonode:abacaxi_corumba_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:abacaxi_coxim_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi no município de Coxim - MS [CNPS]
+- `geonode:abacaxi_figueirao_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi no município de Figueirão - MS [CNPS]
+- `geonode:abacaxi_pedro_gomes_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para abacaxi no município de Pedro Gomes - MS [CNPS]
+- `geonode:abacaxi_rio_negro_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi no município do Rio Negro - MS [CNPS]
+- `geonode:abacaxi_sao_gabriel_ms` — Zoneamento agroecológico para abacaxi no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:abacaxi_sidrolandia_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para abacaxi no município de Sidrolândia - MS [CNPS]
+- `geonode:abobral` — Solos da Sub-Região do Abobral em 1997 - Pantanal do Brasil
+- `geonode:abobral2` — Sub-região do Pantanal do Abobral
+- `geonode:abobral_v` — Vegetação da Sub-Região do Abobral em 1997 - Pantanal do Brasil
+- `geonode:ac_abacaxi_chuvoso` — ZONPB - Aptidão climática para a cultura da abacaxi  - cenário chuvoso [CNPS]
+- `geonode:ac_abacaxi_regular` — ZONPB - Aptidão climática para a cultura do abacaxi - cenário regular [CNPS]
+- `geonode:ac_abacaxi_seco` — ZONPB - Aptidão climática para a cultura do abacaxi - cenário seco [CNPS]
+- `geonode:ac_atualizacao_2020_1` — Espacialização dos dados sobre aquicultura do Portal Nacional de Licenciamento Ambiental para o estado do Acre
+- `geonode:ac_cana_chuvoso` — ZONPB - Aptidão climática para a cultura da cana-de-açúcar - cenário chuvoso [CNPS]
+- `geonode:ac_cana_regular` — ZONPB - Aptidão climática para a cultura da cana-de-açúcar - cenário regular [CNPS]
+- `geonode:ac_cana_seco` — ZONPB - Aptidão climática para a cultura da cana-de-açúcar - cenário seco [CNPS]
+- `geonode:ac_mandioca_chuvoso` — ZONPB - Aptidão climática para a cultura da mandioca - cenário chuvoso [CNPS]
+- `geonode:ac_mandioca_regular` — ZONPB - Aptidão climática para a cultura da mandioca - cenário regular [CNPS]
+- `geonode:ac_mandioca_seco` — ZONPB - Aptidão climática para a cultura da mandioca  - cenário seco [CNPS]
+- `geonode:ac_milho_chuvoso` — ZONPB - Aptidão climática para a cultura do milho - cenário chuvoso [CNPS]
+- `geonode:ac_milho_regular` — ZONPB - Aptidão climática para a cultura do milho - cenário regular [CNPS]
+- `geonode:ac_milho_seco` — ZONPB - Aptidão climática para a cultura do milho - cenário seco [CNPS]
+- `geonode:ac_sorgo_chuvoso` — ZONPB - Aptidão climática para a cultura do sorgo - cenário chuvoso [CNPS]
+- `geonode:ac_sorgo_regular` — ZONPB - Aptidão climática para a cultura do sorgo - cenário regular [CNPS]
+- `geonode:ac_sorgo_seco` — ZONPB - Aptidão climática para a cultura do sorgo - cenário seco [CNPS]
+- `geonode:acesso_vias_escoamento` — ACESSO A VIAS DE ESCOAMENTO POR UNIDADE DA FEDERAÇÃO EM 2016
+- `geonode:acre_aptidao_agric` — Solos: consolidação e validação dos estudos de levantamento de reconhecimento dos solos  na área de abrangência do UZEE no Estado do Acre_ 2017
+- `geonode:ad` — Estimativa de água disponível do Vale dos Vinhedos - RS [CNPS]
+- `geonode:ad_98a8dcca664f761f5546492208425b3c` — Estimativa de água disponível do Estado de Pernambuco [CNPS]
+- `geonode:ad_brasil` — ad_brasil
+- `geonode:ad_faz_angra_rj_espg4674_cnps` — Estimativa de água disponível nos solos da Fazenda Angra - PESAGRO-Rio: Estação Experimental: Campos dos Goytacazes - RJ [CNPS]
+- `geonode:ad_guapi_mac_cacer_gcs_sirgas2000` — Estimativa de água disponível nos solos das bacias hidrográficas dos Rios Guapi-Macacu e Caceribu - RJ [CNPS]
+- `geonode:ad_mbh_barbranco_gcs_sirgas2000` — Estimativa de água disponível nos solos da microbacia do ribeirão Barro Branco município de São José do Ubá - RJ [CNPS]
+- `geonode:ad_parte_baixada_campista_rj_gcs_sirgas2000` — Estimativa de água disponível nos solos de parte da baixada campista, RJ [CNPS]
+- `geonode:ad_pito_aceso_gcs_sirgas2000` — Estimativa de água disponível nos solos da microbacia do Pito Aceso, município de Bom Jardim - RJ [CNPS]
+- `geonode:ad_rio_grande_reg_ser_rj_gcs_sirgas2000` — Estimativa de água disponível nos solos do médio alto curso do Rio Grande, Região Serrana - RJ [CNPS]
+- `geonode:ad_se` — Estimativa de água disponível Tabuleiros Costeiros Sergipe [CNPS]
+- `geonode:ad_solos_mun_rj` — Estimativa de água disponível nos solos do município do Rio de Janeiro - RJ [CNPS]
+- `geonode:ad_ti_potiguara_pb` — Estimativa de água disponível em solos: Terra Indígena Potiguara, PB [CNPS]
+- `geonode:adbrasil` — Estimativa de água disponível nos solos do Brasil (Segunda aproximação) [CNPS]
+- `geonode:adbrasil_b0f18f25e5eac580ec58488ae35e3918` — Estimativa de água disponível Malha Municipal (Segunda Aproximação) [CNPS]
+- `geonode:adesoes_pontos` — Adesões em associações de aquicultura por microrregião de Santa Catarina
+- `geonode:ahe` — Barragens- RH Paraguai
+- `geonode:alagoas_ad` — Água Disponível em Solos do Estado de Alagoas [CNPS]
+- `geonode:altroc_3` — Níveis de alumínio trocável do solo (cmolc Al/dm3) em pontos amostrais no Estado de Sergipe.
+- `geonode:am_atualizacao_2020` — Espacialização dos dados sobre aquicultura do Portal Nacional de Licenciamento Ambiental para o estado do Amazonas
+- `geonode:amapa_aptidao_agricola` — Aptidão Agrícola do Estado do Amapá
+- `geonode:amapa_solos` — Solos do Estado do Amapá
+- `geonode:amazonas_aptidao_agricola` — Aptidão agrícola do Estado do Amazonas
+- `geonode:amazoniadesmata2021queima2021fitofisio2019` — Quantificação no Bioma Amazônia em nível municipal de desmatamentos e de queimadas (2009 a 2021) e relações com imóveis rurais (2021) e fitofisionomias florestais (2019)
+- `geonode:anomed_jap` — Pluviosidade média na série histórica anual na bacia do rio Japaratuba em Sergipe.
+- `geonode:app_uso_sf_caatinga_66ab600f8aeaee29f9d08df65c7139eb` — Área de Preservação Permanente e Passivo ambiental hídrico na Caatinga da bacia do São Francisco
+- `geonode:apt_agricola_lat_wgs84` — Mapa de aptidão agrícola das terras do médio alto curso do rio grande, região serrana do Estado do Rio de Janeiro [CNPS]
+- `geonode:apt_clima_chuvoso_algodao_zaal_2023fc26404373f0` — ZAAL - Aptidão Climática Algodão - Cenário Chuvoso [CNPS]
+- `geonode:apt_clima_chuvoso_cana_zaal_202383fd5ccc10a8` — ZAAL - Aptidão Climática Cana-de-açúcar - Cenário Chuvoso [CNPS]
+- `geonode:apt_clima_chuvoso_caupi_zaal_2023231dc9f6e070` — ZAAL - Aptidão Climática Feijão caupi - Cenário Chuvoso [CNPS]
+- `geonode:apt_clima_chuvoso_mamona_zaal_2023f06d96962204` — ZAAL - Aptidão Climática Mamona - Cenário Chuvoso [CNPS]
+- `geonode:apt_clima_chuvoso_mandioca_zaal_2023db76ef1d1fb6` — ZAAL - Aptidão Climática Mandioca - Cenário Chuvoso [CNPS]
+- `geonode:apt_clima_chuvoso_milho` — ZAAL - Aptidão Climática Milho - Cenário Chuvoso [CNPS]
+- `geonode:apt_clima_chuvoso_phaseolus_zaal_2023d4d59df50857` — ZAAL - Aptidão Climática Feijão phaseolus - Cenário Chuvoso [CNPS]
+- `geonode:apt_clima_chuvoso_sorgo_zaal_202336025d9f49da` — ZAAL - Aptidão Climática Sorgo - Cenário Chuvoso [CNPS]
+- `geonode:apt_clima_regular_algodao_zaal_2023e446378e17a3` — ZAAL - Aptidão Climática Algodão - Cenário Regular [CNPS]
+- `geonode:apt_clima_regular_cana_zaal_2023dced8f935e28` — ZAAL - Aptidão Climática Cana-de-açúcar - Cenário Regular [CNPS]
+- `geonode:apt_clima_regular_caupi_zaal_20231fff2cb8c841` — ZAAL - Aptidão Climática Feijão caupi - Cenário Regular [CNPS]
+- `geonode:apt_clima_regular_mamona_zaal_2023c13357b618c6` — ZAAL - Aptidão Climática Mamona - Cenário Regular [CNPS]
+- `geonode:apt_clima_regular_mandioca_zaal_20230ffe87a9fce4` — ZAAL - Aptidão Climática Mandioca - Cenário Regular [CNPS]
+- `geonode:apt_clima_regular_milho_zaal_2023f2990904f158` — ZAAL - Aptidão Climática Milho - Cenário Regular [CNPS]
+- `geonode:apt_clima_regular_phaseolus_zaal` — ZAAL - Aptidão Climática Feijão phaseolus - Cenário Regular [CNPS]
+- `geonode:apt_clima_regular_sorgo_zaal_20236c4ec103bc18` — ZAAL - Aptidão Climática Sorgo - Cenário Regular [CNPS]
+- `geonode:apt_clima_seco_algodao_zaal_20237cb9b4985190` — ZAAL - Aptidão Climática Algodão - Cenário Seco [CNPS]
+- `geonode:apt_clima_seco_cana_zaal_2023_0d24a6d177d62182c50190118d0fc747` — ZAAL - Aptidão Climática Cana-de-açúcar - Cenário Seco [CNPS]
+- `geonode:apt_clima_seco_caupi_zaal` — ZAAL - Aptidão Climática Feijão caupi - Cenário Seco [CNPS]
+- `geonode:apt_clima_seco_mamona_zaal` — ZAAL - Aptidão Climática Mamona - Cenário Seco [CNPS]
+- `geonode:apt_clima_seco_mandioca_zaal_202335f480bc13b6` — ZAAL - Aptidão Climática Mandioca - Cenário Seco [CNPS]
+- `geonode:apt_clima_seco_milho_zaal_8990ff77def1499b530d70b06115c609` — ZAAL - Aptidão Climática Milho - Cenário Seco [CNPS]
+- `geonode:apt_clima_seco_phaseolus_zaal_20231b540fc2dcc7` — ZAAL - Aptidão Climática Feijão phaseolus - Cenário seco [CNPS]
+- `geonode:apt_clima_seco_sorgo_zaal` — ZAAL - Aptidão Climática Sorgo - Cenário Seco [CNPS]
+- `geonode:aptagr_bra` — Mapa de aptidão agrícola das terras do Brasil_ escala 1:500.000 (2ª Aproximação) - dashboard [CNPS]
+- `geonode:aptd_agricola_cana_2009` — Aptidão agrícola para culturas exigentes em terras altas BR - ZAECana 2009
+- `geonode:aptidao_agr_bra` — Mapa de aptidão agrícola das terras do Brasil, escala 1:500.000 (2ª Aproximação) [CNPS]
+- `geonode:aptidao_agricola_sebastiao__lan_wgs84f3c7e9a3d236` — Mapa de aptidão agrícola das terras do assentamento e acampamento Sebastião Lan I e II [CNPS]
+- `geonode:aptidao_agricola_triangulo_mineiro_lat_long_sirgas2000` — Mapa de aptidão agrícola das terras do Triângulo Mineiro [CNPS]
+- `geonode:aptidao_baciasdomingos_multiport_lam_lat_long_wgs84` — Mapa de aptidão agrícola das terras da bacia hidrográfica do Rio São Domingos, RJ [CNPS]
+- `geonode:aptidao_corregocacho_paty_rj_latlong_wgs84` — Mapa de aptidão agrícola das terras da microbacia do Córrego da Cachoeira, Paty do Alferes, RJ [CNPS]
+- `geonode:aptidao_microbacia_sao_domingos_mg_geografico_wgs84` — Mapa de aptidão agrícola das terras da microbacia do ribeirão São Domingos, estado de Minas Gerais [CNPS]
+- `geonode:aquidauana` — Solos da Sub-Região de Aquidauana em 1997 - Pantanal do Brasil
+- `geonode:aquidauana_1` — Sub-região do Pantanal de Aquidauana
+- `geonode:aquidauana_abacaxi_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para abacaxi no município de Aquidauana - MS [CNPS]
+- `geonode:aquidauana_banana_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para banana no município de Aquidauana - MS [CNPS]
+- `geonode:aquidauana_eucalipto_lat_long_wgs84_multipart_v4` — Zoneamento agroecológico para eucalipto no município de Aquidauana - MS [CNPS]
+- `geonode:aquidauana_girassol_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para girassol no município de Aquidauana - MS [CNPS]
+- `geonode:aquidauana_mamao_lat_longwgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Aquidauana - MS [CNPS]
+- `geonode:aquidauana_manga_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para manga no município de Aquidauana - MS [CNPS]
+- `geonode:aquidauana_seringueira_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para seringueira no município de Aquidauana - MS [CNPS]
+- `geonode:aquidauana_v` — Vegetação da Sub-Região de Aquidauana em 1997 - Pantanal do Brasil
+- `geonode:aquidauanah` — Vegetação do município de Aquidauana no Mato Grosso do Sul em 1997
+- `geonode:aquifero_1` — Aquíferos em águas subterrâneas de Sergipe.
+- `geonode:area_algo_al_21` — Área plantada de algodão em Alagoas em 2021
+- `geonode:area_algo_ba_21` — Área plantada do algodão na Bahia em 2021
+- `geonode:area_algo_ce_21` — Área plantada do algodão no Ceará em 2021
+- `geonode:area_algo_certo_sp_21_941710a3062750a56a4dbbcf893d265d` — Área plantada de algodão em São Paulo em 2021
+- `geonode:area_algo_ma_21` — Área plantada do algodão no Maranhão em 2021
+- `geonode:area_algo_mg_21` — Área plantada do algodão em Minas Gerais em 2021
+- `geonode:area_algo_ms_21` — Área plantada de algodão em Mato Grosso do Sul  em 2021
+- `geonode:area_algo_mt_21` — Área plantada do algodão em Mato Grosso em 2021
+- `geonode:area_algo_pb_21` — Área plantada do algodão na Paraíba em 2021
+- `geonode:area_algo_pe_21` — Área plantada do algodão em Pernambuco em 2021
+- `geonode:area_algo_to_21` — Área plantada do algodão em Tocantins em 2021
+- `geonode:area_algo_total_23_c` — Área plantada de algodão no Brasil em 2023
+- `geonode:area_amend_24` — area_amend_24
+- `geonode:area_amend_ac_21` — Área plantada de amendoim no Acre em 2021
+- `geonode:area_amend_es_21` — Área plantada de amendoim no Espírito Santo em 2021
+- `geonode:area_amend_ma_21_certo` — Área plantada de amendoim no Maranhão em 2021
+- `geonode:area_amend_pa_21` — Área plantada de amendoim no Pará em 2021
+- `geonode:area_amend_pe_2021_5b26a85df1070d04f473f5ff58718b18` — Área plantada de amendoim em Pernambuco em 2021
+- `geonode:area_amend_pi_21` — Área plantada de amendoim no Piauí em 2021
+- `geonode:area_amend_total_23` — Área plantada de amendoim no Brasil em 2023
+- `geonode:area_ce_mamona_2021` — Área plantada de mamona no Ceará em 2021
+- `geonode:area_certo_go` — Área plantada de algodão em Goiás em 2021
+- `geonode:area_de_estudo_zon_pb` — ZONPB - Área das vertentes litorâneas da Paraíba na escala 1:250.000 [CNPS]
+- `geonode:area_gerg_23` — Área plantada de gergelim no Brasil em 2023
+- `geonode:area_gerg_24` — area_gerg_24
+- `geonode:area_interesse_uso_e_cobertura_2020_1` — Uso e cobertura da terra atual (2020) no Pq. Est. Podocarpus
+- `geonode:area_mam_22_23` — Área plantada de mamona no Brasil em 2023
+- `geonode:area_mam_24` — area_mam_24
+- `geonode:area_mam_pe_21` — Área plantada de mamona em Pernambuco em 2021
+- `geonode:area_mamon_sp_21_certo` — Área plantada de mamona em São Paulo em 2021
+- `geonode:area_mt_mamona_2021` — Área plantada de mamona no Mato Grosso em 2021
+- `geonode:area_plant_amend_ba_21_certo` — Área plantada de amendoim na Bahia em 2021
+- `geonode:area_pluma24` — area_pluma24
+- `geonode:area_rn_municipios_2021` — Área plantada de sisal no Rio Grande do Norte em 2021
+- `geonode:area_sisal_ce_certo_2021` — Área plantada do sisal no Ceará em 2021
+- `geonode:area_sisal_pb_2021certo` — Área plantada de sisal na Paraíba em 2021
+- `geonode:areaconflitouso_1` — Áreas conflituosas- RH Paraguai
+- `geonode:areas_mangabeiras_pe` — Mapa das áreas naturais e do extrativismo da mangaba no estado de Pernambuco [CNPS]
+- `geonode:areas_potenciais_bs` — ZonBarragem - Áreas potenciais para a construção de barragens subterrâneas na região semiárida de Alagoas [CNPS]
+- `geonode:areas_prioritarias_serv_ecossist_guapi_macacu_rj` — Áreas prioritárias à intervenção em iniciativa de Pagamento por Serviços Ambientais hídricos na bacia do rio Guapi-Macacu, RJ [CNPS]
+- `geonode:areasatribuidas2023` — Áreas Legalmente Atribuídas do Brasil em Unidades de Conservação_ Terras Indígenas_ Áreas Militares_ Assentamentos e Quilombolas (2022/2023)
+- `geonode:areaslibdrdhoutorgas2` — Áreas não estratégicas
+- `geonode:areaspreservadascar2020` — Dimensão Territorial das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2020
+- `geonode:areasprioritariashelicoverpa_2015_br_completo_epsg4326` — Áreas do Cerrado do Brasil com maior potencial à infestação por migração de Helicoverpa armigera por massas de ar.
+- `geonode:areasprioritariashelicoverpasp_bp66_completo_epsg4326` — Áreas do estado de São Paulo com maior potencial à infestação por migração de Helicoverpa armigera por massas de ar.
+- `geonode:areasprotegidas2019municipios` — Dimensão Territorial das Áreas Protegidas em Unidades de Conservação Integral_ Terras Indígenas e Áreas Militares em 2029
+- `geonode:arroiogrande_decl_30m_solos_wgs` — Áreas aptas para cultivo de arroz irrigado por sulco em Arroio Grande – RS
+- `geonode:aspersao_wgs84` — Avaliação da cana-de-açúcar sob irrigação por aspersão no Perímetro Salitre, Juazeiro - BA [CNPS]
+- `geonode:ate15km30kmmaior30km_centrosul` — Distância das Usinas sucroalcoleiras_ 1:250.000_ Centro-sul do Brasil em 2014.
+- `geonode:avaliacao_socioambiental_af_renda_20200414` — Priorização de municípios para ações de conservação do solo - Cenário 2: considerando indicadores socioambientais com ênfase no aspecto socioeconômico [CNPS]
+- `geonode:avaliacao_socioambiental_bhqm_20200413_v5` — Priorização de municípios para ações de conservação do solo - Cenário 1:  considerando indicadores socioambientais com ênfase no balanço hídrico quantitativo [CNPS]
+- `geonode:b_vista_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico do Município de Bela Vista - MS [CNPS]
+- `geonode:ba_risco_desmatamento_v3` — Mapa de Risco de Desmatamento para Bioma Mata Atlântica - Bahia (2000 a 2017) [CNPS]
+- `geonode:bacia_hidro` — Bacia Hidrográfica em águas subterrâneas de Sergipe.
+- `geonode:bacias_logisticas_2015_2023_wgs84` — Bacias logísticas de grãos dos anos de 2015 a 2023 no Brasil
+- `geonode:bacias_macrolog` — Bacias Logísticas da Exportação de Grãos
+- `geonode:baciav` — Vegetação da Bacia do Alto Paraguai em 1997_ escala 1:250.00
+- `geonode:baciax` — Solos da Bacia do Alto Paraguai em 1997 - PCBAP
+- `geonode:baixadacuiabana_areaslegalmenteatribuidas2023` — Quadro Agrário da Baixada Cuiabana/MT (2023)
+- `geonode:baixadacuiabana_car2023_imoveisrurais_14436` — Baixada Cuiabana - Imóveis Rurais
+- `geonode:baixadacuiabana_censo2017_estabelecimentosagropecuarias_16041` — Baixada Cuiabana - Estabelecimentos Agropecuários
+- `geonode:baixadacuiabana_imoveisruraisareasdestinadasmunicipio2023` — Baixada Cuiabana - municípios com os imóveis rurais e áreas destinadas à preservação da vegetação nativa
+- `geonode:baixadacuiabana_municipiosibge_2019` — Baixada Cuiabana - Municípios
+- `geonode:baixo_amazonas_solos` — Solos das áreas alteradas a região de integração Baixo Amazonas
+- `geonode:balanco_janeiro` — Balanço Hídrico de Janeiro para a Área de Atuação da Embrapa Tabuleiros Costeiros (GeoTAB)
+- `geonode:banana_alcinopolis_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para banana no município de Alcinópolis - MS [CNPS]
+- `geonode:banana_anastacio_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para banana no município de Anastácio - MS [CNPS]
+- `geonode:banana_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para banana no município de Bandeirantes - MS [CNPS]
+- `geonode:banana_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para banana no município de Camapuã - MS [CNPS]
+- `geonode:banana_cg_vetor_lat_long_wgs84_multipart_v8` — Zoneamento agroecológico para banana no município de Campo Grande - MS [CNPS]
+- `geonode:banana_corumba_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para banana nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:banana_coxim_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para banana no município de Coxim - MS [CNPS]
+- `geonode:banana_figueirao_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para banana no município de Figueirão - MS [CNPS]
+- `geonode:banana_jaraguari_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para banana no município de Jaraguari - MS [CNPS]
+- `geonode:banana_maracaju_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para banana do município de Maracaju - MS [CNPS]
+- `geonode:banana_rio_negro_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para banana no município do Rio Negro - MS [CNPS]
+- `geonode:banana_rio_verde_mt` — Zoneamento agroecológico para banana do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:banana_rochedo_vetor_lat_long_wgs84_multipart_v4` — Zoneamento agroecológico para banana no município de Rochedo - MS [CNPS]
+- `geonode:banana_sao_gabriel_ms` — Zoneamento agroecológico para banana no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:banana_sidrolandia_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para banana no município de Sidrolândia - MS [CNPS]
+- `geonode:banana_sonora_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para banana no município de Sonora - MS [CNPS]
+- `geonode:barao_melgaco` — Vegetação do município de Barão de Melgaço no Mato Grosso em 1997
+- `geonode:barao_melgaco_1` — Sub-região do Pantanal de Barão de Melgaço
+- `geonode:barao_melgaco_2` — Solos do município de Barão de Melgaço  no Mato Grosso  em 1997
+- `geonode:barao_mergaco_v` — Vegetação da Sub-Região de Barão de Melgaço em 1997 - Pantanal do Brasil
+- `geonode:baraomelgaco1` — Solos da Sub-Região de Barão de Melgaço em 1997- Pantanal do Brasil
+- `geonode:barro_branco_solos_lam_lat_long_wgs84` — Mapa semidetalhado de solos da microbacia do ribeirão barro branco município de São José do Ubá - RJ [CNPS]
+- `geonode:bhamazonica` — Excedentes hídricos decendiais na Bacia Hidrográfica Amazônica
+- `geonode:bhatlanticoleste` — Excedentes hídricos decendiais na Bacia Hidrográfica Atlântico Leste
+- `geonode:bhatlanticonordesteocidental` — Excedentes hídricos decendiais na Bacia Hidrográfica Atlântico Nordeste Ocidental
+- `geonode:bhatlanticonordesteoriental` — Excedentes hídricos decendiais na Bacia Hidrográfica Atlântico Nordeste Oriental
+- `geonode:bhatlanticosudeste` — Excedentes hídricos decendiais na Bacia Hidrográfica Atlântico Sudeste
+- `geonode:bhatlanticosul` — Excedentes hídricos decendiais na Bacia Hidrográfica Atlântico Sul
+- `geonode:bhparaguai` — Excedentes hídricos decendiais na Bacia Hidrográfica do Rio Paraguai
+- `geonode:bhparana` — Excedentes hídricos decendiais na Bacia Hidrográfica do Rio Paraná
+- `geonode:bhparnaiba_c19af42b0a1c491e13140f3dee765eef` — Excedentes hídricos decendiais na Bacia Hidrográfica do Rio Parnaíba
+- `geonode:bhsaofrancisco` — Excedentes hídricos decendiais na Bacia Hidrográfica do Rio São Francisco
+- `geonode:bhsaofrancisco_782c822292accce28acee2a2a665d86c` — Excedentes hídricos decendiais na Bacia Hidrográfica do Rio São Francisco
+- `geonode:bhtocantinsaraguaia_4ec27171829d745e755c26921f0498e6` — Excedentes hídricos decendiais na Bacia Hidrográfica dos Rios Tocantins e Araguaia
+- `geonode:bhuruguai_f44ed1718f37ffe2b43bebb58a85b95e` — Excedentes hídricos decendiais na Bacia Hidrográfica do Rio Uruguai
+- `geonode:biodiesel_materiaprimatotal_microrregioes2019_wgs84` — Banco de dados georreferenciados do total de matérias-primas para biodiesel em cada microrregião do Brasil
+- `geonode:biomacaatinga_censo2017_lavoura_pastagem` — BiomaCaatinga_CensoAgropecuario2017_lavoura_pastagem
+- `geonode:biomacaatinga_delimitacao` — Divisão territorial do Bioma Caatinga ajustada por microrregião e municípios do IBGE de 2019
+- `geonode:bodoquena` — Vegetação do município de Bodoquena no Mato Grosso do Sul em 1997
+- `geonode:bodoquena_1` — Solos do município de Bodoquena no Mato Grosso Sul em 1997
+- `geonode:bodoquena_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico de Bodoquena - MS [CNPS]
+- `geonode:bonito_ms_zae_lat_long_sirgas2000` — Zoneamento agroecológico do município de Bonito - MS [CNPS]
+- `geonode:bp99_regionalizacao` — Regionalização socieconômica da área de atuação da Embrapa Tabuleiros Costeiros
+- `geonode:br_edafica` — Aptidão edáfica para culturas exigentes em terras altas do território brasileiro
+- `geonode:br_ima_municipios_censo_2006_base2010` — Índice Tecnológico Municipal Agropecuário - Censo 2006
+- `geonode:br_municipios_2010` — Malha municipal de 2010 com código de micro e mesorregiões
+- `geonode:br_municipios_micro_mesorreg_2018` — Malha territorial do Brasil com divisão municipal - ano de 2018
+- `geonode:br_riscoclimacana_2009_wgs84` — Risco Climático para cana-de-açúcar no Brasil_ 2009
+- `geonode:bra_erod_dashboard` — Erodibilidade dos solos do Brasil (dashboard) [CNPS]
+- `geonode:bra_erodibilidade_2024_sirgas2000` — Erodibilidade dos solos do Brasil [CNPS]
+- `geonode:brasil_2024_areaslegalmenteatribuidas_uc_ti_militar_assentamen` — Áreas Legalmente Atribuídas do Brasil em Unidades de Conservação_ Terras Indígenas_ Áreas Militares_ Assentamentos e Quilombolas (2022/2024)
+- `geonode:brasil_erodibilidade_solo` — Mapa de erodibilidade dos solos à erosão hídrica do Brasil (Primeira aproximação) [CNPS]
+- `geonode:brasil_solos_5m_20201104` — Mapa de solos do Brasil [CNPS]
+- `geonode:cabedelo_flona_pb_solos` — cabedelo_flona_pb_solos
+- `geonode:caceres` — Solos da Sub-Região de Cáceres em 1997 - Pantanal do Brasil
+- `geonode:caceres_1` — Sub-região do Pantanal de Cáceres
+- `geonode:caceres_2` — Vegetação do município de Cáceres no Mato Grosso em 1997
+- `geonode:caceres_3` — Solos do município de Cáceres no Mato Grosso em 1997
+- `geonode:caceres_v` — Vegetação da Sub-Região de Cáceres em 1997- Pantanal do Brasil
+- `geonode:cafe_scr` — ZAPE - Aptidão climática, aptidão pedoclimática, potencial pedológico e fatores limitantes para a cultura do cafeeiro em cenários pluviométricos (secos, regulares e chuvosos) e em manejos B e C (baixa e média tecnologia) na escala 1:100.000 [CNPS]
+- `geonode:calcario_final_centroide` — Estimativa de oferta potencial de calcário obtidos a partir de jazidas disponíveis no território brasileiro
+- `geonode:camapua_ms_zae_202011` — Zoneamento agroecológico do município de Camapuã  - MS [CNPS]
+- `geonode:camgtroc_4` — Níveis de Cálcio + Magnésio trocáveis (cmolc CA+Mg/dm3) em pontos amostrais no Estado de Sergipe.
+- `geonode:campo_experimental_ad` — Estimativa de água disponível do Centro Nacional de Pesquisa de Milho e Sorgo - MG [CNPS]
+- `geonode:campo_grande__ad_campo_grande` — Estimativa de água disponível Campo Grande - MS [CNPS]
+- `geonode:campo_grande_ms_aptidao_v10` — Mapa de aptidão agrícola das terras do município de Campo Grande - MS [CNPS]
+- `geonode:campo_grande_ms_solos_v2` — Levantamento de reconhecimento de baixa intensidade dos solos município de Campo Grande - MS [CNPS]
+- `geonode:cana_alcinopolis_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para cana no município de Alcinópolis - MS [CNPS]
+- `geonode:cana_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para cana no município de Camapuã - MS [CNPS]
+- `geonode:cana_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para cana no município de Campo Grande - MS [CNPS]
+- `geonode:cana_corguinho_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para cana no município de Corguinho - MS [CNPS]
+- `geonode:cana_coxim_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para cana no município de Coxim - MS [CNPS]
+- `geonode:cana_dois_irmaos_buriti_latlongwgs84_v2` — Zoneamento agroecológico para cana no município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:cana_figueirao_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para cana no município de Figueirão  - MS [CNPS]
+- `geonode:cana_jaraguari_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para cana no município de Jaraguari - MS [CNPS]
+- `geonode:cana_maracaju_vetor_lat_long_wgs84_multipart_v2_2` — Zoneamento agroecológico para cana do município de Maracaju - MS [CNPS]
+- `geonode:cana_p_gomes_vetor_lat_long_wgs84_multipart_v4` — Zoneamento agroecológico para cana no município de Pedro Gomes - MS [CNPS]
+- `geonode:cana_rio_negro_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para cana no município do Rio Negro - MS [CNPS]
+- `geonode:cana_rio_verde_mt` — Zoneamento agroecológico para cana do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:cana_rochedo_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para cana no município de Rochedo - MS [CNPS]
+- `geonode:cana_sao_gabriel_ms` — Zoneamento agroecológico para cana no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:cana_scr` — ZAPE - Aptidão climática, aptidão pedoclimática, potencial pedológico e fatores limitantes para a cultura da cana-de-açúcar em cenários pluviométricos (secos, regulares e chuvosos) e em manejos B e C (baixa e média tecnologia) na escala 1:100.000 [CNPS]
+- `geonode:cana_sidrolandia_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para cana no município de Sidrolândia - MS [CNPS]
+- `geonode:cana_sonora_vetor_latlong_wgs84_multipart` — Zoneamento agroecológico para cana no município de Sonora - MS [CNPS]
+- `geonode:cana_terenos_lat_long_wgs84_multipart2` — Zoneamento agroecológico para cana no Município de Terenos - MS [CNPS]
+- `geonode:canal_transposicao_sf` — Zon-PB - Canal de Transposição do Rio São Francisco - Vertentes Litorâneas da Paraíba [CNPS]
+- `geonode:canola_1` — Zoneamento edafoclimático para arroz irrigado em Marau_ RS
+- `geonode:capimmarandu_arenoso_sp` — Zoneamento de Riscos Climáticos para Semeadura do Capim-Marandu - SP. Solos Arenosos
+- `geonode:capimmarandu_argiloso_sp` — Zoneamento de Riscos Climáticos para a Semeadura do Capim-Marandu - SP. Solos Argilosos
+- `geonode:car2021_biomaamazonia_municipios2019_dimensaoterritorial` — Dimensão Territorial no Bioma Amazônia das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2021
+- `geonode:car2021_municipios2019_dimensaoterritorial_wgs84utf8` — Dimensão Territorial das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2021
+- `geonode:car2022_biomacaatinga_municipios2019_dimensaoterritorial` — Dimensão Territorial no Bioma Caatinga das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2022
+- `geonode:car2022_dimensaosocialeconomica_milho2021` — Dimensão Social e Econômica das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2022
+- `geonode:car2022_municipios2019_dimensaopatrimonio_valorha2020_wgs84utf` — Estimativa do Valor Patrimonial das Terras Imobilizadas Municipais para a Preservação Ambiental no ano de 2022
+- `geonode:car2022_municipios2019_dimensaoterritorial_wgs84utf8` — Dimensão Territorial das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2022
+- `geonode:car2023_biomaamazonia_municipios2019_dimensaosocialeconomica20` — Dimensão Social e Econômica no Bioma Amazônia das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2023
+- `geonode:car2023_biomaamazonia_municipios2019_dimensaoterritorial` — Dimensão Territorial no Bioma Amazônia das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2023
+- `geonode:car2023_biomaamazonia_municipios2019_valor22_dimensaopatrimoni` — Estimativa do Valor Patrimonial no Bioma Amazônia das Terras Imobilizadas Municipais para a Preservação Ambiental no ano de 2023
+- `geonode:car2023_biomacaatinga_municipios2019_dimensaosocialeconomica20` — Dimensão Social e Econômica no Bioma Caatinga das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2023
+- `geonode:car2023_biomacaatinga_municipios2019_dimensaoterritorial` — Dimensão Territorial no Bioma Caatinga das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2023
+- `geonode:car2023_biomacerrado_municipios2019_dimensaosocialeconomica202` — Dimensão Social e Econômica no Bioma Cerrado das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2023
+- `geonode:car2023_biomacerrado_municipios2019_dimensaoterritorial` — Dimensão Territorial no Bioma Cerrado das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2023
+- `geonode:car2023_biomacerrado_municipios2019_valor22_dimensaopatrimonio` — Estimativa do Valor Patrimonial no Bioma Cerrado das Terras Imobilizadas Municipais para a Preservação Ambiental no ano de 2023
+- `geonode:car2023_municipios2019_dimensaopatrimonio_valorha2022_wgs84utf` — Estimativa do Valor Patrimonial das Terras Imobilizadas Municipais para a Preservação Ambiental no ano de 2023
+- `geonode:car2023_municipios2019_dimensaosocialeconomica_milho2022_wgs84` — Dimensão Social e Econômica das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2023
+- `geonode:car2023_municipios2019_dimensaoterritorial_wgs84utf8` — Dimensão Territorial das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2023
+- `geonode:car2024_biomaamazonia_municipios2019_dimensaosocialeconomica20` — Estimativa do Valor Patrimonial no Bioma Amazônia das Terras Imobilizadas Municipais para a Preservação Ambiental no ano de 2024
+- `geonode:car2024_biomacaatinga_municipios2019_dimensaoterritorial` — Dimensão Territorial no Bioma Caatinga das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2024
+- `geonode:car2024_biomacerrado_municipios2019_dimensaosocialeconomica202` — Estimativa do Valor Patrimonial no Bioma Cerrado das Terras Imobilizadas Municipais para a Preservação Ambiental no ano de 2024
+- `geonode:car2024_biomacerrado_municipios2019_dimensaoterritorial` — Dimensão Territorial no Bioma Cerrado das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2024
+- `geonode:car2024_municipios2019_dimensaopatrimonio_valorha2023_wgs84utf` — Estimativa do Valor Patrimonial das Terras Imobilizadas Municipais para a Preservação Ambiental no ano de 2024
+- `geonode:car2024_municipios2019_dimensaoterritorial_wgs84utf8` — Dimensão Territorial das Áreas Destinadas à Preservação da Vegetação Nativa nos Imóveis Rurais do CAR de 2024
+- `geonode:caracol_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico do Município de Caracol - MS [CNPS]
+- `geonode:carajas_aptidao` — Aptidão agrícola das áreas alteradas a região de integração Carajás
+- `geonode:carajas_solos` — Solos das áreas alteradas a região de integração Carajás
+- `geonode:ce_canchim_sp_espg4326` — Levantamento semidetalhado dos solos da fazenda Canchim, Centro de Pesquisa de Pecuária Sudeste, São Carlos, SP [CNPS]
+- `geonode:ce_fazendinha_km47_solos_rj_v9` — Levantamento  semidetalhado dos solos da área do Sistema Integrado de Produção Agroecológica (SIPA) Km 47 Seropédica-RJ [CNPS]
+- `geonode:ce_gado_corte_cg_ms_aptidao_20201121` — Mapa de aptidão agrícola dos solos da área do CNPGC_ MS [CNPS]
+- `geonode:ce_gado_corte_cg_ms_solos_20201118` — Mapa de reconhecimento detalhado dos solos da área do CNPGC_ MS [CNPS]
+- `geonode:ce_gado_corte_cg_ms_solos_sibcs_20201123` — Mapa de reconhecimento detalhado dos solos da área do CNPGC_ MS - classificação atualizada [CNPS]
+- `geonode:ce_gado_corte_ms_aptidao_milho_b_20k` — Aptidão pedológica para cultura do milho no nível de manejo B da área do CNPGC, MS (1:20.000) [CNPS]
+- `geonode:ce_gado_corte_ms_aptidao_milho_c_20k` — Aptidão pedológica para cultura do milho no nível de manejo C da área do CNPGC, MS (1:20.000) [CNPS]
+- `geonode:ceara_sul_ad__ad_sul_ce` — Estimativa de água disponível do Sul do Ceará [CNPS]
+- `geonode:centroide_fruticultura` — Localização da fruticultura no município de Valinhos - SP, em 2023
+- `geonode:cetesb_sp` — Espacialização dos dados da Companhia Ambiental do Estado de São Paulo - CETESB - Ofício SEI n° 5169064
+- `geonode:citrus_alcinopolis_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para citrus no município de Alcinópolis - MS [CNPS]
+- `geonode:citrus_anastacio_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para citrus no município de Anastácio - MS [CNPS]
+- `geonode:citrus_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para citrus no município de Bandeirantes - MS [CNPS]
+- `geonode:citrus_corguinho_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para citrus no município de Corguinho - MS [CNPS]
+- `geonode:citrus_corumba_ladario_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para citrus nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:citrus_dois_irmaos_buriti_latlongwgs84` — Zoneamento agroecológico para citrus no município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:citrus_figueirao_vetor_lat_long_wgs84_multipart_v2_1` — Zoneamento agroecológico para citrus no município de Figueirão  - MS [CNPS]
+- `geonode:citrus_jaraguari_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para citrus no município de Jaraguari - MS [CNPS]
+- `geonode:citrus_maracaju_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para citrus do município de Maracaju - MS [CNPS]
+- `geonode:citrus_pedro_gomes_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para citrus no município de Pedro Gomes - MS [CNPS]
+- `geonode:citrus_rio_negro_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para citrus no município de Rio Negro - MS [CNPS]
+- `geonode:citrus_rio_verde_ms` — Zoneamento agroecológico para citrus do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:citrus_rochedo_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para citrus no município de Rochedo - MS [CNPS]
+- `geonode:citrus_sidrolandia_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para citrus no município de Sidrolândia - MS [CNPS]
+- `geonode:citrus_sonora_vetor_latlong_wgs84multipart` — Zoneamento agroecológico para citrus no município de Sonora - MS [CNPS]
+- `geonode:citrus_terenos_lat_long_wgs84_multipart2` — Zoneamento agroecológico para citrus no Município de Terenos - MS [CNPS]
+- `geonode:class_solo_semiarido_2022` — Classificação dos solos do Semiárido Brasileiro
+- `geonode:clima_mde_semiarido_1` — Classificação climática do Semiárido brasileiro
+- `geonode:cobertur` — Cobertura vegetal em pontos amostrais no Estado de Sergipe.
+- `geonode:colonias_pesca` — Espacialização das Colônias de Pescadores no Território Nacional
+- `geonode:comercializacao_pescados_amazonia` — Espacialização das distribuidoras de pescado  no bioma amazônico
+- `geonode:contorno_537ab932a91fc80b2deb9ccbeee4a714` — Limite total da bacia do rio Japaratuba em Sergipe.
+- `geonode:coredes_1` — Número de Vacas que produzem leite destinado à industrialização por COREDE-RS_ 2021
+- `geonode:coredes_2` — Produção de leite para industrialização no Estado de Rio Grande do Sul_ organizados por COREDEs_ 2021
+- `geonode:coredes_4_cf588bcd3cf7cee1181ebf1ffdef0edc` — Produção de leite_ em litros/ano_ destinado a industrialização_ por vaca nos COREDEs-RS_ 2001
+- `geonode:coredes_5` — Produção de leite destinada à industrialização por produtor em cada COREDE-RS_ 2021
+- `geonode:coredeserra_declividade3045per_4326f68ed2d47f7c` — COREDE Serra – áreas de risco geológico escorregamentos
+- `geonode:coredeserra_declividademaior45per_4326` — Região COREDE Serra – áreas com potencial risco de escorregamentos
+- `geonode:coredeserra_declividademenor3perper_4326` — Região COREDE Serra – áreas com potencial risco de alagamentos e encharcamentos
+- `geonode:coredeserra_declividademenor3perper_4326bc89b21cd887` — COREDE Serra – áreas de risco geológico encharcamentos e alagamentos
+- `geonode:coredeserra_escorregamentosmaiojunho2024_4326` — Região COREDE Serra – áreas de escorregamentos – maio de 2024
+- `geonode:coredeserra_escorregamentosmaiojunho2024_4326c30b03e99071` — COREDE Serra – áreas de escorregamentos
+- `geonode:coredeserra_mapeamentodesolos50mil_4326` — Mapeamento Semidetalhado de Solos dos Municípios do COREDE Serra
+- `geonode:coredeserra_solosescorregamentos_4326` — Região COREDE Serra – classes de solos afetadas por escorregamentos – maio de 2024
+- `geonode:coredeserra_usodaterraescorregamentos_4326` — Região COREDE Serra – perdas de uso da terra por escorregamentos – maio de 2024
+- `geonode:corguinho_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico do município de Corguinho - MS [CNPS]
+- `geonode:corumba` — Vegetação do município de Corumbá no Mato Grosso do Sul em 1997
+- `geonode:corumba_1` — Solos do município de Corumbá no Mato Grosso Sul em 1997
+- `geonode:corumba_ladario_ms_zae_202011` — Zoneamento agroecológico dos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:costa_descobrimento_aptidao` — Mapa de aptidão agrícola das terras das microbacias hidrográficas do entorno do banco genético do Pau-Brasil, municípios de Porto Seguro e Santa Cruz de Cabrália, Costa do Descobrimento, Bahia [CNPS]
+- `geonode:costa_descobrimento_solos_lat_long_wgs84` — Mapa de solos das microbacias hidrográficas do entorno do banco genético do Pau-Brasil, municípios de Porto Seguro e Santa Cruz de Cabrália, Costa do Descobrimento, Bahia [CNPS]
+- `geonode:coxim` — Vegetação do município de Coxim no Mato Grosso do Sul em 1997
+- `geonode:coxim_1` — Solos do município de Coxim no Mato Grosso Sul em 1997
+- `geonode:coxim_ms_zae_202011` — Zoneamento agroecológico do município de Coxim - MS [CNPS]
+- `geonode:cprh_pe` — Espacialização dos dados da Agência Estadual de Meio Ambiente de Pernambuco - CPRH - Ofício SEI n° 3108124
+- `geonode:culturas_agric_acajutiba_2025` — Culturas agrícolas do município de  Acajutiba (Bahia Brasil) para o ano de 2025
+- `geonode:cursos_dagua_gravatai_rs` — Trechos de Drenagem da Base Hidrográfica Ottocodificada Multiescalas 2017 da região de Gravataí_ RS
+- `geonode:custo_oportunidade_2019_microrregiao_br` — Custo de oportunidade e potencial de geração de empregos_ impostos e alimentos nas reservas legais dos imóveis rurais do Brasil.
+- `geonode:dados_ruraltins` — Espacialização dos dados do Instituto de Desenvolvimento Rural do Tocantins - Ruraltins
+- `geonode:declivid` — Declividade do solo (%) em pontos amostrais do litoral no Estado de Sergipe.
+- `geonode:declivid_1` — Declividade do solo em pontos amostrais no Estado de Sergipe.
+- `geonode:declividade_corrego_tabua_rj_lat_longwgs84` — Mapa de declividade da microbacia do córrego da Tábua - município de São Fidelis, Rio de Janeiro [CNPS]
+- `geonode:demandanpk_v3_geo_wgs84` — Banco de dados georreferenciados sobre a demanda de fertilizantes de NPK por meio da estimativa de recomendações regionais da estimativa do uso real e da demanda com base na exportação pela produção.
+- `geonode:df_100000_ad` — Estimativa de água disponível do Distrito Federal [CNPS]
+- `geonode:dimensaoeconomicacar2019` — Estimativa do Valor Patrimonial no Brasil das Terras Imobilizadas Municipais para a Preservação Ambiental no ano de 2019
+- `geonode:do_vale_dos_vinhedos_limite4326` — DO Vale dos Vinhedos - Limite
+- `geonode:doapb_limite_4326` — Denominação de Origem Altos de Pinto Bandeira - vetor limite
+- `geonode:doccs_30mdrenagem4326` — doccs_30mdrenagem4326
+- `geonode:doccs_decliperclass4326` — doccs_decliperclass4326
+- `geonode:doccs_expo8class4326` — doccs_expo8class4326
+- `geonode:doccs_geologiacprm2022_4326` — doccs_geologiacprm2022_4326
+- `geonode:doccs_ibgegeomorfologia4326` — doccs_ibgegeomorfologia4326
+- `geonode:doccs_maiordoque45_4326` — doccs_maiordoque45_4326
+- `geonode:doccs_usocladaterra4326` — doccs_usocladaterra4326
+- `geonode:dois_irmaos_buritis_ms_zae_20201111` — Zoneamento agroecológico do município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:dovv_geologia` — DO Vale dos Vinhedos – geologia 2020
+- `geonode:dovv_mdeaero2m_expoclass9` — DO Vale dos Vinhedos - exposição solar segmentada
+- `geonode:dovv_mdeaero2m_hipso50m` — DO Vale dos Vinhedos - Hipsometria 50 m
+- `geonode:drenagem_final` — Drenagem na Área de Atuação da Embrapa Tabuleiros Costeiros (GeoTAB)
+- `geonode:dreno` — Drenagens da bacia do Rio Paraguai
+- `geonode:emater_ce` — Espacialização dos dados da Empresa de Assistência Técnica e Extensão Rural do Ceará - EMATER - Ofício SEI n° 3110944
+- `geonode:emater_mg` — Espacialização dos dados da Empresa de Assistência Técnica e Extensão Rural de Minas Gerais - EMATER - Ofício SEI n° 3111507
+- `geonode:emater_pr` — Espacialização dos dados da Empresa de Assistência Técnica e Extensão Rural do Paraná - EMATER - Ofício SEI n° 3111503
+- `geonode:empresas_consultoria_aquicultura` — Espacialização das empresas de consultoria em aquicultura localizadas no bioma amazônico
+- `geonode:empresas_prod_sanidade_aquicola` — Espacialização das Empresas de Produtos em Sanidade Aquícola em Território Nacional
+- `geonode:empresas_venda_equipamento_aquicultura` — Espacialização das Empresas que Comercializam Equipamentos para Aquicultura em Território Nacional
+- `geonode:ensino_aquicultura_amazonia` — Espacialização das instituições de ensino superior e técnico em aquicultura no bioma amazônico
+- `geonode:entrepostos_amazonia` — Espacialização dos entrepostos de pescado no bioma amazônico
+- `geonode:epagri_sc` — Espacialização dos dados da Empresa de Pesquisa Agropecuária e Extensão Rural de Santa Catarina - EPAGRI - Ofício SEI n° 4819714
+- `geonode:epamig_mg` — Espacialização dos dados da Empresa de Pesquisa Agropecuária de Minas Gerais - EPAMIG - Ofício SEI n° 4215480
+- `geonode:especies_cultivo_uf` — Espacialização das Espécies de Pescado Liberadas para Cultivo por Unidade Federativa
+- `geonode:especies_cultivo_ugr` — Espécies de Pescado Liberadas para Cultivo por Unidade Geográfica Referencial
+- `geonode:especies_ugr_litoraneas_continentais_wgs84` — Espécies e híbridos de animais aquáticos nativas e exóticas detectadas em Unidade Geográfica Referencial
+- `geonode:espessur` — Espessura do solo (cm) no horizonte A em pontos amostrais no Estado de Sergipe.
+- `geonode:eucalipto_alcinopolis_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para eucalipto no município de Alcinópolis - MS [CNPS]
+- `geonode:eucalipto_anastacio_vetor_latlong_wgs84_multipart_6` — Zoneamento agroecológico para  eucalipto no município de Anastácio - MS [CNPS]
+- `geonode:eucalipto_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para eucalipto no município de Bandeirantes - MS [CNPS]
+- `geonode:eucalipto_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para eucalipto no município de Camapuã  - MS [CNPS]
+- `geonode:eucalipto_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para eucalipto no município de Campo Grande - MS [CNPS]
+- `geonode:eucalipto_corguinho_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para eucalipto no município de Corguinho - MS [CNPS]
+- `geonode:eucalipto_corumba_ladario_vetor_latlong_wgs84` — Zoneamento agroecológico para eucalipto nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:eucalipto_coxim_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para eucalipto no município de Coxim - MS [CNPS]
+- `geonode:eucalipto_dois_irmaos_buriti_latlongwgs84` — Zoneamento agroecológico para eucalipto no município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:eucalipto_jaraguari` — Zoneamento agroecológico para eucalipto no município de Jaraguari - MS [CNPS]
+- `geonode:eucalipto_maracaju_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para eucalipto do município de Maracaju - MS [CNPS]
+- `geonode:eucalipto_p_gomes_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para eucalipto no município de Pedro Gomes - MS {CNPS]
+- `geonode:eucalipto_rio_negro_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para eucalipto no município de Rio Negro - MS [CNPS]
+- `geonode:eucalipto_rio_verde_mt` — Zoneamento agroecológico para eucalipto do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:eucalipto_rochedo_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para eucalipto no município de Rochedo - MS [CNPS]
+- `geonode:eucalipto_sao_gabriel_ms` — Zoneamento agroecológico para eucalipto no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:eucalipto_sonora_vetor_latlong_wgs84multipart` — Zoneamento agroecológico para eucalipto no município de Sonora - MS [CNPS]
+- `geonode:eucalipto_terenos_lat_long_wgs84_multipart` — Zoneamento agroecológico para eucalipto no Município de Terenos - MS [CNPS]
+- `geonode:fabricas_de_racao` — Espacialização das Fábricas de Ração para Pescado em Território Nacional
+- `geonode:fabricas_gelo` — Espacialização das Fábricas de Gelo para Pescado em Território Nacional
+- `geonode:fabricas_racao_amazonia` — Espacialização das fábricas de ração para peixes no bioma amazônico
+- `geonode:faz_pesagro_campos_rj_solos` — Levantamento detalhado de solos da Fazenda Angra - Pesagro Rio Estação Experimental de Campos (RJ) [CNPS]
+- `geonode:fazenda_iraci_solos_2024_geoinfo` — fazenda_iraci_solos_2024_geoinfo
+- `geonode:figueirao_ms_zae_202011` — Zoneamento agroecológico do município de Figueirão  - MS [CNPS]
+- `geonode:fn_10000_ad` — Estimativa de água disponível de Fernando de Noronha - PE [CNPS]
+- `geonode:focos_centroide` — Centróides dos focos de resinose no lote H. Dantas em Sergipe.
+- `geonode:fosforo_final_centroide` — Estimativa de oferta potencial de fosfatos naturais obtidos a partir de jazidas disponíveis no território brasileiro
+- `geonode:geomorfologia_2022` — Geomorfologia do Semiárido brasileiro
+- `geonode:ggrup_um` — Grandes grupos dos solos no litoral do Estado de Sergipe.
+- `geonode:girassol` — Zoneamento Zoneamento edafoclimático para o cultivo do girassol em Marau – RS
+- `geonode:girassol_alcinopolis_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para girassol no município de Alcinópolis - MS [CNPS]
+- `geonode:girassol_corguinho_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para girassol no município de Corguinho - MS [CNPS]
+- `geonode:girassol_corumba_ladario_vetor_latlong_wgs84` — Zoneamento agroecológico para girassol nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:girassol_doisirmaosburiti_latlong_wgs84` — Zoneamento agroecológico para girassol no município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:girassol_figueirao_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para girassol no município de Figueirão - MS [CNPS]
+- `geonode:girassol_p_gomes_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para girassol no município de Pedro Gomes - MS [CNPS]
+- `geonode:girassol_rochedo_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para girassol no município de Rochedo - MS [CNPS]
+- `geonode:girassol_sao_gabriel_ms` — Zoneamento agroecológico para girassol no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:girassol_sonora_vetor_latlong_wgs84multipart` — Zoneamento agroecológico para girassol no município de Sonora - MS [CNPS]
+- `geonode:girassol_terenos_lat_long_wgs84_multipart` — Zoneamento agroecológico para girassol no Município de Terenos - MS [CNPS]
+- `geonode:go_aptd_usos_scana_12_mun_sirgas` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado de Goiás - 2009
+- `geonode:goiaba_alcinopolis_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para goiaba no município de Alcinópolis - MS [CNPS]
+- `geonode:goiaba_anastacio_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para goiaba no município de Anastácio - MS [CNPS]
+- `geonode:goiaba_corguinho_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para goiaba no município de Corguinho - MS [CNPS]
+- `geonode:goiaba_corumba_ladario_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para goiaba nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:goiaba_figueirao_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para goiaba no município de Figueirão - MS [CNPS]
+- `geonode:goiaba_maracaju_ms_v20` — Zoneamento agroecológico para goiaba do município de Maracaju - MS [CNPS]
+- `geonode:goiaba_pedro_gomes_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para goiaba no município de Pedro Gomes - MS [CNPS]
+- `geonode:goiaba_rio_negro_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para goiaba no município de Rio Negro - MS [CNPS]
+- `geonode:goiaba_rio_verde_ms_v2` — Zoneamento agroecológico para goiaba do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:goiaba_rochedo_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para goiaba no município de Rochedo - MS [CNPS]
+- `geonode:goiaba_sao_gabriel_ms` — Zoneamento agroecológico para goiaba no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:goiaba_sidrolandia_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para goiaba no município de Sidrolândia - MS [CNPS]
+- `geonode:goiaba_sonora_vetor_latlong_wgs84multipart` — Zoneamento agroecológico para goiaba no município de Sonora - MS [CNPS]
+- `geonode:goiaba_terenos_lat_long_wgs84_multipart` — Zoneamento agroecológico para goiaba no Município de Terenos - MS [CNPS]
+- `geonode:grupos` — Grupos dos solos em pontos amostrais no Estado de Sergipe.
+- `geonode:grupos_pesquisa` — Grupos de pesquisa dos estudos científicos sobre a eficiência agronômica de agrominerais silicáticos
+- `geonode:gstarfdr1999_2017_base2016_c9939cb6cfe3e541ea90419febf3c6b1` — Mapeamento dos agregados espaciais locais para a variável rendimento médio do milho no NE entre 1999 e 2017 (getis-ord g*)
+- `geonode:guama_solos` — Solos das áreas alteradas da região de integração Guamá
+- `geonode:guia_lopes_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico do Município de Guia Lopes de Laguna - MS [CNPS]
+- `geonode:hidro_in_jp` — Hidrografia principal e secundária da bacia do rio Japaratuba em Sergipe.
+- `geonode:hidrografia` — Rede de drenagem da região semiárida de Alagoas [CNPS]
+- `geonode:horas_frio_gravatai` — Distribuição de horas de frio em Gravataí - RS
+- `geonode:ibate_uso_2002` — Uso e ocupação do solo de Ibaté/SP_ no ano de 2002.
+- `geonode:icms_interestadual` — Espacialização das Alíquotas Interestaduais de ICMS para Comercialização de Pescado em Território Nacional
+- `geonode:icms_intermunicipal` — Espacialização das Alíquotas Intermunicipais de ICMS para Comercialização de Pescado em Território Nacional
+- `geonode:idema_rn` — Espacialização dos dados do Instituto de Desenvolvimento Sustentável e Meio Ambiente do Rio Grande do Norte - IDEMA - Ofício SEI n° 3108007
+- `geonode:idh_geotab` — IDH dos Municípios na Área de Atuação da Embrapa Tabuleiros Costeiros (GeoTAB)
+- `geonode:igam_mg` — Espacialização dos dados do Instituto Mineiro de Gestão das Águas de Minas Gerais - IGAM
+- `geonode:igpb_morfoestruturas` — IP Pinto Bandeira - morfoestruturas
+- `geonode:igvv_morfoestrutsentorno4326` — IP Vale dos Vinhedos - morfoestruturas
+- `geonode:ilha_vila_nova_parintins_am_pedo_70k_v28076e57ea4b7` — Mapa semidetalhado dos solos da Ilha Vila Nova, município de Parintins - AM
+- `geonode:ima_al` — Espacialização dos dados do Instituto de Meio Ambiente de Alagoas - IMA - Ofício SEI n° 4356549
+- `geonode:ima_sc` — Espacialização dos dados do Instituto do Meio Ambiente de Santa Catarina - IMA - Ofício SEI n° 3107870
+- `geonode:impedimento_mecan_sao_domingos_mg_lat_long_wgs84` — Mapa de impedimentos à mecanização das terras da microbacia do ribeirão São Domingos, estado de Minas Gerais [CNPS]
+- `geonode:indea_mt` — Espacialização dos dados do Instituto de Defesa Agropecuária do Mato Grosso - INDEA - Ofício SEI n° 4215455
+- `geonode:indicadores_demograficos_bioma_amazonia_wgs84` — Indicadores demográficos dos municípios do Bioma Amazônia
+- `geonode:instituicoes_de_ensino` — Espacialização das Instituições de Ensino Superior_ Técnico e Cursos de Especialização em Aquicultura  em Território Nacional
+- `geonode:ip_altos_montes_limite` — IP Altos Montes - Limite
+- `geonode:ip_campanha_gaucha_setores_vitivinicolas_1` — IP Campanha Gaúcha - Limite de setores vitivinícolas
+- `geonode:ip_farroupilha_limite` — IP Farroupilha - Limite ADPM
+- `geonode:ip_pinto_bandeira_limite` — IP Pinto Bandeira - Limite
+- `geonode:ipaam_am_1` — Espacialização dos dados do Instituto de Proteção Ambiental do Amazonas – IPAAM - Ofício SEI n° 3109477
+- `geonode:ipam_aloshipso50m` — IP Altos Montes -  hipsometria
+- `geonode:ipam_alosmde_expoclass` — IP Altos Montes -  exposição solar
+- `geonode:ipam_geologia4326` — IP Altos Montes - Geologia
+- `geonode:ipam_usodaterra2020_4326` — IP Altos Montes – uso da terra 2020
+- `geonode:ipca_geologiacprm` — IP Campanha Gaúcha - Geologia
+- `geonode:ipca_geomorfologiaibge2122` — IP Campanha Gaúcha - Geomorfologia
+- `geonode:ipca_regionalimite_decli5` — IP Campanha Gaúcha - Declividade
+- `geonode:ipca_regionalimite_expodeg4` — IP Campanha Gaúcha - Exposição solar
+- `geonode:ipfa_geologiamoscato4326` — IP Farroupilha - Geologia da área da ADPM
+- `geonode:ipfa_geologiamuni` — IP Farroupilha - Geologia
+- `geonode:ipfa_mdealos12_5_expodeg94326` — IP Farroupilha -  exposição solar
+- `geonode:ipfa_morfoestruturasmuni4326` — IP Farroupilha - morfoestruturas
+- `geonode:ipfaadpm_mdealos12_5_decliper74326` — IP Farroupilha – declividade na área da ADPM
+- `geonode:ipfaadpm_mdealos12_5_expodeg94326` — IP Farroupilha -  exposição solar na área da ADPM
+- `geonode:ipfaadpm_mdealos2_5mhipso50m4326` — IP Farroupilha -  hipsometria da ADPM
+- `geonode:ipfamuni_mdealos2_5mhipso50m4326` — IP Farroupilha -  hipsometria
+- `geonode:ipmb_geologia4326` — IP Monte Belo - Geologia
+- `geonode:ipmb_mdealos2m_decliper74326` — IP Monte Belo - declividade
+- `geonode:ipmb_mdealos2m_expodeg94326` — IP Monte Belo -  exposição solar
+- `geonode:ipmb_mdealos2m_hipso50m4326` — IP Monte Belo -  hipsometria
+- `geonode:ippb_mdeaero2m_expodeg94326` — IP Pinto Bandeira -  exposição solar
+- `geonode:ippb_usodaterras2mar20_vinhedosjan2019` — IP Pinto Bandeira – uso da terra
+- `geonode:ips` — Índice de Potencial de Sedimentação (IPS)
+- `geonode:ipvv_geologia2020` — IP Vale dos Vinhedos - Geologia 2020
+- `geonode:ipvv_mdeaero2m_expoclass9` — IP Vale dos Vinhedos - exposição solar segmentada
+- `geonode:ipvv_ucts2mar2020vitisjan2019` — IP Vale dos Vinhedos - uso da terra 2020
+- `geonode:isoietas_abril` — Isoietas médias do mês de abril do cerrado brasileiro
+- `geonode:isoietas_agosto` — Isoietas médias do mês de agosto do cerrado brasileiro
+- `geonode:isoietas_anual` — Isoietas anuais do cerrado brasileiro
+- `geonode:isoietas_outubro` — Isoietas médias do mês de outubro do cerrado brasileiro
+- `geonode:isoietas_setembro` — Isoietas médias do mês de setembro do cerrado brasileiro
+- `geonode:itiquira` — Vegetação do município de Itiquira no Mato Grosso em 1997
+- `geonode:itiquira_1` — Solos do município de Itiquira no Mato Grosso em 1997
+- `geonode:jaguarao_decl_30m_solos_wgs` — Áreas aptas para cultivo de arroz irrigado por sulco em Jaguarão – RS
+- `geonode:jaiba_ad` — Estimativa de água disponível projeto Jaíba - MG [CNPS]
+- `geonode:jaiba_iv_solos` — jaiba_iv_solos
+- `geonode:jaraguari_ms_zae_202011` — Zoneamento agroecológico do município de Jaraguari - MS [CNPS]
+- `geonode:jardim_vetor_latlong_wgs84_multipart` — Zoneamento agroecológico do Município de Jardim - MS [CNPS]
+- `geonode:laboratorio_alevinos_amazonia` — Espacialização dos laboratórios de formas jovens no bioma amazônico
+- `geonode:laboratorio_formas_jovens` — Espacialização dos Laboratórios de Formas Jovens em Território Nacional
+- `geonode:ladario` — Vegetação do município de Ladário no Mato Grosso do Sul em 1997
+- `geonode:ladarion` — Solos do município de Ladário no Mato Grosso Sul em 1997
+- `geonode:lago_de_tucurui_aptidao` — Aptidão agrícola das áreas alteradas a região de Integração Lago de Tucuruí
+- `geonode:lago_de_tucurui_solos` — Solos das áreas alteradas da Região de Integração Lago de Tucuruí
+- `geonode:lambari_oeste` — Vegetação do município de Lambari d'Oeste no Mato Grosso em 1997
+- `geonode:lambari_oeste_1` — Solos do município de Lambari d'Oeste no Mato Grosso em 1997
+- `geonode:lc_povoado_cadastrado` — Povoados cadastrados em áreas de extrativismo da mangaba em Sergipe.
+- `geonode:lem_ba_solos` — lem_ba_solos
+- `geonode:lev__rj_reg_lagos_solos_wgs84` — Mapa de reconhecimento de alta intensidade dos solos - quadrículas de Silva Jardim e Rio das Ostras, estado do Rio de Janeiro [CNPS]
+- `geonode:lev_es_solos_lat_long_wgs84` — Levantamento de reconhecimento dos solos do estado do Espírito Santo [CNPS]
+- `geonode:lev_mg_alto_paranaiba_solos_wgs84_1277af0769189` — Mapa de solos da região do Alto Paranaíba - MG [CNPS]
+- `geonode:lev_mg_estado_solos_lat_long_wgs84_vt` — Mapa de solos do estado de Minas Gerais [CNPS]
+- `geonode:lev_rj_estado_bioclimatico_lat_long_sirgas2000_12_11_18` — Mapa dos domínios bioclimáticos do estado do Rio de Janeiro [CNPS]
+- `geonode:lev_rj_municipio_rj_qualidade_wgs84_vt` — Qualidade ambiental das terras do município do Rio de Janeiro [CNPS]
+- `geonode:lev_sc_estado_solos_lat_long_wgs84` — Levantamento de reconhecimento dos solos do estado de Santa Catarina [CNPS]
+- `geonode:levantamento_solos_50k_gravatai` — Mapeamento de solos do município de Gravatai - RS
+- `geonode:licenciamento_ambiental_amazonia` — Espacialização das propriedades que passaram por algum processo de licenciamento ambiental para atividade aquícola
+- `geonode:lim_cajueiro` — Limite da estação Fazenda Cajueiro em Sergipe.
+- `geonode:lim_pacucar` — Limite da estação Pão de Açúcar em Sergipe.
+- `geonode:lim_siriri` — Limite da estação Siriri em Sergipe.
+- `geonode:limite_potreiros_cppsul_2023_91999483479a744b08f7708bf65c3f1e` — Limite dos Potreiros da Embrapa Pecuária Sul em Bagé, RS, 2023
+- `geonode:limites_cppsul_um` — Limites e Subdivisões da Embrapa Pecuária Sul - Bagé_ RS
+- `geonode:limites_potreiros_cppsul_2021_20bb7f88a2bbb` — Limite dos Potreiros da Embrapa Pecuária Sul em Bagé, RS, 2020
+- `geonode:limitescartas_1_50000` — ZONPB - Limites das cartas 1:50.000 - Vertentes Litorâneas da Paraíba [CNPS]
+- `geonode:lm_hdantas` — Limite do lote H. Dantas no perímetro irrigado do platô de Neópolis em Sergipe.
+- `geonode:lm_mangaba_2010` — Limite das áreas de extrativismo da mangaba em Sergipe_ versão 2009
+- `geonode:lm_mangaba_final_edicao` — Limite das áreas de extrativismo da mangaba em Sergipe.
+- `geonode:lm_propiedade` — Limite dos lotes do perímetro irrigado do platô de Neópolis em Sergipe.
+- `geonode:lm_sede` — Limite das sedes municipais do Estado de Sergipe.
+- `geonode:local_experimentos` — Local dos experimentos nos estudos científicos sobre a eficiência agronômica de agrominerais silicáticos
+- `geonode:localizacao_da_horticultura_condominios_residenciais_horizonta` — Localizacao da horticultura_ condominios residenciais horizontais e feiras de produtores em Valinhos - SP em 2023
+- `geonode:localizada_lat_long_wgs84` — Avaliação da cana-de-açúcar sob irrigação localizada no Perímetro Salitre, Juazeiro - BA [CNPS]
+- `geonode:ma_atualizacao_2020` — Espacialização dos dados sobre aquicultura do Portal Nacional de Licenciamento Ambiental para o estado do Maranhão
+- `geonode:mamao_alcinopolis_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Alcinópolis - MS [CNPS]
+- `geonode:mamao_anastacio_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Anastácio - MS [CNPS]
+- `geonode:mamao_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Bandeirantes - MS [CNPS]
+- `geonode:mamao_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Camapuã  - MS [CNPS]
+- `geonode:mamao_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Campo Grande - MS [CNPS]
+- `geonode:mamao_corguinho_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Corguinho - MS [CNPS]
+- `geonode:mamao_coxim_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Coxim - MS [CNPS]
+- `geonode:mamao_dois_irmaos_buriti_lat_long_wgs84` — Zoneamento agroecológico para mamão no município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:mamao_jaraguari_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para mamão no município de Jaraguari - MS [CNPS]
+- `geonode:mamao_maracaju_ms` — Zoneamento agroecológico para mamão do município de Maracaju - MS [CNPS]
+- `geonode:mamao_rio_verde_ms` — Zoneamento agroecológico para mamão do município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:mamao_terenos_lat_long_wgs84_multipart` — Zoneamento agroecológico para mamão no Município de Terenos - MS [CNPS]
+- `geonode:mancha_inundacao_v2` — mancha_inundacao_v2
+- `geonode:manga_anastacio_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para manga no município de Anastácio - MS [CNPS]
+- `geonode:manga_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para manga no município de Camapuã  - MS [CNPS]
+- `geonode:manga_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para manga no município de Campo Grande - MS [CNPS]
+- `geonode:manga_corumba_ladario_vetor_latlong_wgs84_v100` — Zoneamento agroecológico para manga nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:manga_coxim_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para manga no município de Coxim - MS [CNPS]
+- `geonode:manga_dois_irmaos_buriti_lat_long_wgs84_v2` — Zoneamento agroecológico para manga no município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:manga_jaraguari_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para manga no município de Jaraguari - MS [CNPS]
+- `geonode:manga_pedro_gomes_vetor_lat_long_wgs84_v1_multipart` — Zoneamento agroecológico para manga no município de Pedro Gomes - MS [CNPS]
+- `geonode:manga_rio_verde_ms` — Zoneamento agroecológico para manga do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:manga_rochedo_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para manga no município de Rochedo - MS [CNPS]
+- `geonode:manga_sao_gabriel_ms` — Zoneamento agroecológico para manga no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:manga_sidrolandia_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para manga no município de Sidrolândia - MS [CNPS]
+- `geonode:manga_sonora_vetor_latlong_wgs84multipart_v2` — Zoneamento agroecológico para manga no município de Sonora - MS [CNPS]
+- `geonode:manga_terenos_lat_long_wgs84_multipart` — Zoneamento agroecológico para manga no Município de Terenos - MS [CNPS]
+- `geonode:mangai_figueirao_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para manga no município de Figueirão - MS [CNPS]
+- `geonode:mapa_exploratorio_solos_pernambuco_wgs84` — Mapa exploratório - reconhecimento de solos estado de Pernambuco [CNPS]
+- `geonode:mapa_paty_solos_lat_long_wgs84` — Mapa semidetalhado de solos do municipio de Paty do Alferes -RJ [CNPS]
+- `geonode:mapa_solos_df_lat_long_wgs84` — Mapa de reconhecimento dos solos do Distrito Federal [CNPS]
+- `geonode:mapeamento_viveiros_ba` — Mapeamento de Viveiros Escavados em áreas com até 10 metros de altitude no estado da Bahia
+- `geonode:mapeamento_viveiros_es` — Mapeamento de Viveiros Escavados em áreas com até 10 metros de altitude no estado do Espírito Santo
+- `geonode:maracaju_zae_202011` — Zoneamento agroecológico do município de Maracaju - MS [CNPS]
+- `geonode:maracuja_alcinopolis_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para maracujá no município de Alcinópolis - MS [CNPS]
+- `geonode:maracuja_anastacio_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para maracujá no município de Anastácio - MS [CNPS]
+- `geonode:maracuja_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para maracujá no município de Bandeirantes - MS [CNPS]
+- `geonode:maracuja_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para maracujá no município de Camapuã  - MS [CNPS]
+- `geonode:maracuja_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para maracujá no município de Campo Grande - MS [CNPS]
+- `geonode:maracuja_corguinho_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para maracujá no município de Corguinho - MS [CNPS]
+- `geonode:maracuja_corumba_ladario_vetor_latlong_wgs84_multipart_v4` — Zoneamento agroecológico para maracujá nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:maracuja_coxim_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para maracujá no município de Coxim - MS [CNPS]
+- `geonode:maracuja_dois_irmaos_buriti_lat_long_wgs84_v2` — Zoneamento agroecológico para maracujá no município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:maracuja_figueirao_vetor_lat_long_wgs84_multipart_v2_1` — Zoneamento agroecológico para maracujá no município de Figueirão - MS [CNPS]
+- `geonode:maracuja_jaraguari_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para maracujá no município de Jaraguari - MS [CNPS]
+- `geonode:maracuja_maracaju_ms` — Zoneamento agroecológico para maracujá do município de Maracaju - MS [CNPS]
+- `geonode:maracuja_pedro_gomes_vetor_lat_long_wgs84_multipart_1` — Zoneamento agroecológico para maracujá no município de Pedro Gomes - MS [CNPS]
+- `geonode:maracuja_rio_negro_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para maracujá no município de Rio Negro - MS [CNPS]
+- `geonode:maracuja_rio_verde_ms` — Zoneamento agroecológico para maracujá do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:maracuja_sao_gabriel_mt_1` — Zoneamento agroecológico para maracujá no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:maracuja_sidrolandia_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para maracujá no município de Sidrolândia - MS [CNPS]
+- `geonode:maracuja_sonora_vetor_latlong_wgs84multipart` — Zoneamento agroecológico para maracujá no município de Sonora - MS [CNPS]
+- `geonode:maracuja_terenos_lat_long_wgs84_multipart` — Zoneamento agroecológico para maracujá no Município de Terenos - MS [CNPS]
+- `geonode:maranduargilosomg` — Zoneamento de Riscos Climáticos para Semeadura do Capim-Marandu - MG. Solos Argilosos
+- `geonode:marandutmedmg` — Zoneamento de Riscos Climáticos para Semeadura do Capim-Marandu - MG. Solos de Textura Média
+- `geonode:maranhao_aptidao_agricola` — Aptidão agropastoril das terras do Estado do Maranhão
+- `geonode:maranhao_solos` — Solos do Estado do Maranhão
+- `geonode:marenosomg` — Zoneamento de Riscos Climáticos para Semeadura do Capim-Marandú - MG. Solos Arenosos.
+- `geonode:massas_dagua_sf_caatinga_1` — Massas d´água na Caatinga da bacia do São Francisco
+- `geonode:mataseca_30000_ad` — Estimativa de água disponível do parque estadual da Mata Seca - MG [CNPS]
+- `geonode:matogrosso_solos` — Solos na área de abrangência do UZEE no Estado do Mato Grosso
+- `geonode:matogrosso_solos_3` — Padrões de Aptidão Agrícola – Mato Grosso
+- `geonode:matopiba_aptidao_20201110_v2` — Mapa de aptidão agrícola das terras do MATOPIBA [CNPS]
+- `geonode:mbh_pito_aceso_2022` — mbh_pito_aceso_2022
+- `geonode:mg_cafe_geadas2021_amazonia1` — Lavouras de café afetadas por geadas em 2021 no Estado de Minas Gerais
+- `geonode:mg_risco_desmatamento` — Mapa de Risco de Desmatamento para Bioma Mata Atlântica - Minas Gerais (2000 a 2017) [CNPS]
+- `geonode:milhomaranduarenosomg` — Zoneamento Agroclimático para o Consórcio Milho x Capim-Marandu - MG. Solos Arenosos
+- `geonode:milhomaranduaresp` — Zoneamento Agroclimático para o Consórcio Milho x Capim-Marandu no Estado de São Paulo. Solos Arenosos
+- `geonode:milhomaranduargsp` — Zoneamento Agroclimático para o Consórcio Milho x Capim-Marandú - SP. Solos Argilosos.
+- `geonode:milhomarandutextmedmg` — Zoneamento Agroclimático para o Consórcio Milho x Capim-Marandú - MG. Solos de Textura Média.
+- `geonode:milhomarandutmsp` — Zoneamento Agroclimático para o Consórcio Milho x Capim-Marandú - SP. Solos de Textura Média
+- `geonode:miranda` — Vegetação do município de Miranda no Mato Grosso do Sul em 1997
+- `geonode:miranda_1` — Sub-região do Pantanal de Miranda
+- `geonode:miranda_2` — Solos da Sub-Região de Miranda em 1997 - Pantanal do Brasil
+- `geonode:miranda_3` — Solos do município de Miranda no Mato Grosso do Sul em 1997
+- `geonode:miranda_v` — Vegetação da Sub-Região de Miranda em 1997 - Pantanal do Brasil
+- `geonode:miranda_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico do Município de Miranda - MS [CNPS]
+- `geonode:montealegredosul1972` — Mapa de uso e cobertura das terras de Monte Alegre do Sul no ano de 1972.
+- `geonode:mrcxs_escorregamentos4326` — Microrregião de Caxias do Sul – escorregamentos – vetores
+- `geonode:mrcxs_limite4326` — Microrregião de Caxias do Sul – limite – vetores
+- `geonode:mrcxs_mapbiomasvinhedo_classedeuso4326` — Microrregião de Caxias do Sul – uso da terra – vetores
+- `geonode:mrcxs_riscogeodecliperclas4326` — Microrregião de Caxias do Sul – risco geológico por  declividade - vetores
+- `geonode:mrcxs_vinhedos4326` — Microrregião de Caxias do Sul – vinhedos – vetores
+- `geonode:ms_acv_cana_basemapas` — Resultado da integracao dos parametros utilizados para suporte ao projeto ACV-Cana_ 1:250.000_ estado do Mato Grosso do Sul - 2015
+- `geonode:mt_atualizacao_2020` — Espacialização dos dados sobre aquicultura do Portal Nacional de Licenciamento Ambiental para o estado do Mato Grosso
+- `geonode:municipio_rj_aptidao_lat_long_wgs84` — Aptidão para reflorestamento e olericultura das terras do município do Rio de Janeiro - RJ [CNPS]
+- `geonode:municipios_calamidade2024` — municipios_calamidade2024
+- `geonode:municipios_produtores_de_algodao_ba_2020_certo` — Municípios da Bahia com produção de algodão em 2020 e 2021
+- `geonode:municipios_produtores_g75_brasil` — Mapeamento de viveiros escavados para aquicultura no Brasil por sensoriamento remoto agregado em nível municipal
+- `geonode:municipios_zonpb` — ZONPB - Municípios das vertentes litorâneas da Paraíba na escala 1:250.000 (IBGE, 2019) [CNPS]
+- `geonode:municipioscomassociacao` — Associações de aquicultores por municípios de Santa Catarina
+- `geonode:munipios_produt_algod_al_2020_certo` — Municípios de Alagoas com produção de algodão em 2020 e 2021
+- `geonode:nabileque1` — Solos da Sub-Região do Nabileque em 1997 - Pantanal do Brasil
+- `geonode:nabileque_v` — Vegetação da Sub-Região do Nabileque em 1997 - Pantanal do Brasil
+- `geonode:naturatins_to` — Espacialização dos dados do Instituto Natureza do Tocantins - Naturatins - Ofício SEI n° 3106868
+- `geonode:nh30814f` — Variação horizontal de nitrogênio amoniacal (mg/L) em cultivo de tambaquis no reservatório da PCH Lagoa Grande_ TO
+- `geonode:nhecolandia_1` — Sub-região do Pantanal da Nhecolândia
+- `geonode:nhecolandia_v` — Vegetação da Sub-Região da Nhecolândia em 1997 - Pantanal do Brasil
+- `geonode:nioaque_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico do Município de Nioaque - MS [CNPS]
+- `geonode:nodes3` — Nodos alvo dos corredores de biodiversidade na Bacia do Alto Paraguai (cautela: em elaboração)
+- `geonode:nogueira_10a0bca6bda15f4b76b069bd9056bc18` — Zoneamento edafoclimático para cultivo da nogueira-pecã em Marau – RS
+- `geonode:ns_livramento` — Vegetação do município de Nossa Senhora do Livramento no Mato Grosso em 1997
+- `geonode:ns_livramento_1` — Solos do município de Nossa Senhora do Livramento no Mato Grosso em 1997
+- `geonode:origem_rochas` — Origem das rochas e materiais dos estudos científicos sobre a eficiência agronômica de agrominerais silicáticos
+- `geonode:p_0714f_wgs84_b86126f26c5414f95834dfcbb936f08f` — Variação horizontal de fósforo total (mg/L) em cultivo de tambaquis no reservatório da PCH Lagoa GrandeTO
+- `geonode:p_murtinho_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico do Município de Porto Murtinho - MS [CNPS]
+- `geonode:paiaguas` — Solos da Sub-Região do Paiaguás em 1997 - Pantanal do Brasil
+- `geonode:paiaguas_1` — Sub-região do Pantanal do Paiaguás
+- `geonode:paiaguas_2` — Vegetação da Sub-Região do Paiaguás em 1997 - Pantanal do Brasil
+- `geonode:panta` — Vegetação do Pantanal do Brasil em 1997
+- `geonode:paraguai` — Sub-região do Pantanal do Paraguai.
+- `geonode:paraguai1` — Solos da Sub-Região do Paraguai em 1997- Pantanal do Brasil
+- `geonode:paraguai_v` — Vegetação da Sub-Região do Paraguai em 1997 - Pantanal do Brasil
+- `geonode:paraiba_ad` — ZONPB - Estimativa de água disponível da área de influência do canal das vertentes litorâneas no Estado da Paraíba [CNPS]
+- `geonode:parana_solos_20201105` — Mapa de solos do estado do Paraná [CNPS]
+- `geonode:parintins_am_ad_100k_v2` — Estimativa de água disponível nos solos de parte do município de Parintins - AM [CNPS]
+- `geonode:parintins_am_ad_250k_v2` — Estimativa de água disponível nos solos do município de Parintins - AM [CNPS]
+- `geonode:parintins_am_pedo_100k_v3` — Mapa de reconhecimento dos solos de parte da área do município de Parintins - AM [CNPS]
+- `geonode:parintins_am_pedo_250k_v7` — Mapa de solos do município de Parintins - AM [CNPS]
+- `geonode:pb100solos` — Mapa preliminar de solos do estado da Paraíba na escala 1:100.000. [CNPS]
+- `geonode:pe100solos` — Mapa preliminar de solos do estado de Pernambuco na escala 1:100.000. [CNPS]
+- `geonode:pe50solos` — Mapa preliminar de solos do estado de Pernambuco na escala 1:50.000. [CNPS]
+- `geonode:pe_podocarpus` — Localização do Parque Estadual Podocarpus
+- `geonode:peca_pr` — Zoneamento edafoclimático da nogueira-pecã para o estado do Paraná
+- `geonode:peca_rs_1` — Zoneamento edafoclimático da nogueira-pecã para o Rio Grande do Sul
+- `geonode:peca_sc_1` — Zoneamento edafoclimático da nogueira-pecã para o estado de Santa Catarina
+- `geonode:ped_geo_rj_lat_long_wgs84` — Mapa pedológico-geotécnico do município do Rio de Janeiro [CNPS]
+- `geonode:pedro_gomes_zae_20201112` — Zoneamento agroecológico do município de Pedro Gomes - MS [CNPS]
+- `geonode:perfis_pronasolos_2020` — Pontos de amostragem PronaSolos - 2020 [CNPS]
+- `geonode:piaui_mapa_exploratorio_solos_wgs8` — Mapa exploratório - reconhecimento de solos do estado do Piauí [CNPS]
+- `geonode:pivos_2020_uf_al` — Pivôs centrais no Estado do Alagoas em 2020
+- `geonode:pivos_2020_uf_ba_77b7f078bd069531b65ab7d9ac77a257` — Pivôs centrais no Estado da Bahia em 2020
+- `geonode:pivos_2020_uf_ce_7494b6fb8046e156b16d67a067685579` — Pivôs centrais no Estado do Ceará em 2020
+- `geonode:pivos_2020_uf_df_31ac9b5933d5e633120362cb3639f8ed` — Pivôs centrais no Distrito Federal em 2020
+- `geonode:pivos_2020_uf_es_ab79d3d65ba3b876e7fb36e800d7362a` — Pivôs centrais no Estado do Espírito Santo em 2020
+- `geonode:pivos_2020_uf_go_98d0e3d6323c8c9cffde77696d09c9bc` — Pivôs centrais no Estado de Goiás em 2020
+- `geonode:pivos_2020_uf_mg` — Pivôs centrais no Estado de Minas Gerais em 2020
+- `geonode:pivos_2020_uf_ms_89bada2f54b694a76a4eeb3e75ad053f` — Pivôs centrais no Estado do Mato Grosso do Sul em 2020
+- `geonode:pivos_2020_uf_pa_85923631bd66f7c63215a934108af3af` — Pivôs centrais no Estado do Pará em 2020
+- `geonode:pivos_2020_uf_pb_8510a8ae6c91a7b56fe4a963edf63c48` — Pivôs centrais no Estado da Paraíba em 2020
+- `geonode:pivos_2020_uf_pe_c75078dc4c41a6bba3a8e2543016eeea` — Pivôs centrais no Estado de Pernambuco em 2020
+- `geonode:pivos_2020_uf_pi_8d7b545311787dec224dc021b05aeb91` — Pivôs centrais no Estado do Piauí em 2020
+- `geonode:pivos_2020_uf_rn_c33be86ab7cac016667f55ac38a3eded` — Pivôs centrais no Estado do Rio Grande do Norte em 2020
+- `geonode:pivos_2020_uf_ro_decc3c65ee787b7f2245ab19c9ebb28e` — Pivôs centrais no Estado de Rondônia em 2020
+- `geonode:pivos_2020_uf_rr_bca88fe0840092d1b5d2da8155a3d202` — Pivôs centrais no Estado de Roraima em 2020
+- `geonode:pivos_2020_uf_rs_0e6e40e12eb2bfbd7c74e70ffea9a54f` — Pivôs centrais no Estado do Rio Grande do Sul em 2020
+- `geonode:pivos_2020_uf_sc_3cc16b1d9da8258ad2907bdf122c5784` — Pivôs centrais no Estado de Santa Catarina em 2020
+- `geonode:pivos_2020_uf_se_8b6d66e161b8fe96b71673363063ff56` — Pivôs centrais no Estado de Sergipe em 2020
+- `geonode:pivos_2020_uf_sp_c2fefffac80c54d8a93a90ec3cd66894` — Pivôs centrais no Estado de São Paulo em 2020
+- `geonode:pivos_2020_uf_to_dd513aaad661d7197f01b5b833d63c85` — Pivôs centrais no Estado do Tocantins em 2020
+- `geonode:pnf_potencialnpk_geowgs84` — Banco de dados georreferenciados sobre a localização e estimativa de potencial produção de fertilizantes de NPK no Brasil.
+- `geonode:pocone` — Sub-região do Pantanal de Poconé
+- `geonode:pocone_1` — Solos da Sub-Região de Poconé em 1997 - Pantanal do Brasil
+- `geonode:pocone_2` — Vegetação do município de Poconé no Mato Grosso em 1997
+- `geonode:pocone_3` — Solos do município de Poconé no Mato Grosso em 1997
+- `geonode:pocone_v` — Vegetação da Sub-Região de Poconé em 1997 - Pantanal do Brasil
+- `geonode:pocos_amostra` — Poços de amostras em águas subterrâneas de Sergipe.
+- `geonode:pocos_recupera_geostory___vmp` — Poços RECUPERA/RS - GEOINFO/GEONODE
+- `geonode:ponta_pora_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico do Município de Ponta Porã - MS [CNPS]
+- `geonode:pop_total` — População total dos municípios da bacia do rio Japaratuba em Sergipe.
+- `geonode:porto_murtinho_1` — Vegetação do município de Porto Murtinho no Mato Grosso do Sul em 1997
+- `geonode:porto_murtinho_2` — Solos do município de Porto Murtinho no Mato Grosso do Sul em 1997
+- `geonode:portomurtinho_v` — Vegetação da Sub-Região de Porto Murtinho em 1997 - Pantanal do Brasil
+- `geonode:pot_irr_potiguara_pb` — Potencial geral de terras para irrigação: Terra Indígena Potiguara_ PB [CNPS]
+- `geonode:pot_pedo_algodao_b_zaal_2023_08c6f62215e90c47c5d74b7307efba0e` — ZAAL - Pot. Pedológico Algodão - Média Tecnologia (B) [CNPS]
+- `geonode:pot_pedo_algodao_c_zaal_2023_0534694b420dac3b9bec67ddc3125ae3` — ZAAL - Pot. Pedológico Algodão - Alta Tecnologia (C) [CNPS]
+- `geonode:pot_pedo_cana_b_zaal_2023_2afb81ad80bfa1ac058e0e1327e178db` — ZAAL - Pot. Pedológico Cana-de-açúcar - Média Tecnologia (B) [CNPS]
+- `geonode:pot_pedo_cana_c_zaal_2023_19ee2370779c032fc480b09a847aa3b3` — ZAAL - Pot. Pedológico Cana-de-açúcar - Alta Tecnologia (C) [CNPS]
+- `geonode:pot_pedo_caupi_b_zaal_2023_23c1da2dde8cd886632382b6419cda3c` — ZAAL - Pot. Pedológico Feijão Caupi - Média Tecnologia (B) [CNPS]
+- `geonode:pot_pedo_caupi_c_zaal_2023_8c36e7426041d60dac3c5c29f51999d4` — ZAAL - Pot. Pedológico Feijão Caupi - Alta Tecnologia (C) [CNPS]
+- `geonode:pot_pedo_mamona_b_zaal_2023_815fb1c4a9cc52cc3e56408a9794dad6` — ZAAL - Pot. Pedológico Mamona - Média Tecnologia (B) [CNPS]
+- `geonode:pot_pedo_mamona_c_zaal_2023_ee7ab30f02a850ee5f53b1b6e46c9730` — ZAAL - Pot. Pedológico Mamona - Alta Tecnologia (C) [CNPS]
+- `geonode:pot_pedo_mandioca_b_zaal_2023_a12584ad27a76285b3af876937a16c41` — ZAAL - Pot. Pedológico Mandioca - Média Tecnologia (B) [CNPS]
+- `geonode:pot_pedo_mandioca_c_zaal_2023_33b843a6e9ed9236d2fdb939f9296e36` — ZAAL - Pot. Pedológico Mandioca - Alta Tecnologia (C) [CNPS]
+- `geonode:pot_pedo_milho_b_zaal_2023_a0d73f325b12fc86fe076d684af02c12` — ZAAL - Pot. Pedológico Milho - Média Tecnologia (B) [CNPS]
+- `geonode:pot_pedo_milho_c_zaal` — ZAAL - Pot. Pedológico Milho - Média Tecnologia (C) [CNPS]
+- `geonode:pot_pedo_phaseolus_b_zaal` — ZAAL - Pot. Pedológico Feijão Phaseolus - Média Tecnologia (B) [CNPS]
+- `geonode:pot_pedo_phaseolus_c_zaal` — ZAAL - Pot. Pedológico Feijão Phaseolus - Alta Tecnologia (C) [CNPS]
+- `geonode:pot_pedo_sorgo_b_zaal_2023_d3c5150b378527d14035627da8ac2ec4` — ZAAL - Pot. Pedológico Sorgo - Média Tecnologia (B) [CNPS]
+- `geonode:pot_pedo_sorgo_c_zaal_2023_23617d9e816f0ac262334b0826dcde65` — ZAAL - Pot. Pedológico Sorgo - Alta Tecnologia (C) [CNPS]
+- `geonode:pot_terras_irrig_69ed360770db696ac5d497e5067d5241` — ZAAL - Potencial Geral de Terras para Irrigação do Estado de Alagoas [CNPS]
+- `geonode:potassio_final_centroide` — Estimativa de oferta potencial de fertilizantes potássicos obtidos a partir de jazidas disponíveis no território brasileiro
+- `geonode:potiguarasolo` — Mapa de reconhecimento de alta intensidade de solos na Terra Indígena Potiguara_ PB_  escala 1:25.000 [CNPS]
+- `geonode:pp_abacaxi_b` — ZONPB - Potencial pedológico para cultura do abacaxi no manejo B (média tecnologia) na escala 1:50.000
+- `geonode:pp_abacaxi_c` — ZONPB - Potencial pedológico para cultura do abacaxi no manejo C (alta tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:pp_andiroba_rr_prod_2006_2018` — Monitoramento da produção de sementes de andiroba (Carapa guianensis) em parcelas permanentes localizadas em áreas de florestas em Roraima
+- `geonode:pp_andiroba_rr_prod_2006_2018_ajuste_02` — Monitoramento da produção de sementes de andiroba (Carapa guianensis) em parcelas permanentes localizadas em áreas de florestas em Roraima
+- `geonode:pp_cana_b` — ZONPB - Potencial pedológico para cultura da cana-de-açúcar no manejo B (média tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:pp_cana_c` — ZONPB - Potencial pedológico para cultura da cana-de-açúcar no manejo C (alta tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:pp_mandioca_b` — ZONPB - Potencial pedológico para cultura de mandioca  no manejo B (média tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:pp_mandioca_c` — ZONPB - Potencial pedológico para cultura de Mandioca no manejo C (alta tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:pp_milho_b` — ZONPB - Potencial pedológico para cultura do Milho no manejo B (média tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:pp_milho_c` — ZONPB - Potencial pedológico para cultura do Milho no manejo C (alta tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:pp_sorgo_b` — ZONPB - Potencial pedológico para cultura do sorgo no manejo B (média tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:pp_sorgo_c` — ZONPB - Potencial pedológico para cultura do Sorgo no manejo C (alta tecnologia) na escala 1:50.000 [CNPS]
+- `geonode:ppc_abacaxi_b_chu` — ZONPB - Potencial pedoclimático para a cultura do abacaxi no manejo B (média tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_abacaxi_b_reg` — ZONPB - Potencial pedoclimático para a cultura do abacaxi no manejo B (média tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_abacaxi_b_sec` — ZONPB - Potencial pedoclimático para a cultura do abacaxi no manejo B (média tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_abacaxi_c_chu` — ZONPB - Potencial pedoclimático para a cultura do abacaxi no manejo C (alta tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_abacaxi_c_reg` — ZONPB - Potencial pedoclimático para a cultura do abacaxi no manejo C (alta tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_abacaxi_c_sec` — ZONPB - Potencial pedoclimático para a cultura do abacaxi no manejo C (alta tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_algodao_b_chuv_zaal_2023_9fd61c7ee10e4cb3a7e1380b3f81a77a` — ZAAL - Pot. Pedoclimático Algodão - B - Chuvoso [CNPS]
+- `geonode:ppc_algodao_b_regu_zaal_2023_9aebf7cf3b5b9a59d8fbd990fd0bbf71` — ZAAL - Pot. Pedoclimático Algodão - B - Regular [CNPS]
+- `geonode:ppc_algodao_b_seco_zaal_2023_1a086106afb221cd9d5e8a77250f81e7` — ZAAL - Pot. Pedoclimático Algodão - B - Seco [CNPS]
+- `geonode:ppc_algodao_c_chuv_zaal_2023_7be26ac9beb3df459461a705bf18d127` — ZAAL - Pot. Pedoclimático Algodão - C - Chuvoso [CNPS]
+- `geonode:ppc_algodao_c_regu_zaal_2023_69d8f147c91d91eebda54e39a2805cfe` — ZAAL - Pot. Pedoclimático Algodão - C - Regular [CNPS]
+- `geonode:ppc_algodao_c_seco_zaal_2023_02d5e77a4b8b62e24df94ff303c08eed` — ZAAL - Pot. Pedoclimático Algodão - C - Seco [CNPS]
+- `geonode:ppc_cana_b_chu` — ZONPB - Potencial pedoclimático para a cultura da Cana-de-açúcar no manejo B (média tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_cana_b_chuv_zaal_2023_78ce43b082d6797edb6e0450c510156d` — ZAAL - Pot. Pedoclimático Cana-de-açúcar - B - Chuvoso [CNPS]
+- `geonode:ppc_cana_b_reg` — ZONPB - Potencial pedoclimático para a cultura da Cana-de-açúcar no manejo B (média tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_cana_b_regu_zaal_2023_6003cfe8bcd9023730836c7eeb379be3` — ZAAL - Pot. Pedoclimático Cana-de-açúcar - B - Regular [CNPS]
+- `geonode:ppc_cana_b_sec` — ZONPB - Potencial pedoclimático para a cultura da Cana-de-açúcar no manejo B (média tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_cana_b_seco_zaal_2023_c3422a57141133c709eb3eda04057fda` — ZAAL - Pot. Pedoclimático Cana-de-açúcar - B - Seco [CNPS]
+- `geonode:ppc_cana_c_chu` — ZONPB - Potencial pedoclimático para a cultura da Cana-de-açúcar no manejo C (alta tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_cana_c_chuv_zaal_2023_6df7722b6c23a37963e87081b0f39e1b` — ZAAL - Pot. Pedoclimático Cana-de-açúcar - C - Chuvoso [CNPS]
+- `geonode:ppc_cana_c_reg` — ZONPB - Potencial pedoclimático para a cultura da Cana-de-açúcar no manejo C (alta tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_cana_c_regu_zaal_2023_ee3602254c7cf59bf73c531d094317ff` — ZAAL - Pot. Pedoclimático Cana-de-açúcar - C - Regular [CNPS]
+- `geonode:ppc_cana_c_sec` — ZONPB - Potencial pedoclimático para a cultura da Cana-de-açúcar no manejo C (alta tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_cana_c_seco_zaal_2023_c99d3d137c4d07b65efcf8f0a36a09b5` — ZAAL - Pot. Pedoclimático Cana-de-açúcar - C - Seco [CNPS]
+- `geonode:ppc_caupi_b_chuv_zaal_2023_2420758e084a8a89feee39f24b2902be` — ZAAL - Pot. Pedoclimático Feijão Caupi - B - Chuvoso [CNPS]
+- `geonode:ppc_caupi_b_regu_zaal_2023_3e07543d9936e8a3c2aea92bd59f2eb0` — ZAAL - Pot. Pedoclimático Feijão Caupi - B - Regular [CNPS]
+- `geonode:ppc_caupi_b_seco_zaal_2023_9d090df01e3720b02a2ed8bb46d4c4d4` — ZAAL - Pot. Pedoclimático Feijão Caupi - B - Seco [CNPS]
+- `geonode:ppc_caupi_c_chuv_zaal` — ZAAL - Pot. Pedoclimático Feijão Caupi - C - Chuvoso [CNPS]
+- `geonode:ppc_caupi_c_regu_zaal_2023_31c52047ef7875031353409568b3f67e` — ZAAL - Pot. Pedoclimático Feijão Caupi - C - Regular [CNPS]
+- `geonode:ppc_caupi_c_seco_zaal_2023_9253217006d86c4ea1996d0f22b7df75` — ZAAL - Pot. Pedoclimático Feijão Caupi - C - Seco [CNPS]
+- `geonode:ppc_mamona_b_chuv_zaal` — ZAAL - Pot. Pedoclimático Mamona - B - Chuvoso [CNPS]
+- `geonode:ppc_mamona_b_regu_zaal_2023_9abf70da4ca8b5e181d52fabe4e35d59` — ZAAL - Pot. Pedoclimático Mamona - B - Regular [CNPS]
+- `geonode:ppc_mamona_b_seco_zaal_2023_89eec1839bc0be2260a2bad33436bbdd` — ZAAL - Pot. Pedoclimático Mamona - B - Seco [CNPS]
+- `geonode:ppc_mamona_c_chuv_zaal_2023_73b5abd9839db5fefb5e7ee32d976057` — ZAAL - Pot. Pedoclimático Mamona - C - Chuvoso [CNPS]
+- `geonode:ppc_mamona_c_regu_zaal_2023_2600f2334f0c9c3687522063b456ee7f` — ZAAL - Pot. Pedoclimático Mamona - C - Regular [CNPS]
+- `geonode:ppc_mamona_c_seco_zaal` — ZAAL - Pot. Pedoclimático Mamona - C - Seco [CNPS]
+- `geonode:ppc_mandioca_b_chu` — ZONPB - Potencial pedoclimático para a cultura da mandioca no manejo B (média tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_mandioca_b_chuv_zaal_2023_d7914a00a0759ddb7b800ffc23293cd7` — ZAAL - Pot. Pedoclimático Mandioca - B - Chuvoso [CNPS]
+- `geonode:ppc_mandioca_b_reg` — ZONPB - Potencial pedoclimático para a cultura da mandioca no manejo B (média tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_mandioca_b_regu_zaal_2023_a667f3c8d2f32894c279f459669218e3` — ZAAL - Pot. Pedoclimático Mandioca - B - Regular [CNPS]
+- `geonode:ppc_mandioca_b_sec` — ZONPB - Potencial pedoclimático para a cultura da mandioca no manejo B (média tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_mandioca_b_seco_zaal_2023_cc6aaad83c08f4dd8a72dd7d98217fa4` — ZAAL - Pot. Pedoclimático Mandioca - B - Seco [CNPS]
+- `geonode:ppc_mandioca_c_chu` — ZONPB - Potencial pedoclimático para a cultura da mandioca no manejo C (alta tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_mandioca_c_chuv_zaal_2023_0ac5d5ae767ee23a207eacce9a24f21c` — ZAAL - Pot. Pedoclimático Mandioca - C - Chuvoso [CNPS]
+- `geonode:ppc_mandioca_c_reg` — ZONPB - Potencial pedoclimático para a cultura da mandioca no manejo C (alta tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_mandioca_c_regu_zaal_2023_374f56bf3c2808d6c0a94ebf0134cd77` — ZAAL - Pot. Pedoclimático Mandioca - C - Regular [CNPS]
+- `geonode:ppc_mandioca_c_sec` — ZONPB - Potencial pedoclimático para a cultura da mandioca no manejo C (alta tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_mandioca_c_seco_zaal_2023_464d8967c4b6935a51cdcb3b242dd8ad` — ZAAL - Pot. Pedoclimático Mandioca - C - Seco [CNPS]
+- `geonode:ppc_milho_b_chu` — ZONPB - Potencial pedoclimático para a cultura do milho no manejo B (média tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_milho_b_chuv_zaal_2023_63139570b36dc926578afb0479beb385` — ZAAL - Pot. Pedoclimático Milho - B - Chuvoso [CNPS]
+- `geonode:ppc_milho_b_reg` — ZONPB - Potencial pedoclimático para a cultura do milho no manejo B (média tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_milho_b_regu_zaal_2023_a060e9c8feb69be297497eb696edffa3` — ZAAL - Pot. Pedoclimático Milho - B - Regular [CNPS]
+- `geonode:ppc_milho_b_sec` — ZONPB - Potencial pedoclimático para a cultura do milho no manejo B (média tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_milho_b_seco_zaal_2023_e18488a764c851742e8f57ed2d88ca9b` — ZAAL - Pot. Pedoclimático Milho - B - Seco [CNPS]
+- `geonode:ppc_milho_c_chu` — ZONPB - Potencial pedoclimático para a cultura do milho no manejo C  (alta tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_milho_c_chuv_zaal_2023_13ab4e79624fd35050c9884cbe500db6` — ZAAL - Pot. Pedoclimático Milho - C - Chuvoso [CNPS]
+- `geonode:ppc_milho_c_reg` — ZONPB - Potencial pedoclimático para a cultura do milho no manejo C (alta tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_milho_c_regu_zaal_2023_fd0e713af8b08ddabfaf5fab4093cae4` — ZAAL - Pot. Pedoclimático Milho - C - Regular [CNPS]
+- `geonode:ppc_milho_c_sec` — ZONPB - Potencial pedoclimático para a cultura do milho no manejo C (alta tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_milho_c_seco_zaal_2023_88220ab0cfddb80810b13eb4135af7c9` — ZAAL - Pot. Pedoclimático Milho - C - Seco [CNPS]
+- `geonode:ppc_phaseolus_b_chuv_zaal_78c5c16889fe6d1e855f8afabeb18068` — ZAAL - Pot. Pedoclimático Feijão Phaseolus - B - Chuvoso [CNPS]
+- `geonode:ppc_phaseolus_b_seco_zaal` — ZAAL - Pot. Pedoclimático Feijão Phaseolus - B - Seco [CNPS]
+- `geonode:ppc_phaseolus_c_regu_zaal` — ZAAL - Pot. Pedoclimático Feijão Phaseolus - C - Regular [CNPS]
+- `geonode:ppc_sorgo_b_chu` — ZONPB - Potencial pedoclimático para a cultura do sorgo no manejo B (média tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_sorgo_b_chuv_zaal_2023_33efe2d63304c1a8b285e49fd23f70f0` — ZAAL - Pot. Pedoclimático Sorgo - B - Chuvoso [CNPS]
+- `geonode:ppc_sorgo_b_reg` — ZONPB - Potencial pedoclimático para a cultura do sorgo no manejo B (média tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_sorgo_b_regu_zaal_2023_777b91f54f91e8be6f63dfed5fee1673` — ZAAL - Pot. Pedoclimático Sorgo - B - Regular [CNPS]
+- `geonode:ppc_sorgo_b_sec` — ZONPB - Potencial pedoclimático para a cultura do sorgo no manejo B (média tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_sorgo_b_seco_zaal_2023_2041a81dd7230236d37f57e846e63523` — ZAAL - Pot. Pedoclimático Sorgo - B - Seco [CNPS]
+- `geonode:ppc_sorgo_c_chu` — ZONPB - Potencial pedoclimático para a cultura do sorgo no manejo C (alta tecnologia) e no cenário chuvoso (escala 1:50.000) [CNPS]
+- `geonode:ppc_sorgo_c_chuv_zaal_2023_e7420702862972fd35794986ea73ebc0` — ZAAL - Pot. Pedoclimático Sorgo - C - Chuvoso [CNPS]
+- `geonode:ppc_sorgo_c_reg` — ZONPB - Potencial pedoclimático para a cultura do sorgo no manejo C (alta tecnologia) e no cenário regular (escala 1:50.000) [CNPS]
+- `geonode:ppc_sorgo_c_regu_zaal_2023_9e186b1bd69dbd0e294ac3db068a9810` — ZAAL - Pot. Pedoclimático Sorgo - C - Regular [CNPS]
+- `geonode:ppc_sorgo_c_sec` — ZONPB - Potencial pedoclimático para a cultura do sorgo no manejo C (alta tecnologia) e no cenário seco (escala 1:50.000) [CNPS]
+- `geonode:ppc_sorgo_c_seco_zaal_2023_7adaabee5d240aa0846eadf91cb3fe90` — ZAAL - Pot. Pedoclimático Sorgo - C - Seco [CNPS]
+- `geonode:pr_acv_cana_basemapas` — Resultado da integracao dos parametros utilizados para suporte ao projeto ACV-Cana_ 1:250.000_ estado do Paraná - 2015
+- `geonode:pr_risco_desmatamaneto_v5` — Mapa de Risco de Desmatamento para Bioma Mata Atlântica - Paraná (2000 a 2017)
+- `geonode:prodagro_composicaoec_desnutricao_indicadoresnut_wgs84` — Produção agropecuária; estrutura econômica; e indicadores de nutrição infantil nos municípios do bioma Amazônia
+- `geonode:prodsed` — Produção de sedimentos na bacia do rio Japaratuba em Sergipe.
+- `geonode:produ_gerg_2024` — produ_gerg_2024
+- `geonode:produc_algo_car_23_24` — produc_algo_car_23_24
+- `geonode:produc_amend_total_23` — Produção de amendoim no Brasil em 2023
+- `geonode:producao_algo_24` — producao_algo_24
+- `geonode:producao_amend24` — producao_amend24
+- `geonode:producao_mam_22_23` — Produção de mamona no Brasil em 2023
+- `geonode:producao_mam_24` — producao_mam_24
+- `geonode:produtiv_amend_22_23` — Produtividade de amendoim no Brasil em 2023
+- `geonode:produtiv_gerg_23` — Produtividade de gergelim no Brasil em 2023
+- `geonode:produtiv_gerge_24` — produtiv_gerge_24
+- `geonode:produtiv_mam_22_23` — Produtividade de mamona no Brasil em 2023
+- `geonode:produtos_registrados_out24` — Produtos registrados (remineralizadores_ fertilizantes minerais simples e materiais secundários)
+- `geonode:produtv_amend_24` — produtv_amend_24
+- `geonode:produtv_mam_24` — produtv_mam_24
+- `geonode:produtv_pluma_24` — produtv_pluma_24
+- `geonode:pti` — ZAAL - Potencial Geral de Terras para Irrigação do Estado de Alagoas [CNPS]
+- `geonode:pti_28f79bcfe1f418a6219d5af23e8c1c45` — Potencial de terras para irrigação do Brasi [CNPS]
+- `geonode:pti_geral` — ZONPB -  Potencial Geral de Terras para Irrigação na escala 1:50.000 [CNPS]
+- `geonode:pti_milho_aspersao` — ZONPB -  Potencial de Terras para Irrigação com a cultura do Milho (Irrigação por aspersão) na escala 1:50.000  [CNPS]
+- `geonode:pti_milho_localizada` — ZONPB - Potencial de Terras para Irrigação com a cultura do Milho (Irrigação localizada) na escala 1:50.000 [CNPS]
+- `geonode:ptos_comerciais_mangaba` — Pontos comerciais de mangaba no estado de Pernambuco [CNPS]
+- `geonode:quadro_agricola_baixada_cuiabana` — Baixada Cuiabana - Produção Agropecuária
+- `geonode:qualisocamb_amz_v3` — Indicadores Socioeconômicos - Bioma Amazônia
+- `geonode:regiao_geoeconomica_brasilia_mg_solos` — Mapa de reconhecimento dos solos da Região Geoeconômica de Brasília - Minas Gerais [CNPS]
+- `geonode:resex_arapixi_am_soil_1100000_geoinfo` — resex_arapixi_am_soil_1100000_geoinfo
+- `geonode:rio_caete_solos` — Solos das áreas alteradas da região de Integração Rio Caeté
+- `geonode:rio_capim_aptidao` — Aptidão agrícola das áreas alteradas a região de Integração Rio Capim
+- `geonode:rio_verde_ms_zae_202011` — Zoneamento agroecológico do município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:rio_verdemt` — Vegetação do município de Rio Verde de Mato Grosso no Mato Grosso do Sul em 1997
+- `geonode:rioverde` — Solos do município de Rio Verde de Mato Grosso no Mato Grosso do Sul em 1997
+- `geonode:rj250_aptidao_2022_2` — Mapa de aptidão agrícola das terras do estado do Rio de Janeiro [CNPS]
+- `geonode:rj_apa_alto_pirai` — Limite da Área de Proteção Ambiental do Alto Piraí (RJ) [CNPAB]
+- `geonode:rj_apa_pirai_appdeclividade_perda_adequacao3` — Áreas de Preservação Permanente de encostas da Área de Proteção Ambiental do Alto Piraí - RJ que precisam ser restauradas [CNPAB]
+- `geonode:rj_apa_pirai_apphidrica_formacaonaoflorestal_conservacao2` — Áreas de Preservação Permanente hídrica da Área de Proteção Ambiental do Alto Piraí - RJ cobertas por formação não florestal, e que precisam receber ações de conservação da biodiversidade [CNPAB]
+- `geonode:rj_apa_pirai_apptm_perda_adequacao4` — Áreas de Preservação Permanente de topo de morro da Área de Proteção Ambiental do Alto Piraí - RJ  que precisam ser restauradas [CNPAB]
+- `geonode:rj_apa_pirai_demaisusos_conservacao` — Demais usos do solo da Área de Proteção Ambiental do Alto Piraí (RJ) [CNPAB]
+- `geonode:rj_apa_pirai_usoverde_conservacao` — Uso verde - conservação da Área de Proteção Ambiental do Alto Piraí (RJ) [CNPAB]
+- `geonode:rj_estado_a_zoneamento_lat_long_wgs84` — Zoneamento agroecológico do estado do Rio de Janeiro [CNPS]
+- `geonode:rj_setores_apa_pirai_adequacao_ambiental` — Setores da Área de Proteção Ambiental do Alto Piraí (RJ) prioritários para restauração florestal [CNPAB]
+- `geonode:rj_zon_lupulo_20220622` — Zoneamento agroecológico preliminar da cultura do lúpulo (Humulus Lupulus) para o estado do Rio de Janeiro [CNPS]
+- `geonode:rn_solos_vf_14_04_2016_lat_long_wgs84` — Mapa exploratório - reconhecimento de solos  estado do Rio Grande do Norte [CNPS]
+- `geonode:rondonia_solos` — Solos na área de abrangência do UZEE no Estado de Rondônia
+- `geonode:rpraima_solos` — Solos na área de abrangência do UZEE no Estado de Roraima
+- `geonode:rs_limite4326` — Limite estadual RS
+- `geonode:rs_risco_desmatamento` — Mapa de Risco de Desmatamento para Bioma Mata Atlântica - Rio Grande do Sul (2000 a 2017) [CNPS]
+- `geonode:sa_leverger` — Vegetação do município de Santo Antonio do Leverger no Mato Grosso em 1997
+- `geonode:sa_leverger_1` — Solos do município de Santo Antonio do Leverger no Mato Grosso em 1997
+- `geonode:sagrima` — Espacialização dos dados da Secretária de Agricultura_ Pecuária e Pesca do Maranhão - SAGRIMA - Ofício SEI n° 3176402
+- `geonode:sao_gabriel_oeste_ms_zae_202011` — Zoneamento agroecológico do município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:saopaulo_ad_4109459bd64ccdddc10e3dfa510cc90b` — Estimativa de Água Disponível do Estado de São Paulo [CNPS]
+- `geonode:seagri_al` — Espacialização dos dados da Secretaria de Estado da Agricultura_ Pecuária_ Pesca e Aquicultura de Alagoas - SEAGRI - Ofício SEI n° 3176459
+- `geonode:sebastiao_lan_adequacao_uso_lat_long_wgs84` — Mapa de adequação de uso do assentamento e acampamento Sebastião Lan I e II [CNPS]
+- `geonode:sedam_ro` — Espacialização dos dados da Secretaria de Estado de Desenvolvimento Ambiental de Rondônia – SEDAM - Ofício SEI n° 3107911
+- `geonode:sedes_project` — Sedes dos municípios da bacia do rio Japaratuba em Sergipe.
+- `geonode:semad_mg` — Espacialização dos dados da Secretaria de Estado de Meio Ambiente e Desenvolvimento Sustentável de Minas Gerais – SEMAD - Ofício SEI n° 3109080
+- `geonode:semarh_se` — Espacialização dos dados da Secretaria de Estado do Meio Ambiente e dos Recursos Hídricos de Sergipe - SEMARH
+- `geonode:sensorprox_seropedia_rj_solos_2025` — Levantamento pedológico ultradetalhado (escala 1:2.000) da área de estudo do projeto SensorProx, Seropédica - RJ [CNPS]
+- `geonode:seringa_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para seringueira no município de Bandeirantes - MS [CNPS]
+- `geonode:seringueira_alcinopolis_multipart` — Zoneamento agroecológico para seringueira no município de Alcinópolis - MS [CNPS]
+- `geonode:seringueira_anastacio_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para seringueira no município de Anastácio - MS [CNPS]
+- `geonode:seringueira_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para seringueira no município de Camapuã - MS [CNPS]
+- `geonode:seringueira_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para seringueira no município de Campo Grande - MS [CNPS]
+- `geonode:seringueira_corguinho_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para seringueira no município de Corguinho - MS [CNPS]
+- `geonode:seringueira_figueirao_vetor_lat_long_wgs84_v5` — Zoneamento agroecológico para seringueira no município de Figueirão  - MS [CNPS]
+- `geonode:seringueira_jaraguari_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para seringueira município de Jaraguari - MS [CNPS]
+- `geonode:seringueira_maracaju` — Zoneamento agroecológico para seringueira do município de Maracaju - MS [CNPS]
+- `geonode:seringueira_rio_verde_ms` — Zoneamento agroecológico para seringueira do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:seringueira_sao_gabriel_ms` — Zoneamento agroecológico para seringueira no município de São Gabriel do Oeste - MS [CNPS]
+- `geonode:seringueira_sonora_vetor_latlong_wgs84multipart` — Zoneamento agroecológico para seringueira no município de Sonora - MS [CNPS]
+- `geonode:seringueira_terenos_lat_long_wgs84_multipart` — Zoneamento agroecológico para seringueira no Município de Terenos - MS [CNPS]
+- `geonode:sidrolandia_zae_202011` — Zoneamento agroecológico do município de Sidrolândia - MS [CNPS]
+- `geonode:soils_brazil_wrb_wgs84` — Soil map of Brazil [CNPS]
+- `geonode:soja` — Zoneamento edafoclimático para cultivo da soja em Marau – RS
+- `geonode:solo_pernambuco_wgs84_cc2d1ae680928ab867e7cc866a56dc70` — ZAPE - Mapa de reconhecimento de baixa e média intensidade de solos do estado de Pernambuco [CNPS]
+- `geonode:solos_564079a49fbcc378d67a12e976c053b7` — ZAAL - Levantamento de Solos do Estado de Alagoas [CNPS]
+- `geonode:solos__sergipe_wgs84` — Mapa exploratório - reconhecimento de solos do estado de Sergipe [CNPS]
+- `geonode:solos_acegua_wgs_84_rs` — Levantamento semidetalhado de solos do município de Aceguá - RS
+- `geonode:solos_aihda` — solos_aihda
+- `geonode:solos_al_geogr_wgs84` — Mapa exploratório - reconhecimento de solos do estado de Alagoas [CNPS]
+- `geonode:solos_amazonia` — Classificação dos solos do Bioma Amazônia
+- `geonode:solos_bacia_rios_guapi_macacu_caceribu_latlongwgs84` — Levantamento de reconhecimento de alta intensidade dos solos das bacias  hidrográficas dos rios Guapi-Macacu e Caceribu [CNPS]
+- `geonode:solos_buritirana_to_lat_long_wgs84` — Mapa de solos do campo experimental de Buritirana, Município de Palmas (TO) [CNPS]
+- `geonode:solos_campo_experimental_milho_sorgo_mg_latlongwgs84` — Mapa detalhado de solos do centro nacional de pesquisa de Milho e Sorgo - Município de Sete Lagoas, Minas Gerais [CNPS]
+- `geonode:solos_campos_vertentes_lat_long_wgs84` — Mapa de reconhecimento de média intensidade dos solos da zona dos Campos das Vertentes - MG [CNPS]
+- `geonode:solos_ce_lat_long_wgs84` — Levantamento exploratório de reconhecimento de solos do estado do Ceará [CNPS]
+- `geonode:solos_cor_cachoeira_paty_rj_v4` — Mapa semidetalhado de solos da microbacia do  Córrego da Cachoeira - Paty do Alferes [CNPS]
+- `geonode:solos_corede` — Solos da Zona Sul - RS
+- `geonode:solos_corrego_da_tabua_rj_lat_long_wgs84` — Mapa semidetalhado de solos da microbacia do córrego da Tábua - município de São Fidelis, Rio de Janeiro [CNPS]
+- `geonode:solos_fronteira_oeste_rs_7f34d2ac423592630d464758cf096e94` — Levantamento Semidetalhado de Solos das Áreas Arenizadas da Fronteira Oeste do Rio Grande do Sul
+- `geonode:solos_jaguariuna_spwgs84` — Levantamento detalhado dos solos do campo experimental  da Embrapa Meio Ambiente Jaguariúna, SP [CNPS]
+- `geonode:solos_lat_long_wgs84_5e1a2d0214f746c4b9156c5ddc03fccd` — Mapa de solos do estado do Rio de Janeiro [CNPS]
+- `geonode:solos_ma_lat_long_wgs84` — Mapa exploratório-reconhecimento de solos do estado do Maranhão [CNPS]
+- `geonode:solos_mbh_bonfim_rj` — solos_mbh_bonfim_rj
+- `geonode:solos_microbacia_sao_domingos_mg_lat_long_wgs84` — Mapa semidetalhado de solos da microbacia do ribeirão São Domingos, estado de Minas Gerais [CNPS]
+- `geonode:solos_municipio_rj_75000_2004_lat_long_wgs84_1` — Mapa semidetalhado de solos do município do Rio de Janeiro [CNPS]
+- `geonode:solos_paraiba_wgs84_1` — Mapa exploratório - reconhecimento de solos do estado da Paraíba [CNPS]
+- `geonode:solos_parte_baixada_campista_rj_v2` — Mapa semidetalhado de solos de parte da baixada campista [CNPS]
+- `geonode:solos_pems_latlong_wgs84_2` — Mapa semidetalhado de solos do Parque Estadual da Mata Seca, município de Manga - MG [CNPS]
+- `geonode:solos_reca_2020_80000_embrapaacre_geoinfo_v1_1` — Mapa de solos da área de inserção do projeto RECA
+- `geonode:solos_regiao_sul_rs` — Solos e terras do Planalto Sul-Rio-Grandense e Planícies Costeiras
+- `geonode:solos_rj_lat_long_wgs84_1` — Mapa de reconhecimento de baixa intensidade dos solos do estado do Rio de Janeiro [CNPS]
+- `geonode:solos_rs_wgs84` — Zoneamento edáfico do pessegueiro para RGS
+- `geonode:solos_suavizado_lat_long_wgs84` — Mapa de solos do médio alto curso do rio grande, região serrana do Estado do Rio de Janeiro [CNPS]
+- `geonode:solos_triangulo_mineiro_atributos` — Mapa de reconhecimento dos solos do Triângulo Mineiro [CNPS]
+- `geonode:solos_zonpb` — ZONPB - Levantamento de reconhecimento de alta intensidade de solos da área de influência do canal das vertentes litorâneas no Estado da Paraíba (escala 1:50.000) [CNPS]
+- `geonode:solosareaiii_lat_wgs84` — Mapa semidetalhado dos solos do projeto Jaíba, MG - etapa III [CNPS]
+- `geonode:sonora` — Vegetação do município de Sonora no Mato Grosso do Sul em 1997
+- `geonode:sonora_1` — Solos do município de Sonora no Mato Grosso do Sul em 1997
+- `geonode:sonora_ms_zae_202011` — Zoneamento agroecológico do município de Sonora - MS [CNPS]
+- `geonode:spadotto_mingoti_2023_v1` — Características físicas e hidráulicas dos solos no estado de São Paulo
+- `geonode:ssclasse` — Subsubclasses dos solos em pontos amostrais do litoral no Estado de Sergipe.
+- `geonode:st_fer_a1c238ae379d62ec00c6069c87105fe3` — Malha ferroviária do Estado de Sergipe.
+- `geonode:subs` — Delimitação do Pantanal Brasileiro e suas sub-regiões em 1997
+- `geonode:subs_sb` — Solos do Pantanal do Brasil - PCBAP
+- `geonode:sudema_pb` — Espacialização dos dados da Superintendência de Administração do Meio Ambiente da Paraíba - SUDEMA - Ofício SEI n° 3109001
+- `geonode:superficie_lat_long_wgs84` — Avaliação da cana-de-açúcar sob irrigação por superfície no Perímetro Salitre, Juazeiro - BA [CNPS]
+- `geonode:tapajos_solos` — Solos das Áreas Alteradas da Região de Integração Xingu
+- `geonode:tc_acre_2012` — Uso do solo para todo o Estado do Acre no ano de 2012
+- `geonode:tc_am_2012` — Uso do solo para todo o Estado do Amazonas no ano de 2012
+- `geonode:tc_ap_2012` — Uso do solo para todo estado do Amapá no ano de 2012
+- `geonode:tc_mt_2012` — Uso do solo para todo Estado do Mato Grosso no ano de 2012
+- `geonode:tc_ro_2012` — Uso do solo para todo estado de Rondônia no ano de 2012
+- `geonode:terenos_zae_202011_v2` — Zoneamento agroecológico do município de Terenos - MS [CNPS]
+- `geonode:terraclass2008_am` — Uso do solo para todo o estado do Amazonas no ano de 2008
+- `geonode:terraclass2008_ma` — Uso do solo para todo o Estado do Maranhão no ano de 2008
+- `geonode:terraclass_2008__ac` — Uso do solo para todo o Estado do Acre no ano de 2008
+- `geonode:terraclass_ap_2008` — Uso do solo para todo o Estado do Amapá no ano de 2008
+- `geonode:textmedia_marandu_spfim` — Zoneamento de Riscos Climáticos para Semeadura do Capim-Marandu - SP.  Solos de Textura Média
+- `geonode:ti_poyanawa_2022_solos_100000_etnopedologia` — Etnopedologia da TI Poyanawa - 1:100.000
+- `geonode:tiposclimaticos_v1_thornthwaite_mingotietal2021` — Tipos climáticos_ segundo classificação de Thornthwaite
+- `geonode:tocantins` — Espacialização dos dados sobre aquicultura do Portal Nacional de Licenciamento Ambiental para o estado do Tocantins
+- `geonode:todos__ad_abel_figueiredo` — Estimativa de água disponivel Munícipio de Abel Figueiredo - PA [CNPS]
+- `geonode:todos__ad_barcarena` — Estimativa de água disponível do Município de Barcarena - PA [CNPS]
+- `geonode:todos__ad_bom_jesus_tocantins` — Estimativa de água disponível do Município de Bom Jesus do Tocantins - PA [CNPS]
+- `geonode:todos__ad_bujaru` — Estimativa de água disponível do Município de Bujaru - PA [CNPS]
+- `geonode:todos__ad_capixaba` — Estimativa de água disponível do Município de Capibaxaba - AC [CNPS]
+- `geonode:todos__ad_castanhal` — Estimativa de água disponível do Município de Castanhal - PA [CNPS]
+- `geonode:todos__ad_inhangapi` — Estimativa de água disponível do Município de Inhangapi - PA [CNPS]
+- `geonode:todos__ad_irituia` — Estimativa de água disponível do Município de Irituia - PA [CNPS]
+- `geonode:todos__ad_plcido_de_castro` — Estimativa de água disponível do Município de Plácido de Castro - AC [CNPS]
+- `geonode:todos__ad_rondon_do_para` — Estimativa de água disponível do Município de Rondon do Pará - PA [CNPS]
+- `geonode:todos__ad_senador_guimardac` — Estimativa de água disponível do Município de  Senador Guiomard - AC [CNPS]
+- `geonode:todos__ad_sta_isabel_para` — Estimativa de água disponível do Município de Santa Izabel do Pará - PA [CNPS]
+- `geonode:todos__ad_sto_antonio_taua` — Estimativa de água disponível do Município de Santo Antônio do Tauá - PA [CNPS]
+- `geonode:tracunhaem_aptidao_2016_lat_long_wgs84` — Zoneamento agroecológico do município de Tracunhaém - PE. Mapa aptidão para cana-de-açúcar manejo C, 1:25.000 [CNPS]
+- `geonode:tracunhaem_pe_solos_2016_lat_long_wgs84` — Mapa semidetalhado de solos, 1:25.000, do município de Tracunhaém - PE [CNPS]
+- `geonode:transicao_1990_2000_shp` — Dinâmica landuse 1990-2000 Pq. Est. Podocarpus_ RS
+- `geonode:transicao_2000_2010_shp` — Dinâmica landuse 2000 - 2010 Pq. Est. Podocarpus_ RS
+- `geonode:transicao_2010_2020_shp` — Dinâmica landuse 2010-2020 Pq. Est. Podocarpus_ RS
+- `geonode:trechos_de_drenagem5k_marau_rs` — Trechos de Drenagem da Base Hidrográfica Ottocodificada Multiescalas 2017 da região de Marau_ RS
+- `geonode:uct_seminarido_pe1` — ZAPE - Uso e Cobertura das terras do semiárido de Pernambuco [CNPS]
+- `geonode:unid_planej_bacia_japaratuba` — Unidades de planejamento da bacia do rio Japaratuba em Sergipe.
+- `geonode:unidade_de_benef_pescado` — Espacialização das Unidades de Beneficiamento de Pescados em Território Nacional
+- `geonode:uso_atual_corrego_cacho_paty_rj_lat_long_wgs84_v2` — Mapa de uso atual das terras  do Córrego da Cachoeira, Paty do Alferes, RJ [CNPS]
+- `geonode:uso_cobertura_comperj_2009_lat_long_wgs84` — Uso e Cobertura da Terra na área do Comperj em 2009 [CNPS]
+- `geonode:uso_cobertura_terra_macacu_caceribu_2007_latlongwgs84` — Uso e cobertura da terra nas bacias hidrográficas dos Rios Guapi-Macacu e Caceribu em 2007 [CNPS]
+- `geonode:uso_cobertura_terra_macacu_caceribu_rj_1997_latlongwgs84` — Uso e Cobertura das terras nas bacias hidrográficas dos rios Guapi-Macacu e Caceribu em 1997 [CNPS]
+- `geonode:uso_cobertura_zaal` — ZONPB - Uso e cobertura de terras da área do canal das vertentes litorâneas no Estado da Paraíba na escala 1:25.000 [CNPS]
+- `geonode:uva_alcinopolis_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para uva no município de Alcinópolis - MS [CNPS]
+- `geonode:uva_anastacio_vetor_latlongwgs84_multipart_v2` — Zoneamento agroecológico para  uva no município de Anastácio - MS [CNPS]
+- `geonode:uva_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para uva no município de Bandeirantes - MS [CNPS]
+- `geonode:uva_camapuam_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para uva no município de Camapuã  - MS [CNPS]
+- `geonode:uva_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para uva no município de Campo Grande - MS [CNPS]
+- `geonode:uva_corumba_ladario_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para uva nos municípios de Corumbá e Ladário - MS [CNPS]
+- `geonode:uva_dois_irmaos_buriti_lat_long_wgs84` — Zoneamento agroecológico para uva no município de Dois Irmãos do Buriti - MS [CNPS]
+- `geonode:uva_figueirao_2_vetor_latlong_wgs84_multipart_v2` — Zoneamento agroecológico para uva no município de Figueirão  - MS [CNPS]
+- `geonode:uva_jaraguari_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico para uva no município de Jaraguari - MS [CNPS]
+- `geonode:uva_maracaju_ms` — Zoneamento agroecológico para uva do município de Maracaju - MS [CNPS]
+- `geonode:uva_pedro_gomes_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico para uva no município de Pedro Gomes - MS [CNPS]
+- `geonode:uva_rio_negro_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para uva no município de Rio Negro - MS [CNPS]
+- `geonode:uva_rio_verde_ms` — Zoneamento agroecológico para uva do Município de Rio Verde de Mato Grosso - MS [CNPS]
+- `geonode:uva_rochedo_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para uva no município de Rochedo - MS [CNPS]
+- `geonode:uva_sidrolandia_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico para uva no município de Sidrolândia- MS [CNPS]
+- `geonode:uva_sonora_vetor_latlong_wgs84multipart` — Zoneamento agroecológico para uva no município de Sonora - MS
+- `geonode:valinhos_uso_terra_2023_v2023_11_29b24627777387` — Uso da Terra de Valinhos SP 2023
+- `geonode:vul_munc_rj_wgs84` — Vulnerabilidade ambiental para planejamento de uso das terras do  município do Rio de Janeiro [CNPS]
+- `geonode:vunerabilidade_reg_lagos_lat_long_wgs84_vt` — Mapa de vulnerabilidade das terras - quadrículas de Silva Jardim e Rio das Ostras, estado Rio de Janeiro [CNPS]
+- `geonode:xingu_solos` — Solos das áreas alteradas da região de integração Xingu
+- `geonode:za_podocarpus` — Zona transição Pq. Est. Podocarpus
+- `geonode:zae_al` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado de Alagoas - 2009
+- `geonode:zae_aml_palma_oleo_manejo_nivelb_latlong_wgs84` — Zoneamento agroecológico cultura da palma de óleo nas áreas desmatadas da Amazônia Legal - nível de manejo B [CNPS]
+- `geonode:zae_aml_palma_oleo_manejo_nivelc_latlong_wgs84` — Zoneamento agroecológico cultura da palma de óleo nas áreas desmatadas da Amazônia Legal - nível de manejo C [CNPS]
+- `geonode:zae_ba` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado da Bahia - 2009
+- `geonode:zae_ce` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado do Ceará - 2009
+- `geonode:zae_es` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado do Espírito Santo - 2009
+- `geonode:zae_mt` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado do Mato Grosso - 2009
+- `geonode:zae_pe` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado de Pernambuco - 2009
+- `geonode:zae_pr_c7d03085765cd148a0e99abf9d84ee0b` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado do Paraná - 2009
+- `geonode:zae_rj` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado do Rio de Janeiro - 2009
+- `geonode:zae_rn` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado de Rio Grande do Norte - 2009
+- `geonode:zae_se` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado do Sergipe - 2009
+- `geonode:zae_to` — Zoneamento agroecológico da cana-de-açúcar_ 1:250.000_ estado do Tocantins - 2009
+- `geonode:zaecana_rj_lat_long_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Rio de Janeiro [CNPS]
+- `geonode:ze_acu_parintins_am_ad_25k_v2_9c783b38fa363f99d29c88d45daa5d46` — Estimativa de água disponível nos solos de Zé Açú município de Parintins - AM [CNPS]
+- `geonode:ze_acu_parintins_am_pedo_25k_v3a77ca85bfbc2` — Mapa semidetalhado dos solos do Distrito de Zé Açu, município de Parintins, AM [CNPS]
+- `geonode:zon_alagoana_sertao_sf_final` — ZonBarragem - Áreas potenciais para construção de barragens subterrâneas na microrregião Alagoana de Sertão do São Francisco - Semiárido de Alagoas [CNPS]
+- `geonode:zon_arapiraca_final` — ZonBarragem - Áreas potenciais para construção de barragens subterrâneas na microrregião de Arapiraca - Semiárido de Alagoas
+- `geonode:zon_batalha_final` — ZonBarragem - Áreas potenciais para construção de barragens subterrâneas na microrregião de Batalha - Semiárido de Alagoas [CNPS]
+- `geonode:zon_batatainglesa_gravatai` — Zoneamento edafoclimático da batata inglesa em Gravataí-RS
+- `geonode:zon_palmeira_dos_indios_final` — ZonBarragem - Áreas potenciais para construção de barragens subterrâneas na microrregião de Palmeira dos Índios - Semiárido de Alagoas [CNPS]
+- `geonode:zon_pessegueironogueira_gravatai_1` — Zoneamento edafoclimático da nogueira-pecã para Gravataí- RS
+- `geonode:zon_rj_estado_pupunha_atributos_sirgas2000` — Zoneamento da cultura da pupunha no estado do Rio de Janeiro [CNPS]
+- `geonode:zon_rj_estado_seringueira_latlong_sirgas2000` — Mapa do zoneamento da cultura da Seringueira no estado do Rio de Janeiro [CNPS]
+- `geonode:zon_santana_do_ipanema_final` — ZonBarragem - Áreas potenciais para construção de barragens subterrâneas na microrregião de Santana do Ipanema - Semiárido de Alagoas
+- `geonode:zon_serrana_sertao_alagoano_final` — ZonBarragem - Áreas potenciais para construção de barragens subterrâneas na microrregião Serrana do Sertão Alagoano - Semiárido de Alagoas
+- `geonode:zon_traipu_final` — ZonBarragem - Áreas potenciais para construção de barragens subterrâneas na microrregião de Traipu - Semiárido de Alagoas [CNPS]
+- `geonode:zona_alcinopolis_vetor_lat_long_wgs84_multipart` — Zoneamento agroecológico do município de Alcinópolis - MS [CNPS]
+- `geonode:zona_anastacio_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico do município de Anastácio - MS [CNPS]
+- `geonode:zona_aquidauana_vetor_lat_long_wgs84_multipart_v3` — Zoneamento agroecológico do município de Aquidauana - MS [CNPS]
+- `geonode:zonas_bandeirantes_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico do município de Bandeirantes - MS [CNPS]
+- `geonode:zonas_cg_vetor_lat_long_wgs84_multipart_v2` — Zoneamento agroecológico do município de Campo Grande - MS [CNPS]
+- `geonode:zonas_matopiba` — Zoneamento Territorial do Matopiba [CNPS]
+- `geonode:zoncana_al_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado de Alagoas [CNPS]
+- `geonode:zoncana_ba_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado da Bahia [CNPS]
+- `geonode:zoncana_ce_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Ceará [CNPS]
+- `geonode:zoncana_df_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar no Distrito Federal [CNPS]
+- `geonode:zoncana_es_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar no estado do Espírito Santo [CNPS]
+- `geonode:zoncana_go_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar no estado de Goiás [CNPS]
+- `geonode:zoncana_ma_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar no estado do Maranhão [CNPS]
+- `geonode:zoncana_mg_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar no estado de Minas Gerais [CNPS]
+- `geonode:zoncana_ms_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Mato Grosso do Sul [CNPS]
+- `geonode:zoncana_mt_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Mato Grosso [CNPS]
+- `geonode:zoncana_pb_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado da Paraíba [CNPS]
+- `geonode:zoncana_pe_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado de Pernambuco [CNPS]
+- `geonode:zoncana_pi_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Piauí [CNPS]
+- `geonode:zoncana_pr_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Paraná [CNPS]
+- `geonode:zoncana_rn_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Rio Grande do Norte [CNPS]
+- `geonode:zoncana_rs_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Rio Grande do Sul [CNPS]
+- `geonode:zoncana_sc_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado de Santa Catarina [CNPS]
+- `geonode:zoncana_se_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado do Sergipe [CNPS]
+- `geonode:zoncana_to_latlong_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado de Tocantins [CNPS]
+- `geonode:zoncanasp_lat_long_wgs84` — Zoneamento agroecológico da cana-de-açúcar do estado de São Paulo [CNPS]
+- `geonode:zondende_merge_sirgas` — Zoneamento Agroecológico para a Palma de Óleo_ 1:250.000_ Nordeste e Sudeste - 2010
+- `geonode:zoneamento_edaficlimatico_1` — Zoneamento Edafoclimático da Olivicultura para RGS

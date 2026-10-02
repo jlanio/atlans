@@ -1,0 +1,167 @@
+import { INodeContext } from "@/context/useFlowContext";
+import { useWorkflowCatalogStore } from "@/app/stores/workflowCatalogStore";
+import { useConfigNodeParams } from "@/app/hooks/workflow/useConfigNodeParams";
+import { cn } from "@/lib/utils";
+import { useReactFlow, Edge } from "@xyflow/react";
+import { FaTrash } from "react-icons/fa";
+import { IoCopySharp } from "react-icons/io5";
+import { MdEdit } from "react-icons/md";
+import { TbPinFilled, TbPinnedOff, TbSubtask } from "react-icons/tb";
+import { useWorkflowExecutionStore } from "@/app/stores/workflowExecutionStore";
+import { useSubflowDrilldownStore } from "@/app/stores/subflowDrilldownStore";
+import { useSubflowReadOnly } from "../../subflow-viewer/scope";
+import { useCanvasReadOnly } from "../../canvas-interaction";
+import { v4 as uuid } from "uuid"
+import { useParams } from "next/navigation";
+import { useState } from "react";
+import { GisFlowService } from "@/service/GisFlowService";
+import { createToast } from "@/utils/createToast";
+import PinDialog from "./pin-dialog";
+
+interface ToolsIconProps {
+  nodeId: string
+  open: boolean
+}
+
+const ToolsIcon = ({ open, nodeId }: ToolsIconProps) => {
+
+  const { setEdges, setNodes, addNodes, getNode } = useReactFlow<INodeContext, Edge>()
+  const { setConfigNodeParam } = useConfigNodeParams()
+  const pinnedNodes = useWorkflowCatalogStore(s => s.pinnedNodes)
+  const setPinnedNodes = useWorkflowCatalogStore(s => s.setPinnedNodes)
+  const { id: workflowId } = useParams<{ id?: string }>()
+  const [pinDialogOpen, setPinDialogOpen] = useState(false)
+
+  const isPinned = pinnedNodes.some(p => p.node_id === nodeId && !p.expired)
+
+  // Só oferece a descida quando o run carregado de fato executou algo lá dentro:
+  // sem execução não há nada para pintar, e o visualizador mostraria um grafo
+  // cinza que se passa por "nada rodou" quando o certo é "não há run aberto".
+  const executouSubfluxo = useWorkflowExecutionStore(s => s.subflowRoots.has(nodeId))
+  const abrirSubfluxo = useSubflowDrilldownStore(s => s.open)
+  const noVisualizador = useSubflowReadOnly()
+  const somenteLeitura = useCanvasReadOnly()
+
+  function handleAbrirSubfluxo() {
+    const node = getNode(nodeId)
+    const props = (node?.data?.properties ?? {}) as Record<string, unknown>
+    const hash = String(props.workflowHash ?? "").trim()
+    if (!hash) return
+    abrirSubfluxo([{
+      canvasNodeId: nodeId,
+      workflowHash: hash,
+      label: (props.alias as string) || (node?.data?.alias as string) || "Sub-fluxo",
+    }])
+  }
+
+  function handleDeleteNode() {
+    setNodes(nds => nds.filter((node) => node.id !== nodeId))
+    setEdges(edgs => edgs.filter((edg) => edg.target !== nodeId && edg.source !== nodeId))
+  }
+
+  function copyNode() {
+    const node = getNode(nodeId)
+    if (!node) return
+
+    const newNode = {
+      ...node,
+      id: uuid(),
+      position: {
+        x: node.position.x + 35,
+        y: node.position.y - 35
+      },
+    } satisfies INodeContext
+
+    addNodes(newNode)
+    setNodes(nds => nds.map(nd =>
+      nd.id === nodeId ? { ...nd, selected: false } : nd
+    ))
+  }
+
+  async function handleUnpin() {
+    if (!workflowId) return
+    try {
+      const res = await GisFlowService.unpinNodeOutput(workflowId, nodeId)
+      if (res?.error) {
+        createToast.error("Erro ao remover pin", res.error.message)
+        return
+      }
+      setPinnedNodes(pinnedNodes.filter(p => p.node_id !== nodeId))
+      createToast.success("Pin removido")
+    } catch (err) {
+      createToast.error("Erro ao remover pin", String(err))
+    }
+  }
+
+  function handlePinClick() {
+    if (isPinned) {
+      handleUnpin()
+    } else {
+      setPinDialogOpen(true)
+    }
+  }
+
+  // O visualizador de sub-fluxo desenha o grafo do FILHO: editar, duplicar,
+  // apagar ou fixar aqui agiria sobre o canvas errado — os ids nem existem no
+  // fluxo aberto no editor. Lá dentro descer um nível é o duplo clique.
+  // A barra inteira é revelada por `open`, que vem do hover — um evento que o
+  // toque não produz. No telefone ela seria código morto de qualquer forma:
+  // aparecia por um instante depois de um toque, com editar/copiar/excluir que
+  // o canvas ali nem permite. A configuração continua alcançável tocando o nó.
+  if (noVisualizador || somenteLeitura) return null
+
+  return (
+    <>
+      <div
+        className={cn(
+          "absolute flex items-center gap-2 rounded-md -top-9 px-3 py-1.5 bg-card border shadow-sm cursor-auto transition-opacity duration-100 z-50",
+          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      >
+        <MdEdit
+          onClick={() => setConfigNodeParam(nodeId)}
+          size={16} className="cursor-pointer hover:text-primary" />
+
+        {executouSubfluxo && (
+          <button
+            onClick={handleAbrirSubfluxo}
+            title="Ver o que rodou dentro do sub-fluxo"
+            className="flex items-center"
+          >
+            <TbSubtask size={16} className="cursor-pointer text-indigo-500 hover:text-indigo-600" />
+          </button>
+        )}
+
+        <button
+          onClick={handlePinClick}
+          title={isPinned ? "Remover pin" : "Fixar output"}
+          className="flex items-center"
+        >
+          {isPinned
+            ? <TbPinnedOff size={16} className="cursor-pointer text-amber-500 hover:text-amber-600" />
+            : <TbPinFilled size={16} className="cursor-pointer hover:text-amber-500" />
+          }
+        </button>
+
+        <IoCopySharp
+          onClick={copyNode}
+          size={15} className="cursor-pointer hover:text-muted-foreground" />
+
+        <FaTrash
+          onClick={handleDeleteNode}
+          size={13} className="cursor-pointer hover:text-destructive" />
+      </div>
+
+      {pinDialogOpen && (
+        <PinDialog
+          nodeId={nodeId}
+          workflowId={workflowId ?? ""}
+          onClose={() => setPinDialogOpen(false)}
+        />
+      )}
+    </>
+  )
+
+}
+
+export default ToolsIcon;

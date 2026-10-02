@@ -1,0 +1,10 @@
+# Runtime Python, payload e instaladores — todos GERADOS pelos scripts de build.
+# Nada em resources/ deve ser versionado: sao ~370 MB reconstruiveis a partir de
+# python-runtime.json + o lock do executor (executor/requirements-full.txt).
+resources/
+dist/
+# `dist/` NAO cobre este: sao diretorios de nomes diferentes, e o padrao precisa
+# ser explicito. Sem ele, `git add -A` levaria ~890 MB para dentro do historico
+# — o instalador NSIS mais a arvore `win-unpacked` do Electron.
+dist-installer/
+node_modules/

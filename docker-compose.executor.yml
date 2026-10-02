@@ -1,0 +1,134 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+#  Atlans Executor — Docker Compose
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# ── Como usar (mTLS + Bootstrap OTP) ──────────────────────────────────────────
+#
+#   1. Admin: cria executor na plataforma e gera OTP via
+#      POST /executores/{executor_id}/enroll-otp (valido 24h, uso unico)
+#   2. Operador: copia EXECUTOR_ID + OTP via canal seguro (1Password, Signal)
+#   3. Antes do primeiro `up`, rode o enrollment fora do container:
+#
+#        python -m executor enroll --otp=<OTP> --server=https://<AGENTS_HOST> \
+#                                  --cert-dir=./executor-certs
+#
+#      Isso gera ./executor-certs/{cert,chain,ca,key,x25519_key}.pem
+#   4. Cole EXECUTOR_ID abaixo no campo marcado com COLE_AQUI
+#   5. Ajuste EXECUTOR_SERVER_URL e monte ./executor-certs no container
+#   6. Inicie:
+#
+#        docker compose -f docker-compose.executor.yml up -d --build
+#
+# ── Comandos úteis ────────────────────────────────────────────────────────────
+#
+#   Logs:       docker compose -f docker-compose.executor.yml logs -f
+#   Reiniciar:  docker compose -f docker-compose.executor.yml restart
+#   Parar:      docker compose -f docker-compose.executor.yml down
+#   Rebuild:    docker compose -f docker-compose.executor.yml up -d --build
+#
+# ── Notas ─────────────────────────────────────────────────────────────────────
+#
+#   • A chave privada e a chave do servidor são obtidas automaticamente.
+#   • O executor reinicia automaticamente em caso de crash (restart: on-failure);
+#     um executor revogado sai com código 0 e permanece parado (não reinicia).
+#   • GeoSync: disponível apenas para executores exclusivos. Monte o volume e
+#     defina EXECUTOR_SYNC_DIRS para ativar.
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+services:
+  executor:
+    # Para a imagem da release (docker load < atlans-executor-docker-amd64.tar.gz):
+    # image: atlans-executor:latest, no lugar do build.
+    build:
+      context: .
+      dockerfile: Dockerfile.executor
+      args:
+        # A versão que o painel mostra (2.15.0+3f02f44) sai do próprio checkout
+        # no build (executor/versao.py). EXECUTOR_COMMIT só se for preciso
+        # forçar outro valor.
+        EXECUTOR_COMMIT: ${EXECUTOR_COMMIT:-}
+    # Era `atlas-executor` (sem o n). O compose recria o container com o nome
+    # novo no proximo `up -d`; o volume `executor-data` (certs, chaves,
+    # artefatos) e o mesmo, entao a matricula continua valendo. Um container
+    # antigo criado por `docker run` (fora do compose) precisa de
+    # `docker rm -f atlas-executor` antes — o install.sh faz isso.
+    container_name: atlans-executor
+    # on-failure: reinicia em crash (exit != 0). Revogado sai com 0 → para.
+    restart: on-failure
+
+    env_file: executor/.env
+
+    environment:
+      # Sobrescritas especificas do container Docker
+      - EXECUTOR_ARTIFACTS_DIR=/data/artifacts
+      - LOG_COLOR=never #auto, always, never
+      # Painel ao vivo desligado explicitamente. Sem `-it` ele ja nao ligaria
+      # (stdout nao e TTY), e LOG_COLOR=never tambem o desliga — mas depender
+      # de efeito colateral e frágil para quem le este arquivo depois.
+      - EXECUTOR_DASHBOARD=off
+      # Cert mTLS persistente — populado pelo `python -m executor enroll` antes do up.
+      - EXECUTOR_CERT_DIR=/data/certs
+      # GeoSync (opcional): descomente junto com o volume de sync abaixo para
+      # ativar. Vazio = GeoSync desabilitado (default).
+      # - EXECUTOR_SYNC_DIRS=/data/sync
+
+      # HOST_ALIASES — reescrita de hostnames internos do Docker
+      # - EXECUTOR_HOST_ALIASES=db=host.docker.internal:5432,redis=host.docker.internal:6379
+
+    volumes:
+      # Dados persistentes (cert mTLS + chaves + artefatos)
+      - executor-data:/data
+
+      # Bind dos certs gerados pelo enroll no host → /data/certs no container.
+      # Comente esse mount se voce gerou os certs DENTRO do container.
+      #- ./executor-certs:/data/certs:ro
+
+      # ── GeoSync (opcional) ───────────────────────────────────────────────
+      # Sincroniza uma pasta local do host com o Drive do workspace.
+      # Use a LONG SYNTAX abaixo — evita o erro "invalid volume specification"
+      # no Windows (onde o ':' da letra de drive, ex.: D:, colide com o
+      # separador host:container da short syntax). Edite `source` para o
+      # caminho da SUA maquina e descomente EXECUTOR_SYNC_DIRS na secao environment:
+      #   Windows: D:\drive   (ou D:/drive)
+      #   Linux:   /home/usuario/drive
+      #   macOS:   /Users/usuario/drive
+      #- type: bind
+      #  source: /caminho/no/host
+      #  target: /data/sync
+
+    # Acesso ao host de dentro do container (localhost do host)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    # Perfil seccomp — bloqueia syscalls perigosas (mount, ptrace, reboot, etc.)
+    security_opt:
+      - seccomp:security/seccomp-executor.json
+
+    # Rede compartilhada com o servidor (acesso ao MinIO via hostname interno)
+    networks:
+      - atlans-backend
+
+    # Limites de recursos
+    #
+    # Memoria: EXECUTOR_MEMORIA, lida do .env AO LADO deste arquivo (o compose
+    # interpola dali). O instalador (static/install.sh) grava 75% da memoria
+    # que o Docker enxerga (minimo 2G); sem ela, 2G. O 2G fixo matava o executor por OOM do
+    # cgroup numa maquina de 16 GB com 13 GB livres — e o job
+    # em andamento ficava sem desfecho. Para mudar num executor ja instalado:
+    #   echo EXECUTOR_MEMORIA=12G >> .env && docker compose -f docker-compose.executor.yml up -d
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: ${EXECUTOR_MEMORIA:-2G}
+        reservations:
+          cpus: "0.5"
+          memory: 512M
+
+networks:
+  atlans-backend:
+    driver: bridge
+
+volumes:
+  executor-data:

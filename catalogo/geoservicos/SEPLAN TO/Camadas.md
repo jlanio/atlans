@@ -1,0 +1,1296 @@
+# SEPLAN TO — camadas
+
+Geoportal: [[Geosserviços/SEPLAN TO/Secretaria do Planejamento e Orçamento do Tocantins — SEPLAN|Secretaria do Planejamento e Orçamento do Tocantins — SEPLAN]]
+
+Total: **1267** camadas, organizadas em 12 grupo(s).
+
+## base_cartografica_sudeste_tocantins (12)
+- `base_cartografica_sudeste_tocantins:aerodromo_st` — Aeródromo
+- `base_cartografica_sudeste_tocantins:areaestudopoligon` — Área estudo
+- `base_cartografica_sudeste_tocantins:areaumida_pol50` — Área Úmida
+- `base_cartografica_sudeste_tocantins:assentamentoincrapoligono` — Assentamento INCRA
+- `base_cartografica_sudeste_tocantins:estacaofluvioanaponto` — Estação Fluvio ANA
+- `base_cartografica_sudeste_tocantins:hidrografialinha50` — Hidrografia
+- `base_cartografica_sudeste_tocantins:ilhapoligono50` — Ilha
+- `base_cartografica_sudeste_tocantins:localidades_st` — Localidades
+- `base_cartografica_sudeste_tocantins:massaaguapoligono50` — Massa d'água
+- `base_cartografica_sudeste_tocantins:nascenteponto50` — Nascente Ponto 50
+- `base_cartografica_sudeste_tocantins:territorioquilombolaincra` — Território Quilombola INCRA
+- `base_cartografica_sudeste_tocantins:trechomassaaguapoligono50` — Trecho Massa Água 50.000
+
+## base_digital_continua (115)
+- `base_digital_continua:aeroportos_bdc_250` — Aeroportos - Escala 1:250.000
+- `base_digital_continua:areas_humidas_bdc` — Áreas úmidas - Escala 1:100.000
+- `base_digital_continua:areas_humidas_bdc_1000` — Áreas úmidas - Escala 1:1.000.000
+- `base_digital_continua:areas_humidas_bdc_250` — Áreas úmidas - Escala 1:250.000
+- `base_digital_continua:areas_lazer_pontos_bdc` — Áreas de lazer (pontos) - Escala 1:100.000
+- `base_digital_continua:areas_lazer_pontos_bdc_1000` — Áreas de lazer (pontos) - Escala 1:1.000.000
+- `base_digital_continua:areas_lazer_pontos_bdc_250` — Áreas de lazer (pontos) - Escala 1:250.000
+- `base_digital_continua:bacias_hidrograficas_poligonos_bdc` — Bacias hidrográficas  - Escala 1:100.000
+- `base_digital_continua:bacias_hidrograficas_poligonos_bdc_1000` — Bacias hidrográficas - Escala 1:1.000.000
+- `base_digital_continua:bacias_hidrograficas_poligonos_bdc_250` — Bacias hidrográficas  - Escala 1:250.000
+- `base_digital_continua:barragem_represa_bdc` — Barragem de represa - Escala 1:100.000
+- `base_digital_continua:barragem_represa_bdc_1000` — Barragem de represa - Escala 1:1.000.000
+- `base_digital_continua:barragem_represa_bdc_250` — Barragem de represa - Escala 1:250.000
+- `base_digital_continua:campo_pouso_poligonos_bdc` — Campos de pouso (polígonos) - Escala 1:100.000
+- `base_digital_continua:campo_pouso_poligonos_bdc_250` — Campos de pouso (polígonos) - Escala 1:250.000
+- `base_digital_continua:campo_pouso_pontos_bdc` — Campos de pouso (pontos) - Escala 1:100.000
+- `base_digital_continua:campo_pouso_pontos_bdc_1000` — Campos de pouso (pontos) - Escala 1:1.000.000
+- `base_digital_continua:campo_pouso_pontos_bdc_250` — Campos de pouso (pontos) - Escala 1:250.000
+- `base_digital_continua:cercas_muros_bdc` — Cercas e muros divisórios - Escala 1:100.000
+- `base_digital_continua:cercas_muros_bdc_1000` — Cercas e muros divisórios - Escala 1:1.000.000
+- `base_digital_continua:cercas_muros_bdc_250` — Cercas e muros divisórios - Escala 1:250.000
+- `base_digital_continua:cursos_agua_bdc` — Cursos d´água - Escala 1:100.000
+- `base_digital_continua:cursos_agua_bdc_1000` — Cursos d´água - Escala 1:1.000.000
+- `base_digital_continua:cursos_agua_bdc_250` — Cursos d´água - Escala 1:250.000
+- `base_digital_continua:curvas_de_nivel_bdc` — Curvas de nível - Escala 1:100.000
+- `base_digital_continua:curvas_de_nivel_bdc_1000` — Curvas de nível - Escala 1:1.000.000
+- `base_digital_continua:curvas_de_nivel_bdc_250` — Curvas de nível - Escala 1:250.000
+- `base_digital_continua:desmatamento_1000_bdc` — Desmatamento período 2000-2002 Norte Tocantins - Escala 1:1.000.000
+- `base_digital_continua:desmatamento_100_bdc` — Desmatamento do período 2000-2002  Norte do Tocantins - Escala 1:100.000
+- `base_digital_continua:desmatamento_250_bdc` — Desmatamento do período 2000-2002 Norte do Tocantins - Escala 1:250.000
+- `base_digital_continua:desmatamento_bdc` — Desmatamento - Escala 1:100.000
+- `base_digital_continua:desmatamento_bdc_1000` — Desmatamento - Escala 1:1.000.000
+- `base_digital_continua:desmatamento_bdc_250` — Desmatamento - Escala 1:250.000
+- `base_digital_continua:edificacoes_grandes_bdc_` — Edificação representável em escala 1:100.000
+- `base_digital_continua:edificacoes_grandes_bdc_250` — Edificação representável em escala  1:250.000
+- `base_digital_continua:edificacoes_pontos_bdc_` — Edificações (pontos) - Escala 1:100.000
+- `base_digital_continua:edificacoes_pontos_bdc_1000` — Edificações (pontos) - Escala 1:1.000.000
+- `base_digital_continua:edificacoes_pontos_bdc_250` — Edificações (pontos) - Escala 1:250.000
+- `base_digital_continua:estacao_geradora_bdc` — Estação geradora - Escala 1:100.000
+- `base_digital_continua:estacao_geradora_bdc_1000` — Estação geradora - Escala 1:1.000.000
+- `base_digital_continua:estacao_geradora_bdc_250` — Estação geradora - Escala 1:250.000
+- `base_digital_continua:ferrovia_bdc` — Ferrovias - Escala 1:100.000
+- `base_digital_continua:hidrografia_balsas_bdc` — Balsas - Escala 1:100.000
+- `base_digital_continua:hidrografia_balsas_bdc_1000` — Balsas - Escala 1:1.000.000
+- `base_digital_continua:hidrografia_balsas_bdc_250` — Balsas - Escala 1:250.000
+- `base_digital_continua:hidrografia_ilhas_bdc` — Ilhas - Escala 1:100.000
+- `base_digital_continua:hidrografia_ilhas_bdc_1000` — Ilhas - Escala 1:1.000.000
+- `base_digital_continua:hidrografia_ilhas_bdc_250` — Ilhas - Escala 1:250.000
+- `base_digital_continua:hidrografia_pontos_bdc` — Hidrografia (pontos) - Escala 1:100.000
+- `base_digital_continua:hidrografia_pontos_bdc_250` — Hidrografia (pontos) - Escala 1:250.000
+- `base_digital_continua:hipsografia_banco_bdc` — Hipsografia (bancos) - Escala 1:100.000
+- `base_digital_continua:hipsografia_banco_bdc_1000` — Hipsografia (bancos) - Escala 1:1.000.000
+- `base_digital_continua:hipsografia_banco_bdc_250` — Hipsografia (bancos) - Escala 1:250.000
+- `base_digital_continua:hipsografia_escarpa_bdc` — Hipsografia (escarpas) - Escala 1:100.000
+- `base_digital_continua:hipsografia_escarpa_bdc_1000` — Hipsografia (escarpas) - Escala 1:1.000.000
+- `base_digital_continua:hipsografia_escarpa_bdc_250` — Hipsografia (escarpas) - Escala 1:250.000
+- `base_digital_continua:hipsografia_linha_bdc` — Hipsografia (linhas) - Escala 1:100.000
+- `base_digital_continua:hipsografia_linha_bdc_1000` — Hipsografia (linhas) - Escala 1:1.000.000
+- `base_digital_continua:hipsografia_linha_bdc_250` — Hipsografia (linhas) - Escala 1:250.000
+- `base_digital_continua:hipsografia_ponto_bdc` — Hipsografia (pontos) - Escala 1:100.000
+- `base_digital_continua:hipsografia_ponto_bdc_1000` — Hipsografia (pontos) - Escala 1:1.000.000
+- `base_digital_continua:hipsografia_ponto_bdc_250` — Hipsografia (pontos) - Escala 1:250.000
+- `base_digital_continua:jazida_linhas_bdc` — Jazidas (linhas) - Escala 1:100.000
+- `base_digital_continua:jazida_linhas_bdc_1000` — Jazidas (linhas) - Escala 1:1.000.000
+- `base_digital_continua:jazida_linhas_bdc_250` — Jazidas (linhas) - Escala 1:250.000
+- `base_digital_continua:jazida_poligonos_bdc` — Jazidas (polígonos) - Escala 1:100.000
+- `base_digital_continua:jazida_poligonos_bdc_1000` — Jazidas (polígonos) - Escala 1:1.000.000
+- `base_digital_continua:jazida_poligonos_bdc_250` — Jazidas (polígonos) - Escala 1:250.000
+- `base_digital_continua:jazida_pontos_bdc` — Jazidas (pontos) - Escala 1:100.000
+- `base_digital_continua:jazida_pontos_bdc_1000` — Jazidas (pontos) - Escala 1:1.000.000
+- `base_digital_continua:jazida_pontos_bdc_250` — Jazidas (pontos) - Escala 1:250.000
+- `base_digital_continua:limite_estadual_poligono_bdc` — Limite estadual (polígono) - Escala 1:100.000
+- `base_digital_continua:limites_municipais_bdc` — Limites municipais - Escala 1:100.000
+- `base_digital_continua:linha_transmissao_energia_bdc` — Linhas de transmissão de energia - Escala 1:100.000
+- `base_digital_continua:linha_transmissao_energia_bdc_1000` — Linhas de transmissão de energia - Escala 1:1.000.000
+- `base_digital_continua:linha_transmissao_energia_bdc_250` — Linhas de transmissão de energia - Escala 1:250.000
+- `base_digital_continua:localidades_poligono_bdc` — Localidades (polígonos) - Escala 1:100.000
+- `base_digital_continua:localidades_ponto_bdc` — Localidades (pontos) - Escala 1:100.000
+- `base_digital_continua:marco_1000_bdc` — Marco Municipal (pontos) - Escala 1:1.000.000
+- `base_digital_continua:marco_100_bdc` — Marco Municipal (pontos) - Escala 1: 100.000
+- `base_digital_continua:marco_250_bdc` — Marco Municipal (pontos) - Escala 1: 250.000
+- `base_digital_continua:massa_agua_bdc` — Massa d'Água - Escala 1:100.000
+- `base_digital_continua:massa_agua_bdc_1000` — Massa d'Água - Escala 1:1.000.000
+- `base_digital_continua:massa_agua_bdc_250` — Massa d'Água - Escala 1:250.000
+- `base_digital_continua:pistas_aeroporto_bdc` — Pistas de aeroporto - Escala 1:100.000
+- `base_digital_continua:pistas_aeroporto_bdc_250` — Pistas de aeroporto - Escala 1:250.000
+- `base_digital_continua:pontes_pontos_bdc` — Pontes (pontos) - Escala 1:100.000
+- `base_digital_continua:pontes_pontos_bdc_1000` — Pontes (pontos) - Escala 1:1.000.000
+- `base_digital_continua:pontes_pontos_bdc_250` — Pontes (pontos) - Escala 1:250.000
+- `base_digital_continua:ponto_fiscal_bdc` — Posto fiscal - Escala 1:100.000
+- `base_digital_continua:ponto_fiscal_bdc_1000` — Posto fiscal - Escala 1:1.000.000
+- `base_digital_continua:ponto_fiscal_bdc_250` — Posto fiscal - Escala 1:250.000
+- `base_digital_continua:ponto_passagem_bdc` — Pontos de passagem - Escala 1:100.000
+- `base_digital_continua:ponto_passagem_bdc_1000` — Pontos de passagem - Escala 1:1.000.000
+- `base_digital_continua:ponto_passagem_bdc_250` — Pontos de passagem - Escala 1:250.000
+- `base_digital_continua:ponto_referencia_bdc` — Pontos de referencia - Escala 1:100.000
+- `base_digital_continua:ponto_referencia_bdc_1000` — Pontos de referencia - Escala 1:1.000.000
+- `base_digital_continua:ponto_referencia_bdc_250` — Pontos de referencia - Escala 1:250.000
+- `base_digital_continua:pontos_cotados_bdc` — Pontos cotados - Escala 1:100.000
+- `base_digital_continua:pontos_cotados_bdc_1000` — Pontos cotados - Escala 1:1.000.000
+- `base_digital_continua:pontos_cotados_bdc_250` — Pontos cotados - Escala 1:250.000
+- `base_digital_continua:prefixo_rodovias_bdc` — Prefixos rodovias - Escala 1:100.000
+- `base_digital_continua:prefixo_rodovias_bdc_1000` — Prefixos rodovias - Escala 1:1.000.000
+- `base_digital_continua:terras_indigenas_bdc` — Terras indígenas - Escala 1:100.000
+- `base_digital_continua:terras_indigenas_bdc_1000` — Terras indígenas  - Escala 1:1.000.000
+- `base_digital_continua:terras_indigenas_bdc_250` — Terras indígenas - Escala 1:250.000
+- `base_digital_continua:torres_bdc` — Torres - Escala 1:100.000
+- `base_digital_continua:torres_bdc_1000` — Torres - Escala 1:1.000.000
+- `base_digital_continua:torres_bdc_250` — Torres - Escala 1:250.000
+- `base_digital_continua:tunel_bdc` — Túneis - Escala 1:100.000
+- `base_digital_continua:tunel_bdc_1000` — Túneis - Escala 1:1.000.000
+- `base_digital_continua:tunel_bdc_250` — Túneis - Escala 1:250.000
+- `base_digital_continua:uso_da_terr_250_bdc` — Cobertura e uso da terra - Escala 1:250.000
+- `base_digital_continua:uso_da_terra_1000_bdc` — Cobertura e uso da Terra - Escala 1:1.000.000
+- `base_digital_continua:uso_da_terra_100_bdc_` — Cobertura e uso da Terra - Escala 1:100.000
+
+## base_referencia_palmas (20)
+- `base_referencia_palmas:sigp_areas_especiais_brp` — Áreas Especiais
+- `base_referencia_palmas:sigp_borda_chapada_brp` — Borda de Chapada
+- `base_referencia_palmas:sigp_cabeceira_brp` — Cabeceira
+- `base_referencia_palmas:sigp_curso_agua_brp` — Curso d'água
+- `base_referencia_palmas:sigp_curso_hidrico_brp` — Curso Hídrico
+- `base_referencia_palmas:sigp_curva_nivel_brp` — Curvas de Nível
+- `base_referencia_palmas:sigp_declividade_brp` — Declividade
+- `base_referencia_palmas:sigp_edificacoes_brp` — Edificações
+- `base_referencia_palmas:sigp_espelho_agua_brp` — Espelho d'água
+- `base_referencia_palmas:sigp_hidrografia_brp` — Hidrografia
+- `base_referencia_palmas:sigp_limite_municipal_brp` — Limite Municipal
+- `base_referencia_palmas:sigp_linha_pontes_brp` — Pontes
+- `base_referencia_palmas:sigp_mancha_urbana_brp` — Mancha Urbana
+- `base_referencia_palmas:sigp_rodovias_brp` — Rodovias
+- `base_referencia_palmas:sigp_rppn_brp` — Reservas Particulares do Patrimônio Natural
+- `base_referencia_palmas:sigp_topo_morro_brp` — Topo de Morro
+- `base_referencia_palmas:sigp_unidade_conservacao_brp` — Unidades de Conservação
+- `base_referencia_palmas:sigp_unidades_conservacao_municipal_brp` — Unidades de Conservação Municipal
+- `base_referencia_palmas:sigp_vias_interurbanas_brp` — Vias Interurbanas
+- `base_referencia_palmas:sigp_vias_urbanas_brp` — Vias Urbanas
+
+## base_tematica_norte_tocantins (26)
+- `base_tematica_norte_tocantins:abacaxi_nt` — Zoneamento Edafoclimático - Abacaxi
+- `base_tematica_norte_tocantins:acai_nt` — Zoneamento Edafoclimático - Açaí
+- `base_tematica_norte_tocantins:aptidao` — Aptidão Agrícola das Terras
+- `base_tematica_norte_tocantins:arroz_medio_nt_` — Zoneamento Edafoclimático - Arroz Sequeiro Ciclo Médio
+- `base_tematica_norte_tocantins:arroz_precoce_nt` — Zoneamento Edafoclimático - Arroz Sequeiro Ciclo Precoce
+- `base_tematica_norte_tocantins:banana_nt` — Zoneamento Edafoclimático - Banana
+- `base_tematica_norte_tocantins:caju_nt` — Zoneamento Edafoclimático - Caju
+- `base_tematica_norte_tocantins:cobertura_e_uso_terra` — Cobertura e Uso da Terra
+- `base_tematica_norte_tocantins:cupuacu` — Zoneamento Edafoclimático - Cupuaçu
+- `base_tematica_norte_tocantins:feijao_caupi_nt` — Zoneamento Edafoclimático - Feijão Caupi
+- `base_tematica_norte_tocantins:feijao_precoce_nt` — Zoneamento Edafoclimático - Feijão Precoce
+- `base_tematica_norte_tocantins:feijao_tardio_nt` — Zoneamento Edafoclimático - Feijão Tardio
+- `base_tematica_norte_tocantins:geologia` — Geologia
+- `base_tematica_norte_tocantins:geomorfologia` — Geomorfologia
+- `base_tematica_norte_tocantins:girassol_nt` — Zoneamento Edafoclimático - Girassol
+- `base_tematica_norte_tocantins:manga_nt` — Zoneamento Edafoclimático - Manga
+- `base_tematica_norte_tocantins:milho_nt` — Zoneamento Edafoclimático - Milho
+- `base_tematica_norte_tocantins:murici_nt` — Zoneamento Edafoclimático - Murici
+- `base_tematica_norte_tocantins:plano_uso_vegetacao_nt` — Plano de Uso Potencial da Cobertura Vegetal
+- `base_tematica_norte_tocantins:regioes_fitoecologicas` — Regiões Fitoecológicas
+- `base_tematica_norte_tocantins:soja_precoce_nt` — Zoneamento Edafoclimático - Soja de Ciclo Precoce
+- `base_tematica_norte_tocantins:soja_tardio_nt` — Zoneamento Edafoclimático - Soja de Ciclo Tardio
+- `base_tematica_norte_tocantins:solos` — Solos
+- `base_tematica_norte_tocantins:unidades_territoriais_basicas` — Unidades Territoriais Básicas
+- `base_tematica_norte_tocantins:vulnerabilidade_paisagens_nt` — Vulnerabilidade de Paisagens à Perda de Solos
+- `base_tematica_norte_tocantins:zoneamento_ecolog_econ_nt` — Plano de Zoneamento Ecológico-Econômico
+
+## base_tematica_palmas (7)
+- `base_tematica_palmas:cob_uso_100mil_btp` — Cobertura e Uso do Solo - 100 mil
+- `base_tematica_palmas:cob_uso_2011_final_btp` — Cobertura e Uso do Solo - 25 mil
+- `base_tematica_palmas:cob_uso_250mil_btp` — Cobertura e Uso do Solo - 250 mil
+- `base_tematica_palmas:cob_uso_50mil_btp` — Cobertura e Uso do Solo - 50 mil
+- `base_tematica_palmas:sigp_bacias_btp` — Bacias Hidrográfica
+- `base_tematica_palmas:sigp_pontos_referencia_btp` — Pontos de Referência
+- `base_tematica_palmas:sigp_sub_bacias_btp` — Sub-bacias Hidrográficas
+
+## base_tematica_sudeste_tocantins (29)
+- `base_tematica_sudeste_tocantins:adequacao_uso` — Adequação do uso dos solos
+- `base_tematica_sudeste_tocantins:aptidao_agricola_st` — Aptidão agrícola das terras
+- `base_tematica_sudeste_tocantins:areaminerae_st` — Área Mineral
+- `base_tematica_sudeste_tocantins:articulacao_100mil_st` — Articulação 100.000
+- `base_tematica_sudeste_tocantins:articulacao_100mil_st_especial` — Articulação 100.000 Especial
+- `base_tematica_sudeste_tocantins:articulacao_50mil_st` — Articulação 50.000
+- `base_tematica_sudeste_tocantins:articulacao_50mil_st_especial` — Articulação 50.000 especial
+- `base_tematica_sudeste_tocantins:caverna_ponto_st` — Caverna Ponto
+- `base_tematica_sudeste_tocantins:cob_uso_st` — Cobertura e uso da terra 100.000
+- `base_tematica_sudeste_tocantins:cobusorse_pol50_` — Cobertura e uso da terra 50.000
+- `base_tematica_sudeste_tocantins:escassezhidrica_clima_pol50_st` — Escassez Hídrica Clima
+- `base_tematica_sudeste_tocantins:escassezhidricarse_pol50_gcs` — Escassez Hídrica
+- `base_tematica_sudeste_tocantins:estruturas_geologia_linha250_st` — Geologia Estruturas
+- `base_tematica_sudeste_tocantins:geologia_st` — Geologia Sudeste Tocantins
+- `base_tematica_sudeste_tocantins:geomorfologia_tematica_se` — Geomorfologia
+- `base_tematica_sudeste_tocantins:hidrogeologia_st_` — Hidrogeologia
+- `base_tematica_sudeste_tocantins:pedologia_st` — Pedologia do Sudeste
+- `base_tematica_sudeste_tocantins:pocoprofundo_ponto100_st` — Poço profundo
+- `base_tematica_sudeste_tocantins:potencial_caverna_st` — Potencial Caverna
+- `base_tematica_sudeste_tocantins:projetobarraginhasponto_st` — Projeto Barraginhas
+- `base_tematica_sudeste_tocantins:regiaofitoecologica_pol50_st` — Região Fitoecológica 50.000
+- `base_tematica_sudeste_tocantins:titulominerariopol100_gcs_st` — Titulo Minerario
+- `base_tematica_sudeste_tocantins:turismo_st` — Turismo
+- `base_tematica_sudeste_tocantins:ubc_pol50_mi_completo_4674` — Unidades básicas de compartimentação
+- `base_tematica_sudeste_tocantins:unidades_de_paisagem_st` — Unidades de Paisagem
+- `base_tematica_sudeste_tocantins:up_pol50_norte` — Unidades de Paisagem Norte
+- `base_tematica_sudeste_tocantins:up_pol50_sul` — Unidades de Paisagem Sul
+- `base_tematica_sudeste_tocantins:vereda_st` — Vereda
+- `base_tematica_sudeste_tocantins:vulnerabilidade_st` — Vulnerabilidade
+
+## base_tematica_tocantins (66)
+- `base_tematica_tocantins:atrativos_turistico_cientifico_2012` — Atrativo Turístico científico
+- `base_tematica_tocantins:bacias_hidro_2000` — Bacias Hidrográficas - ZAE
+- `base_tematica_tocantins:bacias_hidrograficas_2012` — Bacias Hidrográficas
+- `base_tematica_tocantins:cena_cbers` — Cena CBERS
+- `base_tematica_tocantins:cenlandsat` — Cena Landsat
+- `base_tematica_tocantins:cobertura_e_uso_1996` — Cobertura e Uso da Terra Ano 1996
+- `base_tematica_tocantins:cobertura_uso_1990` — Cobertura e Uso da Terra Ano 1990
+- `base_tematica_tocantins:cobertura_uso_2002` — Cobertura e Uso da Terra Ano 2002
+- `base_tematica_tocantins:cobertura_uso_2004` — Desmatamento do Tocantins Ano 2004
+- `base_tematica_tocantins:cobertura_uso_2007_1` — Cobertura e Uso da Terra Ano 2007
+- `base_tematica_tocantins:cobertura_uso_solo_2000_2` — Cobertura e Uso da Terra Ano 2000
+- `base_tematica_tocantins:cobertura_uso_solo_2003` — Desmatamento do Tocantins Ano 2003
+- `base_tematica_tocantins:cobertura_usosolo_2005` — Cobertura e Uso da Terra Ano 2005
+- `base_tematica_tocantins:compartimentacao_geoambiental_2012` — Compartimentação Geoambiental - ZAE
+- `base_tematica_tocantins:declividade_2012` — Declividade - ZAE
+- `base_tematica_tocantins:erodibilidade` — Erodibilidade Potencial dos Solos - ZAE
+- `base_tematica_tocantins:ferrovia_patios_2019` — Ferrovias patios
+- `base_tematica_tocantins:ferrovias_2019` — Ferrovias
+- `base_tematica_tocantins:fitoecologico_1` — Regiöes Fitoecologicas
+- `base_tematica_tocantins:floresta_amazonica` — Floresta Amazônica - SIPAM
+- `base_tematica_tocantins:formas_relevo` — Geomorfologia - ZAE
+- `base_tematica_tocantins:geoformologia_amz` — Geomorfologia - SIPAM
+- `base_tematica_tocantins:geologia_afloramentos` — Afloramentos - SIPAM
+- `base_tematica_tocantins:geologia_ambientes_2012` — Geologia Ambientes
+- `base_tematica_tocantins:geologia_amz` — Geologia - SIPAM
+- `base_tematica_tocantins:geologia_ano_2000` — Geologia - ZAE
+- `base_tematica_tocantins:geologia_dobra` — Dobras Geológicas - SIPAM
+- `base_tematica_tocantins:geologia_estruturas` — Estruturas Geológicas - SIPAM
+- `base_tematica_tocantins:geologia_falha_sipam` — Falhas Geológicas - SIPAM
+- `base_tematica_tocantins:geologia_fratura` — Fraturas Geológicas - SIPAM
+- `base_tematica_tocantins:geomorfologia_dominios_2012` — Geomorfologia Dominios
+- `base_tematica_tocantins:geomorfologia_unidades_2012` — Geomorfologia Unidades
+- `base_tematica_tocantins:geracao_de_energia` — Geração de energia
+- `base_tematica_tocantins:hidrogeologia_2012` — Hidrogeologia
+- `base_tematica_tocantins:index_100` — Index 100
+- `base_tematica_tocantins:index_250` — Index 250
+- `base_tematica_tocantins:index_500` — Index 500
+- `base_tematica_tocantins:LimiteEstadual_AGM_TO_2022_A` — Limite estadual 2022 A
+- `base_tematica_tocantins:LimiteMunicipal_AGM_TO_2022_A` — Limite municipal 2022 A
+- `base_tematica_tocantins:LimiteMunicipal_AGM_TO_2022_L` — Limite municipal 2022 L
+- `base_tematica_tocantins:localidade_2022` — Localidades 2022
+- `base_tematica_tocantins:macrorregiao_regiao_2024` — Macrorregião e região de planejamento
+- `base_tematica_tocantins:ocorrencias_minerais_2012` — Ocorrências Minerais
+- `base_tematica_tocantins:pedologia_2012` — Pedologia
+- `base_tematica_tocantins:pedologia_sipam` — Solos - SIPAM
+- `base_tematica_tocantins:plano_diretor_palmas` — Plano Diretor de Palmas - ZAE
+- `base_tematica_tocantins:plano_uso_potencial_vegetacao` — Plano de Uso Vegetação
+- `base_tematica_tocantins:potencialidade_uso_terra_2012` — Potencialidade de Uso da Terra - ZAE
+- `base_tematica_tocantins:precipit_media_anual_zae` — Precipitação Média Anual - ZAE
+- `base_tematica_tocantins:prectanual_1m_gcs_a` — Precipitação Média Anual (1990 a 2019)
+- `base_tematica_tocantins:prectanual_1m_gcs_l` — Precipitação Média Anual  - Isolinhas
+- `base_tematica_tocantins:regionalizacao_climatica_2020` — Regionalização Climática - Thornthwaite-Mather
+- `base_tematica_tocantins:rodovia_2024` — Rodovias 2024
+- `base_tematica_tocantins:sedes` — Sedes municipais
+- `base_tematica_tocantins:sistemas_hidrograficos_2012` — Sistemas Hidrográficos
+- `base_tematica_tocantins:solos_2000` — Pedologia - ZAE
+- `base_tematica_tocantins:subbacias_hidrograficas_2012` — Sub-bacias Hidrográficas
+- `base_tematica_tocantins:temperatura_media_2000` — Regionalização Climática - ZAE
+- `base_tematica_tocantins:temperatura_media_anual_zae` — Temperatura do Ar Média Anual - ZAE
+- `base_tematica_tocantins:terras_indigenas_2019` — Terras indígenas
+- `base_tematica_tocantins:tmedmanual_1m_gcs_a` — Temperatura Média Anual (1990 a 2019)
+- `base_tematica_tocantins:uhe_lajeado_nivel_maximo_sirgas2000` — UHE Lajeado - Cota de Nível Máximo
+- `base_tematica_tocantins:veg_sec_amz` — Vegetação Secundária - SIPAM
+- `base_tematica_tocantins:vegetacao_amz_` — Vegetação - SIPAM
+- `base_tematica_tocantins:vegetacao_potencial` — Vegetação Potencial - ZAE
+- `base_tematica_tocantins:zoneamento_agroecologico_zae` — Zoneamento Agroecológico - ZAE
+
+## cartas_climaticas (890)
+- `cartas_climaticas:DChv1990_1M_GCS_a` — Dias Chuvosos em 1990 - A
+- `cartas_climaticas:DChv1990_1M_GCS_l` — Dias Chuvosos em 1990 - L
+- `cartas_climaticas:DChv1991_1M_GCS_a` — Dias Chuvosos em 1991 - A
+- `cartas_climaticas:DChv1991_1M_GCS_l` — Dias Chuvosos em 1991 - L
+- `cartas_climaticas:DChv1992_1M_GCS_a` — Dias Chuvosos em 1992 - A
+- `cartas_climaticas:DChv1992_1M_GCS_l` — Dias Chuvosos em 1992 - L
+- `cartas_climaticas:DChv1993_1M_GCS_a` — Dias Chuvosos em 1993 - A
+- `cartas_climaticas:DChv1993_1M_GCS_l` — Dias Chuvosos em 1993 - L
+- `cartas_climaticas:DChv1994_1M_GCS_a` — Dias Chuvosos em 1994 - A
+- `cartas_climaticas:DChv1994_1M_GCS_l` — Dias Chuvosos em 1994 - L
+- `cartas_climaticas:DChv1995_1M_GCS_a` — Dias Chuvosos em 1995 - A
+- `cartas_climaticas:DChv1995_1M_GCS_l` — Dias Chuvosos em 1995 - L
+- `cartas_climaticas:DChv1996_1M_GCS_a` — Dias Chuvosos em 1996 - A
+- `cartas_climaticas:DChv1996_1M_GCS_l` — Dias Chuvosos em 1996 - L
+- `cartas_climaticas:DChv1997_1M_GCS_a` — Dias Chuvosos em 1997 - A
+- `cartas_climaticas:DChv1997_1M_GCS_l` — Dias Chuvosos em 1997 - L
+- `cartas_climaticas:DChv1998_1M_GCS_a` — Dias Chuvosos em 1998 - A
+- `cartas_climaticas:DChv1998_1M_GCS_l` — Dias Chuvosos em 1998 - L
+- `cartas_climaticas:DChv1999_1M_GCS_a` — Dias Chuvosos em 1999 - A
+- `cartas_climaticas:DChv1999_1M_GCS_l` — Dias Chuvosos em 1999 - L
+- `cartas_climaticas:DChv2000_1M_GCS_a` — Dias Chuvosos em 2000 - A
+- `cartas_climaticas:DChv2000_1M_GCS_l` — Dias Chuvosos em 2000 - L
+- `cartas_climaticas:DChv2001_1M_GCS_a` — Dias Chuvosos em 2001 - A
+- `cartas_climaticas:DChv2001_1M_GCS_l` — Dias Chuvosos em 2001 - L
+- `cartas_climaticas:DChv2002_1M_GCS_a` — Dias Chuvosos em 2002 - A
+- `cartas_climaticas:DChv2002_1M_GCS_l` — Dias Chuvosos em 2002 - L
+- `cartas_climaticas:DChv2003_1M_GCS_a` — Dias Chuvosos em 2003 - A
+- `cartas_climaticas:DChv2003_1M_GCS_l` — Dias Chuvosos em 2003 - L
+- `cartas_climaticas:DChv2004_1M_GCS_a` — Dias Chuvosos em 2004 - A
+- `cartas_climaticas:DChv2004_1M_GCS_l` — Dias Chuvosos em 2004 - L
+- `cartas_climaticas:DChv2005_1M_GCS_a` — Dias Chuvosos em 2005 - A
+- `cartas_climaticas:DChv2005_1M_GCS_l` — Dias Chuvosos em 2005 - L
+- `cartas_climaticas:DChv2006_1M_GCS_a` — Dias Chuvosos em 2006 - A
+- `cartas_climaticas:DChv2006_1M_GCS_l` — Dias Chuvosos em 2006 - L
+- `cartas_climaticas:DChv2007_1M_GCS_a` — Dias Chuvosos em 2007 - A
+- `cartas_climaticas:DChv2007_1M_GCS_l` — Dias Chuvosos em 2007 - L
+- `cartas_climaticas:DChv2008_1M_GCS_a` — Dias Chuvosos em 2008 - A
+- `cartas_climaticas:DChv2008_1M_GCS_l` — Dias Chuvosos em 2008 - L
+- `cartas_climaticas:DChv2009_1M_GCS_a` — Dias Chuvosos em 2009 - A
+- `cartas_climaticas:DChv2009_1M_GCS_l` — Dias Chuvosos em 2009 - L
+- `cartas_climaticas:DChv2010_1M_GCS_a` — Dias Chuvosos em 2010 - A
+- `cartas_climaticas:DChv2010_1M_GCS_l` — Dias Chuvosos em 2010 - L
+- `cartas_climaticas:DChv2011_1M_GCS_a` — Dias Chuvosos em 2011 - A
+- `cartas_climaticas:DChv2011_1M_GCS_l` — Dias Chuvosos em 2011 - L
+- `cartas_climaticas:DChv2012_1M_GCS_a` — Dias Chuvosos em 2012 - A
+- `cartas_climaticas:DChv2012_1M_GCS_l` — Dias Chuvosos em 2012 - L
+- `cartas_climaticas:DChv2013_1M_GCS_a` — Dias Chuvosos em 2013 - A
+- `cartas_climaticas:DChv2013_1M_GCS_l` — Dias Chuvosos em 2013 - L
+- `cartas_climaticas:DChv2014_1M_GCS_a` — Dias Chuvosos em 2014 - A
+- `cartas_climaticas:DChv2014_1M_GCS_l` — Dias Chuvosos em 2014 - L
+- `cartas_climaticas:DChv2015_1M_GCS_a` — Dias Chuvosos em 2015 - A
+- `cartas_climaticas:DChv2015_1M_GCS_l` — Dias Chuvosos em 2015 - L
+- `cartas_climaticas:DChv2016_1M_GCS_a` — Dias Chuvosos em 2016 - A
+- `cartas_climaticas:DChv2016_1M_GCS_l` — Dias Chuvosos em 2016 - L
+- `cartas_climaticas:DChv2017_1M_GCS_a` — Dias Chuvosos em 2017 - A
+- `cartas_climaticas:DChv2017_1M_GCS_l` — Dias Chuvosos em 2017 - L
+- `cartas_climaticas:DChv2018_1M_GCS_a` — Dias Chuvosos em 2018 - A
+- `cartas_climaticas:DChv2018_1M_GCS_l` — Dias Chuvosos em 2018 - L
+- `cartas_climaticas:DChv2019_1M_GCS_a` — Dias Chuvosos em 2019 - A
+- `cartas_climaticas:DChv2019_1M_GCS_l` — Dias Chuvosos em 2019 - L
+- `cartas_climaticas:DChvM01_1M_GCS_a` — Dias Chuvosos em Janeiro - A
+- `cartas_climaticas:DChvM01_1M_GCS_l` — Dias Chuvosos em Janeiro - L
+- `cartas_climaticas:DChvM02_1M_GCS_a` — Dias Chuvosos em Fevereiro - A
+- `cartas_climaticas:DChvM02_1M_GCS_l` — Dias Chuvosos em Fevereiro - L
+- `cartas_climaticas:DChvM03_1M_GCS_a` — Dias Chuvosos em Março - A
+- `cartas_climaticas:DChvM03_1M_GCS_l` — Dias Chuvosos em Março - L
+- `cartas_climaticas:DChvM04_1M_GCS_a` — Dias Chuvosos em Abril - A
+- `cartas_climaticas:DChvM04_1M_GCS_l` — Dias Chuvosos em Abril - L
+- `cartas_climaticas:DChvM05_1M_GCS_a` — Dias Chuvosos em Maio - A
+- `cartas_climaticas:DChvM05_1M_GCS_l` — Dias Chuvosos em Maio - L
+- `cartas_climaticas:DChvM06_1M_GCS_a` — Dias Chuvosos em Junho - A
+- `cartas_climaticas:DChvM06_1M_GCS_l` — Dias Chuvosos em Junho - L
+- `cartas_climaticas:DChvM07_1M_GCS_a` — Dias Chuvosos em Julho - A
+- `cartas_climaticas:DChvM07_1M_GCS_l` — Dias Chuvosos em Julho - L
+- `cartas_climaticas:DChvM08_1M_GCS_a` — Dias Chuvosos em Agosto - A
+- `cartas_climaticas:DChvM08_1M_GCS_l` — Dias Chuvosos em Agosto - L
+- `cartas_climaticas:DChvM09_1M_GCS_a` — Dias Chuvosos em Setembro - A
+- `cartas_climaticas:DChvM09_1M_GCS_l` — Dias Chuvosos em Setembro - L
+- `cartas_climaticas:DChvM10_1M_GCS_a` — Dias Chuvosos em Outubro - A
+- `cartas_climaticas:DChvM10_1M_GCS_l` — Dias Chuvosos em Outubro - L
+- `cartas_climaticas:DChvM11_1M_GCS_a` — Dias Chuvosos em Novembro - A
+- `cartas_climaticas:DChvM11_1M_GCS_l` — Dias Chuvosos em Novembro - L
+- `cartas_climaticas:DChvM12_1M_GCS_a` — Dias Chuvosos em Dezembro - A
+- `cartas_climaticas:DChvM12_1M_GCS_l` — Dias Chuvosos em Dezembro - L
+- `cartas_climaticas:DChvTAnual_1M_GCS_a` — Dias Chuvosos Total Anual - A
+- `cartas_climaticas:DChvTAnual_1M_GCS_l` — Dias Chuvosos Total Anual - L
+- `cartas_climaticas:DHidAnual_1M_GCS_a` — Deficiência Hídrica Média Anual (1990-2019)
+- `cartas_climaticas:DHidM01_1M_GCS_a` — Deficiência Hídrica em Janeiro
+- `cartas_climaticas:DHidM02_1M_GCS_a` — Deficiência Hídrica em Fevereiro
+- `cartas_climaticas:DHidM03_1M_GCS_a` — Deficiência Hídrica em Março
+- `cartas_climaticas:DHidM04_1M_GCS_a` — Deficiência Hídrica em Abril
+- `cartas_climaticas:DHidM05_1M_GCS_a` — Deficiência Hídrica em Maio
+- `cartas_climaticas:DHidM06_1M_GCS_a` — Deficiência Hídrica em Junho
+- `cartas_climaticas:DHidM07_1M_GCS_a` — Deficiência Hídrica em Julho
+- `cartas_climaticas:DHidM08_1M_GCS_a` — Deficiência Hídrica em Agosto
+- `cartas_climaticas:DHidM09_1M_GCS_a` — Deficiência Hídrica em Setembro
+- `cartas_climaticas:DHidM10_1M_GCS_a` — Deficiência Hídrica em Outubro
+- `cartas_climaticas:DHidM11_1M_GCS_a` — Deficiência Hídrica em Novembro
+- `cartas_climaticas:DHidM12_1M_GCS_a` — Deficiência Hídrica em Dezembro
+- `cartas_climaticas:EHidAnual_1M_GCS_a` — Excedente Hídrico Média Anual (1990-2019)
+- `cartas_climaticas:EHidM01_1M_GCS_a` — Excedente Hídrico em Janeiro
+- `cartas_climaticas:EHidM02_1M_GCS_a` — Excedente Hídrico em Fevereiro
+- `cartas_climaticas:EHidM03_1M_GCS_a` — Excedente Hídrico em Março
+- `cartas_climaticas:EHidM04_1M_GCS_a` — Excedente Hídrico em Abril
+- `cartas_climaticas:EHidM05_1M_GCS_a` — Excedente Hídrico em Maio
+- `cartas_climaticas:EHidM06_1M_GCS_a` — Excedente Hídrico em Junho
+- `cartas_climaticas:EHidM07_1M_GCS_a` — Excedente Hídrico em Julho
+- `cartas_climaticas:EHidM08_1M_GCS_a` — Excedente Hídrico em Agosto
+- `cartas_climaticas:EHidM09_1M_GCS_a` — Excedente Hídrico em Setembro
+- `cartas_climaticas:EHidM10_1M_GCS_a` — Excedente Hídrico em Outubro
+- `cartas_climaticas:EHidM11_1M_GCS_a` — Excedente Hídrico em Novembro
+- `cartas_climaticas:EHidM12_1M_GCS_a` — Excedente Hídrico em Dezembro
+- `cartas_climaticas:EtoRMM01_1M_GCS_a` — Evapotranspiração Média em Janeiro - A
+- `cartas_climaticas:EtoRMM01_1M_GCS_l` — Evapotranspiração Média em Janeiro - L
+- `cartas_climaticas:EtoRMM02_1M_GCS_a` — Evapotranspiração Média em Fevereiro - A
+- `cartas_climaticas:EtoRMM02_1M_GCS_l` — Evapotranspiração Média em Fevereiro - L
+- `cartas_climaticas:EtoRMM03_1M_GCS_a` — Evapotranspiração Média em Março - A
+- `cartas_climaticas:EtoRMM03_1M_GCS_l` — Evapotranspiração Média em Março - L
+- `cartas_climaticas:EtoRMM04_1M_GCS_a` — Evapotranspiração Média em Abril - A
+- `cartas_climaticas:EtoRMM04_1M_GCS_l` — Evapotranspiração Média em Abril - L
+- `cartas_climaticas:EtoRMM05_1M_GCS_a` — Evapotranspiração Média em Maio - A
+- `cartas_climaticas:EtoRMM05_1M_GCS_l` — Evapotranspiração Média em Maio - L
+- `cartas_climaticas:EtoRMM06_1M_GCS_a` — Evapotranspiração Média em Junho - A
+- `cartas_climaticas:EtoRMM06_1M_GCS_l` — Evapotranspiração Média em Junho - L
+- `cartas_climaticas:EtoRMM07_1M_GCS_a` — Evapotranspiração Média em Julho - A
+- `cartas_climaticas:EtoRMM07_1M_GCS_l` — Evapotranspiração Média em Julho - L
+- `cartas_climaticas:EtoRMM08_1M_GCS_a` — Evapotranspiração Média em Agosto - A
+- `cartas_climaticas:EtoRMM08_1M_GCS_l` — Evapotranspiração Média em Agosto - L
+- `cartas_climaticas:EtoRMM09_1M_GCS_a` — Evapotranspiração Média em Setembro - A
+- `cartas_climaticas:EtoRMM09_1M_GCS_l` — Evapotranspiração Média em Setembro - L
+- `cartas_climaticas:EtoRMM10_1M_GCS_a` — Evapotranspiração Média em Outubro - A
+- `cartas_climaticas:EtoRMM10_1M_GCS_l` — Evapotranspiração Média em Outubro - L
+- `cartas_climaticas:EtoRMM11_1M_GCS_a` — Evapotranspiração Média em Novembro - A
+- `cartas_climaticas:EtoRMM11_1M_GCS_l` — Evapotranspiração Média em Novembro - L
+- `cartas_climaticas:EtoRMM12_1M_GCS_a` — Evapotranspiração Média em Dezembro - A
+- `cartas_climaticas:EtoRMM12_1M_GCS_l` — Evapotranspiração Média em Dezembro - L
+- `cartas_climaticas:EtoRT2007_1M_GCS_a` — Evapotranspiração Total em 2007 - A
+- `cartas_climaticas:EtoRT2007_1M_GCS_l` — Evapotranspiração Total em 2007 - L
+- `cartas_climaticas:EtoRT2008_1M_GCS_a` — Evapotranspiração Total em 2008 - A
+- `cartas_climaticas:EtoRT2008_1M_GCS_l` — Evapotranspiração Total em 2008 - L
+- `cartas_climaticas:EtoRT2009_1M_GCS_a` — Evapotranspiração Total em 2009 - A
+- `cartas_climaticas:EtoRT2009_1M_GCS_l` — Evapotranspiração Total em 2009 - L
+- `cartas_climaticas:EtoRT2010_1M_GCS_a` — Evapotranspiração Total em 2010 - A
+- `cartas_climaticas:EtoRT2010_1M_GCS_l` — Evapotranspiração Total em 2010 - L
+- `cartas_climaticas:EtoRT2011_1M_GCS_a` — Evapotranspiração Total em 2011 - A
+- `cartas_climaticas:EtoRT2011_1M_GCS_l` — Evapotranspiração Total em 2011 - L
+- `cartas_climaticas:EtoRT2012_1M_GCS_a` — Evapotranspiração Total em 2012 - A
+- `cartas_climaticas:EtoRT2013_1M_GCS_a` — Evapotranspiração Total em 2013 - A
+- `cartas_climaticas:EtoRT2013_1M_GCS_l` — Evapotranspiração Total em 2013 - L
+- `cartas_climaticas:EtoRT2014_1M_GCS_a` — Evapotranspiração Total em 2014 - A
+- `cartas_climaticas:EtoRT2014_1M_GCS_l` — Evapotranspiração Total em 2014 - L
+- `cartas_climaticas:EtoRT2015_1M_GCS_a` — Evapotranspiração Total em 2015 - A
+- `cartas_climaticas:EtoRT2015_1M_GCS_l` — Evapotranspiração Total em 2015 - L
+- `cartas_climaticas:EtoRT2016_1M_GCS_a` — Evapotranspiração Total em 2016 - A
+- `cartas_climaticas:EtoRT2016_1M_GCS_l` — Evapotranspiração Total em 2016 - L
+- `cartas_climaticas:EtoRT2017_1M_GCS_a` — Evapotranspiração Total em 2017 - A
+- `cartas_climaticas:EtoRT2017_1M_GCS_l` — Evapotranspiração Total em 2017 - L
+- `cartas_climaticas:EtoRT2018_1M_GCS_a` — Evapotranspiração Total em 2018 - A
+- `cartas_climaticas:EtoRT2018_1M_GCS_l` — Evapotranspiração Total em 2018 - L
+- `cartas_climaticas:EtoRT2019_1M_GCS_a` — Evapotranspiração Total em 2019 - A
+- `cartas_climaticas:EtoRT2019_1M_GCS_l` — Evapotranspiração Total em 2019 - L
+- `cartas_climaticas:EtoRTAnual_1M_GCS_a` — Evapotranspiração Total Média Anual - A
+- `cartas_climaticas:EtoRTAnual_1M_GCS_l` — Evapotranspiração Total Média Anual - L
+- `cartas_climaticas:EvapMM01_1M_GCS_a` — Evaporação Média em Janeiro - A
+- `cartas_climaticas:EvapMM01_1M_GCS_l` — Evaporação Média em Janeiro - L
+- `cartas_climaticas:EvapMM02_1M_GCS_a` — Evaporação Média em Fevereiro - A
+- `cartas_climaticas:EvapMM02_1M_GCS_l` — Evaporação Média em Fevereiro - L
+- `cartas_climaticas:EvapMM03_1M_GCS_a` — Evaporação Média em Março - A
+- `cartas_climaticas:EvapMM03_1M_GCS_l` — Evaporação Média em Março - L
+- `cartas_climaticas:EvapMM04_1M_GCS_a` — Evaporação Média em Abril - A
+- `cartas_climaticas:EvapMM04_1M_GCS_l` — Evaporação Média em Abril - L
+- `cartas_climaticas:EvapMM05_1M_GCS_a` — Evaporação Média em Maio - A
+- `cartas_climaticas:EvapMM05_1M_GCS_l` — Evaporação Média em Maio - L
+- `cartas_climaticas:EvapMM06_1M_GCS_a` — Evaporação Média em Junho - A
+- `cartas_climaticas:EvapMM06_1M_GCS_l` — Evaporação Média em Junho - L
+- `cartas_climaticas:EvapMM07_1M_GCS_a` — Evaporação Média em Julho - A
+- `cartas_climaticas:EvapMM07_1M_GCS_l` — Evaporação Média em Julho - L
+- `cartas_climaticas:EvapMM08_1M_GCS_a` — Evaporação Média em Agosto - A
+- `cartas_climaticas:EvapMM08_1M_GCS_l` — Evaporação Média em Agosto - L
+- `cartas_climaticas:EvapMM09_1M_GCS_a` — Evaporação Média em Setembro - A
+- `cartas_climaticas:EvapMM09_1M_GCS_l` — Evaporação Média em Setembro - L
+- `cartas_climaticas:EvapMM10_1M_GCS_a` — Evaporação Média em Outubro - A
+- `cartas_climaticas:EvapMM10_1M_GCS_l` — Evaporação Média em Outubro - L
+- `cartas_climaticas:EvapMM11_1M_GCS_a` — Evaporação Média em Novembro - A
+- `cartas_climaticas:EvapMM11_1M_GCS_l` — Evaporação Média em Novembro - L
+- `cartas_climaticas:EvapMM12_1M_GCS_a` — Evaporação Média em Dezembro - A
+- `cartas_climaticas:EvapMM12_1M_GCS_l` — Evaporação Média em Dezembro - L
+- `cartas_climaticas:EvapT1990_1M_GCS_a` — Evaporação Total em 1990 - A
+- `cartas_climaticas:EvapT1990_1M_GCS_l` — Evaporação Total em 1990 - L
+- `cartas_climaticas:EvapT1991_1M_GCS_a` — Evaporação Total em 1991 - A
+- `cartas_climaticas:EvapT1991_1M_GCS_l` — Evaporação Total em 1991 - L
+- `cartas_climaticas:EvapT1992_1M_GCS_a` — Evaporação Total em 1992 - A
+- `cartas_climaticas:EvapT1992_1M_GCS_l` — Evaporação Total em 1992 - L
+- `cartas_climaticas:EvapT1993_1M_GCS_a` — Evaporação Total em 1993 - A
+- `cartas_climaticas:EvapT1993_1M_GCS_l` — Evaporação Total em 1993 - L
+- `cartas_climaticas:EvapT1994_1M_GCS_a` — Evaporação Total em 1994 - A
+- `cartas_climaticas:EvapT1994_1M_GCS_l` — Evaporação Total em 1994 - L
+- `cartas_climaticas:EvapT1995_1M_GCS_a` — Evaporação Total em 1995 - A
+- `cartas_climaticas:EvapT1995_1M_GCS_l` — Evaporação Total em 1995 - L
+- `cartas_climaticas:EvapT1996_1M_GCS_a` — Evaporação Total em 1996 - A
+- `cartas_climaticas:EvapT1996_1M_GCS_l` — Evaporação Total em 1996 - L
+- `cartas_climaticas:EvapT1997_1M_GCS_a` — Evaporação Total em 1997 - A
+- `cartas_climaticas:EvapT1997_1M_GCS_l` — Evaporação Total em 1997 - L
+- `cartas_climaticas:EvapT1998_1M_GCS_a` — Evaporação Total em 1998 - A
+- `cartas_climaticas:EvapT1998_1M_GCS_l` — Evaporação Total em 1998 - L
+- `cartas_climaticas:EvapT1999_1M_GCS_a` — Evaporação Total em 1999 - A
+- `cartas_climaticas:EvapT1999_1M_GCS_l` — Evaporação Total em 1999 - L
+- `cartas_climaticas:EvapT2000_1M_GCS_a` — Evaporação Total em 2000 - A
+- `cartas_climaticas:EvapT2000_1M_GCS_l` — Evaporação Total em 2000 - L
+- `cartas_climaticas:EvapT2001_1M_GCS_a` — Evaporação Total em 2001 - A
+- `cartas_climaticas:EvapT2001_1M_GCS_l` — Evaporação Total em 2001 - L
+- `cartas_climaticas:EvapT2002_1M_GCS_a` — Evaporação Total em 2002 - A
+- `cartas_climaticas:EvapT2002_1M_GCS_l` — Evaporação Total em 2002 - L
+- `cartas_climaticas:EvapT2003_1M_GCS_a` — Evaporação Total em 2003 - A
+- `cartas_climaticas:EvapT2003_1M_GCS_l` — Evaporação Total em 2003 - L
+- `cartas_climaticas:EvapT2004_1M_GCS_a` — Evaporação Total em 2004 - A
+- `cartas_climaticas:EvapT2004_1M_GCS_l` — Evaporação Total em 2004 - L
+- `cartas_climaticas:EvapT2005_1M_GCS_a` — Evaporação Total em 2005 - A
+- `cartas_climaticas:EvapT2005_1M_GCS_l` — Evaporação Total em 2005 - L
+- `cartas_climaticas:EvapT2006_1M_GCS_a` — Evaporação Total em 2006 - A
+- `cartas_climaticas:EvapT2006_1M_GCS_l` — Evaporação Total em 2006 - L
+- `cartas_climaticas:EvapT2007_1M_GCS_a` — Evaporação Total em 2007 - A
+- `cartas_climaticas:EvapT2007_1M_GCS_l` — Evaporação Total em 2007 - L
+- `cartas_climaticas:EvapT2008_1M_GCS_a` — Evaporação Total em 2008 - A
+- `cartas_climaticas:EvapT2008_1M_GCS_l` — Evaporação Total em 2008 - L
+- `cartas_climaticas:EvapT2009_1M_GCS_a` — Evaporação Total em 2009 - A
+- `cartas_climaticas:EvapT2009_1M_GCS_l` — Evaporação Total em 2009 - L
+- `cartas_climaticas:EvapT2010_1M_GCS_a` — Evaporação Total em 2010 - A
+- `cartas_climaticas:EvapT2010_1M_GCS_l` — Evaporação Total em 2010 - L
+- `cartas_climaticas:EvapT2011_1M_GCS_a` — Evaporação Total em 2011 - A
+- `cartas_climaticas:EvapT2011_1M_GCS_l` — Evaporação Total em 2011 - L
+- `cartas_climaticas:EvapT2012_1M_GCS_a` — Evaporação Total em 2012 - A
+- `cartas_climaticas:EvapT2012_1M_GCS_l` — Evaporação Total em 2012 - L
+- `cartas_climaticas:EvapT2013_1M_GCS_a` — Evaporação Total em 2013 - A
+- `cartas_climaticas:EvapT2013_1M_GCS_l` — Evaporação Total em 2013 - L
+- `cartas_climaticas:EvapT2014_1M_GCS_a` — Evaporação Total em 2014 - A
+- `cartas_climaticas:EvapT2014_1M_GCS_l` — Evaporação Total em 2014 - L
+- `cartas_climaticas:EvapT2015_1M_GCS_a` — Evaporação Total em 2015 - A
+- `cartas_climaticas:EvapT2015_1M_GCS_l` — Evaporação Total em 2015 - L
+- `cartas_climaticas:EvapT2016_1M_GCS_a` — Evaporação Total em 2016 - A
+- `cartas_climaticas:EvapT2016_1M_GCS_l` — Evaporação Total em 2016 - L
+- `cartas_climaticas:EvapT2017_1M_GCS_a` — Evaporação Total em 2017 - A
+- `cartas_climaticas:EvapT2017_1M_GCS_l` — Evaporação Total em 2017 - L
+- `cartas_climaticas:EvapTAnual_1M_GCS_a` — Evaporação Total Média Anual - A
+- `cartas_climaticas:EvapTAnual_1M_GCS_l` — Evaporação Total Média Anual - L
+- `cartas_climaticas:IHid_1M_GCS_a` — Índice Hídrico (média 1990-2019)
+- `cartas_climaticas:InslMM01_1M_GCS_a` — Insolação Média em Janeiro - A
+- `cartas_climaticas:InslMM01_1M_GCS_l` — Insolação Média em Janeiro - L
+- `cartas_climaticas:InslMM02_1M_GCS_a` — Insolação Média em Fevereiro - A
+- `cartas_climaticas:InslMM02_1M_GCS_l` — Insolação Média em Fevereiro - L
+- `cartas_climaticas:InslMM03_1M_GCS_a` — Insolação Média em Março - A
+- `cartas_climaticas:InslMM03_1M_GCS_l` — Insolação Média em Março - L
+- `cartas_climaticas:InslMM04_1M_GCS_a` — Insolação Média em Abril - A
+- `cartas_climaticas:InslMM04_1M_GCS_l` — Insolação Média em Abril - L
+- `cartas_climaticas:InslMM05_1M_GCS_a` — Insolação Média em Maio - A
+- `cartas_climaticas:InslMM05_1M_GCS_l` — Insolação Média em Maio - L
+- `cartas_climaticas:InslMM06_1M_GCS_a` — Insolação Média em Junho - A
+- `cartas_climaticas:InslMM06_1M_GCS_l` — Insolação Média em Junho - L
+- `cartas_climaticas:InslMM07_1M_GCS_a` — Insolação Média em Julho - A
+- `cartas_climaticas:InslMM07_1M_GCS_l` — Insolação Média em Julho - L
+- `cartas_climaticas:InslMM08_1M_GCS_a` — Insolação Média em Agosto - A
+- `cartas_climaticas:InslMM08_1M_GCS_l` — Insolação Média em Agosto - L
+- `cartas_climaticas:InslMM09_1M_GCS_a` — Insolação Média em Setembro - A
+- `cartas_climaticas:InslMM09_1M_GCS_l` — Insolação Média em Setembro - L
+- `cartas_climaticas:InslMM10_1M_GCS_a` — Insolação Média em Outubro - A
+- `cartas_climaticas:InslMM10_1M_GCS_l` — Insolação Média em Outubro - L
+- `cartas_climaticas:InslMM11_1M_GCS_a` — Insolação Média em Novembro - A
+- `cartas_climaticas:InslMM11_1M_GCS_l` — Insolação Média em Novembro - L
+- `cartas_climaticas:InslMM12_1M_GCS_a` — Insolação Média em Dezembro - A
+- `cartas_climaticas:InslMM12_1M_GCS_l` — Insolação Média em Dezembro - L
+- `cartas_climaticas:InslT1990_1M_GCS_a` — Insolação Total em 1990 - A
+- `cartas_climaticas:InslT1990_1M_GCS_l` — Insolação Total em 1990 - L
+- `cartas_climaticas:InslT1991_1M_GCS_a` — Insolação Total em 1991 - A
+- `cartas_climaticas:InslT1991_1M_GCS_l` — Insolação Total em 1991 - L
+- `cartas_climaticas:InslT1992_1M_GCS_a` — Insolação Total em 1992 - A
+- `cartas_climaticas:InslT1992_1M_GCS_l` — Insolação Total em 1992 - L
+- `cartas_climaticas:InslT1993_1M_GCS_a` — Insolação Total em 1993 - A
+- `cartas_climaticas:InslT1993_1M_GCS_l` — Insolação Total em 1993 - L
+- `cartas_climaticas:InslT1994_1M_GCS_a` — Insolação Total em 1994 - A
+- `cartas_climaticas:InslT1994_1M_GCS_l` — Insolação Total em 1994 - L
+- `cartas_climaticas:InslT1995_1M_GCS_a` — Insolação Total em 1995 - A
+- `cartas_climaticas:InslT1995_1M_GCS_l` — Insolação Total em 1995 - L
+- `cartas_climaticas:InslT1996_1M_GCS_a` — Insolação Total em 1996 - A
+- `cartas_climaticas:InslT1996_1M_GCS_l` — Insolação Total em 1996 - L
+- `cartas_climaticas:InslT1997_1M_GCS_a` — Insolação Total em 1997 - A
+- `cartas_climaticas:InslT1997_1M_GCS_l` — Insolação Total em 1997 - L
+- `cartas_climaticas:InslT1998_1M_GCS_a` — Insolação Total em 1998 - A
+- `cartas_climaticas:InslT1998_1M_GCS_l` — Insolação Total em 1998 - L
+- `cartas_climaticas:InslT1999_1M_GCS_a` — Insolação Total em 1999 - A
+- `cartas_climaticas:InslT1999_1M_GCS_l` — Insolação Total em 1999 - L
+- `cartas_climaticas:InslT2000_1M_GCS_a` — Insolação Total em 2000 - A
+- `cartas_climaticas:InslT2000_1M_GCS_l` — Insolação Total em 2000 - L
+- `cartas_climaticas:InslT2001_1M_GCS_a` — Insolação Total em 2001 - A
+- `cartas_climaticas:InslT2001_1M_GCS_l` — Insolação Total em 2001 - L
+- `cartas_climaticas:InslT2002_1M_GCS_a` — Insolação Total em 2002 - A
+- `cartas_climaticas:InslT2002_1M_GCS_l` — Insolação Total em 2002 - L
+- `cartas_climaticas:InslT2003_1M_GCS_a` — Insolação Total em 2003 - A
+- `cartas_climaticas:InslT2003_1M_GCS_l` — Insolação Total em 2003 - L
+- `cartas_climaticas:InslT2004_1M_GCS_a` — Insolação Total em 2004 - A
+- `cartas_climaticas:InslT2004_1M_GCS_l` — Insolação Total em 2004 - L
+- `cartas_climaticas:InslT2005_1M_GCS_a` — Insolação Total em 2005 - A
+- `cartas_climaticas:InslT2005_1M_GCS_l` — Insolação Total em 2005 - L
+- `cartas_climaticas:InslT2006_1M_GCS_a` — Insolação Total em 2006 - A
+- `cartas_climaticas:InslT2006_1M_GCS_l` — Insolação Total em 2006 - L
+- `cartas_climaticas:InslT2007_1M_GCS_a` — Insolação Total em 2007 - A
+- `cartas_climaticas:InslT2007_1M_GCS_l` — Insolação Total em 2007 - L
+- `cartas_climaticas:InslT2008_1M_GCS_a` — Insolação Total em 2008 - A
+- `cartas_climaticas:InslT2008_1M_GCS_l` — Insolação Total em 2008 - L
+- `cartas_climaticas:InslT2009_1M_GCS_a` — Insolação Total em 2009 - A
+- `cartas_climaticas:InslT2009_1M_GCS_l` — Insolação Total em 2009 - L
+- `cartas_climaticas:InslT2010_1M_GCS_a` — Insolação Total em 2010 - A
+- `cartas_climaticas:InslT2010_1M_GCS_l` — Insolação Total em 2010 - L
+- `cartas_climaticas:InslT2011_1M_GCS_a` — Insolação Total em 2011 - A
+- `cartas_climaticas:InslT2011_1M_GCS_l` — Insolação Total em 2011 - L
+- `cartas_climaticas:InslT2012_1M_GCS_a` — Insolação Total em 2012 - A
+- `cartas_climaticas:InslT2012_1M_GCS_l` — Insolação Total em 2012 - L
+- `cartas_climaticas:InslT2013_1M_GCS_a` — Insolação Total em 2013 - A
+- `cartas_climaticas:InslT2013_1M_GCS_l` — Insolação Total em 2013 - L
+- `cartas_climaticas:InslT2014_1M_GCS_a` — Insolação Total em 2014 - A
+- `cartas_climaticas:InslT2014_1M_GCS_l` — Insolação Total em 2014 - L
+- `cartas_climaticas:InslT2015_1M_GCS_a` — Insolação Total em 2015 - A
+- `cartas_climaticas:InslT2015_1M_GCS_l` — Insolação Total em 2015 - L
+- `cartas_climaticas:InslT2016_1M_GCS_a` — Insolação Total em 2016 - A
+- `cartas_climaticas:InslT2016_1M_GCS_l` — Insolação Total em 2016 - L
+- `cartas_climaticas:InslT2017_1M_GCS_a` — Insolação Total em 2017 - A
+- `cartas_climaticas:InslT2017_1M_GCS_l` — Insolação Total em 2017 - L
+- `cartas_climaticas:InslT2018_1M_GCS_a` — Insolação Total em 2018 - A
+- `cartas_climaticas:InslT2018_1M_GCS_l` — Insolação Total em 2018 - L
+- `cartas_climaticas:InslT2019_1M_GCS_a` — Insolação Total em 2019 - A
+- `cartas_climaticas:InslT2019_1M_GCS_l` — Insolação Total em 2019 - L
+- `cartas_climaticas:InslTAnual_1M_GCS_a` — Insolação Total Média Anual - A
+- `cartas_climaticas:InslTAnual_1M_GCS_l` — Insolação Total Média Anual - L
+- `cartas_climaticas:ISec_1M_GCS_a` — Índice de Seca (média 1990-2019)
+- `cartas_climaticas:Nebl1990_1M_GCS_a` — Nebulosidade em 1990 - A
+- `cartas_climaticas:Nebl1990_1M_GCS_l` — Nebulosidade em 1990 - L
+- `cartas_climaticas:Nebl1991_1M_GCS_a` — Nebulosidade em 1991 - A
+- `cartas_climaticas:Nebl1991_1M_GCS_l` — Nebulosidade em 1991 - L
+- `cartas_climaticas:Nebl1992_1M_GCS_a` — Nebulosidade em 1992 - A
+- `cartas_climaticas:Nebl1992_1M_GCS_l` — Nebulosidade em 1992 - L
+- `cartas_climaticas:Nebl1993_1M_GCS_a` — Nebulosidade em 1993 - A
+- `cartas_climaticas:Nebl1993_1M_GCS_l` — Nebulosidade em 1993 - L
+- `cartas_climaticas:Nebl1994_1M_GCS_a` — Nebulosidade em 1994 - A
+- `cartas_climaticas:Nebl1994_1M_GCS_l` — Nebulosidade em 1994 - L
+- `cartas_climaticas:Nebl1995_1M_GCS_a` — Nebulosidade em 1995 - A
+- `cartas_climaticas:Nebl1995_1M_GCS_l` — Nebulosidade em 1995 - L
+- `cartas_climaticas:Nebl1996_1M_GCS_a` — Nebulosidade em 1996 - A
+- `cartas_climaticas:Nebl1996_1M_GCS_l` — Nebulosidade em 1996 - L
+- `cartas_climaticas:Nebl1997_1M_GCS_a` — Nebulosidade em 1997 - A
+- `cartas_climaticas:Nebl1997_1M_GCS_l` — Nebulosidade em 1997 - L
+- `cartas_climaticas:Nebl1998_1M_GCS_a` — Nebulosidade em 1998 - A
+- `cartas_climaticas:Nebl1998_1M_GCS_l` — Nebulosidade em 1998 - L
+- `cartas_climaticas:Nebl1999_1M_GCS_a` — Nebulosidade em 1999 - A
+- `cartas_climaticas:Nebl1999_1M_GCS_l` — Nebulosidade em 1999 - L
+- `cartas_climaticas:Nebl2000_1M_GCS_a` — Nebulosidade em 2000 - A
+- `cartas_climaticas:Nebl2000_1M_GCS_l` — Nebulosidade em 2000 - L
+- `cartas_climaticas:Nebl2001_1M_GCS_a` — Nebulosidade em 2001 - A
+- `cartas_climaticas:Nebl2001_1M_GCS_l` — Nebulosidade em 2001 - L
+- `cartas_climaticas:Nebl2002_1M_GCS_a` — Nebulosidade em 2002 - A
+- `cartas_climaticas:Nebl2002_1M_GCS_l` — Nebulosidade em 2002 - L
+- `cartas_climaticas:Nebl2003_1M_GCS_a` — Nebulosidade em 2003 - A
+- `cartas_climaticas:Nebl2003_1M_GCS_l` — Nebulosidade em 2003 - L
+- `cartas_climaticas:Nebl2004_1M_GCS_a` — Nebulosidade em 2004 - A
+- `cartas_climaticas:Nebl2004_1M_GCS_l` — Nebulosidade em 2004 - L
+- `cartas_climaticas:Nebl2005_1M_GCS_a` — Nebulosidade em 2005 - A
+- `cartas_climaticas:Nebl2005_1M_GCS_l` — Nebulosidade em 2005 - L
+- `cartas_climaticas:Nebl2006_1M_GCS_a` — Nebulosidade em 2006 - A
+- `cartas_climaticas:Nebl2006_1M_GCS_l` — Nebulosidade em 2006 - L
+- `cartas_climaticas:Nebl2007_1M_GCS_a` — Nebulosidade em 2007 - A
+- `cartas_climaticas:Nebl2007_1M_GCS_l` — Nebulosidade em 2007 - L
+- `cartas_climaticas:Nebl2008_1M_GCS_a` — Nebulosidade em 2008 - A
+- `cartas_climaticas:Nebl2008_1M_GCS_l` — Nebulosidade em 2008 - L
+- `cartas_climaticas:Nebl2009_1M_GCS_a` — Nebulosidade em 2009 - A
+- `cartas_climaticas:Nebl2009_1M_GCS_l` — Nebulosidade em 2009 - L
+- `cartas_climaticas:Nebl2010_1M_GCS_a` — Nebulosidade em 2010 - A
+- `cartas_climaticas:Nebl2010_1M_GCS_l` — Nebulosidade em 2010 - L
+- `cartas_climaticas:Nebl2011_1M_GCS_a` — Nebulosidade em 2011 - A
+- `cartas_climaticas:Nebl2011_1M_GCS_l` — Nebulosidade em 2011 - L
+- `cartas_climaticas:Nebl2012_1M_GCS_a` — Nebulosidade em 2012 - A
+- `cartas_climaticas:Nebl2012_1M_GCS_l` — Nebulosidade em 2012 - L
+- `cartas_climaticas:Nebl2013_1M_GCS_a` — Nebulosidade em 2013 - A
+- `cartas_climaticas:Nebl2013_1M_GCS_l` — Nebulosidade em 2013 - L
+- `cartas_climaticas:Nebl2014_1M_GCS_a` — Nebulosidade em 2014 - A
+- `cartas_climaticas:Nebl2014_1M_GCS_l` — Nebulosidade em 2014 - L
+- `cartas_climaticas:Nebl2015_1M_GCS_a` — Nebulosidade em 2015 - A
+- `cartas_climaticas:Nebl2015_1M_GCS_l` — Nebulosidade em 2015 - L
+- `cartas_climaticas:Nebl2016_1M_GCS_a` — Nebulosidade em 2016 - A
+- `cartas_climaticas:Nebl2016_1M_GCS_l` — Nebulosidade em 2016 - L
+- `cartas_climaticas:Nebl2017_1M_GCS_a` — Nebulosidade em 2017 - A
+- `cartas_climaticas:Nebl2017_1M_GCS_l` — Nebulosidade em 2017 - L
+- `cartas_climaticas:Nebl2018_1M_GCS_a` — Nebulosidade em 2018 - A
+- `cartas_climaticas:Nebl2018_1M_GCS_l` — Nebulosidade em 2018 - L
+- `cartas_climaticas:Nebl2019_1M_GCS_a` — Nebulosidade em 2019 - A
+- `cartas_climaticas:Nebl2019_1M_GCS_l` — Nebulosidade em 2019 - L
+- `cartas_climaticas:NeblM01_1M_GCS_a` — Nebulosidade em Janeiro - A
+- `cartas_climaticas:NeblM01_1M_GCS_l` — Nebulosidade em Janeiro - L
+- `cartas_climaticas:NeblM02_1M_GCS_a` — Nebulosidade em Fevereiro - A
+- `cartas_climaticas:NeblM02_1M_GCS_l` — Nebulosidade em Fevereiro - L
+- `cartas_climaticas:NeblM03_1M_GCS_a` — Nebulosidade em Março - A
+- `cartas_climaticas:NeblM03_1M_GCS_l` — Nebulosidade em Março - L
+- `cartas_climaticas:NeblM04_1M_GCS_a` — Nebulosidade em Abril - A
+- `cartas_climaticas:NeblM04_1M_GCS_l` — Nebulosidade em Abril - L
+- `cartas_climaticas:NeblM05_1M_GCS_a` — Nebulosidade em Maio - A
+- `cartas_climaticas:NeblM05_1M_GCS_l` — Nebulosidade em Maio - L
+- `cartas_climaticas:NeblM06_1M_GCS_a` — Nebulosidade em Junho - A
+- `cartas_climaticas:NeblM06_1M_GCS_l` — Nebulosidade em Junho - L
+- `cartas_climaticas:NeblM07_1M_GCS_a` — Nebulosidade em Julho - A
+- `cartas_climaticas:NeblM07_1M_GCS_l` — Nebulosidade em Julho - L
+- `cartas_climaticas:NeblM08_1M_GCS_a` — Nebulosidade em Agosto - A
+- `cartas_climaticas:NeblM08_1M_GCS_l` — Nebulosidade em Agosto - L
+- `cartas_climaticas:NeblM09_1M_GCS_a` — Nebulosidade em Setembro - A
+- `cartas_climaticas:NeblM09_1M_GCS_l` — Nebulosidade em Setembro - L
+- `cartas_climaticas:NeblM10_1M_GCS_a` — Nebulosidade em Outubro - A
+- `cartas_climaticas:NeblM10_1M_GCS_l` — Nebulosidade em Outubro - L
+- `cartas_climaticas:NeblM11_1M_GCS_a` — Nebulosidade em Novembro - A
+- `cartas_climaticas:NeblM11_1M_GCS_l` — Nebulosidade em Novembro - L
+- `cartas_climaticas:NeblM12_1M_GCS_a` — Nebulosidade em Dezembro - A
+- `cartas_climaticas:NeblM12_1M_GCS_l` — Nebulosidade em Dezembro - L
+- `cartas_climaticas:NeblMAnual_1M_GCS_a` — Nebulosidade Média Anual (1990-2019) - A
+- `cartas_climaticas:NeblMAnual_1M_GCS_l` — Nebulosidade Média Anual (1990-2019) - L
+- `cartas_climaticas:OVrn1990a1991_1M_GCS_a` — Ocorrência de Veranicos - 1990 a 1991 - A
+- `cartas_climaticas:OVrn1990a1991_1M_GCS_l` — Ocorrência de Veranicos - 1990 a 1991 - L
+- `cartas_climaticas:OVrn1991a1992_1M_GCS_a` — Ocorrência de Veranicos - 1991 a 1992 - A
+- `cartas_climaticas:OVrn1991a1992_1M_GCS_l` — Ocorrência de Veranicos - 1991 a 1992 - L
+- `cartas_climaticas:OVrn1992a1993_1M_GCS_a` — Ocorrência de Veranicos - 1992 a 1993 - A
+- `cartas_climaticas:OVrn1992a1993_1M_GCS_l` — Ocorrência de Veranicos - 1992 a 1993 - L
+- `cartas_climaticas:OVrn1993a1994_1M_GCS_a` — Ocorrência de Veranicos - 1993 a 1994 - A
+- `cartas_climaticas:OVrn1993a1994_1M_GCS_l` — Ocorrência de Veranicos - 1993 a 1994 - L
+- `cartas_climaticas:OVrn1994a1995_1M_GCS_a` — Ocorrência de Veranicos - 1994 a 1995 - A
+- `cartas_climaticas:OVrn1994a1995_1M_GCS_l` — Ocorrência de Veranicos - 1994 a 1995 - L
+- `cartas_climaticas:OVrn1995a1996_1M_GCS_a` — Ocorrência de Veranicos - 1995 a 1996 - A
+- `cartas_climaticas:OVrn1995a1996_1M_GCS_l` — Ocorrência de Veranicos - 1995 a 1996 - L
+- `cartas_climaticas:OVrn1996a1997_1M_GCS_a` — Ocorrência de Veranicos - 1996 a 1997 - A
+- `cartas_climaticas:OVrn1996a1997_1M_GCS_l` — Ocorrência de Veranicos - 1996 a 1997 - L
+- `cartas_climaticas:OVrn1997a1998_1M_GCS_a` — Ocorrência de Veranicos - 1997 a 1998 - A
+- `cartas_climaticas:OVrn1997a1998_1M_GCS_l` — Ocorrência de Veranicos - 1997 a 1998 - L
+- `cartas_climaticas:OVrn1998a1999_1M_GCS_a` — Ocorrência de Veranicos - 1998 a 1999 - A
+- `cartas_climaticas:OVrn1998a1999_1M_GCS_l` — Ocorrência de Veranicos - 1998 a 1999 - L
+- `cartas_climaticas:OVrn1999a2000_1M_GCS_a` — Ocorrência de Veranicos - 1999 a 2000 - A
+- `cartas_climaticas:OVrn1999a2000_1M_GCS_l` — Ocorrência de Veranicos - 1999 a 2000 - L
+- `cartas_climaticas:OVrn2000a2001_1M_GCS_a` — Ocorrência de Veranicos - 2000 a 2001 - A
+- `cartas_climaticas:OVrn2000a2001_1M_GCS_l` — Ocorrência de Veranicos - 2000 a 2001 - L
+- `cartas_climaticas:OVrn2001a2002_1M_GCS_a` — Ocorrência de Veranicos - 2001 a 2002 - A
+- `cartas_climaticas:OVrn2001a2002_1M_GCS_l` — Ocorrência de Veranicos - 2001 a 2002 - L
+- `cartas_climaticas:OVrn2002a2003_1M_GCS_a` — Ocorrência de Veranicos - 2002 a 2003 - A
+- `cartas_climaticas:OVrn2002a2003_1M_GCS_l` — Ocorrência de Veranicos - 2002 a 2003 - L
+- `cartas_climaticas:OVrn2003a2004_1M_GCS_a` — Ocorrência de Veranicos - 2003 a 2004 - A
+- `cartas_climaticas:OVrn2003a2004_1M_GCS_l` — Ocorrência de Veranicos - 2003 a 2004 - L
+- `cartas_climaticas:OVrn2004a2005_1M_GCS_a` — Ocorrência de Veranicos - 2004 a 2005 - A
+- `cartas_climaticas:OVrn2004a2005_1M_GCS_l` — Ocorrência de Veranicos - 2004 a 2005 - L
+- `cartas_climaticas:OVrn2005a2006_1M_GCS_a` — Ocorrência de Veranicos - 2005 a 2006 - A
+- `cartas_climaticas:OVrn2005a2006_1M_GCS_l` — Ocorrência de Veranicos - 2005 a 2006 - L
+- `cartas_climaticas:OVrn2006a2007_1M_GCS_a` — Ocorrência de Veranicos - 2006 a 2007 - A
+- `cartas_climaticas:OVrn2006a2007_1M_GCS_l` — Ocorrência de Veranicos - 2006 a 2007 - L
+- `cartas_climaticas:OVrn2007a2008_1M_GCS_a` — Ocorrência de Veranicos - 2007 a 2008 - A
+- `cartas_climaticas:OVrn2007a2008_1M_GCS_l` — Ocorrência de Veranicos - 2007 a 2008 - L
+- `cartas_climaticas:OVrn2008a2009_1M_GCS_a` — Ocorrência de Veranicos - 2008 a 2009 - A
+- `cartas_climaticas:OVrn2008a2009_1M_GCS_l` — Ocorrência de Veranicos - 2008 a 2009 - L
+- `cartas_climaticas:OVrn2009a2010_1M_GCS_a` — Ocorrência de Veranicos - 2009 a 2010 - A
+- `cartas_climaticas:OVrn2009a2010_1M_GCS_l` — Ocorrência de Veranicos - 2009 a 2010 - L
+- `cartas_climaticas:OVrn2010a2011_1M_GCS_a` — Ocorrência de Veranicos - 2010 a 2011 - A
+- `cartas_climaticas:OVrn2010a2011_1M_GCS_l` — Ocorrência de Veranicos - 2010 a 2011 - L
+- `cartas_climaticas:OVrn2011a2012_1M_GCS_a` — Ocorrência de Veranicos - 2011 a 2012 - A
+- `cartas_climaticas:OVrn2011a2012_1M_GCS_l` — Ocorrência de Veranicos - 2011 a 2012 - L
+- `cartas_climaticas:OVrn2012a2013_1M_GCS_a` — Ocorrência de Veranicos - 2012 a 2013 - A
+- `cartas_climaticas:OVrn2012a2013_1M_GCS_l` — Ocorrência de Veranicos - 2012 a 2013 - L
+- `cartas_climaticas:OVrn2013a2014_1M_GCS_a` — Ocorrência de Veranicos - 2013 a 2014 - A
+- `cartas_climaticas:OVrn2013a2014_1M_GCS_l` — Ocorrência de Veranicos - 2013 a 2014 - L
+- `cartas_climaticas:OVrn2014a2015_1M_GCS_a` — Ocorrência de Veranicos - 2014 a 2015 - A
+- `cartas_climaticas:OVrn2014a2015_1M_GCS_l` — Ocorrência de Veranicos - 2014 a 2015 - L
+- `cartas_climaticas:OVrn2015a2016_1M_GCS_a` — Ocorrência de Veranicos - 2015 a 2016 - A
+- `cartas_climaticas:OVrn2015a2016_1M_GCS_l` — Ocorrência de Veranicos - 2015 a 2016 - L
+- `cartas_climaticas:OVrn2016a2017_1M_GCS_a` — Ocorrência de Veranicos - 2016 a 2017 - A
+- `cartas_climaticas:OVrn2016a2017_1M_GCS_l` — Ocorrência de Veranicos - 2016 a 2017 - L
+- `cartas_climaticas:OVrn2017a2018_1M_GCS_a` — Ocorrência de Veranicos - 2017 a 2018 - A
+- `cartas_climaticas:OVrn2017a2018_1M_GCS_l` — Ocorrência de Veranicos - 2017 a 2018 - L
+- `cartas_climaticas:OVrn2018a2019_1M_GCS_a` — Ocorrência de Veranicos - 2018 a 2019 - A
+- `cartas_climaticas:OVrn2018a2019_1M_GCS_l` — Ocorrência de Veranicos - 2018 a 2019 - L
+- `cartas_climaticas:OVrnMAnual_1M_GCS_a` — Ocorrência de Veranicos Anual - A
+- `cartas_climaticas:OVrnMAnual_1M_GCS_l` — Ocorrência de Veranicos Anual - L
+- `cartas_climaticas:PChv1990a1991_1M_GCS_a` — Duração do Período Chuvoso - 1990 a 1991 - A
+- `cartas_climaticas:PChv1990a1991_1M_GCS_l` — Duração do Período Chuvoso - 1990 a 1991 - L
+- `cartas_climaticas:PChv1991a1992_1M_GCS_a` — Duração do Período Chuvoso - 1991 a 1992 - A
+- `cartas_climaticas:PChv1991a1992_1M_GCS_l` — Duração do Período Chuvoso - 1991 a 1992 - L
+- `cartas_climaticas:PChv1992a1993_1M_GCS_a` — Duração do Período Chuvoso - 1992 a 1993 - A
+- `cartas_climaticas:PChv1992a1993_1M_GCS_l` — Duração do Período Chuvoso - 1992 a 1993 - L
+- `cartas_climaticas:PChv1993a1994_1M_GCS_a` — Duração do Período Chuvoso - 1993 a 1994 - A
+- `cartas_climaticas:PChv1993a1994_1M_GCS_l` — Duração do Período Chuvoso - 1993 a 1994 - L
+- `cartas_climaticas:PChv1994a1995_1M_GCS_a` — Duração do Período Chuvoso - 1994 a 1995 - A
+- `cartas_climaticas:PChv1994a1995_1M_GCS_l` — Duração do Período Chuvoso - 1994 a 1995 - L
+- `cartas_climaticas:PChv1995a1996_1M_GCS_a` — Duração do Período Chuvoso - 1995 a 1996 - A
+- `cartas_climaticas:PChv1995a1996_1M_GCS_l` — Duração do Período Chuvoso - 1995 a 1996 - L
+- `cartas_climaticas:PChv1996a1997_1M_GCS_a` — Duração do Período Chuvoso - 1996 a 1997 - A
+- `cartas_climaticas:PChv1996a1997_1M_GCS_l` — Duração do Período Chuvoso - 1996 a 1997 - L
+- `cartas_climaticas:PChv1997a1998_1M_GCS_a` — Duração do Período Chuvoso - 1997 a 1998 - A
+- `cartas_climaticas:PChv1997a1998_1M_GCS_l` — Duração do Período Chuvoso - 1997 a 1998 - L
+- `cartas_climaticas:PChv1998a1999_1M_GCS_a` — Duração do Período Chuvoso - 1998 a 1999 - A
+- `cartas_climaticas:PChv1998a1999_1M_GCS_l` — Duração do Período Chuvoso - 1998 a 1999 - L
+- `cartas_climaticas:PChv1999a2000_1M_GCS_a` — Duração do Período Chuvoso - 1999 a 2000 - A
+- `cartas_climaticas:PChv1999a2000_1M_GCS_l` — Duração do Período Chuvoso - 1999 a 2000 - L
+- `cartas_climaticas:PChv2000a2001_1M_GCS_a` — Duração do Período Chuvoso - 2000 a 2001 - A
+- `cartas_climaticas:PChv2000a2001_1M_GCS_l` — Duração do Período Chuvoso - 2000 a 2001 - L
+- `cartas_climaticas:PChv2001a2002_1M_GCS_a` — Duração do Período Chuvoso - 2001 a 2002 - A
+- `cartas_climaticas:PChv2001a2002_1M_GCS_l` — Duração do Período Chuvoso - 2001 a 2002 - L
+- `cartas_climaticas:PChv2002a2003_1M_GCS_a` — Duração do Período Chuvoso - 2002 a 2003 - A
+- `cartas_climaticas:PChv2002a2003_1M_GCS_l` — Duração do Período Chuvoso - 2002 a 2003 - L
+- `cartas_climaticas:PChv2003a2004_1M_GCS_a` — Duração do Período Chuvoso - 2003 a 2004 - A
+- `cartas_climaticas:PChv2003a2004_1M_GCS_l` — Duração do Período Chuvoso - 2003 a 2004 - L
+- `cartas_climaticas:PChv2004a2005_1M_GCS_a` — Duração do Período Chuvoso - 2004 a 2005 - A
+- `cartas_climaticas:PChv2004a2005_1M_GCS_l` — Duração do Período Chuvoso - 2004 a 2005 - L
+- `cartas_climaticas:PChv2005a2006_1M_GCS_a` — Duração do Período Chuvoso - 2005 a 2006 - A
+- `cartas_climaticas:PChv2005a2006_1M_GCS_l` — Duração do Período Chuvoso - 2005 a 2006 - L
+- `cartas_climaticas:PChv2006a2007_1M_GCS_a` — Duração do Período Chuvoso - 2006 a 2007 - A
+- `cartas_climaticas:PChv2006a2007_1M_GCS_l` — Duração do Período Chuvoso - 2006 a 2007 - L
+- `cartas_climaticas:PChv2007a2008_1M_GCS_a` — Duração do Período Chuvoso - 2007 a 2008 - A
+- `cartas_climaticas:PChv2007a2008_1M_GCS_l` — Duração do Período Chuvoso - 2007 a 2008 - L
+- `cartas_climaticas:PChv2008a2009_1M_GCS_a` — Duração do Período Chuvoso - 2008 a 2009 - A
+- `cartas_climaticas:PChv2008a2009_1M_GCS_l` — Duração do Período Chuvoso - 2008 a 2009 - L
+- `cartas_climaticas:PChv2009a2010_1M_GCS_a` — Duração do Período Chuvoso - 2009 a 2010 - A
+- `cartas_climaticas:PChv2009a2010_1M_GCS_l` — Duração do Período Chuvoso - 2009 a 2010 - L
+- `cartas_climaticas:PChv2010a2011_1M_GCS_a` — Duração do Período Chuvoso - 2010 a 2011 - A
+- `cartas_climaticas:PChv2010a2011_1M_GCS_l` — Duração do Período Chuvoso - 2010 a 2011 - L
+- `cartas_climaticas:PChv2011a2012_1M_GCS_a` — Duração do Período Chuvoso - 2011 a 2012 - A
+- `cartas_climaticas:PChv2011a2012_1M_GCS_l` — Duração do Período Chuvoso - 2011 a 2012 - L
+- `cartas_climaticas:PChv2012a2013_1M_GCS_a` — Duração do Período Chuvoso - 2012 a 2013 - A
+- `cartas_climaticas:PChv2012a2013_1M_GCS_l` — Duração do Período Chuvoso - 2012 a 2013 - L
+- `cartas_climaticas:PChv2013a2014_1M_GCS_a` — Duração do Período Chuvoso - 2013 a 2014 - A
+- `cartas_climaticas:PChv2013a2014_1M_GCS_l` — Duração do Período Chuvoso - 2013 a 2014 - L
+- `cartas_climaticas:PChv2014a2015_1M_GCS_a` — Duração do Período Chuvoso - 2014 a 2015 - A
+- `cartas_climaticas:PChv2014a2015_1M_GCS_l` — Duração do Período Chuvoso - 2014 a 2015 - L
+- `cartas_climaticas:PChv2015a2016_1M_GCS_a` — Duração do Período Chuvoso - 2015 a 2016 - A
+- `cartas_climaticas:PChv2015a2016_1M_GCS_l` — Duração do Período Chuvoso - 2015 a 2016 - L
+- `cartas_climaticas:PChv2016a2017_1M_GCS_a` — Duração do Período Chuvoso - 2016 a 2017 - A
+- `cartas_climaticas:PChv2016a2017_1M_GCS_l` — Duração do Período Chuvoso - 2016 a 2017 - L
+- `cartas_climaticas:PChv2017a2018_1M_GCS_a` — Duração do Período Chuvoso - 2017 a 2018 - A
+- `cartas_climaticas:PChv2017a2018_1M_GCS_l` — Duração do Período Chuvoso - 2017 a 2018 - L
+- `cartas_climaticas:PChv2018a2019_1M_GCS_a` — Duração do Período Chuvoso - 2018 a 2019 - A
+- `cartas_climaticas:PChv2018a2019_1M_GCS_l` — Duração do Período Chuvoso - 2018 a 2019 - L
+- `cartas_climaticas:PChvMAnual_1M_GCS_a` — Duração do Período Chuvoso Anual - A
+- `cartas_climaticas:PChvMAnual_1M_GCS_l` — Duração do Período Chuvoso Anual - L
+- `cartas_climaticas:PrecMM01_1M_GCS_a` — Precipitação Média em Janeiro - A
+- `cartas_climaticas:PrecMM01_1M_GCS_l` — Precipitação Média em Janeiro - L
+- `cartas_climaticas:PrecMM02_1M_GCS_a` — Precipitação Média em Fevereiro - A
+- `cartas_climaticas:PrecMM02_1M_GCS_l` — Precipitação Média em Fevereiro - L
+- `cartas_climaticas:PrecMM03_1M_GCS_a` — Precipitação Média em Março - A
+- `cartas_climaticas:PrecMM03_1M_GCS_l` — Precipitação Média em Março - L
+- `cartas_climaticas:PrecMM04_1M_GCS_a` — Precipitação Média em Abril - A
+- `cartas_climaticas:PrecMM04_1M_GCS_l` — Precipitação Média em Abril - L
+- `cartas_climaticas:PrecMM05_1M_GCS_a` — Precipitação Média em Maio - A
+- `cartas_climaticas:PrecMM05_1M_GCS_l` — Precipitação Média em Maio - L
+- `cartas_climaticas:PrecMM06_1M_GCS_a` — Precipitação Média em Junho - A
+- `cartas_climaticas:PrecMM06_1M_GCS_l` — Precipitação Média em Junho - L
+- `cartas_climaticas:PrecMM07_1M_GCS_a` — Precipitação Média em Julho - A
+- `cartas_climaticas:PrecMM07_1M_GCS_l` — Precipitação Média em Julho - L
+- `cartas_climaticas:PrecMM08_1M_GCS_a` — Precipitação Média em Agosto - A
+- `cartas_climaticas:PrecMM08_1M_GCS_l` — Precipitação Média em Agosto - L
+- `cartas_climaticas:PrecMM09_1M_GCS_a` — Precipitação Média em Setembro - A
+- `cartas_climaticas:PrecMM09_1M_GCS_l` — Precipitação Média em Setembro - L
+- `cartas_climaticas:PrecMM10_1M_GCS_a` — Precipitação Média em Outubro - A
+- `cartas_climaticas:PrecMM10_1M_GCS_l` — Precipitação Média em Outubro - L
+- `cartas_climaticas:PrecMM11_1M_GCS_a` — Precipitação Média em Novembro - A
+- `cartas_climaticas:PrecMM11_1M_GCS_l` — Precipitação Média em Novembro - L
+- `cartas_climaticas:PrecMM12_1M_GCS_a` — Precipitação Média em Dezembro - A
+- `cartas_climaticas:PrecMM12_1M_GCS_l` — Precipitação Média em Dezembro - L
+- `cartas_climaticas:PrecT1990_1M_GCS_a` — Precipitação Total em 1990 - A
+- `cartas_climaticas:PrecT1990_1M_GCS_l` — Precipitação Total em 1990 - L
+- `cartas_climaticas:PrecT1991_1M_GCS_a` — Precipitação Total em 1991 - A
+- `cartas_climaticas:PrecT1991_1M_GCS_l` — Precipitação Total em 1991 - L
+- `cartas_climaticas:PrecT1992_1M_GCS_a` — Precipitação Total em 1992 - A
+- `cartas_climaticas:PrecT1992_1M_GCS_l` — Precipitação Total em 1992 - L
+- `cartas_climaticas:PrecT1993_1M_GCS_a` — Precipitação Total em 1993 - A
+- `cartas_climaticas:PrecT1993_1M_GCS_l` — Precipitação Total em 1993 - L
+- `cartas_climaticas:PrecT1994_1M_GCS_a` — Precipitação Total em 1994 - A
+- `cartas_climaticas:PrecT1994_1M_GCS_l` — Precipitação Total em 1994 - L
+- `cartas_climaticas:PrecT1995_1M_GCS_a` — Precipitação Total em 1995 - A
+- `cartas_climaticas:PrecT1995_1M_GCS_l` — Precipitação Total em 1995 - L
+- `cartas_climaticas:PrecT1996_1M_GCS_a` — Precipitação Total em 1996 - A
+- `cartas_climaticas:PrecT1996_1M_GCS_l` — Precipitação Total em 1996 - L
+- `cartas_climaticas:PrecT1997_1M_GCS_a` — Precipitação Total em 1997 - A
+- `cartas_climaticas:PrecT1997_1M_GCS_l` — Precipitação Total em 1997 - L
+- `cartas_climaticas:PrecT1998_1M_GCS_a` — Precipitação Total em 1998 - A
+- `cartas_climaticas:PrecT1998_1M_GCS_l` — Precipitação Total em 1998 - L
+- `cartas_climaticas:PrecT1999_1M_GCS_a` — Precipitação Total em 1999 - A
+- `cartas_climaticas:PrecT1999_1M_GCS_l` — Precipitação Total em 1999 - L
+- `cartas_climaticas:PrecT2000_1M_GCS_a` — Precipitação Total em 2000 - A
+- `cartas_climaticas:PrecT2000_1M_GCS_l` — Precipitação Total em 2000 - L
+- `cartas_climaticas:PrecT2001_1M_GCS_a` — Precipitação Total em 2001 - A
+- `cartas_climaticas:PrecT2001_1M_GCS_l` — Precipitação Total em 2001 - L
+- `cartas_climaticas:PrecT2002_1M_GCS_a` — Precipitação Total em 2002 - A
+- `cartas_climaticas:PrecT2002_1M_GCS_l` — Precipitação Total em 2002 - L
+- `cartas_climaticas:PrecT2003_1M_GCS_a` — Precipitação Total em 2003 - A
+- `cartas_climaticas:PrecT2003_1M_GCS_l` — Precipitação Total em 2003 - L
+- `cartas_climaticas:PrecT2004_1M_GCS_a` — Precipitação Total em 2004 - A
+- `cartas_climaticas:PrecT2004_1M_GCS_l` — Precipitação Total em 2004 - L
+- `cartas_climaticas:PrecT2005_1M_GCS_a` — Precipitação Total em 2005 - A
+- `cartas_climaticas:PrecT2005_1M_GCS_l` — Precipitação Total em 2005 - L
+- `cartas_climaticas:PrecT2006_1M_GCS_a` — Precipitação Total em 2006 - A
+- `cartas_climaticas:PrecT2006_1M_GCS_l` — Precipitação Total em 2006 - L
+- `cartas_climaticas:PrecT2007_1M_GCS_a` — Precipitação Total em 2007 - A
+- `cartas_climaticas:PrecT2007_1M_GCS_l` — Precipitação Total em 2007 - L
+- `cartas_climaticas:PrecT2008_1M_GCS_a` — Precipitação Total em 2008 - A
+- `cartas_climaticas:PrecT2008_1M_GCS_l` — Precipitação Total em 2008 - L
+- `cartas_climaticas:PrecT2009_1M_GCS_a` — Precipitação Total em 2009 - A
+- `cartas_climaticas:PrecT2009_1M_GCS_l` — Precipitação Total em 2009 - L
+- `cartas_climaticas:PrecT2010_1M_GCS_a` — Precipitação Total em 2010 - A
+- `cartas_climaticas:PrecT2010_1M_GCS_l` — Precipitação Total em 2010 - L
+- `cartas_climaticas:PrecT2011_1M_GCS_a` — Precipitação Total em 2011 - A
+- `cartas_climaticas:PrecT2011_1M_GCS_l` — Precipitação Total em 2011 - L
+- `cartas_climaticas:PrecT2012_1M_GCS_a` — Precipitação Total em 2012 - A
+- `cartas_climaticas:PrecT2012_1M_GCS_l` — Precipitação Total em 2012 - L
+- `cartas_climaticas:PrecT2013_1M_GCS_l` — Precipitação Total em 2013 - L
+- `cartas_climaticas:PrecT2014_1M_GCS_a` — Precipitação Total em 2014 - A
+- `cartas_climaticas:PrecT2014_1M_GCS_l` — Precipitação Total em 2014 - L
+- `cartas_climaticas:PrecT2015_1M_GCS_a` — Precipitação Total em 2015 - A
+- `cartas_climaticas:PrecT2015_1M_GCS_l` — Precipitação Total em 2015 - L
+- `cartas_climaticas:PrecT2016_1M_GCS_a` — Precipitação Total em 2016 - A
+- `cartas_climaticas:PrecT2016_1M_GCS_l` — Precipitação Total em 2016 - L
+- `cartas_climaticas:PrecT2017_1M_GCS_a` — Precipitação Total em 2017 - A
+- `cartas_climaticas:PrecT2017_1M_GCS_l` — Precipitação Total em 2017 - L
+- `cartas_climaticas:PrecT2018_1M_GCS_a` — Precipitação Total em 2018 - A
+- `cartas_climaticas:PrecT2018_1M_GCS_l` — Precipitação Total em 2018 - L
+- `cartas_climaticas:PrecT2019_1M_GCS_a` — Precipitação Total em 2019 - A
+- `cartas_climaticas:PrecT2019_1M_GCS_l` — Precipitação Total em 2019 - L
+- `cartas_climaticas:PrecTAnual_1M_GCS_a` — Precipitação Total Média Anual (1990-2019) - A
+- `cartas_climaticas:PrecTAnual_1M_GCS_l` — Precipitação Total Média Anual (1990-2019) - L
+- `cartas_climaticas:RClm_1M_GCS_a` — Regionalização Climática de Thornthwaite-Mather
+- `cartas_climaticas:RClmK_1M_GCS_a` — Regionalização Climática de Köppen-Geiger
+- `cartas_climaticas:RClmS_1M_GCS_a` — Regionalização Climática Simplificada de Thornthwaite-Mather
+- `cartas_climaticas:RdSG2007_1M_GCS_a` — Radiação Solar Global em 2007 - A
+- `cartas_climaticas:RdSG2007_1M_GCS_l` — Radiação Solar Global em 2007 - L
+- `cartas_climaticas:RdSG2008_1M_GCS_a` — Radiação Solar Global em 2008 - A
+- `cartas_climaticas:RdSG2008_1M_GCS_l` — Radiação Solar Global em 2008 - L
+- `cartas_climaticas:RdSG2009_1M_GCS_a` — Radiação Solar Global em 2009 - A
+- `cartas_climaticas:RdSG2009_1M_GCS_l` — Radiação Solar Global em 2009 - L
+- `cartas_climaticas:RdSG2010_1M_GCS_a` — Radiação Solar Global em 2010 - A
+- `cartas_climaticas:RdSG2010_1M_GCS_l` — Radiação Solar Global em 2010 - L
+- `cartas_climaticas:RdSG2011_1M_GCS_a` — Radiação Solar Global em 2011 - A
+- `cartas_climaticas:RdSG2011_1M_GCS_l` — Radiação Solar Global em 2011 - L
+- `cartas_climaticas:RdSG2012_1M_GCS_a` — Radiação Solar Global em 2012 - A
+- `cartas_climaticas:RdSG2012_1M_GCS_l` — Radiação Solar Global em 2012 - L
+- `cartas_climaticas:RdSG2013_1M_GCS_a` — Radiação Solar Global em 2013 - A
+- `cartas_climaticas:RdSG2013_1M_GCS_l` — Radiação Solar Global em 2013 - L
+- `cartas_climaticas:RdSG2014_1M_GCS_a` — Radiação Solar Global em 2014 - A
+- `cartas_climaticas:RdSG2014_1M_GCS_l` — Radiação Solar Global em 2014 - L
+- `cartas_climaticas:RdSG2015_1M_GCS_a` — Radiação Solar Global em 2015 - A
+- `cartas_climaticas:RdSG2015_1M_GCS_l` — Radiação Solar Global em 2015 - L
+- `cartas_climaticas:RdSG2016_1M_GCS_a` — Radiação Solar Global em 2016 - A
+- `cartas_climaticas:RdSG2016_1M_GCS_l` — Radiação Solar Global em 2016 - L
+- `cartas_climaticas:RdSG2017_1M_GCS_a` — Radiação Solar Global em 2017 - A
+- `cartas_climaticas:RdSG2017_1M_GCS_l` — Radiação Solar Global em 2017 - L
+- `cartas_climaticas:RdSG2018_1M_GCS_a` — Radiação Solar Global em 2018 - A
+- `cartas_climaticas:RdSG2018_1M_GCS_l` — Radiação Solar Global em 2018 - L
+- `cartas_climaticas:RdSGM01_1M_GCS_a` — Radiação Solar Global em Janeiro - A
+- `cartas_climaticas:RdSGM01_1M_GCS_l` — Radiação Solar Global em Janeiro - L
+- `cartas_climaticas:RdSGM02_1M_GCS_a` — Radiação Solar Global em Fevereiro - A
+- `cartas_climaticas:RdSGM02_1M_GCS_l` — Radiação Solar Global em Fevereiro - L
+- `cartas_climaticas:RdSGM03_1M_GCS_a` — Radiação Solar Global em Março - A
+- `cartas_climaticas:RdSGM03_1M_GCS_l` — Radiação Solar Global em Março - L
+- `cartas_climaticas:RdSGM04_1M_GCS_a` — Radiação Solar Global em Abril - A
+- `cartas_climaticas:RdSGM04_1M_GCS_l` — Radiação Solar Global em Abril - L
+- `cartas_climaticas:RdSGM05_1M_GCS_a` — Radiação Solar Global em Maio - A
+- `cartas_climaticas:RdSGM05_1M_GCS_l` — Radiação Solar Global em Maio - L
+- `cartas_climaticas:RdSGM06_1M_GCS_a` — Radiação Solar Global em Junho - A
+- `cartas_climaticas:RdSGM06_1M_GCS_l` — Radiação Solar Global em Junho - L
+- `cartas_climaticas:RdSGM07_1M_GCS_a` — Radiação Solar Global em Julho - A
+- `cartas_climaticas:RdSGM07_1M_GCS_l` — Radiação Solar Global em Julho - L
+- `cartas_climaticas:RdSGM08_1M_GCS_a` — Radiação Solar Global em Agosto - A
+- `cartas_climaticas:RdSGM08_1M_GCS_l` — Radiação Solar Global em Agosto - L
+- `cartas_climaticas:RdSGM09_1M_GCS_a` — Radiação Solar Global em Setembro - A
+- `cartas_climaticas:RdSGM09_1M_GCS_l` — Radiação Solar Global em Setembro - L
+- `cartas_climaticas:RdSGM10_1M_GCS_a` — Radiação Solar Global em Outubro - A
+- `cartas_climaticas:RdSGM10_1M_GCS_l` — Radiação Solar Global em Outubro - L
+- `cartas_climaticas:RdSGM11_1M_GCS_a` — Radiação Solar Global em Novembro - A
+- `cartas_climaticas:RdSGM11_1M_GCS_l` — Radiação Solar Global em Novembro - L
+- `cartas_climaticas:RdSGM12_1M_GCS_a` — Radiação Solar Global em Dezembro - A
+- `cartas_climaticas:RdSGM12_1M_GCS_l` — Radiação Solar Global em Dezembro - L
+- `cartas_climaticas:RdSGMAnual_1M_GCS_a` — Radiação Solar Global Média Anual (2007-2018) - A
+- `cartas_climaticas:RdSGMAnual_1M_GCS_l` — Radiação Solar Global Média Anual (2007-2018) - L
+- `cartas_climaticas:TMax1990_1M_GCS_a` — Temperatura Máxima em 1990
+- `cartas_climaticas:TMax1991_1M_GCS_a` — Temperatura Máxima em 1991
+- `cartas_climaticas:TMax1992_1M_GCS_a` — Temperatura Máxima em 1992
+- `cartas_climaticas:TMax1993_1M_GCS_a` — Temperatura Máxima em 1993
+- `cartas_climaticas:TMax1994_1M_GCS_a` — Temperatura Máxima em 1994
+- `cartas_climaticas:TMax1995_1M_GCS_a` — Temperatura Máxima em 1995
+- `cartas_climaticas:TMax1996_1M_GCS_a` — Temperatura Máxima em 1996
+- `cartas_climaticas:TMax1997_1M_GCS_a` — Temperatura Máxima em 1997
+- `cartas_climaticas:TMax1998_1M_GCS_a` — Temperatura Máxima em 1998
+- `cartas_climaticas:TMax1999_1M_GCS_a` — Temperatura Máxima em 1999
+- `cartas_climaticas:TMax2000_1M_GCS_a` — Temperatura Máxima em 2000
+- `cartas_climaticas:TMax2001_1M_GCS_a` — Temperatura Máxima em 2001
+- `cartas_climaticas:TMax2002_1M_GCS_a` — Temperatura Máxima em 2002
+- `cartas_climaticas:TMax2003_1M_GCS_a` — Temperatura Máxima em 2003
+- `cartas_climaticas:TMax2004_1M_GCS_a` — Temperatura Máxima em 2004
+- `cartas_climaticas:TMax2005_1M_GCS_a` — Temperatura Máxima em 2005
+- `cartas_climaticas:TMax2006_1M_GCS_a` — Temperatura Máxima em 2006
+- `cartas_climaticas:TMax2007_1M_GCS_a` — Temperatura Máxima em 2007
+- `cartas_climaticas:TMax2008_1M_GCS_a` — Temperatura Máxima em 2008
+- `cartas_climaticas:TMax2009_1M_GCS_a` — Temperatura Máxima em 2009
+- `cartas_climaticas:TMax2010_1M_GCS_a` — Temperatura Máxima em 2010
+- `cartas_climaticas:TMax2011_1M_GCS_a` — Temperatura Máxima em 2011
+- `cartas_climaticas:TMax2012_1M_GCS_a` — Temperatura Máxima em 2012
+- `cartas_climaticas:TMax2013_1M_GCS_a` — Temperatura Máxima em 2013
+- `cartas_climaticas:TMax2014_1M_GCS_a` — Temperatura Máxima em 2014
+- `cartas_climaticas:TMax2015_1M_GCS_a` — Temperatura Máxima em 2015
+- `cartas_climaticas:TMax2016_1M_GCS_a` — Temperatura Máxima em 2016
+- `cartas_climaticas:TMax2017_1M_GCS_a` — Temperatura Máxima em 2017
+- `cartas_climaticas:TMax2018_1M_GCS_a` — Temperatura Máxima em 2018
+- `cartas_climaticas:TMax2019_1M_GCS_a` — Temperatura Máxima em 2019
+- `cartas_climaticas:TMaxM01_1M_GCS_a` — Temperatura Máxima em Janeiro
+- `cartas_climaticas:TMaxM02_1M_GCS_a` — Temperatura Máxima em Fevereiro
+- `cartas_climaticas:TMaxM03_1M_GCS_a` — Temperatura Máxima em Março
+- `cartas_climaticas:TMaxM04_1M_GCS_a` — Temperatura Máxima em Abril
+- `cartas_climaticas:TMaxM05_1M_GCS_a` — Temperatura Máxima em Maio
+- `cartas_climaticas:TMaxM06_1M_GCS_a` — Temperatura Máxima em Junho
+- `cartas_climaticas:TMaxM07_1M_GCS_a` — Temperatura Máxima em Julho
+- `cartas_climaticas:TMaxM08_1M_GCS_a` — Temperatura Máxima em Agosto
+- `cartas_climaticas:TMaxM09_1M_GCS_a` — Temperatura Máxima em Setembro
+- `cartas_climaticas:TMaxM10_1M_GCS_a` — Temperatura Máxima em Outubro
+- `cartas_climaticas:TMaxM11_1M_GCS_a` — Temperatura Máxima em Novembro
+- `cartas_climaticas:TMaxM12_1M_GCS_a` — Temperatura Máxima em Dezembro
+- `cartas_climaticas:TMaxMAnual_1M_GCS_a` — Temperatura Máxima Anual
+- `cartas_climaticas:TMed1990_1M_GCS_a` — Temperatura Média em 1990
+- `cartas_climaticas:TMed1991_1M_GCS_a` — Temperatura Média em 1991
+- `cartas_climaticas:TMed1992_1M_GCS_a` — Temperatura Média em 1992
+- `cartas_climaticas:TMed1993_1M_GCS_a` — Temperatura Média em 1993
+- `cartas_climaticas:TMed1994_1M_GCS_a` — Temperatura Média em 1994
+- `cartas_climaticas:TMed1995_1M_GCS_a` — Temperatura Média em 1995
+- `cartas_climaticas:TMed1996_1M_GCS_a` — Temperatura Média em 1996
+- `cartas_climaticas:TMed1997_1M_GCS_a` — Temperatura Média em 1997
+- `cartas_climaticas:TMed1998_1M_GCS_a` — Temperatura Média em 1998
+- `cartas_climaticas:TMed1999_1M_GCS_a` — Temperatura Média em 1999
+- `cartas_climaticas:TMed2000_1M_GCS_a` — Temperatura Média em 2000
+- `cartas_climaticas:TMed2001_1M_GCS_a` — Temperatura Média em 2001
+- `cartas_climaticas:TMed2002_1M_GCS_a` — Temperatura Média em 2002
+- `cartas_climaticas:TMed2003_1M_GCS_a` — Temperatura Média em 2003
+- `cartas_climaticas:TMed2004_1M_GCS_a` — Temperatura Média em 2004
+- `cartas_climaticas:TMed2005_1M_GCS_a` — Temperatura Média em 2005
+- `cartas_climaticas:TMed2006_1M_GCS_a` — Temperatura Média em 2006
+- `cartas_climaticas:TMed2007_1M_GCS_a` — Temperatura Média em 2007
+- `cartas_climaticas:TMed2008_1M_GCS_a` — Temperatura Média em 2008
+- `cartas_climaticas:TMed2009_1M_GCS_a` — Temperatura Média em 2009
+- `cartas_climaticas:TMed2010_1M_GCS_a` — Temperatura Média em 2010
+- `cartas_climaticas:TMed2011_1M_GCS_a` — Temperatura Média em 2011
+- `cartas_climaticas:TMed2012_1M_GCS_a` — Temperatura Média em 2012
+- `cartas_climaticas:TMed2013_1M_GCS_a` — Temperatura Média em 2013
+- `cartas_climaticas:TMed2014_1M_GCS_a` — Temperatura Média em 2014
+- `cartas_climaticas:TMed2015_1M_GCS_a` — Temperatura Média em 2015
+- `cartas_climaticas:TMed2016_1M_GCS_a` — Temperatura Média em 2016
+- `cartas_climaticas:TMed2017_1M_GCS_a` — Temperatura Média em 2017
+- `cartas_climaticas:TMed2018_1M_GCS_a` — Temperatura Média em 2018
+- `cartas_climaticas:TMed2019_1M_GCS_a` — Temperatura Média em 2019
+- `cartas_climaticas:TMedM01_1M_GCS_a` — Temperatura Média em Janeiro
+- `cartas_climaticas:TMedM02_1M_GCS_a` — Temperatura Média em Fevereiro
+- `cartas_climaticas:TMedM03_1M_GCS_a` — Temperatura Média em Março
+- `cartas_climaticas:TMedM04_1M_GCS_a` — Temperatura Média em Abril
+- `cartas_climaticas:TMedM05_1M_GCS_a` — Temperatura Média em Maio
+- `cartas_climaticas:TMedM06_1M_GCS_a` — Temperatura Média em Junho
+- `cartas_climaticas:TMedM07_1M_GCS_a` — Temperatura Média em Julho
+- `cartas_climaticas:TMedM08_1M_GCS_a` — Temperatura Média em Agosto
+- `cartas_climaticas:TMedM09_1M_GCS_a` — Temperatura Média em Setembro
+- `cartas_climaticas:TMedM10_1M_GCS_a` — Temperatura Média em Outubro
+- `cartas_climaticas:TMedM11_1M_GCS_a` — Temperatura Média em Novembro
+- `cartas_climaticas:TMedM12_1M_GCS_a` — Temperatura Média em Dezembro
+- `cartas_climaticas:TMedMAnual_1M_GCS_a` — Temperatura Média Anual
+- `cartas_climaticas:TMin1990_1M_GCS_a` — Temperatura Mínima em 1990
+- `cartas_climaticas:TMin1991_1M_GCS_a` — Temperatura Mínima em 1991
+- `cartas_climaticas:TMin1992_1M_GCS_a` — Temperatura Mínima em 1992
+- `cartas_climaticas:TMin1993_1M_GCS_a` — Temperatura Mínima em 1993
+- `cartas_climaticas:TMin1994_1M_GCS_a` — Temperatura Mínima em 1994
+- `cartas_climaticas:TMin1995_1M_GCS_a` — Temperatura Mínima em 1995
+- `cartas_climaticas:TMin1996_1M_GCS_a` — Temperatura Mínima em 1996
+- `cartas_climaticas:TMin1997_1M_GCS_a` — Temperatura Mínima em 1997
+- `cartas_climaticas:TMin1998_1M_GCS_a` — Temperatura Mínima em 1998
+- `cartas_climaticas:TMin1999_1M_GCS_a` — Temperatura Mínima em 1999
+- `cartas_climaticas:TMin2000_1M_GCS_a` — Temperatura Mínima em 2000
+- `cartas_climaticas:TMin2001_1M_GCS_a` — Temperatura Mínima em 2001
+- `cartas_climaticas:TMin2003_1M_GCS_a` — Temperatura Mínima em 2003
+- `cartas_climaticas:TMin2004_1M_GCS_a` — Temperatura Mínima em 2004
+- `cartas_climaticas:TMin2005_1M_GCS_a` — Temperatura Mínima em 2005
+- `cartas_climaticas:TMin2006_1M_GCS_a` — Temperatura Mínima em 2006
+- `cartas_climaticas:TMin2007_1M_GCS_a` — Temperatura Mínima em 2007
+- `cartas_climaticas:TMin2008_1M_GCS_a` — Temperatura Mínima em 2008
+- `cartas_climaticas:TMin2009_1M_GCS_a` — Temperatura Mínima em 2009
+- `cartas_climaticas:TMin2010_1M_GCS_a` — Temperatura Mínima em 2010
+- `cartas_climaticas:TMin2011_1M_GCS_a` — Temperatura Mínima em 2011
+- `cartas_climaticas:TMin2012_1M_GCS_a` — Temperatura Mínima em 2012
+- `cartas_climaticas:TMin2013_1M_GCS_a` — Temperatura Mínima em 2013
+- `cartas_climaticas:TMin2014_1M_GCS_a` — Temperatura Mínima em 2014
+- `cartas_climaticas:TMin2015_1M_GCS_a` — Temperatura Mínima em 2015
+- `cartas_climaticas:TMin2016_1M_GCS_a` — Temperatura Mínima em 2016
+- `cartas_climaticas:TMin2017_1M_GCS_a` — Temperatura Mínima em 2017
+- `cartas_climaticas:TMin2018_1M_GCS_a` — Temperatura Mínima em 2018
+- `cartas_climaticas:TMin2019_1M_GCS_a` — Temperatura Mínima em 2019
+- `cartas_climaticas:TMinM01_1M_GCS_a` — Temperatura Mínima em Janeiro
+- `cartas_climaticas:TMinM02_1M_GCS_a` — Temperatura Mínima em Fevereiro
+- `cartas_climaticas:TMinM03_1M_GCS_a` — Temperatura Mínima em Março
+- `cartas_climaticas:TMinM04_1M_GCS_a` — Temperatura Mínima em Abril
+- `cartas_climaticas:TMinM05_1M_GCS_a` — Temperatura Mínima em Maio
+- `cartas_climaticas:TMinM06_1M_GCS_a` — Temperatura Mínima em Junho
+- `cartas_climaticas:TMinM07_1M_GCS_a` — Temperatura Mínima em Julho
+- `cartas_climaticas:TMinM08_1M_GCS_a` — Temperatura Mínima em Agosto
+- `cartas_climaticas:TMinM09_1M_GCS_a` — Temperatura Mínima em Setembro
+- `cartas_climaticas:TMinM10_1M_GCS_a` — Temperatura Mínima em Outubro
+- `cartas_climaticas:TMinM11_1M_GCS_a` — Temperatura Mínima em Novembro
+- `cartas_climaticas:TMinM12_1M_GCS_a` — Temperatura Mínima em Dezembro
+- `cartas_climaticas:TMinMAnual_1M_GCS_a` — Temperatura Mínima Anual
+- `cartas_climaticas:Umid1990_1M_GCS_a` — Umidade Relativa do Ar Média em 1990 - A
+- `cartas_climaticas:Umid1990_1M_GCS_l` — Umidade Relativa do Ar Média em 1990 - L
+- `cartas_climaticas:Umid1991_1M_GCS_a` — Umidade Relativa do Ar Média em 1991 - A
+- `cartas_climaticas:Umid1991_1M_GCS_l` — Umidade Relativa do Ar Média em 1991 - L
+- `cartas_climaticas:Umid1992_1M_GCS_a` — Umidade Relativa do Ar Média em 1992 - A
+- `cartas_climaticas:Umid1992_1M_GCS_l` — Umidade Relativa do Ar Média em 1992 - L
+- `cartas_climaticas:Umid1993_1M_GCS_a` — Umidade Relativa do Ar Média em 1993 - A
+- `cartas_climaticas:Umid1993_1M_GCS_l` — Umidade Relativa do Ar Média em 1993 - L
+- `cartas_climaticas:Umid1994_1M_GCS_a` — Umidade Relativa do Ar Média em 1994 - A
+- `cartas_climaticas:Umid1994_1M_GCS_l` — Umidade Relativa do Ar Média em 1994 - L
+- `cartas_climaticas:Umid1995_1M_GCS_a` — Umidade Relativa do Ar Média em 1995 - A
+- `cartas_climaticas:Umid1995_1M_GCS_l` — Umidade Relativa do Ar Média em 1995 - L
+- `cartas_climaticas:Umid1996_1M_GCS_a` — Umidade Relativa do Ar Média em 1996 - A
+- `cartas_climaticas:Umid1996_1M_GCS_l` — Umidade Relativa do Ar Média em 1996 - L
+- `cartas_climaticas:Umid1997_1M_GCS_a` — Umidade Relativa do Ar Média em 1997 - A
+- `cartas_climaticas:Umid1997_1M_GCS_l` — Umidade Relativa do Ar Média em 1997 - L
+- `cartas_climaticas:Umid1998_1M_GCS_a` — Umidade Relativa do Ar Média em 1998 - A
+- `cartas_climaticas:Umid1998_1M_GCS_l` — Umidade Relativa do Ar Média em 1998 - L
+- `cartas_climaticas:Umid1999_1M_GCS_l` — Umidade Relativa do Ar Média em 1999 - L
+- `cartas_climaticas:Umid2000_1M_GCS_a` — Umidade Relativa do Ar Média em 2000 - A
+- `cartas_climaticas:Umid2000_1M_GCS_l` — Umidade Relativa do Ar Média em 2000 - L
+- `cartas_climaticas:Umid2001_1M_GCS_a` — Umidade Relativa do Ar Média em 2001 - A
+- `cartas_climaticas:Umid2001_1M_GCS_l` — Umidade Relativa do Ar Média em 2001 - L
+- `cartas_climaticas:Umid2002_1M_GCS_a` — Umidade Relativa do Ar Média em 2002 - A
+- `cartas_climaticas:Umid2002_1M_GCS_l` — Umidade Relativa do Ar Média em 2002 - L
+- `cartas_climaticas:Umid2003_1M_GCS_a` — Umidade Relativa do Ar Média em 2003 - A
+- `cartas_climaticas:Umid2003_1M_GCS_l` — Umidade Relativa do Ar Média em 2003 - L
+- `cartas_climaticas:Umid2004_1M_GCS_a` — Umidade Relativa do Ar Média em 2004 - A
+- `cartas_climaticas:Umid2004_1M_GCS_l` — Umidade Relativa do Ar Média em 2004 - L
+- `cartas_climaticas:Umid2005_1M_GCS_a` — Umidade Relativa do Ar Média em 2005 - A
+- `cartas_climaticas:Umid2005_1M_GCS_l` — Umidade Relativa do Ar Média em 2005 - L
+- `cartas_climaticas:Umid2006_1M_GCS_a` — Umidade Relativa do Ar Média em 2006 - A
+- `cartas_climaticas:Umid2006_1M_GCS_l` — Umidade Relativa do Ar Média em 2006 - L
+- `cartas_climaticas:Umid2007_1M_GCS_a` — Umidade Relativa do Ar Média em 2007 - A
+- `cartas_climaticas:Umid2007_1M_GCS_l` — Umidade Relativa do Ar Média em 2007 - L
+- `cartas_climaticas:Umid2008_1M_GCS_a` — Umidade Relativa do Ar Média em 2008 - A
+- `cartas_climaticas:Umid2008_1M_GCS_l` — Umidade Relativa do Ar Média em 2008 - L
+- `cartas_climaticas:Umid2009_1M_GCS_a` — Umidade Relativa do Ar Média em 2009 - A
+- `cartas_climaticas:Umid2009_1M_GCS_l` — Umidade Relativa do Ar Média em 2009 - L
+- `cartas_climaticas:Umid2010_1M_GCS_a` — Umidade Relativa do Ar Média em 2010 - A
+- `cartas_climaticas:Umid2010_1M_GCS_l` — Umidade Relativa do Ar Média em 2010 - L
+- `cartas_climaticas:Umid2011_1M_GCS_a` — Umidade Relativa do Ar Média em 2011 - A
+- `cartas_climaticas:Umid2011_1M_GCS_l` — Umidade Relativa do Ar Média em 2011 - L
+- `cartas_climaticas:Umid2012_1M_GCS_a` — Umidade Relativa do Ar Média em 2012 - A
+- `cartas_climaticas:Umid2012_1M_GCS_l` — Umidade Relativa do Ar Média em 2012 - L
+- `cartas_climaticas:Umid2013_1M_GCS_a` — Umidade Relativa do Ar Média em 2013 - A
+- `cartas_climaticas:Umid2013_1M_GCS_l` — Umidade Relativa do Ar Média em 2013 - L
+- `cartas_climaticas:Umid2014_1M_GCS_a` — Umidade Relativa do Ar Média em 2014 - A
+- `cartas_climaticas:Umid2014_1M_GCS_l` — Umidade Relativa do Ar Média em 2014 - L
+- `cartas_climaticas:Umid2015_1M_GCS_a` — Umidade Relativa do Ar Média em 2015 - A
+- `cartas_climaticas:Umid2015_1M_GCS_l` — Umidade Relativa do Ar Média em 2015 - L
+- `cartas_climaticas:Umid2016_1M_GCS_a` — Umidade Relativa do Ar Média em 2016 - A
+- `cartas_climaticas:Umid2016_1M_GCS_l` — Umidade Relativa do Ar Média em 2016 - L
+- `cartas_climaticas:Umid2017_1M_GCS_a` — Umidade Relativa do Ar Média em 2017 - A
+- `cartas_climaticas:Umid2017_1M_GCS_l` — Umidade Relativa do Ar Média em 2017 - L
+- `cartas_climaticas:Umid2018_1M_GCS_a` — Umidade Relativa do Ar Média em 2018 - A
+- `cartas_climaticas:Umid2018_1M_GCS_l` — Umidade Relativa do Ar Média em 2018 - L
+- `cartas_climaticas:Umid2019_1M_GCS_a` — Umidade Relativa do Ar Média em 2019 - A
+- `cartas_climaticas:Umid2019_1M_GCS_l` — Umidade Relativa do Ar Média em 2019 - L
+- `cartas_climaticas:UmidM01_1M_GCS_a` — Umidade Relativa do Ar Média em Janeiro - A
+- `cartas_climaticas:UmidM01_1M_GCS_l` — Umidade Relativa do Ar Média em Janeiro - L
+- `cartas_climaticas:UmidM02_1M_GCS_a` — Umidade Relativa do Ar Média em Fevereiro - A
+- `cartas_climaticas:UmidM02_1M_GCS_l` — Umidade relativa do Ar Média em Fevereiro - L
+- `cartas_climaticas:UmidM03_1M_GCS_a` — Umidade Relativa do Ar Média em Março - A
+- `cartas_climaticas:UmidM03_1M_GCS_l` — Umidade Relativa do Ar Média em Março - L
+- `cartas_climaticas:UmidM04_1M_GCS_a` — Umidade Relativa do Ar Média em Abril - A
+- `cartas_climaticas:UmidM04_1M_GCS_l` — Umidade Relativa do Ar Média em Abril - L
+- `cartas_climaticas:UmidM05_1M_GCS_a` — Umidade Relativa do Ar Média em Maio - A
+- `cartas_climaticas:UmidM05_1M_GCS_l` — Umidade Relativa do Ar Média em Maio - L
+- `cartas_climaticas:UmidM06_1M_GCS_a` — Umidade Relativa do Ar Média em Junho - A
+- `cartas_climaticas:UmidM06_1M_GCS_l` — Umidade Relativa do Ar Média em Junho - L
+- `cartas_climaticas:UmidM07_1M_GCS_a` — Umidade Relativa do Ar Média em Julho - A
+- `cartas_climaticas:UmidM07_1M_GCS_l` — Umidade Relativa do Ar Média em Julho - L
+- `cartas_climaticas:UmidM08_1M_GCS_a` — Umidade Relativa do Ar Média em Agosto - A
+- `cartas_climaticas:UmidM08_1M_GCS_l` — Umidade Relativa do Ar Média em Agosto - L
+- `cartas_climaticas:UmidM09_1M_GCS_a` — Umidade Relativa do Ar Média em Setembro - A
+- `cartas_climaticas:UmidM09_1M_GCS_l` — Umidade Relativa do Ar Média em Setembro - L
+- `cartas_climaticas:UmidM10_1M_GCS_a` — Umidade Relativa do Ar Média em Outubro - A
+- `cartas_climaticas:UmidM10_1M_GCS_l` — Umidade Relativa do Ar Média em Outubro - L
+- `cartas_climaticas:UmidM11_1M_GCS_a` — Umidade Relativa do Ar Média em Novembro - A
+- `cartas_climaticas:UmidM11_1M_GCS_l` — Umidade Relativa do Ar Média em Novembro - L
+- `cartas_climaticas:UmidM12_1M_GCS_a` — Umidade Relativa do Ar Média em Dezembro - A
+- `cartas_climaticas:UmidM12_1M_GCS_l` — Umidade Relativa do Ar Média em Dezembro - L
+- `cartas_climaticas:UmidMAnual_1M_GCS_a` — Umidade Relativa do Ar Média Anual de 1990 a 2019 - A
+- `cartas_climaticas:UmidMAnual_1M_GCS_l` — Umidade Relativa do Ar Média Anual de 1990 a 2019 - L
+
+## estatistica (71)
+- `estatistica:acidentes_com_animais_peconhentos` — Acidentes com Animais Peçonhentos
+- `estatistica:alho` — Alho
+- `estatistica:aquicultura_2013_2018` — Aquicultura
+- `estatistica:bovino1989_2018` — Bovino
+- `estatistica:bubalinos1989_2018` — Bubalinos
+- `estatistica:caprino1989_2018` — Caprino
+- `estatistica:codorna` — Codorna
+- `estatistica:coeficiente_deteccao_anual_hanseniase` — Coeficiente de Detecção Anual de Casos Novos de Hanseníase
+- `estatistica:docentes_separados_2014` — Docentes separados por categoria 2014
+- `estatistica:docentes_separados_por_categoria_2012` — Docentes separados por categoria 2012
+- `estatistica:docentes_separados_por_categoria_2015` — Docentes separados por categoria 2015
+- `estatistica:equinos` — Equinos
+- `estatistica:estabelecimentos_2012` — Estabelecimentos separados por categoria 2012
+- `estatistica:estabelecimentos_2014` — Estabelecimentos separados por categoria 2014
+- `estatistica:estabelecimentos_2015` — Estabelecimentos separados por categoria 2015
+- `estatistica:estimativa_populacao` — Estimativa população municípios
+- `estatistica:galinaceo1` — Galináceo
+- `estatistica:imunizacao_em_menores` — Imunização em menores de um ano
+- `estatistica:indice_2013` — Índice de Desenvolvimento da Educação Básica – IDEB, segundo Localização e Dependência Administrativa 2013
+- `estatistica:indice_2015` — Índice de Desenvolvimento da Educação Básica – IDEB, segundo Localização e Dependência Administrativa 2015
+- `estatistica:inidce_2009` — Índice de Desenvolvimento da Educação Básica – IDEB, segundo Localização e Dependência Administrativa 2009
+- `estatistica:inidce_2011` — Índice de Desenvolvimento da Educação Básica – IDEB, segundo Localização e Dependência Administrativa 2011
+- `estatistica:lavoura_permanente_abacate_1989a2018` — Abacate
+- `estatistica:lavoura_permanente_banana_1989a2018` — Banana
+- `estatistica:lavoura_permanente_coco_da_baia_1996a2018` — Coco da baia
+- `estatistica:lavoura_permanente_laranja_1989a2018` — Laranja
+- `estatistica:lavoura_permanente_manga_1994a2018` — Manga
+- `estatistica:lavoura_permanente_maracuja_1989a2018` — Maracujá
+- `estatistica:lavoura_temporaria_abacaxi_1989_2018` — Abacaxi
+- `estatistica:lavoura_temporaria_algodao_1989_2018` — Algodão
+- `estatistica:lavoura_temporaria_amendoim_1989_2018` — Amendoim
+- `estatistica:lavoura_temporaria_arroz_1989_2018` — Arroz
+- `estatistica:lavoura_temporaria_cana_de_acucar_1989_2018` — Cana de açúcar
+- `estatistica:lavoura_temporaria_feijao_1989_2018` — Feijão
+- `estatistica:lavoura_temporaria_mandioca_1989_2018` — Mandioca
+- `estatistica:lavoura_temporaria_melancia_1989_2018` — Melancia
+- `estatistica:lavoura_temporaria_melao_1989_2018` — Melão
+- `estatistica:lavoura_temporaria_milho_1989_2018` — Milho
+- `estatistica:lavoura_temporaria_soja_1989_2018` — Soja
+- `estatistica:lavoura_temporaria_sorgo_1989_2018` — Sorgo
+- `estatistica:lavoura_temporaria_tomate_1989_2018` — Tomate
+- `estatistica:leishmaniose_visceral` — Leishmaniose Visceral e Leishmaniose Tegumentar
+- `estatistica:leite1` — Leite
+- `estatistica:matriculas_2012` — Matrículas na Educação Básica segundo tipo de Ensino, Localização e Dependência Administrativa 2012
+- `estatistica:matriculas_2014` — Matrículas na Educação Básica segundo tipo de Ensino, Localização e Dependência Administrativa 2014
+- `estatistica:matriculas_2015` — Matrículas na Educação Básica segundo tipo de Ensino, Localização e Dependência Administrativa 2015
+- `estatistica:mel_de_abelha_1989_2018` — Mel de abelha
+- `estatistica:numero_casos_dengue` — Número de Casos Prováveis de Dengue
+- `estatistica:numero_de_casos_confirmados_de_meningite_2007_a_2018` — Número de Casos Confirmados de Meningite
+- `estatistica:numero_de_leitos_de_internacao_hospitalar` — Número de Leitos de Internação Hospitalar
+- `estatistica:numero_de_profissionais_de_saude` — Número de Profissionais na Área de Saúde
+- `estatistica:numero_estabelecimentos_saude` — Numero de estabelecimentos de saúde
+- `estatistica:numero_nascidos_vivos_por_sexo_faixa_etaria_de_mae_2009_a_2018` — Nascidos vivos
+- `estatistica:numero_obitos_por_faixa_etaria_2009_a_2018` — Número de Óbitos por Faixa Etária
+- `estatistica:obitos_por_causa_morte_2009_2010_2013_2014_2015` — Óbitos por Causa Morte
+- `estatistica:ovino` — Ovino
+- `estatistica:ovos_galinha_1989_2018` — Ovos Galinha
+- `estatistica:pib_e_pib_por_capita` — PIB e PIB por capita
+- `estatistica:popul_resid_cor_raca_sexo_situacao` — População residente por cor ou raça, sexo, situação do domicílio e grupos de idade
+- `estatistica:popul_resid_por_situacao_do_domicilio_e_sexo_2010` — População residente por situação do domicílio e sexo no ano 2010
+- `estatistica:populacao_censitaria_municip_1991_2000_2010` — População censitária municipal
+- `estatistica:suino1989_2018` — Suino
+- `estatistica:taxa_abandono_2013` — Taxa de Abandono na Educação Básica regular segundo Localização e Dependência Administrativa 2013
+- `estatistica:taxa_abandono_2015` — Taxa de Abandono na Educação Básica regular segundo Localização e Dependência Administrativa 2015
+- `estatistica:taxa_aprovacao_2013` — Taxa de Aprovação na Educação Básica regular segundo Localização e Dependência Administrativa 2013
+- `estatistica:taxa_de_aprovacao_2015` — Taxa de Aprovação na Educação Básica regular segundo Localização e Dependência Administrativa 2015
+- `estatistica:taxa_de_distorcao_2013` — Taxa de Distorção Idade Série da Educação Básica Regular segundo Localização e Dependência Administrativa 2013
+- `estatistica:taxa_de_distorcao_2015` — Taxa de Distorção Idade Série Separado por Categoria e modalidade de Ensino 2015
+- `estatistica:taxa_de_mortalidade_infantil_2008_a_2015` — Taxa Mortalidade Infantil
+- `estatistica:taxa_de_reprovacao_2013` — Taxa de Reprovação, Separado por Categoria e Modalidade de Ensino 2013
+- `estatistica:taxa_de_reprovacao_2015` — Taxa de Reprovação, Separado por Categoria e Modalidade de Ensino 2015
+
+## hidrogeologico (14)
+- `hidrogeologico:AreaEstudo_A` — Limite da área de estudo
+- `hidrogeologico:CobUso_2015_A` — Cobertura e uso da Terra 2015
+- `hidrogeologico:Fitoecologico_A` — Regiões Fitoecológicas - Hidrogeológico
+- `hidrogeologico:Geologia_A` — Geologia
+- `hidrogeologico:Geomofologia_A` — Geomorfologia – Unidades Geomorfológicas
+- `hidrogeologico:Pedologia_A` — Pedologia
+- `hidrogeologico:Pocos_STD_PH` — Poços de Sólidos Totais Dissolvidos
+- `hidrogeologico:PocosPotenciometria` — Poço Profundo para Cálculo de Potenciometria
+- `hidrogeologico:PocosVulnerabilidade` — Poços de Vulnerabilidade Hidrogeológica
+- `hidrogeologico:Potenciometria` — Potenciometria Hidrogeológica
+- `hidrogeologico:STD_Fissural` — Sólidos totais do aquífero fissural
+- `hidrogeologico:STD_Poroso` — Sólidos totais do aquífero poroso
+- `hidrogeologico:Vunerabilidade` — Vulnerabilidade natural dos aquíferos
+- `hidrogeologico:ZonasHidrogeologico` — Zoneamento Explotável
+
+## preview (3)
+- `preview:preview_line` — line
+- `preview:preview_point` — point
+- `preview:preview_polygon` — polygon
+
+## zoneamento_ecologico_economico (14)
+- `zoneamento_ecologico_economico:cenario_atual_` — Cenário Atual
+- `zoneamento_ecologico_economico:cobertura_uso_2015_zoneamento` — Cobertura e Uso da Terra Ano 2015
+- `zoneamento_ecologico_economico:localidades_consulta_publica_zoneamento_` — Localidades Consultas Públicas
+- `zoneamento_ecologico_economico:localidades_oficinas_zoneamento_` — Localidades Oficinas
+- `zoneamento_ecologico_economico:municipios_consulta_publica_zoneamento_` — Municipios Consultas Públicas
+- `zoneamento_ecologico_economico:municipios_oficinas_zoneamento_` — Municipios Oficinas
+- `zoneamento_ecologico_economico:nivel_macro_zoneamento` — Nível I - Macrocompartimentos da Paisagem
+- `zoneamento_ecologico_economico:pontos_campo_biotico_zoneamento_` — Pontos Campo Biotico
+- `zoneamento_ecologico_economico:pontos_coleta_zoneamento_4674` — Pontos coleta
+- `zoneamento_ecologico_economico:rotas_campo_antropico_zoneamento_` — Rotas Campo Antropico
+- `zoneamento_ecologico_economico:servicos_ecossistemicos_4674` — Serviços Ecossistêmicos
+- `zoneamento_ecologico_economico:unidades_paisagem_zoneamento_` — Unidades Paisagem N III
+- `zoneamento_ecologico_economico:vulnerabilidade_zoneamento_` — Vulnerabilidade
+- `zoneamento_ecologico_economico:zoneamento_to` — Zoneamento Ecológico-Econômico

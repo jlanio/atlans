@@ -1,0 +1,20 @@
+{
+  "_comment": [
+    "Runtime CPython embarcado no app desktop. Pinado por release E por SHA-256:",
+    "sem o hash, uma release re-publicada trocaria o interpretador sem ninguem notar.",
+    "",
+    "Python 3.12 nao e escolha livre — alinha com Dockerfile.executor, com o",
+    "Dockerfile.api e com o setup-python de .github/workflows/ci.yml. Subir a",
+    "versao aqui exige subir nos tres e regerar os locks (scripts/travar_python.py).",
+    "",
+    "Distribuicao install_only: extrai como python/{python.exe,Lib,DLLs,Scripts}.",
+    "NAO e a 'embeddable' da python.org (que usa python._pth e nao aceita pip).",
+    "",
+    "Este arquivo e a chave do cache do tarball no CI — mudar qualquer campo",
+    "baixa o CPython de novo."
+  ],
+  "release": "20260814",
+  "version": "3.12.14",
+  "asset": "cpython-3.12.14+20260814-x86_64-pc-windows-msvc-install_only.tar.gz",
+  "sha256": "7330282b47cd43a66b702d39078d2e5a88e580cee351d82f95045f21f5ee042a"
+}

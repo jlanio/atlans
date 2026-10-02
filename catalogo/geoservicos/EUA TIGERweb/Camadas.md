@@ -1,0 +1,4829 @@
+# U.S. Census Bureau — TIGERweb — camadas
+
+Geoportal: [[Geosserviços/EUA TIGERweb/U.S. Census Bureau — TIGERweb|U.S. Census Bureau — TIGERweb]]
+
+Total: **4144** camadas em **170** serviços ArcGIS. Cada camada é acessível por `HttpRequest` com `f=geojson`.
+
+## Census2020/AIANNHA (35)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/0>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/1>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/2>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/3>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/4>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/5>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/6>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/7>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/8>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/9>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/10>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/11>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/12>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/13>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/14>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/15>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/16>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/17>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/18>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/19>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/20>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/21>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/22>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/23>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/24>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/25>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/26>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/27>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/28>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/29>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/30>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/31>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/32>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/33>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/AIANNHA/MapServer/34>
+
+## Census2020/CBSA (23)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/0>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/1>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/2>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/3>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/4>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/5>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/6>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/7>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/8>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/9>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/10>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/11>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/12>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/13>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/14>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/15>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/16>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/17>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/18>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/19>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/20>
+- `Metropolitan Statistical Areas/Consolidated Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/21>
+- `Primary Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/CBSA/MapServer/22>
+
+## Census2020/Hydro (3)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Hydro/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Hydro/MapServer/0>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Hydro/MapServer/1>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Hydro/MapServer/2>
+
+## Census2020/Labels (196)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `PUMAs, UGAs, and ZCTAs` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/0>
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/1>
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/2>
+- `ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/3>
+- `Tribal Census Tracts and Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/4>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/6>
+- `Census Tracts and Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/8>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/9>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/10>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/11>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/12>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/13>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/14>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/15>
+- `School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/16>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/17>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/18>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/19>
+- `Places and County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/20>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/21>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/22>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/24>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/25>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/26>
+- `American Indian, Alaska Native, and Native Hawaiian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/27>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/28>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/29>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/30>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/31>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/32>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/33>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/34>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/35>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/36>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/37>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/38>
+- `Legislative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/39>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/40>
+- `2018 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/41>
+- `2018 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/42>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/43>
+- `Census Regions and Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/44>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/45>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/46>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/47>
+- `2020 Urban Areas - Corrected` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/48>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/49>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/50>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/51>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/52>
+- `New England City and Town Area  Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/53>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/54>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/55>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/56>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/57>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/58>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/59>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/60>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/61>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/62>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/63>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/64>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/65>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/66>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/67>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/68>
+- `PUMAs, UGAs, and ZCTAs` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/69>
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/70>
+- `Traffic Analysis Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/71>
+- `Traffic Analysis Zones` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/72>
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/73>
+- `ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/74>
+- `Tribal Census Tracts and Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/75>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/76>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/77>
+- `Census Tracts and Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/78>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/79>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/80>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/81>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/82>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/83>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/84>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/85>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/86>
+- `School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/87>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/88>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/89>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/90>
+- `Places and County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/91>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/92>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/93>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/94>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/95>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/96>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/97>
+- `American Indian, Alaska Native, and Native Hawaiian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/98>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/99>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/100>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/101>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/102>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/103>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/104>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/105>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/106>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/107>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/108>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/109>
+- `Legislative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/110>
+- `111th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/111>
+- `2010 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/112>
+- `2010 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/113>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/114>
+- `Census Regions and Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/115>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/116>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/117>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/118>
+- `Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/119>
+- `Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/120>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/121>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/122>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/123>
+- `New England City and Town Area  Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/124>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/125>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/126>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/127>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/128>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/129>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/130>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/131>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/132>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/133>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/134>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/135>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/136>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/137>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/138>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/139>
+- `PUMAs, UGAs, and ZCTAs` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/140>
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/141>
+- `Traffic Analysis Zones` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/142>
+- `ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/143>
+- `Census Tracts and Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/144>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/145>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/146>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/147>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/148>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/149>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/150>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/151>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/152>
+- `School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/153>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/154>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/155>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/156>
+- `Places and County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/157>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/158>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/159>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/160>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/161>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/162>
+- `American Indian, Alaska Native, and Native Hawaiian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/163>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/164>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/165>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/166>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/167>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/168>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/169>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/170>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/171>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/172>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/173>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/174>
+- `Legislative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/175>
+- `108th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/176>
+- `2000 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/177>
+- `2000 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/178>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/179>
+- `Census Regions and Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/180>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/181>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/182>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/183>
+- `Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/184>
+- `Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/185>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/186>
+- `Metropolitan Statistical Areas/Consolidated Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/187>
+- `Primary Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/188>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/189>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/190>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/191>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/192>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/193>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/194>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Labels/MapServer/195>
+
+## Census2020/Legislative (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/0>
+- `2018 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/1>
+- `2018 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/2>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/3>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/4>
+- `111th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/5>
+- `2010 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/6>
+- `2010 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/7>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/8>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/9>
+- `108th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/10>
+- `2000 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/11>
+- `2000 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/12>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Legislative/MapServer/13>
+
+## Census2020/Places_CouSub_ConCity_SubMCD (19)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/6>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/11>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/12>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/13>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/14>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/15>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/16>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/17>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Places_CouSub_ConCity_SubMCD/MapServer/18>
+
+## Census2020/PUMA_TAD_TAZ_UGA_ZCTA (13)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/0>
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1>
+- `ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/2>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/3>
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4>
+- `Traffic Analysis Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/5>
+- `Traffic Analysis Zones` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/6>
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/7>
+- `ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/8>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/9>
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/10>
+- `Traffic Analysis Zones` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/11>
+- `ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/12>
+
+## Census2020/Region_Division (8)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer/0>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer/1>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer/2>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer/4>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer/5>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer/6>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Region_Division/MapServer/7>
+
+## Census2020/School (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/0>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/1>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/2>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/3>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/4>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/5>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/6>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/7>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/8>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/9>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/School/MapServer/10>
+
+## Census2020/Special_Land_Use_Areas (4)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Special_Land_Use_Areas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Special_Land_Use_Areas/MapServer/0>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Special_Land_Use_Areas/MapServer/1>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Special_Land_Use_Areas/MapServer/2>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Special_Land_Use_Areas/MapServer/3>
+
+## Census2020/State_County (53)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/0>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/1>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/2>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/3>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/4>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/6>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/7>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/8>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/9>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/10>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/11>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/12>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/13>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/14>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/15>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/16>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/17>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/18>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/19>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/20>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/21>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/22>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/23>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/24>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/25>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/26>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/27>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/28>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/29>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/30>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/31>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/32>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/33>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/34>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/35>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/36>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/37>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/38>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/39>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/40>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/41>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/42>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/43>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/44>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/45>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/46>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/47>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/48>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/49>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/50>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/51>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/State_County/MapServer/52>
+
+## Census2020/tigerWMS_Census2000 (76)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/0>
+- `Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/1>
+- `Traffic Analysis Zones` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/2>
+- `Traffic Analysis Zones Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/3>
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/4>
+- `Urban Growth Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/5>
+- `Zip Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/6>
+- `Zip Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/11>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/12>
+- `Census Blocks Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/13>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/14>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/15>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/16>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/17>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/18>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/51>
+- `108th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/52>
+- `108th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/53>
+- `State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/54>
+- `State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/55>
+- `State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/56>
+- `State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/57>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/58>
+- `Voting Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/59>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/60>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/61>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/62>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/63>
+- `Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/64>
+- `Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/65>
+- `Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/66>
+- `Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/67>
+- `Metropolitan Statistical Areas/Consolidated Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/68>
+- `Metropolitan Statistical Areas/Consolidated Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/69>
+- `Primary Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/70>
+- `Primary Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/71>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/72>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/73>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/74>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2000/MapServer/75>
+
+## Census2020/tigerWMS_Census2010 (96)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/0>
+- `Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/1>
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/2>
+- `Urban Growth Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/3>
+- `Zip Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/4>
+- `Zip Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/5>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/6>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/7>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/8>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/9>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/10>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/11>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/12>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/13>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/14>
+- `Census Blocks Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/15>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/16>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/17>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/18>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/19>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/20>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/21>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/22>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/23>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/24>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/25>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/26>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/27>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/28>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/29>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/30>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/31>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/32>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/33>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/34>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/35>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/36>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/37>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/38>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/39>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/40>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/41>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/42>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/43>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/44>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/45>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/46>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/47>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/48>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/49>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/50>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/51>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/52>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/53>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/54>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/55>
+- `111th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/56>
+- `111th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/57>
+- `State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/58>
+- `State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/59>
+- `State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/60>
+- `State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/61>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/62>
+- `Voting Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/63>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/64>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/65>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/66>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/67>
+- `Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/68>
+- `Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/69>
+- `Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/70>
+- `Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/71>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/72>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/73>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/74>
+- `New England City and Town Area Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/75>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/76>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/77>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/78>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/79>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/80>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/81>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/82>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/83>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/84>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/85>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/86>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/87>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/88>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/89>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/90>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/91>
+- `Traffic Analysis Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/92>
+- `Traffic Analysis Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/93>
+- `Traffic Analysis Zones` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/94>
+- `Traffic Analysis Zones Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2010/MapServer/95>
+
+## Census2020/tigerWMS_Census2020 (92)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/0>
+- `Urban Growth Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/1>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/2>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/3>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/4>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/5>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/6>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/7>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/8>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/9>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/10>
+- `Census Blocks Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/51>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/52>
+- `116th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/53>
+- `State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/54>
+- `State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/55>
+- `State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/56>
+- `State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/57>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/58>
+- `Voting Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/59>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/60>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/61>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/62>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/63>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/64>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/65>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/66>
+- `New England City and Town Area Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/67>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/68>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/69>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/70>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/71>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/72>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/73>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/74>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/75>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/76>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/77>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/78>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/79>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/80>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/81>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/82>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/83>
+- `Zip Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/84>
+- `Zip Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/85>
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/86>
+- `Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/87>
+- `2020 Urban Areas - Corrected` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/88>
+- `2020 Urban Areas Labels - Corrected` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/89>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/90>
+- `2020 Urban Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_Census2020/MapServer/91>
+
+## Census2020/tigerWMS_PhysicalFeatures (19)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Transportation` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/0>
+- `Primary Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/1>
+- `Primary Roads Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/2>
+- `Secondary Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/3>
+- `Secondary Roads Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/4>
+- `Local Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/5>
+- `Local Roads Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/6>
+- `Railroads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/7>
+- `Railroads Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/8>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/9>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/10>
+- `Linear Hydrography Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/11>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/12>
+- `Areal Hydrography Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/13>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/14>
+- `Glaciers Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/15>
+- `Other` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/16>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/17>
+- `Military Installations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/tigerWMS_PhysicalFeatures/MapServer/18>
+
+## Census2020/Tracts_Blocks (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/0>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/1>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/2>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/3>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/4>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/5>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/6>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/8>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/9>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Tracts_Blocks/MapServer/10>
+
+## Census2020/Transportation (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Primary Roads Interstates 5M scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/0>
+- `Primary Roads 2_1M scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/1>
+- `Primary Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/2>
+- `Secondary Roads Interstates and US Highways` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/3>
+- `Secondary Roads 578k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/4>
+- `Secondary Roads 289_144k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/5>
+- `Secondary Roads 72_1k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/6>
+- `Local Roads 72k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/7>
+- `Local Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/8>
+- `Railroads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Transportation/MapServer/9>
+
+## Census2020/TribalTracts (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/TribalTracts/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/TribalTracts/MapServer/0>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/TribalTracts/MapServer/1>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/TribalTracts/MapServer/2>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/TribalTracts/MapServer/3>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/TribalTracts/MapServer/4>
+
+## Census2020/Urban (8)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Urban Areas - Corrected` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer/0>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer/1>
+- `Census 2010` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer/2>
+- `Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer/3>
+- `Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer/4>
+- `Census 2000` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer/5>
+- `Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer/6>
+- `Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Census2020/Urban/MapServer/7>
+
+## Econ/AIANNHA (2)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `American Indian Reservations and/or Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/AIANNHA/MapServer/0>
+- `Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/AIANNHA/MapServer/1>
+
+## Econ/CBSA (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2022` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/0>
+- `Principal Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/1>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/2>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/3>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/4>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/5>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/6>
+- `2017` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/7>
+- `Principal Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/8>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/9>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/10>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/11>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/12>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/CBSA/MapServer/13>
+
+## Econ/EconPlaces (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2022` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/0>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/1>
+- `Incorporated Places/Minor Civil Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/2>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/3>
+- `Balance of County` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/4>
+- `2017` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/5>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/6>
+- `Incorporated Places/Minor Civil Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/7>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/8>
+- `Balance of County` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/EconPlaces/MapServer/9>
+
+## Econ/Hydro (3)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Hydro/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Hydro/MapServer/0>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Hydro/MapServer/1>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Hydro/MapServer/2>
+
+## Econ/Labels (58)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2022` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/0>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/1>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/2>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/3>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/4>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/5>
+- `American Indian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/6>
+- `American Indian Reservation and/or Off-Reservation Trust Land` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/7>
+- `Tribal Statistical Area` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/8>
+- `Economic Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/9>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/10>
+- `Incorporated Places/Minor Civil Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/11>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/12>
+- `Balance of County` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/13>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/14>
+- `Principal Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/15>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/16>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/17>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/18>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/19>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/20>
+- `Planning Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/21>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/22>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/23>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/24>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/25>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/26>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/27>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/28>
+- `2017` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/29>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/30>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/31>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/32>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/33>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/34>
+- `American Indian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/35>
+- `American Indian Reservation and/or Off-Reservation Trust Land` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/36>
+- `Tribal Statistical Area` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/37>
+- `Economic Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/38>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/39>
+- `Incorporated Places/Minor Civil Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/40>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/41>
+- `Balance of County` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/42>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/43>
+- `Principal Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/44>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/45>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/46>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/47>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/48>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/49>
+- `Planning Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/50>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/51>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/52>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/53>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/54>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/55>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/56>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Labels/MapServer/57>
+
+## Econ/Planning_Regions (4)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Planning_Regions/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2022` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Planning_Regions/MapServer/0>
+- `Planning Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Planning_Regions/MapServer/1>
+- `2017` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Planning_Regions/MapServer/2>
+- `Planning Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Planning_Regions/MapServer/3>
+
+## Econ/Special_Land_Use_Areas (4)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Special_Land_Use_Areas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Special_Land_Use_Areas/MapServer/0>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Special_Land_Use_Areas/MapServer/1>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Special_Land_Use_Areas/MapServer/2>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Special_Land_Use_Areas/MapServer/3>
+
+## Econ/State_County (36)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2022` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/1>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/2>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/3>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/4>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/5>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/6>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/7>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/8>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/10>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/11>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/12>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/13>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/14>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/15>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/16>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/17>
+- `2017` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/18>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/19>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/20>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/21>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/22>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/23>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/24>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/25>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/26>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/27>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/28>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/29>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/30>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/31>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/32>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/33>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/34>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/State_County/MapServer/35>
+
+## Econ/Transportation (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Primary Roads Interstates 5M scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/0>
+- `Primary Roads 2_1M scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/1>
+- `Primary Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/2>
+- `Secondary Roads Interstates and US Highways` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/3>
+- `Secondary Roads 578k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/4>
+- `Secondary Roads 289_144k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/5>
+- `Secondary Roads 72_1k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/6>
+- `Local Roads 72k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/7>
+- `Local Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/8>
+- `Railroads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Econ/Transportation/MapServer/9>
+
+## Generalized_ACS2012/Places_CouSub_ConCity_SubMCD (3)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2012/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2012/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `2012 Economic Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2012/Places_CouSub_ConCity_SubMCD/MapServer/6>
+- `2012 Economic Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2012/Places_CouSub_ConCity_SubMCD/MapServer/12>
+
+## Generalized_ACS2015/AIANNHA (21)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/1>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/2>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/3>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/4>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/5>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/6>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/7>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/8>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/9>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/10>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/11>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/12>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/13>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/14>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/15>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/16>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/17>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/18>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/19>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/AIANNHA/MapServer/20>
+
+## Generalized_ACS2015/CBSA (26)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/0>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/1>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/2>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/3>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/4>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/5>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/6>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/7>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/8>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/9>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/10>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/11>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/12>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/13>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/14>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/15>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/16>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/17>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/18>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/19>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/20>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/21>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/22>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/23>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/24>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/CBSA/MapServer/25>
+
+## Generalized_ACS2015/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/0>
+- `114th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/1>
+- `2014 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/2>
+- `2014 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/3>
+- `114th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/4>
+- `114th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/5>
+- `114th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/6>
+- `114th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/7>
+- `2014 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/8>
+- `2014 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Legislative/MapServer/9>
+
+## Generalized_ACS2015/Places_CouSub_ConCity_SubMCD (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2015/PUMA_TAD_TAZ_UGA_ZCTA (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/PUMA_TAD_TAZ_UGA_ZCTA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/0>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/2>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/3>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4>
+
+## Generalized_ACS2015/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Region_Division/MapServer/14>
+
+## Generalized_ACS2015/School (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/School/MapServer/3>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/School/MapServer/4>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/School/MapServer/5>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/School/MapServer/6>
+
+## Generalized_ACS2015/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/State_County/MapServer/13>
+
+## Generalized_ACS2015/Tracts_Blocks (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Tracts_Blocks/MapServer/1>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Tracts_Blocks/MapServer/2>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Tracts_Blocks/MapServer/3>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Tracts_Blocks/MapServer/4>
+
+## Generalized_ACS2015/Urban (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Urban/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Urban/MapServer/0>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Urban/MapServer/1>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Urban/MapServer/2>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Urban/MapServer/3>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2015/Urban/MapServer/4>
+
+## Generalized_ACS2016/AIANNHA (21)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/1>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/2>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/3>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/4>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/5>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/6>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/7>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/8>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/9>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/10>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/11>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/12>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/13>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/14>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/15>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/16>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/17>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/18>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/19>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/AIANNHA/MapServer/20>
+
+## Generalized_ACS2016/CBSA (26)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/0>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/1>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/2>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/3>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/4>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/5>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/6>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/7>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/8>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/9>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/10>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/11>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/12>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/13>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/14>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/15>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/16>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/17>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/18>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/19>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/20>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/21>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/22>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/23>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/24>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/CBSA/MapServer/25>
+
+## Generalized_ACS2016/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/0>
+- `115th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/1>
+- `2016 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/2>
+- `2016 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/3>
+- `115th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/4>
+- `115th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/5>
+- `115th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/6>
+- `115th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/7>
+- `2016 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/8>
+- `2016 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Legislative/MapServer/9>
+
+## Generalized_ACS2016/Places_CouSub_ConCity_SubMCD (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2016/PUMA_TAD_TAZ_UGA_ZCTA (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/PUMA_TAD_TAZ_UGA_ZCTA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/0>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/2>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/3>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4>
+
+## Generalized_ACS2016/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Region_Division/MapServer/14>
+
+## Generalized_ACS2016/School (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/School/MapServer/3>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/School/MapServer/4>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/School/MapServer/5>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/School/MapServer/6>
+
+## Generalized_ACS2016/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/State_County/MapServer/13>
+
+## Generalized_ACS2016/Tracts_Blocks (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Tracts_Blocks/MapServer/1>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Tracts_Blocks/MapServer/2>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Tracts_Blocks/MapServer/3>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Tracts_Blocks/MapServer/4>
+
+## Generalized_ACS2016/Urban (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Urban/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Urban/MapServer/0>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Urban/MapServer/1>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Urban/MapServer/2>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Urban/MapServer/3>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2016/Urban/MapServer/4>
+
+## Generalized_ACS2017/AIANNHA (21)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/1>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/2>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/3>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/4>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/5>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/6>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/7>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/8>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/9>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/10>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/11>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/12>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/13>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/14>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/15>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/16>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/17>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/18>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/19>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/AIANNHA/MapServer/20>
+
+## Generalized_ACS2017/CBSA (26)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/0>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/1>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/2>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/3>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/4>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/5>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/6>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/7>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/8>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/9>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/10>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/11>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/12>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/13>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/14>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/15>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/16>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/17>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/18>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/19>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/20>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/21>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/22>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/23>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/24>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/CBSA/MapServer/25>
+
+## Generalized_ACS2017/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/0>
+- `115th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/1>
+- `2016 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/2>
+- `2016 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/3>
+- `115th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/4>
+- `115th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/5>
+- `115th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/6>
+- `115th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/7>
+- `2016 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/8>
+- `2016 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Legislative/MapServer/9>
+
+## Generalized_ACS2017/Places_CouSub_ConCity_SubMCD (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2017/PUMA_TAD_TAZ_UGA_ZCTA (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/PUMA_TAD_TAZ_UGA_ZCTA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/0>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/2>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/3>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4>
+
+## Generalized_ACS2017/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Region_Division/MapServer/14>
+
+## Generalized_ACS2017/School (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/School/MapServer/3>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/School/MapServer/4>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/School/MapServer/5>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/School/MapServer/6>
+
+## Generalized_ACS2017/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/State_County/MapServer/13>
+
+## Generalized_ACS2017/Tracts_Blocks (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Tracts_Blocks/MapServer/1>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Tracts_Blocks/MapServer/2>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Tracts_Blocks/MapServer/3>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Tracts_Blocks/MapServer/4>
+
+## Generalized_ACS2017/Urban (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Urban/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Urban/MapServer/0>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Urban/MapServer/1>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Urban/MapServer/2>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Urban/MapServer/3>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2017/Urban/MapServer/4>
+
+## Generalized_ACS2018/AIANNHA (21)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/1>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/2>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/3>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/4>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/5>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/6>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/7>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/8>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/9>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/10>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/11>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/12>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/13>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/14>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/15>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/16>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/17>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/18>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/19>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/AIANNHA/MapServer/20>
+
+## Generalized_ACS2018/CBSA (26)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/0>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/1>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/2>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/3>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/4>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/5>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/6>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/7>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/8>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/9>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/10>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/11>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/12>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/13>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/14>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/15>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/16>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/17>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/18>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/19>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/20>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/21>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/22>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/23>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/24>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/CBSA/MapServer/25>
+
+## Generalized_ACS2018/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/0>
+- `116th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/1>
+- `2018 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/2>
+- `2018 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/3>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/4>
+- `116th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/5>
+- `116th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/6>
+- `116th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/7>
+- `2018 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/8>
+- `2018 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Legislative/MapServer/9>
+
+## Generalized_ACS2018/Places_CouSub_ConCity_SubMCD (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2018/PUMA_TAD_TAZ_UGA_ZCTA (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/PUMA_TAD_TAZ_UGA_ZCTA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/0>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/2>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/3>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4>
+
+## Generalized_ACS2018/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Region_Division/MapServer/14>
+
+## Generalized_ACS2018/School (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/School/MapServer/3>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/School/MapServer/4>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/School/MapServer/5>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/School/MapServer/6>
+
+## Generalized_ACS2018/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/State_County/MapServer/13>
+
+## Generalized_ACS2018/Tracts_Blocks (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Tracts_Blocks/MapServer/1>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Tracts_Blocks/MapServer/2>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Tracts_Blocks/MapServer/3>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Tracts_Blocks/MapServer/4>
+
+## Generalized_ACS2018/Urban (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Urban/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Urban/MapServer/0>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Urban/MapServer/1>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Urban/MapServer/2>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Urban/MapServer/3>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2018/Urban/MapServer/4>
+
+## Generalized_ACS2019/AIANNHA (21)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/1>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/2>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/3>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/4>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/5>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/6>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/7>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/8>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/9>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/10>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/11>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/12>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/13>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/14>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/15>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/16>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/17>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/18>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/19>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/AIANNHA/MapServer/20>
+
+## Generalized_ACS2019/CBSA (30)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/0>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/1>
+- `Combined New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/2>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/3>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/4>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/5>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/6>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/7>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/8>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/9>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/10>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/11>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/12>
+- `Combined New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/13>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/14>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/15>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/16>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/17>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/18>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/19>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/20>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/21>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/22>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/23>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/24>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/25>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/26>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/27>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/28>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/CBSA/MapServer/29>
+
+## Generalized_ACS2019/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/0>
+- `116th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/1>
+- `2018 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/2>
+- `2018 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/3>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/4>
+- `116th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/5>
+- `116th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/6>
+- `116th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/7>
+- `2018 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/8>
+- `2018 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Legislative/MapServer/9>
+
+## Generalized_ACS2019/Places_CouSub_ConCity_SubMCD (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2019/PUMA_TAD_TAZ_UGA_ZCTA (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/PUMA_TAD_TAZ_UGA_ZCTA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/0>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/2>
+- `2010 Census Public Use Microdata Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/3>
+- `2010 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4>
+
+## Generalized_ACS2019/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Region_Division/MapServer/14>
+
+## Generalized_ACS2019/School (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/School/MapServer/3>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/School/MapServer/4>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/School/MapServer/5>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/School/MapServer/6>
+
+## Generalized_ACS2019/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/State_County/MapServer/13>
+
+## Generalized_ACS2019/Tracts_Blocks (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Tracts_Blocks/MapServer/1>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Tracts_Blocks/MapServer/2>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Tracts_Blocks/MapServer/3>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Tracts_Blocks/MapServer/4>
+
+## Generalized_ACS2019/Urban (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Urban/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Urban/MapServer/0>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Urban/MapServer/1>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Urban/MapServer/2>
+- `2010 Census Urbanized Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Urban/MapServer/3>
+- `2010 Census Urban Clusters 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2019/Urban/MapServer/4>
+
+## Generalized_ACS2021/AIANNHA (21)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/1>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/2>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/3>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/4>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/5>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/6>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/7>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/8>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/9>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/10>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/11>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/12>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/13>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/14>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/15>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/16>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/17>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/18>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/19>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/AIANNHA/MapServer/20>
+
+## Generalized_ACS2021/CBSA (40)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/0>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/1>
+- `Combined New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/2>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/3>
+- `New England City and Town Area Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/4>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/5>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/6>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/7>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/8>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/9>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/10>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/11>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/12>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/13>
+- `Combined New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/14>
+- `Combined New England City and Town Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/15>
+- `Combined New England City and Town Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/16>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/17>
+- `New England City and Town Area Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/18>
+- `New England City and Town Area Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/19>
+- `New England City and Town Area Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/20>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/21>
+- `Metropolitan New England City and Town Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/22>
+- `Metropolitan New England City and Town Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/23>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/24>
+- `Micropolitan New England City and Town Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/25>
+- `Micropolitan New England City and Town Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/26>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/27>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/28>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/29>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/30>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/31>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/32>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/33>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/34>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/35>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/36>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/37>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/38>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/CBSA/MapServer/39>
+
+## Generalized_ACS2021/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/0>
+- `116th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/1>
+- `2018 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/2>
+- `2018 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/3>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/4>
+- `116th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/5>
+- `116th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/6>
+- `116th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/7>
+- `2018 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/8>
+- `2018 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Legislative/MapServer/9>
+
+## Generalized_ACS2021/Places_CouSub_ConCity_SubMCD (13)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/15>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/14>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2021/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Region_Division/MapServer/14>
+
+## Generalized_ACS2021/School (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/School/MapServer/3>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/School/MapServer/4>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/School/MapServer/5>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/School/MapServer/6>
+
+## Generalized_ACS2021/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/State_County/MapServer/13>
+
+## Generalized_ACS2021/Tracts_Blocks (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Tracts_Blocks/MapServer/1>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Tracts_Blocks/MapServer/2>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Tracts_Blocks/MapServer/3>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/Tracts_Blocks/MapServer/4>
+
+## Generalized_ACS2021/TribalTracts (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/TribalTracts/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/TribalTracts/MapServer/0>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/TribalTracts/MapServer/1>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/TribalTracts/MapServer/2>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/TribalTracts/MapServer/3>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2021/TribalTracts/MapServer/4>
+
+## Generalized_ACS2022/AIANNHA (23)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/1>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/2>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/3>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/4>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/5>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/6>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/7>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/8>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/9>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/10>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/11>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/12>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/13>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/14>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/15>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/16>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/17>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/18>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/19>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/20>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/21>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/AIANNHA/MapServer/22>
+
+## Generalized_ACS2022/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/0>
+- `118th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/1>
+- `2022 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/2>
+- `2022 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/3>
+- `118th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/4>
+- `118th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/5>
+- `118th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/6>
+- `118th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/7>
+- `2022 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/8>
+- `2022 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Legislative/MapServer/9>
+
+## Generalized_ACS2022/Places_CouSub_ConCity_SubMCD (13)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/15>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/14>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2022/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Region_Division/MapServer/14>
+
+## Generalized_ACS2022/School (9)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/3>
+- `School District Administrative Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/4>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/5>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/6>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/7>
+- `School District Administrative Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/School/MapServer/8>
+
+## Generalized_ACS2022/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/State_County/MapServer/13>
+
+## Generalized_ACS2022/Tracts_Blocks (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Tracts_Blocks/MapServer/1>
+- `Census Tracts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Tracts_Blocks/MapServer/2>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Tracts_Blocks/MapServer/3>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Tracts_Blocks/MapServer/4>
+- `Census Tracts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Tracts_Blocks/MapServer/5>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/Tracts_Blocks/MapServer/6>
+
+## Generalized_ACS2022/TribalTracts (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/TribalTracts/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/TribalTracts/MapServer/0>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/TribalTracts/MapServer/1>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/TribalTracts/MapServer/2>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/TribalTracts/MapServer/3>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2022/TribalTracts/MapServer/4>
+
+## Generalized_ACS2023/AIANNHA (23)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/1>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/2>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/3>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/4>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/5>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/6>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/7>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/8>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/9>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/10>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/11>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/12>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/13>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/14>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/15>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/16>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/17>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/18>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/19>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/20>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/21>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/AIANNHA/MapServer/22>
+
+## Generalized_ACS2023/CBSA (26)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/0>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/1>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/2>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/3>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/4>
+- `Metropolitan Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/5>
+- `Metropolitan Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/6>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/7>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/8>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/9>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/10>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/11>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/12>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/13>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/14>
+- `Metropolitan Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/15>
+- `Metropolitan Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/16>
+- `Metropolitan Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/17>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/18>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/19>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/20>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/21>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/22>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/23>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/24>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/CBSA/MapServer/25>
+
+## Generalized_ACS2023/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/0>
+- `118th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/1>
+- `2022 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/2>
+- `2022 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/3>
+- `118th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/4>
+- `118th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/5>
+- `118th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/6>
+- `118th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/7>
+- `2022 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/8>
+- `2022 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Legislative/MapServer/9>
+
+## Generalized_ACS2023/Places_CouSub_ConCity_SubMCD (13)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/15>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/14>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2023/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Region_Division/MapServer/14>
+
+## Generalized_ACS2023/School (9)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/3>
+- `School District Administrative Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/4>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/5>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/6>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/7>
+- `School District Administrative Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/School/MapServer/8>
+
+## Generalized_ACS2023/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/State_County/MapServer/13>
+
+## Generalized_ACS2023/Tracts_Blocks (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Tracts_Blocks/MapServer/1>
+- `Census Tracts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Tracts_Blocks/MapServer/2>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Tracts_Blocks/MapServer/3>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Tracts_Blocks/MapServer/4>
+- `Census Tracts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Tracts_Blocks/MapServer/5>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/Tracts_Blocks/MapServer/6>
+
+## Generalized_ACS2023/TribalTracts (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/TribalTracts/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/TribalTracts/MapServer/0>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/TribalTracts/MapServer/1>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/TribalTracts/MapServer/2>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/TribalTracts/MapServer/3>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2023/TribalTracts/MapServer/4>
+
+## Generalized_ACS2024/AIANNHA (23)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/1>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/2>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/3>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/4>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/5>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/6>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/7>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/8>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/9>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/10>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/11>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/12>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/13>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/14>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/15>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/16>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/17>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/18>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/19>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/20>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/21>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/AIANNHA/MapServer/22>
+
+## Generalized_ACS2024/CBSA (26)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/0>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/1>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/2>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/3>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/4>
+- `Metropolitan Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/5>
+- `Metropolitan Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/6>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/7>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/8>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/9>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/10>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/11>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/12>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/13>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/14>
+- `Metropolitan Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/15>
+- `Metropolitan Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/16>
+- `Metropolitan Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/17>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/18>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/19>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/20>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/21>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/22>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/23>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/24>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/CBSA/MapServer/25>
+
+## Generalized_ACS2024/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/0>
+- `119th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/1>
+- `2024 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/2>
+- `2024 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/3>
+- `119th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/4>
+- `119th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/5>
+- `119th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/6>
+- `119th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/7>
+- `2024 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/8>
+- `2024 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Legislative/MapServer/9>
+
+## Generalized_ACS2024/Places_CouSub_ConCity_SubMCD (13)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/15>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/14>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2024/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Region_Division/MapServer/14>
+
+## Generalized_ACS2024/School (9)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/3>
+- `School District Administrative Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/4>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/5>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/6>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/7>
+- `School District Administrative Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/School/MapServer/8>
+
+## Generalized_ACS2024/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/State_County/MapServer/13>
+
+## Generalized_ACS2024/Tracts_Blocks (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Tracts_Blocks/MapServer/1>
+- `Census Tracts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Tracts_Blocks/MapServer/2>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Tracts_Blocks/MapServer/3>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Tracts_Blocks/MapServer/4>
+- `Census Tracts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Tracts_Blocks/MapServer/5>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/Tracts_Blocks/MapServer/6>
+
+## Generalized_ACS2024/TribalTracts (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/TribalTracts/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/TribalTracts/MapServer/0>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/TribalTracts/MapServer/1>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/TribalTracts/MapServer/2>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/TribalTracts/MapServer/3>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2024/TribalTracts/MapServer/4>
+
+## Generalized_ACS2025/AIANNHA (23)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/1>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/2>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/3>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/4>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/5>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/6>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/7>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/8>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/9>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/10>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/11>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/12>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/13>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/14>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/15>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/16>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/17>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/18>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/19>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/20>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/21>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/AIANNHA/MapServer/22>
+
+## Generalized_ACS2025/CBSA (26)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/0>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/1>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/2>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/3>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/4>
+- `Metropolitan Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/5>
+- `Metropolitan Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/6>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/7>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/8>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/9>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/10>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/11>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/12>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/13>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/14>
+- `Metropolitan Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/15>
+- `Metropolitan Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/16>
+- `Metropolitan Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/17>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/18>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/19>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/20>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/21>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/22>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/23>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/24>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/CBSA/MapServer/25>
+
+## Generalized_ACS2025/Legislative (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/0>
+- `119th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/1>
+- `2024 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/2>
+- `2024 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/3>
+- `119th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/4>
+- `119th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/5>
+- `119th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/6>
+- `119th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/7>
+- `2024 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/8>
+- `2024 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Legislative/MapServer/9>
+
+## Generalized_ACS2025/Places_CouSub_ConCity_SubMCD (13)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/15>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Estates 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/14>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_ACS2025/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Region_Division/MapServer/14>
+
+## Generalized_ACS2025/School (9)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/3>
+- `School District Administrative Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/4>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/5>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/6>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/7>
+- `School District Administrative Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/School/MapServer/8>
+
+## Generalized_ACS2025/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/State_County/MapServer/13>
+
+## Generalized_ACS2025/Tracts_Blocks (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Tracts_Blocks/MapServer/1>
+- `Census Tracts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Tracts_Blocks/MapServer/2>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Tracts_Blocks/MapServer/3>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Tracts_Blocks/MapServer/4>
+- `Census Tracts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Tracts_Blocks/MapServer/5>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/Tracts_Blocks/MapServer/6>
+
+## Generalized_ACS2025/TribalTracts (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/TribalTracts/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/TribalTracts/MapServer/0>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/TribalTracts/MapServer/1>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/TribalTracts/MapServer/2>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/TribalTracts/MapServer/3>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_ACS2025/TribalTracts/MapServer/4>
+
+## Generalized_TAB2020/AIANNHA (23)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/0>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/1>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/2>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/3>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/4>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/5>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/6>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/7>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/8>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/9>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/10>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/11>
+- `Alaska Native Regional Corporations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/12>
+- `Tribal Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/13>
+- `Federal American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/14>
+- `Off-Reservation Trust Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/15>
+- `State American Indian Reservations 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/16>
+- `Hawaiian Home Lands 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/17>
+- `Alaska Native Village Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/18>
+- `Oklahoma Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/19>
+- `State Designated Tribal Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/20>
+- `Tribal Designated Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/21>
+- `American Indian Joint-Use Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/AIANNHA/MapServer/22>
+
+## Generalized_TAB2020/CBSA (38)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/0>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/1>
+- `Combined New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/2>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/3>
+- `New England City and Town Area Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/4>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/5>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/6>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/7>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/8>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/9>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/10>
+- `Metropolitan Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/11>
+- `Metropolitan Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/12>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/13>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/14>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/15>
+- `Combined New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/16>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/17>
+- `New England City and Town Area Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/18>
+- `Metropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/19>
+- `Micropolitan New England City and Town Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/20>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/21>
+- `Combined Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/22>
+- `Combined Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/23>
+- `Combined Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/24>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/25>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/26>
+- `Metropolitan Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/27>
+- `Metropolitan Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/28>
+- `Metropolitan Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/29>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/30>
+- `Metropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/31>
+- `Metropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/32>
+- `Metropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/33>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/34>
+- `Micropolitan Statistical Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/35>
+- `Micropolitan Statistical Areas 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/36>
+- `Micropolitan Statistical Areas 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/CBSA/MapServer/37>
+
+## Generalized_TAB2020/Legislative (12)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/0>
+- `116th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/1>
+- `2018 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/2>
+- `2018 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/3>
+- `Voting Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/4>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/5>
+- `116th Congressional Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/6>
+- `116th Congressional Districts 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/7>
+- `116th Congressional Districts 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/8>
+- `2018 State Legislative Districts - Upper 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/9>
+- `2018 State Legislative Districts - Lower 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/10>
+- `Voting Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Legislative/MapServer/11>
+
+## Generalized_TAB2020/Places_CouSub_ConCity_SubMCD (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `Subbarrios 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `County Subdivisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `Consolidated Cities 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Incorporated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Census Designated Places 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Places_CouSub_ConCity_SubMCD/MapServer/11>
+
+## Generalized_TAB2020/PUMA_TAD_TAZ_UGA_ZCTA (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/0>
+- `2020 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/1>
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/2>
+- `2020 Census ZIP Code Tabulation Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/3>
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/PUMA_TAD_TAZ_UGA_ZCTA/MapServer/4>
+
+## Generalized_TAB2020/Region_Division (15)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/0>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/1>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/2>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/4>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/5>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/6>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/7>
+- `Census Divisions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/8>
+- `Census Divisions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/9>
+- `Census Divisions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/10>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/11>
+- `Census Regions 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/12>
+- `Census Regions 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/13>
+- `Census Regions 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Region_Division/MapServer/14>
+
+## Generalized_TAB2020/School (7)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/School/MapServer/0>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/School/MapServer/1>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/School/MapServer/2>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/School/MapServer/3>
+- `Unified School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/School/MapServer/4>
+- `Secondary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/School/MapServer/5>
+- `Elementary School Districts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/School/MapServer/6>
+
+## Generalized_TAB2020/State_County (14)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/0>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/1>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/2>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/3>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/4>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/6>
+- `States 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/7>
+- `States 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/8>
+- `States 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/9>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/10>
+- `Counties 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/11>
+- `Counties 5M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/12>
+- `Counties 20M` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/State_County/MapServer/13>
+
+## Generalized_TAB2020/Tracts_Blocks (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Tracts_Blocks/MapServer/0>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Tracts_Blocks/MapServer/1>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Tracts_Blocks/MapServer/2>
+- `Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Tracts_Blocks/MapServer/3>
+- `Census Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Tracts_Blocks/MapServer/4>
+
+## Generalized_TAB2020/TribalTracts (5)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/TribalTracts/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/TribalTracts/MapServer/0>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/TribalTracts/MapServer/1>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/TribalTracts/MapServer/2>
+- `Tribal Census Tracts 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/TribalTracts/MapServer/3>
+- `Tribal Block Groups 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/TribalTracts/MapServer/4>
+
+## Generalized_TAB2020/Urban (3)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Urban/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Urban/MapServer/0>
+- `2020 Census Urban Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Urban/MapServer/1>
+- `2020 Census Urban Areas 500K` — <https://tigerweb.geo.census.gov/arcgis/rest/services/Generalized_TAB2020/Urban/MapServer/2>
+
+## TIGERweb/AIANNHA (48)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/0>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/1>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/2>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/3>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/4>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/5>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/6>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/7>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/8>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/9>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/10>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/11>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/12>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/13>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/14>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/15>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/16>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/17>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/18>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/19>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/20>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/21>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/22>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/23>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/24>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/25>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/26>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/27>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/28>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/29>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/30>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/31>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/32>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/33>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/34>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/35>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/36>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/37>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/38>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/39>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/40>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/42>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/43>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/44>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/45>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/46>
+- `American Indian, Alaska Native, and Native Hawaiian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/AIANNHA/MapServer/47>
+
+## TIGERweb/CBSA (28)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/0>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/1>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/2>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/3>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/4>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/5>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/6>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/7>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/8>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/9>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/10>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/11>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/12>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/13>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/14>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/15>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/16>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/17>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/18>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/19>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/20>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/21>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/22>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/23>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/24>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/25>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/26>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/CBSA/MapServer/27>
+
+## TIGERweb/Hydro (3)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Hydro/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Hydro/MapServer/0>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Hydro/MapServer/1>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Hydro/MapServer/2>
+
+## TIGERweb/Labels (252)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `PUMAs, UGAs, and ZCTAs` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/0>
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/1>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/2>
+- `Tribal Census Tracts and Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/4>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/5>
+- `Census Tracts and Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/6>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/7>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/8>
+- `2020 Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/9>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/10>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/11>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/12>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/13>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/14>
+- `School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/15>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/16>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/17>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/18>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/19>
+- `Places and County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/20>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/21>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/22>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/24>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/25>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/26>
+- `American Indian, Alaska Native, and Native Hawaiian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/27>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/28>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/29>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/30>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/31>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/32>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/33>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/34>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/35>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/36>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/37>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/38>
+- `Legislative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/39>
+- `120th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/40>
+- `2026 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/41>
+- `2026 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/42>
+- `Census Regions and Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/43>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/44>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/45>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/46>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/47>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/48>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/49>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/50>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/51>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/52>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/53>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/54>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/55>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/56>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/57>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/58>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/59>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/60>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/61>
+- `PUMAs, UGAs, and ZCTAs` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/62>
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/63>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/64>
+- `Tribal Census Tracts and Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/65>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/66>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/67>
+- `Census Tracts and Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/68>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/69>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/70>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/71>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/72>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/73>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/74>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/75>
+- `School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/76>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/77>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/78>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/79>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/80>
+- `Places and County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/81>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/82>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/83>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/84>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/85>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/86>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/87>
+- `American Indian, Alaska Native, and Native Hawaiian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/88>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/89>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/90>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/91>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/92>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/93>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/94>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/95>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/96>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/97>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/98>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/99>
+- `Legislative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/100>
+- `119th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/101>
+- `2024 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/102>
+- `2024 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/103>
+- `Census Regions and Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/104>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/105>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/106>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/107>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/108>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/109>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/110>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/111>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/112>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/113>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/114>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/115>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/116>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/117>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/118>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/119>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/120>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/121>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/122>
+- `PUMAs, UGAs, and ZCTAs` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/123>
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/124>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/125>
+- `Tribal Census Tracts and Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/126>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/127>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/128>
+- `Census Tracts and Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/129>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/130>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/131>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/132>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/133>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/134>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/135>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/136>
+- `School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/137>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/138>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/139>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/140>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/141>
+- `Places and County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/142>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/143>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/144>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/145>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/146>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/147>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/148>
+- `American Indian, Alaska Native, and Native Hawaiian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/149>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/150>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/151>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/152>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/153>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/154>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/155>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/156>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/157>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/158>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/159>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/160>
+- `Legislative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/161>
+- `119th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/162>
+- `2024 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/163>
+- `2024 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/164>
+- `Census Regions and Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/165>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/166>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/167>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/168>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/169>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/170>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/171>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/172>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/173>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/174>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/175>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/176>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/177>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/178>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/179>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/180>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/181>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/182>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/183>
+- `PUMAs, UGAs, and ZCTAs` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/184>
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/185>
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/186>
+- `ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/187>
+- `Tribal Census Tracts and Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/188>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/189>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/190>
+- `Census Tracts and Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/191>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/192>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/193>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/194>
+- `Military and Other Special Land Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/195>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/196>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/197>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/198>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/199>
+- `School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/200>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/201>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/202>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/203>
+- `Places and County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/204>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/205>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/206>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/207>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/208>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/209>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/210>
+- `American Indian, Alaska Native, and Native Hawaiian Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/211>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/212>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/213>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/214>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/215>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/216>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/217>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/218>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/219>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/220>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/221>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/222>
+- `Legislative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/223>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/224>
+- `2018 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/225>
+- `2018 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/226>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/227>
+- `Census Regions and Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/228>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/229>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/230>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/231>
+- `2020 Urban Areas - Corrected` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/232>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/233>
+- `Metropolitan and Micropolitan Statistical Areas and Related Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/234>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/235>
+- `New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/236>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/237>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/238>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/239>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/240>
+- `Metropolitan and Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/241>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/242>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/243>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/244>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/245>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/246>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/247>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/248>
+- `States and Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/249>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/250>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Labels/MapServer/251>
+
+## TIGERweb/Legislative (16)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `120th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/0>
+- `2026 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/1>
+- `2026 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/2>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/3>
+- `119th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/4>
+- `2024 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/5>
+- `2024 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/6>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/7>
+- `119th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/8>
+- `2024 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/9>
+- `2024 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/10>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/11>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/12>
+- `2018 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/13>
+- `2018 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/14>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Legislative/MapServer/15>
+
+## TIGERweb/Places_CouSub_ConCity_SubMCD (27)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/0>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/1>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/2>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/3>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/4>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/5>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/6>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/7>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/8>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/9>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/10>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/11>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/12>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/13>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/14>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/15>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/16>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/17>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/18>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/19>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/20>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/21>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/22>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/24>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/25>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Places_CouSub_ConCity_SubMCD/MapServer/26>
+
+## TIGERweb/Region_Division (12)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/0>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/1>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/2>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/3>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/4>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/5>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/6>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/7>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/8>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/9>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/10>
+- `Regional Offices` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Region_Division/MapServer/11>
+
+## TIGERweb/School (18)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/0>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/1>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/2>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/3>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/4>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/5>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/6>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/7>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/8>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/9>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/10>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/11>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/12>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/13>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/14>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/15>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/16>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/School/MapServer/17>
+
+## TIGERweb/Special_Land_Use_Areas (4)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Special_Land_Use_Areas/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Special_Land_Use_Areas/MapServer/0>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Special_Land_Use_Areas/MapServer/1>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Special_Land_Use_Areas/MapServer/2>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Special_Land_Use_Areas/MapServer/3>
+
+## TIGERweb/State_County (71)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/0>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/1>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/2>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/3>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/4>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/5>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/6>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/7>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/8>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/9>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/10>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/11>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/12>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/13>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/14>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/15>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/16>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/17>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/18>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/19>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/20>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/21>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/22>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/23>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/24>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/25>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/26>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/27>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/28>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/29>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/30>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/31>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/32>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/33>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/34>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/35>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/36>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/37>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/38>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/39>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/40>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/41>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/42>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/43>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/44>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/45>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/46>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/47>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/48>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/49>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/50>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/51>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/52>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/53>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/54>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/55>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/56>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/57>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/58>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/59>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/60>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/61>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/62>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/63>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/64>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/65>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/66>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/67>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/68>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/69>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/State_County/MapServer/70>
+
+## TIGERweb/tigerWMS_ACS2012 (86)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2010 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/0>
+- `2010 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/2>
+- `2010 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/51>
+- `112th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/52>
+- `112th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/53>
+- `2010 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/54>
+- `2010 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/55>
+- `2010 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/56>
+- `2010 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/57>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/58>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/59>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/60>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/61>
+- `2010 Census Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/62>
+- `2010 Census Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/63>
+- `2010 Census Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/64>
+- `2010 Census Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/65>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/66>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/67>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/68>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/69>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/70>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/71>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/72>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/73>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/74>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/75>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/76>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/77>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/78>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/79>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/80>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/81>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/82>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/83>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/84>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2012/MapServer/85>
+
+## TIGERweb/tigerWMS_ACS2013 (86)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2010 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/0>
+- `2010 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/2>
+- `2010 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/51>
+- `113th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/52>
+- `113th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/53>
+- `2013 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/54>
+- `2013 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/55>
+- `2013 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/56>
+- `2013 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/57>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/58>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/59>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/60>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/61>
+- `2010 Census Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/62>
+- `2010 Census Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/63>
+- `2010 Census Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/64>
+- `2010 Census Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/65>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/66>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/67>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/68>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/69>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/70>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/71>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/72>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/73>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/74>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/75>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/76>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/77>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/78>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/79>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/80>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/81>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/82>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/83>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/84>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2013/MapServer/85>
+
+## TIGERweb/tigerWMS_ACS2014 (86)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2010 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/0>
+- `2010 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/2>
+- `2010 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/51>
+- `114th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/52>
+- `114th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/53>
+- `2014 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/54>
+- `2014 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/55>
+- `2014 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/56>
+- `2014 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/57>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/58>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/59>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/60>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/61>
+- `2010 Census Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/62>
+- `2010 Census Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/63>
+- `2010 Census Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/64>
+- `2010 Census Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/65>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/66>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/67>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/68>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/69>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/70>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/71>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/72>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/73>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/74>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/75>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/76>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/77>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/78>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/79>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/80>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/81>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/82>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/83>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/84>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2014/MapServer/85>
+
+## TIGERweb/tigerWMS_ACS2015 (86)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2010 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/0>
+- `2010 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/2>
+- `2010 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/51>
+- `114th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/52>
+- `114th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/53>
+- `2014 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/54>
+- `2014 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/55>
+- `2014 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/56>
+- `2014 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/57>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/58>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/59>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/60>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/61>
+- `2010 Census Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/62>
+- `2010 Census Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/63>
+- `2010 Census Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/64>
+- `2010 Census Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/65>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/66>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/67>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/68>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/69>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/70>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/71>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/72>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/73>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/74>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/75>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/76>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/77>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/78>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/79>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/80>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/81>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/82>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/83>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/84>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2015/MapServer/85>
+
+## TIGERweb/tigerWMS_ACS2016 (86)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2010 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/0>
+- `2010 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/2>
+- `2010 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/51>
+- `115th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/52>
+- `115th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/53>
+- `2016 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/54>
+- `2016 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/55>
+- `2016 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/56>
+- `2016 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/57>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/58>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/59>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/60>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/61>
+- `2010 Census Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/62>
+- `2010 Census Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/63>
+- `2010 Census Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/64>
+- `2010 Census Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/65>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/66>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/67>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/68>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/69>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/70>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/71>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/72>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/73>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/74>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/75>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/76>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/77>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/78>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/79>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/80>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/81>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/82>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/83>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/84>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2016/MapServer/85>
+
+## TIGERweb/tigerWMS_ACS2017 (86)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2010 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/0>
+- `2010 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/2>
+- `2010 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/51>
+- `115th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/52>
+- `115th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/53>
+- `2016 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/54>
+- `2016 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/55>
+- `2016 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/56>
+- `2016 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/57>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/58>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/59>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/60>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/61>
+- `2010 Census Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/62>
+- `2010 Census Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/63>
+- `2010 Census Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/64>
+- `2010 Census Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/65>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/66>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/67>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/68>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/69>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/70>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/71>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/72>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/73>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/74>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/75>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/76>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/77>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/78>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/79>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/80>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/81>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/82>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/83>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/84>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2017/MapServer/85>
+
+## TIGERweb/tigerWMS_ACS2018 (86)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2010 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/0>
+- `2010 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/2>
+- `2010 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/51>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/52>
+- `116th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/53>
+- `2018 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/54>
+- `2018 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/55>
+- `2018 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/56>
+- `2018 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/57>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/58>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/59>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/60>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/61>
+- `2010 Census Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/62>
+- `2010 Census Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/63>
+- `2010 Census Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/64>
+- `2010 Census Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/65>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/66>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/67>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/68>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/69>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/70>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/71>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/72>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/73>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/74>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/75>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/76>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/77>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/78>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/79>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/80>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/81>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/82>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/83>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/84>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2018/MapServer/85>
+
+## TIGERweb/tigerWMS_ACS2019 (86)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2010 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/0>
+- `2010 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/1>
+- `2010 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/2>
+- `2010 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/51>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/52>
+- `116th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/53>
+- `2018 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/54>
+- `2018 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/55>
+- `2018 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/56>
+- `2018 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/57>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/58>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/59>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/60>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/61>
+- `2010 Census Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/62>
+- `2010 Census Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/63>
+- `2010 Census Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/64>
+- `2010 Census Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/65>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/66>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/67>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/68>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/69>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/70>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/71>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/72>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/73>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/74>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/75>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/76>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/77>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/78>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/79>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/80>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/81>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/82>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/83>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/84>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2019/MapServer/85>
+
+## TIGERweb/tigerWMS_ACS2021 (80)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/0>
+- `2020 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/1>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/2>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/3>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/4>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/5>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/6>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/7>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/8>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/9>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/10>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/11>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/12>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/13>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/14>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/15>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/16>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/17>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/18>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/19>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/20>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/21>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/22>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/23>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/24>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/25>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/26>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/27>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/28>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/29>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/30>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/31>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/32>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/33>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/34>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/35>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/36>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/37>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/38>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/39>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/40>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/41>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/42>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/43>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/44>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/45>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/46>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/47>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/48>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/49>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/50>
+- `116th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/51>
+- `2018 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/52>
+- `2018 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/53>
+- `2018 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/54>
+- `2018 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/55>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/56>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/57>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/58>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/59>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/60>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/61>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/62>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/63>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/64>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/65>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/66>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/67>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/68>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/69>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/70>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/71>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/72>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/73>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/74>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/75>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/76>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/77>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/78>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2021/MapServer/79>
+
+## TIGERweb/tigerWMS_ACS2022 (68)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/80>
+- `2020 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/81>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/0>
+- `2020 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/1>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/2>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/3>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/4>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/5>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/6>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/7>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/8>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/9>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/10>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/11>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/12>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/13>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/14>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/15>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/82>
+- `School District Administrative Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/83>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/16>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/17>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/18>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/19>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/20>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/21>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/22>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/23>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/24>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/25>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/26>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/27>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/28>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/29>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/30>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/31>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/32>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/33>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/34>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/35>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/36>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/37>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/38>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/39>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/40>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/41>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/42>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/43>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/44>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/45>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/46>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/47>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/48>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/49>
+- `118th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/50>
+- `118th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/51>
+- `2022 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/52>
+- `2022 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/53>
+- `2022 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/54>
+- `2022 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/55>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/56>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/57>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/58>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/59>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/76>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/77>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/78>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2022/MapServer/79>
+
+## TIGERweb/tigerWMS_ACS2023 (78)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/0>
+- `2020 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/1>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/2>
+- `2020 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/14>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/15>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/16>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/17>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/18>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/19>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/84>
+- `School District Administrative Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/85>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/20>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/21>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/22>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/23>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/24>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/25>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/26>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/27>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/28>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/29>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/30>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/31>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/32>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/33>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/34>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/35>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/36>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/37>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/38>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/39>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/40>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/41>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/42>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/43>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/44>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/45>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/46>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/47>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/48>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/49>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/50>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/51>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/52>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/53>
+- `118th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/54>
+- `118th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/55>
+- `2022 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/56>
+- `2022 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/57>
+- `2022 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/58>
+- `2022 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/59>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/60>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/61>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/62>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/63>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/80>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/81>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/82>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/83>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/88>
+- `Urban Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/87>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/97>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/96>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/95>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/94>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/93>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/92>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/91>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2023/MapServer/90>
+
+## TIGERweb/tigerWMS_ACS2024 (78)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/0>
+- `2020 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/1>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/2>
+- `2020 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/14>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/15>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/16>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/17>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/18>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/19>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/84>
+- `School District Administrative Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/85>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/20>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/21>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/22>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/23>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/24>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/25>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/26>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/27>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/28>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/29>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/30>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/31>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/32>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/33>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/34>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/35>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/36>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/37>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/38>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/39>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/40>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/41>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/42>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/43>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/44>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/45>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/46>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/47>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/48>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/49>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/50>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/51>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/52>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/53>
+- `119th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/54>
+- `119th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/55>
+- `2024 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/56>
+- `2024 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/57>
+- `2024 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/58>
+- `2024 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/59>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/60>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/61>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/62>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/63>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/80>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/81>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/82>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/83>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/88>
+- `Urban Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/87>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/97>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/96>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/95>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/94>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/93>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/92>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/91>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2024/MapServer/90>
+
+## TIGERweb/tigerWMS_ACS2025 (78)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/0>
+- `2020 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/1>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/2>
+- `2020 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/14>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/15>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/16>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/17>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/18>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/19>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/84>
+- `School District Administrative Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/85>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/20>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/21>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/22>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/23>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/24>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/25>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/26>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/27>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/28>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/29>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/30>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/31>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/32>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/33>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/34>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/35>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/36>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/37>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/38>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/39>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/40>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/41>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/42>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/43>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/44>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/45>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/46>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/47>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/48>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/49>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/50>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/51>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/52>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/53>
+- `119th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/54>
+- `119th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/55>
+- `2024 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/56>
+- `2024 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/57>
+- `2024 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/58>
+- `2024 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/59>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/60>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/61>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/62>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/63>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/80>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/81>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/82>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/83>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/88>
+- `Urban Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/87>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/97>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/96>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/95>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/94>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/93>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/92>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/91>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2025/MapServer/90>
+
+## TIGERweb/tigerWMS_ACS2026 (78)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/0>
+- `2020 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/1>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/2>
+- `2020 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/14>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/15>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/16>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/17>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/18>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/19>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/84>
+- `School District Administrative Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/85>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/20>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/21>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/22>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/23>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/24>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/25>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/26>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/27>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/28>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/29>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/30>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/31>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/32>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/33>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/34>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/35>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/36>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/37>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/38>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/39>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/40>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/41>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/42>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/43>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/44>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/45>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/46>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/47>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/48>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/49>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/50>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/51>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/52>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/53>
+- `120th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/54>
+- `120th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/55>
+- `2026 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/56>
+- `2026 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/57>
+- `2026 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/58>
+- `2026 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/59>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/60>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/61>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/62>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/63>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/80>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/81>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/82>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/83>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/88>
+- `Urban Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/87>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/97>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/96>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/95>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/94>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/93>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/92>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/91>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ACS2026/MapServer/90>
+
+## TIGERweb/tigerWMS_Census2010 (102)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/0>
+- `Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/1>
+- `Traffic Analysis Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/2>
+- `Traffic Analysis Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/3>
+- `Traffic Analysis Zones` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/4>
+- `Traffic Analysis Zones Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/5>
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/6>
+- `Urban Growth Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/7>
+- `ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/8>
+- `ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/9>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/10>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/11>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/12>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/13>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/14>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/15>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/16>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/17>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/18>
+- `Census Blocks Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/19>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/20>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/21>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/22>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/23>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/24>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/25>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/26>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/27>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/28>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/29>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/30>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/31>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/32>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/33>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/34>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/35>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/36>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/37>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/38>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/39>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/40>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/41>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/42>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/43>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/44>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/45>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/46>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/47>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/48>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/49>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/50>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/51>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/52>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/53>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/54>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/55>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/56>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/57>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/58>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/59>
+- `113th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/60>
+- `113th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/61>
+- `111th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/62>
+- `111th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/63>
+- `2012 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/64>
+- `2013 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/65>
+- `2012 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/66>
+- `2012 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/67>
+- `2010 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/68>
+- `2010 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/69>
+- `2010 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/70>
+- `2010 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/71>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/72>
+- `Voting Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/73>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/74>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/75>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/76>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/77>
+- `Urbanized Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/78>
+- `Urbanized Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/79>
+- `Urban Clusters` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/80>
+- `Urban Clusters Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/81>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/82>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/83>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/84>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/85>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/86>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/87>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/88>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/89>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/90>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/91>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/92>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/93>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/94>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/95>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/96>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/97>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/98>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/99>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/100>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2010/MapServer/101>
+
+## TIGERweb/tigerWMS_Census2020 (92)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Urban Growth Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/0>
+- `Urban Growth Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/1>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/2>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/3>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/4>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/5>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/6>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/7>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/8>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/9>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/10>
+- `Census Blocks Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/11>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/12>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/13>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/14>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/15>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/16>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/17>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/18>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/19>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/20>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/21>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/22>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/23>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/24>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/25>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/26>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/27>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/28>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/29>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/30>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/31>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/32>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/33>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/34>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/35>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/36>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/37>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/38>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/39>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/40>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/41>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/42>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/43>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/44>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/45>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/46>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/47>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/48>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/49>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/50>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/51>
+- `116th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/52>
+- `116th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/53>
+- `2018 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/54>
+- `2018 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/55>
+- `2018 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/56>
+- `2018 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/57>
+- `Voting Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/58>
+- `Voting Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/59>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/60>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/61>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/62>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/63>
+- `Combined New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/64>
+- `Combined New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/65>
+- `New England City and Town Area Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/66>
+- `New England City and Town Area  Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/67>
+- `Metropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/68>
+- `Metropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/69>
+- `Micropolitan New England City and Town Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/70>
+- `Micropolitan New England City and Town Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/71>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/72>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/73>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/74>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/75>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/76>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/77>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/78>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/79>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/80>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/81>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/82>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/83>
+- `Zip Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/84>
+- `Zip Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/85>
+- `Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/86>
+- `Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/87>
+- `2020 Urban Areas - Corrected` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/88>
+- `2020 Urban Areas Labels - Corrected` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/89>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/90>
+- `2020 Urban Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Census2020/MapServer/91>
+
+## TIGERweb/tigerWMS_Current (80)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Census Public Use Microdata Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/0>
+- `2020 Census Public Use Microdata Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/1>
+- `2020 Census ZIP Code Tabulation Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/2>
+- `2020 Census ZIP Code Tabulation Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/3>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/4>
+- `Tribal Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/5>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/6>
+- `Tribal Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/7>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/8>
+- `Census Tracts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/9>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/10>
+- `Census Block Groups Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/11>
+- `2020 Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/12>
+- `2020 Census Blocks Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/13>
+- `Unified School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/14>
+- `Unified School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/15>
+- `Secondary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/16>
+- `Secondary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/17>
+- `Elementary School Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/18>
+- `Elementary School Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/19>
+- `School District Administrative Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/84>
+- `School District Administrative Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/85>
+- `Estates` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/20>
+- `Estates Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/21>
+- `County Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/22>
+- `County Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/23>
+- `Subbarrios` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/24>
+- `Subbarrios Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/25>
+- `Consolidated Cities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/26>
+- `Consolidated Cities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/27>
+- `Incorporated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/28>
+- `Incorporated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/29>
+- `Census Designated Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/30>
+- `Census Designated Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/31>
+- `Alaska Native Regional Corporations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/32>
+- `Alaska Native Regional Corporations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/33>
+- `Tribal Subdivisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/34>
+- `Tribal Subdivisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/35>
+- `Federal American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/36>
+- `Federal American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/37>
+- `Off-Reservation Trust Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/38>
+- `Off-Reservation Trust Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/39>
+- `State American Indian Reservations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/40>
+- `State American Indian Reservations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/41>
+- `Hawaiian Home Lands` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/42>
+- `Hawaiian Home Lands Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/43>
+- `Alaska Native Village Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/44>
+- `Alaska Native Village Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/45>
+- `Oklahoma Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/46>
+- `Oklahoma Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/47>
+- `State Designated Tribal Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/48>
+- `State Designated Tribal Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/49>
+- `Tribal Designated Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/50>
+- `Tribal Designated Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/51>
+- `American Indian Joint-Use Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/52>
+- `American Indian Joint-Use Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/53>
+- `120th Congressional Districts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/54>
+- `120th Congressional Districts Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/55>
+- `2026 State Legislative Districts - Upper` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/56>
+- `2026 State Legislative Districts - Upper Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/57>
+- `2026 State Legislative Districts - Lower` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/58>
+- `2026 State Legislative Districts - Lower Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/59>
+- `Census Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/60>
+- `Census Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/61>
+- `Census Regions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/62>
+- `Census Regions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/63>
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/80>
+- `States Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/81>
+- `Counties` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/82>
+- `Counties Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/83>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/88>
+- `Urban Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/87>
+- `Combined Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/97>
+- `Combined Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/96>
+- `Metropolitan Divisions` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/95>
+- `Metropolitan Divisions Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/94>
+- `Metropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/93>
+- `Metropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/92>
+- `Micropolitan Statistical Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/91>
+- `Micropolitan Statistical Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_Current/MapServer/90>
+
+## TIGERweb/tigerWMS_CurrentBlocks (2)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_CurrentBlocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Census Current Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_CurrentBlocks/MapServer/0>
+- `Census Current Blocks Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_CurrentBlocks/MapServer/1>
+
+## TIGERweb/tigerWMS_ECON2012 (2)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ECON2012/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Economic Places` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ECON2012/MapServer/0>
+- `Economic Places Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_ECON2012/MapServer/1>
+
+## TIGERweb/tigerWMS_PhysicalFeatures (25)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Transportation` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/0>
+- `Primary Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/1>
+- `Primary Roads Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/2>
+- `Secondary Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/3>
+- `Secondary Roads Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/4>
+- `Local Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/5>
+- `Local Roads Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/6>
+- `Railroads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/7>
+- `Railroads Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/8>
+- `Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/9>
+- `Linear Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/10>
+- `Linear Hydrography Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/11>
+- `Areal Hydrography` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/12>
+- `Areal Hydrography Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/13>
+- `Glaciers` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/14>
+- `Glaciers Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/15>
+- `Other` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/16>
+- `National Park Service Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/17>
+- `National Park Service Areas Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/18>
+- `Correctional Facilities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/19>
+- `Correctional Facilities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/20>
+- `Colleges and Universities` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/21>
+- `Colleges and Universities Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/22>
+- `Military Installations` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/23>
+- `Military Installations Labels` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/tigerWMS_PhysicalFeatures/MapServer/24>
+
+## TIGERweb/Tracts_Blocks (13)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/0>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/1>
+- `2020 Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/2>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/3>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/4>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/5>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/6>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/7>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/8>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/9>
+- `Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/10>
+- `Census Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/11>
+- `Census Blocks` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Tracts_Blocks/MapServer/12>
+
+## TIGERweb/Transportation (10)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Primary Roads Interstates 5M scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/0>
+- `Primary Roads 2_1M scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/1>
+- `Primary Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/2>
+- `Secondary Roads Interstates and US Highways` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/3>
+- `Secondary Roads 578k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/4>
+- `Secondary Roads 289_144k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/5>
+- `Secondary Roads 72_1k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/6>
+- `Local Roads 72k scale` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/7>
+- `Local Roads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/8>
+- `Railroads` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/9>
+
+## TIGERweb/TribalTracts (11)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/0>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/1>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/2>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/3>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/4>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/5>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/6>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/7>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/8>
+- `Tribal Census Tracts` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/9>
+- `Tribal Block Groups` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/TribalTracts/MapServer/10>
+
+## TIGERweb/Urban (9)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/0>
+- `BAS 2026` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/1>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/2>
+- `ACS 2025` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/3>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/4>
+- `Census 2020` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/5>
+- `2020 Urban Areas - Corrected` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/6>
+- `2020 Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/7>
+- `Urban Areas` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Urban/MapServer/8>
+
+## TIGERweb/US_InternationalBoundary_Line (1)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/US_InternationalBoundary_Line/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `International Boundary` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/US_InternationalBoundary_Line/MapServer/0>
+
+## TIGERweb/USLandmass (1)
+- **Serviço:** <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/USLandmass/MapServer>
+- **Capacidades:** Map,Query,Data · **máx. registros:** 100000
+- `States` — <https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/USLandmass/MapServer/0>

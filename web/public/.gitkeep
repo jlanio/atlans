@@ -1,0 +1,3 @@
+# Diretório de arquivos estáticos do Next (servidos na raiz da URL).
+# Fica versionado mesmo vazio: o web/Dockerfile.ui copia /app/public para a
+# imagem de produção, e o build falha se o diretório não existir.

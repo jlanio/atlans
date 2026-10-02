@@ -1,0 +1,361 @@
+# Prefeitura BH — camadas
+
+Geoportal: [[Geosserviços/Prefeitura BH/Prefeitura de Belo Horizonte — MG|Prefeitura de Belo Horizonte — MG]]
+
+Total: **354** camadas, organizadas em 1 grupo(s).
+
+## ide_bhgeo (354)
+- `ide_bhgeo:ACADEMIA_CEU_ABERTO` — Academia Ceu Aberto
+- `ide_bhgeo:ACADEMIA_CIDADE` — Academia da Cidade
+- `ide_bhgeo:ADE` — Ade
+- `ide_bhgeo:ADE_11181` — ADE Lei 11181
+- `ide_bhgeo:ADE_INTERESSE_AMBIENTAL_11181` — ADE Interesse Ambiental Lei 11181
+- `ide_bhgeo:ADE_SETORES_11181` — ADE Setores Lei 11181
+- `ide_bhgeo:AEIS` — Aeis
+- `ide_bhgeo:AEIS_INTERESSE_AMBIENTAL_11181` — AEIS Interesse Ambiental Lei 11181
+- `ide_bhgeo:AIP_PB_COMAER` — AIP_BH_COMAER
+- `ide_bhgeo:ALAGAMENTO_AREA_PRIORITARIA_SBN` — Alagamento - Area Prioritaria SBN
+- `ide_bhgeo:ALIMENTACAO_ESCOLAR` — Alimentacao Escolar
+- `ide_bhgeo:ALIMENTACAO_SOCIOASSISTENCIAL` — Alimentacao Socioassistencial
+- `ide_bhgeo:ALVARA_LOCALIZACAO_FUNCIONAMENTO` — Alvara Localizacao Funcionamento
+- `ide_bhgeo:AMBULANTES` — Ambulantes
+- `ide_bhgeo:ANTENA` — Antena
+- `ide_bhgeo:AREA_ABRANGENCIA_SAUDE` — Area de Abrangencia de Saude
+- `ide_bhgeo:AREA_ESCAPE` — Area Escape
+- `ide_bhgeo:AREA_PONDERACAO_CENSO_2010` — Area de Ponderacao Censo 2010
+- `ide_bhgeo:AREA_PRESERVACAO_PERMANENTE` — Area de Preservacao Permanente
+- `ide_bhgeo:AREA_PROTECAO_CULTURAL_CDPCM-BH` — Area de Protecao Cultural - CDPCM-BH
+- `ide_bhgeo:AREA_PROTECAO_CULTURAL_IEPHA` — Área de Proteção Cultural - IEPHA-MG
+- `ide_bhgeo:AREA_PROTECAO_CULTURAL_IPHAN` — Área de Proteção Cultural - IPHAN
+- `ide_bhgeo:AREA_PUBLICA_WIFI` — Area Pubica com Wifi
+- `ide_bhgeo:AREA_RISCO_ASSOCIADO_ESCAVACOES` — Area Risco Associado Escavacoes
+- `ide_bhgeo:AREA_RISCO_CONTAMINACAO_LENCOL_FREATICO` — Area Risco Contaminacao Lencol Freatico
+- `ide_bhgeo:AREA_RISCO_EROSAO_ASSOREAMENTO` — Area Risco Erosao Assoreamento
+- `ide_bhgeo:AREA_RISCO_ESCORREGAMENTO` — Area Risco Escorregamento
+- `ide_bhgeo:AREA_RISCO_INUNDACAO` — Area de Risco Inundacao
+- `ide_bhgeo:AREAS_CONTAMINADAS` — Areas Contaminadas
+- `ide_bhgeo:ARTICULACAO_1` — Articulacao 1
+- `ide_bhgeo:ARTICULACAO_1942` — Articulacao 1942
+- `ide_bhgeo:ARTICULACAO_1953` — Articulacao 1953
+- `ide_bhgeo:ARTICULACAO_2` — Articulacao 2
+- `ide_bhgeo:ARTICULACAO_400` — Articulacao 400
+- `ide_bhgeo:ARTICULACAO_5` — Articulacao 5
+- `ide_bhgeo:ATIVIDADE_ECONOMICA` — Atividade Econômica
+- `ide_bhgeo:ATIVIDADE_ECONOMICAS_AUTONOMOS` — Atividades Economicas Autonomos
+- `ide_bhgeo:ATRATIVO_TURISTICO` — Atrativo Turistico
+- `ide_bhgeo:BACIA_HIDROGRAFICA` — Bacia Hidrografica
+- `ide_bhgeo:BACIA_HIDROGRAFICA_ELEMENTAR` — Bacia Hidrografica Elementar
+- `ide_bhgeo:BAIRRO_OFICIAL` — Bairro Oficial
+- `ide_bhgeo:BAIRRO_POPULAR` — Bairro
+- `ide_bhgeo:BANCO_ALIMENTOS` — Banco de Alimentos
+- `ide_bhgeo:BANHEIRO_PUBLICO_AUTOLIMPANTE` — Banheiro Publico Autolimpante
+- `ide_bhgeo:BARES` — Bares
+- `ide_bhgeo:BEM_CULTURAL_IEPHA` — Bem Cultural IEPHA
+- `ide_bhgeo:BEM_CULTURAL_IMATERIAL` — Bem Cultural Imaterial
+- `ide_bhgeo:BEM_CULTURAL_IMOVEL` — Bem Cultural Imovel
+- `ide_bhgeo:BEM_CULTURAL_INTEGRADO` — Bem Cultural Integrado
+- `ide_bhgeo:BEM_CULTURAL_IPHAN` — Bem Culural IPHAN
+- `ide_bhgeo:BEM_CULTURAL_MOVEL` — Bem Cultural Movel
+- `ide_bhgeo:BEM_CULTURAL_NATURAL` — Bem Cultural Natural
+- `ide_bhgeo:BEM_CULTURAL_URBANISTICO` — Bem Cultural Ubanistico
+- `ide_bhgeo:BH_RESOLVE` — BH Resolve
+- `ide_bhgeo:BH_RESOLVE_VELHA` — BH Resolve Velha
+- `ide_bhgeo:BREJO` — Brejo
+- `ide_bhgeo:CA_BASICO_11181` — CA Basico 11181
+- `ide_bhgeo:CADASTRO_ENGENHO_PUBLICIDADE` — Cadastro Engenho de Publicidade
+- `ide_bhgeo:CADASTRO_IMOBILIARIO` — Cadastro Imobiliario IPTU
+- `ide_bhgeo:CAMPO_FUTEBOL` — Campo Futebol
+- `ide_bhgeo:CANTEIRO_CENTRAL` — Canteiro Central
+- `ide_bhgeo:CAPELA_VELORIO` — Capela Velorio
+- `ide_bhgeo:CASA_ACOLHIMENTO_LGBT` — Casa de Acolhimento LGBT
+- `ide_bhgeo:CEMITERIO_PARTICULAR` — Cemiterio Particular
+- `ide_bhgeo:CEMITERIO_PUBLICO` — Cemiterio Publico
+- `ide_bhgeo:CENTRAL_ABASTECIMENTO_CAFA` — Central de Abastecimento CAFA
+- `ide_bhgeo:CENTRALIDADE_LOCAL_11181` — Centralidades Locais 11181
+- `ide_bhgeo:CENTRO_ATENDIMENTO_TURISTA` — Centro de Atendimento ao Turista
+- `ide_bhgeo:CENTRO_DIA` — Centro Dia
+- `ide_bhgeo:CENTRO_ESPECIALIZADO_ATENDIMENTO_MULHER` — Centro Especializado de Atendimento a Mulher
+- `ide_bhgeo:CENTRO_POP` — Centro Pop
+- `ide_bhgeo:CENTRO_REFERENCIA_JUVENTUDES` — Centro de Referencia das Juventudes
+- `ide_bhgeo:CENTRO_REFERENCIA_LGBT` — Centro de Referencia LGBT
+- `ide_bhgeo:CENTRO_REFERENCIA_PESSOA_IDOSA` — Centro de Referencia Pessoa Idosa
+- `ide_bhgeo:CENTRO_REFERENCIA_SEGURANCA_ALIMENTAR_NUTRI` — Centro de Referencia em Seguranca Alimentar e Nutricional
+- `ide_bhgeo:CENTRO_SAUDE` — Centro de Saude
+- `ide_bhgeo:CENTROS_ESPECIALIDADES` — Centros de Especialidades
+- `ide_bhgeo:CIRCULACAO_VIARIA` — Circulacao Viaria
+- `ide_bhgeo:CIRCUNSCRICAO_CARTORIAL` — Circunscricao Cartorial
+- `ide_bhgeo:CLASSIFICACAO_CALCADA` — Classificacao Calcada
+- `ide_bhgeo:CLASSIFICACAO_VIARIA` — Classificacao Viaria
+- `ide_bhgeo:CLASSIFICACAO_VIARIA_11181` — Classificacao Viaria 11181
+- `ide_bhgeo:COEF_CN_CENARIO_2021` — Coeficiente CN Cenario 2021
+- `ide_bhgeo:COEF_CN_CENARIO_LEI11181` — Coeficiente CN Cenario Lei 11181
+- `ide_bhgeo:COEF_ESCOAMENTO_SUPERFICIAL` — Coeficiente de Escoamento Superficial
+- `ide_bhgeo:COLETA_RESIDUOS` — Coleta de Residuos
+- `ide_bhgeo:COLETA_SELETIVA_PORTA_PORTA` — Coleta Seletiva Porta a Porta
+- `ide_bhgeo:COMERCIO_EQUIPAMENTO_INFORMATICA` — Comercio de Equipamentos de Informatica
+- `ide_bhgeo:COMUNIDADE_QUILOMBOLA` — Comunidade Quilombola
+- `ide_bhgeo:CONEXAO_FUNDO_VALE` — Conexao Fundo de Vale 11181
+- `ide_bhgeo:CONEXAO_VERDE_11181` — Conexao Verde 11181
+- `ide_bhgeo:CONJUNTO_HABITACIONAL` — Conjunto Habitacional
+- `ide_bhgeo:CONSELHO_TUTELAR` — Conselho Tutelar
+- `ide_bhgeo:CORREDOR_ECOLOGICO_SERRA_CURRAL` — Corredor Ecologico Espinhaco Serra Curral
+- `ide_bhgeo:CORREDOR_ECOLOGICO_SERRA_CURRAL_VELHA` — Corredor Ecologico Espinhaco Serra Curral Velha
+- `ide_bhgeo:COZINHA_SOLIDARIA` — Cozinha Solidaria
+- `ide_bhgeo:CRECHES_CONVENIADAS` — Creches Conveniadas
+- `ide_bhgeo:CURSO_DAGUA` — Curso Dagua
+- `ide_bhgeo:CURVA_DE_NIVEL_5M` — Curva de Nivel 5 metros
+- `ide_bhgeo:CURVA_NIVEL_SEGMENTADA_1M` — Curva Nivel Segmentada 1M
+- `ide_bhgeo:DECLIV_TRECHO_LOGRAD_SEG_2015` — Declividade Trecho Logradouro Segmentado 2015
+- `ide_bhgeo:DECLIV_TRECHO_LOGRAD_SEG_2015_ACESS` — Declividade Trecho Segmentado 2015 Acessibilidade
+- `ide_bhgeo:DECLIV_TRECHO_LOGRADOURO_2007` — Declividade Trecho Logradouro 2007
+- `ide_bhgeo:DECLIVIDADE_TRECHO_LOGRADOURO_2015` — Declividade Média Trecho Logradouro 2015
+- `ide_bhgeo:DENSIDADE_DOMICILIO_POR_BAIRRO_2010` — Densidade de Domicílio por Bairro 2010
+- `ide_bhgeo:DENSIDADE_DOMICILIO_POR_BAIRRO_2022` — Densidade Domicílio por Bairro 2022
+- `ide_bhgeo:DENSIDADE_DOMICILIO_POR_REGONAL_2010` — Densidade de Domicílio por Regional 2010
+- `ide_bhgeo:DENSIDADE_DOMICILIO_POR_REGONAL_2022` — Densidade de Domicílio por Regional 2022
+- `ide_bhgeo:DENSIDADE_POPULACIONAL_BAIRRO_2010` — Densidade Populacional por Bairro 2010
+- `ide_bhgeo:DENSIDADE_POPULACIONAL_BAIRRO_2022` — Densidade Populacional por Bairro 2022
+- `ide_bhgeo:DENSIDADE_POPULACIONAL_REGIONAL_2010` — Densidade Populacional por Regional 2010
+- `ide_bhgeo:DENSIDADE_POPULACIONAL_REGIONAL_2022` — Densidade Populacional por Regional 2022
+- `ide_bhgeo:DESLIZAMENTO_TERRA_AREA_PRIORITARIA_SBN` — Deslizamento de Terra - Area Prioritaria SBN
+- `ide_bhgeo:DESTAQUE_CIRCULACAO_VIARIA` — Destaque Circulacao Viaria
+- `ide_bhgeo:DIRETRIZ_ALTIMETRIA` — Diretriz de Altimetria
+- `ide_bhgeo:DIRETRIZ_PROTECAO` — Diretriz de Protecao
+- `ide_bhgeo:DISTRITO_MUNICIPAL` — Distrito Municipal
+- `ide_bhgeo:DISTRITO_SANITARIO` — Distrito Sanitario
+- `ide_bhgeo:DIVISA_FISICA` — Divisa Fisica
+- `ide_bhgeo:DOACAO_EQUIPAMENTO_ELETRONICO` — Doacao Equipamento Eletronico
+- `ide_bhgeo:EDIFICACAO` — Edificacao
+- `ide_bhgeo:EDIFICACAO_DESTAQUE` — EDIFICACAO_DESTAQUE
+- `ide_bhgeo:EMPREENDIMENTOS_SUDECAP` — Empreendimentos Sudecap
+- `ide_bhgeo:EMPRESA_PEQUENO_PORTE` — Empresa de Pequeno Porte
+- `ide_bhgeo:EMPRESAS_OUTROS_PORTES` — Empresas de Outros Portes
+- `ide_bhgeo:ENDERECO` — Endereco
+- `ide_bhgeo:ENSINO_SUPERIOR` — Ensino Superior
+- `ide_bhgeo:EQUIP_CEVAE` — Equipamento CEVAE
+- `ide_bhgeo:EQUIP_EDUCACAO_AMBIENTAL` — Equipamento de Educação Ambiental
+- `ide_bhgeo:EQUIP_ESPORTIVO_ESPECIALIZADO` — Equipamento Esportivo Especializado
+- `ide_bhgeo:EQUIP_HAB_CREAR` — Equipamento Habitacao CREAR
+- `ide_bhgeo:EQUIP_PUBLICO_WIFI` — Equipamento Publico com Wifi
+- `ide_bhgeo:EQUIPAMENTO_CIDADANIA` — Equipamento Cidadania
+- `ide_bhgeo:EQUIPAMENTO_CRAS` — Equipamento CRAS
+- `ide_bhgeo:EQUIPAMENTO_CREAS` — Equipamento CREAS
+- `ide_bhgeo:EQUIPAMENTOS_CULTURAIS` — Equipamentos Culturais
+- `ide_bhgeo:ESCOLAS_ESTADUAIS` — Escolas Estaduais
+- `ide_bhgeo:ESCOLAS_FEDERAIS` — Escolas Federais
+- `ide_bhgeo:ESCOLAS_MUNICIPAIS_EDUCACAO_INFANTIL` — Escolas Municipais de Educacao Infantil
+- `ide_bhgeo:ESCOLAS_MUNICIPAIS_ENSINO_FUNDAMENTAL` — Escolas Municipais de Ensino Fundamental
+- `ide_bhgeo:ESCOLAS_PARTICULARES` — Escolas Particulares
+- `ide_bhgeo:ESPACO_OPERACIONAL` — Espaço Operacional
+- `ide_bhgeo:ESTACAO_HIDROMETEOROLOGICA` — Estacao Hidrometeorologica
+- `ide_bhgeo:ESTACAO_METRO` — Estacao Metro
+- `ide_bhgeo:ESTACAO_ONIBUS` — Estacao Onibus
+- `ide_bhgeo:ESTACAO_TRANSPORTE_PUBLICO` — Estação Transporte Público
+- `ide_bhgeo:ESTACIONAMENTO_IDOSO_PERMANENCIA_LIVRE` — Estacionamento Idoso Permanência Livre
+- `ide_bhgeo:ESTACIONAMENTO_ROTATIVO_IDOSO_PARQUE_MANGABEIRAS` — Estacionamento Rotativo Idoso Parque Mangabeiras
+- `ide_bhgeo:ESTACIONAMENTO_ROTATIVO_IDOSO_SABADO` — Estacionamento Rotativo Idoso Sabado
+- `ide_bhgeo:ESTACIONAMENTO_ROTATIVO_IDOSO_SEGUNDA_SEXTA` — Estacionamento Rotativo Idoso Segunda a Sexta
+- `ide_bhgeo:ESTACIONAMENTO_ROTATIVO_MOTOFRETE_SABADO` — Estacionamento Rotativo Motofrete Sabado
+- `ide_bhgeo:ESTACIONAMENTO_ROTATIVO_MOTOFRETE_SEGUNDA_SEXTA` — Estacionamento Rotativo Motofrete Segunda Sexta
+- `ide_bhgeo:ESTACIONAMENTO_ROTATIVO_PARQUE_MANGABEIRAS` — Estacionamento Rotativo Parque das Mangabeiras
+- `ide_bhgeo:ESTACIONAMENTO_ROTATIVO_SABADO` — Estacionamento Rotativo Sabado
+- `ide_bhgeo:ESTACIONAMENTO_ROTATIVO_SEGUNDA_SEXTA` — Estacionamento Rotativo Segunda a Sexta
+- `ide_bhgeo:FABRICACAO_EQUIPAMENTO_INFORMATICA` — Fabricacao de Equipamento de Informatica
+- `ide_bhgeo:FAIXA_RODAGEM_RODOVIA` — Faixa de Rodagem Rodovia
+- `ide_bhgeo:FEIRA` — Feira
+- `ide_bhgeo:FEIRA_AFONSO_PENA_BARRACA` — Feira Afonso Pena Barraca
+- `ide_bhgeo:FEIRA_AFONSO_PENA_SETOR` — Feira Afonso Pena Setor
+- `ide_bhgeo:FERROVIA` — Ferrovia
+- `ide_bhgeo:FISCALIZACAO_ELETRONICA` — Fiscalizacao Eletronica
+- `ide_bhgeo:GALPAO_RECICLAGEM` — Galpao de Reciclagem
+- `ide_bhgeo:GEOLOGIA_BASICA_ATIVIDADE_MINERARIA` — Geologia Basica Atividade Mineraria 1995
+- `ide_bhgeo:GEOLOGIA_BASICA_CONTATO` — Geologia Basica Contato
+- `ide_bhgeo:GEOLOGIA_BASICA_DIQUE_CLASTICO` — Geologia Basica Dique Clastico
+- `ide_bhgeo:GEOLOGIA_BASICA_FALHA` — Geologia Basica Falha
+- `ide_bhgeo:GEOLOGIA_BASICA_FOTOLINEAMENTO` — Geologia Basica Fotolineamento
+- `ide_bhgeo:GEOLOGIA_BASICA_LIMITE` — Geologia Basica Limite
+- `ide_bhgeo:GEOLOGIA_BASICA_LITOTIPO` — Geologia Basica Litotipo
+- `ide_bhgeo:GEOLOGIA_BASICA_LITOTIPO_OCORRENCIA_PONTUAL` — Geologia Basica Litotipo Ocorrencia Pontual
+- `ide_bhgeo:GEOLOGIA_BASICA_MEDIDA_ESTRUTURAL` — Geologia Basica Medida Estrutural
+- `ide_bhgeo:GEOLOGIA_BASICA_TRACADO_PERFIL_GEOLOGICO` — Geologia Basica Tracado Perfil Geologico
+- `ide_bhgeo:GEOLOGIA_BASICA_ZONA_CISALHAMENTO` — Geologia Basica  Zona de Cisalhamento
+- `ide_bhgeo:GINASIO` — Ginasio
+- `ide_bhgeo:HELIPONTO` — Heliponto
+- `ide_bhgeo:HOSPITAIS` — Hospital
+- `ide_bhgeo:ILUM_PUBLICA` — Trecho com Iluminacao Publica
+- `ide_bhgeo:INDICE_QUALIDADE_NASCENTES` — Indice de Qualidade de Nascentes
+- `ide_bhgeo:INUNDACAO_AREA_PRIORITARIA_SBN` — Inundacao - Area Prioritaria SBN
+- `ide_bhgeo:ISA_BACIA` — Isa Bacia
+- `ide_bhgeo:ISA_SUB_BACIA` — Isa Sub Bacia
+- `ide_bhgeo:ITINERARIO_TRANSPORTE_COLETIVO` — Itinerario Transporte Coletivo
+- `ide_bhgeo:IVS_INDICE_VULNERAB_SAUDE` — IVS_Indice de Vulnerabilidade da Saude
+- `ide_bhgeo:JARDIM_CHUVA` — Jardim Chuva
+- `ide_bhgeo:JURISDICAO_ESCOLAR_EDUCACAO_INFANTIL` — Jurisdicao Escolar Educacao Infantil
+- `ide_bhgeo:JURISDICAO_ESCOLAR_EF` — Jurisdicao Escolar Ensino Fundamental
+- `ide_bhgeo:LAGOA_PAMPULHA` — Lagoa Pampulha
+- `ide_bhgeo:LANCHONETES` — Lanchonetes
+- `ide_bhgeo:LIMITE_AREA_PLANEJADA_1895` — Limite Area Planejada 1895
+- `ide_bhgeo:LIMITE_MUNICIPIO` — Limite de Municipio
+- `ide_bhgeo:LINHA_METRO` — Linha Metro
+- `ide_bhgeo:LINHA_TRANSMISSAO` — Linha de Transmissao
+- `ide_bhgeo:LOCAL_ENTREGA_VOLUNTARIA` — Local de Entrega Voluntaria LEV's
+- `ide_bhgeo:LOGRADOURO` — Logradouro
+- `ide_bhgeo:LOGRADOURO_DESTAQUE` — Logradouro Destaque
+- `ide_bhgeo:LOGRADOURO_OBRA_DE_ARTE` — Viaduto - Passarela - Ponte - Túnel - Trincheira
+- `ide_bhgeo:LOTE_APROVADO` — Lote Aprovado
+- `ide_bhgeo:LOTE_CTM` — Lote CTM
+- `ide_bhgeo:MANCHA_URBANA_1918` — Mancha Urbana 1918
+- `ide_bhgeo:MANCHA_URBANA_1935` — Mancha Urbana 1935
+- `ide_bhgeo:MANCHA_URBANA_1950` — Mancha Urbana 1950
+- `ide_bhgeo:MANCHA_URBANA_1977` — Mancha Urbana 1977
+- `ide_bhgeo:MANCHA_URBANA_1999` — Mancha Urbana 1999
+- `ide_bhgeo:MANCHA_URBANA_2007` — Mancha Urbana 2007
+- `ide_bhgeo:MANCHA_URBANA_2018` — Mancha Urbana 2018
+- `ide_bhgeo:MEIO_FIO` — Trecho com Meio Fio
+- `ide_bhgeo:MEIO_FIO_QUADRA` — Meio Fio Quadra
+- `ide_bhgeo:MEIO_FIO_QUADRA_DESTAQUE` — Meio Fio Quadra Destaque
+- `ide_bhgeo:MERCADO_MUNICIPAL` — Mercado Municipal
+- `ide_bhgeo:MICRO_EMPRESA` — Micro Empresa
+- `ide_bhgeo:MUNICIPIO_RMBH` — Municipio RMBH
+- `ide_bhgeo:NASCENTE` — Nascente
+- `ide_bhgeo:NO_CIRCULACAO` — Nó Circulacao Viaria
+- `ide_bhgeo:OBRAS_SUDECAP` — Obras Sudecap
+- `ide_bhgeo:OCORRENCIA_SINISTRO_TRANSITO_COM_VITIMA` — Ocorrência Sinistro Trânsito com Vítima
+- `ide_bhgeo:OCUPACAO_LOTEAMENTO_IRREGULAR` — Ocupação Loteamento Irregular
+- `ide_bhgeo:OLEI` — Orientação para Licenciamento para empreendimento de impacto - OLEI
+- `ide_bhgeo:ONDAS_CALOR_AREA_PRIORITARIA_SBN` — Ondas de calor - Area Prioritaria SBN
+- `ide_bhgeo:OPERACAO_URBANA` — Operacao Urbana
+- `ide_bhgeo:OPERACAO_URBANA_11181` — Operacao Urbana 11181
+- `ide_bhgeo:OPERACAO_URBANA_TRANS_11181` — Operacao Urbana Transicao
+- `ide_bhgeo:PARQUE_LAGOA_PAMPULHA` — Parque Lagoa Pampulha
+- `ide_bhgeo:PARQUES_MUNICIPAIS` — Parques Municipais
+- `ide_bhgeo:PAVIMENTACAO` — Trecho com Pavimentacao
+- `ide_bhgeo:PER_USO_REGRA_ESPEC_AREA_7166` — Permissividade Espeficica de Uso -  Area - Lei 7166
+- `ide_bhgeo:PERM_USO_LOTES_BELVII_11181` — Permissividade Especifica Belvedere 11181
+- `ide_bhgeo:PERMISSIV_ESPEC_TRECHO_7166` — Permissividade Especifica de Uso - Trecho - Lei 7166
+- `ide_bhgeo:PERMISSIV_REGRA_GERAL_7166` — Permissividade Geral de Uso 7166
+- `ide_bhgeo:PERMISSIV_USO_REG_ESP_11181` — Permissividade Especifica de Uso 11181
+- `ide_bhgeo:PERMISSIV_USO_REG_GERAL_11181` — Permissividade Geral de Uso 11181
+- `ide_bhgeo:PISTA_AEROPORTO` — Pista Aeroporto
+- `ide_bhgeo:PISTA_SKATE` — Pista Skate
+- `ide_bhgeo:PLANTA_APROVADA` — Planta Aprovada
+- `ide_bhgeo:PLANTA_PARTICULAR` — Planta Particular
+- `ide_bhgeo:PONTO_ALTIMETRICO_MUNICIPIO` — Ponto Altimetrico Municipio
+- `ide_bhgeo:PONTO_ALTIMETRICO_REGIONAL` — Ponto Altimetrico Regional
+- `ide_bhgeo:PONTO_INCLUSAO_DIGITAL` — Ponto de Inclusão Digital
+- `ide_bhgeo:PONTO_ONIBUS` — Ponto Onibus
+- `ide_bhgeo:PONTO_VERDE` — Ponto Verde
+- `ide_bhgeo:PONTOS_DE_CULTURA` — Pontos De Cultura
+- `ide_bhgeo:PONTOS_REDE_TRIANGULACAO_1895` — Pontos Rede Triangulação 1895
+- `ide_bhgeo:POP_DOMIC_BAIRRO_2010` — Populacao Domicilio Bairro 2010
+- `ide_bhgeo:POP_DOMIC_BAIRRO_2022` — Populacao Domicilio Bairro 2022
+- `ide_bhgeo:POP_DOMIC_REGIONAL_2010` — Populacao Domicilio Regional 2010
+- `ide_bhgeo:POP_DOMIC_REGIONAL_2022` — Populacao Domicilio Regional 2022
+- `ide_bhgeo:POSTE` — Poste
+- `ide_bhgeo:POSTO_VENDA_ROTATIVO` — Posto de Venda Rotativo
+- `ide_bhgeo:PRACA` — Praca
+- `ide_bhgeo:PREFEITURA_BELO_HORIZONTE` — Prefeitura de Belo Horizonte
+- `ide_bhgeo:PRESTACAO_SERVICOS_INFORMACAO` — Prestacao de Servicos de Informacao
+- `ide_bhgeo:PROGRAMA_ABASTECER` — Programa Abastecer - Sacolão
+- `ide_bhgeo:PROGRAMA_ADORO_BH_AREA_ADOTADA` — Programa Adoro BH - Area Adotada
+- `ide_bhgeo:PROGRAMA_ADORO_BH_AREA_ADOTAVEL` — Programa Adoro BH - Area Adotavel
+- `ide_bhgeo:PROGRAMA_ADOTE_JARDIM_CHUVA_AREA_ADOTADA` — Programa Adote Jardim de Chuva Área Adotada
+- `ide_bhgeo:PROGRAMA_ADOTE_JARDIM_CHUVA_AREA_DISPONIVEL` — Programa Adote Jardim de Chuva Área Disponivel
+- `ide_bhgeo:PROGRAMA_ESPACO_CIDADANIA` — Programa Espaço da Cidadania
+- `ide_bhgeo:PROGRAMA_QUALIF_CENTRALIDADE` — Programa Perto de Casa
+- `ide_bhgeo:PROGRAMA_VILA_MAIS_CONECTADA` — Programa Vila Mais Conectada
+- `ide_bhgeo:PROJ_VIARIO_PRIOR_11181` — Projeto Viario Prioritario 11181
+- `ide_bhgeo:PROJETO_EDIFICACAO_LICENCIADO` — Projeto Edificacao Licenciado
+- `ide_bhgeo:PROJETO_VIARIO_PRIORITARIO` — Projeto Viario Prioritario
+- `ide_bhgeo:PROPOSTA_OUS` — Proposta OUS
+- `ide_bhgeo:QUADRA_CEMITERIO` — Quadra Cemitério Público
+- `ide_bhgeo:QUADRA_CTM` — Quadra CTM
+- `ide_bhgeo:QUADRA_ESPORTIVA` — Quadra Esportiva
+- `ide_bhgeo:QUADRA_VIARIA` — Quadra Viaria
+- `ide_bhgeo:RADIACAO_ELETROMAG_ANTENA_2018` — Radiação Eletromagnética Antena 2018
+- `ide_bhgeo:RADIACAO_ELETROMAG_ANTENA_2019` — Radiação Eletromagnética Antena 2019
+- `ide_bhgeo:RADIACAO_ELETROMAG_ANTENA_2021` — Radiação Eletromagnética Antena 2021
+- `ide_bhgeo:RADIACAO_ELETROMAG_ANTENA_2025` — Radiação Eletromagnética Antena 2025
+- `ide_bhgeo:RECUO_ALINHAMENTO_11181` — Recuo Alinhamento 11181
+- `ide_bhgeo:REDE_AGUA` — Trecho com Rede Agua
+- `ide_bhgeo:REDE_CICLOVIARIA_ANEXOIX` — Rede Cicloviaria AnexoIX
+- `ide_bhgeo:REDE_ELETRICA` — Trecho com Rede Eletrica
+- `ide_bhgeo:REDE_ESGOTO` — Trecho com Rede Esgoto
+- `ide_bhgeo:REDE_EST_TRANSP_COLETIVO` — Rede Estruturante de Transporte Coletivo
+- `ide_bhgeo:REDE_MICRODRENAGEM` — Rede de Microdrenagem
+- `ide_bhgeo:REDE_MUNIC_REFERENCIA_CADASTRAL` — Rede Municipal de Referencia Cadastral
+- `ide_bhgeo:REDE_PRIORIZACAO_ONIBUS` — Rede Priorização Ônibus
+- `ide_bhgeo:REDE_PROTECAO_ESPECIAL_ALTA_COMPLEXIDADE` — Rede Protecao Especial Alta Complexidade
+- `ide_bhgeo:REDE_PROTECAO_ESPECIAL_MEDIA_COMPLEXIDADE` — Rede Protecao Especial Media Complexidade
+- `ide_bhgeo:REDE_PROTECAO_SOCIAL_BASICA` — Rede Protecao Social Basica
+- `ide_bhgeo:REDE_TELEFONICA` — Trecho com Rede Telefonica
+- `ide_bhgeo:REDE_TRIANGULACAO_1895` — Rede Triangulação 1895
+- `ide_bhgeo:REDUTOR_VELOCIDADE` — Redutor de Velocidade
+- `ide_bhgeo:REFERENCIA` — Referencia
+- `ide_bhgeo:REGIONAL` — Região Administrativa
+- `ide_bhgeo:REGIONAL_OBRA_MB` — Regional Obra MB
+- `ide_bhgeo:REGIONAL_OBRA_TEMATICO_MB` — Regional Obra Tematico MB
+- `ide_bhgeo:REPARACAO_MANUTENCAO_EQUIPAMENTOS` — Reparacao e Manutencao de Equipamentos
+- `ide_bhgeo:REPRESA` — Represa
+- `ide_bhgeo:RESTAURANTE_POPULAR` — Restaurante Popular
+- `ide_bhgeo:RESTAURANTES_E_SIMILARES` — Restaurantes e Similares
+- `ide_bhgeo:RESTRICAO_VOO_DRONE` — Restricao Voo Drone
+- `ide_bhgeo:ROTA_CICLOVIARIA` — Rota Cicloviaria
+- `ide_bhgeo:ROTULO_LOGRADOURO` — Rotulo_Logradouro
+- `ide_bhgeo:SAUDE_MENTAL` — Saude Mental
+- `ide_bhgeo:SEDE_REGIONAL` — Sede Regional
+- `ide_bhgeo:SEDE_REGIONAL_VELHA` — Sede Regional
+- `ide_bhgeo:SERVICOS_DISTRITAIS` — Servicos Distritais
+- `ide_bhgeo:SERVICOS_TECNOLOGIA_INFORMACAO` — Servicos Tecnologia e Informacao
+- `ide_bhgeo:SETOR_CENSITARIO_2010` — Setor Censitario 2010
+- `ide_bhgeo:SETOR_CENSITARIO_2022` — Setor Censitario 2022
+- `ide_bhgeo:SINALIZACAO_SEMAFORICA` — Sinalizacao Semaforica
+- `ide_bhgeo:SONDAGEM_GEOTECNICA` — Sondagem Geotecnica
+- `ide_bhgeo:SUBBACIA_HIDROGRAFICA` — Sub Bacia Hidrografica
+- `ide_bhgeo:SUBESTACAO_ENERGIA` — Subestação de Energia Elétrica
+- `ide_bhgeo:SUBESTACAO_ENERGIA_MB` — Subestacao Energia
+- `ide_bhgeo:SUBESTACOES_REFERENCIA_LOCALIZACAO` — Subestacoes Referencia Localizacao
+- `ide_bhgeo:TAXA_PERMEABILIDADE_11181` — Taxa Permeabilidade 11181
+- `ide_bhgeo:TERRITORIO_CRAS` — Territorio CRAS
+- `ide_bhgeo:TERRITORIO_FISCALIZACAO` — Territorio de Gestao de Fiscalizacao
+- `ide_bhgeo:TERRITORIO_GESTAO_COMPART` — Territorio de Gestao Compartilhada
+- `ide_bhgeo:TERRITORIO_PROTECAO_SOCIOASSISTENCIAL` — Territorio de Protecao Socioassistencial
+- `ide_bhgeo:TIPOLOGIA_USO_OCUPACAO_LOTE_2011` — Tipologia Uso e Ocupacao Lote 2011
+- `ide_bhgeo:TIPOLOGIA_USO_OCUPACAO_LOTE_2017` — Tipologia Uso e Ocupacao Lote 2017
+- `ide_bhgeo:TIPOLOGIA_USO_OCUPACAO_LOTE_2018` — Tipologia Uso e Ocupacao Lote 2018
+- `ide_bhgeo:TIPOLOGIA_USO_OCUPACAO_LOTE_2020` — Tipologia Uso e Ocupacao Lote 2020
+- `ide_bhgeo:TIPOLOGIA_USO_OCUPACAO_LOTE_2022` — Tipologia Uso e Ocupacao Lote 2022
+- `ide_bhgeo:TORRE_TRANSMISSAO` — Torre de Transmissao de Energia Eletrica
+- `ide_bhgeo:TRECHO_CIRC_VIARIA_DESTAQUE` — Trecho Circulacao Viaria Destaque
+- `ide_bhgeo:TRECHO_LOGRADOURO` — Trecho Logradouro
+- `ide_bhgeo:TREVO` — Trevo
+- `ide_bhgeo:TREVO_MB` — Trevo MB
+- `ide_bhgeo:UNID_CONSERV_AMBIENTAL` — Unidade de Conservacao Ambiental
+- `ide_bhgeo:UNID_PLANEJAMENTO` — Unidade de Planejamento
+- `ide_bhgeo:UNIDADE_ILUMINACAO_PUBLICA` — Unidade Iluminacao Publica
+- `ide_bhgeo:UNIDADE_PRODUTIVA_COLETIVA_COMUNITARIA` — Unidade Produtiva Coletiva Comunitaria
+- `ide_bhgeo:UNIDADE_PRODUTIVA_INSTITUCIONAL` — Unidade Produtiva Institucional
+- `ide_bhgeo:UNIDADE_PRODUTIVA_INSTITUCIONAL_ESCOLAR` — Unidade Produtiva Institucional Escolar
+- `ide_bhgeo:UNIDADE_PRONTO_ATENDIMENTO` — Unidade de Pronto Atendimento
+- `ide_bhgeo:URPV` — Unidade de Recebimento de Pequenos Volumes URPV
+- `ide_bhgeo:USUARIOS_DIA_UTIL_DESTINO` — Usuarios Transporte Dia Util Tipico Destino
+- `ide_bhgeo:USUARIOS_DIA_UTIL_ORIGEM` — Usuarios Transporte Dia Util Tipico Origem
+- `ide_bhgeo:USUARIOS_DOMINGO_DESTINO` — Usuarios Transporte Domingo Tipico Destino
+- `ide_bhgeo:USUARIOS_DOMINGO_ORIGEM` — Usuarios Transporte Domingo Tipico Origem
+- `ide_bhgeo:USUARIOS_SABADO_DESTINO` — Usuarios Transporte Sabado Tipico Destino
+- `ide_bhgeo:USUARIOS_SABADO_ORIGEM` — Usuarios Transporte Sabado Tipico Origem
+- `ide_bhgeo:VARANDA_URBANA_PARKLET` — Varanda Urbana Parklet
+- `ide_bhgeo:VIA_CEMITERIO_PUBLICO` — Via Cemitério Público
+- `ide_bhgeo:VILA_FAVELA` — Vila e Favela
+- `ide_bhgeo:VIST_OBRA_LOGRAD_LICEN` — Vistoria de Obra em Logradouro - Licenciada
+- `ide_bhgeo:WIFI_HIPERCENTRO` — Wifi Hipercentro
+- `ide_bhgeo:ZON_GEOTECNICO_COMPL_LITOGENET` — Zoneamento Geotecnico - Complexo Litogenetico
+- `ide_bhgeo:ZON_GEOTECNICO_PL` — Zoneamento Geotécnico - Zona Geotécnica Poligonal
+- `ide_bhgeo:ZON_GEOTECNICO_PT` — Zoneamento Geotecnico - Zona Geotecnica Pontual
+- `ide_bhgeo:ZON_GEOTECNICO_ZONA_LITOLOGICA` — Zoneamento Geotecnico - Zona Litologica
+- `ide_bhgeo:ZONA_CULTURAL` — Zona Cultural
+- `ide_bhgeo:ZONA_HOMOGENEA_IPTU` — Zona Homogenea IPTU
+- `ide_bhgeo:ZONA_RUIDO_AERONAUTICA` — Zona Ruido Aeronautica
+- `ide_bhgeo:ZONEAMENTO` — Zoneamento
+- `ide_bhgeo:ZONEAMENTO_11181` — Zoneamento Lei 11181
+- `ide_bhgeo:ZOONOSES` — Zoonoses
