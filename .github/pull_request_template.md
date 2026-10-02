@@ -1,54 +1,54 @@
 <!--
-  Modelo de PR do Atlans. É um guia, não um formulário: preencha o que fizer
-  sentido e apague o que não se aplicar. Descreva apenas as suas mudanças de
-  código — nada de credenciais, tokens ou dados internos.
+  Atlans PR template. It is a guide, not a form: fill in what makes
+  sense and delete what does not apply. Describe only your code
+  changes — no credentials, tokens or internal data.
 -->
 
-## O quê e por quê
+## What and why
 
-<!-- Uma ou duas frases: o que este PR muda e qual problema resolve. -->
+<!-- One or two sentences: what this PR changes and which problem it solves. -->
 
 
-## Mudanças
+## Changes
 
-<!-- Os pontos principais do diff — uma linha por mudança relevante. -->
+<!-- The main points of the diff — one line per relevant change. -->
 -
 
-## Como testar
+## How to test
 
 <!--
-  O que você rodou, e o que dá para conferir. Exemplos por área:
+  What you ran, and what can be checked. Examples by area:
     desktop/    → npm run typecheck && npm test
     web/        → npm run lint && npm test
-    flow/ e API → pytest
-  Inclua os passos manuais quando houver (fluxo de UI, deep link, execução de nó).
+    flow/ and API → pytest
+  Include the manual steps when there are any (UI flow, deep link, node execution).
 -->
 -
 
-## Impacto e riscos
+## Impact and risks
 
-<!-- Marque o que se aplica e detalhe abaixo. -->
+<!-- Check what applies and give details below. -->
 
-- [ ] Migração de banco (descreva; diga se é reversível)
-- [ ] Quebra de compatibilidade (API, contrato de nó, config)
-- [ ] Toca em segurança (auth, mTLS, credenciais, isolamento, CSP)
-- [ ] Muda variáveis de ambiente ou o processo de build/CD
-- [ ] Nenhum dos acima
+- [ ] Database migration (describe it; say whether it is reversible)
+- [ ] Breaking change (API, node contract, config)
+- [ ] Touches security (auth, mTLS, credentials, isolation, CSP)
+- [ ] Changes environment variables or the build/CD process
+- [ ] None of the above
 
 
 ## Checklist
 
-- [ ] Testes cobrindo a mudança (ou justificativa de por que não)
-- [ ] `typecheck`/`lint` e a suíte da área afetada passando localmente
-- [ ] Sem segredos, tokens ou dados sensíveis no diff
-- [ ] Documentação atualizada quando fazia sentido
-- [ ] Primeiro PR: aceitei o CLA (o CLA.md e o CONTRIBUTING.md, na raiz do repositório, dizem como)
+- [ ] Tests covering the change (or a justification of why not)
+- [ ] `typecheck`/`lint` and the affected area's suite passing locally
+- [ ] No secrets, tokens or sensitive data in the diff
+- [ ] Documentation updated where it made sense
+- [ ] First PR: I have accepted the CLA (CLA.md and CONTRIBUTING.md, at the repository root, explain how)
 
-## Evidência
+## Evidence
 
-<!-- Screenshots ou gravação para mudanças de UI (web/desktop); logs/saída para o resto. -->
+<!-- Screenshots or a recording for UI changes (web/desktop); logs/output for everything else. -->
 
 
-## Pendências / follow-ups
+## Pending items / follow-ups
 
-<!-- O que ficou de fora de propósito e vira issue ou próximo PR. -->
+<!-- What was deliberately left out and becomes an issue or the next PR. -->

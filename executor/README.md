@@ -1,127 +1,127 @@
 # Atlans Executor
 
-O **executor** é o componente de execução distribuída do Atlans. Ele conecta ao servidor via WebSocket, recebe workflows criptografados, executa o motor `flow/` localmente e retorna resultados em tempo real.
+The **executor** is Atlans's distributed execution component. It connects to the server over WebSocket, receives encrypted workflows, runs the `flow/` engine locally and returns results in real time.
 
-## Sumário
+## Contents
 
-- [Visão Geral](#visão-geral)
-- [Pré-requisitos](#pré-requisitos)
-- [Instalação e Setup](#instalação-e-setup)
-- [Configuração](#configuração)
-- [Execução](#execução)
-- [Painel ao vivo](#painel-ao-vivo)
+- [Overview](#overview)
+- [Prerequisites](#prerequisites)
+- [Installation and Setup](#installation-and-setup)
+- [Configuration](#configuration)
+- [Running](#running)
+- [Live dashboard](#live-dashboard)
 - [Docker](#docker)
-- [Protocolo de Comunicação](#protocolo-de-comunicação)
-- [Criptografia](#criptografia)
-- [GeoSync — Sincronização de Arquivos](#geosync--sincronização-de-arquivos)
-- [Limites de Recursos](#limites-de-recursos)
+- [Communication Protocol](#communication-protocol)
+- [Encryption](#encryption)
+- [GeoSync — File Synchronization](#geosync--file-synchronization)
+- [Resource Limits](#resource-limits)
 - [Troubleshooting](#troubleshooting)
-- [HOST_ALIASES para Executores Externos](#host_aliases-para-executores-externos)
+- [HOST_ALIASES for External Executors](#host_aliases-for-external-executors)
 
 ---
 
-## Visão Geral
+## Overview
 
-No Atlans, **toda execução de workflow acontece nos executores** — não existe Celery nem workers no servidor. O servidor é responsável por orquestrar, criptografar e despachar jobs; o executor é responsável por executar.
+In Atlans, **every workflow run happens on the executors** — there is no Celery and there are no workers on the server. The server is responsible for orchestrating, encrypting and dispatching jobs; the executor is responsible for executing them.
 
-### Três jeitos de rodar um executor
+### Three ways to run an executor
 
-A stack do servidor (`docker-compose.yml`) **não sobe executor nenhum**: o
-primeiro é matriculado pelo painel (Executores → gerar o código) e roda onde
-você quiser, inclusive no mesmo host.
+The server stack (`docker-compose.yml`) **does not start any executor**: the
+first one is enrolled from the web panel ("Executores" (Executors) → generate the code) and runs
+wherever you want, including on the same host.
 
-| Jeito | Onde roda | Caso de uso |
+| Way | Where it runs | Use case |
 |---|---|---|
-| **Docker** | Qualquer máquina com Docker (`install.sh` servido pelo painel, ou `docker-compose.executor.yml`) | O caminho padrão: servidores, VMs, o próprio host da stack |
-| **Python nativo** | Uma máquina com Python 3.12 (`python -m executor`) | Acesso a bancos internos e dados locais, desenvolvimento |
-| **Desktop** | Máquina do usuário (app Electron, Windows) | Dados locais, prototipagem, uso individual |
+| **Docker** | Any machine with Docker (`install.sh` served by the web panel, or `docker-compose.executor.yml`) | The default path: servers, VMs, the stack's own host |
+| **Native Python** | A machine with Python 3.12 (`python -m executor`) | Access to internal databases and local data, development |
+| **Desktop** | The user's machine (Electron app, Windows) | Local data, prototyping, individual use |
 
-Os três usam o mesmo código (`executor/`) — a diferença está no ambiente de execução e na forma como as variáveis de ambiente são configuradas.
+All three use the same code (`executor/`) — the difference is in the execution environment and in how the environment variables are configured.
 
 ### Quickstart (`install.sh`)
 
-A tela de matrícula do painel (Executores → o executor → matricular) mostra o
-comando pronto, com os endereços da instalação:
+The web panel's enrollment screen ("Executores" → the executor → enroll) shows the
+ready-made command, with the installation's addresses:
 
 ```bash
 curl -fsSL https://<site>/executores/install | bash -s -- --executor-id=<ID> --otp=<OTP>
 ```
 
-Requisitos na máquina: `docker` (com o plugin `compose`), `git` e `curl`; o
-script confere. Ele clona o repositório (`--repo`, padrão: o que o servidor
-configurou em `EXECUTOR_REPO_URL`), baixa a CA interna, semeia o `executor/.env`,
-constrói a imagem, matricula e sobe o container com `docker-compose.executor.yml`.
+Requirements on the machine: `docker` (with the `compose` plugin), `git` and `curl`; the
+script checks for them. It clones the repository (`--repo`, default: the one the server
+configured in `EXECUTOR_REPO_URL`), downloads the internal CA, seeds `executor/.env`,
+builds the image, enrolls and starts the container with `docker-compose.executor.yml`.
 
-| Flag | Para quê |
+| Flag | What for |
 |---|---|
-| `--executor-id=<ID>` / `--otp=<OTP>` | A identidade e o código de matrícula (sem eles, o script pergunta) |
-| `--server=<URL>` / `--public-server=<URL>` | O host dos executores e o site (padrão: os do servidor que serviu o script) |
-| `--dir=<caminho>` | Onde instalar (padrão `~/atlans-executor`) |
-| `--repo=<URL git>` | O repositório a clonar |
-| `--memoria=<N>G` | Limite de memória do container (padrão 75 % da memória que o Docker enxerga, mínimo 2G) |
-| `--force` | Refaz uma instalação existente (apaga os certificados antigos) |
+| `--executor-id=<ID>` / `--otp=<OTP>` | The identity and the enrollment code (without them, the script asks) |
+| `--server=<URL>` / `--public-server=<URL>` | The executors' host and the site (default: those of the server that served the script) |
+| `--dir=<caminho>` | Where to install (default `~/atlans-executor`) |
+| `--repo=<URL git>` | The repository to clone |
+| `--memoria=<N>G` | Container memory limit (default 75% of the memory Docker sees, minimum 2G) |
+| `--force` | Redoes an existing installation (deletes the old certificates) |
 
-O script só executa depois de baixado inteiro (o corpo está numa função chamada
-na última linha): um download cortado não roda meio instalador.
-
----
-
-## Pré-requisitos
-
-- **Python 3.12** — a versão das imagens Docker, do app desktop e do CI
-- Acesso à plataforma Atlans (URL do servidor)
-- **Executor ID** e um **OTP de enrollment** (gerados no painel, em Executores)
-
-As bibliotecas geoespaciais (GDAL, GEOS, PROJ) vêm embutidas nas wheels do `pyogrio`, do `shapely` e do `pyproj`: não há nada para instalar no sistema. Só numa plataforma sem wheel publicada o pip compilaria esses pacotes, e aí precisaria de `libgdal-dev`, `libgeos-dev` e `libproj-dev` (ou `brew install gdal geos proj`).
+The script only runs after it has been downloaded in full (the body is in a function called
+on the last line): a cut-off download does not run half an installer.
 
 ---
 
-## Instalação e Setup
+## Prerequisites
 
-### 1. Instale as dependências
+- **Python 3.12** — the version of the Docker images, the desktop app and CI
+- Access to the Atlans platform (server URL)
+- **Executor ID** and an **enrollment OTP** (generated in the web panel, under "Executores")
+
+The geospatial libraries (GDAL, GEOS, PROJ) come bundled in the `pyogrio`, `shapely` and `pyproj` wheels: there is nothing to install on the system. Only on a platform with no published wheel would pip compile these packages, and then it would need `libgdal-dev`, `libgeos-dev` and `libproj-dev` (or `brew install gdal geos proj`).
+
+---
+
+## Installation and Setup
+
+### 1. Install the dependencies
 
 ```bash
-# Num ambiente só do executor, de preferência
+# Preferably in an environment just for the executor
 python -m venv .venv && . .venv/bin/activate   # Windows: .venv\Scripts\activate
 
-# Dependências mínimas (execução básica)
+# Minimal dependencies (basic execution)
 pip install -r executor/requirements.txt
 
-# Dependências completas (todas as categorias de nós)
+# Full dependencies (all node categories)
 pip install -r executor/requirements-full.txt
 ```
 
-Os dois arquivos são **locks**: todas as dependências, travadas, com o hash de cada
-arquivo, e o pip confere os hashes sozinho. Nada é resolvido na hora da instalação,
-então a máquina recebe as mesmas versões do Docker e do app desktop, e uma versão
-recém-publicada (ou um arquivo trocado no PyPI) não entra. As fontes, o que se edita,
-são os `.in` ao lado. Para regenerar os locks: `python scripts/travar_python.py`, ver
-[CONTRIBUTING, "Dependências Python"](../CONTRIBUTING.md#dependências-python-locks-com-hash).
+Both files are **locks**: every dependency, pinned, with the hash of each
+file, and pip checks the hashes on its own. Nothing is resolved at install time,
+so the machine gets the same versions as Docker and the desktop app, and a
+freshly published version (or a file swapped on PyPI) does not get in. The sources, the files
+you edit, are the `.in` files next to them. To regenerate the locks: `python scripts/travar_python.py`, see
+[CONTRIBUTING, "Python dependencies"](../CONTRIBUTING.md#python-dependencies-hashed-locks).
 
-### 2. Faça o enrollment
+### 2. Enroll
 
 ```bash
 python -m executor enroll     --executor-id=<ID> --otp=<OTP> --server=https://agents.<dominio>
 ```
 
-O comando gera o par Ed25519, envia o CSR, recebe e persiste o certificado mTLS,
-fixa a chave pública do servidor e grava o `EXECUTOR_ID` no `.env`.
+The command generates the Ed25519 key pair, sends the CSR, receives and persists the mTLS certificate,
+pins the server's public key and writes `EXECUTOR_ID` to `.env`.
 
-Gere o par ID + OTP no painel, em **Executores** → **Gerar OTP**. O código é de
-uso único e vale por 24 horas.
+Generate the ID + OTP pair in the web panel, under **Executores** (Executors) → **Gerar OTP** (Generate
+OTP). The code is single-use and valid for 24 hours.
 
-> **No Windows, use o app desktop.** Ele traz o Python embarcado e faz o
-> enrollment por formulário — sem terminal, sem Docker, sem clonar o repositório.
-> Ver [`desktop/`](../desktop/).
+> **On Windows, use the desktop app.** It ships with embedded Python and does the
+> enrollment through a form — no terminal, no Docker, no cloning the repository.
+> See [`desktop/`](../desktop/).
 
-> Existia aqui um wizard interativo (`python -m executor setup`), removido junto
-> com `executor/setup.py`. Ele dependia de `input()`, que não existe em nenhum
-> dos ambientes onde o executor roda de verdade: container sem `-it`, serviço, e
-> o app desktop, que captura os pipes. Nos três, o wizard estourava `EOFError`
-> no lugar da mensagem útil.
+> There used to be an interactive wizard here (`python -m executor setup`), removed along
+> with `executor/setup.py`. It depended on `input()`, which does not exist in any
+> of the environments where the executor actually runs: a container without `-it`, a service, and
+> the desktop app, which captures the pipes. In all three, the wizard blew up with `EOFError`
+> instead of the useful message.
 
-> O OTP pode ir por **stdin** em vez de argv, o que evita expô-lo na linha de
-> comando do processo:
+> The OTP can go through **stdin** instead of argv, which avoids exposing it on the process's
+> command line:
 >
 > ```bash
 > echo "<OTP>" | python -m executor enroll --otp-stdin --executor-id=<ID> --server=<URL>
@@ -129,127 +129,127 @@ uso único e vale por 24 horas.
 
 ---
 
-## Configuração
+## Configuration
 
-Arquivo: `executor/.env`
+File: `executor/.env`
 
-### Variáveis obrigatórias
+### Required variables
 
-| Variável | Descrição | Onde obter |
+| Variable | Description | Where to get it |
 |---|---|---|
-| `EXECUTOR_ID` | UUID do executor | Plataforma > Admin > Executores > Novo Executor |
+| `EXECUTOR_ID` | Executor UUID | Platform > Admin > Executores > Novo Executor (New Executor) |
 
-Além do `EXECUTOR_ID`, o executor exige o **certificado mTLS** em
-`EXECUTOR_CERT_DIR` — produzido pelo enrollment, não configurável à mão. A
-checagem das duas coisas está em `config.assert_configured()` e
+Besides `EXECUTOR_ID`, the executor requires the **mTLS certificate** in
+`EXECUTOR_CERT_DIR` — produced by the enrollment, not configurable by hand. The
+check for both is in `config.assert_configured()` and
 `config.assert_enrolled()`.
 
-> `EXECUTOR_API_KEY` **não existe mais**. A autenticação por API key foi
-> substituída por mTLS com enrollment por OTP; `SERVER_SIGNING_PUBLIC_KEY` também
-> deixou de ser configurada à mão — vem no bundle do enrollment e é fixada
-> (pinning) por `executor/server_key.py`.
+> `EXECUTOR_API_KEY` **no longer exists**. API key authentication was
+> replaced by mTLS with OTP enrollment; `SERVER_SIGNING_PUBLIC_KEY` also
+> stopped being configured by hand — it comes in the enrollment bundle and is pinned
+> by `executor/server_key.py`.
 
-### Variáveis opcionais — Conexão
+### Optional variables — Connection
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `EXECUTOR_SERVER_URL` | — (obrigatória; o enroll grava) | URL WebSocket do host dos executores da instalação |
-| `EXECUTOR_VERSION` | `1.0.0` | Versão exibida na plataforma quando o executor roda fora da imagem Docker (o app desktop define a dele). Na imagem vale a gravada no build — versão do produto + commit do checkout, ex. `2.15.0+3f02f44` (`executor/versao.py`) —, acima do `.env` (um valor diferente do `1.0.0` antigo gera aviso no boot) |
-| `EXECUTOR_RECONNECT_MAX_DELAY` | `15` | Cap (segundos) do backoff exponencial de reconexão |
-| `NONCE_CACHE_TTL` | `600` | TTL do cache de nonces anti-replay (segundos) |
+| `EXECUTOR_SERVER_URL` | — (obrigatória; o enroll grava) | WebSocket URL of the installation's executors host (required; enroll writes it) |
+| `EXECUTOR_VERSION` | `1.0.0` | Version shown on the platform when the executor runs outside the Docker image (the desktop app sets its own). In the image, the one written at build time applies — product version + checkout commit, e.g. `2.15.0+3f02f44` (`executor/versao.py`) — over `.env` (a value other than the old `1.0.0` triggers a warning at boot) |
+| `EXECUTOR_RECONNECT_MAX_DELAY` | `15` | Cap (seconds) of the exponential reconnection backoff |
+| `NONCE_CACHE_TTL` | `600` | TTL of the anti-replay nonce cache (seconds) |
 
-### Variáveis opcionais — Segurança e ciclo de vida
+### Optional variables — Security and lifecycle
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `EXECUTOR_MAX_JOB_EXPIRY_SECONDS` | `900` | Teto da duração declarada do envelope de um job (`expires_at - issued_at`) |
-| `EXECUTOR_CLOCK_SKEW_SECONDS` | `300` | Folga de relógio na checagem de expiração de jobs/comandos |
-| `EXECUTOR_MAX_CLOCK_SKEW_SECONDS` | `900` | Teto rígido de deriva do relógio local. Acima dele, todo job/comando é recusado apontando o NTP — com deriva grande a janela de aceitação passaria do `NONCE_CACHE_TTL` e o anti-replay deixaria de valer. Subir este valor exige subir `NONCE_CACHE_TTL` junto |
-| `EXECUTOR_AUTO_RESTART` | `auto` | Reinício ao receber `config_changed` do servidor: `auto` re-executa o processo fora de container e, em container, sai com código 1 para o Docker reiniciar (`restart: on-failure`); `always` sempre re-executa; `never` só encerra (use com systemd/pm2/NSSM). Com supervisor (`EXECUTOR_SUPERVISOR_PID`) o auto-restart é desligado |
+| `EXECUTOR_MAX_JOB_EXPIRY_SECONDS` | `900` | Ceiling on the declared duration of a job's envelope (`expires_at - issued_at`) |
+| `EXECUTOR_CLOCK_SKEW_SECONDS` | `300` | Clock slack when checking the expiry of jobs/commands |
+| `EXECUTOR_MAX_CLOCK_SKEW_SECONDS` | `900` | Hard ceiling on local clock drift. Above it, every job/command is refused, pointing at NTP — with large drift the acceptance window would exceed `NONCE_CACHE_TTL` and anti-replay would stop holding. Raising this value requires raising `NONCE_CACHE_TTL` along with it |
+| `EXECUTOR_AUTO_RESTART` | `auto` | Restart on receiving `config_changed` from the server: `auto` re-executes the process outside a container and, in a container, exits with code 1 so Docker restarts it (`restart: on-failure`); `always` always re-executes; `never` only shuts down (use with systemd/pm2/NSSM). With a supervisor (`EXECUTOR_SUPERVISOR_PID`) auto-restart is turned off |
 
-> As quatro primeiras são lidas em `executor/job_validator.py`, junto do comentário que explica cada valor.
+> The first four are read in `executor/job_validator.py`, next to the comment that explains each value.
 
-### Variáveis opcionais — Chaves e certificado
+### Optional variables — Keys and certificate
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `EXECUTOR_CERT_DIR` | `/data/certs` se `/data` existe, senão `./certs` | Diretório do cert mTLS + chaves gravados no enrollment: `cert.pem`, `chain.pem`, `ca.pem`, `key.pem` (chave Ed25519 do cert mTLS) e `x25519_key.pem` (chave de envelope) |
-| `EXECUTOR_PRIVATE_KEY` | *(vazio)* | Chave privada X25519 em base64 (raw). Alternativa ao arquivo — **não** é gerada automaticamente: a chave nasce no enrollment |
-| `EXECUTOR_PRIVATE_KEY_PATH` | `<EXECUTOR_CERT_DIR>/x25519_key.pem` | Caminho da chave X25519 gerada no enrollment. É o caminho alternativo usado pelo Electron |
+| `EXECUTOR_CERT_DIR` | `/data/certs` se `/data` existe, senão `./certs` | Directory of the mTLS cert + keys written at enrollment: `cert.pem`, `chain.pem`, `ca.pem`, `key.pem` (Ed25519 key of the mTLS cert) and `x25519_key.pem` (envelope key). Default: `/data/certs` if `/data` exists, otherwise `./certs` |
+| `EXECUTOR_PRIVATE_KEY` | *(vazio)* | X25519 private key in base64 (raw). Alternative to the file — it is **not** generated automatically: the key is born at enrollment |
+| `EXECUTOR_PRIVATE_KEY_PATH` | `<EXECUTOR_CERT_DIR>/x25519_key.pem` | Path of the X25519 key generated at enrollment. It is the alternative path used by Electron |
 
-### Variáveis opcionais — Recursos
+### Optional variables — Resources
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `EXECUTOR_MAX_CONCURRENT` | `4` | Jobs em execução simultânea (faixa 1–256) |
-| `EXECUTOR_MAX_QUEUE_SIZE` | `50` | Fila local máxima — back-pressure se cheia (faixa 1–10 000) |
-| `EXECUTOR_JOB_TIMEOUT` | `3600` | Timeout por job em segundos (mínimo 1, sem teto) |
-| `EXECUTOR_ARTIFACTS_DIR` | `~/AtlansExecutor/artifacts` | Diretório de artefatos gerados |
+| `EXECUTOR_MAX_CONCURRENT` | `4` | Jobs running simultaneously (range 1–256) |
+| `EXECUTOR_MAX_QUEUE_SIZE` | `50` | Maximum local queue — back-pressure when full (range 1–10,000) |
+| `EXECUTOR_JOB_TIMEOUT` | `3600` | Timeout per job in seconds (minimum 1, no ceiling) |
+| `EXECUTOR_ARTIFACTS_DIR` | `~/AtlansExecutor/artifacts` | Directory for generated artifacts |
 
-> Valor fora da faixa, ou que não é um inteiro, não derruba o executor: ele avisa
-> no log e usa o padrão (`executor/_ambiente.py`). A tela de Ajustes do app
-> desktop aplica as mesmas faixas — `desktop/src/shared/limites.ts`, com teste que
-> as compara com `executor/config.py`.
+> A value out of range, or one that is not an integer, does not bring the executor down: it warns
+> in the log and uses the default (`executor/_ambiente.py`). The desktop app's "Ajustes"
+> (Settings) screen applies the same ranges — `desktop/src/shared/limites.ts`, with a test that
+> compares them with `executor/config.py`.
 
-### Variáveis opcionais — Logging e painel
+### Optional variables — Logging and dashboard
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `LOG_LEVEL` | `INFO` | Nível: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
-| `LOG_COLOR` | `auto` | Cores no terminal: `auto`, `always`, `never`. `never` também desliga o painel |
-| `LOG_FILE_AGENT` | *(vazio)* | Arquivo de log do executor (rotativo 10MB, 5 backups) |
-| `LOG_FILE_WORKFLOW` | *(vazio)* | Arquivo de log dos workflows (rotativo 10MB, 5 backups) |
-| `EXECUTOR_DASHBOARD` | `auto` | Painel ao vivo: `auto`, `on`, `off` (ver [Painel ao vivo](#painel-ao-vivo)) |
-| `EXECUTOR_DASHBOARD_INTERVAL` | `1.0` | Segundos entre atualizações do painel (mínimo `0.25`) |
-| `EXECUTOR_LOG_DIR` | `<pai de ARTIFACTS_DIR>/logs` | Onde o painel grava os logs. No host, `~/AtlansExecutor/logs`; no Docker, `/data/logs` |
+| `LOG_LEVEL` | `INFO` | Level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+| `LOG_COLOR` | `auto` | Terminal colors: `auto`, `always`, `never`. `never` also turns off the dashboard |
+| `LOG_FILE_AGENT` | *(vazio)* | Executor log file (rotating 10MB, 5 backups) |
+| `LOG_FILE_WORKFLOW` | *(vazio)* | Workflow log file (rotating 10MB, 5 backups) |
+| `EXECUTOR_DASHBOARD` | `auto` | Live dashboard: `auto`, `on`, `off` (see [Live dashboard](#live-dashboard)) |
+| `EXECUTOR_DASHBOARD_INTERVAL` | `1.0` | Seconds between dashboard updates (minimum `0.25`) |
+| `EXECUTOR_LOG_DIR` | `<pai de ARTIFACTS_DIR>/logs` | Where the dashboard writes the logs (default: the parent of `ARTIFACTS_DIR` + `/logs`). On the host, `~/AtlansExecutor/logs`; in Docker, `/data/logs` |
 
-> **Com o painel ativo, `LOG_FILE_AGENT` passa a receber *todos* os loggers** — `executor.*`, `flow.*`, `websockets`, `asyncio`, terceiros —, e não apenas `executor.*`/`httpx`. Ele vira o espelho fiel do que ia para o terminal. `LOG_FILE_WORKFLOW`, se definido, continua sendo um arquivo dedicado adicional.
+> **With the dashboard active, `LOG_FILE_AGENT` receives *all* loggers** — `executor.*`, `flow.*`, `websockets`, `asyncio`, third parties —, not just `executor.*`/`httpx`. It becomes a faithful mirror of what used to go to the terminal. `LOG_FILE_WORKFLOW`, if set, remains an additional dedicated file.
 
-### Variáveis opcionais — GeoSync
+### Optional variables — GeoSync
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `EXECUTOR_SYNC_DIRS` | *(vazio)* | Pastas para sincronizar (separadas por vírgula). Vazio = desabilitado |
-| `EXECUTOR_SYNC_INTERVAL` | `30` | Intervalo de scan em segundos. O `.env.example` (semente de toda instalação nova) e o app desktop gravam `10` |
-| `EXECUTOR_SYNC_MODE` | `upload` | Modo: `upload`, `download`, `bidirectional`, `catalog` (ver abaixo). O `.env.example` grava `bidirectional` |
-| `EXECUTOR_SYNC_CONFLICT_STRATEGY` | `remote-wins` | Conflito: `local-wins`, `remote-wins`, `keep-both` |
-| `EXECUTOR_SYNC_TRIGGERS` | *(vazio)* | Triggers adicionais de sincronização |
+| `EXECUTOR_SYNC_DIRS` | *(vazio)* | Folders to synchronize (comma-separated). Empty = disabled |
+| `EXECUTOR_SYNC_INTERVAL` | `30` | Scan interval in seconds. `.env.example` (the seed of every new installation) and the desktop app write `10` |
+| `EXECUTOR_SYNC_MODE` | `upload` | Mode: `upload`, `download`, `bidirectional`, `catalog` (see below). `.env.example` writes `bidirectional` |
+| `EXECUTOR_SYNC_CONFLICT_STRATEGY` | `remote-wins` | Conflict: `local-wins`, `remote-wins`, `keep-both` |
+| `EXECUTOR_SYNC_TRIGGERS` | *(vazio)* | Additional synchronization triggers |
 
-### Variáveis opcionais — Rede
+### Optional variables — Network
 
-| Variável | Padrão | Descrição |
+| Variable | Default | Description |
 |---|---|---|
-| `EXECUTOR_HOST_ALIASES` | *(vazio)* | Reescrita de hostnames internos (ver [seção dedicada](#host_aliases-para-executores-externos)) |
-| `WFS_CAPABILITIES_TTL_S` | `3600` | Cache do GetCapabilities do nó WFS entre execuções e retries (segundos; 0 desliga) |
-| `WEBHOOK_RESPONSE_INLINE_LIMIT` | `1048576` | Acima deste tamanho (bytes), o body do ResponseNode sobe ao MinIO em vez de trafegar pelo WebSocket |
-| `EXECUTOR_ENV_PATH` | `executor/.env` | Caminho alternativo do `.env` (usado pelo Electron) |
+| `EXECUTOR_HOST_ALIASES` | *(vazio)* | Rewriting of internal hostnames (see [dedicated section](#host_aliases-for-external-executors)) |
+| `WFS_CAPABILITIES_TTL_S` | `3600` | Cache of the WFS node's GetCapabilities across runs and retries (seconds; 0 turns it off) |
+| `WEBHOOK_RESPONSE_INLINE_LIMIT` | `1048576` | Above this size (bytes), the ResponseNode body is uploaded to MinIO instead of traveling over the WebSocket |
+| `EXECUTOR_ENV_PATH` | `executor/.env` | Alternative path of `.env` (used by Electron) |
 
 ---
 
-## Execução
+## Running
 
 ```bash
 python -m executor
 ```
 
-O executor executa o seguinte fluxo de inicialização:
+The executor goes through the following startup sequence:
 
-1. Carrega configuração (variáveis de ambiente)
-2. Carrega a chave privada X25519 gravada no enrollment. **Nunca gera uma nova**:
-   se ela faltar, o executor falha pedindo um novo enrollment (a chave pública
-   correspondente já está registrada no servidor desde o enrollment)
-3. Inicia a `ExecutorJobQueue` com workers concorrentes
-4. Inicia a `ExecutorConnection` (WebSocket com mTLS e reconnect automático)
-5. Opcionalmente inicia o GeoSync para cada diretório configurado
-6. Aguarda `SIGTERM`/`SIGINT` para shutdown gracioso
+1. Loads the configuration (environment variables)
+2. Loads the X25519 private key written at enrollment. **It never generates a new one**:
+   if it is missing, the executor fails asking for a new enrollment (the matching
+   public key has been registered on the server since the enrollment)
+3. Starts the `ExecutorJobQueue` with concurrent workers
+4. Starts the `ExecutorConnection` (WebSocket with mTLS and automatic reconnect)
+5. Optionally starts GeoSync for each configured directory
+6. Waits for `SIGTERM`/`SIGINT` for a graceful shutdown
 
-> **Subcomando `status`.** `python -m executor status [--json]` consulta o
-> servidor e lista os workspaces acessíveis a este executor (autenticando com o
-> cert mTLS do enrollment) — útil para verificar o vínculo sem subir o executor.
+> **The `status` subcommand.** `python -m executor status [--json]` queries the
+> server and lists the workspaces accessible to this executor (authenticating with the
+> enrollment's mTLS cert) — useful to check the binding without starting the executor.
 
-### Painel ao vivo
+### Live dashboard
 
-Num terminal interativo, depois do boot o executor troca o log passo-a-passo por um **painel que se atualiza a cada segundo**:
+In an interactive terminal, after boot the executor replaces the step-by-step log with a **dashboard that refreshes every second**:
 
 ```
 +- Atlans Executor v1.0.0  ·  a1b2c3d4…  ·  wss://agents.exemplo.org ---------+
@@ -283,156 +283,156 @@ Num terminal interativo, depois do boot o executor troca o log passo-a-passo por
 log: ~/AtlansExecutor/logs/executor.log  l log/painel  a alertas  d debug  q sai
 ```
 
-**O log passo-a-passo não se perde**: ele vai para `~/AtlansExecutor/logs/executor.log`, rotativo (10 MB × 5), no mesmo formato de sempre. Acompanhe em outro terminal com `tail -f`.
+**The step-by-step log is not lost**: it goes to `~/AtlansExecutor/logs/executor.log`, rotating (10 MB × 5), in the same format as always. Follow it in another terminal with `tail -f`.
 
-O bloco **alertas** mostra os últimos `WARNING`/`ERROR`, para que um executor em loop de reconexão ou falhando todos os jobs não fique com a causa escondida. As seções **em execução** e **geosync** só aparecem quando têm o que mostrar, e o layout se adapta ao tamanho do terminal — de 4 colunas em telas largas até uma coluna só, cortando blocos por prioridade quando falta altura.
+The **alertas** (alerts) block shows the latest `WARNING`/`ERROR` entries, so that an executor stuck in a reconnection loop or failing every job does not keep the cause hidden. The **em execução** (running) and **geosync** sections only appear when they have something to show, and the layout adapts to the terminal size — from 4 columns on wide screens down to a single column, dropping blocks by priority when height runs short.
 
-#### Atalhos de teclado
+#### Keyboard shortcuts
 
-| Tecla | O que faz |
+| Key | What it does |
 |---|---|
-| `l` ou `Tab` | **Alterna entre o painel e o log linha a linha** — o comportamento histórico volta na hora, sem reiniciar o executor |
-| `a` | Abre o histórico completo de alertas (o buffer guarda 200 linhas; o rodapé mostra 6) |
-| `d` | **Liga/desliga o log `DEBUG` sem reiniciar** — o arquivo passa a receber detalhe na hora |
-| `r` | Força a reconexão agora, sem esperar o backoff (que chega a `EXECUTOR_RECONNECT_MAX_DELAY`) |
-| `z` | Zera os contadores da sessão (jobs em execução e conexão não são afetados) |
-| `p` | Pausa/retoma a atualização do painel |
-| `?` ou `h` | Mostra/esconde a lista de atalhos |
-| `q` | Encerra o executor com o mesmo shutdown ordenado de um `SIGTERM` |
-| `Ctrl+C` | Encerra o executor |
+| `l` or `Tab` | **Toggles between the dashboard and the line-by-line log** — the historical behavior comes back instantly, without restarting the executor |
+| `a` | Opens the full alert history (the buffer keeps 200 lines; the footer shows 6) |
+| `d` | **Turns the `DEBUG` log on/off without restarting** — the file starts receiving detail instantly |
+| `r` | Forces reconnection now, without waiting for the backoff (which goes up to `EXECUTOR_RECONNECT_MAX_DELAY`) |
+| `z` | Resets the session counters (running jobs and the connection are not affected) |
+| `p` | Pauses/resumes the dashboard refresh |
+| `?` or `h` | Shows/hides the list of shortcuts |
+| `q` | Shuts the executor down with the same orderly shutdown as a `SIGTERM` |
+| `Ctrl+C` | Shuts the executor down |
 
-Alternar não custa registro nenhum: **o arquivo de log continua gravando nos dois modos**. No modo log o console volta a receber tudo e o arquivo segue como espelho; no modo painel só o arquivo recebe.
+Toggling costs no log records: **the log file keeps writing in both modes**. In log mode the console receives everything again and the file stays as a mirror; in dashboard mode only the file receives.
 
-Quando o `DEBUG` está ligado, o rodapé mostra `[DEBUG]` — ele multiplica o volume do arquivo, e esquecer ligado enche o disco em silêncio. O `httpx`/`httpcore` ficam em `INFO` mesmo em modo debug, senão cada frame HTTP afogaria o log do `executor` e do `flow`. Depois de um `z`, o bloco **workflows** passa a mostrar *zerado há X* para que "total 0" não pareça um executor recém-subido.
+When `DEBUG` is on, the footer shows `[DEBUG]` — it multiplies the file's volume, and leaving it on fills the disk silently. `httpx`/`httpcore` stay at `INFO` even in debug mode, otherwise every HTTP frame would drown the `executor` and `flow` log. After a `z`, the **workflows** block shows *zerado há X* (reset X ago) so that "total 0" does not look like a freshly started executor.
 
-Em telas estreitas a barra do rodapé encolhe, mantendo sempre `l`, `?` e `q` — o `?` lista todos.
+On narrow screens the footer bar shrinks, always keeping `l`, `?` and `q` — `?` lists them all.
 
-Os atalhos exigem que o `stdin` seja um terminal. Se ele estiver redirecionado (`< /dev/null`, um pipe, um supervisor), o painel continua funcionando e o rodapé avisa que não há atalhos.
+The shortcuts require `stdin` to be a terminal. If it is redirected (`< /dev/null`, a pipe, a supervisor), the dashboard keeps working and the footer warns that there are no shortcuts.
 
-> No Windows a tecla `q` é a forma mais confiável de encerrar: o `asyncio` não registra handlers de sinal nessa plataforma, e o `Ctrl+C` pode derrubar o processo antes do shutdown ordenado.
+> On Windows the `q` key is the most reliable way to shut down: `asyncio` does not register signal handlers on that platform, and `Ctrl+C` may kill the process before the orderly shutdown.
 
-#### Quando o painel liga
+#### When the dashboard turns on
 
-| Situação | Painel |
+| Situation | Dashboard |
 |---|---|
-| `EXECUTOR_DASHBOARD=off` | não |
-| `EXECUTOR_DASHBOARD=on` (e `rich` instalado) | sim, mesmo sem terminal interativo |
-| `rich` não instalado | não — o executor sobe normalmente com o log de sempre |
-| `stdout` ou `stderr` não é terminal | não — cobre Docker sem `-it`, systemd/journald, `\| tee`, Electron |
-| `LOG_COLOR=never`, `NO_COLOR` ou `CI` definidos | não |
-| `TERM` ausente ou `dumb` (POSIX) | não |
-| terminal menor que 60×12 | não |
-| resto | sim |
+| `EXECUTOR_DASHBOARD=off` | no |
+| `EXECUTOR_DASHBOARD=on` (and `rich` installed) | yes, even without an interactive terminal |
+| `rich` not installed | no — the executor starts normally with the usual log |
+| `stdout` or `stderr` is not a terminal | no — covers Docker without `-it`, systemd/journald, `\| tee`, Electron |
+| `LOG_COLOR=never`, `NO_COLOR` or `CI` set | no |
+| `TERM` missing or `dumb` (POSIX) | no |
+| terminal smaller than 60×12 | no |
+| otherwise | yes |
 
-O motivo de não ligar aparece no banner de boot (`Painel: desligado (...)`). Se o arquivo de log não puder ser aberto, o painel também não liga — o objetivo é *mover* o log para disco, não apagá-lo.
+The reason it did not turn on appears in the boot banner (`Painel: desligado (...)`). If the log file cannot be opened, the dashboard does not turn on either — the goal is to *move* the log to disk, not to erase it.
 
-O subcomando `python -m executor enroll` nunca aciona o painel.
+The `python -m executor enroll` subcommand never triggers the dashboard.
 
-### Shutdown gracioso
+### Graceful shutdown
 
-Ao receber sinal de encerramento, o executor:
+On receiving a termination signal, the executor:
 
-- Fecha o painel e devolve o terminal (o encerramento volta a sair em texto)
-- Aguarda jobs em andamento (timeout de 120s)
-- Drena os resultados pela conexão ainda viva
-- Cancela a conexão WebSocket, o renewal do certificado e o GeoSync
-- Fecha pools de conexão asyncpg
-- Encerra
+- Closes the dashboard and gives the terminal back (shutdown output goes back to plain text)
+- Waits for in-progress jobs (120s timeout)
+- Drains the results through the still-live connection
+- Cancels the WebSocket connection, the certificate renewal and GeoSync
+- Closes the asyncpg connection pools
+- Exits
 
 ---
 
-## Canal com um supervisor (`EXECUTOR_DASHBOARD=json`)
+## Channel with a supervisor (`EXECUTOR_DASHBOARD=json`)
 
-Quando o executor é iniciado por um programa em vez de por uma pessoa — o app
-desktop em [`desktop/`](../desktop/) —, o painel `rich` não serve: não há
-terminal. No lugar dele, `EXECUTOR_DASHBOARD=json` liga um canal de eventos
-estruturados.
+When the executor is started by a program instead of by a person — the desktop
+app in [`desktop/`](../desktop/) —, the `rich` dashboard is no use: there is no
+terminal. In its place, `EXECUTOR_DASHBOARD=json` turns on a channel of structured
+events.
 
-O modo **nunca é inferido**: emitir JSON no `stdout` de quem esperava log humano
-quebraria o consumidor em silêncio. Quem quer o canal, pede.
+The mode is **never inferred**: emitting JSON on the `stdout` of someone expecting a human log
+would break the consumer silently. Whoever wants the channel asks for it.
 
-### Separação dos canais
+### Channel separation
 
-| Canal | Conteúdo |
+| Channel | Content |
 |---|---|
-| `stdout` | **apenas** NDJSON, uma linha por evento |
-| `stderr` | log humano formatado, exatamente como sempre |
-| arquivo | log rotativo, ligado junto (best-effort) |
+| `stdout` | **only** NDJSON, one line per event |
+| `stderr` | formatted human log, exactly as always |
+| file | rotating log, turned on alongside (best-effort) |
 
-Isso funciona sem refactor porque o handler de console do `logging_setup` já
-escreve em `stderr` — o `stdout` estava livre.
+This works without a refactor because the `logging_setup` console handler already
+writes to `stderr` — `stdout` was free.
 
-### Eventos (executor → supervisor)
+### Events (executor → supervisor)
 
-Uma linha JSON por evento, terminada em `\n`, **sempre** começando por `{"v":1,`.
-O prefixo é framing: o leitor descarta qualquer linha que não case, o que cobre
-um `print()` acidental de um nó de workflow caindo no mesmo `stdout`.
+One JSON line per event, terminated by `\n`, **always** starting with `{"v":1,`.
+The prefix is framing: the reader discards any line that does not match, which covers
+an accidental `print()` from a workflow node landing on the same `stdout`.
 
-| `t` | Quando | Conteúdo |
+| `t` | When | Content |
 |---|---|---|
-| `hello` | primeira linha, sempre | pid, executor_id, versão do Python, comandos aceitos |
-| `state` | mudança de fase | `booting` (com `step`), `running`, `draining`, `stopped`, `failed` |
-| `snapshot` | a cada `EXECUTOR_DASHBOARD_INTERVAL` | o `Snapshot` inteiro — os mesmos campos que o painel `rich` desenha |
-| `job` | imediato | `started`, `finished`, `cancelled` |
-| `sync` | imediato | eventos do GeoSync |
-| `conn` | imediato | `connecting`, `connected`, `reconnecting`, `terminal` |
-| `log` | `WARNING+` | nível, alias, mensagem |
-| `ack` | resposta a comando | `ok`, `detail`, `id` do comando |
+| `hello` | first line, always | pid, executor_id, Python version, accepted commands |
+| `state` | phase change | `booting` (with `step`), `running`, `draining`, `stopped`, `failed` |
+| `snapshot` | every `EXECUTOR_DASHBOARD_INTERVAL` | the whole `Snapshot` — the same fields the `rich` dashboard draws |
+| `job` | immediate | `started`, `finished`, `cancelled` |
+| `sync` | immediate | GeoSync events |
+| `conn` | immediate | `connecting`, `connected`, `reconnecting`, `terminal` |
+| `log` | `WARNING+` | level, alias, message |
+| `ack` | reply to a command | `ok`, `detail`, the command's `id` |
 
-Os eventos imediatos existem porque o tick perde informação: `last_finished`
-guarda **um** job, então dois terminando no mesmo segundo fariam o primeiro
-desaparecer do histórico.
+The immediate events exist because the tick loses information: `last_finished`
+holds **one** job, so two finishing in the same second would make the first
+disappear from the history.
 
-`state: failed` carrega o passo exato (`server_key`, `private_key`) e o motivo.
-É a diferença entre a UI oferecer "refazer enrollment" e oferecer "tentar de
-novo" — sem ele, uma falha de boot chega ao supervisor apenas como código de
-saída 1.
+`state: failed` carries the exact step (`server_key`, `private_key`) and the reason.
+It is the difference between the UI offering "redo enrollment" and offering "try
+again" — without it, a boot failure reaches the supervisor only as exit
+code 1.
 
-### Comandos (supervisor → executor)
+### Commands (supervisor → executor)
 
-Uma linha JSON por comando no `stdin`. Espelham 1:1 as teclas do painel: a GUI
-ganha exatamente a superfície de controle que o operador do terminal tem.
+One JSON line per command on `stdin`. They mirror the dashboard keys 1:1: the GUI
+gets exactly the control surface the terminal operator has.
 
-| Comando | Tecla | Efeito |
+| Command | Key | Effect |
 |---|---|---|
-| `{"cmd":"shutdown"}` | `q` | shutdown ordenado — o **mesmo** caminho de um SIGTERM |
-| `{"cmd":"reconnect"}` | `r` | interrompe o backoff de reconexão |
-| `{"cmd":"reset_stats"}` | `z` | zera os contadores da sessão |
-| `{"cmd":"toggle_debug"}` | `d` | alterna o nível de log |
-| `{"cmd":"ping"}` | — | responde `ack` (verificação de liveness) |
-| `{"cmd":"sync_now"}` | — | força uma varredura do GeoSync agora (sem tecla equivalente no painel) |
+| `{"cmd":"shutdown"}` | `q` | orderly shutdown — the **same** path as a SIGTERM |
+| `{"cmd":"reconnect"}` | `r` | interrupts the reconnection backoff |
+| `{"cmd":"reset_stats"}` | `z` | resets the session counters |
+| `{"cmd":"toggle_debug"}` | `d` | toggles the log level |
+| `{"cmd":"ping"}` | — | replies `ack` (liveness check) |
+| `{"cmd":"sync_now"}` | — | forces a GeoSync scan now (no equivalent key in the dashboard) |
 
-O campo `id` é opcional e volta no `ack` correspondente.
+The `id` field is optional and comes back in the corresponding `ack`.
 
 ### `EXECUTOR_SUPERVISOR_PID`
 
-O supervisor passa o próprio PID nesta variável. Duas coisas mudam:
+The supervisor passes its own PID in this variable. Two things change:
 
-1. Sobe o watchdog de [`executor/supervisor.py`](supervisor.py), que verifica a
-   cada 5 s se o supervisor continua vivo — comparando PID **e** `create_time`,
-   porque o sistema operacional recicla números de processo. Se o supervisor
-   morrer (usuário matando o app pelo Gerenciador de Tarefas), o executor faz
-   shutdown **ordenado** em vez de virar órfão segurando a conexão WebSocket.
-2. Desliga o auto-restart interno. `os.execve` substitui o processo em POSIX,
-   mas no Windows cria um processo novo e encerra o atual — o supervisor
-   perderia o rastro do executor real e subiria um segundo. Havendo supervisor,
-   religar é trabalho dele; o executor apenas sai com código diferente de zero.
+1. It starts the watchdog in [`executor/supervisor.py`](supervisor.py), which checks
+   every 5 s whether the supervisor is still alive — comparing the PID **and** `create_time`,
+   because the operating system recycles process numbers. If the supervisor
+   dies (the user killing the app from Task Manager), the executor performs an
+   **orderly** shutdown instead of becoming an orphan holding the WebSocket connection.
+2. It turns off the internal auto-restart. `os.execve` replaces the process on POSIX,
+   but on Windows it creates a new process and ends the current one — the supervisor
+   would lose track of the real executor and start a second one. When there is a supervisor,
+   restarting is its job; the executor just exits with a non-zero code.
 
 ---
 
 ## Docker
 
-O executor é distribuído como uma imagem Docker standalone via `docker-compose.executor.yml`.
+The executor is distributed as a standalone Docker image via `docker-compose.executor.yml`.
 
-### Primeira configuração
+### First-time configuration
 
-Rode o enrollment gravando o cert num diretório do host que será montado no
-container. **Não** monte sobre `/app/executor` — isso esconde o código do
-executor. Grave em `/data/certs`:
+Run the enrollment writing the cert to a host directory that will be mounted in the
+container. Do **not** mount over `/app/executor` — that hides the executor's
+code. Write to `/data/certs`:
 
 ```bash
-# A imagem: construída daqui (`docker compose -f docker-compose.executor.yml build`)
-# ou carregada do asset da release (`docker load < atlans-executor-docker-amd64.tar.gz`).
+# The image: built from here (`docker compose -f docker-compose.executor.yml build`)
+# or loaded from the release asset (`docker load < atlans-executor-docker-amd64.tar.gz`).
 mkdir executor-certs
 docker run --rm \
   -v $(pwd)/executor-certs:/data/certs \
@@ -441,251 +441,251 @@ docker run --rm \
     --cert-dir=/data/certs --server=https://agents.<dominio>
 ```
 
-O `-it` não é necessário: o enrollment não é interativo. Depois monte
-`./executor-certs` em `/data/certs` no compose (ou gere os certs direto no
-volume `executor-data`, sem bind).
+`-it` is not needed: the enrollment is not interactive. Then mount
+`./executor-certs` on `/data/certs` in the compose file (or generate the certs directly in the
+`executor-data` volume, without a bind).
 
-### Iniciar
+### Start
 
 ```bash
 docker compose -f docker-compose.executor.yml up -d
 ```
 
-### Ver logs
+### View logs
 
 ```bash
 docker compose -f docker-compose.executor.yml logs -f
 ```
 
-> O painel ao vivo **não** liga sob Docker: sem `-it` o stdout não é um terminal, e o compose já define `EXECUTOR_DASHBOARD=off` explicitamente. A saída de `docker logs` continua sendo o log linha a linha de sempre.
+> The live dashboard does **not** turn on under Docker: without `-it` stdout is not a terminal, and the compose file already sets `EXECUTOR_DASHBOARD=off` explicitly. The output of `docker logs` remains the usual line-by-line log.
 
-### Parar
+### Stop
 
 ```bash
 docker compose -f docker-compose.executor.yml down
 ```
 
-Dois processos com o mesmo outbox (no desktop, o app morto à força deixa o
-Python antigo drenando por até 150 s enquanto a reabertura sobe outro): o
-diário tem dono. O processo trava `.executor_results.sqlite.dono` na subida; se outro
-processo vivo já segura a trava, os jobs do diário são dele e nenhum é
-convertido em falha — e o processo novo segue tentando em segundo plano, para
-virar o dono assim que o anterior sair (senão um terceiro converteria os jobs
-vivos dele).
+Two processes with the same outbox (on the desktop, an app killed by force leaves the
+old Python draining for up to 150 s while the reopened app starts another): the
+journal has an owner. The process locks `.executor_results.sqlite.dono` at startup; if another
+live process already holds the lock, the journal's jobs are its own and none is
+converted into a failure — and the new process keeps trying in the background, so as
+to become the owner as soon as the previous one exits (otherwise a third would convert its
+live jobs).
 
-### Limite de memória
+### Memory limit
 
-O container recebe o limite de `EXECUTOR_MEMORIA`, lido do `.env` **ao lado** do
-`docker-compose.executor.yml` (não do `executor/.env`, que é o ambiente do
-processo). O instalador grava 75% da memória que o Docker enxerga — a RAM da
-máquina no Linux, a da VM no Docker Desktop —, nunca menos que `2G`, ou o valor
-de `--memoria=<N>G` (mínimo `512M`, a reserva do compose). Sem a variável, o
-limite é `2G`. Se o `docker-compose.executor.yml` tiver edição local, o `git pull`
-do instalador aborta e o arquivo segue com o limite fixo — o instalador avisa.
+The container gets the limit from `EXECUTOR_MEMORIA`, read from the `.env` **next to**
+`docker-compose.executor.yml` (not from `executor/.env`, which is the process's
+environment). The installer writes 75% of the memory Docker sees — the machine's RAM
+on Linux, the VM's on Docker Desktop —, never less than `2G`, or the value
+of `--memoria=<N>G` (minimum `512M`, the compose reservation). Without the variable, the
+limit is `2G`. If `docker-compose.executor.yml` has local edits, the installer's `git pull`
+aborts and the file keeps the fixed limit — the installer warns about it.
 
 ```bash
 echo EXECUTOR_MEMORIA=12G >> .env
 docker compose -f docker-compose.executor.yml up -d
 ```
 
-O `2G` fixo de antes matava o executor por OOM do cgroup em máquinas com memória
-de sobra; hoje, se isso acontecer, o próximo boot reporta o job interrompido com
-o limite do container na mensagem (ver "Jobs que não terminam", acima).
+The fixed `2G` of before killed the executor through cgroup OOM on machines with memory
+to spare; today, if that happens, the next boot reports the interrupted job with
+the container limit in the message (see "Jobs that never finish", above).
 
-### Volumes e configuração
+### Volumes and configuration
 
-| Item | Onde no container | Descrição |
+| Item | Where in the container | Description |
 |---|---|---|
-| `executor-data` (volume nomeado) | `/data` | Dados persistentes: cert mTLS + chaves em `/data/certs` (`cert.pem`, `chain.pem`, `ca.pem`, `key.pem`, `x25519_key.pem`) e artefatos em `/data/artifacts` |
-| `./executor-certs` (bind opcional) | `/data/certs` (`:ro`) | Certs gerados pelo enroll no host. Comente o mount se gerou os certs dentro do container |
-| bind opcional do GeoSync | `/data/sync` | Pasta local a sincronizar (descomente junto com `EXECUTOR_SYNC_DIRS`) |
+| `executor-data` (named volume) | `/data` | Persistent data: mTLS cert + keys in `/data/certs` (`cert.pem`, `chain.pem`, `ca.pem`, `key.pem`, `x25519_key.pem`) and artifacts in `/data/artifacts` |
+| `./executor-certs` (optional bind) | `/data/certs` (`:ro`) | Certs generated by enroll on the host. Comment out the mount if you generated the certs inside the container |
+| optional GeoSync bind | `/data/sync` | Local folder to synchronize (uncomment together with `EXECUTOR_SYNC_DIRS`) |
 
-A configuração vem via `env_file: executor/.env` no compose — **não** é um volume
-montado. As sobrescritas do container ficam no bloco `environment:`
+The configuration comes via `env_file: executor/.env` in the compose file — it is **not** a mounted
+volume. The container's overrides live in the `environment:` block
 (`EXECUTOR_ARTIFACTS_DIR=/data/artifacts`, `EXECUTOR_CERT_DIR=/data/certs`,
 `EXECUTOR_DASHBOARD=off`, `LOG_COLOR=never`).
 
 ---
 
-## Protocolo de Comunicação
+## Communication Protocol
 
 ```mermaid
 sequenceDiagram
     participant Ex as Executor
-    participant API as Servidor (API HTTPS)
-    participant WS as Servidor (WebSocket)
+    participant API as Server (HTTPS API)
+    participant WS as Server (WebSocket)
 
-    Note over Ex,API: Enrollment (uma única vez) — ver "Instalação e Setup"
-    Ex->>Ex: Gera par Ed25519 (cert mTLS) + par X25519 (envelope)
+    Note over Ex,API: Enrollment (one time only) — see "Installation and Setup"
+    Ex->>Ex: Generates Ed25519 pair (mTLS cert) + X25519 pair (envelope)
     Ex->>API: POST /executores/enroll<br/>{csr_pem, public_key_pem, ...}<br/>Authorization: Bearer <OTP>
     API-->>Ex: cert.pem, chain.pem, ca.pem, server_signing_public_key
-    Note over Ex: Persiste cert + chaves e fixa (pin) a chave do servidor
+    Note over Ex: Persists cert + keys and pins the server's key
 
-    Note over Ex,WS: Toda conexão — autenticação por mTLS (sem API key, sem JWT)
-    Ex->>WS: WebSocket {SERVER_URL}/ws/executores/{EXECUTOR_ID}<br/>SSLContext mTLS: cert + key + CA fixada do enrollment
+    Note over Ex,WS: Every connection — mTLS authentication (no API key, no JWT)
+    Ex->>WS: WebSocket {SERVER_URL}/ws/executores/{EXECUTOR_ID}<br/>SSLContext mTLS: cert + key + CA pinned at enrollment
     Ex->>WS: {type: "handshake", protocol_version: "1.0", executor_version: "1.0.0", system_info}
 
-    loop A cada 30s
+    loop Every 30s
         Ex->>WS: {type: "heartbeat"}
     end
 
-    loop A cada 10s
+    loop Every 10s
         Ex->>WS: {type: "capacity", running: N, queued: M, max_concurrent: X, max_queue: Y}
     end
 
-    loop Na conexão e a cada 60s
+    loop On connection and every 60s
         Ex->>WS: {type: "inventario", ativos: [job_id], resultados: [job_id], truncado}
     end
 
-    Note over WS: Dispatch de job (cifrado ponta a ponta)
+    Note over WS: Job dispatch (end-to-end encrypted)
     WS->>Ex: {type: "job", envelope: {...}, ephemeral_public, ciphertext, signature}
-    Ex->>Ex: Verifica assinatura Ed25519 (chave fixada do servidor)
-    Ex->>Ex: Descriptografa payload (X25519 ECDH + HKDF + AES-256-GCM)
+    Ex->>Ex: Verifies Ed25519 signature (server's pinned key)
+    Ex->>Ex: Decrypts payload (X25519 ECDH + HKDF + AES-256-GCM)
     Ex->>WS: {type: "ack", job_id, status: "enqueued"}
-    Ex->>Ex: Executa flow/
+    Ex->>Ex: Runs flow/
 
-    loop Para cada nó executado
+    loop For each executed node
         Ex->>WS: {type: "node_event", node, status, ...}
     end
 
     Ex->>WS: {type: "job_result", job_id, run_id, status: "ok"|"error"}
 
-    Note over WS,Ex: Controle (assinado Ed25519)
+    Note over WS,Ex: Control (Ed25519-signed)
     WS->>Ex: {type: "cancel", job_id} · {type: "control", action}
 ```
 
-### Tipos de mensagem
+### Message types
 
-A autenticação é por **mTLS**: a identidade do executor vem do certificado
-(CN/serial), validado no `accept()` do WebSocket. **Não há API key nem JWT
-intermediário** — a URL é `{SERVER_URL}/ws/executores/{EXECUTOR_ID}` e o cert +
-chave + CA fixada vão no `SSLContext` do connect. `control` e `cancel` exigem
-assinatura Ed25519 do servidor e são recusados sem ela.
+Authentication is by **mTLS**: the executor's identity comes from the certificate
+(CN/serial), validated in the WebSocket's `accept()`. **There is no API key and no intermediate
+JWT** — the URL is `{SERVER_URL}/ws/executores/{EXECUTOR_ID}` and the cert +
+key + pinned CA go into the connect's `SSLContext`. `control` and `cancel` require
+an Ed25519 signature from the server and are refused without it.
 
-| Direção | Tipo | Descrição |
+| Direction | Type | Description |
 |---|---|---|
-| Executor → Servidor | `handshake` | `protocol_version` + `executor_version` (+ `system_info`) na conexão |
-| Executor → Servidor | `heartbeat` | Keep-alive (30s) |
-| Executor → Servidor | `capacity` | Report de capacidade (10s): `running`, `queued`, `max_concurrent`, `max_queue` |
-| Executor → Servidor | `node_event` | Progresso de execução por nó |
-| Executor → Servidor | `job_result` | Resultado final do job |
-| Executor → Servidor | `ack` | Confirmação de recebimento do job (`status: "enqueued"`); o servidor promove o run para "Em andamento" |
-| Executor → Servidor | `inventario` | Na conexão e a cada 60s: jobs `ativos` (fila/execução) e com `resultados` ainda não confirmados — os do outbox, os da fila em memória e, no espaço que sobrar, os enviados há menos de 90 s (o servidor pode ainda não os ter processado). O servidor fecha como perdidos os runs deste executor que não estão aqui. Com o outbox ilegível o inventário sai marcado `truncado` (nada é fechado por ausência) |
-| Servidor → Executor | `job` | Job criptografado para execução |
-| Servidor → Executor | `drive_event` | Evento de sincronização de arquivos |
-| Servidor → Executor | `cancel` | Interrompe um job em execução ou enfileirado (assinado Ed25519). Para um job que o executor não tem, devolve um `job_result` `cancelled` (o servidor fecha o run) e guarda uma lápide por 10 min: se o job chegar atrasado, é descartado sem rodar. Se o resultado do job estiver a caminho (outbox, fila em memória ou enviado há menos de 90 s), não responde nada — o job terminou aqui |
-| Servidor → Executor | `control` | Ação de controle (assinado Ed25519): `revoked`, `shutdown`, `config_changed`, `purge_artifacts` |
-| Servidor → Executor | `error` | Recusa de uma mensagem do executor (`invalid_json`, `invalid_schema`, `handshake_required`, `invalid_capacity`, `unsupported_protocol_version`), com o detalhe. Não é assinada: o executor só a registra em WARNING |
+| Executor → Server | `handshake` | `protocol_version` + `executor_version` (+ `system_info`) on connection |
+| Executor → Server | `heartbeat` | Keep-alive (30s) |
+| Executor → Server | `capacity` | Capacity report (10s): `running`, `queued`, `max_concurrent`, `max_queue` |
+| Executor → Server | `node_event` | Per-node execution progress |
+| Executor → Server | `job_result` | Final job result |
+| Executor → Server | `ack` | Acknowledgment that the job was received (`status: "enqueued"`); the server moves the run to "Em andamento" (In progress) |
+| Executor → Server | `inventario` | On connection and every 60s: `ativos` (active) jobs (queued/running) and jobs with `resultados` (results) not yet confirmed — those in the outbox, those in the in-memory queue and, in whatever space is left, those sent less than 90 s ago (the server may not have processed them yet). The server closes as lost the runs of this executor that are not listed here. With an unreadable outbox the inventory goes out marked `truncado` (truncated) (nothing is closed for being absent) |
+| Server → Executor | `job` | Encrypted job for execution |
+| Server → Executor | `drive_event` | File synchronization event |
+| Server → Executor | `cancel` | Interrupts a running or queued job (Ed25519-signed). For a job the executor does not have, it returns a `cancelled` `job_result` (the server closes the run) and keeps a tombstone for 10 min: if the job arrives late, it is discarded without running. If the job's result is on its way (outbox, in-memory queue or sent less than 90 s ago), it replies nothing — the job finished here |
+| Server → Executor | `control` | Control action (Ed25519-signed): `revoked`, `shutdown`, `config_changed`, `purge_artifacts` |
+| Server → Executor | `error` | Rejection of a message from the executor (`invalid_json`, `invalid_schema`, `handshake_required`, `invalid_capacity`, `unsupported_protocol_version`), with the detail. It is not signed: the executor only logs it at WARNING |
 
-### Jobs que não terminam: o diário em disco
+### Jobs that never finish: the on-disk journal
 
-Todo job aceito entra num diário no mesmo SQLite do outbox de resultados
-(`ARTIFACTS_DIR/.executor_results.sqlite`, tabela `jobs_em_voo`) e só sai quando
-o resultado dele entra no outbox, na mesma transação. Se o processo morre no
-meio — falta de memória, `kill`, queda da máquina —, o próximo boot encontra o
-job no diário e o reporta como falha (`executor_lost`), com o ponto em que ele
-estava (na fila ou executando) e o limite de memória do container. Antes o run
-ficava "Em andamento" no servidor para sempre: o executor voltava em segundos e
-ninguém mais sabia do job.
+Every accepted job goes into a journal in the same SQLite as the results outbox
+(`ARTIFACTS_DIR/.executor_results.sqlite`, table `jobs_em_voo`) and only leaves when
+its result goes into the outbox, in the same transaction. If the process dies
+midway — out of memory, `kill`, the machine going down —, the next boot finds the
+job in the journal and reports it as a failure (`executor_lost`), with the point it
+had reached (in the queue or running) and the container's memory limit. Before, the run
+stayed "Em andamento" (In progress) on the server forever: the executor came back within seconds and
+nobody knew about the job anymore.
 
 ### Back-pressure
 
-Quando a fila local do executor atinge `EXECUTOR_MAX_QUEUE_SIZE`, novos jobs são **rejeitados** com mensagem de erro `"Fila do executor cheia — back-pressure."`. O servidor pode então redirecionar para outro executor disponível.
+When the executor's local queue reaches `EXECUTOR_MAX_QUEUE_SIZE`, new jobs are **rejected** with the error message `"Fila do executor cheia — back-pressure."`. The server can then redirect to another available executor.
 
 ---
 
-## Criptografia
+## Encryption
 
-Toda comunicação de jobs entre servidor e executor é criptografada end-to-end. Mesmo com TLS, os payloads são cifrados para garantir que o servidor armazene apenas dados opacos.
+All job communication between server and executor is end-to-end encrypted. Even with TLS, the payloads are encrypted to ensure that the server stores only opaque data.
 
-### Algoritmos
+### Algorithms
 
-| Etapa | Algoritmo | Finalidade |
+| Step | Algorithm | Purpose |
 |---|---|---|
-| Troca de chaves | **X25519 ECDH** | Gera shared secret entre servidor e executor |
-| Derivação de chave | **HKDF-SHA256** | Deriva chave AES a partir do shared secret |
-| Criptografia | **AES-256-GCM** | Cifra o payload do workflow |
-| Assinatura | **Ed25519** | Garante autenticidade e integridade do job |
-| Anti-replay | **Nonce cache** | Impede reenvio de jobs com mesmo nonce |
+| Key exchange | **X25519 ECDH** | Generates a shared secret between server and executor |
+| Key derivation | **HKDF-SHA256** | Derives the AES key from the shared secret |
+| Encryption | **AES-256-GCM** | Encrypts the workflow payload |
+| Signature | **Ed25519** | Ensures the job's authenticity and integrity |
+| Anti-replay | **Nonce cache** | Prevents resending jobs with the same nonce |
 
-### Fluxo de criptografia
+### Encryption flow
 
 ```mermaid
 graph TD
-    subgraph Servidor
-        A[Gera par efêmero X25519] --> B[ECDH: shared_secret = X25519 server_ephemeral, agent_public]
+    subgraph Servidor [Server]
+        A[Generates ephemeral X25519 pair] --> B[ECDH: shared_secret = X25519 server_ephemeral, agent_public]
         B --> C[HKDF-SHA256 shared_secret, salt=nonce → aes_key]
         C --> D[AES-256-GCM encrypt payload → ciphertext]
         D --> E[Ed25519 sign envelope+ephemeral+ciphertext]
-        E --> F[Envia: envelope, ephemeral_public, ciphertext, signature]
+        E --> F[Sends: envelope, ephemeral_public, ciphertext, signature]
     end
 
     subgraph Executor
-        G[Recebe mensagem] --> H[Ed25519 verify signature]
+        G[Receives message] --> H[Ed25519 verify signature]
         H --> I[ECDH: shared_secret = X25519 agent_private, ephemeral_public]
         I --> J[HKDF-SHA256 shared_secret, salt=nonce → aes_key]
         J --> K[AES-256-GCM decrypt ciphertext → payload]
-        K --> L[Executa workflow]
+        K --> L[Runs workflow]
     end
 
     F -->|WebSocket| G
 ```
 
-### Formato do ciphertext
+### Ciphertext format
 
-Os primeiros **12 bytes** do ciphertext decodificado de base64 são o **GCM nonce**. O restante é o ciphertext + authentication tag.
+The first **12 bytes** of the base64-decoded ciphertext are the **GCM nonce**. The rest is the ciphertext + authentication tag.
 
-### Segurança de chaves
+### Key security
 
-- A chave privada X25519 é salva com permissões `0600` (somente leitura do owner)
-- Após descriptografia, variáveis sensíveis (`shared_secret`, `aes_key`, `plaintext`) são deletadas da memória (best-effort)
-- O info label do HKDF é fixo: `atlas-executor-job-v1`
+- The X25519 private key is saved with `0600` permissions (readable only by the owner)
+- After decryption, sensitive variables (`shared_secret`, `aes_key`, `plaintext`) are deleted from memory (best-effort)
+- The HKDF info label is fixed: `atlas-executor-job-v1`
 
 ---
 
-## GeoSync — Sincronização de Arquivos
+## GeoSync — File Synchronization
 
-O GeoSync permite sincronizar pastas locais do executor com o Drive do Workspace na plataforma.
+GeoSync lets you synchronize the executor's local folders with the Workspace Drive on the platform.
 
-### Componentes
+### Components
 
-| Módulo | Responsabilidade |
+| Module | Responsibility |
 |---|---|
-| `sync/manager.py` | Orquestrador principal |
-| `sync/scanner.py` | Detecta datasets na pasta local |
-| `sync/watcher.py` | Monitora mudanças em tempo real (fsevents/inotify) |
-| `sync/uploader.py` | Upload de arquivos para o Drive |
-| `sync/downloader.py` | Download de arquivos do Drive |
-| `sync/manifest.py` | Estado local da sincronização |
-| `sync/validator.py` | Valida integridade dos datasets |
-| `sync/metadata.py` | Extrai metadados geoespaciais |
-| `sync/trigger.py` | Triggers de sincronização |
-| `sync/ignore.py` | Filtro de arquivos ignorados |
+| `sync/manager.py` | Main orchestrator |
+| `sync/scanner.py` | Detects datasets in the local folder |
+| `sync/watcher.py` | Watches for changes in real time (fsevents/inotify) |
+| `sync/uploader.py` | Uploads files to the Drive |
+| `sync/downloader.py` | Downloads files from the Drive |
+| `sync/manifest.py` | Local synchronization state |
+| `sync/validator.py` | Validates dataset integrity |
+| `sync/metadata.py` | Extracts geospatial metadata |
+| `sync/trigger.py` | Synchronization triggers |
+| `sync/ignore.py` | Filter for ignored files |
 
-### Modos de sincronização
+### Synchronization modes
 
-| Modo | Descrição |
+| Mode | Description |
 |---|---|
-| `upload` | Envia arquivos locais para o Drive (padrão) |
-| `download` | Baixa arquivos do Drive para a pasta local |
-| `bidirectional` | Sincronização nos dois sentidos |
-| `catalog` | Registra o dataset no Drive (nome, tipo, tamanho, CRS, bbox, contagem de feições) **sem enviar os bytes** — para dado pessoal/LGPD. O conteúdo nunca sai desta máquina e só workflows que rodam neste mesmo executor leem os arquivos |
+| `upload` | Sends local files to the Drive (default) |
+| `download` | Downloads files from the Drive to the local folder |
+| `bidirectional` | Synchronization in both directions |
+| `catalog` | Registers the dataset in the Drive (name, type, size, CRS, bbox, feature count) **without sending the bytes** — for personal data/LGPD. The content never leaves this machine and only workflows running on this same executor read the files |
 
-> `upload` é o que o executor usa quando `EXECUTOR_SYNC_MODE` falta — o padrão
-> seguro: nada que aconteça no Drive apaga ou sobrescreve arquivo local. O
-> `.env.example`, que semeia o `.env` de toda instalação nova (`static/install.sh`,
-> `python -m executor enroll` e o app desktop), grava `bidirectional`. A tela de
-> GeoSync do app desktop mostra o modo que está no `.env` e, sem ele, `upload`.
+> `upload` is what the executor uses when `EXECUTOR_SYNC_MODE` is missing — the safe
+> default: nothing that happens in the Drive deletes or overwrites a local file. The
+> `.env.example`, which seeds the `.env` of every new installation (`static/install.sh`,
+> `python -m executor enroll` and the desktop app), writes `bidirectional`. The desktop app's
+> GeoSync screen shows the mode in `.env` and, without it, `upload`.
 
-### Estratégias de conflito
+### Conflict strategies
 
-| Estratégia | Descrição |
+| Strategy | Description |
 |---|---|
-| `remote-wins` | Versão do servidor prevalece (padrão) |
-| `local-wins` | Versão local prevalece |
-| `keep-both` | Mantém ambas as versões (renomeia a local) |
+| `remote-wins` | The server's version prevails (default) |
+| `local-wins` | The local version prevails |
+| `keep-both` | Keeps both versions (renames the local one) |
 
-### Configuração exemplo
+### Example configuration
 
 ```env
 EXECUTOR_SYNC_DIRS=/home/usuario/dados-geo,/home/usuario/shapefiles
@@ -694,39 +694,39 @@ EXECUTOR_SYNC_MODE=bidirectional
 EXECUTOR_SYNC_CONFLICT_STRATEGY=remote-wins
 ```
 
-### Eventos Drive via WebSocket
+### Drive events over WebSocket
 
-Quando o modo inclui `download` ou `bidirectional`, o executor recebe eventos `drive_event` do servidor via WebSocket. Esses eventos informam sobre uploads feitos por outros executores ou pela interface web, permitindo download imediato sem polling.
+When the mode includes `download` or `bidirectional`, the executor receives `drive_event` events from the server over WebSocket. These events report uploads made by other executors or through the web interface, allowing immediate download without polling.
 
 ---
 
-## Limites de Recursos
+## Resource Limits
 
-### Configurações de limites
+### Limit settings
 
 ```env
-# Máximo de jobs rodando ao mesmo tempo
+# Maximum number of jobs running at the same time
 EXECUTOR_MAX_CONCURRENT=4
 
-# Tamanho máximo da fila local (back-pressure acima disso)
+# Maximum size of the local queue (back-pressure above that)
 EXECUTOR_MAX_QUEUE_SIZE=50
 
-# Timeout por job individual (segundos)
+# Timeout per individual job (seconds)
 EXECUTOR_JOB_TIMEOUT=3600
 ```
 
-### Comportamento
+### Behavior
 
-| Situação | Ação do executor |
+| Situation | Executor action |
 |---|---|
-| Jobs em execução < `MAX_CONCURRENT` | Aceita e executa imediatamente |
-| Jobs em execução = `MAX_CONCURRENT`, fila < `MAX_QUEUE_SIZE` | Aceita e enfileira |
-| Fila = `MAX_QUEUE_SIZE` | **Rejeita** com back-pressure |
-| Job excede `JOB_TIMEOUT` | **Cancela** e retorna erro de timeout |
+| Running jobs < `MAX_CONCURRENT` | Accepts and runs immediately |
+| Running jobs = `MAX_CONCURRENT`, queue < `MAX_QUEUE_SIZE` | Accepts and queues |
+| Queue = `MAX_QUEUE_SIZE` | **Rejects** with back-pressure |
+| Job exceeds `JOB_TIMEOUT` | **Cancels** and returns a timeout error |
 
 ### Capacity report
 
-A cada 10 segundos, o executor envia um report de capacidade ao servidor:
+Every 10 seconds, the executor sends a capacity report to the server:
 
 ```json
 {
@@ -738,154 +738,154 @@ A cada 10 segundos, o executor envia um report de capacidade ao servidor:
 }
 ```
 
-O servidor usa essas informações para decidir para qual executor despachar o próximo job.
+The server uses this information to decide which executor to dispatch the next job to.
 
 ---
 
 ## Troubleshooting
 
-### Erros comuns
+### Common errors
 
 **`Variavel obrigatoria nao definida: EXECUTOR_ID`**
-> O `.env` não existe ou está incompleto — o caminho esperado aparece na própria
-> mensagem, e respeita `EXECUTOR_ENV_PATH`.
+> `.env` does not exist or is incomplete — the expected path appears in the message
+> itself, and it honors `EXECUTOR_ENV_PATH`.
 >
 > `python -m executor enroll --executor-id=<ID> --otp=<OTP>
-> --server=https://agents.<dominio>`, ou defina `EXECUTOR_ID` no `.env` montado
-> no container. No app desktop, o formulário de vínculo faz isso pela interface.
+> --server=https://agents.<dominio>`, or set `EXECUTOR_ID` in the `.env` mounted
+> in the container. In the desktop app, the binding form does this through the interface.
 
 ---
 
 **`EXECUTOR_SERVER_URL deve começar com ws:// ou wss://`**
-> Verifique o valor no `.env`. Use `wss://` em produção e `ws://` em desenvolvimento local.
+> Check the value in `.env`. Use `wss://` in production and `ws://` in local development.
 
 ---
 
-**Conexão fechada com `code=4404 Executor nao encontrado`**
-> O servidor não reconhece mais este executor: ele foi removido ou revogado. O
-> certificado em disco continua válido localmente, mas é inútil — só um
-> enrollment novo devolve o executor ao ar. No app desktop há o botão **Refazer
-> enrollment**, que descarta o certificado e leva ao formulário.
+**Connection closed with `code=4404 Executor nao encontrado`**
+> The server no longer recognizes this executor: it was removed or revoked. The
+> certificate on disk is still valid locally, but it is useless — only a
+> new enrollment brings the executor back online. In the desktop app there is the **Refazer
+> enrollment** (Redo enrollment) button, which discards the certificate and takes you to the form.
 
 ---
 
-**Executor aparece offline na plataforma após alguns minutos**
-> O executor envia heartbeat a cada 30 segundos. Se o servidor não receber por 90 segundos, fecha a conexão. Verifique:
-> - Conectividade de rede entre o executor e o servidor
-> - Firewalls ou proxies bloqueando WebSocket
-> - Logs do executor para erros de reconexão
+**Executor shows as offline on the platform after a few minutes**
+> The executor sends a heartbeat every 30 seconds. If the server receives none for 90 seconds, it closes the connection. Check:
+> - Network connectivity between the executor and the server
+> - Firewalls or proxies blocking WebSocket
+> - The executor logs for reconnection errors
 
 ---
 
 **`relation "..." does not exist`**
-> A tabela referenciada no workflow não existe no banco de dados configurado na credencial. Verifique:
-> - O schema e o nome da tabela
-> - A connection string da credencial na plataforma
-> - Se o executor tem acesso de rede ao banco de dados
+> The table referenced in the workflow does not exist in the database configured in the credential. Check:
+> - The schema and the table name
+> - The credential's connection string on the platform
+> - Whether the executor has network access to the database
 
 ---
 
 **`Falha ao descriptografar payload do job`**
-> A chave privada X25519 do executor (`x25519_key.pem`, gravada no enrollment em
-> `EXECUTOR_CERT_DIR`) não corresponde mais à chave pública registrada no
-> servidor. Isso pode acontecer se:
-> - O arquivo `x25519_key.pem` foi deletado ou substituído após o enrollment
-> - O executor foi reconfigurado apontando para outra chave
+> The executor's X25519 private key (`x25519_key.pem`, written at enrollment in
+> `EXECUTOR_CERT_DIR`) no longer matches the public key registered on the
+> server. This can happen if:
+> - The `x25519_key.pem` file was deleted or replaced after the enrollment
+> - The executor was reconfigured pointing to another key
 >
-> **Solução:** refaça o enrollment (`python -m executor enroll --executor-id=<ID>
-> --otp=<OTP> --server=<URL>`) — ele gera um par novo e registra a pública no
-> servidor. O executor **nunca** gera nem re-registra a chave sozinho: se
-> `x25519_key.pem` faltar, ele falha no boot pedindo um novo enrollment. Apagar a
-> chave e reiniciar **não** resolve. No app desktop, use **Refazer enrollment**.
+> **Solution:** redo the enrollment (`python -m executor enroll --executor-id=<ID>
+> --otp=<OTP> --server=<URL>`) — it generates a new pair and registers the public key on the
+> server. The executor **never** generates or re-registers the key on its own: if
+> `x25519_key.pem` is missing, it fails at boot asking for a new enrollment. Deleting the
+> key and restarting does **not** fix it. In the desktop app, use **Refazer enrollment**.
 
 ---
 
 **`Fila do executor cheia — back-pressure`**
-> O executor está sobrecarregado. Possíveis ações:
-> - Aumente `EXECUTOR_MAX_CONCURRENT` (se a máquina tem recursos)
-> - Aumente `EXECUTOR_MAX_QUEUE_SIZE`
-> - Adicione mais executores ao workspace
+> The executor is overloaded. Possible actions:
+> - Increase `EXECUTOR_MAX_CONCURRENT` (if the machine has the resources)
+> - Increase `EXECUTOR_MAX_QUEUE_SIZE`
+> - Add more executors to the workspace
 
 ---
 
-**Jobs travam e dão timeout**
-> Verifique:
-> - `EXECUTOR_JOB_TIMEOUT` (padrão: 3600s = 1 hora)
-> - Se o workflow acessa recursos externos (banco, API) que podem estar lentos
-> - Logs de workflow: defina `LOG_FILE_WORKFLOW=/tmp/workflow.log` para capturar detalhes
-> - Com o painel ativo, o bloco **em execução** mostra em qual nó cada run está parado e há quanto tempo
+**Jobs hang and time out**
+> Check:
+> - `EXECUTOR_JOB_TIMEOUT` (default: 3600s = 1 hour)
+> - Whether the workflow accesses external resources (database, API) that may be slow
+> - Workflow logs: set `LOG_FILE_WORKFLOW=/tmp/workflow.log` to capture details
+> - With the dashboard active, the **em execução** (running) block shows which node each run is stuck on and for how long
 
 ---
 
-**O painel não aparece**
-> O motivo é impresso no banner de boot, na linha `Painel: desligado (...)`. As causas mais comuns:
-> - `rich` não instalado → `pip install rich`
-> - saída redirecionada ou sob Docker sem `-it` (o painel exige terminal interativo)
-> - `LOG_COLOR=never` no `.env` ou no compose
+**The dashboard does not appear**
+> The reason is printed in the boot banner, on the `Painel: desligado (...)` line. The most common causes:
+> - `rich` not installed → `pip install rich`
+> - output redirected or under Docker without `-it` (the dashboard requires an interactive terminal)
+> - `LOG_COLOR=never` in `.env` or in the compose file
 >
-> Para forçar: `EXECUTOR_DASHBOARD=on`.
+> To force it: `EXECUTOR_DASHBOARD=on`.
 
 ---
 
-**Quero ver o log passo a passo de novo**
-> Aperte `l`. O painel sai, o log volta ao terminal, e `l` de novo traz o painel. Para nunca ligar o painel, use `EXECUTOR_DASHBOARD=off`.
+**I want to see the step-by-step log again**
+> Press `l`. The dashboard goes away, the log returns to the terminal, and `l` again brings the dashboard back. To never turn the dashboard on, use `EXECUTOR_DASHBOARD=off`.
 
 ---
 
-**As teclas não respondem**
-> O rodapé mostra os atalhos apenas quando o `stdin` é um terminal. Se ele estiver redirecionado ou o executor rodar sob um supervisor que não repassa o teclado, o painel funciona mas sem atalhos — encerre com `Ctrl+C` ou `SIGTERM`.
+**The keys do not respond**
+> The footer shows the shortcuts only when `stdin` is a terminal. If it is redirected or the executor runs under a supervisor that does not pass the keyboard through, the dashboard works but without shortcuts — shut down with `Ctrl+C` or `SIGTERM`.
 
 ---
 
-**O terminal ficou sem cursor depois de encerrar o executor**
-> Não deveria acontecer — o painel é fechado em todos os caminhos de saída. Se ocorrer, `reset` (POSIX) devolve o terminal, e vale abrir uma issue com o modo de encerramento usado.
+**The terminal was left without a cursor after shutting down the executor**
+> It should not happen — the dashboard is closed on every exit path. If it does, `reset` (POSIX) restores the terminal, and it is worth opening an issue with the shutdown method used.
 
 ---
 
-**Erro de conexão SSL em desenvolvimento local**
-> O executor detecta automaticamente servidores locais (`localhost`, `127.0.0.1`) e desabilita verificação de certificado. Se o servidor usa um hostname customizado local, adicione-o à detecção ou use `ws://` em vez de `wss://`.
+**SSL connection error in local development**
+> The executor automatically detects local servers (`localhost`, `127.0.0.1`) and disables certificate verification. If the server uses a custom local hostname, add it to the detection or use `ws://` instead of `wss://`.
 
 ---
 
-## Veio de um executor com o nome antigo?
+## Coming from an executor with the old name?
 
-Até a versão anterior, a imagem, o container e o volume do Docker chamavam-se
-`atlas-executor` (sem o «n»). Agora é `atlans-executor`:
+Up to the previous version, the Docker image, container and volume were called
+`atlas-executor` (without the "n"). Now it is `atlans-executor`:
 
-- **Pelo compose** (`docker-compose.executor.yml`, o caminho do `install.sh`): o
-  próximo `up -d` recria o container com o nome novo. O volume `executor-data`
-  é o mesmo, e a matrícula continua valendo.
-- **Pelo `docker run`** (as instruções da release): pare e remova o antigo
-  (`docker rm -f atlas-executor`) e suba o novo com o volume que já tem a
-  matrícula (`-v atlas-executor-data:/data`), em vez de criar outro.
+- **Through compose** (`docker-compose.executor.yml`, the `install.sh` path): the
+  next `up -d` recreates the container with the new name. The `executor-data` volume
+  is the same, and the enrollment remains valid.
+- **Through `docker run`** (the release instructions): stop and remove the old one
+  (`docker rm -f atlas-executor`) and start the new one with the volume that already holds the
+  enrollment (`-v atlas-executor-data:/data`), instead of creating another.
 
-Nada muda no protocolo: o rótulo de derivação de chaves dos jobs e as
-identidades mTLS não dependem do nome.
+Nothing changes in the protocol: the jobs' key-derivation label and the
+mTLS identities do not depend on the name.
 
-## HOST_ALIASES para Executores Externos
+## HOST_ALIASES for External Executors
 
-Quando o executor roda **fora da rede do compose do servidor** (outra máquina, Python nativo, app desktop), os workflows podem referenciar hostnames internos do Docker (ex: `db`, `redis`, `minio`) que não são resolvidos na máquina do executor.
+When the executor runs **outside the server's compose network** (another machine, native Python, desktop app), workflows may reference internal Docker hostnames (e.g. `db`, `redis`, `minio`) that do not resolve on the executor's machine.
 
-Use `EXECUTOR_HOST_ALIASES` para mapear esses nomes para endereços acessíveis:
+Use `EXECUTOR_HOST_ALIASES` to map those names to reachable addresses:
 
 ```env
-# Formato: hostname_interno=host_externo:porta, separados por vírgula
+# Format: internal_hostname=external_host:port, comma-separated
 EXECUTOR_HOST_ALIASES=db=192.168.1.10:5432,redis=192.168.1.10:6379,minio=192.168.1.10:9000
 ```
 
-### Como funciona
+### How it works
 
-O executor intercepta connection strings nos payloads descriptografados e substitui os hostnames internos pelos mapeados. Por exemplo:
+The executor intercepts connection strings in the decrypted payloads and replaces the internal hostnames with the mapped ones. For example:
 
-| Original (Docker) | Reescrito (executor externo) |
+| Original (Docker) | Rewritten (external executor) |
 |---|---|
 | `postgresql://user:pass@db:5432/geo` | `postgresql://user:pass@192.168.1.10:5432/geo` | <!-- pragma: allowlist secret -->
 | `redis://:senha@redis:6379/0` | `redis://:senha@192.168.1.10:6379/0` |
 
-### Quando usar
+### When to use it
 
-| Cenário | Necessário? |
+| Scenario | Needed? |
 |---|---|
-| Executor Docker no mesmo host da stack, na rede do compose | Geralmente não |
-| Executor Docker ou Python nativo em outra máquina | Sim, se os workflows usam hostnames internos |
-| App desktop (máquina do usuário) | Sim, quase sempre |
+| Docker executor on the same host as the stack, on the compose network | Usually not |
+| Docker or native Python executor on another machine | Yes, if the workflows use internal hostnames |
+| Desktop app (the user's machine) | Yes, almost always |

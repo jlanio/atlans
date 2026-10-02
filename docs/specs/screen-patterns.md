@@ -1,148 +1,148 @@
-# Padrão de telas do Atlans
+# Atlans screen patterns
 
-Contrato de consistência visual e de interação para as telas da aplicação web
-(`web/`). Extraído das quatro telas já redesenhadas — **Dashboard**, **Histórico**
-(`/observability`), **Projetos** e **Workspaces** — e do shell. Toda tela nova ou
-padronizada segue este documento. É guia de implementação, não de produto: preserva
-a função e a arquitetura de informação de cada tela; alinha casca, estados, tokens,
-acessibilidade e microcopy.
+Contract for visual and interaction consistency across the screens of the web application
+(`web/`). Extracted from the four screens already redesigned — **Dashboard**, **Histórico** (History)
+(`/observability`), **Projetos** (Projects) and **Workspaces** — and from the shell. Every new or
+standardized screen follows this document. It is an implementation guide, not a product guide: it preserves
+each screen's function and information architecture; it aligns the page frame, states, tokens,
+accessibility and microcopy.
 
-Referências vivas: `web/app/globals.css` (tokens) e
+Living references: `web/app/globals.css` (tokens) and
 `docs/specs/{dashboard,projetos,historico-metricas}.md`.
 
 ---
 
-### 0. Shell e casca da página
-- **Layout raiz**: `sidebar/index.tsx` → `SidebarProvider` + `AppSidebar` + `<main class="flex-1 overflow-auto bg-card flex flex-col">` com `AppHeader` sticky (`app-header.tsx`) e o conteúdo abaixo.
-- **`AppHeader`** (`web/app/components/app-header.tsx`): barra sticky `h-12 px-4 border-b border-border bg-background/95 backdrop-blur z-40`. Mostra o `WorkspaceSwitcher`; slot `right` reservado. É `app-region-drag` (janela desktop). Rotas de canvas fullscreen (`/workflow/`) retornam `null`.
-- **`PageRoot`** (`web/app/components/page-root.tsx`): TODA tela é envolvida por `<PageRoot>`. Ele dá `<main class="flex justify-center w-full px-safe">` + miolo `flex flex-col gap-4 px-4 py-6 sm:gap-6 sm:px-8 sm:py-8 max-w-6xl w-full` com fade de entrada em CSS (`animate-in fade-in slide-in-from-bottom-2 duration-350 ease-out`). Padding menor no telefone; `px-safe` cobre o notch. Espaçamento vertical entre blocos de topo é o `gap-4 sm:gap-6` do PageRoot — não repita margens.
-- **Exceção — a Home (`/`)**: é full-bleed como o canvas do editor, e NÃO segue os itens acima. O layout `(dashboard)` é compartilhado, e um `ShellSidebar` (client, `usePathname`) troca a casca: em `/` renderiza o **`HomeSidebar`** (grupo *Meus → Agendamentos, Artefatos, Chats*; marca linkando `/projects`; rodapé `UserSidebar`), nas demais rotas o `AppSidebar` de sempre. O `AppHeader` retorna `null` em `/` (como em `/workflow/`). A página é `<HomeView>` — `relative h-svh w-full overflow-hidden`, sem `PageRoot` — com o globo em tela cheia. A Home é **sempre escura**, independente do tema do app: a raiz da `HomeView` e do `HomeSidebar` leva `className="home dark"`, e o bloco `.home` em `globals.css` sobrescreve os neutros para a escala quase preta (`#050505`/`#0f0f0f`/`#171717`/`#262626`/`#ececec`), mantendo a terracota do `.dark`.
+### 0. Shell and page frame
+- **Root layout**: `sidebar/index.tsx` → `SidebarProvider` + `AppSidebar` + `<main class="flex-1 overflow-auto bg-card flex flex-col">` with a sticky `AppHeader` (`app-header.tsx`) and the content below.
+- **`AppHeader`** (`web/app/components/app-header.tsx`): sticky bar `h-12 px-4 border-b border-border bg-background/95 backdrop-blur z-40`. Shows the `WorkspaceSwitcher`; `right` slot reserved. It is `app-region-drag` (desktop window). Fullscreen canvas routes (`/workflow/`) return `null`.
+- **`PageRoot`** (`web/app/components/page-root.tsx`): EVERY screen is wrapped in `<PageRoot>`. It provides `<main class="flex justify-center w-full px-safe">` + an inner column `flex flex-col gap-4 px-4 py-6 sm:gap-6 sm:px-8 sm:py-8 max-w-6xl w-full` with a CSS entrance fade (`animate-in fade-in slide-in-from-bottom-2 duration-350 ease-out`). Smaller padding on phones; `px-safe` covers the notch. Vertical spacing between top-level blocks is PageRoot's `gap-4 sm:gap-6` — do not repeat margins.
+- **Exception — the Home (`/`)**: it is full-bleed like the editor canvas, and does NOT follow the items above. The `(dashboard)` layout is shared, and a `ShellSidebar` (client, `usePathname`) swaps the frame: on `/` it renders the **`HomeSidebar`** (group *Meus → Agendamentos, Artefatos, Chats* (Mine → Schedules, Artifacts, Chats); brand linking to `/projects`; `UserSidebar` footer), on the other routes the usual `AppSidebar`. The `AppHeader` returns `null` on `/` (as on `/workflow/`). The page is `<HomeView>` — `relative h-svh w-full overflow-hidden`, without `PageRoot` — with the globe in full screen. The Home is **always dark**, regardless of the app theme: the root of `HomeView` and of `HomeSidebar` carries `className="home dark"`, and the `.home` block in `globals.css` overrides the neutrals with the near-black scale (`#050505`/`#0f0f0f`/`#171717`/`#262626`/`#ececec`), keeping the terracotta of `.dark`.
 
-### 1. Cabeçalho de página (padrão fixo)
-Primeiro filho do `PageRoot`, sempre este esqueleto:
+### 1. Page header (fixed pattern)
+First child of `PageRoot`, always this skeleton:
 ```
 <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
   <div className="min-w-0">
     <h1 className="text-2xl font-semibold text-foreground">Título</h1>
     {subtitulo ? <p className="text-sm font-medium text-muted-foreground">…</p> : <Skeleton className="mt-1 h-4 w-64" />}
   </div>
-  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto"> {/* ações à direita */} </div>
+  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto"> {/* actions on the right */} </div>
 </div>
 ```
-- **h1**: `text-2xl font-semibold text-foreground`. Workspaces usa `text-2xl` também (não `text-xl`). Uma palavra/curto.
-- **Subtítulo**: `text-sm font-medium text-muted-foreground`, uma frase que diz o ESCOPO/estado ("Execuções dos seus workflows · comparado com os 30 dias anteriores"; "10 workflows em 3 grupos · 8 ativos"). Enquanto não há o que contar (1ª carga), vira `<Skeleton className="mt-1 h-4 w-64" />` — nunca escreve "— ativos".
-- **Ações à direita**: agrupadas em `flex ... gap-2`, `w-full sm:w-auto` (empilham no telefone). Hierarquia: **1 ação primária** (`<Button>` default, laranja) à direita de tudo; secundárias em `variant="outline"`; **Atualizar** sempre `variant="ghost" size="sm"` com `<TbRefresh size={14} className={carregando ? "motion-safe:animate-spin" : undefined}/>` + rótulo "Atualizar". No **Histórico** o Atualizar é seguido do **Frescor** ("atualizado há 20 s", `text-xs tabular-nums text-muted-foreground`, relógio próprio via `textoDeFrescor` de `observability/cabecalho.tsx`) — atualmente esse frescor é exclusivo do Histórico; Dashboard, Projetos e Workspaces não o renderizam.
-- **Toggles de escopo/período**: grupo `role="group" aria-label` `inline-flex h-8 w-full overflow-hidden rounded-md border bg-card max-md:h-10 sm:w-auto`; botões com `aria-pressed`, `border-l first:border-l-0`, ativo = `bg-accent text-foreground`, inativo = `text-muted-foreground hover:bg-accent/60`.
-- **Telefone**: quando há 3+ ações, o secundário vai para um menu `⋯` (`DropdownMenu`, gatilho `variant="outline" size="icon" size-10 shrink-0 md:hidden`) e o primário ocupa a linha (`flex-1 max-md:h-10 md:flex-none`). Ver `projects/cabecalho.tsx`.
-- Ícones dos botões: `react-icons/tb`, `size={14}`–`15`.
+- **h1**: `text-2xl font-semibold text-foreground`. Workspaces uses `text-2xl` too (not `text-xl`). One word/short.
+- **Subtitle**: `text-sm font-medium text-muted-foreground`, one sentence that states the SCOPE/state ("Execuções dos seus workflows · comparado com os 30 dias anteriores" (Runs of your workflows · compared with the previous 30 days); "10 workflows em 3 grupos · 8 ativos" (10 workflows in 3 groups · 8 active)). While there is nothing to count (1st load), it becomes `<Skeleton className="mt-1 h-4 w-64" />` — it never writes "— ativos".
+- **Actions on the right**: grouped in `flex ... gap-2`, `w-full sm:w-auto` (they stack on phones). Hierarchy: **1 primary action** (default `<Button>`, orange) to the right of everything; secondary ones in `variant="outline"`; **Atualizar** (Refresh) is always `variant="ghost" size="sm"` with `<TbRefresh size={14} className={carregando ? "motion-safe:animate-spin" : undefined}/>` + the label "Atualizar". On **Histórico**, Atualizar is followed by the **freshness** indicator ("atualizado há 20 s" (updated 20 s ago), `text-xs tabular-nums text-muted-foreground`, its own clock via `textoDeFrescor` from `observability/cabecalho.tsx`) — currently this freshness indicator is exclusive to Histórico; Dashboard, Projetos and Workspaces do not render it.
+- **Scope/period toggles**: group `role="group" aria-label` `inline-flex h-8 w-full overflow-hidden rounded-md border bg-card max-md:h-10 sm:w-auto`; buttons with `aria-pressed`, `border-l first:border-l-0`, active = `bg-accent text-foreground`, inactive = `text-muted-foreground hover:bg-accent/60`.
+- **Phone**: when there are 3+ actions, the secondary ones go into a `⋯` menu (`DropdownMenu`, trigger `variant="outline" size="icon" size-10 shrink-0 md:hidden`) and the primary one takes the whole row (`flex-1 max-md:h-10 md:flex-none`). See `projects/cabecalho.tsx`.
+- Button icons: `react-icons/tb`, `size={14}`–`15`.
 
-### 2. Seções e cartões
-Duas formas, ambas com a MESMA moldura:
-- **Cartão base**: `rounded-lg border bg-card shadow-xs`. Nunca hex; sempre `bg-card` + `border` (herda `border-border`). Sombra é sempre `shadow-xs` (não `shadow-sm`/`md` salvo hover). O hero de destaque usa `rounded-xl` (Workspaces `workspace-hero`, SaudeHero atenção/crítico).
-- **Seção com título**: `<section aria-labelledby="X-titulo" class="flex min-w-0 flex-col rounded-lg border bg-card shadow-xs">`; cabeçalho interno `px-4 pt-4 pb-1` com `<h2 id="X-titulo" class="text-sm font-semibold">` + linha de apoio `text-xs text-muted-foreground`. Corpo em `px-2 pb-2 pt-1` (listas) ou `px-4 pb-4`.
-- **Eyebrow / título de faixa fora de cartão**: `text-[11px] font-semibold uppercase tracking-wide text-muted-foreground` (ex.: "Resumo do período · últimos 30 dias", "Outros workspaces", "Sem grupo"). Alguns usam `tracking-[0.08em]`/`[0.1em]`.
-- **Indicador/stat**: `relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg border bg-card p-3 shadow-xs sm:p-4`; título `text-[11px] font-semibold uppercase tracking-wide text-muted-foreground` + ícone `text-muted-foreground`; valor `text-2xl font-semibold leading-none tabular-nums tracking-tight`; sparkline absoluto no canto. Ver `observability/indicadores.tsx`.
-- **Hero de destaque** (workspace ativo, saúde em alerta): `relative overflow-hidden rounded-xl border bg-card shadow-xs` + friso de identidade/tom `absolute inset-y-0 left-0 w-1.5` (a cor de identidade entra só como friso — sem brilho difuso/degradê no fundo) + `motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300`.
-- **Linha/row de lista** (item clicável): `flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 shadow-xs`, hover `hover:bg-accent/40`/`hover:border-muted-foreground/30`. Item de lista dentro de cartão-seção é `<button>` full-width com `grid ... rounded-md px-2 py-2 text-left hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50`.
+### 2. Sections and cards
+Two forms, both with the SAME frame:
+- **Base card**: `rounded-lg border bg-card shadow-xs`. Never hex; always `bg-card` + `border` (inherits `border-border`). The shadow is always `shadow-xs` (not `shadow-sm`/`md` except on hover). The highlight hero uses `rounded-xl` (Workspaces `workspace-hero`, SaudeHero attention/critical).
+- **Section with a title**: `<section aria-labelledby="X-titulo" class="flex min-w-0 flex-col rounded-lg border bg-card shadow-xs">`; inner header `px-4 pt-4 pb-1` with `<h2 id="X-titulo" class="text-sm font-semibold">` + a supporting line `text-xs text-muted-foreground`. Body in `px-2 pb-2 pt-1` (lists) or `px-4 pb-4`.
+- **Eyebrow / band title outside a card**: `text-[11px] font-semibold uppercase tracking-wide text-muted-foreground` (e.g. "Resumo do período · últimos 30 dias" (Period summary · last 30 days), "Outros workspaces" (Other workspaces), "Sem grupo" (No group)). Some use `tracking-[0.08em]`/`[0.1em]`.
+- **Indicator/stat**: `relative flex min-w-0 flex-col gap-1.5 overflow-hidden rounded-lg border bg-card p-3 shadow-xs sm:p-4`; title `text-[11px] font-semibold uppercase tracking-wide text-muted-foreground` + icon `text-muted-foreground`; value `text-2xl font-semibold leading-none tabular-nums tracking-tight`; absolutely positioned sparkline in the corner. See `observability/indicadores.tsx`.
+- **Highlight hero** (active workspace, health on alert): `relative overflow-hidden rounded-xl border bg-card shadow-xs` + identity/tone stripe `absolute inset-y-0 left-0 w-1.5` (the identity color comes in only as a stripe — no diffuse glow/gradient in the background) + `motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300`.
+- **List line/row** (clickable item): `flex items-center gap-3 rounded-lg border bg-card px-3 py-2.5 shadow-xs`, hover `hover:bg-accent/40`/`hover:border-muted-foreground/30`. A list item inside a section card is a full-width `<button>` with `grid ... rounded-md px-2 py-2 text-left hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:ring-[3px] focus-visible:ring-ring/50`.
 
-### 3. Estados (contrato — os quatro estados canônicos)
-As molduras dos estados moram numa peça só, `components/shared/estados.tsx` — `CartaoDeEstado`, `ErroDeCarga`, `VazioPrimeiroUso`, `SemResultado`/`textoDeSemResultado` e `AvisoAmbar`: use-a, não recopie o cartão. Cada tela guarda no seu `estados.tsx` só os Skeleton* (que desenham o layout real) e as SUAS frases, e a composição fica no `index`; telas sem módulo próprio (Histórico, Workspaces, o editor, o portal) usam as mesmas peças inline. Ordem de precedência no `index`: **carregando → erro (só se nunca houve carga aceita) → primeiro uso → conteúdo**; dentro do conteúdo, **sem resultado** e **avisos de falha parcial** por seção.
+### 3. States (contract — the four canonical states)
+The state frames live in a single piece, `components/shared/estados.tsx` — `CartaoDeEstado`, `ErroDeCarga`, `VazioPrimeiroUso`, `SemResultado`/`textoDeSemResultado` and `AvisoAmbar`: use it, do not re-copy the card. Each screen keeps in its own `estados.tsx` only the Skeleton* (which draw the real layout) and ITS OWN phrases, and the composition lives in the `index`; screens without their own module (Histórico, Workspaces, the editor, the portal) use the same pieces inline. Order of precedence in the `index`: **loading → error (only if there has never been an accepted load) → first use → content**; within the content, **no results** and **partial-failure warnings** per section.
 
-1. **Skeleton da 1ª carga**: desenha o layout REAL (mesmas alturas/grids) para a troca não pular. Wrapper `role="status" aria-busy="true" aria-label="Carregando …"`. Usa `<Skeleton>` (`ui/skeleton.tsx`, shimmer). O cabeçalho real fica por cima (o `index` sempre o renderiza); o skeleton cobre só os blocos. Alturas típicas: indicadores `h-24`, gráfico `h-56`, listas `h-48`/`h-56`, hero `h-11`/`h-48`.
-2. **Erro** (fonte-espinha caiu na 1ª carga): cartão centralizado `flex flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-card px-6 py-14 text-center shadow-xs`; ícone `TbAlertTriangle` em círculo `border border-destructive/20 bg-destructive/10 p-3 text-destructive`; título `text-sm font-medium` "Não foi possível carregar …"; mensagem `text-xs text-muted-foreground`; `<Button variant="outline" size="sm" className="mt-2 max-md:h-10">Tentar de novo</Button>`; `role="alert"` (§5). Peça: `ErroDeCarga({ titulo, mensagem, onTentar })` — o anúncio vem do tom `erro` do `CartaoDeEstado`, não de quem compõe a tela lembrar dele; `mensagem` é a do servidor, quando a tela a tem. Só toma a tela se `atualizadoEm == null` — recarga que falha sobre lista pronta NÃO apaga a tela (mantém o que havia + toast).
-3. **Vazio / primeiro uso**: cartão centralizado `rounded-lg border bg-card px-6 py-14 text-center shadow-xs`; ícone em círculo `bg-muted/60 p-5` com ícone `text-muted-foreground/50`; título `text-base font-semibold`; parágrafo `text-sm text-muted-foreground`; opcionalmente passos numerados; CTA primário se `canEdit`, senão "Peça a um editor do workspace…". Distingue **primeiro uso** (sem nada) de **sem resultado** (recorte ativo, ícone `TbFilterOff`, oferece "Limpar filtros"). Peças: `VazioPrimeiroUso` (o cartão `amplo`: ícone 36, `gap-5`, `passos?`, `cta` para quem `podeCriar`, senão "Peça a um editor do workspace para {pedirA}.") e `SemResultado` (o cartão `compacto` do §3.2 em tom neutro — ícone 26, `p-3`, título `text-sm font-medium`, dica `text-xs` —, com a frase de `textoDeSemResultado`). O vazio de uma seção (Histórico, Admin › Configurações) é o `CartaoDeEstado` compacto.
-4. **Falha parcial por seção (aviso âmbar)**: uma linha, NÃO derruba o bloco — `role="status"` `flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-amber-500/30 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400` + `TbAlertTriangle size={14}` + texto + botão "Tentar de novo" inline (`underline-offset-2 hover:underline focus-visible:ring-[3px] max-md:min-h-10`). Peça: `AvisoAmbar` (`shared/estados.tsx`); `rotuloDoBotao` traduz o botão onde a tela fala outros idiomas (a Home).
-   - Variante "dado velho" (Histórico): `<p role="alert" class="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">…{" Mostrando a última leitura."}</p>` — usada por seção quando há leitura anterior na tela.
+1. **1st-load skeleton**: draws the REAL layout (same heights/grids) so the swap does not jump. Wrapper `role="status" aria-busy="true" aria-label="Carregando …"`. Uses `<Skeleton>` (`ui/skeleton.tsx`, shimmer). The real header stays on top (the `index` always renders it); the skeleton covers only the blocks. Typical heights: indicators `h-24`, chart `h-56`, lists `h-48`/`h-56`, hero `h-11`/`h-48`.
+2. **Error** (the backbone source failed on the 1st load): centered card `flex flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-card px-6 py-14 text-center shadow-xs`; `TbAlertTriangle` icon in a circle `border border-destructive/20 bg-destructive/10 p-3 text-destructive`; title `text-sm font-medium` "Não foi possível carregar …" (Could not load …); message `text-xs text-muted-foreground`; `<Button variant="outline" size="sm" className="mt-2 max-md:h-10">Tentar de novo</Button>`; `role="alert"` (§5). Piece: `ErroDeCarga({ titulo, mensagem, onTentar })` — the announcement comes from the `erro` tone of `CartaoDeEstado`, not from whoever composes the screen remembering it; `mensagem` is the server's, when the screen has it. It only takes over the screen if `atualizadoEm == null` — a reload that fails over a ready list does NOT wipe the screen (it keeps what was there + a toast).
+3. **Empty / first use**: centered card `rounded-lg border bg-card px-6 py-14 text-center shadow-xs`; icon in a circle `bg-muted/60 p-5` with icon `text-muted-foreground/50`; title `text-base font-semibold`; paragraph `text-sm text-muted-foreground`; optionally numbered steps; primary CTA if `canEdit`, otherwise "Peça a um editor do workspace…" (Ask a workspace editor…). It distinguishes **first use** (nothing at all) from **no results** (active filter, `TbFilterOff` icon, offers "Limpar filtros" (Clear filters)). Pieces: `VazioPrimeiroUso` (the `amplo` card: icon 36, `gap-5`, `passos?`, `cta` for whoever `podeCriar`, otherwise "Peça a um editor do workspace para {pedirA}.") and `SemResultado` (the `compacto` card of §3.2 in a neutral tone — icon 26, `p-3`, title `text-sm font-medium`, hint `text-xs` —, with the phrase from `textoDeSemResultado`). A section's empty state (Histórico, Admin › Configurações) is the compact `CartaoDeEstado`.
+4. **Partial failure per section (amber warning)**: one line, it does NOT bring down the block — `role="status"` `flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border border-amber-500/30 bg-amber-50 px-3 py-1.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400` + `TbAlertTriangle size={14}` + text + an inline "Tentar de novo" (Try again) button (`underline-offset-2 hover:underline focus-visible:ring-[3px] max-md:min-h-10`). Piece: `AvisoAmbar` (`shared/estados.tsx`); `rotuloDoBotao` translates the button where the screen speaks other languages (the Home).
+   - "Stale data" variant (Histórico): `<p role="alert" class="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">…{" Mostrando a última leitura."}</p>` — used per section when there is a previous reading on screen.
 
-### 4. Grid e espaçamento
-- Espaço entre blocos de topo: herdado do `PageRoot` (`gap-4 sm:gap-6`). Dentro de uma seção multi-parte: `flex flex-col gap-3`.
-- **Grid de indicadores**: `grid grid-cols-2 gap-3 lg:grid-cols-4`.
-- **Duas colunas conteúdo/lateral**: `grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]` (Dashboard) ou `lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,1fr)]` (Histórico). Sempre 1 coluna abaixo de `lg`; no telefone a lista mais acionável vem primeiro.
-- **Grid de cards/linhas**: `grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3` (Workspaces).
-- **`gap`**: `gap-4` entre blocos maiores, `gap-3` dentro de seção, `gap-2`/`gap-2.5` entre linhas/botões, `gap-0.5`/`gap-1` entre itens de lista dentro de cartão.
-- `min-w-0` em todo contêiner flex/grid que contém texto truncável; `truncate` no que pode estourar. Conteúdo largo rola em `overflow-x-auto` próprio — o body é `overflow-x: clip`.
+### 4. Grid and spacing
+- Space between top-level blocks: inherited from `PageRoot` (`gap-4 sm:gap-6`). Inside a multi-part section: `flex flex-col gap-3`.
+- **Indicator grid**: `grid grid-cols-2 gap-3 lg:grid-cols-4`.
+- **Two columns, content/side**: `grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]` (Dashboard) or `lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,1fr)]` (Histórico). Always 1 column below `lg`; on phones the most actionable list comes first.
+- **Card/row grid**: `grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3` (Workspaces).
+- **`gap`**: `gap-4` between larger blocks, `gap-3` inside a section, `gap-2`/`gap-2.5` between rows/buttons, `gap-0.5`/`gap-1` between list items inside a card.
+- `min-w-0` on every flex/grid container that holds truncatable text; `truncate` on whatever can overflow. Wide content scrolls in its own `overflow-x-auto` — the body is `overflow-x: clip`.
 
-### 5. Acessibilidade
-- Seções: `<section aria-labelledby="X-titulo">` com `<h2 id="X-titulo">` (mesmo quando o h2 é `sr-only`, como no SaudeHero calmo).
-- `aria-busy` nos contêineres em carregamento; `role="status" aria-busy="true" aria-label` nos skeletons; `role="alert"` em erros.
-- Itens de lista são `<button>` com `aria-label` completo (nome + detalhe + ação); grupos de toggle com `aria-pressed`; abas com `role="tabpanel"`/`aria-labelledby`.
-- **Foco**: sempre `focus-visible:ring-[3px] focus-visible:ring-ring/50` (botões shadcn já trazem `focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]`). `outline-none` só junto com um ring visível.
-- **Alvos ≥40px no telefone**: `max-md:h-10` em botões/chips/campos, `max-md:min-h-10`/`min-h-10` em links e itens clicáveis, `size-10` em botões-ícone mobile. Ícone decorativo `coarse:opacity-40`; affordance só-hover (setas) escondida no ponteiro grosso (variante `coarse`).
-- **Movimento**: toda animação sob `motion-safe:` (spin do Atualizar, entrada de heros, ping do "em execução"). `globals.css` congela animações do canvas em `prefers-reduced-motion`.
-- Ícones puramente visuais: `aria-hidden="true"`.
+### 5. Accessibility
+- Sections: `<section aria-labelledby="X-titulo">` with `<h2 id="X-titulo">` (even when the h2 is `sr-only`, as in the calm SaudeHero).
+- `aria-busy` on loading containers; `role="status" aria-busy="true" aria-label` on skeletons; `role="alert"` on errors.
+- List items are `<button>` with a complete `aria-label` (name + detail + action); toggle groups with `aria-pressed`; tabs with `role="tabpanel"`/`aria-labelledby`.
+- **Focus**: always `focus-visible:ring-[3px] focus-visible:ring-ring/50` (shadcn buttons already come with `focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]`). `outline-none` only together with a visible ring.
+- **Targets ≥40px on phones**: `max-md:h-10` on buttons/chips/fields, `max-md:min-h-10`/`min-h-10` on links and clickable items, `size-10` on mobile icon buttons. Decorative icon `coarse:opacity-40`; hover-only affordance (arrows) hidden on a coarse pointer (`coarse` variant).
+- **Motion**: every animation under `motion-safe:` (the Atualizar spin, hero entrances, the "em execução" (running) ping). `globals.css` freezes canvas animations under `prefers-reduced-motion`.
+- Purely visual icons: `aria-hidden="true"`.
 
 ### 6. Dark/Light — tokens
-- **Nunca hex solto** em superfície/texto/borda. Use tokens: `bg-card`, `text-foreground`, `text-muted-foreground`, `border`/`border-border`, `bg-background`, `bg-accent`, `bg-muted`, `text-primary`, `bg-destructive`/`text-destructive`, `ring-ring`. Definidos em `oklch` em `globals.css` (`:root` claro, `.dark` escuro), primário laranja/terracota.
-- **Exceção documentada — cores de status**: os únicos literais permitidos são os pares Tailwind de status, sempre com o par dark: `bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400` (sucesso), `red` (falha/erro), `blue` (em andamento/fila), `amber` (presa/cancelado/aviso), `yellow` (pendente), `purple` (cache). Padrão canônico em `shared/StatusBadge.tsx`. Pontos de estado: `bg-green-500`/`bg-amber-500`/`bg-red-500`/`bg-blue-500`.
-- Gráfico (Recharts) usa hex fixo nas 4 séries (`#22c55e/#ef4444/#3b82f6/#f59e0b`) porque `fill` de SVG não aceita classe — igual nos dois temas, definido em `grafico-por-dia.tsx SERIES`.
-- Aviso âmbar: `border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400`.
-- `tabular-nums` em todo número (contagens, durações, percentuais, frescor).
+- **Never a loose hex** on surface/text/border. Use tokens: `bg-card`, `text-foreground`, `text-muted-foreground`, `border`/`border-border`, `bg-background`, `bg-accent`, `bg-muted`, `text-primary`, `bg-destructive`/`text-destructive`, `ring-ring`. Defined in `oklch` in `globals.css` (`:root` light, `.dark` dark), orange/terracotta primary.
+- **Documented exception — status colors**: the only literals allowed are the Tailwind status pairs, always with the dark pair: `bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400` (success), `red` (failure/error), `blue` (in progress/queued), `amber` (stuck/cancelled/warning), `yellow` (pending), `purple` (cache). Canonical pattern in `shared/StatusBadge.tsx`. State dots: `bg-green-500`/`bg-amber-500`/`bg-red-500`/`bg-blue-500`.
+- The chart (Recharts) uses fixed hex for the 4 series (`#22c55e/#ef4444/#3b82f6/#f59e0b`) because SVG `fill` does not accept a class — the same in both themes, defined in `grafico-por-dia.tsx SERIES`.
+- Amber warning: `border-amber-500/30 bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400`.
+- `tabular-nums` on every number (counts, durations, percentages, freshness).
 
 ### 7. Microcopy (pt-BR)
-- **Tom**: direto, minúsculo nos rótulos de apoio, frase curta. Verbos no infinitivo/imperativo nos botões ("Criar workflow", "Novo grupo", "Atualizar", "Tentar de novo", "Usar", "Configurar", "Limpar filtros"). Nomes de entidades entre aspas angulares: `«{nome}»`.
-- **Deep-links padronizados**: "Ver no Histórico →" (`TbArrowRight size={13}`), "Ver em andamento →", "Ver execuções". Link em `text-primary text-xs font-medium underline-offset-2 hover:underline`.
-- **Erros**: "Não foi possível carregar o painel/os projetos/…" + botão "Tentar de novo". Falha parcial: "Não foi possível carregar {a atividade recente / o gráfico / as próximas execuções}." / "Sem dados de execução agora — a lista continua completa." / "Mostrando a última leitura."
-- **Vazios**: "Nada rodou ainda", "Comece pelo primeiro workflow", "Nenhum workspace encontrado", "Nenhuma execução recente.", "Sem execuções no período.", "Nenhum workflow com «{q}»".
-- **Frescor**: "atualizado agora" / "atualizado há 20 s" / "atualizado há 3 min" / "atualizado há 2 h" (grão grosso, `textoDeFrescor`).
-- **Status em pt-BR** via `shared/status-rotulos.ts` (`rotuloDoStatus`); o valor cru fica em `data-status`. Origem/categoria/nível: `rotuloDaOrigem`/`rotuloDaCategoria`/`rotuloDoNivel` em `observability/formatos.ts` ("manual", "webhook", "agendado", "reexecução", "tempo esgotado", "sem executor"…).
-- **Plurais e números**: sempre por `plural(n, "singular")` e `formatarInteiro` (milhar pt-BR "1.284"); percentual com vírgula "96,4%" (`formatarPercentual`); pontos "−1,1 pt" (`formatarPontos`); duração por extenso "4 min 02 s" / "2 h 14 min" (`formatarDuracao`); tempo relativo "há 6 min" (`formatarQuando`/`formatarInicio`). Zero some do subtítulo ("0 agendados" não aparece).
-### 8. Componentes reutilizáveis (não reinventar)
+- **Tone**: direct, lowercase in supporting labels, short sentences. Verbs in the infinitive/imperative on buttons ("Criar workflow" (Create workflow), "Novo grupo" (New group), "Atualizar" (Refresh), "Tentar de novo" (Try again), "Usar" (Use), "Configurar" (Configure), "Limpar filtros" (Clear filters)). Entity names in angle quotes: `«{nome}»`.
+- **Standardized deep links**: "Ver no Histórico →" (See in History →) (`TbArrowRight size={13}`), "Ver em andamento →" (See in progress →), "Ver execuções" (See runs). Link in `text-primary text-xs font-medium underline-offset-2 hover:underline`.
+- **Errors**: "Não foi possível carregar o painel/os projetos/…" (Could not load the dashboard/the projects/…) + a "Tentar de novo" button. Partial failure: "Não foi possível carregar {a atividade recente / o gráfico / as próximas execuções}." (Could not load {the recent activity / the chart / the upcoming runs}.) / "Sem dados de execução agora — a lista continua completa." (No run data right now — the list is still complete.) / "Mostrando a última leitura." (Showing the last reading.)
+- **Empty states**: "Nada rodou ainda" (Nothing has run yet), "Comece pelo primeiro workflow" (Start with the first workflow), "Nenhum workspace encontrado" (No workspace found), "Nenhuma execução recente." (No recent runs.), "Sem execuções no período." (No runs in the period.), "Nenhum workflow com «{q}»" (No workflow with "{q}").
+- **Freshness**: "atualizado agora" / "atualizado há 20 s" / "atualizado há 3 min" / "atualizado há 2 h" (updated now / 20 s ago / 3 min ago / 2 h ago; coarse grain, `textoDeFrescor`).
+- **Status in pt-BR** via `shared/status-rotulos.ts` (`rotuloDoStatus`); the raw value stays in `data-status`. Origin/category/level: `rotuloDaOrigem`/`rotuloDaCategoria`/`rotuloDoNivel` in `observability/formatos.ts` ("manual", "webhook", "agendado" (scheduled), "reexecução" (re-run), "tempo esgotado" (timed out), "sem executor" (no executor)…).
+- **Plurals and numbers**: always through `plural(n, "singular")` and `formatarInteiro` (pt-BR thousands "1.284"); percentage with a comma "96,4%" (`formatarPercentual`); points "−1,1 pt" (`formatarPontos`); duration spelled out "4 min 02 s" / "2 h 14 min" (`formatarDuracao`); relative time "há 6 min" (6 min ago) (`formatarQuando`/`formatarInicio`). Zero disappears from the subtitle ("0 agendados" (0 scheduled) does not appear).
+### 8. Reusable components (do not reinvent)
 
-| Componente | Arquivo | Uso |
+| Component | File | Use |
 |---|---|---|
-| `PageRoot` | `components/page-root.tsx` | Envelope obrigatório de toda tela (max-w-6xl, padding responsivo, gap, fade de entrada). |
-| Shell | `components/sidebar/index.tsx`, `sidebar/app-sidebar.tsx`, `app-header.tsx` | Casca: sidebar colapsável + main scrollável + header sticky. Telas só respeitam o header sticky. |
-| `Skeleton` | `components/ui/skeleton.tsx` | Placeholder com shimmer; base de todo estado de 1ª carga, com alturas reais. |
-| `StatusBadge` | `components/shared/StatusBadge.tsx` | Selo de status (fonte canônica das cores de status + rótulo pt-BR). |
-| `status-rotulos` | `components/shared/status-rotulos.ts` | `rotuloDoStatus(status)` → pt-BR. Nunca exibir status cru. |
-| `Sparkline` | `components/shared/Sparkline.tsx` | Mini-gráfico SVG (`currentColor`), usado nos indicadores. |
-| `EntityCard` | `components/shared/EntityCard.tsx` | Card genérico de entidade (leading + título + badge + descrição + ações). |
-| `DeleteDialog` | `components/shared/DeleteDialog.tsx` | Confirmação de exclusão reutilizável (ação destrutiva): `confirmarDigitando` para o "digite X para confirmar", `children` para os avisos. |
-| `useAcaoDeDialogo` | `hooks/useAcaoDeDialogo.ts` | Ciclo de um diálogo de ação (abrir, executar, toast, fechar) com guarda de reentrada: o Enter e o clique chamam o mesmo `executar`, e a ação roda uma vez só. |
-| `bloqueado` | `components/ui/dialog.tsx` (`DialogContent`) | Operação em voo: trava Esc, clique fora e o `X` de uma vez. Não copiar o trio `onEscapeKeyDown` + `onInteractOutside` + `closeDisabled`. |
-| `useFetchData` | `hooks/useFetchData.ts` | Carga de tela: 1ª carga × recarga, erro, guarda de resposta velha (geração), gate de sessão, `atualizadoEm` e `onErroComDados` (o toast da recarga). O auto-refresh e a volta à aba chamam `recarregarEmFundo`, não o `refetch`: com a 1ª carga em erro, o cartão fica na tela durante a tentativa, em vez de sair e voltar (e ser anunciado de novo) a cada tique. Não reescrever loading/erro à mão. |
-| `Indicadores` | `components/observability/indicadores.tsx` | Grid de 4 stat-cards com tendência e sparkline. |
-| `GraficoPorDia` | `components/observability/grafico-por-dia.tsx` | Seção-cartão "Execuções por dia" (barras via next/dynamic). |
-| `formatos` | `components/observability/formatos.ts` | Toda formatação pt-BR: `formatarInteiro/Percentual/Pontos/Duracao/Inicio/Quando`, `plural`, `rotuloDaOrigem/Categoria/Nivel`. Usar sempre. |
-| `textoDeFrescor` | `components/observability/cabecalho.tsx` | "atualizado há N" (grão grosso). Reusado por todos os cabeçalhos. |
-| Estados de tela | `components/shared/estados.tsx` | Molduras dos estados do §3: `CartaoDeEstado` (tom `erro`/`neutro` — `role="alert"` automático no erro —, tamanho `compacto`/`amplo`), `ErroDeCarga`, `VazioPrimeiroUso`, `SemResultado`/`textoDeSemResultado`, `AvisoAmbar`. Usar `shared/estados.tsx` — não copiar a estrutura; o `estados.tsx` de cada tela guarda só os Skeleton* e as frases. |
-| `ui/*` (shadcn) | `components/ui/*` | Primitivos: Button (default/outline/ghost/destructive; sizes default h-9, sm h-8, icon size-9), Dialog, Sheet, Select, DropdownMenu, Input, Switch, Tooltip, Separator. Foco ring-[3px] embutido. |
+| `PageRoot` | `components/page-root.tsx` | Mandatory envelope of every screen (max-w-6xl, responsive padding, gap, entrance fade). |
+| Shell | `components/sidebar/index.tsx`, `sidebar/app-sidebar.tsx`, `app-header.tsx` | Frame: collapsible sidebar + scrollable main + sticky header. Screens only have to respect the sticky header. |
+| `Skeleton` | `components/ui/skeleton.tsx` | Placeholder with shimmer; the basis of every 1st-load state, with real heights. |
+| `StatusBadge` | `components/shared/StatusBadge.tsx` | Status badge (canonical source of the status colors + pt-BR label). |
+| `status-rotulos` | `components/shared/status-rotulos.ts` | `rotuloDoStatus(status)` → pt-BR. Never display a raw status. |
+| `Sparkline` | `components/shared/Sparkline.tsx` | SVG mini-chart (`currentColor`), used in the indicators. |
+| `EntityCard` | `components/shared/EntityCard.tsx` | Generic entity card (leading + title + badge + description + actions). |
+| `DeleteDialog` | `components/shared/DeleteDialog.tsx` | Reusable deletion confirmation (destructive action): `confirmarDigitando` for the "type X to confirm", `children` for the warnings. |
+| `useAcaoDeDialogo` | `hooks/useAcaoDeDialogo.ts` | Lifecycle of an action dialog (open, execute, toast, close) with a reentrancy guard: Enter and the click call the same `executar`, and the action runs only once. |
+| `bloqueado` | `components/ui/dialog.tsx` (`DialogContent`) | Operation in flight: locks Esc, outside click and the `X` all at once. Do not copy the `onEscapeKeyDown` + `onInteractOutside` + `closeDisabled` trio. |
+| `useFetchData` | `hooks/useFetchData.ts` | Screen load: 1st load × reload, error, stale-response guard (generation), session gate, `atualizadoEm` and `onErroComDados` (the reload toast). Auto-refresh and returning to the tab call `recarregarEmFundo`, not `refetch`: with the 1st load in error, the card stays on screen during the attempt, instead of leaving and coming back (and being announced again) on every tick. Do not rewrite loading/error by hand. |
+| `Indicadores` | `components/observability/indicadores.tsx` | Grid of 4 stat cards with trend and sparkline. |
+| `GraficoPorDia` | `components/observability/grafico-por-dia.tsx` | Section card "Execuções por dia" (Runs per day) (bars via next/dynamic). |
+| `formatos` | `components/observability/formatos.ts` | All pt-BR formatting: `formatarInteiro/Percentual/Pontos/Duracao/Inicio/Quando`, `plural`, `rotuloDaOrigem/Categoria/Nivel`. Always use it. |
+| `textoDeFrescor` | `components/observability/cabecalho.tsx` | "atualizado há N" (updated N ago; coarse grain). Reused by every header. |
+| Screen states | `components/shared/estados.tsx` | Frames for the states of §3: `CartaoDeEstado` (tone `erro`/`neutro` — automatic `role="alert"` on error —, size `compacto`/`amplo`), `ErroDeCarga`, `VazioPrimeiroUso`, `SemResultado`/`textoDeSemResultado`, `AvisoAmbar`. Use `shared/estados.tsx` — do not copy the structure; each screen's `estados.tsx` keeps only the Skeleton* and the phrases. |
+| `ui/*` (shadcn) | `components/ui/*` | Primitives: Button (default/outline/ghost/destructive; sizes default h-9, sm h-8, icon size-9), Dialog, Sheet, Select, DropdownMenu, Input, Switch, Tooltip, Separator. Built-in ring-[3px] focus. |
 
-### 9. Escopo deste lote (redesenho de consistência)
+### 9. Scope of this batch (consistency redesign)
 
-**Telas padronizadas** (preservam função/IA; alinham casca, estados, tokens, a11y,
-microcopy): **Autenticação** (login já é a referência; nivelar cadastro, recuperar
-senha, redefinir senha, verificar e-mail — extrair uma casca `AuthShell`, migrar às
-classes `.auth-*`, `aria-hidden` no fundo decorativo; desde a Home aberta sem login, as
-CINCO são painéis do **modal de entrada da Home** — `components/home/entrada/`, no tema
-dela — e as rotas antigas só redirecionam para lá, de modo que nenhuma segue a
-`AuthShell`), **Credenciais**, **Drive**,
-**Executores** (manter o "trilho"-tabela denso como variante deliberada), **Artefatos**,
-**Admin › Configurações**, **Admin › Usuários**, **Portal de compartilhamento** (`/share`
-— corrigir a página de erro, microcopy acentuada, estados vazios, foco/alvos; manter o
-mapa e a identidade de marca), e afinações no **shell** (CommandPalette, NotificationBell,
+**Standardized screens** (they preserve function/IA; they align frame, states, tokens, a11y,
+microcopy): **Autenticação** (Authentication; login is already the reference; level up sign-up, password
+recovery, password reset, email verification — extract an `AuthShell` frame, migrate to the
+`.auth-*` classes, `aria-hidden` on the decorative background; since the Home opened up without login, all
+FIVE are panels of the **Home sign-in modal** — `components/home/entrada/`, in its
+theme — and the old routes only redirect there, so none of them follows the
+`AuthShell`), **Credenciais** (Credentials), **Drive**,
+**Executores** (Executors; keep the dense table-style "rail" as a deliberate variant), **Artefatos** (Artifacts),
+**Admin › Configurações** (Settings), **Admin › Usuários** (Users), **Portal de compartilhamento** (Share portal; `/share`
+— fix the error page, accented microcopy, empty states, focus/targets; keep the
+map and the brand identity), and refinements in the **shell** (CommandPalette, NotificationBell,
 ExecutorLocalBadge, TitleSidebar).
 
-**Sem mudança de backend** em nenhuma tela — é um passe 100% web.
+**No backend change** on any screen — it is a 100% web pass.
 
-**Fora do lote — Editor de workflow (canvas React Flow):** o canvas é o núcleo do
-produto e tela cheia (sem `PageRoot`/`AppHeader`, por contrato). Não é redesenhado aqui.
-Apenas um passe cosmético mínimo e de baixo risco no *chrome* flutuante: `shadow-sm →
-shadow-xs` em `workflow-location`/`global-save-indicator`, `ring-2 → ring-[3px]` no botão
-do save-indicator, tokenizar as cores do MiniMap, e trocar o erro ad-hoc de
-`/workflow/[id]` pelo cartão de erro do §3.2. Nada de canvas/nós/arestas/execução/Monaco.
+**Outside the batch — Workflow editor (React Flow canvas):** the canvas is the core of the
+product and full-screen (no `PageRoot`/`AppHeader`, by contract). It is not redesigned here.
+Only a minimal, low-risk cosmetic pass on the floating *chrome*: `shadow-sm →
+shadow-xs` on `workflow-location`/`global-save-indicator`, `ring-2 → ring-[3px]` on the
+save-indicator button, tokenizing the MiniMap colors, and replacing the ad-hoc error of
+`/workflow/[id]` with the error card of §3.2. Nothing on canvas/nodes/edges/execution/Monaco.
 
-### 10. Dados de tela: `@tanstack/react-query` (migração em curso)
+### 10. Screen data: `@tanstack/react-query` (migration in progress)
 
-Prova feita em **Artefatos** (`(dashboard)/artifacts/use-artifacts-query.ts`, presa por `__tests__/app/artefatos/tela-de-artefatos.test.tsx`); as demais telas seguem nos hooks feitos à mão até migrarem.
+Proven on **Artefatos** (`(dashboard)/artifacts/use-artifacts-query.ts`, pinned by `__tests__/app/artefatos/tela-de-artefatos.test.tsx`); the other screens stay on hand-written hooks until they migrate.
 
-- **Cliente**: `ProvedorDeConsultas` (`components/provedor-de-consultas.tsx`) envolve o layout `(dashboard)`, a Home inclusive. Os padrões (`lib/consultas.ts`) são os das telas de hoje: sem nova tentativa, sem releitura no foco nem na reconexão, **sem cache** (`staleTime`/`gcTime` 0) e `networkMode: "always"`. Migrar não muda o que a tela mostra; cache, releitura e repetição são decisão de cada consulta. O logout recarrega a página, e o cache vai junto — se um dia a troca de usuário acontecer sem recarga, é preciso um `queryClient.clear()` no `SessionSync`.
-- **Consulta**: as opções numa função (`queryOptions`/`infiniteQueryOptions`), com TODOS os filtros na chave — é a chave que descarta a resposta de um filtro velho (sai o `seq`/`geracao`). O `queryFn` lança quando `res.error` vem preenchido: o service não lança, e só um erro que sobe põe a consulta em erro sem apagar o dado.
-- **Saída da chave**: sair dela (outro filtro, outra aba, outra tela) cancela a busca da chave deixada — `cancelQueries({ queryKey, exact: true })` no cleanup de um efeito sobre a consulta. O `queryFn` não aborta a requisição e o `gcTime: 0` só descarta a consulta ociosa: sem o cancelamento, um "Ver mais" em voo mantinha viva a consulta deixada, e a volta pegava carona nela, com a lista guardada e sem skeleton.
-- **Estados (§3)**: `loading = isPending || (isFetching && !isFetchingNextPage)`. O gate `atualizadoEm` é da montagem, não da chave: o `dataUpdatedAt` zera com o filtro novo, e o filtro que falha depois de uma carga aceita é aviso âmbar, não cartão. O erro sai da tela enquanto uma nova busca está em voo.
-- **"Ver mais"**: `useInfiniteQuery` com `getNextPageParam` derivando o offset das páginas; `fetchNextPage` tem identidade estável (acabou o offset em ref). Recarregar volta à 1ª página com `cancelQueries` + `client.infiniteQuery({ ...opcoes, pages: 1, staleTime: 0 })` — o `refetch()` refaria, uma a uma, todas as páginas abertas.
-- **Cache e lista anterior**: `staleTime` + `gcTime` explícitos só onde a tela já guarda dado (o TTL de 60 s do Histórico). `placeholderData: keepPreviousData` só onde a tela já mantém a lista anterior durante a troca (o Drive, pelo `useFetchData`); Artefatos zera a lista de propósito e não o usa.
-- **Polling**: `refetchInterval: N` (já pausa com a aba oculta) + `refetchOnWindowFocus: true` com `staleTime: N` — relê ao voltar só se o intervalo venceu, como o `setInterval` + `visibilitychange` de hoje.
-- **Mutações**: `invalidateQueries` pela chave. O dedup de GET em voo e a época de escrita de `service/http.ts` ficam até a última leitura sair do caminho manual.
+- **Client**: `ProvedorDeConsultas` (`components/provedor-de-consultas.tsx`) wraps the `(dashboard)` layout, the Home included. The defaults (`lib/consultas.ts`) are those of today's screens: no retry, no refetch on focus or on reconnect, **no cache** (`staleTime`/`gcTime` 0) and `networkMode: "always"`. Migrating does not change what the screen shows; cache, refetching and retrying are each query's decision. Logout reloads the page, and the cache goes with it — if one day a user switch happens without a reload, a `queryClient.clear()` in `SessionSync` will be needed.
+- **Query**: the options in a function (`queryOptions`/`infiniteQueryOptions`), with ALL the filters in the key — it is the key that discards the response of a stale filter (out goes the `seq`/`geracao`). The `queryFn` throws when `res.error` comes back filled in: the service does not throw, and only an error that propagates puts the query in error without wiping the data.
+- **Leaving the key**: leaving it (another filter, another tab, another screen) cancels the fetch of the key left behind — `cancelQueries({ queryKey, exact: true })` in the cleanup of an effect on the query. The `queryFn` does not abort the request and `gcTime: 0` only discards an idle query: without the cancellation, a "Ver mais" (See more) in flight kept the abandoned query alive, and coming back piggybacked on it, with the stored list and no skeleton.
+- **States (§3)**: `loading = isPending || (isFetching && !isFetchingNextPage)`. The `atualizadoEm` gate belongs to the mount, not to the key: `dataUpdatedAt` resets with the new filter, and a filter that fails after an accepted load is an amber warning, not a card. The error leaves the screen while a new fetch is in flight.
+- **"Ver mais"**: `useInfiniteQuery` with `getNextPageParam` deriving the offset from the pages; `fetchNextPage` has a stable identity (no more offset in a ref). Reloading goes back to the 1st page with `cancelQueries` + `client.infiniteQuery({ ...opcoes, pages: 1, staleTime: 0 })` — `refetch()` would redo, one by one, every open page.
+- **Cache and previous list**: explicit `staleTime` + `gcTime` only where the screen already keeps data (Histórico's 60 s TTL). `placeholderData: keepPreviousData` only where the screen already keeps the previous list during the switch (the Drive, through `useFetchData`); Artefatos clears the list on purpose and does not use it.
+- **Polling**: `refetchInterval: N` (it already pauses with the tab hidden) + `refetchOnWindowFocus: true` with `staleTime: N` — it refetches on return only if the interval has elapsed, like today's `setInterval` + `visibilitychange`.
+- **Mutations**: `invalidateQueries` by key. The in-flight GET dedup and the write epoch of `service/http.ts` stay until the last read leaves the manual path.
 
-**Ordem da migração**: (1) `observability/use-execucoes.ts`, gêmeo da prova (`with_total` só na página 0, `has_more` no `getNextPageParam`); (2) na Home, `useConversas` e `useAgendamentos` ("Ver mais" com `geracao`); (3) o `useFetchData` por dentro, com a mesma interface e uma chave por chamador — Credenciais, Tokens, settings-sheet, Admin, Executores, Drive e Planos de uma vez, presos pelos testes do próprio hook; (4) os de polling com várias fontes — `use-projetos-dados`, `use-dashboard-dados`, `use-historico-dados` (`useQueries`, uma consulta por fonte, o TTL como `staleTime`); (5) `useAcervo`; (6) os contextos (execuções ativas, notificações, workspaces) e, por último, o dedup e a época de `service/http.ts`.
+**Migration order**: (1) `observability/use-execucoes.ts`, the proof's twin (`with_total` only on page 0, `has_more` in `getNextPageParam`); (2) on the Home, `useConversas` and `useAgendamentos` ("Ver mais" with `geracao`); (3) `useFetchData` from the inside, with the same interface and one key per caller — Credentials, Tokens, settings-sheet, Admin, Executors, Drive and Plans all at once, pinned by the hook's own tests; (4) the polling ones with several sources — `use-projetos-dados`, `use-dashboard-dados`, `use-historico-dados` (`useQueries`, one query per source, the TTL as `staleTime`); (5) `useAcervo`; (6) the contexts (active runs, notifications, workspaces) and, last of all, the dedup and the epoch of `service/http.ts`.

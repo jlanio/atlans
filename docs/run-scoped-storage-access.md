@@ -1,111 +1,111 @@
-# Escopo de storage por run (follow-up de segurança)
+# Run-scoped storage access (security follow-up)
 
-**Status:** aberto — plano acordado, não implementado.
+**Status:** open — plan agreed, not implemented.
 
-## Problema
+## Problem
 
-Os endpoints de storage do executor autorizam pelo **workspace do executor**, não
-pelo **workspace do run**. Como `get_agent_workspace_ids` devolve *todos* os
-workspaces quando `is_default=True` (`app/services/user_executor_service.py`) e
-todo workflow sem `target_agent_id` é roteado ao executor default, a checagem é
-sempre verdadeira nesse caminho. Na prática o `id_hash` do arquivo (ou a `s3_key`)
-funciona como credencial portátil: quem o conhece, lê — de qualquer workspace.
+The executor's storage endpoints authorize by the **executor's workspace**, not
+by the **run's workspace**. Since `get_agent_workspace_ids` returns *all*
+workspaces when `is_default=True` (`app/services/user_executor_service.py`) and
+every workflow without `target_agent_id` is routed to the default executor, the check is
+always true on that path. In practice the file's `id_hash` (or the `s3_key`)
+works as a portable credential: whoever knows it can read it — from any workspace.
 
-Não há validação da origem do id: `driveFileId` vai cru da definição JSON do
-workflow para o nó. O único ponto em `app/` que sequer inspeciona o campo é o
-relatório de move (`app/services/workflow_move_report.py`, que define
-`_DRIVE_ID_PROP = "driveFileId"` e emite `drive_refs_out_of_scope`) — em nenhum
-momento da leitura de arquivo o id é validado contra o workspace do run.
+There is no validation of the id's origin: `driveFileId` goes raw from the workflow's JSON
+definition to the node. The only place in `app/` that even inspects the field is the
+move report (`app/services/workflow_move_report.py`, which defines
+`_DRIVE_ID_PROP = "driveFileId"` and emits `drive_refs_out_of_scope`) — at no
+point in reading a file is the id validated against the run's workspace.
 
-### Cenário sem adivinhação de id
+### Scenario without guessing ids
 
-1. Uma pessoa é membro dos workspaces **X** e **Y** e vê legitimamente, na UI de
-   Y, os ids dos arquivos do Drive.
-2. Ela cria um workflow **em X** com `driveFileId` de um arquivo de **Y**, ligado
-   a um `DataOutput`.
-3. O run de X pede o arquivo; o servidor entrega (executor default → todos os
-   workspaces); o dado de Y vira artefato **de X**, visível para membros de X que
-   nunca tiveram acesso a Y.
+1. A person is a member of workspaces **X** and **Y** and legitimately sees, in Y's
+   UI, the ids of the Drive files.
+2. They create a workflow **in X** with the `driveFileId` of a file from **Y**, wired
+   to a `DataOutput`.
+3. X's run requests the file; the server delivers it (default executor → all
+   workspaces); Y's data becomes an artifact **of X**, visible to members of X who
+   never had access to Y.
 
-Variante: a pessoa é **removida de Y** e os ids que anotou continuam funcionando
-a partir de qualquer workflow em X — a revogação de acesso não revoga nada.
+Variant: the person is **removed from Y** and the ids they wrote down keep working
+from any workflow in X — revoking access revokes nothing.
 
-### Interação com o move de workflow
+### Interaction with the workflow move
 
-`POST /workflows/{id}/move` torna esse caminho mais fácil de exercitar **sem má
-intenção**: um workflow legítimo, com `driveFileId` de arquivos do workspace A,
-passa a rodar no workspace B e continua lendo os arquivos de A — porque o
-executor default enxerga todos os workspaces. O move avisa disso
-(`drive_refs_out_of_scope`), mas o aviso é informativo: quem ignorar segue com um
-fluxo que lê dados fora do próprio tenant.
+`POST /workflows/{id}/move` makes this path easier to exercise **without ill
+intent**: a legitimate workflow, with the `driveFileId` of files from workspace A,
+starts running in workspace B and keeps reading A's files — because the
+default executor sees every workspace. The move warns about this
+(`drive_refs_out_of_scope`), but the warning is informational: whoever ignores it ends up with a
+workflow that reads data outside its own tenant.
 
-Isso não muda a correção proposta abaixo, só aumenta a chance de o cenário
-aparecer em uso normal. Quando o enforcement por run entrar, esses fluxos passam
-a falhar de forma visível — que é o comportamento desejado.
+This does not change the fix proposed below, it only increases the chance of the scenario
+showing up in normal use. When per-run enforcement lands, these workflows will start
+failing visibly — which is the desired behavior.
 
-### Nota histórica
+### Historical note
 
-A regra correta existia no código: `wf.workspace_id != workspace_id →
-PermissionError`, dentro de `_resolve_server` no `drive_resolver`. Estava em dois
-lugares errados — num branch inalcançável (o motor nunca roda no servidor) e do
-lado do cliente, onde o próprio executor conferia a si mesmo. O branch foi
-removido na limpeza do modo in-server; a intenção precisa voltar, agora no
-servidor e derivada de dados que o cliente não escolhe.
+The correct rule used to exist in the code: `wf.workspace_id != workspace_id →
+PermissionError`, inside `_resolve_server` in the `drive_resolver`. It was in two
+wrong places — in an unreachable branch (the engine never runs on the server) and on
+the client side, where the executor checked itself. The branch was
+removed in the cleanup of the in-server mode; the intent needs to come back, now on the
+server and derived from data that the client does not choose.
 
-## Endpoints afetados
+## Affected endpoints
 
-Todos em `app/api/routers/drive_router.py`:
+All in `app/api/routers/drive_router.py`:
 
-| Endpoint | Autorização atual | Usado por |
+| Endpoint | Current authorization | Used by |
 |---|---|---|
-| `GET /drive/executor-download/{id_hash}` | `wf.workspace_id in executor._resolved_ws_ids` | leitores de Drive, DataInput |
-| `GET /drive/executor-download-artifact/{id_hash}` | `artifact.workspace_id in ...` | DataInput (contexto Artefatos) |
-| `POST /drive/executor-presign-download` | `svc.presign_download` — checagem própria (segmento de workspace p/ `pin-cache/`+`artifacts/`, lookup em `WorkspaceFile` p/ `drive/`) | pin cache, send_email (modo link) |
-| `POST /drive/executor-presign-upload` | `_validate_agent_s3_key` (segmento de workspace na s3_key) | pin cache, response_node, artefatos |
-| `POST /drive/executor-upload-url` | `_validate_agent_s3_key` + `ws_id in ...` | DataOutput com entrada no Drive |
+| `GET /drive/executor-download/{id_hash}` | `wf.workspace_id in executor._resolved_ws_ids` | Drive readers, DataInput |
+| `GET /drive/executor-download-artifact/{id_hash}` | `artifact.workspace_id in ...` | DataInput (Artifacts context) |
+| `POST /drive/executor-presign-download` | `svc.presign_download` — its own check (workspace segment for `pin-cache/`+`artifacts/`, lookup in `WorkspaceFile` for `drive/`) | pin cache, send_email (link mode) |
+| `POST /drive/executor-presign-upload` | `_validate_agent_s3_key` (workspace segment in the s3_key) | pin cache, response_node, artifacts |
+| `POST /drive/executor-upload-url` | `_validate_agent_s3_key` + `ws_id in ...` | DataOutput with a Drive entry |
 
-## Correção proposta
+## Proposed fix
 
-O executor envia o run (`task_id`, já disponível como `self._task_id` em todo nó
-— ver `flow/nodes/base.py`) e o servidor deriva a autorização da própria linha de
-`WorkflowRun`, sem confiar no valor enviado para nada além da busca:
+The executor sends the run (`task_id`, already available as `self._task_id` in every node
+— see `flow/nodes/base.py`) and the server derives the authorization from the
+`WorkflowRun` row itself, without trusting the value sent for anything beyond the lookup:
 
-1. carrega o `WorkflowRun` pelo `task_id`;
-2. confere que `run.host == f"executor:{executor.id_hash}"` — o run foi despachado
-   para *este* executor (mesmo cruzamento que `_query_run_belongs_to_agent` já faz
-   em `executor_ws_router.py`);
-3. confere que o recurso pertence a `run.workspace_id` (em vez de "algum
-   workspace do executor").
+1. load the `WorkflowRun` by `task_id`;
+2. check that `run.host == f"executor:{executor.id_hash}"` — the run was dispatched
+   to *this* executor (the same cross-check that `_query_run_belongs_to_agent` already does
+   in `executor_ws_router.py`);
+3. check that the resource belongs to `run.workspace_id` (instead of "some
+   workspace of the executor").
 
-> Esquema das chaves (âncora do passo 3): os prefixos aceitos são `drive/`,
-> `pin-cache/` e `artifacts/`, todos no formato `{prefixo}/{workspace_id}/…`
-> (artefatos como `artifacts/{workspace_id}/{task_id}/arquivo`). É esse
-> `{workspace_id}` embutido — hoje comparado com "algum workspace do executor" —
-> que a checagem por run passa a comparar com `run.workspace_id`.
+> Key layout (anchor for step 3): the accepted prefixes are `drive/`,
+> `pin-cache/` and `artifacts/`, all in the format `{prefixo}/{workspace_id}/…`
+> (artifacts as `artifacts/{workspace_id}/{task_id}/arquivo`). It is this embedded
+> `{workspace_id}` — today compared against "some workspace of the executor" —
+> that the per-run check will compare against `run.workspace_id`.
 
-O padrão de referência já existe em `_authorize_key`
-(`app/api/routers/change_detector_router.py`), que resolve o workspace do
-workflow antes de liberar a chave.
+The reference pattern already exists in `_authorize_key`
+(`app/api/routers/change_detector_router.py`), which resolves the workflow's workspace
+before releasing the key.
 
 ## Rollout
 
-Executores são externos/on-premise e atualizam de forma independente: se o
-servidor passar a **exigir** o `task_id` de imediato, todo executor que ainda não
-subiu quebra em qualquer leitura do Drive. Três passos:
+Executors are external/on-premise and update independently: if the
+server starts **requiring** the `task_id` right away, every executor that has not yet
+upgraded breaks on any Drive read. Three steps:
 
-1. **Executor** passa a enviar o `task_id` (header ou query) nos cinco endpoints.
-2. **Servidor** aceita o campo como opcional: quando presente, aplica a checagem
-   por run; quando ausente, mantém o comportamento atual e loga em `warning` com
-   o `executor_id` e o `executor_version` do handshake.
-3. **Enforcement** depois que os logs mostrarem a frota atualizada — o
-   `executor_version` chega no handshake (`executor_ws_router.py`), então dá para
-   gatear por versão mínima em vez de data.
+1. The **executor** starts sending the `task_id` (header or query) on the five endpoints.
+2. The **server** accepts the field as optional: when present, it applies the per-run
+   check; when absent, it keeps the current behavior and logs at `warning` with
+   the `executor_id` and the `executor_version` from the handshake.
+3. **Enforcement** once the logs show the fleet has been updated — the
+   `executor_version` arrives in the handshake (`executor_ws_router.py`), so it is possible to
+   gate on a minimum version instead of a date.
 
-## Itens menores relacionados
+## Related minor items
 
-- `local_fallback=True` (em `flow/utils/artifact_helpers.py`) devolve a `s3_key`
-  do MinIO mesmo quando o upload falhou e o artefato ficou só no disco do
-  executor. O servidor registra um `Artifact` apontando para objeto inexistente.
-  O flag hoje é informativo — o servidor poderia usá-lo para marcar o artefato.
-- `count_orphaned_pinned_artifacts` (`app/core/storage_reconciliation.py`) apenas
-  audita pins órfãos de workflow deletado; não remove.
+- `local_fallback=True` (in `flow/utils/artifact_helpers.py`) returns the MinIO
+  `s3_key` even when the upload failed and the artifact stayed only on the executor's
+  disk. The server records an `Artifact` pointing to a nonexistent object.
+  The flag is informational today — the server could use it to mark the artifact.
+- `count_orphaned_pinned_artifacts` (`app/core/storage_reconciliation.py`) only
+  audits orphaned pins of deleted workflows; it does not remove them.

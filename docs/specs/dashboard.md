@@ -1,263 +1,263 @@
-# Dashboard (landing) — redesenho
+# Dashboard (landing) — redesign
 
-Data: 2026-09-07. Estado: **parcialmente implementado**. Construído e no código hoje: cabeçalho (escopo +
-período), faixa de **Saúde**, **Precisa de atenção | Próximas execuções**, e o
-**Resumo do período** (indicadores + gráfico). **NÃO** construído nesta rodada
-(ver §4): "Atividade recente", "Atalhos / Seus workspaces / Armazenamento", a
-busca de `storage` no hook de dados, e o carimbo de frescor ("atualizado há X")
-no cabeçalho. Exemplo aprovado: mockup "Dashboard, nova versão" (desktop 1440,
-telefone 390, temas escuro e claro).
+Date: 2026-09-07. Status: **partially implemented**. Built and in the code today: header (scope +
+period), **Saúde** (Health) strip, **Precisa de atenção | Próximas execuções** (Needs attention | Upcoming runs), and the
+**Resumo do período** (Period summary; indicators + chart). **NOT** built in this round
+(see §4): "Atividade recente" (Recent activity), "Atalhos / Seus workspaces / Armazenamento" (Shortcuts / Your workspaces / Storage), the
+`storage` fetch in the data hook, and the freshness stamp ("atualizado há X" — updated X ago)
+in the header. Approved example: the "Dashboard, nova versão" (Dashboard, new version) mockup (desktop 1440,
+phone 390, dark and light themes).
 
-A rota `/dashboard` é a visão geral do **administrador do sistema** — restrita ao
-admin por enquanto (o middleware barra quem não é admin, o mesmo portão de `/admin/*`;
-some da sidebar e da paleta para os demais). A **landing** pós-login passou a ser a
-Home `/` (globo 3D + assistente).
-Papel próprio do Dashboard: **orientação + triagem + roteamento**, não análise. Abre respondendo
-o AGORA e desce por prioridade operacional: **está tudo bem agora? → o que precisa
-de mim? → o que vai rodar? → como andou?** (o "por onde entro?" — atalhos/roteamento —
-ficou para depois; §4.)
+The `/dashboard` route is the overview for the **system administrator** — restricted to
+admins for now (the middleware blocks non-admins, the same gate as `/admin/*`;
+it disappears from the sidebar and the palette for everyone else). The post-login **landing** is now the
+Home `/` (3D globe + assistant).
+The Dashboard's own role: **orientation + triage + routing**, not analysis. It opens by answering
+the NOW and goes down by operational priority: **is everything fine right now? → what needs
+me? → what is going to run? → how did it go?** (the "where do I go in?" — shortcuts/routing —
+was left for later; §4.)
 
-Delimitação — regra de ouro: o Dashboard **resume e roteia**; as irmãs **detalham e
-editam**. Nunca tem tabela filtrável, visões ou painel de execução embutido; nunca
-lista/edita workflows (isso é Projetos); nunca gere workspaces (isso é Workspaces).
-Reusar `indicadores`/`grafico-por-dia`/`atencao-lista` do Histórico é reuso de FAMÍLIA,
-sem a superfície interativa (sem filtros, sem tabela, sem visões); a única herdada é o
-**seletor de período** (7/30/90 dias), no cabeçalho.
+Boundaries — golden rule: the Dashboard **summarizes and routes**; its sibling screens **detail and
+edit**. It never has a filterable table, views or an embedded run panel; it never
+lists/edits workflows (that is Projects); it never manages workspaces (that is Workspaces).
+Reusing `indicadores`/`grafico-por-dia`/`atencao-lista` from History is reuse of the FAMILY,
+without the interactive surface (no filters, no table, no views); the only thing inherited is the
+**period selector** (7/30/90 days), in the header.
 
-## 1. Decisões
+## 1. Decisions
 
-| Decisão | Motivo |
+| Decision | Reason |
 |---|---|
-| **Escopo: workspace ATIVO por padrão, com um toggle "Todos os workspaces"** | Pedido do dono. O toggle troca o `workspace_id` de todas as chamadas (default = `WorkspaceContext.current`; "todos" = sem `workspace_id`). |
-| Estado do escopo na URL: `?escopo=todos` (default = ativo, omitido) | F5/voltar/link preservam a escolha; espelha o padrão do Histórico |
-| No escopo "todos", cada item de lista **diz o workspace** (etiqueta com cor); no escopo de um workspace, a etiqueta some (é redundante) | O que torna a visão global legível sem confundir |
-| Faixa de **Saúde colorida** no topo (verde/âmbar/vermelho) com veredito em uma frase + a linha "agora" | Nada na tela dizia o instante; o dado (`now`) já vinha e era descartado |
-| **Precisa de atenção** (presas, falhas repetidas, executor no teto) que resume e deep-linka ao Histórico/Executores | O backend calcula `top_failing_workflows` e a tela ignorava |
-| **Próximas execuções** agendadas (forward-looking) — EXCLUSIVO do Dashboard | Nenhuma outra tela responde "o que vai rodar" |
-| **Resumo do período: 7 / 30 / 90 dias (default 30), com seletor no cabeçalho** — o mesmo grupo do Histórico | Pedido do dono; a janela governa indicadores, gráfico e as falhas da atenção, como no Histórico |
-| 4 indicadores comparados ao período anterior + gráfico de 4 séries — reuso de `observability/indicadores` e `grafico-por-dia` | Mesma família; sem a superfície do Histórico |
-| Atividade recente enriquecida: status pt-BR, **workspace · origem · quando**, leva ao painel da execução — **não construído nesta rodada (§4)** | A atual tinha data crua e nenhum contexto |
-| Atalhos de verdade (lidera **"Abrir «workspace ativo»"** + Novo workflow); lista "Seus workspaces" para rotear; armazenamento com quebra — **não construído nesta rodada (§4)** | "Duração média" sai dos atalhos (vira indicador); storage sem cota/tendência (o endpoint não tem) |
-| Saem: `MetricCard`/`AnimatedNumber`, `RunsChart` (2 séries), `framer-motion`, datas cruas, `avg_duration_seconds` | A família abandonou; incoerências e ruído |
-| Sem migração de banco; único endpoint tocado: `/workspaces/storage/my` ganhou `workspace_id` opcional (feito no backend, **nunca ligado** na tela e depois removido — §2.1, §4) | Coerência do storage com o escopo |
+| **Scope: ACTIVE workspace by default, with a "Todos os workspaces" (All workspaces) toggle** | Requested by the owner. The toggle switches the `workspace_id` of every call (default = `WorkspaceContext.current`; "all" = no `workspace_id`). |
+| Scope state in the URL: `?escopo=todos` (default = active, omitted) | F5/back/link preserve the choice; mirrors the History pattern |
+| In the "all" scope, every list item **states its workspace** (colored tag); in a single-workspace scope, the tag disappears (it is redundant) | What makes the global view readable without confusion |
+| **Colored Health** strip at the top (green/amber/red) with a one-sentence verdict + the "now" line | Nothing on the screen said what was happening at the moment; the data (`now`) was already arriving and being discarded |
+| **Precisa de atenção** (Needs attention: stuck runs, repeated failures, executor at its ceiling) that summarizes and deep-links to History/Executors | The backend computes `top_failing_workflows` and the screen ignored it |
+| Scheduled **Próximas execuções** (Upcoming runs; forward-looking) — EXCLUSIVE to the Dashboard | No other screen answers "what is going to run" |
+| **Period summary: 7 / 30 / 90 days (default 30), with a selector in the header** — the same group as History | Requested by the owner; the window governs the indicators, the chart and the attention failures, as in History |
+| 4 indicators compared with the previous period + a 4-series chart — reuse of `observability/indicadores` and `grafico-por-dia` | Same family; without the History surface |
+| Enriched recent activity: pt-BR status, **workspace · origin · when**, leads to the run panel — **not built in this round (§4)** | The current one had a raw date and no context |
+| Real shortcuts (led by **"Abrir «workspace ativo»"** (Open "active workspace") + New workflow); a "Seus workspaces" (Your workspaces) list for routing; storage with a breakdown — **not built in this round (§4)** | "Duração média" (Average duration) leaves the shortcuts (becomes an indicator); storage without quota/trend (the endpoint does not have them) |
+| Removed: `MetricCard`/`AnimatedNumber`, `RunsChart` (2 series), `framer-motion`, raw dates, `avg_duration_seconds` | The family abandoned them; inconsistencies and noise |
+| No database migration; the only endpoint touched: `/workspaces/storage/my` gained an optional `workspace_id` (done in the backend, **never wired** on screen and later removed — §2.1, §4) | Storage consistency with the scope |
 
 ## 2. API
 
-### 2.1 `GET /workspaces/storage/my` — `workspace_id` opcional (feito, depois removido)
+### 2.1 `GET /workspaces/storage/my` — optional `workspace_id` (done, later removed)
 
-> A rota e o `getMyStorageUsage` da web saíram sem nunca terem sido chamados. Ficam aqui
-> como registro da regra, para quando o bloco de Armazenamento (§4) for construído.
+> The route and the web's `getMyStorageUsage` were removed without ever having been called. They stay here
+> as a record of the rule, for when the Storage block (§4) is built.
 
-Query param novo `workspace_id?: str`. Sem ele: soma todos os workspaces do usuário
-(comportamento de sempre — escopo "todos"). Com ele: só aquele workspace, **validado
-por pertencimento** (`workspace_id not in workspace_ids` → 403). Ao contrário do
-`/observability/metrics`, este endpoint não recebe o objeto `user`, então aplica a
-regra a todos igualmente, **sem o bypass de admin** que o metrics tem (§2.2) — na
-prática as duas só divergem para um admin de plataforma, e o Dashboard nunca manda um
-`workspace_id` fora do acesso (o escopo ativo sempre usa `current.id_hash`). Web:
-`GisFlowService.getMyStorageUsage(workspaceId?)` (o método existiu; **o Dashboard nunca
-o chamou** — §4).
+New query param `workspace_id?: str`. Without it: sums all of the user's workspaces
+(the usual behavior — "all" scope). With it: only that workspace, **validated
+by membership** (`workspace_id not in workspace_ids` → 403). Unlike
+`/observability/metrics`, this endpoint does not receive the `user` object, so it applies the
+rule to everyone equally, **without the admin bypass** that metrics has (§2.2) — in
+practice the two only diverge for a platform admin, and the Dashboard never sends a
+`workspace_id` outside the user's access (the active scope always uses `current.id_hash`). Web:
+`GisFlowService.getMyStorageUsage(workspaceId?)` (the method existed; **the Dashboard never
+called it** — §4).
 
-### 2.2 Reaproveitados, sem mudança — todos já aceitam `workspace_id`
+### 2.2 Reused, unchanged — all of them already accept `workspace_id`
 
 - `GET /observability/metrics?days=30[&workspace_id=&force=]` → `IObservabilityMetrics`.
-  O `run_f` de `_resolver_escopo` filtra `WorkflowRun`, então no bloco `now` só
-  `running`/`pending`/`stuck` respeitam o escopo. `now.executors`, `queued_on_executors`
-  e `overdue_acks` refletem a **frota acessível do usuário** (pool default + workspaces
-  do usuário + atribuídos), global por design — o despacho tira dessa mesma frota, então
-  ela é relevante mesmo escopado; a frota por workspace fica para v2 (§4). `workspace_id`
-  fora do acesso → 403 (o admin de plataforma tem bypass: vê qualquer `workspace_id`,
-  inclusive inexistente → zeros).
-- `GET /observability/runs-by-day?days=30[&workspace_id=&tz=]` → gráfico (4 séries).
-- `GET /observability/runs?limit=6[&workspace_id=]` → hoje só alimenta a detecção do
-  "vazio de primeiro uso" (§3.10); a lista "Atividade recente" não foi construída (§4).
-  `IRunSummary` já traz `workspace_name` e `trigger_source`.
-- `GET /observability/metrics/executores?days=30[&workspace_id=&force=]` → item
-  "executor no teto" da atenção (opcional; falha → sem esse item).
-- `GET /workflows[?workspace_id=]` → "Próximas execuções" (usa `schedule` +
-  `has_*_trigger` da listagem, já entregues no PR de Projetos).
+  The `run_f` of `_resolver_escopo` filters `WorkflowRun`, so in the `now` block only
+  `running`/`pending`/`stuck` respect the scope. `now.executors`, `queued_on_executors`
+  and `overdue_acks` reflect the **user's accessible fleet** (default pool + the user's
+  workspaces + assigned ones), global by design — dispatch draws from that same fleet, so
+  it is relevant even when scoped; the per-workspace fleet is left for v2 (§4). A `workspace_id`
+  outside the user's access → 403 (the platform admin has a bypass: sees any `workspace_id`,
+  including a nonexistent one → zeros).
+- `GET /observability/runs-by-day?days=30[&workspace_id=&tz=]` → chart (4 series).
+- `GET /observability/runs?limit=6[&workspace_id=]` → today it only feeds the detection of the
+  "first-use empty state" (§3.10); the "Atividade recente" list was not built (§4).
+  `IRunSummary` already includes `workspace_name` and `trigger_source`.
+- `GET /observability/metrics/executores?days=30[&workspace_id=&force=]` → the
+  "executor at its ceiling" attention item (optional; failure → no such item).
+- `GET /workflows[?workspace_id=]` → "Próximas execuções" (uses `schedule` +
+  `has_*_trigger` from the listing, already delivered in the Projects PR).
 
-**Janela = 7 / 30 / 90 dias (default 30)**, escolhida no cabeçalho (`?periodo=`, reusando
-`Periodo`/`PERIODOS` do Histórico), em `metrics`, `runs-by-day` e `metrics/executores`.
-Instante (`now`) não é janela: poll de 30 s isolado, sempre na janela corrente.
+**Window = 7 / 30 / 90 days (default 30)**, chosen in the header (`?periodo=`, reusing
+`Periodo`/`PERIODOS` from History), in `metrics`, `runs-by-day` and `metrics/executores`.
+The instant (`now`) is not a window: a separate 30 s poll, always on the current window.
 
 ## 3. Web
 
-### 3.1 Estrutura (de cima para baixo) — o que existe hoje
+### 3.1 Structure (top to bottom) — what exists today
 
 ```
 Dashboard              [↻ Atualizar]  [«Bacia do Rio Doce» ▾]  [7 · 30 · 90 dias]
-«Bacia do Rio Doce» · 8 workflows ativos   (toggle de escopo → "Todos os workspaces"; período → ?periodo=)
+«Bacia do Rio Doce» · 8 workflows ativos   (scope toggle → "Todos os workspaces"; period → ?periodo=)
 
 ┌ SAÚDE — agora ────────────────────────────────────────────────────────────────┐
-│ (friso âmbar) Precisa de você: 1 execução presa há 18 min e 2 workflows falhando │
+│ (amber edge)  Precisa de você: 1 execução presa há 18 min e 2 workflows falhando │
 │ ● 3 em andamento · 2 na fila │ ⏱ 1 presa há 18 min │ ● Executores 5 de 6 online  Ver em andamento →
 └──────────────────────────────────────────────────────────────────────────────────┘
-     (estado calmo → uma LINHA verde fina, não um cartão grande)
+     (calm state → a thin green LINE, not a big card)
 
 ┌ Precisa de atenção ─────────────────┐  ┌ Próximas execuções ────────────┐
-│ presas → falhas repetidas → teto    │  │ agendadas, por horário          │
+│ stuck → repeated failures → ceiling │  │ scheduled, by time              │
 └─────────────────────────────────────┘  └─────────────────────────────────┘
 
 ┌ RESUMO DO PERÍODO · ÚLTIMOS N DIAS ────────────────────────── Ver no Histórico →┐
-│ [Execuções] [Taxa de sucesso] [Duração típica] [Falhas]   (4 indicadores)        │
-│ ▂▃▅▇… gráfico por dia (4 séries de status)                                        │
+│ [Execuções] [Taxa de sucesso] [Duração típica] [Falhas]   (4 indicators)         │
+│ ▂▃▅▇… daily chart (4 status series)                                               │
 └────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-A região Atenção|Próximas usa a grade `lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]`;
-Saúde e Resumo ocupam a largura toda. Telefone: uma coluna, mesma ordem; cabeçalho
-empilha (título; abaixo o toggle, o período e o Atualizar); indicadores 2×2; gráfico
-`h-40`; alvos ≥ 40 px. (As regiões "Atividade recente" e "Atalhos" do plano original
-não foram construídas — §4.)
+The Atenção|Próximas (Attention|Upcoming) region uses the `lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]` grid;
+Saúde (Health) and Resumo (Summary) take the full width. Phone: one column, same order; the header
+stacks (title; below it the toggle, the period and Atualizar (Refresh)); indicators 2×2; chart
+`h-40`; targets ≥ 40 px. (The "Atividade recente" (Recent activity) and "Atalhos" (Shortcuts) regions of the original plan
+were not built — §4.)
 
-### 3.2 Módulos (`web/app/components/dashboard/`)
+### 3.2 Modules (`web/app/components/dashboard/`)
 
-| Arquivo | Responsabilidade |
+| File | Responsibility |
 |---|---|
-| `index.tsx` | Orquestra: escopo, dados, composição, roteamento das ações. |
-| `dashboard-url.ts` / `use-dashboard-url.ts` | Estado do escopo e do período na URL (`?escopo=todos`, `?periodo=`; `Periodo`/`PERIODOS` reusados do Histórico). |
-| `use-dashboard-dados.ts` | 5 chamadas em paralelo escopadas (§3.3), falha parcial por seção, poll da saúde 30 s, sequência. |
-| `saude.ts` / `saude-hero.tsx` | Tom (puro) + faixa colorida com veredito (§3.4). |
-| `proximas.ts` / `proximas-lista.tsx` | Deriva e lista as próximas execuções agendadas (§3.6). |
-| `estados.tsx` | Skeleton da 1ª carga, erro de espinha, vazio de primeiro uso e o aviso âmbar de falha parcial por seção (§3.10). |
-| `cabecalho.tsx` | Título, subtítulo com escopo, toggle de escopo, seletor de período, Atualizar (§3.9). |
-| reuso do Histórico | `observability/indicadores.tsx`, `grafico-por-dia.tsx`, `atencao.ts`+`atencao-lista.tsx`; `ItensAgora` extraído de `agora-faixa.tsx` (export nomeado, não-quebra) para a Saúde reusar a mesma linha. |
+| `index.tsx` | Orchestrates: scope, data, composition, routing of the actions. |
+| `dashboard-url.ts` / `use-dashboard-url.ts` | Scope and period state in the URL (`?escopo=todos`, `?periodo=`; `Periodo`/`PERIODOS` reused from History). |
+| `use-dashboard-dados.ts` | 5 scoped calls in parallel (§3.3), partial failure per section, 30 s health poll, sequencing. |
+| `saude.ts` / `saude-hero.tsx` | Tone (pure) + colored strip with a verdict (§3.4). |
+| `proximas.ts` / `proximas-lista.tsx` | Derives and lists the upcoming scheduled runs (§3.6). |
+| `estados.tsx` | 1st-load skeleton, backbone error, first-use empty state and the amber per-section partial-failure notice (§3.10). |
+| `cabecalho.tsx` | Title, subtitle with scope, scope toggle, period selector, Atualizar (§3.9). |
+| reuse from History | `observability/indicadores.tsx`, `grafico-por-dia.tsx`, `atencao.ts`+`atencao-lista.tsx`; `ItensAgora` extracted from `agora-faixa.tsx` (named export, non-breaking) so Health can reuse the same line. |
 
-`page.tsx` é um wrapper fino que renderiza `<DashboardView/>`.
+`page.tsx` is a thin wrapper that renders `<DashboardView/>`.
 
-### 3.3 Dados (`use-dashboard-dados.ts`)
+### 3.3 Data (`use-dashboard-dados.ts`)
 
 ```ts
 interface DadosDoDashboard {
-  metrics: IObservabilityMetrics | null   // saúde + atenção + indicadores
-  dias: IRunsByDay[]                       // gráfico
-  runs: IRunSummary[]                      // só alimenta o "vazio de primeiro uso" (§3.10)
-  executores: IExecutorMetrics[]           // atenção "executor no teto" (opcional)
-  workflows: IWorkflow[]                   // próximas execuções (com schedule)
-  carregando: boolean                      // 1ª carga do escopo atual (skeleton)
+  metrics: IObservabilityMetrics | null   // health + attention + indicators
+  dias: IRunsByDay[]                       // chart
+  runs: IRunSummary[]                      // only feeds the "first-use empty state" (§3.10)
+  executores: IExecutorMetrics[]           // "executor at its ceiling" attention item (optional)
+  workflows: IWorkflow[]                   // upcoming runs (with schedule)
+  carregando: boolean                      // 1st load of the current scope (skeleton)
   atualizando: boolean
   falhas: { metrics: boolean; dias: boolean; runs: boolean; workflows: boolean }
-  erroEspinha: string | null               // só quando metrics cai na 1ª carga (bloqueia a tela)
-  atualizadoEm: number | null              // carimbo da última resposta; HOJE não é exibido (§4)
+  erroEspinha: string | null               // only when metrics fails on the 1st load (blocks the screen)
+  atualizadoEm: number | null              // stamp of the last response; NOT displayed TODAY (§4)
   recarregar: (opts?: { force?: boolean }) => void
 }
-// null = "todos" (sem workspace_id); undefined = escopo ativo ainda sem id (workspace
-// carregando) → NÃO busca, mantém o skeleton; dias = 7/30/90
+// null = "all" (no workspace_id); undefined = active scope still without an id (workspace
+// loading) → does NOT fetch, keeps the skeleton; dias = 7/30/90
 useDashboardDados(escopoWorkspaceId: string | null | undefined, dias: number)
 ```
 
-- `escopoWorkspaceId` (resolvido no `index`): `escopo === "todos" ? null`; no escopo
-  ativo, `undefined` enquanto a lista de workspaces carrega (não busca), depois
-  `current?.id_hash`. As **cinco** chamadas partem juntas (`Promise.allSettled`) —
-  `metrics`, `runs-by-day`, `runs`, `executores` e a listagem de `workflows`; só
-  `metrics` é espinha (alimenta saúde + atenção + indicadores) — se ela cair na 1ª carga,
-  `erroEspinha` bloqueia; as demais degradam por seção (aviso âmbar de 1 linha,
-  `falhas.*`). Nunca zerar a tela. **Não há chamada de `storage`.**
-- `executores` é a única opcional que **não** vira aviso: falha → `[]` (a atenção só
-  perde o item "executor no teto").
-- Recarrega ao trocar o escopo E ao trocar `current` quando o escopo é o ativo. Não
-  recarrega ao trocar `current` quando o escopo é "todos". Recarrega também ao trocar
-  o período — mas isso é uma RECARGA (o botão gira, a tela fica), não skeleton: o
-  skeleton fica reservado à 1ª carga de um escopo, como o seletor do Histórico.
-- "Atualizar" → `force:true` (fura o cache das métricas). Poll de 30 s só de `metrics`
-  (aba visível), sem ligar `carregando`/`atualizando`, com carimbo de sequência (resposta
-  velha nunca sobrescreve a nova; força não é sobrescrita por tick — mesmo padrão de
-  `use-projetos-dados`). `atualizadoEm` guarda a última resposta aceita (mas não é
-  exibido hoje — §4).
-- SEM `ActiveRunsContext` para o "agora": ele é do workspace ativo e não serve ao escopo
-  "todos"; o instante vem de `metrics.now`.
+- `escopoWorkspaceId` (resolved in `index`): `escopo === "todos" ? null`; in the active
+  scope, `undefined` while the workspace list is loading (does not fetch), then
+  `current?.id_hash`. The **five** calls go out together (`Promise.allSettled`) —
+  `metrics`, `runs-by-day`, `runs`, `executores` and the `workflows` listing; only
+  `metrics` is the backbone (it feeds health + attention + indicators) — if it fails on the 1st load,
+  `erroEspinha` blocks; the others degrade per section (1-line amber notice,
+  `falhas.*`). Never blank the screen. **There is no `storage` call.**
+- `executores` is the only optional one that does **not** become a notice: failure → `[]` (attention only
+  loses the "executor at its ceiling" item).
+- Reloads when the scope changes AND when `current` changes while the scope is the active one. Does not
+  reload when `current` changes while the scope is "all". It also reloads when
+  the period changes — but that is a RELOAD (the button spins, the screen stays), not a skeleton: the
+  skeleton is reserved for the 1st load of a scope, like the History selector.
+- "Atualizar" (Refresh) → `force:true` (bypasses the metrics cache). 30 s poll of `metrics` only
+  (visible tab), without turning on `carregando`/`atualizando`, with a sequence stamp (a stale
+  response never overwrites a newer one; a forced one is not overwritten by a tick — same pattern as
+  `use-projetos-dados`). `atualizadoEm` holds the last accepted response (but it is not
+  displayed today — §4).
+- NO `ActiveRunsContext` for the "now": it belongs to the active workspace and does not serve the
+  "all" scope; the instant comes from `metrics.now`.
 
-### 3.4 Saúde (`saude.ts` puro + `saude-hero.tsx`)
+### 3.4 Health (pure `saude.ts` + `saude-hero.tsx`)
 
 ```ts
 type TomDeSaude = "calmo" | "atencao" | "critico"
 function tomDeSaude(now: INowBlock | null | undefined, temAtencao: boolean): TomDeSaude
-// crítico: now.stuck_count > 0  OU  (executors.total > 0 && executors.online === 0)
-// atenção: executors.online < executors.total  OU  overdue_acks > 0  OU há itens de atenção*
-// calmo: nenhum dos acima
-// (* "há itens de atenção" é decidido no index via montarAtencao; a saúde recebe, além
-//    de `now`, a contagem por tipo da lista (ResumoDaAtencao: falhas, saturado) para
-//    dizer "2 workflows falhando" sem reimplementar top_failing. As presas NÃO entram
-//    no resumo: já têm motivo próprio, e recontá-las duplicaria o veredito.)
-// A frota (executors) que pesa no tom é a acessível do usuário, não recortada por
-// workspace (§2.2) — o despacho tira dela, então conta mesmo no escopo de um workspace.
+// critical: now.stuck_count > 0  OR  (executors.total > 0 && executors.online === 0)
+// attention: executors.online < executors.total  OR  overdue_acks > 0  OR there are attention items*
+// calm: none of the above
+// (* "there are attention items" is decided in index via montarAtencao; health receives, besides
+//    `now`, the per-type count of the list (ResumoDaAtencao: falhas, saturado) so it can
+//    say "2 workflows falhando" without reimplementing top_failing. Stuck runs are NOT in
+//    the summary: they already have their own reason, and counting them again would duplicate the verdict.)
+// The fleet (executors) that weighs on the tone is the one accessible to the user, not cut down by
+// workspace (§2.2) — dispatch draws from it, so it counts even in a single-workspace scope.
 function veredito(now, tom, resumo, semExecucoes?): string
-// calmo: "Tudo tranquilo — nada pedindo atenção agora." (ou "…— nada rodando ainda."
-//        quando semExecucoes, §3.10);  senão: "Precisa de você: {1–2 motivos}."
+// calm: "Tudo tranquilo — nada pedindo atenção agora." (or "…— nada rodando ainda."
+//       when semExecucoes, §3.10);  otherwise: "Precisa de você: {1–2 motivos}."
 ```
 
-- `saude-hero.tsx`: no **calmo**, uma linha verde fina (friso 4px + ícone check + frase
-  + `ItensAgora`), como a `agora-faixa` neutra do Histórico — NÃO um cartão verde grande.
-  No **atenção/crítico**, o envelope `rounded-xl` ganha friso grosso (padrão
-  `workspace-hero`, sem brilho difuso) + veredito de duas partes. Reusa `ItensAgora` (extraído de
-  `agora-faixa.tsx`). "Ver em andamento →" → `/observability?status=running` (com
-  `&workspace=` quando escopado). Presa clicável → `/observability/run/{runId}`.
-- Textos dos motivos: "1 execução presa há 18 min", "2 workflows falhando", "1 executor
-  no teto", "frota parcialmente offline: 5 de 6". Junta os 1–2 mais graves.
+- `saude-hero.tsx`: when **calm**, a thin green line (4px stripe + check icon + sentence
+  + `ItensAgora`), like History's neutral `agora-faixa` — NOT a big green card.
+  When **attention/critical**, the `rounded-xl` envelope gets a thick stripe (the
+  `workspace-hero` pattern, no diffuse glow) + a two-part verdict. Reuses `ItensAgora` (extracted from
+  `agora-faixa.tsx`). "Ver em andamento →" (See running) → `/observability?status=running` (with
+  `&workspace=` when scoped). A stuck run is clickable → `/observability/run/{runId}`.
+- Reason texts: "1 execução presa há 18 min" (1 run stuck for 18 min), "2 workflows falhando" (2 workflows failing), "1 executor
+  no teto" (1 executor at its ceiling), "frota parcialmente offline: 5 de 6" (fleet partially offline: 5 of 6). It joins the 1–2 most severe.
 
-### 3.5 Precisa de atenção — reuso de `observability/atencao.ts` + `atencao-lista.tsx`
+### 3.5 Precisa de atenção (Needs attention) — reuse of `observability/atencao.ts` + `atencao-lista.tsx`
 
-`montarAtencao({ metrics, executores })` já existe. O `index` mapeia `AcaoDeAtencao`:
+`montarAtencao({ metrics, executores })` already exists. `index` maps `AcaoDeAtencao`:
 `abrir-execucao` → `/observability/run/{runId}`; `filtrar-workflow` →
-`/observability?workflow={id}&status=failed` (a visão padrão — execuções — aplica os
-dois filtros; a visão "workflows" ignoraria ambos e cairia numa lista sem recorte);
-`abrir-executor` → `/executores`. Os deep-links levam `&workspace={id}` quando o painel
-está escopado a um workspace. No escopo "todos", cada item ganha a etiqueta do workspace via o join
-`workflow_hash → Workflow.id_hash → workspace_id → WorkspaceContext` (usando o índice de
-`workflows` já buscado para as Próximas); não resolveu → etiqueta some, nunca inventa.
-Vazio → verde "Nada pendente. Última falha há X." (`textoDeVazio` do Histórico).
+`/observability?workflow={id}&status=failed` (the default view — runs — applies both
+filters; the "workflows" view would ignore both and land on an unfiltered list);
+`abrir-executor` → `/executores`. The deep links carry `&workspace={id}` when the dashboard
+is scoped to a workspace. In the "all" scope, each item gets the workspace tag via the join
+`workflow_hash → Workflow.id_hash → workspace_id → WorkspaceContext` (using the index of
+`workflows` already fetched for the Próximas); if it does not resolve → the tag disappears, it never invents one.
+Empty → green "Nada pendente. Última falha há X." (Nothing pending. Last failure X ago.; History's `textoDeVazio`).
 
-### 3.6 Próximas execuções (`proximas.ts` puro + `proximas-lista.tsx`)
+### 3.6 Próximas execuções (Upcoming runs; pure `proximas.ts` + `proximas-lista.tsx`)
 
-- `proximas(workflows, agora)`: filtra `schedule?.active && flag_ative && next_run_at`
-  no futuro; ordena por `next_run_at` asc; corta em 5. Cada item: ícone do gatilho +
-  nome + workspace (escopo "todos") + `resumirAgendamento`/`formatarProxima`
-  (de `projects/gatilho.ts`). Clique → editor `/workflow/{id}` com prefetch.
-- Vazio → "Nenhuma execução agendada." Pausados/nunca-executados NÃO entram.
-- Contraste com a Home: o painel "Meu → Agendamentos" (`GET /me/schedules`) lista os
-  agendamentos da pessoa entre TODOS os workspaces, ativos E pausados — os pausados
-  aparecem com o `motivoPausa` de `resumirAgendamento` (ex.: "workflow inativo") — e
-  oferece pausar/ativar e rodar agora (com clique, por papel operator). Aqui, no
-  Dashboard, "Próximas" é só uma prévia dos ativos.
+- `proximas(workflows, agora)`: filters `schedule?.active && flag_ative && next_run_at`
+  in the future; sorts by `next_run_at` asc; cuts at 5. Each item: trigger icon +
+  name + workspace ("all" scope) + `resumirAgendamento`/`formatarProxima`
+  (from `projects/gatilho.ts`). Click → editor `/workflow/{id}` with prefetch.
+- Empty → "Nenhuma execução agendada." (No scheduled runs.) Paused/never-run ones are NOT included.
+- Contrast with the Home: the "Meu → Agendamentos" (My → Schedules) panel (`GET /me/schedules`) lists the
+  person's schedules across ALL workspaces, active AND paused — the paused ones
+  appear with the `motivoPausa` from `resumirAgendamento` (e.g. "workflow inativo" — inactive workflow) — and
+  offers pause/activate and run now (with a click, by operator role). Here, on the
+  Dashboard, "Próximas" is just a preview of the active ones.
 
-### 3.7 Cabeçalho + toggle de escopo (`cabecalho.tsx`)
+### 3.7 Header + scope toggle (`cabecalho.tsx`)
 
-- `h1` "Dashboard"; subtítulo = escopo + contagem: escopo ativo → "«{nome}» · {N}
-  workflows ativos"; "todos" → "Todos os workspaces · {W} workspaces · {N} workflows
-  ativos" (`N = metrics.active_workflows`). Skeleton enquanto carrega.
-- **Toggle de escopo** (segmentado, só com > 1 workspace): "«{workspace ativo}»" ↔
-  "Todos os workspaces". Muda `?escopo=`. `aria-label="Escopo do painel"`.
-- **Seletor de período** (segmentado, 7/30/90 dias, default 30): reusa `PERIODOS` do
-  Histórico e o mesmo desenho. Muda `?periodo=`. `aria-label="Período"`, cada botão
-  `aria-label="Últimos N dias"`. Governa a janela dos indicadores, do gráfico e das
-  falhas em "Precisa de atenção" (a "Saúde · agora" e as "Próximas" não mudam).
-- Atualizar (`ghost`, `TbRefresh` sob `motion-safe:`). O carimbo de frescor
-  "atualizado há X" **NÃO** é exibido aqui: `atualizadoEm` existe no hook mas o cabeçalho
-  não o renderiza; `textoDeFrescor` só é usado no Histórico (§4).
+- `h1` "Dashboard"; subtitle = scope + count: active scope → "«{nome}» · {N}
+  workflows ativos"; "all" → "Todos os workspaces · {W} workspaces · {N} workflows
+  ativos" (`N = metrics.active_workflows`). Skeleton while loading.
+- **Scope toggle** (segmented, only with > 1 workspace): "«{workspace ativo}»" ↔
+  "Todos os workspaces". Changes `?escopo=`. `aria-label="Escopo do painel"`.
+- **Period selector** (segmented, 7/30/90 days, default 30): reuses `PERIODOS` from
+  History and the same design. Changes `?periodo=`. `aria-label="Período"`, each button
+  `aria-label="Últimos N dias"`. It governs the window of the indicators, the chart and the
+  failures in "Precisa de atenção" (the "Saúde · agora" (Health · now) and the "Próximas" do not change).
+- Atualizar (`ghost`, `TbRefresh` under `motion-safe:`). The freshness stamp
+  "atualizado há X" is **NOT** displayed here: `atualizadoEm` exists in the hook but the header
+  does not render it; `textoDeFrescor` is only used in History (§4).
 
-### 3.8 Estados
+### 3.8 States
 
-- Carregando (1ª vez do escopo): skeletons com altura real por bloco. Recargas não
-  mostram skeleton.
-- Erro de espinha (`metrics` caiu na 1ª carga): bloco "Não foi possível carregar o
-  painel" + "Tentar de novo". Numa recarga com dados na tela, mantém + aviso.
-- Falha parcial: cada seção (gráfico/atenção/próximas) com aviso âmbar de 1 linha; o
-  resto continua.
-- Vazio de primeiro uso (0 workflows E 0 execuções recentes E 0 no período): bloco
-  centralizado "Nada rodou ainda" + "Criar workflow"; os demais blocos não aparecem.
-- Sem execuções mas com workflows: saúde "Tudo tranquilo — nada rodando ainda";
-  indicadores "—"; gráfico "Sem execuções no período."; atenção verde; próximas mostra
-  os agendados.
-- Trocar escopo/`current` reinicia a 1ª carga daquele escopo (skeleton).
+- Loading (1st time for the scope): skeletons with the real height per block. Reloads do not
+  show a skeleton.
+- Backbone error (`metrics` failed on the 1st load): a "Não foi possível carregar o
+  painel" (Could not load the dashboard) block + "Tentar de novo" (Try again). On a reload with data on screen, it keeps it + a notice.
+- Partial failure: each section (chart/attention/upcoming) with a 1-line amber notice; the
+  rest carries on.
+- First-use empty state (0 workflows AND 0 recent runs AND 0 in the period): a
+  centered "Nada rodou ainda" (Nothing has run yet) block + "Criar workflow" (Create workflow); the other blocks do not appear.
+- No runs but with workflows: health "Tudo tranquilo — nada rodando ainda" (All quiet — nothing running yet);
+  indicators "—"; chart "Sem execuções no período." (No runs in the period.); green attention; upcoming shows
+  the scheduled ones.
+- Changing the scope/`current` restarts the 1st load of that scope (skeleton).
 
-### 3.9 Acessibilidade
+### 3.9 Accessibility
 
-Saúde e cada seção como `<section aria-labelledby>`; toggle com `aria-label`; itens de
-atenção/próximas são botões/links com nome; ícones `aria-hidden`; alvos ≥ 40 px
-no telefone; movimento sob `motion-safe:`; foco `ring-[3px]`.
+Health and each section as `<section aria-labelledby>`; toggle with `aria-label`; attention/upcoming
+items are buttons/links with a name; icons `aria-hidden`; targets ≥ 40 px
+on the phone; motion under `motion-safe:`; focus `ring-[3px]`.
 
-### 3.10 Textos (pt-BR) — só os que existem hoje
+### 3.10 Copy (pt-BR) — only the strings that exist today
 
 "Dashboard" · "«{nome}» · {N} workflows ativos" · "Todos os workspaces · {W} workspaces
 · {N} workflows ativos" · "Escopo do painel" · "Todos os workspaces" · "Atualizar" ·
@@ -268,42 +268,42 @@ andamento" · "Precisa de atenção" · "Próximas execuções" · "Nenhuma exec
 "Período" · "Últimos N dias" · "Resumo do período · últimos N dias" · "Ver no Histórico" ·
 "Nada rodou ainda" · "Criar workflow".
 
-## 4. Não implementado nesta rodada / futuro
+## 4. Not implemented in this round / future
 
-Descrito no plano original mas **não construído** — não presente no código hoje:
+Described in the original plan but **not built** — not present in the code today:
 
-- **Atividade recente** (era um bloco próprio): lista das 6 execuções mais recentes
-  (`getObservabilityRuns({limit:6})`) com `StatusBadge` pt-BR, `workspace · origem ·
-  quando` e duração, levando a `/observability/run/{id}`. Não existe `atividade-lista.tsx`;
-  o `runs` buscado hoje só alimenta a detecção do "vazio de primeiro uso" (§3.8). Textos
-  que ficariam para este bloco: "Atividade recente", "Nenhuma execução recente.".
-- **Atalhos + Seus workspaces + Armazenamento** (era um bloco próprio): "Abrir
-  «{workspace}»", "Novo workflow", atalhos para Projetos/Histórico/Executores/Workspaces;
-  a lista "Seus workspaces" (rotear com `setCurrent`); e o resumo de armazenamento
-  (`formatBytes` + Drive/Artefatos). Não existe `atalhos.tsx`. Textos que ficariam:
+- **Recent activity** (it was a block of its own): list of the 6 most recent runs
+  (`getObservabilityRuns({limit:6})`) with a pt-BR `StatusBadge`, `workspace · origem ·
+  quando` and duration, leading to `/observability/run/{id}`. There is no `atividade-lista.tsx`;
+  the `runs` fetched today only feeds the detection of the "first-use empty state" (§3.8). Copy
+  that would go with this block: "Atividade recente", "Nenhuma execução recente.".
+- **Shortcuts + Your workspaces + Storage** (it was a block of its own): "Abrir
+  «{workspace}»", "Novo workflow", shortcuts to Projects/History/Executors/Workspaces;
+  the "Seus workspaces" list (routing with `setCurrent`); and the storage summary
+  (`formatBytes` + Drive/Artifacts). There is no `atalhos.tsx`. Copy that would go with it:
   "Atalhos", "Abrir «{nome}»", "Novo workflow", "Seus workspaces", "Armazenamento".
-- **Storage no hook de dados**: o campo `storage: IStorageUsage | null` e
-  `falhas.storage`, e a chamada `getMyStorageUsage(escopoWorkspaceId)`. O endpoint e o
-  método de service chegaram a existir (§2.1), mas nunca foram ligados e saíram: construir
-  este bloco inclui recriá-los.
-- **Carimbo de frescor no cabeçalho**: "atualizado há X". `atualizadoEm` é rastreado no
-  hook mas não é exibido; `textoDeFrescor` só é renderizado no Histórico.
+- **Storage in the data hook**: the `storage: IStorageUsage | null` field and
+  `falhas.storage`, and the `getMyStorageUsage(escopoWorkspaceId)` call. The endpoint and the
+  service method did exist at one point (§2.1), but were never wired and were removed: building
+  this block includes recreating them.
+- **Freshness stamp in the header**: "atualizado há X". `atualizadoEm` is tracked in the
+  hook but not displayed; `textoDeFrescor` is only rendered in History.
 
-Fora de escopo (v2): mapa de cartões de saúde por workspace; métricas por workspace
-(exigiria endpoint agregado `GET /observability/metrics/by-workspace?days=N`); dividir
-"em andamento" por workspace; cota/tendência de armazenamento.
+Out of scope (v2): a map of per-workspace health cards; per-workspace metrics
+(would require an aggregate endpoint `GET /observability/metrics/by-workspace?days=N`); splitting
+"running" by workspace; storage quota/trend.
 
-## 5. Testes
+## 5. Tests
 
-- API: `tests/unit/test_storage_meu_por_workspace.py` (sem/ com `workspace_id`, 403 fora
-  do escopo, zeros sem workspaces) saiu junto com a rota (§2.1).
-- Web (`web/__tests__/components/dashboard/`): `saude` (tom calmo/atenção/crítico,
-  veredito, motivos); `proximas` (filtra futuro/ativo, ordena, corta em 5, ignora
-  pausado); `dashboard-url` (ler/escrever `escopo`, default omitido); `use-dashboard-dados`
-  (escopo troca workspace_id, falha parcial por seção, espinha bloqueia só na 1ª carga,
-  força não sobrescrita por tick); `cabecalho` (subtítulo por escopo, toggle só com >1);
-  `proximas-lista`/`saude-hero` (render, textos, aria); `index` (composição, toggle troca
-  escopo e vai à URL, saúde reflete tom, atenção roteia, vazio de primeiro uso).
-- E2E (Playwright, API real): escopo default (workspace ativo) e toggle "todos"; saúde
-  colorida; atenção com deep-link; próximas; indicadores 30 d; console limpo; escuro e
-  claro; 1440 e 390.
+- API: `tests/unit/test_storage_meu_por_workspace.py` (with/without `workspace_id`, 403 outside
+  the scope, zeros with no workspaces) was removed together with the route (§2.1).
+- Web (`web/__tests__/components/dashboard/`): `saude` (calm/attention/critical tone,
+  verdict, reasons); `proximas` (filters future/active, sorts, cuts at 5, ignores
+  paused); `dashboard-url` (read/write `escopo`, default omitted); `use-dashboard-dados`
+  (scope switches workspace_id, partial failure per section, backbone blocks only on the 1st load,
+  a forced fetch is not overwritten by a tick); `cabecalho` (subtitle per scope, toggle only with >1);
+  `proximas-lista`/`saude-hero` (render, copy, aria); `index` (composition, toggle switches
+  scope and goes to the URL, health reflects tone, attention routes, first-use empty state).
+- E2E (Playwright, real API): default scope (active workspace) and "all" toggle; colored
+  health; attention with deep link; upcoming; 30 d indicators; clean console; dark and
+  light; 1440 and 390.

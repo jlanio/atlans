@@ -1,145 +1,145 @@
-# Bootstrap mTLS — step-ca interno
+# mTLS bootstrap — internal step-ca
 
-Roteiro one-time para preparar a CA interna (`step-ca`) que assina o cert
-TLS do host dos executores (`AGENTS_HOST`, no `.env`) e os certs mTLS dos
-executores enrolados.
+One-time runbook to prepare the internal CA (`step-ca`) that signs the TLS
+cert of the executors' host (`AGENTS_HOST`, in `.env`) and the mTLS certs of the
+enrolled executors.
 
-Aplica-se a um host de produção limpo, ou ao recriar a CA do zero. **Não
-rodar contra um cluster com executores já em produção** — apaga a CA antiga e
-invalida todos os certs emitidos.
+It applies to a clean production host, or when recreating the CA from scratch. **Do not
+run it against a cluster with executors already in production** — it wipes the old CA and
+invalidates every issued cert.
 
-## Caminho rápido (recomendado)
+## Fast path (recommended)
 
-Os passos 1 a 8 deste documento cabem nestes comandos, os de 1, 2 e 4 a 6
-nos scripts. Em um host limpo:
+Steps 1 to 8 of this document fit into these commands, with 1, 2 and 4 to 6
+inside the scripts. On a clean host:
 
 ```bash
-make bootstrap            # cria volume, secrets/, .env
-make up-prod              # sobe step-ca + demais serviços
-docker compose exec api-prod alembic upgrade head  # o schema, antes de recriar a API
-make bootstrap-stepca     # fingerprint, intermediate, prazo dos certs e cert do AGENTS_HOST
-docker compose --profile prod up -d api-prod      # recria a API: só assim ela lê o .env novo
-docker compose --profile prod restart traefik     # carrega os certificados
-make backup-stepca        # backup imediato (faça antes que algo dê errado)
+make bootstrap            # creates the volume, secrets/, .env
+make up-prod              # brings up step-ca + the other services
+docker compose exec api-prod alembic upgrade head  # the schema, before recreating the API
+make bootstrap-stepca     # fingerprint, intermediate, cert lifetime and the AGENTS_HOST cert
+docker compose --profile prod up -d api-prod      # recreates the API: only then does it read the new .env
+docker compose --profile prod restart traefik     # loads the certificates
+make backup-stepca        # immediate backup (do it before something goes wrong)
 ```
 
-Os passos manuais abaixo permanecem como referência para debugging e
-para a [recuperação de desastres](#recuperação-de-desastres), que não tem script.
+The manual steps below remain as a reference for debugging and
+for [disaster recovery](#disaster-recovery), which has no script.
 
-## Pré-requisitos
+## Prerequisites
 
-- Docker com o plugin Compose v2 (`docker compose`) já instalados.
-- Acesso ao host (`ssh`) e permissão para criar volumes.
-- O DNS do `AGENTS_HOST` apontando **direto** para o IP do host, sem CDN na
-  frente (na Cloudflare, *DNS-only*, nunca *proxied*). Um CDN termina o TLS e
-  descarta o certificado do cliente, e o mTLS quebra.
+- Docker with the Compose v2 plugin (`docker compose`) already installed.
+- Access to the host (`ssh`) and permission to create volumes.
+- The `AGENTS_HOST` DNS pointing **directly** at the host's IP, with no CDN in
+  front (on Cloudflare, *DNS-only*, never *proxied*). A CDN terminates TLS and
+  discards the client certificate, and mTLS breaks.
 
-## 1. Volume externo da CA
+## 1. External CA volume
 
-A chave privada da CA mora em `step-ca-data`. O volume é declarado como
-`external: true` em [docker-compose.yml](../docker-compose.yml) para
-sobreviver a um `docker compose down -v` acidental.
+The CA's private key lives in `step-ca-data`. The volume is declared as
+`external: true` in [docker-compose.yml](../docker-compose.yml) so that it
+survives an accidental `docker compose down -v`.
 
 ```bash
 docker volume create step-ca-data
 ```
 
-## 2. Senha do provisioner
+## 2. Provisioner password
 
-`step-ca` precisa de uma senha para criptografar a chave privada do
-provisioner JWK. Gere e persista uma forte:
+`step-ca` needs a password to encrypt the private key of the
+JWK provisioner. Generate a strong one and persist it:
 
 ```bash
 mkdir -p secrets
 openssl rand -base64 48 > secrets/stepca_password.txt
 chmod 600 secrets/stepca_password.txt
-sudo chown 1000:1000 secrets/stepca_password.txt   # o usuário step do container
+sudo chown 1000:1000 secrets/stepca_password.txt   # the container's step user
 ```
 
-A step-ca roda como o usuário `step` (UID 1000), e o compose monta o arquivo
-com o dono e o modo do host: com outro dono e modo 600, ela não o lê e nunca
-fica healthy. O `make bootstrap` faz o `chown` quando roda como root, e avisa
-quando não pode.
+step-ca runs as the `step` user (UID 1000), and compose mounts the file
+with the host's owner and mode: with another owner and mode 600, it cannot read it and never
+becomes healthy. `make bootstrap` does the `chown` when it runs as root, and warns
+when it cannot.
 
-A senha também deve ir no `.env` como `STEPCA_PROVISIONER_PASSWORD` para
-o backend conseguir decifrar a chave do provisioner ao gerar OTTs.
+The password must also go into `.env` as `STEPCA_PROVISIONER_PASSWORD` so that
+the backend can decrypt the provisioner key when generating OTTs.
 
-## 3. Inicializar step-ca
+## 3. Initialize step-ca
 
-A imagem `smallstep/step-ca` faz `init` automático na primeira subida,
-usando as envs já definidas no compose (`DOCKER_STEPCA_INIT_*`).
+The `smallstep/step-ca` image runs `init` automatically on its first start,
+using the env vars already defined in compose (`DOCKER_STEPCA_INIT_*`).
 
 ```bash
 docker compose --profile prod up -d step-ca
 docker compose --profile prod logs -f step-ca
 ```
 
-Aguarde a linha `serving HTTPS on :9000`.
+Wait for the line `serving HTTPS on :9000`.
 
-Na primeira subida, a imagem imprime no log a senha administrativa da CA (a
-mesma do provisioner). Não compartilhe esse log.
+On the first start, the image prints the CA's administrative password to the log (the
+same as the provisioner's). Do not share that log.
 
-## 4. Capturar fingerprint do root cert
+## 4. Capture the root cert fingerprint
 
 ```bash
 docker compose --profile prod exec step-ca \
     step certificate fingerprint /home/step/certs/root_ca.crt
 ```
 
-Cole o valor no `.env` como `STEPCA_ROOT_FINGERPRINT=...`.
+Paste the value into `.env` as `STEPCA_ROOT_FINGERPRINT=...`.
 
-`GET /executores/install` injeta esse valor no script servido, como default de
-`ATLANS_CA_SHA256`. Ele é verificado em dois momentos distintos:
+`GET /executores/install` injects that value into the served script, as the default of
+`ATLANS_CA_SHA256`. It is verified at two distinct moments:
 
-1. **Na instalação**, pelo próprio `install.sh`: o root cert recém-baixado é
-   conferido contra o fingerprint e a instalação **aborta** se não bater. É esta
-   a verificação que impede a CA errada de entrar.
-2. **A cada boot do executor**, por `executor/_ca_bootstrap.py` — tanto quando
-   ele baixa o bundle quanto quando reusa o `atlans-root.crt` que já está no
-   volume. Para isso o instalador grava `ATLANS_CA_SHA256` no `executor/.env`,
-   de onde o serviço de longa duração o lê.
+1. **At installation**, by `install.sh` itself: the freshly downloaded root cert is
+   checked against the fingerprint and the installation **aborts** if it does not match. This is
+   the check that keeps the wrong CA from getting in.
+2. **On every executor boot**, by `executor/_ca_bootstrap.py` — both when
+   it downloads the bundle and when it reuses the `atlans-root.crt` already in the
+   volume. For that, the installer writes `ATLANS_CA_SHA256` into `executor/.env`,
+   where the long-running service reads it from.
 
-   A verificação no caminho de *reuso* é o que fecha o buraco de trocar o
-   arquivo no volume e reiniciar: sem ela o pin valia uma única vez, no primeiro
-   boot que baixou o bundle.
+   The check on the *reuse* path is what closes the hole of swapping the
+   file in the volume and restarting: without it the pin applied only once, on the first
+   boot that downloaded the bundle.
 
-   Em ambos os lados a regra é **todos os certificados do arquivo têm de estar
-   entre os pinados** — não basta um deles casar. O arquivo inteiro é
-   concatenado às CAs públicas e vira o trust store do processo, então uma CA
-   *acrescentada* ao bundle seria tão confiável quanto o root legítimo.
+   On both sides the rule is **every certificate in the file must be
+   among the pinned ones** — it is not enough for one of them to match. The whole file is
+   concatenated to the public CAs and becomes the process's trust store, so a CA
+   *appended* to the bundle would be as trusted as the legitimate root.
 
-### Rotação de CA
+### CA rotation
 
-`ATLANS_CA_SHA256` aceita **vários fingerprints separados por vírgula**. É o que
-torna a rotação possível sem desligar o pinning: durante a sobreposição o bundle
-legitimamente carrega o root antigo e o novo, e ambos precisam estar na lista.
+`ATLANS_CA_SHA256` accepts **several comma-separated fingerprints**. That is what
+makes rotation possible without turning pinning off: during the overlap the bundle
+legitimately carries both the old and the new root, and both need to be on the list.
 
 ```
 ATLANS_CA_SHA256=<fp_antigo>,<fp_novo>
 ```
 
-Depois que todos os executores estiverem no root novo, remova o antigo da lista.
+Once every executor is on the new root, remove the old one from the list.
 
-O container efêmero de *enrollment* é a exceção, e por um motivo concreto: ele
-recebe `SSL_CERT_FILE` apontando para o cert já verificado no passo 1, e
-`bootstrap_ca()` retorna cedo quando essa variável existe, sem chegar a ler o
-pin. Naquele passo a verificação já aconteceu, no shell.
+The ephemeral *enrollment* container is the exception, and for a concrete reason: it
+receives `SSL_CERT_FILE` pointing to the cert already verified in step 1, and
+`bootstrap_ca()` returns early when that variable exists, without ever reading the
+pin. At that step the verification has already happened, in the shell.
 
-Sem a variável configurada o download do `ca-bundle` continua funcionando, mas
-é *trust on first use*: o instalador avisa que não verificou nada. Quem
-conseguisse responder no lugar do servidor entregaria a própria CA. Configure
-em produção.
+Without the variable configured, the `ca-bundle` download keeps working, but
+it is *trust on first use*: the installer warns that it verified nothing. Anyone who
+managed to answer in the server's place would hand over their own CA. Configure it
+in production.
 
-O operador pode sobrescrever exportando `ATLANS_CA_SHA256` antes de rodar o
-instalador — útil quando o fingerprint é transportado por outro canal.
-Aceita hex puro (formato do `step certificate fingerprint`) ou com `:`
-(formato do `openssl x509 -fingerprint`), em maiúsculas ou minúsculas.
+The operator can override it by exporting `ATLANS_CA_SHA256` before running the
+installer — useful when the fingerprint is carried over another channel.
+It accepts plain hex (the `step certificate fingerprint` format) or with `:`
+(the `openssl x509 -fingerprint` format), in upper or lower case.
 
-## 5. Copiar intermediate para o Traefik
+## 5. Copy the intermediate to Traefik
 
-O Traefik valida o client cert do executor contra o intermediate da CA
-interna. Extraia e coloque no caminho montado no compose (o volume
-`traefik/atlans-ca` do serviço `traefik`, no [docker-compose.yml](../docker-compose.yml)):
+Traefik validates the executor's client cert against the internal CA's
+intermediate. Extract it and place it at the path mounted in compose (the
+`traefik/atlans-ca` volume of the `traefik` service, in [docker-compose.yml](../docker-compose.yml)):
 
 ```bash
 mkdir -p traefik/atlans-ca
@@ -149,20 +149,20 @@ docker compose --profile prod exec step-ca \
 chmod 644 traefik/atlans-ca/intermediate.crt
 ```
 
-## 6. Gerar o cert TLS do host dos executores (`AGENTS_HOST`)
+## 6. Generate the TLS cert for the executors' host (`AGENTS_HOST`)
 
-O Traefik **não** tira um cert do Let's Encrypt para o `AGENTS_HOST`: o host
-serve o handshake com certificado de cliente e fica fora do CDN. A step-ca
-emite o cert dele.
+Traefik does **not** get a Let's Encrypt cert for `AGENTS_HOST`: the host
+serves the handshake with a client certificate and stays outside the CDN. step-ca
+issues its cert.
 
-> Este passo é automatizado por `make bootstrap-stepca` (que emite o cert com
-> `--provisioner-password-file`/`--force` e apaga a chave do volume depois de
-> copiá-la). Os comandos abaixo são a referência manual.
+> This step is automated by `make bootstrap-stepca` (which issues the cert with
+> `--provisioner-password-file`/`--force` and deletes the key from the volume after
+> copying it). The commands below are the manual reference.
 
-A step-ca nasce com teto de 24 h por certificado, e este pede um ano (as
-matrículas dos executores pedem `EXECUTOR_CERT_TTL_DAYS`, 90 dias por padrão).
-Antes de emitir, suba o teto do provisioner e reinicie a step-ca, que só lê o
-`ca.json` novo ao reiniciar:
+step-ca starts with a 24 h cap per certificate, and this one asks for a year (the
+executors' enrollments ask for `EXECUTOR_CERT_TTL_DAYS`, 90 days by default).
+Before issuing, raise the provisioner's cap and restart step-ca, which only reads the
+new `ca.json` on restart:
 
 ```bash
 docker compose --profile prod exec step-ca \
@@ -170,8 +170,8 @@ docker compose --profile prod exec step-ca \
 docker compose --profile prod restart step-ca
 ```
 
-Sem isso, a CA recusa: «requested duration of 8760h1m0s is more than the
-authorized maximum certificate duration of 24h1m0s».
+Without this, the CA refuses: "requested duration of 8760h1m0s is more than the
+authorized maximum certificate duration of 24h1m0s".
 
 ```bash
 AGENTS_HOST=$(grep -E '^AGENTS_HOST=' .env | tail -1 | cut -d= -f2- | tr -d '"')
@@ -192,18 +192,18 @@ docker compose --profile prod exec step-ca \
 chmod 600 traefik/atlans-ca/agents.key
 chmod 644 traefik/atlans-ca/agents.crt
 
-# Apague a chave do volume da step-ca apos copiar (o make bootstrap-stepca ja faz isso):
+# Delete the key from the step-ca volume after copying (make bootstrap-stepca already does this):
 docker compose --profile prod exec step-ca \
     sh -c 'rm -f /home/step/agents.crt /home/step/agents.key'
 ```
 
-Renovar em ~11 meses (ou automatizar com `step ca renew --daemon`).
+Renew in ~11 months (or automate with `step ca renew --daemon`).
 
-## 7. Recriar a API e reiniciar o Traefik
+## 7. Recreate the API and restart Traefik
 
 ```bash
-docker compose --profile prod up -d api-prod      # o container só lê o .env ao ser criado
-docker compose --profile prod restart traefik     # o Traefik só lê os certificados ao subir
+docker compose --profile prod up -d api-prod      # the container only reads .env when it is created
+docker compose --profile prod restart traefik     # Traefik only reads the certificates on startup
 ```
 
 Smoke test:
@@ -213,16 +213,16 @@ curl --cacert traefik/atlans-ca/intermediate.crt \
      "https://$AGENTS_HOST/executores/ca-bundle"
 ```
 
-Deve retornar o PEM do root da CA interna.
+It should return the PEM of the internal CA's root.
 
-## 8. Backup periódico do volume
+## 8. Periodic volume backup
 
-A perda do volume `step-ca-data` é catastrófica — todos os executores
-enrolados precisam de novo OTP + enroll.
+Losing the `step-ca-data` volume is catastrophic — every enrolled
+executor needs a new OTP + enroll.
 
-> Prefira `make backup-stepca`: grava em `backups/step-ca-YYYY-MM-DD-HHMM.tar.gz`
-> e mantém os 14 backups mais recentes. O bloco abaixo é o equivalente manual
-> (nome sem hora, sem retenção automática) — rode via cron diário:
+> Prefer `make backup-stepca`: it writes to `backups/step-ca-YYYY-MM-DD-HHMM.tar.gz`
+> and keeps the 14 most recent backups. The block below is the manual equivalent
+> (name without the time, no automatic retention) — run it via a daily cron:
 
 ```bash
 docker run --rm \
@@ -231,33 +231,33 @@ docker run --rm \
     alpine tar czf /backup/step-ca-$(date +%F).tar.gz -C /data .
 ```
 
-Guarde os tarballs fora do host (S3 com KMS, etc.).
+Keep the tarballs off the host (S3 with KMS, etc.).
 
-## 9. Onboarding de um novo executor
+## 9. Onboarding a new executor
 
-Após o bootstrap, qualquer admin pode:
+After the bootstrap, any admin can:
 
-1. Criar o executor na UI (gera OTP, single-use, TTL 24h).
-2. Compartilhar o comando `curl ... | bash` com o operador via canal
-   efêmero.
-3. O executor roda `install.sh`, faz `enroll` → step-ca emite cert mTLS →
-   executor persiste em `EXECUTOR_CERT_DIR/cert.pem`.
+1. Create the executor in the UI (generates an OTP, single-use, TTL 24h).
+2. Share the `curl ... | bash` command with the operator over an ephemeral
+   channel.
+3. The executor runs `install.sh`, does `enroll` → step-ca issues the mTLS cert →
+   the executor persists it in `EXECUTOR_CERT_DIR/cert.pem`.
 
-Renovação automática (`executor/renewal.py`) acontece sozinha próximo do
-vencimento, atomic swap dos arquivos.
+Automatic renewal (`executor/renewal.py`) happens on its own close to
+expiry, with an atomic swap of the files.
 
-## Recuperação de desastres
+## Disaster recovery
 
-Se `step-ca-data` for perdido:
+If `step-ca-data` is lost:
 
-1. Restaurar o backup mais recente, com a step-ca e a API fora do ar (as
-   duas montam o volume):
+1. Restore the most recent backup, with step-ca and the API down (both
+   mount the volume):
    ```bash
    docker compose --profile prod rm -sf step-ca api-prod
    docker run --rm -v step-ca-data:/data -v "$(pwd)/backups:/backup" \
        alpine tar xzf /backup/step-ca-YYYY-MM-DD.tar.gz -C /data
    ```
-2. Subir `step-ca` e `api-prod`, e reiniciar o `traefik`.
-3. Confirmar fingerprint não mudou (mesmo backup → mesma CA). Caso
-   tenha mudado, atualizar `.env` (`STEPCA_ROOT_FINGERPRINT`) e
-   informar a todos os executores para reenrolar (admin gera OTPs novos).
+2. Bring up `step-ca` and `api-prod`, and restart `traefik`.
+3. Confirm the fingerprint did not change (same backup → same CA). If it
+   did change, update `.env` (`STEPCA_ROOT_FINGERPRINT`) and
+   tell every executor to re-enroll (the admin generates new OTPs).

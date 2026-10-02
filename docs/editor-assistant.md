@@ -1,399 +1,399 @@
-# Assistente — montar fluxos por linguagem natural
+# Assistant — building workflows from natural language
 
-O assistente é um painel no editor onde a pessoa descreve o que quer e o fluxo aparece no canvas. Por
-baixo, ele conversa com um modelo de linguagem que tem acesso às **mesmas 42 ferramentas** que o
-servidor MCP expõe a um agente externo — catálogo de nós, guia de autoria, validação, execução.
+The assistant is a panel in the editor where the person describes what they want and the workflow appears on the canvas. Under
+the hood, it talks to a language model that has access to the **same 42 tools** that the
+MCP server exposes to an external agent — node catalog, authoring guide, validation, execution.
 
-É a primeira vez que a plataforma consome o próprio MCP.
+It is the first time the platform consumes its own MCP.
 
-## Como ele entrega: `desenhar_no_canvas`
+## How it delivers: `desenhar_no_canvas`
 
-O assistente tem uma ferramenta que **não existe no MCP** e nunca aparece para um cliente
-externo: `desenhar_no_canvas(definition, nota?)`. O canvas é do editor, e só faz sentido para
-quem está olhando para ele.
+The assistant has a tool that **does not exist in the MCP** and never appears to an external
+client: `desenhar_no_canvas(definition, nota?)`. The canvas belongs to the editor, and only makes sense to
+whoever is looking at it.
 
-**Ela é a entrega.** Enquanto o modelo não a chamar, a tela de quem pediu está vazia — por
-melhor que ele tenha explicado. O prompt manda chamá-la cedo e repetidamente: o fluxo cresce
-enquanto ele monta, em vez de aparecer inteiro no fim.
+**It is the delivery.** Until the model calls it, the screen of whoever asked is empty — however
+well the model explained. The prompt tells it to call it early and repeatedly: the workflow grows
+while it builds, instead of appearing whole at the end.
 
-Isso conserta um defeito de desenho. Antes, pôr o fluxo na tela era **efeito colateral** de uma
-chamada a `validate_workflow` — o painel lia a definição do argumento daquela ferramenta.
-Funcionava quando o modelo validava, e nada o obrigava a validar: pedindo *"lê o shapefile e
-faz buffer de 500 m"*, ele podia ler o Drive, executar e devolver o GeoJSON. Pedido atendido,
-canvas vazio. Nenhuma instrução conserta isso, porque não havia nada cujo nome fosse
-"entregue o fluxo". Agora há, e `validate_workflow` voltou a ser meio.
+This fixes a design flaw. Before, putting the workflow on the screen was a **side effect** of a
+call to `validate_workflow` — the panel read the definition from that tool's argument.
+It worked when the model validated, and nothing forced it to validate: asked *"read the shapefile and
+do a 500 m buffer"*, it could read the Drive, execute and return the GeoJSON. Request fulfilled,
+empty canvas. No instruction fixes that, because there was nothing whose name was
+"deliver the workflow". Now there is, and `validate_workflow` went back to being a means.
 
-**Executar exige ter desenhado antes.** `run_workflow` é recusado enquanto não houver fluxo na
-tela — é o mesmo caminho que produzia a resposta-dado. A recusa é de ordem, não de escopo:
-desenhou, pode rodar (com o aval em texto de sempre).
+**Executing requires having drawn first.** `run_workflow` is refused while there is no workflow on the
+screen — it is the same path that produced the data-as-answer. The refusal is about order, not scope:
+once it has drawn, it may run (with the usual approval in text).
 
-**O desenho entra sozinho.** Num canvas vazio, sempre. Num canvas que já tem trabalho, o
-primeiro desenho da conversa espera um clique — e daí em diante ela desenha sem interromper.
-`Ctrl+Z` desfaz. Desenhar **não salva**: o Salvar do editor continua sendo de quem está usando.
+**The drawing goes in by itself.** On an empty canvas, always. On a canvas that already has work, the
+first drawing of the conversation waits for a click — and from then on it draws without interrupting.
+`Ctrl+Z` undoes. Drawing **does not save**: the editor's Salvar (Save) still belongs to whoever is using it.
 
-## O que ele faz, e o que ele não faz
+## What it does, and what it does not do
 
 | | |
 |---|---|
-| **monta e edita** | lê o guia, consulta o catálogo, confere cada propriedade em `describe_node`, rascunha a definição e valida até o relatório ficar limpo |
-| **mostra** | ao fim, o painel exibe um cartão com o fluxo pronto e o botão **Aplicar no canvas** |
-| **executa** | roda o fluxo com acompanhamento nó a nó — **depois de pedir aval em texto** |
-| **NÃO grava** | `create_workflow` e `update_workflow` não existem para ele. Quem aplica no canvas é você, pelo botão do editor |
-| **NÃO apaga** | agendamento e arquivo do Drive estão fora do alcance dele |
+| **builds and edits** | reads the guide, queries the catalog, checks each property in `describe_node`, drafts the definition and validates until the report is clean |
+| **shows** | at the end, the panel displays a card with the finished workflow and the **Aplicar no canvas** (Apply to canvas) button |
+| **executes** | runs the workflow with node-by-node tracking — **after asking for approval in text** |
+| **does NOT save** | `create_workflow` and `update_workflow` do not exist for it. Whoever applies to the canvas is you, through the editor's button |
+| **does NOT delete** | schedules and Drive files are out of its reach |
 
-### Por que o portão de escrita é duro
+### Why the write gate is hard
 
-A alternativa era confiar no texto do prompt para o modelo pedir confirmação antes de gravar.
-Promessa de texto não é garantia: um modelo que não pergunta grava, e aí o botão de aplicar vira
-decoração.
+The alternative was to trust the prompt text for the model to ask for confirmation before saving.
+A promise in text is not a guarantee: a model that does not ask saves, and then the apply button becomes
+decoration.
 
-A regra não é uma lista escrita à mão — ela é derivada de `GUARDAS`
-(`app/mcp/guardas.py`): **toda ferramenta que não é somente-leitura está fora**, exceto
-`validate_workflow` (que simula e não persiste nada) e `run_workflow` (a exceção deliberada). Uma
-ferramenta de escrita nova nasce bloqueada.
+The rule is not a hand-written list — it is derived from `GUARDAS`
+(`app/mcp/guardas.py`): **every tool that is not read-only is out**, except
+`validate_workflow` (which simulates and persists nothing) and `run_workflow` (the deliberate exception). A
+new write tool is born blocked.
 
-E vale em dois lugares, pela mesma razão que o MCP separa `list_tools` de `call_tool`: escondida da
-lista que o modelo vê (conforto) **e recusada no despacho** (a garantia — mesmo que o modelo a
-nomeie porque leu num exemplo, alucinou, ou alguém mandou no texto de um fluxo compartilhado).
+And it applies in two places, for the same reason the MCP separates `list_tools` from `call_tool`: hidden from the
+list the model sees (comfort) **and refused at dispatch** (the guarantee — even if the model
+names it because it read it in an example, hallucinated it, or someone asked for it in the text of a shared workflow).
 
-## Superfícies
+## Surfaces
 
-O laço (`app/services/assistente_service.py`) é um só; o que muda entre o assistente do **editor** e o
-assistente da **Home** é um pacote de seis coisas, reunido numa `Superficie`:
+The loop (`app/services/assistente_service.py`) is a single one; what changes between the **editor** assistant and the
+**Home** assistant is a package of six things, gathered in a `Superficie`:
 
-| | o que varia |
+| | what varies |
 |---|---|
-| `instrucoes` | o bloco de sistema que corrige onde a política do MCP não vale ali |
-| `ferramentas_extras` | as ferramentas LOCAIS que abrem a lista do modelo (o desenho no canvas; o globo e as respostas rápidas na Home) — não existem no MCP |
-| `executores_locais` | o que essas ferramentas fazem, sem ir ao servidor |
-| `permitida` | quais tools do MCP entram na lista |
-| `portao` | a checagem antes de despachar ao servidor |
-| `quadros_extras` | os quadros SSE que aquela superfície emite depois de uma ferramenta |
+| `instrucoes` | the system block that corrects where the MCP policy does not apply there |
+| `ferramentas_extras` | the LOCAL tools that open the model's list (the canvas drawing; the globe and the quick replies on the Home) — they do not exist in the MCP |
+| `executores_locais` | what those tools do, without going to the server |
+| `permitida` | which MCP tools go into the list |
+| `portao` | the check before dispatching to the server |
+| `quadros_extras` | the SSE frames that that surface emits after a tool |
 
-**O editor é o `EDITOR`, e é o default de tudo** — `conversar`, `montar_sistema` e
-`ferramentas_para_o_modelo` caem nele quando ninguém passa superfície. Então tudo o que este
-documento descreve do editor continua valendo byte a byte: o desenho no canvas, o portão de escrita
-duro, o quadro `proposta`.
+**The editor is the `EDITOR`, and it is the default for everything** — `conversar`, `montar_sistema` and
+`ferramentas_para_o_modelo` fall back to it when nobody passes a surface. So everything this
+document describes about the editor still holds byte for byte: the canvas drawing, the hard write
+gate, the `proposta` frame.
 
-A **Home** (`app/services/assistente_superficie.py`) é a outra superfície. As diferenças são de produto,
-não de mecânica:
+The **Home** (`app/services/assistente_superficie.py`) is the other surface. The differences are about product,
+not mechanics:
 
-- **A entrega é uma camada no globo**, não um desenho no canvas — `exibir_no_globo` no lugar de
-  `desenhar_no_canvas`, e a resposta chega ao globo sozinha quando uma execução do assistente termina.
-  A segunda ferramenta local, `sugerir_respostas`, oferece à pessoa até três continuações curtas
-  (os chips sob a resposta) pelo quadro `respostas_rapidas`.
-- **Alcance completo** (os seis escopos do PAT, contra os quatro do editor), porque o assistente cria
-  e roda os PRÓPRIOS fluxos — marcados `origem="assistente"` pela identidade, escondidos das
-  listagens — sem pedir permissão.
-- **Confirmação por clique** para o que mexe no que já existia (editar/rodar um fluxo da pessoa,
-  agendamentos, apagar arquivo do Drive, publicar, restaurar, ligar/desligar). O portão guarda a ação
-  no Redis por 15 min e emite um quadro `confirmacao`; o clique executa os argumentos ARMAZENADOS, no
-  servidor — nunca uma promessa de texto, nunca os argumentos que o cliente mandar no clique.
+- **The delivery is a layer on the globe**, not a drawing on the canvas — `exibir_no_globo` in place of
+  `desenhar_no_canvas`, and the answer reaches the globe by itself when a run by the assistant finishes.
+  The second local tool, `sugerir_respostas`, offers the person up to three short follow-ups
+  (the chips under the answer) through the `respostas_rapidas` frame.
+- **Full reach** (the six PAT scopes, against the editor's four), because the assistant creates
+  and runs its OWN workflows — marked `origem="assistente"` by the identity, hidden from the
+  listings — without asking for permission.
+- **Click confirmation** for whatever touches what already existed (editing/running one of the person's workflows,
+  schedules, deleting a Drive file, publishing, restoring, turning on/off). The gate stores the action
+  in Redis for 15 min and emits a `confirmacao` frame; the click executes the STORED arguments, on the
+  server — never a promise in text, never the arguments the client sends with the click.
 
-A API que serve a Home (conversas persistidas, o endpoint de confirmação, o globo) é descrita à parte;
-esta seção cobre só a fronteira do laço. A outra fronteira — quem fala com o modelo — é o cliente do
-OpenRouter, abaixo; um runtime futuro (o Hermes) trocaria uma das duas, nunca o meio.
+The API that serves the Home (persisted conversations, the confirmation endpoint, the globe) is described separately;
+this section covers only the boundary of the loop. The other boundary — who talks to the model — is the
+OpenRouter client, below; a future runtime (Hermes) would swap one of the two, never the middle.
 
-## Ligar
+## Turning it on
 
-O assistente é **opcional**. Sem chave ele simplesmente não existe, e o resto do editor continua
-inteiro — o comportamento certo para quem roda o Atlans numa instalação própria e não quer a
-dependência externa.
+The assistant is **optional**. Without a key it simply does not exist, and the rest of the editor remains
+whole — the right behavior for whoever runs Atlans as a self-hosted installation and does not want the
+external dependency.
 
 ```bash
-# .env da API
-LLM_API_KEY=sk-or-v1-...         # ou OPENROUTER_API_KEY, o nome antigo
-#LLM_BASE_URL=                   # vazio = https://openrouter.ai/api/v1; ou um gateway, ou um servidor local
-#ASSISTENTE_ATIVO=true           # false/0/off/no desliga mesmo havendo chave
-#ASSISTENTE_MODELO=              # o nome no catálogo do provedor; reiniciar basta
-#ASSISTENTE_ATRIBUICAO=false     # true: o nome e o FRONTEND_URL vão como atribuição no OpenRouter
+# API .env
+LLM_API_KEY=sk-or-v1-...         # or OPENROUTER_API_KEY, the old name
+#LLM_BASE_URL=                   # empty = https://openrouter.ai/api/v1; or a gateway, or a local server
+#ASSISTENTE_ATIVO=true           # false/0/off/no turns it off even when there is a key
+#ASSISTENTE_MODELO=              # the name in the provider's catalog; a restart is enough
+#ASSISTENTE_ATRIBUICAO=false     # true: the name and FRONTEND_URL go as attribution on OpenRouter
 ```
 
-Fora do OpenRouter, qualquer servidor com a API da OpenAI (`/chat/completions` em stream, com
-ferramentas) serve: um gateway como o LiteLLM, ou um servidor local como o Ollama, o vLLM e o
-llama.cpp. Exemplo com o Ollama:
+Outside OpenRouter, any server with the OpenAI API (`/chat/completions` streaming, with
+tools) works: a gateway such as LiteLLM, or a local server such as Ollama, vLLM and
+llama.cpp. Example with Ollama:
 
 ```bash
 LLM_BASE_URL=http://ollama:11434/v1
-LLM_API_KEY=local                # o Ollama não pede chave; qualquer valor não vazio liga o assistente
-ASSISTENTE_MODELO=qwen3:14b      # um modelo que saiba chamar ferramentas
+LLM_API_KEY=local                # Ollama does not ask for a key; any non-empty value turns the assistant on
+ASSISTENTE_MODELO=qwen3:14b      # a model that knows how to call tools
 ```
 
-Fora do OpenRouter, o pedido vai só no formato da API da OpenAI: sem os campos próprios dele
-(`reasoning`, `usage.include`, o cache de prompt), que a própria OpenAI recusa, e com
-`stream_options.include_usage`, que é como esses servidores mandam a contagem de tokens no stream.
-A cota diária depende dessa contagem: um servidor que não a manda deixa a cota sem contar, e o log
-da API avisa na primeira resposta assim. Sem preço no catálogo do provedor, a tela de custo do admin
-mostra o custo como desconhecido.
+Outside OpenRouter, the request goes only in the OpenAI API format: without OpenRouter's own fields
+(`reasoning`, `usage.include`, the prompt cache), which OpenAI itself refuses, and with
+`stream_options.include_usage`, which is how these servers send the token count in the stream.
+The daily quota depends on that count: a server that does not send it leaves the quota uncounted, and the API
+log warns on the first such response. Without a price in the provider's catalog, the admin's cost screen
+shows the cost as unknown.
 
-A chave é da **plataforma**, não do usuário: quem paga os tokens é a instalação. O teto por pessoa
-está abaixo. Se o seu deploy reescreve o `.env` do servidor a partir de uma cópia guardada fora dele
-(um segredo do CI, por exemplo), a chave tem de estar **nessa cópia**, e não só editada no servidor.
+The key belongs to the **platform**, not to the user: whoever pays for the tokens is the installation. The per-person ceiling
+is below. If your deploy rewrites the server's `.env` from a copy stored outside it
+(a CI secret, for example), the key has to be **in that copy**, and not just edited on the server.
 
-## O provedor: OpenRouter
+## The provider: OpenRouter
 
-O modelo chega pelo [OpenRouter](https://openrouter.ai): um roteador com uma chave e uma API só para
-modelos da Anthropic, da OpenAI, do Google e abertos. Trocar de modelo é trocar `ASSISTENTE_MODELO`
-pelo nome do catálogo (`fornecedor/modelo`, ex.: `anthropic/claude-opus-5`, `openai/gpt-5`,
-`google/gemini-2.5-pro`; a lista viva está em [openrouter.ai/models](https://openrouter.ai/models)) e
-reiniciar a API. O padrão é `anthropic/claude-opus-5`.
+The model comes through [OpenRouter](https://openrouter.ai): a router with a single key and a single API for
+models from Anthropic, OpenAI, Google and open models. Switching models means changing `ASSISTENTE_MODELO`
+to the catalog name (`fornecedor/modelo`, e.g. `anthropic/claude-opus-5`, `openai/gpt-5`,
+`google/gemini-2.5-pro`; the live list is at [openrouter.ai/models](https://openrouter.ai/models)) and
+restarting the API. The default is `anthropic/claude-opus-5`.
 
-**Quem fala com ele é um módulo só**, `app/services/openrouter.py`, sobre `httpx` — nenhum SDK de
-fornecedor entra na imagem, e um único pool de conexões por processo serve todas as conversas. Ele usa
-a API nativa do OpenRouter (`POST /chat/completions`, em stream) e traduz nos dois sentidos:
-
-| | |
-|---|---|
-| **transcrito** | é do **projeto**, não do provedor: `text`, `thinking`, `tool_use` e `tool_result`, em dicionários puros. É o que o Redis (editor) e o Postgres (Home) guardam, o que o replay lê e o que a confirmação por clique casa pelo `tool_use_id`. Na ida vira `system`/`user`/`assistant` (`tool_calls`)/`tool`; na volta, o stream é remontado nesses blocos |
-| **raciocínio** | pedido com `reasoning.effort = high` (o OpenRouter traduz para o que cada família aceita). O texto resumido sai no quadro `pensando`; os `reasoning_details` voltam **verbatim** na volta seguinte, que é o que o modelo precisa para continuar o raciocínio entre chamadas de ferramenta |
-| **cache de prompt** | dois pontos de corte: o prefixo estável (ferramentas + sistema) e a última mensagem humana. O OpenRouter repassa aos provedores que têm cache explícito e ignora nos que cacheiam sozinhos |
-| **cota** | a contagem vem no último quadro do stream (`usage.include`). `entrada` já inclui o que veio do cache; a cota soma entrada + saída. O custo em créditos (dólares) vai no `fim` e no log da API, como informação |
-| **falhas** | rede, 429 e 5xx **antes do corpo** são retentados (3 tentativas); um 400 com raciocínio guardado é refeito uma vez sem ele. Um stream que morre no meio, ou que termina sem `finish_reason` (um 200 de gateway com HTML), é `modelo_indisponivel`, nunca uma resposta pela metade. Uma resposta sem bloco nenhum não entra no transcrito, e uma mensagem do assistente sem texto e sem chamada não vai ao provedor |
-| **paradas** | `stop` encerra; `tool_calls` roda as ferramentas; `length` (cortada por `max_tokens`) **não roda ferramenta nenhuma** — o argumento pode ter chegado pela metade; `content_filter` vira `recusado` |
-
-Um bloco `thinking` antigo — de quando o transcrito vinha de outra API e carregava uma `signature`
-— continua no banco para o replay e é **omitido** na ida: o que já foi pensado em turnos passados não
-é necessário, e reenviá-lo num formato que o provedor não reconhece derrubaria a conversa.
-
-## O painel
-
-Uma gaveta ancorada à direita do canvas, no editor (`/workflow/[id]`) e na tela de criar
-(`/workflow/create`). **Não é sobreposição**: o canvas encolhe e os dois ficam visíveis — dá para ver
-o fluxo aparecer enquanto se lê a explicação, que é o que impede alguém de aplicar sem entender.
+**A single module talks to it**, `app/services/openrouter.py`, on top of `httpx` — no vendor SDK
+goes into the image, and a single connection pool per process serves all conversations. It uses
+OpenRouter's native API (`POST /chat/completions`, streaming) and translates in both directions:
 
 | | |
 |---|---|
-| abrir/fechar | `Ctrl+I`, ou o botão de estrela no canto do canvas |
-| padrão | **aberta** na tela de criar (o canvas nasce vazio), **fechada** no editor de um fluxo pronto |
-| largura | 300–560 px, arrastável pela borda; a preferência fica no navegador |
-| telefone | vira folha de altura cheia |
-| recomeçar | menu `⋯` → *Recomeçar a conversa* (apaga o histórico daquele fluxo, nunca o fluxo) |
+| **transcript** | belongs to the **project**, not to the provider: `text`, `thinking`, `tool_use` and `tool_result`, in plain dictionaries. It is what Redis (editor) and Postgres (Home) store, what the replay reads and what the click confirmation matches by `tool_use_id`. On the way out it becomes `system`/`user`/`assistant` (`tool_calls`)/`tool`; on the way back, the stream is reassembled into these blocks |
+| **reasoning** | requested with `reasoning.effort = high` (OpenRouter translates it to what each family accepts). The summarized text goes out in the `pensando` frame; the `reasoning_details` come back **verbatim** in the next round, which is what the model needs to continue reasoning between tool calls |
+| **prompt cache** | two breakpoints: the stable prefix (tools + system) and the last human message. OpenRouter passes them on to providers that have explicit caching and ignores them for the ones that cache on their own |
+| **quota** | the count comes in the last frame of the stream (`usage.include`). `entrada` already includes what came from the cache; the quota adds input + output. The cost in credits (dollars) goes in `fim` and in the API log, as information |
+| **failures** | network errors, 429 and 5xx **before the body** are retried (3 attempts); a 400 with stored reasoning is redone once without it. A stream that dies midway, or that ends without `finish_reason` (a gateway 200 with HTML), is `modelo_indisponivel`, never a half answer. A response with no block at all does not enter the transcript, and an assistant message with no text and no call does not go to the provider |
+| **stops** | `stop` ends; `tool_calls` runs the tools; `length` (cut by `max_tokens`) **runs no tool at all** — the argument may have arrived halfway; `content_filter` becomes `recusado` |
 
-Sem `LLM_API_KEY` (ou `OPENROUTER_API_KEY`) na instalação, nada disso aparece — nem a gaveta, nem o botão.
+An old `thinking` block — from when the transcript came from another API and carried a `signature`
+— stays in the database for the replay and is **omitted** on the way out: what was already thought in past turns is not
+needed, and resending it in a format the provider does not recognize would bring down the conversation.
 
-## Cota
+## The panel
 
-### Quando ela estoura, a saída
-
-O aviso de cota cheia (`aviso-de-cota.tsx`) pode carregar a oferta de uma extensão
-(`ofertaDaCota`, ver `docs/architecture.md`, Extensões do web). Sem extensão, o aviso fica
-sozinho.
-
-O componente é um só de propósito. O texto vivia duplicado em **três** superfícies — a barra
-da Home, o painel flutuante da Home e a gaveta do assistente no editor; enquanto era só aviso, a
-duplicação custava pouco, mas um botão que existe numa superfície e não na outra é uma venda
-que some conforme a tela de onde a pessoa bateu no teto. A casca continua de cada uma (cápsula
-na barra, bloco nas outras duas); o conteúdo é do componente.
-
-As cores são **cientes de tema** por causa da terceira: a Home força `dark` nas suas cascas,
-mas a gaveta do editor segue o tema de quem olha, e fixar a paleta escura pintaria âmbar-400
-sobre fundo claro.
-
-`GET /assistente/editor/estado` e `/assistente/estado` trazem `plano` e `assinaturas_ativas`, que o
-registro de extensões preenche (sem extensão: `null` e `false`). O aviso também diz o prazo
-**real** de reabertura — o servidor manda `reabre_em_segundos`, o donut logo abaixo já o usava, e
-«algumas horas» era a tela sabendo mais do que contava.
-
-A cota é por **token acumulado** numa janela de 24 h, e não por mensagem. O motivo é direto: uma
-mensagem que dispara dez chamadas de ferramenta custa dez vezes uma que não dispara nenhuma. Contar
-mensagens mediria a coisa errada e daria a mesma cota para o "obrigado!" e para o fluxo de vinte nós.
+A drawer anchored to the right of the canvas, in the editor (`/workflow/[id]`) and on the create
+screen (`/workflow/create`). **It is not an overlay**: the canvas shrinks and both stay visible — you can watch
+the workflow appear while reading the explanation, which is what keeps someone from applying it without understanding.
 
 | | |
 |---|---|
-| teto | **o da instalação**: `ASSISTENTE_TETO_DE_TOKENS_POR_DIA` (padrão 1 500 000), igual para todos. Quem responde é `teto_do_assistente.plano_e_teto()`, que pergunta ao registro de extensões (`app/extensoes`): numa instalação com uma extensão de planos, o teto é o do plano de cada pessoa, que o admin edita |
-| janela | 24 h a partir da primeira conversa |
-| onde | Redis, chave `assistente:tokens:{user_id}` |
-| consulta | `GET /assistente/editor/estado` devolve gasto, teto, quando reabre e o `plano` que dá aquele teto; durante o turno o stream manda o acumulado a cada resposta do modelo (quadro `cota`), com o MESMO teto — o laço resolve o plano uma vez e o carrega até a cobrança, senão o donut oscilaria no meio da resposta |
-| na tela | um donut com o percentual fica SOB o campo de mensagem (barra e painel da Home, gaveta do editor) — `uso-da-cota.tsx`; terracota até 79%, âmbar dali em diante, contagem de reabertura quando estoura; o tooltip traz o detalhe (gasto, teto, percentual, prazo). Sobe durante o turno pelo quadro `cota` e é relido do `/estado` quando o stream fecha |
+| open/close | `Ctrl+I`, or the star button in the corner of the canvas |
+| default | **open** on the create screen (the canvas starts empty), **closed** in the editor of an existing workflow |
+| width | 300–560 px, draggable by the edge; the preference stays in the browser |
+| phone | becomes a full-height sheet |
+| start over | `⋯` menu → *Recomeçar a conversa* (Restart the conversation; deletes the history of that workflow, never the workflow) |
 
-> **O teto atual é folgado de propósito e ainda não foi medido.** Ele saiu de uma estimativa: as
-> definições das ferramentas somavam ~22 KB (~6,9 k tokens, o prefixo estável que o cache guarda) quando eram 38 — hoje são 42 —, e
-> o que domina o custo são os **resultados** — o índice do catálogo tem ~10 KB, uma definição inteira
-> outro tanto. O número definitivo tem de sair de uma sessão real montando um fluxo de verdade.
+Without `LLM_API_KEY` (or `OPENROUTER_API_KEY`) in the installation, none of this appears — neither the drawer nor the button.
+
+## Quota
+
+### When it runs out, the way out
+
+The full-quota notice (`aviso-de-cota.tsx`) can carry an extension's offer
+(`ofertaDaCota`, see `docs/architecture.md`, Web extensions). Without an extension, the notice stands
+alone.
+
+The component is a single one on purpose. The text lived duplicated in **three** surfaces — the Home's
+bar, the Home's floating panel and the assistant drawer in the editor; while it was only a notice, the
+duplication cost little, but a button that exists on one surface and not on the other is a sale
+that disappears depending on the screen where the person hit the ceiling. The shell remains each surface's own (a capsule
+in the bar, a block in the other two); the content belongs to the component.
+
+The colors are **theme-aware** because of the third one: the Home forces `dark` on its shells,
+but the editor's drawer follows the viewer's theme, and fixing the dark palette would paint amber-400
+on a light background.
+
+`GET /assistente/editor/estado` and `/assistente/estado` carry `plano` and `assinaturas_ativas`, which the
+extension registry fills in (without an extension: `null` and `false`). The notice also states the **real**
+reopening time — the server sends `reabre_em_segundos`, the donut right below already used it, and
+"algumas horas" (a few hours) was the screen knowing more than it told.
+
+The quota is by **accumulated tokens** in a 24 h window, not by message. The reason is straightforward: a
+message that triggers ten tool calls costs ten times one that triggers none. Counting
+messages would measure the wrong thing and give the same quota to "thanks!" and to the twenty-node workflow.
+
+| | |
+|---|---|
+| ceiling | **the installation's**: `ASSISTENTE_TETO_DE_TOKENS_POR_DIA` (default 1,500,000), the same for everyone. What answers is `teto_do_assistente.plano_e_teto()`, which asks the extension registry (`app/extensoes`): in an installation with a plans extension, the ceiling is that of each person's plan, which the admin edits |
+| window | 24 h from the first conversation |
+| where | Redis, key `assistente:tokens:{user_id}` |
+| query | `GET /assistente/editor/estado` returns spent, ceiling, when it reopens and the `plano` that gives that ceiling; during the turn the stream sends the running total on each model response (`cota` frame), with the SAME ceiling — the loop resolves the plan once and carries it through to billing, otherwise the donut would oscillate in the middle of the answer |
+| on screen | a donut with the percentage sits UNDER the message field (bar and panel on the Home, editor drawer) — `uso-da-cota.tsx`; terracotta up to 79%, amber from there on, a reopening countdown when it runs out; the tooltip brings the detail (spent, ceiling, percentage, time). It rises during the turn through the `cota` frame and is reread from `/estado` when the stream closes |
+
+> **The current ceiling is generous on purpose and has not been measured yet.** It came from an estimate: the
+> tool definitions added up to ~22 KB (~6.9 k tokens, the stable prefix the cache keeps) when there were 38 — today there are 42 —, and
+> what dominates the cost are the **results** — the catalog index is ~10 KB, a whole definition
+> about as much. The definitive number has to come from a real session building a real workflow.
 >
-> **Desde 2026-09-21 a medição existe**: `uso_do_assistente` grava o consumo real de cada volta.
+> **Since 2026-09-21 the measurement exists**: `uso_do_assistente` records the real consumption of each round.
 
-### Dois freios, e um não depende do Redis
+### Two brakes, and one does not depend on Redis
 
-A cota diária degrada **aberta** quando o Redis some, como todo o resto do módulo de cotas. Mas
-gasto é dinheiro, não carga — por isso existe também um teto de **voltas do laço**
-(`TETO_DE_VOLTAS`, contador em memória) que fecha a conversa de qualquer jeito. Um modelo preso num
-ciclo de ferramentas é o jeito mais rápido de gastar muito sem ninguém perceber.
+The daily quota degrades **open** when Redis goes away, like all the rest of the quota module. But
+spending is money, not load — that is why there is also a ceiling on **loop rounds**
+(`TETO_DE_VOLTAS`, an in-memory counter) that closes the conversation no matter what. A model stuck in a
+tool cycle is the fastest way to spend a lot without anyone noticing.
 
-## Qual modelo: env como piso, banco por cima
+## Which model: env as the floor, database on top
 
-`ASSISTENTE_MODELO` continua sendo o padrão — uma instalação nova sobe funcionando sem
-ninguém configurar nada. Existindo uma escolha salva pelo admin (`SystemConfig`, chave
-`assistente.modelo`), ela vence. Trocar de modelo é decisão de operação, e exigir deploy
-para isso era o que fazia o operador não trocar.
+`ASSISTENTE_MODELO` is still the default — a new installation comes up working without
+anyone configuring anything. When there is a choice saved by the admin (`SystemConfig`, key
+`assistente.modelo`), it wins. Switching models is an operations decision, and requiring a deploy
+for it was what kept the operator from switching.
 
-**Não há tabela nova**: `SystemConfig` já é o chaveiro de configuração global, com os
-mesmos requisitos — uma linha, lida muito, escrita raramente.
+**There is no new table**: `SystemConfig` is already the global configuration keyring, with the
+same requirements — one row, read a lot, written rarely.
 
-O modelo é resolvido **uma vez por conversa**, junto do teto da cota. Resolver a cada
-volta deixaria o admin trocar o modelo no meio de um raciocínio em curso, mudando o
-comportamento no meio do caminho; quem já começou termina no modelo em que começou.
+The model is resolved **once per conversation**, together with the quota ceiling. Resolving it on every
+round would let the admin switch the model in the middle of a reasoning in progress, changing the
+behavior midway; whoever has already started finishes on the model they started with.
 
-`assistente_config_service.modelo_em_uso` nunca devolve vazio: Redis fora, banco fora ou
-linha corrompida caem no padrão do ambiente. Ficar sem modelo significaria o assistente
-inteiro fora do ar por causa de uma configuração, e o padrão é sempre melhor que nada.
-Cache no Redis com TTL de 5 min, invalidado ao salvar — sem a invalidação, a troca
-demora até cinco minutos para valer e o admin conclui que o botão está quebrado.
+`assistente_config_service.modelo_em_uso` never returns empty: Redis down, database down or a
+corrupted row fall back to the environment default. Being left without a model would mean the whole
+assistant out of service because of a configuration, and the default is always better than nothing.
+Cached in Redis with a 5 min TTL, invalidated on save — without the invalidation, the switch
+takes up to five minutes to take effect and the admin concludes that the button is broken.
 
-### `/admin/assistente/modelo` — a troca com o custo na frente
+### `/admin/assistente/modelo` — the switch with the cost up front
 
-Só admin. O `GET` devolve o modelo em uso e o catálogo do provedor
-(`openrouter.listar_modelos`, com os preços **já convertidos para dólares por milhão de
-tokens**). Uma extensão pode somar campos à resposta, e o `?simular=<id>` chega a ela, para
-recalcular o que depende do modelo sem salvar nada.
+Admin only. The `GET` returns the model in use and the provider's catalog
+(`openrouter.listar_modelos`, with the prices **already converted to dollars per million
+tokens**). An extension can add fields to the response, and `?simular=<id>` reaches it, to
+recompute what depends on the model without saving anything.
 
-#### O `PUT` SONDA antes de salvar
+#### The `PUT` PROBES before saving
 
-**«Está no catálogo» não quer dizer «serve».** O provedor lista algumas centenas de
-modelos, e entre eles há variantes que o endpoint de conversa recusa por inteiro (as
-`:batch` — «cannot be used with the chat/completions endpoint»), modelos sem suporte a
-ferramentas (e o assistente manda as 42 em toda chamada) e modelos cujo teto de saída é
-menor que o nosso `MAX_TOKENS`.
+**"It is in the catalog" does not mean "it works".** The provider lists a few hundred
+models, and among them there are variants that the chat endpoint refuses entirely (the
+`:batch` ones — "cannot be used with the chat/completions endpoint"), models without tool
+support (and the assistant sends all 42 on every call) and models whose output ceiling is
+lower than our `MAX_TOKENS`.
 
-Foi assim que o assistente caiu em produção: um id válido, escolhido do catálogo, salvo sem
-conferência — e todo usuário passou a ver «não consegui falar com o modelo» enquanto quem
-trocou não via nada.
+That is how the assistant went down in production: a valid id, picked from the catalog, saved without
+checking — and every user started seeing "não consegui falar com o modelo" (I couldn't reach the
+model) while whoever made the switch saw nothing.
 
-Antes de gravar, `openrouter.sondar_modelo` faz uma chamada real com a **forma** do pedido
-de verdade (as mesmas ferramentas, o mesmo `max_tokens`, o mesmo esforço) e conteúdo
-mínimo. Filtrar por campos do catálogo seria adivinhar quais campos existem e manter a
-adivinhação em dia; uma chamada responde certo sobre todos os casos de uma vez — inclusive
-os que ninguém previu, como a variante de batch, que não estava em lista de suspeitos
-nenhuma.
+Before saving, `openrouter.sondar_modelo` makes a real call with the **shape** of the real
+request (the same tools, the same `max_tokens`, the same effort) and minimal
+content. Filtering by catalog fields would mean guessing which fields exist and keeping the
+guesswork up to date; one call answers correctly for every case at once — including
+the ones nobody foresaw, such as the batch variant, which was on no list of suspects
+at all.
 
-Três regras da sonda:
+Three rules of the probe:
 
-- **A recusa do provedor vira 400 com as palavras dele.** Quem troca lê «cannot be used
-  with the chat/completions endpoint» no clique.
-- **Só `status` de HTTP bloqueia.** Um stream que abre com 200 e termina sem quadro útil é
-  detalhe de transmissão, não configuração — reprovar por isso barraria um modelo que
-  funciona.
-- **Voltar ao padrão (`modelo: null`) NUNCA é sondado.** É a saída de emergência: se o
-  provedor estiver fora do ar com um modelo ruim salvo, sondá-la trancaria a porta na hora
-  em que ela é necessária.
+- **The provider's refusal becomes a 400 with its own words.** Whoever is switching reads "cannot be used
+  with the chat/completions endpoint" on the click.
+- **Only an HTTP `status` blocks.** A stream that opens with 200 and ends without a useful frame is a
+  transmission detail, not configuration — failing because of it would bar a model that
+  works.
+- **Going back to the default (`modelo: null`) is NEVER probed.** It is the emergency exit: if the
+  provider is down with a bad model saved, probing it would lock the door at the very moment
+  it is needed.
 
-**Modelo sem preço conhecido vira `null`, nunca `0`.** Zero lê como «de graça», e é essa
-leitura que faria escolher errado.
+**A model with no known price becomes `null`, never `0`.** Zero reads as "free", and it is that
+reading that would lead to the wrong choice.
 
-Provedor fora do ar não derruba a tela: o catálogo vem vazio com o motivo em
-`catalogo_indisponivel`, e o admin continua podendo ver o que está em uso e voltar ao
-padrão. Responder 500 ali trancaria a única saída.
+A provider that is down does not bring down the screen: the catalog comes empty with the reason in
+`catalogo_indisponivel`, and the admin can still see what is in use and go back to the
+default. Responding 500 there would lock the only way out.
 
-A tela é a seção **Assistente** em `/dashboard/admin/settings`.
+The screen is the **Assistente** (Assistant) section in `/dashboard/admin/settings`.
 
-## Quanto custou: `uso_do_assistente`
+## What it cost: `uso_do_assistente`
 
-Uma linha por **volta** do laço, gravada no mesmo ponto em que a cota é cobrada
-(`cotas.cobrar_tokens_do_assistente`). Gravar ali, e não no fim da conversa, tem duas
-consequências: a cota e o livro de consumo passam a contar a mesma coisa e não podem
-divergir, e uma conversa abandonada no meio (aba fechada, stream morto) já deixou
-registrado o que gastou até ali — somar só no fim perderia essas, e perderia **para
-baixo**, o lado errado de errar num dado que vira decisão de preço.
+One row per **round** of the loop, recorded at the same point where the quota is charged
+(`cotas.cobrar_tokens_do_assistente`). Recording there, and not at the end of the conversation, has two
+consequences: the quota and the consumption ledger count the same thing and cannot
+diverge, and a conversation abandoned midway (tab closed, dead stream) has already
+recorded what it spent up to that point — adding up only at the end would lose those, and would lose them **on the
+low side**, the wrong side to err on for data that becomes a pricing decision.
 
-| Coluna | Para quê |
+| Column | What for |
 |---|---|
-| `modelo` | gravado, **não deduzido**. No dia da primeira troca de modelo, comparar antes e depois depende disto |
-| `entrada` / `saida` | reprecificar com outro modelo — preço de entrada e de saída diferem em várias vezes |
-| `cache_leitura` | recorte de `entrada`, informativo: custa ~10 % do preço de entrada mas conta inteiro na cota |
-| `custo_usd` | o que o provedor disse que custou. `NUMERIC`, não `FLOAT`: são somas de dinheiro sobre milhares de linhas |
+| `modelo` | recorded, **not inferred**. On the day of the first model switch, comparing before and after depends on this |
+| `entrada` / `saida` | repricing with another model — input and output prices differ by several times |
+| `cache_leitura` | a subset of `entrada`, informational: it costs ~10 % of the input price but counts in full against the quota |
+| `custo_usd` | what the provider said it cost. `NUMERIC`, not `FLOAT`: these are sums of money over thousands of rows |
 
-`uso_service.registrar_volta` **nunca levanta** e abre sessão própria (o laço roda
-dentro de um gerador SSE e não tem sessão de request). É o mesmo raciocínio da cobrança
-de cota: a conversa já aconteceu e já foi paga, e perder a anotação é melhor que jogar
-fora o trabalho. Volta sem token nenhum não vira linha — uma linha de zeros puxaria a
-mediana para baixo, e é a mediana que decide preço.
+`uso_service.registrar_volta` **never raises** and opens its own session (the loop runs
+inside an SSE generator and has no request session). It is the same reasoning as the quota
+charge: the conversation already happened and was already paid for, and losing the note is better than throwing
+away the work. A round with no tokens at all does not become a row — a row of zeros would pull the
+median down, and it is the median that decides pricing.
 
-**Nenhum conteúdo mora aqui**: contagens, o modelo e o custo. A tabela responde de
-quanto foi a conta, não do que se falou.
+**No content lives here**: counts, the model and the cost. The table answers how much
+the bill was, not what was said.
 
-## A conversa
+## The conversation
 
-O histórico fica no **servidor**, não no navegador. Chave por `(usuário, fluxo)`: reabrir o editor
-retoma a conversa daquele fluxo; a tela de criar tem a sua. TTL de 24 h.
+The history lives on the **server**, not in the browser. Keyed by `(usuário, fluxo)` (user, workflow): reopening the editor
+resumes the conversation of that workflow; the create screen has its own. 24 h TTL.
 
-Isso não é só conveniência. Um `tool_result` é a palavra do **servidor** sobre o que aconteceu; um
-cliente que guardasse o transcrito poderia reescrevê-lo e dizer ao modelo o que quisesse — *"a
-validação passou"*, *"o usuário é administrador"*. Por isso `POST /assistente/editor/conversa` aceita
-**apenas** a mensagem nova, e recusa com 422 qualquer campo a mais.
+This is not just convenience. A `tool_result` is the **server's** word about what happened; a
+client that stored the transcript could rewrite it and tell the model whatever it wanted — *"the
+validation passed"*, *"the user is an administrator"*. That is why `POST /assistente/editor/conversa` accepts
+**only** the new message, and refuses with 422 any extra field.
 
-Uma conversa por vez, por fluxo: duas abas no mesmo fluxo escreveriam no mesmo transcrito e o
-embaralhariam. A segunda recebe `conversa_em_andamento`.
+One conversation at a time, per workflow: two tabs on the same workflow would write to the same transcript and
+scramble it. The second one gets `conversa_em_andamento`.
 
-## Rotas
+## Routes
 
 | | |
 |---|---|
 | `POST /assistente/editor/conversa` | `{mensagem, workflow_id?}` → `text/event-stream` |
-| `GET /assistente/editor/estado` | `{ativo, motivo?, cota?, plano, assinaturas_ativas}` — o painel consulta antes de aparecer; sem extensão, `plano` é `null` e `assinaturas_ativas` é `false` |
-| `DELETE /assistente/editor/conversa?workflow_id=` | esquece o histórico daquele fluxo (204) |
+| `GET /assistente/editor/estado` | `{ativo, motivo?, cota?, plano, assinaturas_ativas}` — the panel queries it before appearing; without an extension, `plano` is `null` and `assinaturas_ativas` is `false` |
+| `DELETE /assistente/editor/conversa?workflow_id=` | forgets the history of that workflow (204) |
 
-Todas exigem sessão JWT. **Não** aceitam token pessoal: o PAT é para clientes externos, que falam
-por `/mcp`.
+All of them require a JWT session. They do **not** accept a personal access token: the PAT is for external clients, which talk
+through `/mcp`.
 
-### Os quadros do SSE
+### The SSE frames
 
-Cada quadro é um `event:` nomeado com um `data:` JSON. O painel assina por tipo.
+Each frame is a named `event:` with a JSON `data:`. The panel subscribes by type.
 
 | `event` | `data` |
 |---|---|
-| `pensando` | `{texto}` — o raciocínio resumido do modelo |
-| `texto` | `{texto}` — o que ele está escrevendo |
-| `ferramenta` | `{id, nome, argumentos}` — **argumentos resumidos**: chaves e tamanhos, nunca o conteúdo |
-| `progresso` | `{concluidos, total, mensagem, id?}` — o andamento nó a nó de uma execução; `id` é o `tool_use_id` da chamada dona (as ferramentas de uma volta rodam em paralelo — sem ele, o quadro pinta o card errado; ausente só em conversas gravadas antes do campo) |
-| `cota` | `{gasto, teto}` — o acumulado da janela depois de cada resposta do modelo; só com Redis; não é bloco da conversa nem entra no replay |
+| `pensando` | `{texto}` — the model's summarized reasoning |
+| `texto` | `{texto}` — what it is writing |
+| `ferramenta` | `{id, nome, argumentos}` — **summarized arguments**: keys and sizes, never the content |
+| `progresso` | `{concluidos, total, mensagem, id?}` — the node-by-node progress of a run; `id` is the `tool_use_id` of the owning call (the tools of a round run in parallel — without it, the frame paints the wrong card; absent only in conversations recorded before the field existed) |
+| `cota` | `{gasto, teto}` — the window's running total after each model response; only with Redis; it is not a conversation block and does not enter the replay |
 | `ferramenta_fim` | `{id, nome, erro}` |
-| `proposta` | `{definicao, nos, arestas, ok, erros, avisos}` — a definição validada, **inteira** |
+| `proposta` | `{definicao, nos, arestas, ok, erros, avisos}` — the validated definition, **whole** |
 | `erro` | `{code, message, hint?}` |
-| `fim` | `{transcrito, uso, voltas, ok}` — **sempre o último**, mesmo quando deu errado |
+| `fim` | `{transcrito, uso, voltas, ok}` — **always the last**, even when something went wrong |
 
-O `fim` é sempre o último quadro de propósito: é ele que carrega o transcrito, e perder a conversa
-porque o modelo tropeçou na oitava volta faria a pessoa recomeçar do zero. Quando houve falha, um
-`erro` vem antes e o `fim` traz `ok: false`.
+The `fim` is always the last frame on purpose: it is the one that carries the transcript, and losing the conversation
+because the model tripped on the eighth round would make the person start over from scratch. When there was a failure, an
+`erro` comes before and the `fim` carries `ok: false`.
 
-Fechar a aba no meio da resposta **não** perde a conversa: o gerador grava o transcrito num
-`finally` blindado por `asyncio.shield`, para o cancelamento da desconexão não abortar a gravação a
-meio caminho. E um turno longo não morre calado no proxy: o SSE do editor passa pelo mesmo batimento
-(`: ping` a cada 15 s de silêncio, `app/api/routers/_streaming.py`) que o assistente da Home. A cota
-já está protegida sem isso — ela é cobrada depois de cada chamada ao modelo, dentro do laço.
+Closing the tab in the middle of the response does **not** lose the conversation: the generator records the transcript in a
+`finally` shielded by `asyncio.shield`, so that the disconnection's cancellation does not abort the write
+halfway. And a long turn does not die silently at the proxy: the editor's SSE goes through the same heartbeat
+(`: ping` every 15 s of silence, `app/api/routers/_streaming.py`) as the Home assistant. The quota
+is already protected without this — it is charged after each call to the model, inside the loop.
 
-### O quadro `proposta`, e por que ele é a exceção
+### The `proposta` frame, and why it is the exception
 
-Todo quadro `ferramenta` leva os argumentos **resumidos** — chaves e tamanhos, nunca conteúdo. O
-`proposta` é a única exceção, e ela é estreita de propósito: leva a definição INTEIRA, só de
-`validate_workflow`, e só quando a ferramenta não falhou.
+Every `ferramenta` frame carries **summarized** arguments — keys and sizes, never content. The
+`proposta` is the only exception, and it is narrow on purpose: it carries the WHOLE definition, only from
+`validate_workflow`, and only when the tool did not fail.
 
-O motivo é direto. O assistente não grava; quem leva o fluxo ao canvas é o botão **Aplicar**. Com o
-resumo, `definition` chegaria ao painel como `{"__campos__": 2}` — e o botão não teria o que aplicar.
+The reason is straightforward. The assistant does not save; what takes the workflow to the canvas is the **Aplicar** (Apply) button. With the
+summary, `definition` would reach the panel as `{"__campos__": 2}` — and the button would have nothing to apply.
 
-A definição sai do **argumento**, e não do resultado: é o que o modelo pediu para validar, é o que o
-servidor validou, e é exatamente o que será aplicado. Ler do resultado abriria espaço para os dois
-divergirem.
+The definition comes from the **argument**, not from the result: it is what the model asked to validate, it is what the
+server validated, and it is exactly what will be applied. Reading from the result would open room for the two to
+diverge.
 
-`ok`, `erros` e `avisos` vêm do relatório da validação. `ok: null` significa que o relatório não pôde
-ser lido — **não** significa que passou, e o painel desliga o Aplicar nesse caso.
+`ok`, `erros` and `avisos` come from the validation report. `ok: null` means the report could not
+be read — it does **not** mean it passed, and the panel disables Aplicar in that case.
 
-### O Aplicar
+### Aplicar (Apply)
 
-O botão é local: ele monta o canvas a partir da definição e não chama rota nenhuma. Gravar continua
-sendo o **Salvar** do editor, como em qualquer outra edição.
+The button is local: it builds the canvas from the definition and calls no route at all. Saving is still
+the editor's **Salvar** (Save), as in any other edit.
 
-Aplicar **substitui** o canvas, mas **preserva a posição** de todo nó cujo `id` sobreviveu. Isso não é
-detalhe: a definição do assistente não tem posição, e sem a preservação um fluxo de doze nós arrumado à
-mão viraria uma fila horizontal. Os nós novos entram pelo mesmo auto-layout do botão de organizar, e
-descem se caírem em cima de um card que já estava lá.
+Applying **replaces** the canvas, but **preserves the position** of every node whose `id` survived. This is not a
+detail: the assistant's definition has no positions, and without the preservation a twelve-node workflow arranged by
+hand would turn into a horizontal row. The new nodes come in through the same auto-layout as the arrange button, and
+move down if they land on top of a card that was already there.
 
-Antes do clique, o cartão mostra o que vai acontecer — `n novos · n alterados · n removidos` — porque
-aplicar num canvas cheio é destrutivo. `Ctrl+Z` desfaz.
+Before the click, the card shows what is going to happen — `n novos · n alterados · n removidos` — because
+applying on a full canvas is destructive. `Ctrl+Z` undoes.
 
-### Consumir no navegador
+### Consuming it in the browser
 
-**Não é `EventSource`**: ele é GET, não manda cabeçalho, e a conversa precisa de corpo e de
-`Authorization`. Use `fetch` e leia `response.body`:
+**It is not `EventSource`**: that is GET, sends no header, and the conversation needs a body and
+`Authorization`. Use `fetch` and read `response.body`:
 
 ```ts
 const r = await fetch("/assistente/editor/conversa", {
@@ -402,43 +402,43 @@ const r = await fetch("/assistente/editor/conversa", {
   body: JSON.stringify({ mensagem, workflow_id }),
 })
 const leitor = r.body!.getReader()
-// …decodificar os quadros `event:`/`data:` e despachar por tipo
+// …decode the `event:`/`data:` frames and dispatch by type
 ```
 
-Um quadro pode chegar **partido ao meio** entre dois `read()` — a rede não respeita fronteira de
-mensagem. O decodificador precisa guardar o resto; o da web está em
-`web/app/components/home/assistente/quadros.ts`, com esse caso coberto por teste.
+A frame can arrive **split in half** between two `read()` calls — the network does not respect message
+boundaries. The decoder needs to keep the remainder; the web one is in
+`web/app/components/home/assistente/quadros.ts`, with that case covered by a test.
 
-Dentro da própria aplicação web o `Authorization` **não** é mandado: a chamada passa pelo proxy
-`/terra`, que autentica a API com o token do servidor e ignora o header do cliente. O exemplo acima é
-para quem fala direto com a API.
+Inside the web application itself the `Authorization` is **not** sent: the call goes through the
+`/terra` proxy, which authenticates to the API with the server's token and ignores the client's header. The example above is
+for whoever talks directly to the API.
 
-## Segurança
+## Security
 
-- **O assistente não ganha nada que você não tinha.** O escopo é o da sua sessão, com dois escopos a
-  MENOS que um token pessoal completo (`triggers:manage` e `drive:write` ficam fora), e o portão
-  acima tira todas as ferramentas de escrita menos `run_workflow`. A autorização é a mesma do MCP,
-  pelo mesmo `call_tool` — não há uma segunda regra para divergir.
-- **Texto de fluxo é dado, não instrução.** Nome de fluxo, nome de arquivo do Drive e mensagem de
-  erro são escritos por pessoas do workspace, e num workspace compartilhado isso inclui terceiros. O
-  MCP já os embrulha em `untrusted_data`, e o system prompt do assistente diz em voz alta que aquilo
-  não se obedece.
-- **Execução é real.** `run_workflow` dispara nós que escrevem em banco e publicam mapa. O assistente
-  pede aval em texto e só executa no turno seguinte.
-- **O argumento da chamada não vai inteiro para o SSE.** O quadro `ferramenta` leva chaves e
-  tamanhos; a definição do fluxo e o texto de quem está usando ficam fora, porque o stream é log de
-  alguém em algum momento.
+- **The assistant gains nothing you did not have.** The scope is that of your session, with two scopes
+  FEWER than a full personal access token (`triggers:manage` and `drive:write` are left out), and the gate
+  above removes every write tool except `run_workflow`. The authorization is the same as the MCP's,
+  through the same `call_tool` — there is no second rule to diverge.
+- **Workflow text is data, not instruction.** Workflow names, Drive file names and error
+  messages are written by people in the workspace, and in a shared workspace that includes third parties. The
+  MCP already wraps them in `untrusted_data`, and the assistant's system prompt says out loud that those
+  are not to be obeyed.
+- **Execution is real.** `run_workflow` triggers nodes that write to databases and publish maps. The assistant
+  asks for approval in text and only executes on the following turn.
+- **The call's argument does not go whole into the SSE.** The `ferramenta` frame carries keys and
+  sizes; the workflow definition and the text of whoever is using it stay out, because the stream is someone's
+  log at some point.
 
-## Limites conhecidos
+## Known limits
 
-- **Sessão longa acaba.** No teto de voltas a conversa termina com um aviso, em vez de continuar
-  gastando. Compactação de contexto fica registrada como próximo passo.
-- **Sem Redis a conversa não tem memória**: cada mensagem começa do zero, e a cota degrada aberta.
-  É a mesma política do resto da plataforma — a API nem sobe sem Redis, então isso é um incidente de
-  segundos, não um modo de operação.
-- **Raster continua fora** do motor de fluxos, e o guia diz isso ao modelo.
-- **A trava da conversa (Redis, 300 s) se renova** enquanto o turno corre, para não vencer no meio de
-  uma conversa longa e deixar uma segunda aba entrar no mesmo transcrito; e a chave da cota diária
-  ganha o prazo na mesma transação do `INCRBY` (`contar_na_janela`, em `app/core/redis.py`), para o
-  teto nunca ficar imortal e travar o assistente para sempre — o mesmo contador das cotas do MCP e do
-  rate limit do WebSocket.
+- **A long session ends.** At the round ceiling the conversation ends with a notice, instead of continuing
+  to spend. Context compaction is recorded as the next step.
+- **Without Redis the conversation has no memory**: each message starts from scratch, and the quota degrades open.
+  It is the same policy as the rest of the platform — the API does not even start without Redis, so this is an incident of
+  seconds, not an operating mode.
+- **Raster remains outside** the workflow engine, and the guide tells the model so.
+- **The conversation lock (Redis, 300 s) is renewed** while the turn runs, so that it does not expire in the middle of
+  a long conversation and let a second tab into the same transcript; and the daily quota key
+  gets its expiry in the same transaction as the `INCRBY` (`contar_na_janela`, in `app/core/redis.py`), so that the
+  ceiling never becomes immortal and locks the assistant forever — the same counter as the MCP quotas and the
+  WebSocket rate limit.

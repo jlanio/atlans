@@ -1,102 +1,102 @@
-# Acordo de Licença de Contribuidor (individual)
+# Contributor License Agreement (individual)
 
-Versão 1.0, de 2 de outubro de 2026.
+Version 1.0, of October 2, 2026.
 
-Obrigado por contribuir com o Atlans. Este acordo diz com que direitos o
-titular do projeto recebe a sua contribuição. Ele não tira de você direito
-nenhum sobre ela: você continua dono do que escreveu e pode usá-lo como quiser.
+Thank you for contributing to Atlans. This agreement states the rights under which the
+project's holder receives your contribution. It does not take from you any right
+whatsoever over it: you remain the owner of what you wrote and may use it as you wish.
 
-**Por que um acordo.** O Atlans é distribuído como software livre, sob a GNU
-Affero General Public License, versão 3 (AGPL-3.0-only, ver [LICENSE](LICENSE)),
-e o titular também o oferece sob outros termos: na instalação mantida por ele,
-por exemplo, com módulos que não fazem parte da distribuição livre. Para fazer
-as duas coisas com o código de todos, ele precisa de uma licença ampla sobre
-cada contribuição. Em troca, ele se compromete a distribuí-la também como
-software livre (cláusula 5).
+**Why an agreement.** Atlans is distributed as free software, under the GNU
+Affero General Public License, version 3 (AGPL-3.0-only, see [LICENSE](LICENSE)),
+and the holder also offers it under other terms: in the installation the holder maintains,
+for example, with modules that are not part of the free distribution. To do
+both things with everyone's code, the holder needs a broad license to
+each contribution. In return, the holder undertakes to distribute it also as
+free software (clause 5).
 
-## 1. Definições
+## 1. Definitions
 
-- **Você**: a pessoa que aceita este acordo e envia a Contribuição.
-- **Titular**: Joselanio Ferreira de Morais, que mantém o
-  Atlans e publica o repositório oficial dele.
-- **Contribuição**: toda obra original de sua autoria — código, testes,
-  documentação, traduções, imagens — que Você envia ao Titular para inclusão
-  no Atlans, por pull request, patch, issue ou qualquer outro meio, a partir da
-  aceitação deste acordo, e também a que está no pull request em que Você o
-  aceita. Não é Contribuição o que Você marcar por escrito, ao enviar, como
-  «não é uma contribuição», nem a obra de terceiros (cláusula 4.3).
+- **You**: the person who accepts this agreement and submits the Contribution.
+- **Holder**: Joselanio Ferreira de Morais, who maintains
+  Atlans and publishes its official repository.
+- **Contribution**: any original work of your authorship — code, tests,
+  documentation, translations, images — that You submit to the Holder for inclusion
+  in Atlans, by pull request, patch, issue or any other means, from the
+  acceptance of this agreement onward, as well as the work contained in the pull request in which You
+  accept it. Anything You mark in writing, upon submission, as "not a contribution" is
+  not a Contribution, nor is the work of third parties (clause 4.3).
 
-## 2. Licença de direitos autorais
+## 2. Copyright license
 
-Você concede ao Titular uma licença perpétua, mundial, não exclusiva,
-gratuita e irrevogável para reproduzir, adaptar, criar obras derivadas, exibir
-e executar publicamente, distribuir e sublicenciar a Contribuição e as obras
-derivadas dela, sob qualquer licença, livre ou não, inclusive em produtos e
-serviços pagos.
+You grant the Holder a perpetual, worldwide, non-exclusive,
+royalty-free and irrevocable license to reproduce, adapt, create derivative works of, publicly display
+and publicly perform, distribute and sublicense the Contribution and the derivative works
+thereof, under any license, free or not, including in paid products and
+services.
 
-Quem recebe o Atlans recebe a Contribuição pelas licenças que o Titular dá, a
-da distribuição livre entre elas (cláusula 5), e não por este acordo.
+Whoever receives Atlans receives the Contribution under the licenses the Holder grants,
+the free distribution's among them (clause 5), and not under this agreement.
 
-## 3. Licença de patentes
+## 3. Patent license
 
-Você concede ao Titular, e a quem receber software distribuído por ele, uma
-licença perpétua, mundial, não exclusiva, gratuita e irrevogável (exceto como
-diz o fim desta cláusula) para fazer, mandar fazer, usar, oferecer, vender,
-importar e transferir de outro modo a Contribuição, sob as patentes que Você
-pode licenciar e que a Contribuição violaria, sozinha ou combinada com o Atlans
-tal como estava quando Você a enviou. Se alguém mover ação — inclusive por
-reconvenção, ou por pedido contraposto — alegando que a Contribuição, ou o
-Atlans com ela, viola uma patente, as licenças de patente que este acordo dá a
-essa pessoa terminam na data em que a ação for proposta.
+You grant the Holder, and anyone who receives software distributed by the Holder, a
+perpetual, worldwide, non-exclusive, royalty-free and irrevocable (except as
+stated at the end of this clause) license to make, have made, use, offer to sell, sell,
+import and otherwise transfer the Contribution, under the patents that You
+are able to license and that the Contribution would infringe, alone or in combination with Atlans
+as it stood when You submitted it. If anyone brings an action — including by
+counterclaim, or by cross-claim — alleging that the Contribution, or
+Atlans with it, infringes a patent, the patent licenses that this agreement grants to
+that person terminate on the date on which the action is filed.
 
-## 4. O que Você declara
+## 4. What You represent
 
-1. A Contribuição é criação sua, e Você tem o direito de conceder as licenças
-   acima.
-2. Se o seu empregador ou contratante tem direitos sobre o que Você cria — por
-   contrato, ou pela lei (Lei 9.609/1998, art. 4º) —, ele autorizou Você a
-   contribuir sob este acordo.
-3. Obra de terceiros (código, fonte, ícone que Você não criou) não é
-   Contribuição: Você pode enviá-la junto, à parte e identificada (autor,
-   origem e licença), e ela entra pela licença dela, não por este acordo. Você
-   não a apresenta como sua.
-4. Você informa, ao enviar, toda licença ou restrição de terceiros que conheça
-   e que alcance a Contribuição, inclusive patentes e marcas.
-5. Você avisa o Titular se alguma destas declarações deixar de ser verdade.
+1. The Contribution is your own creation, and You have the right to grant the licenses
+   above.
+2. If your employer or contracting party has rights over what You create — by
+   contract, or by law (Lei 9.609/1998, art. 4) —, it has authorized You to
+   contribute under this agreement.
+3. Third-party work (code, fonts, icons that You did not create) is not a
+   Contribution: You may submit it alongside, separately and identified (author,
+   origin and license), and it comes in under its own license, not under this agreement. You
+   do not present it as your own.
+4. You disclose, upon submission, every third-party license or restriction that You know of
+   and that reaches the Contribution, including patents and trademarks.
+5. You notify the Holder if any of these representations ceases to be true.
 
-## 5. O que o Titular se compromete
+## 5. What the Holder undertakes
 
-1. O Titular distribui cada Contribuição que incluir no Atlans também sob a
-   licença da distribuição livre (hoje, a AGPL-3.0-only), e não só sob outros
-   termos.
-2. O Titular não é obrigado a aceitar nem a usar uma Contribuição.
+1. The Holder distributes each Contribution that it includes in Atlans also under the
+   license of the free distribution (currently, the AGPL-3.0-only), and not only under other
+   terms.
+2. The Holder is not obligated to accept or to use a Contribution.
 
-## 6. Sem garantia
+## 6. No warranty
 
-Salvo se Você combinar outra coisa por escrito, a Contribuição vai «como está»,
-sem garantia de nenhum tipo, e Você não é obrigado a dar suporte a ela.
+Unless You agree otherwise in writing, the Contribution is provided "as is",
+without warranty of any kind, and You are not obligated to provide support for it.
 
-## 7. Direitos morais
+## 7. Moral rights
 
-Nada neste acordo afasta os direitos morais que a lei reserva a Você como
-autor (Lei 9.609/1998, art. 2º, § 1º, e Lei 9.610/1998). A autoria de cada
-Contribuição fica registrada no histórico do repositório.
+Nothing in this agreement sets aside the moral rights that the law reserves to You as
+author (Lei 9.609/1998, art. 2, § 1, and Lei 9.610/1998). The authorship of each
+Contribution remains recorded in the repository's history.
 
-## 8. Lei e foro
+## 8. Governing law and venue
 
-Este acordo segue as leis do Brasil. Fica eleito o foro da comarca de
-Porto Velho/RO para resolver o que dele decorrer.
+This agreement is governed by the laws of Brazil. The courts of the judicial district (comarca) of
+Porto Velho/RO are elected to resolve any matter arising from it.
 
-## 9. Como aceitar
+## 9. How to accept
 
-Escreva no seu primeiro pull request, na descrição ou num comentário:
+Write in your first pull request, in the description or in a comment:
 
-> Li o CLA.md, versão 1.0, e concordo com ele.
+> I have read CLA.md, version 1.0, and I agree to it.
 
-O aceite vale para o que está nesse pull request e para as Contribuições
-seguintes, até Você avisar por escrito que não quer mais contribuir sob ele, o
-que não muda as licenças das Contribuições já enviadas. Uma versão nova deste
-acordo só vale para quem a aceitar.
+The acceptance applies to what is in that pull request and to subsequent
+Contributions, until You give written notice that You no longer wish to contribute under it, which
+does not change the licenses of Contributions already submitted. A new version of this
+agreement applies only to those who accept it.
 
-Este acordo é individual. Para contribuir em nome de uma empresa, abra uma
-issue antes e combine com o Titular como.
+This agreement is individual. To contribute on behalf of a company, open an
+issue first and agree with the Holder on how.

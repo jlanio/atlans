@@ -1,87 +1,87 @@
-# Como Criar um Novo Nó
+# How to Create a New Node
 
-Este guia explica passo a passo como adicionar um novo nó ao motor de workflows do Atlans.
+This guide explains, step by step, how to add a new node to the Atlans workflow engine.
 
-## Sumário
+## Table of Contents
 
-- [Conceitos Fundamentais](#conceitos-fundamentais)
-- [Passo 1 — Escolha a categoria](#passo-1--escolha-a-categoria)
-- [Passo 2 — Crie o arquivo do nó](#passo-2--crie-o-arquivo-do-nó)
-- [Passo 3 — Implemente `description()`](#passo-3--implemente-description)
-- [Passo 4 — Implemente `execute()` (ou `execute_sync()`)](#passo-4--implemente-execute-ou-execute_sync)
-- [Passo 5 — Registro automático](#passo-5--registro-automático)
-- [Passo 6 — Verifique no editor](#passo-6--verifique-no-editor)
-- [Referência: BaseNode](#referência-basenode)
-- [Referência: Tipos de propriedades](#referência-tipos-de-propriedades)
-- [Exemplos comentados](#exemplos-comentados)
-- [Checklist final](#checklist-final)
+- [Core Concepts](#core-concepts)
+- [Step 1 — Choose the category](#step-1--choose-the-category)
+- [Step 2 — Create the node file](#step-2--create-the-node-file)
+- [Step 3 — Implement `description()`](#step-3--implement-description)
+- [Step 4 — Implement `execute()` (or `execute_sync()`)](#step-4--implement-execute-or-execute_sync)
+- [Step 5 — Automatic registration](#step-5--automatic-registration)
+- [Step 6 — Check in the editor](#step-6--check-in-the-editor)
+- [Reference: BaseNode](#reference-basenode)
+- [Reference: Property types](#reference-property-types)
+- [Annotated examples](#annotated-examples)
+- [Final checklist](#final-checklist)
 
 ---
 
-## Conceitos Fundamentais
+## Core Concepts
 
-Um **nó** é uma unidade atômica de processamento dentro de um workflow DAG. Cada nó:
+A **node** is an atomic unit of processing inside a DAG workflow. Each node:
 
-- Recebe um dicionário `inputs` com as saídas dos nós anteriores
-- Tem parâmetros configuráveis pelo usuário (acessados via `self.get_param()` / `self.parameters`)
-- Retorna um dicionário `outputs` que alimenta os nós seguintes
+- Receives an `inputs` dictionary with the outputs of the previous nodes
+- Has parameters the user can configure (accessed via `self.get_param()` / `self.parameters`)
+- Returns an `outputs` dictionary that feeds the following nodes
 
 ```
-      [Nó A]
-         │ output "output" ──(aresta: from_key/to_key)──▶
+      [Node A]
+         │ output "output" ──(edge: from_key/to_key)──▶
          ▼
-      [Nó B]  ← inputs = {"output": GeoDataFrame}
+      [Node B]  ← inputs = {"output": GeoDataFrame}
          │ output "output" ──▶
          ▼
-      [Nó C]
+      [Node C]
 ```
 
-> **Como o dado atravessa a aresta.** As chaves que chegam em `inputs` são definidas **na
-> própria aresta** (`from_key`/`to_key`, escolhidas no canvas), não por parâmetros do nó. Um
-> nó novo deve **ler/escrever chaves de saída fixas** (por convenção, `output`) e declará-las
-> em `outputs`; quem conecta escolhe a porta no editor. O antigo padrão de parâmetros
-> `inputKey`/`outputKey` foi **aposentado** — nenhum nó do repositório o usa e o runtime não
-> o interpreta mais (ver `docs/specs/edge-data-contract.md`). Não crie parâmetros
-> `inputKey`/`outputKey`: eles seriam simplesmente descartados.
+> **How data crosses the edge.** The keys that arrive in `inputs` are defined **on the
+> edge itself** (`from_key`/`to_key`, chosen on the canvas), not by node parameters. A
+> new node should **read/write fixed output keys** (by convention, `output`) and declare them
+> in `outputs`; whoever wires the nodes picks the port in the editor. The old pattern of
+> `inputKey`/`outputKey` parameters has been **retired** — no node in the repository uses it and the runtime no
+> longer interprets it (see `docs/specs/edge-data-contract.md`). Do not create
+> `inputKey`/`outputKey` parameters: they would simply be discarded.
 
 ---
 
-## Passo 1 — Escolha a categoria
+## Step 1 — Choose the category
 
-Coloque o arquivo do nó na categoria semanticamente correta:
+Put the node file in the semantically correct category:
 
-| Pasta | Quando usar | Nós existentes (referência) |
+| Folder | When to use | Existing nodes (reference) |
 |-------|-------------|----------------------------|
-| `flow/nodes/action/` | Transformações de atributos, requisições HTTP, geocodificação, scripts | `SetFields`, `Sort`, `RemoveDuplicates`, `HttpRequest`, `GeocodeNode`, `PythonScript` |
-| `flow/nodes/spatial/` | Operações geométricas (buffer, clip, dissolve, join espacial…) | `Buffer`, `Clip`, `Dissolve`, `SpatialJoin`, `CentroidNode`, `UnionNode`, `Simplify`, … |
-| `flow/nodes/datasource/` | Leitura de dados (banco, arquivos, WFS, APIs) | `DatabaseSpatialQuery`, `ReadGeoJSON`, `ReadShapefile`, `WFS`, `DataInput`, … |
-| `flow/nodes/outputs/` | Escrita de resultados (arquivos, banco, S3, webhook, e-mail) | `SaveGeoJSON`, `SaveToPostGIS`, `SaveToS3`, `SendEmail`, `SendWebhook` |
-| `flow/nodes/control/` | Controle de fluxo (condicional, loop, merge, sub-workflow, roteamento) | `Conditional`, `Switch`, `Merge`, `Loop`, `JinjaBranch`, `SubWorkflow` |
-| `flow/nodes/trigger/` | Gatilhos de execução (agendamento, webhook, arquivo) | `ScheduleTrigger`, `WebhookTrigger`, `FileTrigger`, `GeofenceTrigger` |
+| `flow/nodes/action/` | Attribute transformations, HTTP requests, geocoding, scripts | `SetFields`, `Sort`, `RemoveDuplicates`, `HttpRequest`, `GeocodeNode`, `PythonScript` |
+| `flow/nodes/spatial/` | Geometric operations (buffer, clip, dissolve, spatial join…) | `Buffer`, `Clip`, `Dissolve`, `SpatialJoin`, `CentroidNode`, `UnionNode`, `Simplify`, … |
+| `flow/nodes/datasource/` | Data reading (database, files, WFS, APIs) | `DatabaseSpatialQuery`, `ReadGeoJSON`, `ReadShapefile`, `WFS`, `DataInput`, … |
+| `flow/nodes/outputs/` | Writing results (files, database, S3, webhook, email) | `SaveGeoJSON`, `SaveToPostGIS`, `SaveToS3`, `SendEmail`, `SendWebhook` |
+| `flow/nodes/control/` | Flow control (conditional, loop, merge, sub-workflow, routing) | `Conditional`, `Switch`, `Merge`, `Loop`, `JinjaBranch`, `SubWorkflow` |
+| `flow/nodes/trigger/` | Execution triggers (schedule, webhook, file) | `ScheduleTrigger`, `WebhookTrigger`, `FileTrigger`, `GeofenceTrigger` |
 
-> Observação: o `type` da categoria (usado em `description()`) é **singular** — para a pasta
-> `outputs/` o `type` é `"output"`. Note também que o `name` de registro de alguns nós carrega
-> o sufixo `Node` (`GeocodeNode`, `CentroidNode`, `UnionNode`, `SimplifyNode`), enquanto outros
-> não (`Buffer`, `Clip`). O `name` é livre — só precisa ser único (ver Passo 3).
+> Note: the category `type` (used in `description()`) is **singular** — for the
+> `outputs/` folder the `type` is `"output"`. Note also that the registry `name` of some nodes carries
+> the `Node` suffix (`GeocodeNode`, `CentroidNode`, `UnionNode`, `SimplifyNode`), while others
+> do not (`Buffer`, `Clip`). The `name` is free — it only has to be unique (see Step 3).
 
 ---
 
-## Passo 2 — Crie o arquivo do nó
+## Step 2 — Create the node file
 
-**Não existe um `_template.py`.** Crie o arquivo do zero, ou copie um nó existente próximo do
-que você precisa e adapte:
+**There is no `_template.py`.** Create the file from scratch, or copy an existing node close to
+what you need and adapt it:
 
 ```bash
-# Do zero:
+# From scratch:
 touch flow/nodes/spatial/meu_no.py
 
-# Ou copiando um nó simples como ponto de partida:
+# Or by copying a simple node as a starting point:
 cp flow/nodes/spatial/simplify.py flow/nodes/spatial/meu_no.py
 ```
 
-O nome do arquivo deve ser `snake_case`. O nome da classe pode ser `PascalCase`.
+The file name must be `snake_case`. The class name can be `PascalCase`.
 
-Esqueleto mínimo:
+Minimal skeleton:
 
 ```python
 import asyncio
@@ -106,56 +106,56 @@ class MeuNo(BaseNode):
 
 ---
 
-## Passo 3 — Implemente `description()`
+## Step 3 — Implement `description()`
 
-O método `description()` é um `classmethod` que retorna os metadados do nó. Esses metadados
-são usados pelo:
-- **Registry** — para identificar e instanciar o nó pelo campo `name`
-- **Editor visual** — para gerar o formulário de configuração automaticamente
-- **API `/nodes/`** — para listar os nós disponíveis
-- **Simulação de schema (`validate_service`, tool `validate_workflow` do MCP)** — via `outputs`/`dynamic_output`
+The `description()` method is a `classmethod` that returns the node's metadata. This metadata
+is used by:
+- **Registry** — to identify and instantiate the node by its `name` field
+- **Visual editor** — to generate the configuration form automatically
+- **`/nodes/` API** — to list the available nodes
+- **Schema simulation (`validate_service`, the MCP `validate_workflow` tool)** — via `outputs`/`dynamic_output`
 
 ```python
 @classmethod
 def description(cls) -> Dict[str, Any]:
     return {
-        # Identificador único no registro — sem espaços, sem acentos.
-        # É a CHAVE do registro (flow/registry.py) e é salvo na definition do
-        # workflow no campo "name" do nó. A fábrica instancia o nó procurando
-        # node_def["name"] no NODE_REGISTRY (flow/factory.py). NÃO MUDE após o
-        # nó estar em uso em produção — crie um nó novo se precisar mudar.
+        # Unique identifier in the registry — no spaces, no accents.
+        # It is the registry KEY (flow/registry.py) and is saved in the workflow
+        # definition in the node's "name" field. The factory instantiates the node by looking up
+        # node_def["name"] in NODE_REGISTRY (flow/factory.py). DO NOT CHANGE it once the
+        # node is in use in production — create a new node if you need to change it.
         "name": "MeuNo",
 
-        # Nome exibido no editor visual para o usuário
+        # Name shown to the user in the visual editor
         "alias": "Meu Nó",
 
-        # Descrição completa — aparece como tooltip/ajuda no editor
+        # Full description — shows up as tooltip/help in the editor
         "description": "Realiza X operação sobre Y dados, retornando Z resultado.",
 
-        # CATEGORIA do nó (define ícone/cor no editor e é usada no filtro do grafo).
-        # NÃO é o identificador — o identificador é "name" acima.
-        # Valores: "trigger" | "action" | "spatial" | "datasource" | "output" | "control"
+        # The node's CATEGORY (sets icon/color in the editor and is used in the graph filter).
+        # It is NOT the identifier — the identifier is "name" above.
+        # Values: "trigger" | "action" | "spatial" | "datasource" | "output" | "control"
         "type": "spatial",
 
-        # Parâmetros configuráveis pelo usuário
+        # Parameters the user can configure
         "properties": [
             {
-                "name": "distance",         # chave do parâmetro em self.parameters
-                "label": "Distância",       # rótulo exibido no editor (opcional, recomendado)
-                "type": "number",           # ver tabela de tipos abaixo
-                "default": 100,             # default aplicado por self.validate()
+                "name": "distance",         # parameter key in self.parameters
+                "label": "Distância",       # label shown in the editor (optional, recommended)
+                "type": "number",           # see the type table below
+                "default": 100,             # default applied by self.validate()
                 "description": "Distância do buffer em unidades do CRS.",
             },
         ],
 
-        # Campos de saída — a FONTE ÚNICA do contrato de saída: as chaves do
-        # dict que execute() devolve, com tipo. Usados pelo editor (painel de
-        # schema, seletor de porta, autocomplete), pela simulação/preview e
-        # pela detecção de "schema drift" no executor.
-        #   - `port: True` marca um campo com ponto de conexão próprio no
-        #     canvas (2+ deles ⇒ handles nomeados; nenhum ⇒ saída anônima).
-        #   - Nós de RAMO (Conditional e afins) declaram `"branches": True`:
-        #     os pontos de saída são true/false e roteiam a execução.
+        # Output fields — the SINGLE SOURCE of the output contract: the keys of the
+        # dict that execute() returns, with their type. Used by the editor (schema
+        # panel, port selector, autocomplete), by simulation/preview and
+        # by "schema drift" detection in the executor.
+        #   - `port: True` marks a field with its own connection point on the
+        #     canvas (2+ of them ⇒ named handles; none ⇒ anonymous output).
+        #   - BRANCH nodes (Conditional and the like) declare `"branches": True`:
+        #     the output points are true/false and route the execution.
         "outputs": [
             {"name": "output", "type": "geodataframe",
              "description": "GeoDataFrame com o resultado."},
@@ -163,13 +163,13 @@ def description(cls) -> Dict[str, Any]:
     }
 ```
 
-### Campos de propriedade especiais
+### Special property fields
 
-Além de `name`/`type`/`default`/`description`, uma propriedade pode ter:
+Besides `name`/`type`/`default`/`description`, a property can have:
 
 ```python
-# Lista de opções (renderiza um select). Use type "select"; cada opção é um
-# objeto {value, label}. self.validate() valida o valor contra os "value".
+# List of options (renders a select). Use type "select"; each option is an
+# {value, label} object. self.validate() validates the value against the "value"s.
 {
     "name": "crs",
     "label": "CRS de saída",
@@ -182,7 +182,7 @@ Além de `name`/`type`/`default`/`description`, uma propriedade pode ter:
     ],
 },
 
-# Exibição condicional: só mostra o campo quando outro parâmetro tem certo valor.
+# Conditional display: only shows the field when another parameter has a certain value.
 {
     "name": "fieldName",
     "label": "Campo",
@@ -193,22 +193,22 @@ Além de `name`/`type`/`default`/`description`, uma propriedade pode ter:
 },
 ```
 
-### Nós que exigem credencial
+### Nodes that require a credential
 
-Há dois padrões em uso, ambos válidos:
+Two patterns are in use, both valid:
 
 ```python
-# (a) Nós de banco (DatabaseSpatialQuery, SaveToPostGIS): sinalizam com
-#     requires_credential + um parâmetro credential_id (string). O SERVIDOR
-#     resolve a credencial e injeta a connectionString decifrada (ver Passo 4).
+# (a) Database nodes (DatabaseSpatialQuery, SaveToPostGIS): they signal it with
+#     requires_credential + a credential_id parameter (string). The SERVER
+#     resolves the credential and injects the decrypted connectionString (see Step 4).
 "requires_credential": True,
-# ... em properties:
+# ... in properties:
 {"name": "credential_id",     "type": "string", "default": "", "description": "UUID da credencial."},
 {"name": "connectionString",  "type": "string", "default": "", "description": "DSN (injetada automaticamente)."},
 
-# (b) Seletor de credencial no editor: propriedade do tipo "credential" com
-#     credential_types (PLURAL, lista) filtrando os tipos compatíveis
-#     (ex.: HttpRequest, SaveToS3, SaveGeoJSON com webhook opcional).
+# (b) Credential selector in the editor: a property of type "credential" with
+#     credential_types (PLURAL, a list) filtering the compatible types
+#     (e.g. HttpRequest, SaveToS3, SaveGeoJSON with optional webhook).
 {
     "name": "credential_id",
     "type": "credential",
@@ -218,78 +218,78 @@ Há dois padrões em uso, ambos válidos:
 },
 ```
 
-### Saída dinâmica (`dynamic_output` + `simulate`)
+### Dynamic output (`dynamic_output` + `simulate`)
 
-Se o nó gera saídas que dependem dos parâmetros/entrada (ex.: `Switch` com N baldes,
-`DatabaseSpatialQuery` cujo schema vem do SQL), marque `"dynamic_output": True` e,
-opcionalmente, implemente um `classmethod async simulate(cls, parameters, simulated_inputs)`
-que devolve a lista de schema. É isso que a validação (`validate_service`) usa para prever o schema
-sem executar (ver `flow/nodes/datasource/database_spatial_query.py::simulate`); a resposta marca
-esses nós com `schema_source: "simulated"`. Sem `simulate`, o nó `dynamic_output` **não some**
-da resposta: o validate deriva as saídas do próprio payload — `output_vars` (PythonScript),
+If the node produces outputs that depend on the parameters/input (e.g. `Switch` with N buckets,
+`DatabaseSpatialQuery` whose schema comes from the SQL), set `"dynamic_output": True` and,
+optionally, implement a `classmethod async simulate(cls, parameters, simulated_inputs)`
+that returns the schema list. That is what validation (`validate_service`) uses to predict the schema
+without executing (see `flow/nodes/datasource/database_spatial_query.py::simulate`); the response marks
+those nodes with `schema_source: "simulated"`. Without `simulate`, the `dynamic_output` node **does not vanish**
+from the response: validate derives the outputs from the payload itself — `output_vars` (PythonScript),
 `rules[].output` + `fallback_output` (Switch), `ports` (`outputs_from_ports`,
-`SubWorkflowInput`) — ou, na falta deles, dos `outputs` do catálogo, e marca
-`schema_source: "declared"`. É uma
-aproximação pela declaração: implementar `simulate()` continua sendo o que dá o schema real.
+`SubWorkflowInput`) — or, failing those, from the catalog's `outputs`, and marks
+`schema_source: "declared"`. It is an
+approximation from the declaration: implementing `simulate()` is still what gives the real schema.
 
 ---
 
-## Passo 4 — Implemente `execute()` (ou `execute_sync()`)
+## Step 4 — Implement `execute()` (or `execute_sync()`)
 
-A lógica do nó vive em `execute()` (assíncrono) OU em `execute_sync()` (síncrono, para nós
-CPU-bound). Escolha um:
+The node's logic lives in `execute()` (asynchronous) OR in `execute_sync()` (synchronous, for
+CPU-bound nodes). Pick one:
 
-- **`execute_sync(self, inputs)`** — para nós **CPU-bound** (pandas/GeoPandas/Shapely, Jinja
-  linha a linha). A classe base despacha o corpo síncrono para um pool de threads dedicado
-  automaticamente — você **não** precisa de `asyncio.to_thread`. É a forma recomendada pela
-  `BaseNode` para trabalho pesado de CPU (ex.: `flow/nodes/action/field_transformer.py`).
-- **`async def execute(self, inputs)`** — quando o nó **aguarda I/O assíncrono** de verdade
-  (`asyncpg`, `httpx` com `await`). Nesse caso, mande o trabalho **bloqueante** (parsing,
-  cálculos GeoPandas) para dentro de `asyncio.to_thread()` para não travar o event loop. É o
-  padrão da maioria dos nós existentes (ex.: `buffer.py`, `simplify.py`).
+- **`execute_sync(self, inputs)`** — for **CPU-bound** nodes (pandas/GeoPandas/Shapely, Jinja
+  row by row). The base class dispatches the synchronous body to a dedicated thread pool
+  automatically — you do **not** need `asyncio.to_thread`. It is the form `BaseNode`
+  recommends for heavy CPU work (e.g. `flow/nodes/action/field_transformer.py`).
+- **`async def execute(self, inputs)`** — when the node **truly awaits asynchronous I/O**
+  (`asyncpg`, `httpx` with `await`). In that case, send the **blocking** work (parsing,
+  GeoPandas computations) into `asyncio.to_thread()` so it does not block the event loop. It is the
+  pattern of most existing nodes (e.g. `buffer.py`, `simplify.py`).
 
-Regras obrigatórias em qualquer um dos dois:
+Mandatory rules for either one:
 
-1. **Chame `self.validate()` na primeira linha** — aplica os defaults declarados e coage os
-   tipos (`number`→float, `integer`→int, `select` validado contra as opções). Praticamente
-   todos os nós fazem isso.
-2. Acesse parâmetros via `self.get_param()` / `self.parameters` (nunca `self.properties` —
-   esse atributo levanta erro de propósito).
-3. Obtenha a entrada com `self.get_first_gdf(inputs)` (primeiro GeoDataFrame) ou
-   `self.get_input_gdf(inputs, key)` (chave específica).
-4. Retorne um `dict` de saídas com chaves fixas (ex.: `{"output": gdf}`).
-5. **Idempotência:** o executor pode chamar `execute()` mais de uma vez em caso de retry
-   (ver `retry_count`/`retry_delay_s` na referência). Evite efeitos colaterais não repetíveis
-   ou torne-os idempotentes.
+1. **Call `self.validate()` on the first line** — it applies the declared defaults and coerces the
+   types (`number`→float, `integer`→int, `select` validated against the options). Practically
+   every node does this.
+2. Access parameters via `self.get_param()` / `self.parameters` (never `self.properties` —
+   that attribute raises an error on purpose).
+3. Get the input with `self.get_first_gdf(inputs)` (first GeoDataFrame) or
+   `self.get_input_gdf(inputs, key)` (specific key).
+4. Return a `dict` of outputs with fixed keys (e.g. `{"output": gdf}`).
+5. **Idempotency:** the executor may call `execute()` more than once on a retry
+   (see `retry_count`/`retry_delay_s` in the reference). Avoid non-repeatable side effects
+   or make them idempotent.
 
-Exemplo (nó de I/O ou misto — `async execute` + `to_thread` para o trecho pesado):
+Example (I/O or mixed node — `async execute` + `to_thread` for the heavy part):
 
 ```python
 async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-    # 1. Defaults + validação de tipos
+    # 1. Defaults + type validation
     self.validate()
 
-    # 2. Parâmetros (já coagidos por self.validate())
+    # 2. Parameters (already coerced by self.validate())
     distance = self.get_param_float("distance", 100.0)
 
-    # 3. Entrada — primeiro GeoDataFrame disponível
+    # 3. Input — first available GeoDataFrame
     gdf = self.get_first_gdf(inputs)
 
-    # 4. Trabalho bloqueante numa thread separada (não trava o event loop)
+    # 4. Blocking work in a separate thread (does not block the event loop)
     def _apply_buffer(df):
         return df.copy().assign(geometry=df.geometry.buffer(distance))
 
     result = await asyncio.to_thread(_apply_buffer, gdf)
 
-    # 5. Log de resumo
+    # 5. Summary log
     logger.info("%s: buffer de %.1f aplicado em %d feições.",
                 self.__class__.__name__, distance, len(result))
 
-    # 6. Retorne com chave de saída fixa
+    # 6. Return with a fixed output key
     return {"output": result}
 ```
 
-Mesma lógica como nó **CPU-bound** (sem `async`, sem `to_thread` — a base cuida da thread):
+The same logic as a **CPU-bound** node (no `async`, no `to_thread` — the base takes care of the thread):
 
 ```python
 def execute_sync(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
@@ -300,18 +300,18 @@ def execute_sync(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     return {"output": result}
 ```
 
-### Lidando com credenciais
+### Handling credentials
 
-O **servidor** (não o executor) resolve a credencial e injeta o valor decifrado nos
-parâmetros do nó antes da execução (ver `app/services/credential_resolver.py`). Para os tipos
-de banco, o valor chega no parâmetro **`connectionString`** (camelCase); para HTTP, chega em
+The **server** (not the executor) resolves the credential and injects the decrypted value into the
+node's parameters before execution (see `app/services/credential_resolver.py`). For the database
+types, the value arrives in the **`connectionString`** parameter (camelCase); for HTTP, it arrives in
 `http_auth`.
 
 ```python
 async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     self.validate()
-    # A connectionString decifrada foi injetada pelo servidor a partir de credential_id.
-    conn_str = self.get_param("connectionString")   # NÃO "connection_string"
+    # The decrypted connectionString was injected by the server from credential_id.
+    conn_str = self.get_param("connectionString")   # NOT "connection_string"
     if not conn_str:
         raise ValueError("Credencial não resolvida: 'connectionString' vazia.")
 
@@ -323,176 +323,176 @@ async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
     return {"output": result}
 ```
 
-> Nós de banco costumam usar o helper `flow/utils/credencial.py::obter_conexao(self.parameters)`,
-> que lê e valida `parameters["connectionString"]`.
+> Database nodes usually use the helper `flow/utils/credencial.py::obter_conexao(self.parameters)`,
+> which reads and validates `parameters["connectionString"]`.
 
-### Publicando saída no terminal de logs do usuário
+### Publishing output to the user's log terminal
 
-Os atributos injetados pelo executor permitem publicar eventos. O publisher é uma instância
-de `WorkflowEventPublisher` (classe abstrata, método **síncrono** `publish_event(...)`) — não
-existe `RedisPublisher` nem um método `publish()`. Para enviar linhas ao terminal do usuário
-(equivalente a `print()`), use o helper de módulo `publish_stdout`, exatamente como faz o
-`PythonScript` (`flow/nodes/action/python_script.py`):
+The attributes injected by the executor let you publish events. The publisher is an instance
+of `WorkflowEventPublisher` (abstract class, **synchronous** method `publish_event(...)`) — there
+is no `RedisPublisher` and no `publish()` method. To send lines to the user's terminal
+(the equivalent of `print()`), use the module helper `publish_stdout`, exactly as
+`PythonScript` does (`flow/nodes/action/python_script.py`):
 
 ```python
 from flow.utils.publisher.events import publish_stdout
 
-# self._publisher pode ser None fora do contexto de execução — o helper trata isso.
+# self._publisher may be None outside the execution context — the helper handles that.
 publish_stdout(self._publisher, self._task_id, self.node_id,
                [f"Processando {len(gdf)} feições..."])
 ```
 
-Para uma mensagem simples de log (sem terminal do usuário), prefira `self.log("...")` ou o
-`logger` de módulo.
+For a plain log message (without the user's terminal), prefer `self.log("...")` or the
+module `logger`.
 
 ---
 
-## Passo 5 — Registro automático
+## Step 5 — Automatic registration
 
-O `registry.py` descobre seu nó automaticamente ao importar o módulo. Basta adicionar o
-decorator `@register_node` à classe:
+`registry.py` discovers your node automatically when it imports the module. All you need is to add the
+`@register_node` decorator to the class:
 
 ```python
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 
-@register_node   # ← Isso é tudo que é necessário para o registro
+@register_node   # ← This is all that registration needs
 class MeuNo(BaseNode):
     ...
 ```
 
-> O `registry.py` usa `pkgutil.walk_packages` para importar todos os módulos em `flow/nodes/`
-> recursivamente. Não é necessário editar nenhum outro arquivo. O decorator valida que a
-> classe herda de `BaseNode` e que o `name` de `description()` é único (nomes duplicados
-> levantam erro no boot).
+> `registry.py` uses `pkgutil.walk_packages` to import every module under `flow/nodes/`
+> recursively. You do not need to edit any other file. The decorator checks that the
+> class inherits from `BaseNode` and that the `name` from `description()` is unique (duplicate names
+> raise an error at boot).
 
-**Importante:** o valor `"name"` em `description()` é o identificador permanente. A fábrica
-instancia o nó procurando `node_def["name"]` no registro (`flow/factory.py`). Uma vez que
-workflows em produção usem esse nome, **não o altere** — crie um nó novo se precisar mudar o
-comportamento.
+**Important:** the `"name"` value in `description()` is the permanent identifier. The factory
+instantiates the node by looking up `node_def["name"]` in the registry (`flow/factory.py`). Once
+production workflows use that name, **do not change it** — create a new node if you need to change the
+behavior.
 
-Se renomear for inevitável, é no MESMO commit: uma entrada em `NOMES_ANTIGOS`
-(`flow/nodes/contrato.py`, nome antigo → novo), o mapeamento das propriedades que mudaram em
-`app/services/nos_renomeados.py` e, no deploy, `python -m app.cli migrar-nos --aplicar`. Foi
-por faltar isso que a renomeação de 27/07 (`DriveTrigger` → `DataInput`, `ArtifactOutput` →
-`DataOutput`) deixou fluxos salvos falhando todo dia com "Node 'DriveTrigger' não encontrado".
-Com a entrada no mapa, o lint e a fábrica também passam a dizer para onde o nó foi.
+If renaming is unavoidable, it goes in the SAME commit: an entry in `NOMES_ANTIGOS`
+(`flow/nodes/contrato.py`, old name → new), the mapping of the properties that changed in
+`app/services/nos_renomeados.py` and, at deploy, `python -m app.cli migrar-nos --aplicar`. It was
+for lack of this that the July 27 rename (`DriveTrigger` → `DataInput`, `ArtifactOutput` →
+`DataOutput`) left saved workflows failing every day with "Node 'DriveTrigger' não encontrado".
+With the entry in the map, the lint and the factory also start telling you where the node went.
 
 ---
 
-## Passo 6 — Verifique no editor
+## Step 6 — Check in the editor
 
-1. Reinicie o worker e a API:
+1. Restart the worker and the API:
    ```bash
    docker compose restart api worker
    ```
 
-2. Acesse `http://localhost:8000/docs` → `GET /nodes/` → verifique se seu nó aparece na lista
+2. Open `http://localhost:8000/docs` → `GET /nodes/` → check that your node shows up in the list
 
-3. Acesse `http://localhost:3000` → abra um workflow → na paleta de nós (drawer) → seu nó
-   deve aparecer na categoria correta
+3. Open `http://localhost:3000` → open a workflow → in the node palette (drawer) → your node
+   should appear in the correct category
 
-4. Arraste o nó para o canvas, configure os parâmetros e execute um workflow de teste
+4. Drag the node onto the canvas, configure the parameters and run a test workflow
 
 ---
 
-## Referência: BaseNode
+## Reference: BaseNode
 
-Métodos e atributos disponíveis para todos os nós (`flow/nodes/base.py`):
+Methods and attributes available to every node (`flow/nodes/base.py`):
 
-### Ciclo de vida
+### Lifecycle
 
-| Método | Descrição |
+| Method | Description |
 |--------|-----------|
-| `description()` (classmethod, abstrato) | Metadados do nó (obrigatório) |
-| `async execute(self, inputs)` | Lógica principal (assíncrona). Default: despacha `execute_sync` para o pool de threads |
-| `execute_sync(self, inputs)` | Corpo síncrono para nós CPU-bound (implemente este OU sobrescreva `execute`) |
-| `async setup(self)` | Hook opcional chamado ANTES de `execute()` |
-| `async teardown(self)` | Hook opcional chamado APÓS `execute()` (inclusive em erro) |
-| `validate(self)` | Aplica defaults de `description()['properties']` e coage tipos. Chame no início de `execute()` |
+| `description()` (classmethod, abstract) | Node metadata (required) |
+| `async execute(self, inputs)` | Main logic (asynchronous). Default: dispatches `execute_sync` to the thread pool |
+| `execute_sync(self, inputs)` | Synchronous body for CPU-bound nodes (implement this OR override `execute`) |
+| `async setup(self)` | Optional hook called BEFORE `execute()` |
+| `async teardown(self)` | Optional hook called AFTER `execute()` (including on error) |
+| `validate(self)` | Applies defaults from `description()['properties']` and coerces types. Call it at the start of `execute()` |
 
-### Acesso a parâmetros
+### Parameter access
 
-| Método | Descrição |
+| Method | Description |
 |--------|-----------|
-| `self.get_param(name, default)` | Retorna parâmetro como está |
-| `self.get_param_float(name, default)` | Converte para `float`, lança `ValueError` se inválido |
-| `self.get_param_int(name, default)` | Converte para `int` (via `int(float(...))`) |
-| `self.get_param_bool(name, default)` | Converte para `bool` (aceita `True`/`"true"`/`"1"`/`"yes"`/`"sim"`) |
-| `self.get_retry_params()` | Retorna `(retry_count, retry_delay_s)` (defaults `0`, `5.0`) |
+| `self.get_param(name, default)` | Returns the parameter as is |
+| `self.get_param_float(name, default)` | Converts to `float`, raises `ValueError` if invalid |
+| `self.get_param_int(name, default)` | Converts to `int` (via `int(float(...))`) |
+| `self.get_param_bool(name, default)` | Converts to `bool` (accepts `True`/`"true"`/`"1"`/`"yes"`/`"sim"`) |
+| `self.get_retry_params()` | Returns `(retry_count, retry_delay_s)` (defaults `0`, `5.0`) |
 
-### Acesso a inputs
+### Input access
 
-| Método | Descrição |
+| Method | Description |
 |--------|-----------|
-| `self.get_input_gdf(inputs, key)` | GeoDataFrame pela chave. Lança `ValueError` se ausente/vazio, `TypeError` se não for GeoDataFrame |
-| `self.get_first_gdf(inputs)` | Primeiro GeoDataFrame não-vazio. Avisa se houver mais de um candidato distinto; lança `ValueError` se nenhum |
+| `self.get_input_gdf(inputs, key)` | GeoDataFrame by key. Raises `ValueError` if missing/empty, `TypeError` if it is not a GeoDataFrame |
+| `self.get_first_gdf(inputs)` | First non-empty GeoDataFrame. Warns if there is more than one distinct candidate; raises `ValueError` if there is none |
 
-### Atributos injetados pelo executor
+### Attributes injected by the executor
 
-| Atributo | Tipo | Descrição |
+| Attribute | Type | Description |
 |----------|------|-----------|
-| `self.node_id` | `str` | Identificador do nó no workflow |
-| `self.parameters` | `dict` | Parâmetros configurados pelo usuário |
-| `self.context` | `dict` | Contexto compartilhado com o executor (ex.: `_subflow_ancestors`) |
-| `self._publisher` | `WorkflowEventPublisher \| None` | Publicador de eventos (pode ser `None` fora do contexto de execução) |
-| `self._task_id` | `str \| None` | ID da run/tarefa atual |
-| `self._workspace_id` | `str \| None` | ID do workspace (isolamento multi-tenant) |
-| `self._workflow_hash` | `str \| None` | Hash do workflow (state cross-run) |
-| `self._debug_mode` | `bool` | `True` se o workflow está em modo debug |
+| `self.node_id` | `str` | Node identifier within the workflow |
+| `self.parameters` | `dict` | Parameters configured by the user |
+| `self.context` | `dict` | Context shared with the executor (e.g. `_subflow_ancestors`) |
+| `self._publisher` | `WorkflowEventPublisher \| None` | Event publisher (may be `None` outside the execution context) |
+| `self._task_id` | `str \| None` | ID of the current run/task |
+| `self._workspace_id` | `str \| None` | Workspace ID (multi-tenant isolation) |
+| `self._workflow_hash` | `str \| None` | Workflow hash (cross-run state) |
+| `self._debug_mode` | `bool` | `True` if the workflow is in debug mode |
 
-Helpers de contexto: `self.require_execution_context()` (garante `_workspace_id`/`_task_id`) e
-`self.derive_label(...)` (resolve o `label` de nós de saída).
+Context helpers: `self.require_execution_context()` (ensures `_workspace_id`/`_task_id`) and
+`self.derive_label(...)` (resolves the `label` of output nodes).
 
-### Retentativas (retry)
+### Retries
 
-O executor lê `retry_count` e `retry_delay_s` dos parâmetros do nó (defaults `0` e `5.0`s) e
-reexecuta `execute()` em caso de exceção. Esses são parâmetros de **plataforma** — não precisam
-ser declarados em `properties`, e não são reportados como "descartados". Como `execute()` pode
-rodar mais de uma vez, mantenha-o **idempotente**.
+The executor reads `retry_count` and `retry_delay_s` from the node's parameters (defaults `0` and `5.0`s) and
+re-runs `execute()` when an exception is raised. These are **platform** parameters — they do not need
+to be declared in `properties`, and they are not reported as "discarded". Since `execute()` may
+run more than once, keep it **idempotent**.
 
 ### Logging
 
 ```python
-# Opção 1: logger de módulo (recomendado)
+# Option 1: module logger (recommended)
 from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 logger.info("Mensagem")
 
-# Opção 2: helper de instância (sem import)
+# Option 2: instance helper (no import)
 self.log("Mensagem")
 ```
 
 ---
 
-## Referência: Tipos de propriedades
+## Reference: Property types
 
-| `type` | Renderização no editor | Observação |
+| `type` | Rendering in the editor | Note |
 |--------|----------------------|------------|
-| `"string"` | Input de texto | Padrão para a maioria dos parâmetros |
-| `"number"` | Input numérico | `self.validate()` já coage para `float`; leia com `get_param_float()` |
-| `"integer"` | Input numérico inteiro | `self.validate()` coage para `int`; leia com `get_param_int()` |
-| `"boolean"` | Checkbox | Use `get_param_bool()` para leitura segura |
-| `"select"` | Dropdown | Requer `options: [{"value":…, "label":…}]`; `self.validate()` valida o valor |
-| `"object"` | Editor JSON | Aceita `dict` ou `list` (JSON serializado é decodificado) |
-| `"code"` | Editor Monaco (Python) | Para nós que recebem código como parâmetro (ex.: `PythonScript`) |
-| `"credential"` | Select de credenciais | Requer `credential_types` (lista) para filtrar por tipo compatível |
-| `"ports"` | Editor de portas de entrada | Só com `"dynamic_inputs": True`; grava uma lista de nomes (identificadores). Com 2+ portas o editor grava o `to_key` de cada aresta; com 0/1 a aresta é anônima (ex.: `PythonScript`, `CartaImagem`). Leia com `_parse_ports()` |
-| `"keyvalue"` | Pares chave → valor | Lista rasa de duas colunas (ex.: cabeçalhos do `HttpRequest`, cores por porta do `CartaImagem`). Chega como `dict` (ou JSON em string num fluxo antigo): leia com um parser tolerante |
+| `"string"` | Text input | Default for most parameters |
+| `"number"` | Numeric input | `self.validate()` already coerces to `float`; read it with `get_param_float()` |
+| `"integer"` | Integer numeric input | `self.validate()` coerces to `int`; read it with `get_param_int()` |
+| `"boolean"` | Checkbox | Use `get_param_bool()` for safe reading |
+| `"select"` | Dropdown | Requires `options: [{"value":…, "label":…}]`; `self.validate()` validates the value |
+| `"object"` | JSON editor | Accepts `dict` or `list` (serialized JSON is decoded) |
+| `"code"` | Monaco editor (Python) | For nodes that take code as a parameter (e.g. `PythonScript`) |
+| `"credential"` | Credential select | Requires `credential_types` (a list) to filter by compatible type |
+| `"ports"` | Input port editor | Only with `"dynamic_inputs": True`; stores a list of names (identifiers). With 2+ ports the editor stores each edge's `to_key`; with 0/1 the edge is anonymous (e.g. `PythonScript`, `CartaImagem`). Read it with `_parse_ports()` |
+| `"keyvalue"` | Key → value pairs | Flat two-column list (e.g. `HttpRequest` headers, `CartaImagem` per-port colors). Arrives as a `dict` (or as a JSON string in an old workflow): read it with a tolerant parser |
 
-> Em `outputs[].type`, o `type` descreve o **tipo do dado de saída** (ex.:
-> `"geodataframe"`, `"any"`, `"number"`, `"boolean"`), não um widget de UI.
+> In `outputs[].type`, the `type` describes the **type of the output data** (e.g.
+> `"geodataframe"`, `"any"`, `"number"`, `"boolean"`), not a UI widget.
 
-> **Jinja em valores de string:** propriedades `"string"`/`"object"` podem conter expressões
-> Jinja2 (`{{ row.campo }}`, `{{ env.VARIAVEL }}`). O nó `SetFields`
-> (`flow/nodes/action/field_transformer.py`) usa isso para transformações por linha, com um
-> `jinja2.sandbox.SandboxedEnvironment` (ambiente **sandboxed**, não `jinja2.Environment` cru).
+> **Jinja in string values:** `"string"`/`"object"` properties may contain Jinja2
+> expressions (`{{ row.campo }}`, `{{ env.VARIAVEL }}`). The `SetFields` node
+> (`flow/nodes/action/field_transformer.py`) uses this for per-row transformations, with a
+> `jinja2.sandbox.SandboxedEnvironment` (a **sandboxed** environment, not a raw `jinja2.Environment`).
 
 ---
 
-## Exemplos comentados
+## Annotated examples
 
-### Nó de operação espacial simples (CPU-bound via `async execute` + `to_thread`)
+### Simple spatial operation node (CPU-bound via `async execute` + `to_thread`)
 
 ```python
 # flow/nodes/spatial/simplify_geometry.py
@@ -546,7 +546,7 @@ class SimplifyGeometry(BaseNode):
         tolerance = self.get_param_float("tolerance", 1.0)
         preserve_topology = self.get_param_bool("preserveTopology", True)
 
-        # Entrada: primeiro GeoDataFrame disponível (a porta é escolhida na aresta)
+        # Input: first available GeoDataFrame (the port is chosen on the edge)
         gdf = self.get_first_gdf(inputs)
 
         def _simplify(df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
@@ -561,11 +561,11 @@ class SimplifyGeometry(BaseNode):
         logger.info("%s: tolerância=%.2f aplicada em %d feições.",
                     self.__class__.__name__, tolerance, len(result))
 
-        # Chave de saída FIXA (declarada em outputs)
+        # FIXED output key (declared in outputs)
         return {"output": result}
 ```
 
-### Nó que consome uma API externa (I/O assíncrono real)
+### Node that consumes an external API (real asynchronous I/O)
 
 ```python
 # flow/nodes/datasource/fetch_geojson_url.py
@@ -615,12 +615,12 @@ class FetchGeoJsonUrl(BaseNode):
         if not url:
             raise ValueError("O parâmetro 'url' é obrigatório.")
 
-        # Download assíncrono — httpx já é async, não usa asyncio.to_thread
+        # Asynchronous download — httpx is already async, no asyncio.to_thread
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url)
             response.raise_for_status()
 
-        # Parsing bloqueante — executa em thread
+        # Blocking parsing — runs in a thread
         def _parse(content: bytes):
             return gpd.read_file(io.BytesIO(content))
 
@@ -633,36 +633,36 @@ class FetchGeoJsonUrl(BaseNode):
 
 ---
 
-## Helpers de configuração — o critério
+## Configuration helpers — the criterion
 
-O formulário do editor é GERADO do schema (`node-config-form.tsx`): campos,
-rótulos, tooltip de ajuda (`description`), asterisco de obrigatório
-(`required`), exemplo no input (`placeholder`), visibilidade condicional
-(`visibleWhen`), sugestões de coluna (`suggest_columns`) e opções (`options`).
+The editor's form is GENERATED from the schema (`node-config-form.tsx`): fields,
+labels, help tooltip (`description`), required asterisk
+(`required`), example in the input (`placeholder`), conditional visibility
+(`visibleWhen`), column suggestions (`suggest_columns`) and options (`options`).
 
-**Um componente específico de nó (helper) só existe quando há COMPORTAMENTO
-que o schema não expressa** — sondagem de serviço (WFS GetCapabilities),
-teste de webhook, contrato assíncrono de sub-fluxo, editor de recorrência.
-Nunca para layout: cor, agrupamento, texto explicativo e exemplo pertencem ao
-schema, onde o MCP e a validação também os enxergam. O FileTriggerHelper —
-dois inputs decorados — é o contraexemplo que morreu nesta regra.
+**A node-specific component (helper) only exists when there is BEHAVIOR
+that the schema does not express** — service probing (WFS GetCapabilities),
+webhook testing, the asynchronous sub-workflow contract, the recurrence editor.
+Never for layout: color, grouping, explanatory text and examples belong in the
+schema, where the MCP and validation also see them. The FileTriggerHelper —
+two decorated inputs — is the counterexample that died under this rule.
 
-## Checklist final
+## Final checklist
 
-Antes de submeter o PR com o novo nó, confirme:
+Before submitting the PR with the new node, confirm:
 
-- [ ] Arquivo na pasta de categoria correta
-- [ ] Classe decorada com `@register_node`
-- [ ] `description()` tem `name` único (sem espaços, único em todo o projeto)
-- [ ] `outputs` declarado (campos de saída tipados), `type` de categoria correto
-- [ ] `self.validate()` chamado no início de `execute()`/`execute_sync()`
-- [ ] Parâmetros acessados via `self.get_param()` (nunca `self.properties`)
-- [ ] Inputs acessados via `self.get_first_gdf()` / `self.get_input_gdf()` (sem parâmetros `inputKey`/`outputKey`)
-- [ ] Nós CPU-bound usam `execute_sync` OU `asyncio.to_thread` dentro de `async execute`
-- [ ] I/O assíncrono (`httpx`/`asyncpg`) com `await`, sem `to_thread`
-- [ ] `execute()` idempotente (pode ser reexecutado por retry)
-- [ ] Chaves de saída FIXAS (ex.: `{"output": ...}`)
-- [ ] Erros levantados com `raise ValueError(mensagem clara)`
-- [ ] Logger configurado com `logger = get_logger(__name__)`
-- [ ] Comentários e strings em português do Brasil
-- [ ] Testado localmente: nó aparece em `GET /nodes/` e no editor visual
+- [ ] File in the correct category folder
+- [ ] Class decorated with `@register_node`
+- [ ] `description()` has a unique `name` (no spaces, unique across the whole project)
+- [ ] `outputs` declared (typed output fields), correct category `type`
+- [ ] `self.validate()` called at the start of `execute()`/`execute_sync()`
+- [ ] Parameters accessed via `self.get_param()` (never `self.properties`)
+- [ ] Inputs accessed via `self.get_first_gdf()` / `self.get_input_gdf()` (no `inputKey`/`outputKey` parameters)
+- [ ] CPU-bound nodes use `execute_sync` OR `asyncio.to_thread` inside `async execute`
+- [ ] Asynchronous I/O (`httpx`/`asyncpg`) with `await`, without `to_thread`
+- [ ] `execute()` idempotent (may be re-run by a retry)
+- [ ] FIXED output keys (e.g. `{"output": ...}`)
+- [ ] Errors raised with `raise ValueError(mensagem clara)`
+- [ ] Logger set up with `logger = get_logger(__name__)`
+- [ ] Comments and strings in Brazilian Portuguese
+- [ ] Tested locally: the node shows up in `GET /nodes/` and in the visual editor

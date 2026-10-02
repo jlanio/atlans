@@ -1,48 +1,48 @@
-# Como o dado anda pelas arestas
+# How data moves along edges
 
-O executor decide o que o nó filho recebe com três casos, nesta ordem:
+The executor decides what the child node receives with three cases, in this order:
 
-| Aresta | O que o nó filho recebe |
+| Edge | What the child node receives |
 |---|---|
-| com `from_key` | `{to_key ou from_key: pai["from_key"]}` |
-| só `to_key` | `{to_key: primeiro valor do pai}` |
-| sem nenhum dos dois | TODAS as saídas do pai, com os nomes originais |
+| with `from_key` | `{to_key ou from_key: pai["from_key"]}` (ou = or, pai = parent) |
+| only `to_key` | `{to_key: primeiro valor do pai}` (the parent's first value) |
+| with neither | ALL of the parent's outputs, with their original names |
 
-`from_key` é a chave de SAÍDA do pai — os nomes vêm das portas declaradas do
-nó (`describe_node` lista em `outputs`). `to_key` é o nome com
-que o valor chega no `inputs` do filho.
+`from_key` is the parent's OUTPUT key — the names come from the node's declared
+ports (`describe_node` lists them in `outputs`). `to_key` is the name under
+which the value arrives in the child's `inputs`.
 
-## Quando nomear
+## When to name
 
-Se o filho aceita várias entradas distintas (um `SpatialJoin` com camada A e
-camada B, um `SubWorkflowOutput` com várias portas), `to_key` é **obrigatório**
-— sem ele as duas arestas espalham e a segunda sobrescreve a primeira, em
-silêncio. Se o filho só consome um dado, pode deixar as duas em branco.
+If the child accepts several distinct inputs (a `SpatialJoin` with layer A and
+layer B, a `SubWorkflowOutput` with several ports), `to_key` is **mandatory**
+— without it both edges spread and the second overwrites the first,
+silently. If the child consumes only one piece of data, you can leave both blank.
 
-## `from_key` inexistente não derruba a run
+## A nonexistent `from_key` does not bring down the run
 
-Em produção o executor é tolerante de propósito: um `from_key` sem
-correspondência **omite** a porta (uma saída opcional ou um pai pulado não
-podem derrubar um fluxo legítimo). O resultado é o pior tipo de defeito — o
-fluxo termina verde com o dado errado.
+In production the executor is tolerant on purpose: a `from_key` with no
+match **omits** the port (an optional output or a skipped parent must not
+bring down a legitimate workflow). The result is the worst kind of defect — the
+workflow finishes green with the wrong data.
 
-Por isso a checagem é ESTÁTICA. `validate_workflow` compara cada `from_key`
-com as saídas declaradas da origem e devolve:
+That is why the check is STATIC. `validate_workflow` compares each `from_key`
+against the source's declared outputs and returns:
 
-- `edge_from_key_unknown` (**erro**): o `from_key` não é saída declarada do nó
-  de origem. Fiação defasada — quase sempre um nome de porta antigo.
-- `edge_spread_ambiguous` (**aviso**): aresta sem `from_key` nem `to_key`
-  saindo de um nó com várias saídas. Funciona, mas o que chega ao filho
-  depende da ordem das chaves do pai. Nomeie.
+- `edge_from_key_unknown` (**error**): the `from_key` is not a declared output of the source
+  node. Stale wiring — almost always an old port name.
+- `edge_spread_ambiguous` (**warning**): an edge with neither `from_key` nor `to_key`
+  leaving a node with several outputs. It works, but what reaches the child
+  depends on the order of the parent's keys. Name it.
 
-Origem que não declara saída nenhuma não gera diagnóstico: não há com o que
-comparar.
+A source that declares no output at all produces no diagnostic: there is nothing to
+compare against.
 
-## Bifurcação
+## Fork
 
-Aresta que sai de um nó de controle carrega `condition: true` ou
-`condition: false`, e o executor só ativa as que casam com o `branch` do nó. O
-ramo perdedor é marcado como pulado e não executa.
+An edge leaving a control node carries `condition: true` or
+`condition: false`, and the executor only activates the ones that match the node's `branch`. The
+losing branch is marked as skipped and does not execute.
 
 ```json
 [
@@ -51,19 +51,19 @@ ramo perdedor é marcado como pulado e não executa.
 ]
 ```
 
-`source_handle: "true"|"false"` acompanha, e é o que o editor usa para ancorar
-a aresta visualmente. Sem ele a aresta some do canvas ao reabrir — grave os
-dois.
+`source_handle: "true"|"false"` goes along with it, and it is what the editor uses to anchor
+the edge visually. Without it the edge disappears from the canvas on reopening — write
+both.
 
-Nós que bifurcam: `Conditional`, `JinjaBranch`, `ChangeDetector`. O `Switch`
-roteia por porta nomeada (`from_key: "output_0"`), não por `condition`.
+Nodes that fork: `Conditional`, `JinjaBranch`, `ChangeDetector`. `Switch`
+routes by named port (`from_key: "output_0"`), not by `condition`.
 
-Uma aresta de bifurcação **não** leva `from_key`. O filho recebe o dict inteiro
-do pai — o dado com o nome original, mais `branch`, `value` e `result`.
+A fork edge does **not** carry `from_key`. The child receives the parent's whole
+dict — the data under its original name, plus `branch`, `value` and `result`.
 
-## Aresta solta
+## Loose edge
 
-Aresta cuja ponta não existe entre os nós é ignorada pelo executor sem dizer
-nada; a validação a acusa como aviso `orphan_edge`. Nó sem caminho a partir de
-um gatilho fica fora da simulação e do run: `unreachable_node`. Os dois são
-avisos, mas quase sempre significam fiação que você achou que tinha feito.
+An edge whose endpoint does not exist among the nodes is ignored by the executor without a
+word; validation flags it as an `orphan_edge` warning. A node with no path from
+a trigger stays out of the simulation and the run: `unreachable_node`. Both are
+warnings, but they almost always mean wiring you thought you had done.

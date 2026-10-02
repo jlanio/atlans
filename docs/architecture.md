@@ -1,59 +1,59 @@
-# Arquitetura do Atlans
+# Atlans Architecture
 
-Documentação completa da arquitetura do Atlans — plataforma distribuída de orquestração de workflows geoespaciais (GIS).
+Complete documentation of the architecture of Atlans — a distributed platform for geospatial (GIS) workflow orchestration.
 
 ---
 
-## Sumário
+## Contents
 
-- [Visao Geral da Arquitetura](#visao-geral-da-arquitetura)
-- [Servicos e Infraestrutura](#servicos-e-infraestrutura)
-- [Camada API (FastAPI)](#camada-api-fastapi)
-- [Motor de Workflows (flow/)](#motor-de-workflows-flow)
-- [Sistema de Executores](#sistema-de-executores)
-- [Agendamento (AsyncScheduler)](#agendamento-asyncscheduler)
-- [Eventos em Tempo Real](#eventos-em-tempo-real)
-- [Autenticacao e Autorizacao](#autenticacao-e-autorizacao)
+- [Architecture Overview](#architecture-overview)
+- [Services and Infrastructure](#services-and-infrastructure)
+- [API Layer (FastAPI)](#api-layer-fastapi)
+- [Workflow Engine (flow/)](#workflow-engine-flow)
+- [Executor System](#executor-system)
+- [Scheduling (AsyncScheduler)](#scheduling-asyncscheduler)
+- [Real-Time Events](#real-time-events)
+- [Authentication and Authorization](#authentication-and-authorization)
 - [Multi-tenancy (Workspaces)](#multi-tenancy-workspaces)
-- [Gestao de Credenciais](#gestao-de-credenciais)
-- [Armazenamento (MinIO)](#armazenamento-minio)
-- [Banco de Dados](#banco-de-dados)
+- [Credential Management](#credential-management)
+- [Storage (MinIO)](#storage-minio)
+- [Database](#database)
 - [Frontend (Next.js)](#frontend-nextjs)
-- [Aplicativo Desktop (Electron)](#aplicativo-desktop-electron)
-- [Fluxo Completo de Execucao](#fluxo-completo-de-execucao)
+- [Desktop App (Electron)](#desktop-app-electron)
+- [Complete Execution Flow](#complete-execution-flow)
 
 ---
 
-## Visao Geral da Arquitetura
+## Architecture Overview
 
-O Atlans e uma plataforma de orquestracao de workflows geoespaciais que segue uma arquitetura orientada a executores. Diferente de sistemas tradicionais baseados em filas (Celery), a execucao de workflows e delegada a **executores externos** conectados via WebSocket, com comunicacao criptografada de ponta a ponta.
+Atlans is a geospatial workflow orchestration platform that follows an executor-oriented architecture. Unlike traditional queue-based systems (Celery), workflow execution is delegated to **external executors** connected over WebSocket, with end-to-end encrypted communication.
 
 ```mermaid
 graph TB
-    subgraph Cliente["Cliente (Browser)"]
+    subgraph Cliente["Client (Browser)"]
         NEXT["Next.js App<br/>:3000"]
     end
 
-    subgraph API["Servidor API"]
+    subgraph API["API Server"]
         FASTAPI["FastAPI + Uvicorn<br/>:8000"]
         SCHEDULER["AsyncScheduler"]
         CONSUMER["RunResultConsumer"]
         CLEANUP["ArtifactCleanup"]
     end
 
-    subgraph Dados["Camada de Dados"]
+    subgraph Dados["Data Layer"]
         PG["PostgreSQL + PostGIS"]
         REDIS["Redis"]
         MINIO["MinIO (S3)<br/>:9000"]
     end
 
-    subgraph Executores["Executores Externos"]
-        AG1["Pool padrão<br/>(is_default)"]
+    subgraph Executores["External Executors"]
+        AG1["Default pool<br/>(is_default)"]
         AG2["Dedicated<br/>(workspace)"]
-        AG3["Dedicated<br/>(atribuído a usuários)"]
+        AG3["Dedicated<br/>(assigned to users)"]
     end
 
-    subgraph Proxy["Proxy Reverso"]
+    subgraph Proxy["Reverse Proxy"]
         TRAEFIK["Traefik<br/>:80/:443"]
     end
 
@@ -62,23 +62,23 @@ graph TB
     TRAEFIK --> FASTAPI
 
     FASTAPI -->|"SQLAlchemy async"| PG
-    FASTAPI -->|"Pub/Sub + Filas"| REDIS
+    FASTAPI -->|"Pub/Sub + Queues"| REDIS
     FASTAPI -->|"S3 API"| MINIO
-    SCHEDULER -->|"Dispara workflows"| FASTAPI
+    SCHEDULER -->|"Triggers workflows"| FASTAPI
 
     CONSUMER -->|"BRPOP run_results"| REDIS
-    CONSUMER -->|"Persiste runs"| PG
+    CONSUMER -->|"Persists runs"| PG
 
-    AG1 -->|"WebSocket criptografado"| FASTAPI
-    AG2 -->|"WebSocket criptografado"| FASTAPI
-    AG3 -->|"WebSocket criptografado"| FASTAPI
+    AG1 -->|"Encrypted WebSocket"| FASTAPI
+    AG2 -->|"Encrypted WebSocket"| FASTAPI
+    AG3 -->|"Encrypted WebSocket"| FASTAPI
 
-    AG1 -->|"Upload artefatos"| MINIO
-    AG2 -->|"Upload artefatos"| MINIO
-    AG3 -->|"Upload artefatos"| MINIO
+    AG1 -->|"Artifact upload"| MINIO
+    AG2 -->|"Artifact upload"| MINIO
+    AG3 -->|"Artifact upload"| MINIO
 
     FASTAPI -->|"Node events via Pub/Sub"| REDIS
-    REDIS -->|"Eventos → WS"| NEXT
+    REDIS -->|"Events → WS"| NEXT
 
     style API fill:#1e293b,color:#e2e8f0
     style Dados fill:#0f172a,color:#e2e8f0
@@ -86,35 +86,35 @@ graph TB
     style Cliente fill:#1e1b4b,color:#e2e8f0
 ```
 
-### Principios Arquiteturais
+### Architectural Principles
 
-| Principio | Implementacao |
+| Principle | Implementation |
 |-----------|---------------|
-| **Sem Celery** | Executores WebSocket substituem workers Celery; AsyncScheduler substitui Celery Beat |
-| **Criptografia E2E** | Jobs cifrados com X25519 (ECDH efemero) + AES-256-GCM; assinados com Ed25519 |
-| **Forward Secrecy** | Cada job usa par efemero X25519 descartado apos envio |
-| **Multi-tenancy** | Isolamento por `workspace_id` em todos os recursos |
-| **Async-first** | SQLAlchemy async (asyncpg), Redis async, loop de eventos asyncio |
-| **Back-pressure** | Executores reportam capacidade; servidor respeita limites antes de despachar |
+| **No Celery** | WebSocket executors replace Celery workers; AsyncScheduler replaces Celery Beat |
+| **E2E Encryption** | Jobs encrypted with X25519 (ephemeral ECDH) + AES-256-GCM; signed with Ed25519 |
+| **Forward Secrecy** | Each job uses an ephemeral X25519 pair discarded after sending |
+| **Multi-tenancy** | Isolation by `workspace_id` on every resource |
+| **Async-first** | SQLAlchemy async (asyncpg), async Redis, asyncio event loop |
+| **Back-pressure** | Executors report capacity; the server respects the limits before dispatching |
 
 ---
 
-## Servicos e Infraestrutura
+## Services and Infrastructure
 
-| Servico | Tecnologia | Porta | Responsabilidade |
+| Service | Technology | Port | Responsibility |
 |---------|-----------|-------|------------------|
-| `api` | FastAPI + Uvicorn | 8000 | API REST, WebSocket (logs + executores), autenticacao, roteamento, scheduler, consumer |
-| `redis` | Valkey 8 (compatível com Redis; `REDIS_IMAGE`) | 6379 (só na rede interna) | Pub/sub de eventos, fila `run_results`, presenca de executores, locks distribuidos e idempotencia, lockout de login |
-| `minio` | MinIO (S3-compatible) | 9000/9001 | Artefatos de execucao, Drive de workspace, camadas do Portal |
-| `traefik` | Traefik v3 | 80/443 | Proxy reverso, TLS termination, roteamento por Host, **mTLS dos executores** (valida cert do cliente contra a CA interna) |
-| `step-ca` | smallstep/step-ca v0.27 | - (rede interna) | CA interna (PKI) que emite/renova os certificados mTLS dos executores no enrollment |
-| `web` | Next.js 16 (App Router) | 3000 | Interface do usuario (editor visual, dashboard, admin) |
-| `executor` | Python (externo) | - | Executa workflows localmente, conecta via WebSocket (mTLS) ao servidor |
+| `api` | FastAPI + Uvicorn | 8000 | REST API, WebSocket (logs + executors), authentication, routing, scheduler, consumer |
+| `redis` | Valkey 8 (Redis-compatible; `REDIS_IMAGE`) | 6379 (internal network only) | Event pub/sub, `run_results` queue, executor presence, distributed locks and idempotency, login lockout |
+| `minio` | MinIO (S3-compatible) | 9000/9001 | Run artifacts, workspace Drive, Portal layers |
+| `traefik` | Traefik v3 | 80/443 | Reverse proxy, TLS termination, Host-based routing, **executor mTLS** (validates the client cert against the internal CA) |
+| `step-ca` | smallstep/step-ca v0.27 | - (internal network) | Internal CA (PKI) that issues/renews the executors' mTLS certificates at enrollment |
+| `web` | Next.js 16 (App Router) | 3000 | User interface (visual editor, dashboard, admin) |
+| `executor` | Python (external) | - | Runs workflows locally, connects to the server over WebSocket (mTLS) |
 
-> **PostgreSQL + PostGIS não é um serviço do `docker-compose`.** O banco é externo —
-> `DATABASE_URL` aponta para uma instância PostgreSQL 15 + PostGIS gerenciada fora do
-> stack (conexão direta, sem pgbouncer). As tabelas são criadas/migradas pelo Alembic
-> (`alembic upgrade head`), nunca por `create_all`.
+> **PostgreSQL + PostGIS is not a `docker-compose` service.** The database is external —
+> `DATABASE_URL` points to a PostgreSQL 15 + PostGIS instance managed outside the
+> stack (direct connection, no pgbouncer). Tables are created/migrated by Alembic
+> (`alembic upgrade head`), never by `create_all`.
 
 ```mermaid
 graph LR
@@ -124,11 +124,11 @@ graph LR
         WEB["web :3000"]
         REDIS["redis :6379"]
         MINIO["minio :9000"]
-        STEPCA["step-ca (CA interna)"]
+        STEPCA["step-ca (internal CA)"]
     end
 
-    subgraph Externo
-        DB["postgres :5432<br/>(PostGIS — fora do compose)"]
+    subgraph Externo["External"]
+        DB["postgres :5432<br/>(PostGIS — outside the compose)"]
         AGENT1["Executor 1"]
         AGENT2["Executor 2"]
         BROWSER["Browser"]
@@ -140,8 +140,8 @@ graph LR
     API --> DB
     API --> REDIS
     API --> MINIO
-    STEPCA -->|"emite cert mTLS"| AGENT1
-    STEPCA -->|"emite cert mTLS"| AGENT2
+    STEPCA -->|"issues mTLS cert"| AGENT1
+    STEPCA -->|"issues mTLS cert"| AGENT2
     AGENT1 -->|"WSS + mTLS"| TRAEFIK
     AGENT2 -->|"WSS + mTLS"| TRAEFIK
     AGENT1 --> MINIO
@@ -150,105 +150,106 @@ graph LR
 
 ---
 
-## Camada API (FastAPI)
+## API Layer (FastAPI)
 
-### Estrutura de Roteamento
+### Routing Structure
 
 ```
 app/main.py
 ├── Middleware: CORS, SecurityHeaders (CSP/HSTS/X-Frame-Options/nosniff), GZip (>1KB)
-│   (o rate limiter slowapi é aplicado por rota via decorator + exception handler)
-├── Exception handlers: HTTP, validation, rate limit, domain, generico
-├── Background tasks (lifespan; a lista é `_tarefas_de_fundo()`, e os laços periódicos
-│   │   com lock Redis usam `laco_periodico` de app/core/tarefas_periodicas.py):
-│   ├── RunResultConsumer (BRPOP run_results — a fila run_creates foi removida)
-│   ├── AsyncScheduler (loop de agendamentos)
-│   ├── ArtifactCleanup (limpeza periodica de artefatos)
-│   ├── StorageReconciliation (reconcilia DB × MinIO: size_bytes, multipart, drift)
-│   ├── Catálogo de fontes (importação no arranque + verificação periódica dos endpoints)
-│   ├── overdue_acks_monitor (jobs enviados sem ACK do executor)
-│   ├── orphan_runs_watchdog (falha runs cujo executor perdeu presença no Redis)
-│   └── as das extensões (ver abaixo)
-└── Routers montados com prefixo:
+│   (the slowapi rate limiter is applied per route via decorator + exception handler)
+├── Exception handlers: HTTP, validation, rate limit, domain, generic
+├── Background tasks (lifespan; the list is `_tarefas_de_fundo()`, and the periodic loops
+│   │   with a Redis lock use `laco_periodico` from app/core/tarefas_periodicas.py):
+│   ├── RunResultConsumer (BRPOP run_results — the run_creates queue was removed)
+│   ├── AsyncScheduler (schedule loop)
+│   ├── ArtifactCleanup (periodic artifact cleanup)
+│   ├── StorageReconciliation (reconciles DB × MinIO: size_bytes, multipart, drift)
+│   ├── Source catalog (import at startup + periodic endpoint checks)
+│   ├── overdue_acks_monitor (jobs sent without an ACK from the executor)
+│   ├── orphan_runs_watchdog (fails runs whose executor lost presence in Redis)
+│   └── those of the extensions (see below)
+└── Routers mounted with a prefix:
     ├── /auth                     → auth_router.py (login, register, refresh, me,
     │                                verify-email, resend-verification, forgot/reset-password, logout)
-    ├── /workflows                → workflows_router.py (CRUD, duplicar, move + move/preview, versoes)
-    ├── /workflows/{id}/schedules → schedules_router.py (PUT de um agendamento: pausar/retomar, editar)
-    ├── /webhook                  → webhook_router.py (execucao de workflows)
-    ├── /credentials              → credentials_router.py (credenciais criptografadas)
+    ├── /workflows                → workflows_router.py (CRUD, duplicate, move + move/preview, versions)
+    ├── /workflows/{id}/schedules → schedules_router.py (PUT of a schedule: pause/resume, edit)
+    ├── /webhook                  → webhook_router.py (workflow execution)
+    ├── /credentials              → credentials_router.py (encrypted credentials)
     ├── /workspaces               → workspace_router.py (workspaces CRUD, target_executor_id)
-    ├── /executores               → executores_router.py (gestao de executores, enroll OTP/mTLS, set-default)
-    ├── /nodes                    → nodes_router.py (catalogo de nos)
-    ├── /observability            → observability_router.py (metricas e historico)
-    ├── /artifacts                → artifacts_router.py (artefatos) + portal_router.py (/artifacts/portal, /artifacts/tiles)
-    ├── /drive                    → drive_router.py (arquivos) + executor_drive_router (upload via executor)
+    ├── /executores               → executores_router.py (executor management, enroll OTP/mTLS, set-default)
+    ├── /nodes                    → nodes_router.py (node catalog)
+    ├── /observability            → observability_router.py (metrics and history)
+    ├── /artifacts                → artifacts_router.py (artifacts) + portal_router.py (/artifacts/portal, /artifacts/tiles)
+    ├── /drive                    → drive_router.py (files) + executor_drive_router (upload via executor)
     ├── /workflow-groups          → workflow_groups_router.py
     ├── /telemetry                → telemetry_router.py (WebSocket /ws/telemetry)
-    ├── /admin/health             → health_router.py (whitelist de webhook, storage e purga — role admin)
-    ├── /admin/users              → admin_users_router.py (gestao de usuarios)
-    ├── /admin/nodes              → admin_nodes_router.py (habilita/desabilita nodes)
-    ├── /admin/workflows          → admin_workflows_router.py (ativa/desativa workflows)
-    ├── /admin/workspaces         → admin_workspaces_router.py (lixeira: restore/purge)
-    ├── /admin/drive              → drive_admin_router.py (config de Drive)
-    ├── /internal/send-email      → internal_email_router.py (envio via Resend, auth por cert do executor)
-    ├── /internal/change-detector → change_detector_router.py (hash store do node ChangeDetector)
-    ├── /mcp                      → app/mcp (rota exata, autenticacao por token pessoal)
-    ├── /ws/workflow/{run_id}     → log_workflows_router.py (WebSocket de logs)
-    ├── /ws/executores/{id}       → executor_ws_router.py + executor_ws/ (WebSocket de executores, auth mTLS)
-    └── as rotas das extensões, depois das do núcleo (ver abaixo)
+    ├── /admin/health             → health_router.py (webhook whitelist, storage and purge — admin role)
+    ├── /admin/users              → admin_users_router.py (user management)
+    ├── /admin/nodes              → admin_nodes_router.py (enables/disables nodes)
+    ├── /admin/workflows          → admin_workflows_router.py (activates/deactivates workflows)
+    ├── /admin/workspaces         → admin_workspaces_router.py (trash: restore/purge)
+    ├── /admin/drive              → drive_admin_router.py (Drive config)
+    ├── /internal/send-email      → internal_email_router.py (sending via Resend, auth by executor cert)
+    ├── /internal/change-detector → change_detector_router.py (hash store of the ChangeDetector node)
+    ├── /mcp                      → app/mcp (exact route, personal access token authentication)
+    ├── /ws/workflow/{run_id}     → log_workflows_router.py (logs WebSocket)
+    ├── /ws/executores/{id}       → executor_ws_router.py + executor_ws/ (executors WebSocket, mTLS auth)
+    └── the extensions' routes, after the core's (see below)
 ```
 
-### Extensões (`app/extensoes`)
+### Extensions (`app/extensoes`)
 
-O que uma instalação tem além do núcleo. Cada subpacote de `app/extensoes/` é uma extensão, e o
-núcleo nunca a importa pelo nome: na primeira chamada a `registro()`, cada uma é importada e a
-`registrar(registro)` dela pendura no registro as rotas, as tarefas de fundo, o plano e o teto do
-assistente de cada pessoa (`app/services/teto_do_assistente.py`), se há algo a vender, pastas de
-modelos de e-mail e campos a mais no painel do modelo do assistente. Os modelos SQLAlchemy dela
-moram em `<extensão>/modelos` e entram no metadata por `importar_modelos()`
-(`app/models/__init__.py`). As tabelas deles moram no `<extensão>/schema.sql` (DROP + CREATE, como
-o `scripts/init_schema.sql` do núcleo), que a base zero do alembic roda depois do script do núcleo
-(`esquemas()`); o núcleo não cria tabela de extensão.
+What an installation has beyond the core. Each subpackage of `app/extensoes/` is an extension, and the
+core never imports one by name: on the first call to `registro()`, each one is imported and its
+`registrar(registro)` hangs on the registry the routes, the background tasks, each person's plan and
+assistant ceiling (`app/services/teto_do_assistente.py`), whether there is something to sell, email
+template folders and extra fields in the assistant model panel. Its SQLAlchemy models
+live in `<extensão>/modelos` and enter the metadata through `importar_modelos()`
+(`app/models/__init__.py`). Their tables live in `<extensão>/schema.sql` (DROP + CREATE, like
+the core's `scripts/init_schema.sql`), which the alembic zero base runs after the core's script
+(`esquemas()`); the core does not create extension tables.
 
-Sem extensão nenhuma (a distribuição livre), cada ponto de encaixe tem um padrão: ninguém tem
-plano, o teto é `ASSISTENTE_TETO_DE_TOKENS_POR_DIA` e não há o que vender. Três coisas prendem a
-fronteira:
+With no extension at all (the free distribution), each plug-in point has a default: nobody has a
+plan, the ceiling is `ASSISTENTE_TETO_DE_TOKENS_POR_DIA` and there is nothing to sell. Three things hold
+the boundary in place:
 
-- `tests/unit/test_fronteira_das_extensoes.py` falha se o núcleo cita uma extensão pelo nome (num
-  import, absoluto ou relativo, numa cadeia de atributos ou num texto, como um alvo de patch), e
-  prova que a API sobe com `ATLANS_SEM_EXTENSOES=1` sem carregar o código de nenhuma;
-- `scripts/sem_extensoes.sh` faz o corte da distribuição livre: apaga a pasta de cada extensão e os
-  testes delas;
-- o job **Backend sem extensões (núcleo)** do CI roda o corte e, depois, a suíte inteira do núcleo.
+- `tests/unit/test_fronteira_das_extensoes.py` fails if the core mentions an extension by name (in an
+  import, absolute or relative, in an attribute chain or in a string, such as a patch target), and
+  proves that the API starts with `ATLANS_SEM_EXTENSOES=1` without loading the code of any of them;
+- `scripts/sem_extensoes.sh` makes the free-distribution cut: it deletes each extension's folder and
+  their tests;
+- the CI job **Backend sem extensões (núcleo)** (Backend without extensions (core)) runs the cut and,
+  then, the core's entire suite.
 
-Os testes de uma extensão moram em `tests/extensoes/<extensão>/`. Os avisos que um serviço de
-fora manda a uma extensão (um provedor de pagamento, por exemplo) chegam em `/webhooks/<serviço>`:
-a regra pública do Traefik (`api-rest-public`) já leva esse prefixo à API.
+An extension's tests live in `tests/extensoes/<extensão>/`. The notifications an outside service
+sends to an extension (a payment provider, for example) arrive at `/webhooks/<serviço>`:
+the public Traefik rule (`api-rest-public`) already routes that prefix to the API.
 
-O web tem o registro dele, com o mesmo desenho (ver
-[Extensões do web](#extensões-do-web-webextensoes)).
+The web has its own registry, with the same design (see
+[Web extensions](#web-extensions-webextensoes)).
 
-### Dependencias Injetaveis
+### Injectable Dependencies
 
-| Dependencia | Retorna | Uso |
+| Dependency | Returns | Usage |
 |-------------|---------|-----|
-| `get_db` | `AsyncSession` | Sessao SQLAlchemy async por request |
-| `get_current_user` | `User` | Valida JWT do header `Authorization` |
-| `get_user_workspace_ids` | `list[str]` | IDs de TODOS os workspaces dos quais o usuario e membro |
-| `verify_workspace_access(ws_id, ids)` | — | Falha (403) se o `workspace_id` do recurso nao esta na lista do usuario |
-| `workflow_com_papel(minimo)` | `Workflow` | Resolve o workflow por `id_hash` (404 antes de 403) e exige o papel mínimo no `workspace_id` dele |
-| `require_admin` | `User` | Garante role `admin` (alias de `require_role(Role.ADMIN)`) |
-| `require_role(Role)` | `User` | Garante role minimo (viewer/editor/operator/admin) |
+| `get_db` | `AsyncSession` | Async SQLAlchemy session per request |
+| `get_current_user` | `User` | Validates the JWT from the `Authorization` header |
+| `get_user_workspace_ids` | `list[str]` | IDs of ALL the workspaces the user is a member of |
+| `verify_workspace_access(ws_id, ids)` | — | Fails (403) if the resource's `workspace_id` is not in the user's list |
+| `workflow_com_papel(minimo)` | `Workflow` | Resolves the workflow by `id_hash` (404 before 403) and requires the minimum role in its `workspace_id` |
+| `require_admin` | `User` | Ensures the `admin` role (alias of `require_role(Role.ADMIN)`) |
+| `require_role(Role)` | `User` | Ensures a minimum role (viewer/editor/operator/admin) |
 
-> **Não existe** header `x-workspace-id` nem dependência `get_workspace`. O escopo de
-> workspace é passado como **query param `workspace_id`** (ou vem do próprio recurso
-> resolvido) e conferido contra as memberships do usuário via `verify_workspace_access`.
+> **There is no** `x-workspace-id` header nor a `get_workspace` dependency. The workspace
+> scope is passed as the **query param `workspace_id`** (or comes from the resolved resource
+> itself) and checked against the user's memberships via `verify_workspace_access`.
 
-### Ciclo de Vida de uma Request
+### Lifecycle of a Request
 
 ```mermaid
 sequenceDiagram
-    participant C as Cliente
+    participant C as Client
     participant M as Middleware
     participant R as Router
     participant D as Dependencies
@@ -262,22 +263,22 @@ sequenceDiagram
     R->>D: Depends(get_db)
     D-->>R: AsyncSession
     R->>D: Depends(get_current_user)
-    D->>D: Decodifica JWT
+    D->>D: Decodes JWT
     D->>DB: SELECT user
     D-->>R: User
     R->>D: Depends(get_user_workspace_ids)
     D->>DB: SELECT workspace_members (memberships)
     D-->>R: list[workspace_id]
     R->>R: verify_workspace_access(recurso.workspace_id, ids)
-    R->>S: Logica de negocio
+    R->>S: Business logic
     S->>DB: Queries
-    S-->>R: Resultado
+    S-->>R: Result
     R-->>C: JSON Response
 ```
 
-### Formato de Erros Padronizado
+### Standardized Error Format
 
-Todos os erros passam por handlers centralizados em `app/core/utils/error_handlers.py`:
+All errors go through centralized handlers in `app/core/utils/error_handlers.py`:
 
 ```json
 // HTTPException (400, 401, 403, 404, 429)
@@ -295,30 +296,30 @@ Todos os erros passam por handlers centralizados em `app/core/utils/error_handle
 
 ---
 
-## Motor de Workflows (flow/)
+## Workflow Engine (flow/)
 
-O motor de workflows e o nucleo computacional do Atlans. Ele roda **dentro dos executores** (nao no servidor API), processando DAGs de nos geoespaciais.
+The workflow engine is the computational core of Atlans. It runs **inside the executors** (not on the API server), processing DAGs of geospatial nodes.
 
-### Componentes
+### Components
 
-| Arquivo | Responsabilidade |
+| File | Responsibility |
 |---------|-----------------|
-| `registry.py` | Mapa `name → classe`. Descoberta automatica via `pkgutil.walk_packages` sobre `flow/nodes/` |
-| `factory.py` | `NodeFactory` — instancia a classe correta a partir do `name` do no na definicao JSON |
-| `executor/core.py` | `WorkflowExecutor` — orquestra o DAG: ordem topologica, batch paralelo, retry, pin, spill, propagacao, eventos |
-| `executor/node_manager.py` | `NodeManager` — instancia e guarda os nos e suas definicoes |
-| `executor/edge_resolver.py` | Semantica de aresta (`from_key`/`to_key`/spread), no run e na simulacao de schema |
-| `executor/rendering.py` | Renderizacao de parametros (Jinja2 + `$Alias`) |
-| `executor/pin.py` | Pin de outputs no MinIO (upload/download do artefato de pin) |
-| `executor/spill.py` | Spill-to-disk de outputs pesados (Parquet em `/tmp`) para conter pico de RAM |
-| `nodes/base.py` | `BaseNode` — contrato abstrato com helpers de parametros, inputs e retry (`get_retry_params`) |
-| `core/graph.py` | `WorkflowGraph` — topological sort, incoming/outgoing, filtro de nos isolados, alcancabilidade a partir de triggers (+ ancestrais) e descarte de arestas orfas |
-| `utils/publisher/` | `WorkflowEventPublisher` (ABC) — publica eventos de progresso via Redis pub/sub |
-| `metrics/collector.py` | `MetricsCollector` — coleta metricas de CPU, RAM, features, bytes por no |
+| `registry.py` | Map `name → classe`. Automatic discovery via `pkgutil.walk_packages` over `flow/nodes/` |
+| `factory.py` | `NodeFactory` — instantiates the right class from the node's `name` in the JSON definition |
+| `executor/core.py` | `WorkflowExecutor` — orchestrates the DAG: topological order, parallel batch, retry, pin, spill, propagation, events |
+| `executor/node_manager.py` | `NodeManager` — instantiates and holds the nodes and their definitions |
+| `executor/edge_resolver.py` | Edge semantics (`from_key`/`to_key`/spread), in the run and in the schema simulation |
+| `executor/rendering.py` | Parameter rendering (Jinja2 + `$Alias`) |
+| `executor/pin.py` | Pinning outputs in MinIO (upload/download of the pin artifact) |
+| `executor/spill.py` | Spill-to-disk of heavy outputs (Parquet in `/tmp`) to contain RAM peaks |
+| `nodes/base.py` | `BaseNode` — abstract contract with helpers for parameters, inputs and retry (`get_retry_params`) |
+| `core/graph.py` | `WorkflowGraph` — topological sort, incoming/outgoing, filtering of isolated nodes, reachability from triggers (+ ancestors) and discarding of orphan edges |
+| `utils/publisher/` | `WorkflowEventPublisher` (ABC) — publishes progress events via Redis pub/sub |
+| `metrics/collector.py` | `MetricsCollector` — collects CPU, RAM, features and bytes metrics per node |
 
-### Registro Automatico de Nos
+### Automatic Node Registration
 
-O `registry.py` importa recursivamente todos os modulos em `flow/nodes/` ao inicializar. Basta decorar a classe com `@register_node` — que **valida o description inteiro na importacao** (`flow/nodes/contrato.py`): categoria, tipos de propriedade, campos de saida tipados e chaves conhecidas. No malformado derruba o CI com a causa exata em vez de virar defeito visual na tela.
+`registry.py` recursively imports every module in `flow/nodes/` at initialization. All it takes is decorating the class with `@register_node` — which **validates the entire description at import time** (`flow/nodes/contrato.py`): category, property types, typed output fields and known keys. A malformed node breaks CI with the exact cause instead of becoming a visual defect on screen.
 
 ```python
 @register_node
@@ -328,29 +329,29 @@ class MeuNo(BaseNode):
         return {
             "name": "MeuNo",
             "alias": "Meu No Customizado",
-            "type": "action",              # categoria (6 valores fechados)
-            "properties": [...],           # widgets do form (14 tipos; required/placeholder)
-            "outputs": [                   # fonte UNICA da saida: campos tipados
+            "type": "action",              # category (6 closed values)
+            "properties": [...],           # form widgets (14 types; required/placeholder)
+            "outputs": [                   # SINGLE source of the output: typed fields
                 {"name": "output", "type": "geodataframe", "description": "..."},
             ],
         }
 
     async def execute(self, inputs: dict) -> dict:
-        # logica do no
+        # node logic
         return {"output": resultado}
 ```
 
-O contrato completo (vocabularios, `port`/`branches`, `inputs` tipados) esta em
-`docs/creating-nodes.md`; o editor deriva handles, tooltip, asterisco de obrigatorio e o
-`isValidConnection` do gesto **do mesmo catalogo** (`GET /nodes`).
+The complete contract (vocabularies, `port`/`branches`, typed `inputs`) is in
+`docs/creating-nodes.md`; the editor derives handles, tooltip, the required asterisk and the
+gesture's `isValidConnection` **from the same catalog** (`GET /nodes`).
 
-### Categorias de Nos
+### Node Categories
 
-Os exemplos abaixo são nomes de **módulo** (arquivo). O `name` registrado é PascalCase —
-ex.: `webhook_trigger` → `WebhookTrigger`, `field_transformer` → `SetFields`, `data_output`
-→ `DataOutput`. São 63 nós no total.
+The examples below are **module** (file) names. The registered `name` is PascalCase —
+e.g.: `webhook_trigger` → `WebhookTrigger`, `field_transformer` → `SetFields`, `data_output`
+→ `DataOutput`. There are 63 nodes in total.
 
-| Categoria | Diretorio | Exemplos |
+| Category | Directory | Examples |
 |-----------|-----------|----------|
 | **Trigger** | `flow/nodes/trigger/` | `webhook_trigger`, `schedule_trigger`, `file_trigger`, `geofence_trigger`, `sub_workflow_input` |
 | **Datasource** | `flow/nodes/datasource/` | `database_query`, `database_spatial_query`, `read_geojson`, `read_shapefile`, `read_geoparquet`, `read_csv_with_coords`, `wfs`, `data_input` |
@@ -359,193 +360,193 @@ ex.: `webhook_trigger` → `WebhookTrigger`, `field_transformer` → `SetFields`
 | **Control** | `flow/nodes/control/` | `conditional`, `merge`, `loop`, `sub_workflow`, `jinja_branch`, `switch`, `change_detector` |
 | **Output** | `flow/nodes/outputs/` | `save_geojson`, `save_to_postgis`, `save_to_postgres`, `save_to_shapefile`, `save_to_geoparquet`, `save_to_s3`, `send_email`, `send_webhook`, `publish_map`, `data_output`, `response_node`, `sub_workflow_output` |
 
-### Fluxo de Execucao do Executor
+### Executor Execution Flow
 
 ```mermaid
 flowchart TD
-    START["WorkflowExecutor.run()"] --> PARSE["Parsear definicao JSON<br/>nodes + edges"]
-    PARSE --> GRAPH["WorkflowGraph<br/>computar ordem topologica"]
-    GRAPH --> FACTORY["NodeFactory<br/>instanciar nos"]
-    FACTORY --> BATCH["Identificar nos prontos<br/>(sem dependencias pendentes)"]
+    START["WorkflowExecutor.run()"] --> PARSE["Parse JSON definition<br/>nodes + edges"]
+    PARSE --> GRAPH["WorkflowGraph<br/>compute topological order"]
+    GRAPH --> FACTORY["NodeFactory<br/>instantiate nodes"]
+    FACTORY --> BATCH["Identify ready nodes<br/>(no pending dependencies)"]
 
-    BATCH --> PARALLEL["Executar batch em paralelo<br/>asyncio.gather()"]
+    BATCH --> PARALLEL["Run batch in parallel<br/>asyncio.gather()"]
 
-    PARALLEL --> RENDER["Renderizar parametros<br/>Jinja2 + $Alias"]
-    RENDER --> CHECK_PIN{"Output fixado<br/>(pin data)?"}
-    CHECK_PIN -->|"HIT"| PIN_HIT["Usa output fixado<br/>(download do MinIO)"]
-    CHECK_PIN -->|"MISS"| RETRY_LOOP["Executar node.execute()<br/>com retry configuravel"]
+    PARALLEL --> RENDER["Render parameters<br/>Jinja2 + $Alias"]
+    RENDER --> CHECK_PIN{"Pinned output<br/>(pin data)?"}
+    CHECK_PIN -->|"HIT"| PIN_HIT["Uses pinned output<br/>(download from MinIO)"]
+    CHECK_PIN -->|"MISS"| RETRY_LOOP["Run node.execute()<br/>with configurable retry"]
 
-    RETRY_LOOP --> SPILL["Spill de outputs pesados<br/>para disco (>threshold)"]
-    SPILL --> PUBLISH_EVENT["Publicar evento<br/>started/completed/failed"]
+    RETRY_LOOP --> SPILL["Spill heavy outputs<br/>to disk (>threshold)"]
+    SPILL --> PUBLISH_EVENT["Publish event<br/>started/completed/failed"]
 
     PIN_HIT --> PROPAGATE
-    PUBLISH_EVENT --> PROPAGATE["Propagar outputs<br/>via edges (from_key → to_key)"]
+    PUBLISH_EVENT --> PROPAGATE["Propagate outputs<br/>via edges (from_key → to_key)"]
 
-    PROPAGATE --> FREE["Liberar copias de spill<br/>de nos consumidos (M5)"]
-    FREE --> MORE{"Mais nos<br/>prontos?"}
-    MORE -->|"Sim"| BATCH
-    MORE -->|"Nao"| END["Retorna final_outputs<br/>+ node_stats + metricas"]
+    PROPAGATE --> FREE["Free spill copies<br/>of consumed nodes (M5)"]
+    FREE --> MORE{"More nodes<br/>ready?"}
+    MORE -->|"Yes"| BATCH
+    MORE -->|"No"| END["Returns final_outputs<br/>+ node_stats + metrics"]
 
     style START fill:#059669,color:#fff
     style END fill:#059669,color:#fff
 ```
 
-### Sistema de Expressoes
+### Expression System
 
-O executor suporta expressoes Jinja2 e aliases nos parametros dos nos:
+The executor supports Jinja2 expressions and aliases in node parameters:
 
-- **Jinja2**: `{{ nodes.MeuNo.outputs.campo }}` — acessa outputs de nos anteriores
-- **$Alias**: `$MeuNo.campo` — atalho para referenciar outputs pelo alias do no
-- **Funcoes built-in**: `{{ now() }}`, `{{ uuid() }}`, acesso a `env`
+- **Jinja2**: `{{ nodes.MeuNo.outputs.campo }}` — accesses outputs of previous nodes
+- **$Alias**: `$MeuNo.campo` — shortcut to reference outputs by the node's alias
+- **Built-in functions**: `{{ now() }}`, `{{ uuid() }}`, access to `env`
 
-### Pin de Outputs (pinned data)
+### Output Pinning (pinned data)
 
-Em vez de um cache Redis de nós, o executor suporta **pin** de outputs: o resultado de
-um nó é persistido no MinIO (`pin-cache/{workspace_id}/{task_id}/…`) e reutilizado em
-execuções futuras, pulando a execução do nó.
+Instead of a Redis node cache, the executor supports **pinning** outputs: a node's result
+is persisted in MinIO (`pin-cache/{workspace_id}/{task_id}/…`) and reused in
+future runs, skipping the node's execution.
 
-1. O servidor envia `pinned_outputs` + `pin_metadata` no envelope do job (colunas
-   `workflows.pinned_outputs` / `pin_metadata`). **`pin_metadata` é a autorização**:
-   só entra no envelope o nó que tem par lá, porque essa coluna é escrita
-   exclusivamente pelo pin explícito de quem está usando. Entrada em
-   `pinned_outputs` sem par é órfã — resto de nó apagado, de fluxo restaurado, de
-   unpin incompleto — e não é despachada nem quando `pin_metadata` está vazia.
-   Despachar órfã era pior do que parece: a validade é lida de
-   `pin_metadata[node_id]`, então uma órfã com `__pin_s3_key__` **nunca expiraria**
+1. The server sends `pinned_outputs` + `pin_metadata` in the job envelope (columns
+   `workflows.pinned_outputs` / `pin_metadata`). **`pin_metadata` is the authorization**:
+   only a node that has a counterpart there goes into the envelope, because that column is written
+   exclusively by the explicit pin of whoever is using it. An entry in
+   `pinned_outputs` without a counterpart is an orphan — left over from a deleted node, a restored
+   workflow, an incomplete unpin — and is not dispatched even when `pin_metadata` is empty.
+   Dispatching an orphan was worse than it looks: validity is read from
+   `pin_metadata[node_id]`, so an orphan with `__pin_s3_key__` **would never expire**
    (`_safe_pinned_outputs`, `app/services/workflow_execution_service.py`).
-2. No run, `_resolve_pin_data()` verifica expiração (`expires_at`) e baixa o artefato do
-   MinIO; um pin marcado (com metadata) mas ainda vazio dispara **auto-pin** — o output é
-   gravado no MinIO e a nova ref volta ao servidor em `__updated_pinned_outputs__`.
-3. Um evento `completed` com `cache_hit: true` (e `duration_ms: 0`) é publicado quando o
-   output veio do pin.
+2. During the run, `_resolve_pin_data()` checks expiration (`expires_at`) and downloads the artifact from
+   MinIO; a pin that is marked (with metadata) but still empty triggers an **auto-pin** — the output is
+   written to MinIO and the new ref goes back to the server in `__updated_pinned_outputs__`.
+3. A `completed` event with `cache_hit: true` (and `duration_ms: 0`) is published when the
+   output came from the pin.
 
-> **Não existe `NODE_CACHE_TTL` nem cache Redis por nó.** Essa feature foi substituída
-> pelo pin (armazenamento em MinIO).
+> **There is no `NODE_CACHE_TTL` and no per-node Redis cache.** That feature was replaced
+> by the pin (storage in MinIO).
 
-A linha de cache de um nó é única por `(workflow_hash, node_id)` entre as fixadas —
-`uq_artifact_pin_por_no`, índice parcial em `artifacts`. Sem ele, dois runs do mesmo
-fluxo terminando juntos inseriam cada um a sua e toda leitura seguinte encontrava
-duas. O `_upsert_pin_artifact` ainda colapsa o que encontrar (a base que não rodou
-`alembic upgrade head` continua sem o índice) e trata a colisão do INSERT num
-SAVEPOINT — a transação em jogo é a que persiste o resultado da execução.
+A node's cache row is unique per `(workflow_hash, node_id)` among the pinned ones —
+`uq_artifact_pin_por_no`, a partial index on `artifacts`. Without it, two runs of the same
+workflow finishing together each inserted their own, and every subsequent read found
+two. `_upsert_pin_artifact` still collapses whatever it finds (a database that has not run
+`alembic upgrade head` still lacks the index) and handles the INSERT collision in a
+SAVEPOINT — the transaction at stake is the one that persists the run's result.
 
 ### Spill-to-Disk
 
-Outputs pesados (GeoDataFrames acima de um limiar de tamanho) são gravados como Parquet em
-disco (`_spill_to_disk`) e re-hidratados sob demanda quando um filho os consome. As escritas
-são blindadas contra cancelamento (`asyncio.shield`) e drenadas (`_drain_spills`) antes de o
-`_cleanup_spill` remover o diretório do run, evitando Parquet órfão em `/tmp`.
+Heavy outputs (GeoDataFrames above a size threshold) are written as Parquet to
+disk (`_spill_to_disk`) and rehydrated on demand when a child consumes them. The writes
+are shielded against cancellation (`asyncio.shield`) and drained (`_drain_spills`) before
+`_cleanup_spill` removes the run's directory, avoiding orphan Parquet files in `/tmp`.
 
-### Liberacao de Memoria (M5)
+### Memory Release (M5)
 
-O executor rastreia quantos filhos ainda precisam consumir o output de cada nó
-(`remaining_consumers`). Quando o último filho consome, `_free_node_outputs` libera as
-**cópias**: o Parquet de spill em disco e a cópia relida do `_spill_cache`. O payload real
-em `named[alias]` / `final_outputs` **permanece** (alimenta o contexto Jinja `{{ Alias.x }}`
-de nós posteriores) e só morre com o processo — a economia de RAM aqui é parcial e proposital.
+The executor tracks how many children still need to consume each node's output
+(`remaining_consumers`). When the last child consumes it, `_free_node_outputs` frees the
+**copies**: the spill Parquet on disk and the re-read copy in `_spill_cache`. The real payload
+in `named[alias]` / `final_outputs` **remains** (it feeds the Jinja context `{{ Alias.x }}`
+of later nodes) and only dies with the process — the RAM savings here are partial and deliberate.
 
 ---
 
-## Sistema de Executores
+## Executor System
 
-O sistema de executores e o mecanismo de execucao distribuida do Atlans. Executores sao processos externos que conectam ao servidor via WebSocket, recebem jobs criptografados e executam workflows localmente.
+The executor system is Atlans's distributed execution mechanism. Executors are external processes that connect to the server over WebSocket, receive encrypted jobs and run workflows locally.
 
-### Tipos de Executor
+### Executor Types
 
-Um executor tem `executor_type` = `default` **ou** `dedicated`, mais uma flag `is_default`.
-A "visibilidade" não é um tipo próprio — decorre de `is_default` e das atribuições:
+An executor has `executor_type` = `default` **or** `dedicated`, plus an `is_default` flag.
+"Visibility" is not a type of its own — it follows from `is_default` and from the assignments:
 
-| Config | Descricao | Visibilidade |
+| Config | Description | Visibility |
 |------|-----------|-------------|
-| **Pool padrão** (`is_default = true`) | Executores da plataforma. Recebem os workflows cujo workspace não define `target_executor_id`. **Múltiplos são permitidos** (via `POST /executores/set-default` e `/unset-default`). | Todos os usuarios |
-| **Dedicated** ligado a workspace | `Workspace.target_executor_id` aponta para ele — executor primário do tenant. | Membros do workspace |
-| **Dedicated** atribuído a usuários | Vinculado a usuários via `user_executor_assignments` (admin). Isolamento / cargas sensíveis. | Apenas usuarios atribuidos |
+| **Default pool** (`is_default = true`) | Platform executors. They receive the workflows whose workspace does not set `target_executor_id`. **Multiple are allowed** (via `POST /executores/set-default` and `/unset-default`). | All users |
+| **Dedicated** bound to a workspace | `Workspace.target_executor_id` points to it — the tenant's primary executor. | Workspace members |
+| **Dedicated** assigned to users | Bound to users via `user_executor_assignments` (admin). Isolation / sensitive workloads. | Assigned users only |
 
-### Ciclo de Vida do Executor
+### Executor Lifecycle
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Pending: POST /executores/ (admin cria) + POST /{id}/enroll-otp (gera OTP)
-    Pending --> Active: POST /executores/enroll<br/>(OTP → CSR → cert mTLS + chave X25519)
-    Active --> Connected: WS /ws/executores/{id}<br/>(handshake TLS mTLS)
-    Connected --> Active: Desconexao
-    Active --> Active: POST /executores/renew-cert<br/>(renova cert)
-    Active --> Inactive: desativado manualmente
-    Active --> Revoked: DELETE /executores/{id}<br/>(cert vai para a blacklist)
+    [*] --> Pending: POST /executores/ (admin creates) + POST /{id}/enroll-otp (generates OTP)
+    Pending --> Active: POST /executores/enroll<br/>(OTP → CSR → mTLS cert + X25519 key)
+    Active --> Connected: WS /ws/executores/{id}<br/>(mTLS TLS handshake)
+    Connected --> Active: Disconnection
+    Active --> Active: POST /executores/renew-cert<br/>(renews cert)
+    Active --> Inactive: manually deactivated
+    Active --> Revoked: DELETE /executores/{id}<br/>(cert goes to the blacklist)
     Revoked --> Deleted: DELETE /executores/{id}/permanent<br/>(soft-delete: deleted_at)
-    Connected --> Revoked: Admin revoga<br/>(WS fechado com 44xx)
+    Connected --> Revoked: Admin revokes<br/>(WS closed with 44xx)
 ```
 
-### Protocolo de Enrollment e Conexao (OTP + mTLS)
+### Enrollment and Connection Protocol (OTP + mTLS)
 
-Executores **não** usam API key nem token JWT. A confiança é estabelecida por
-**certificado mTLS** emitido por uma **CA interna** (serviço `step-ca`):
+Executors do **not** use an API key or a JWT token. Trust is established by an
+**mTLS certificate** issued by an **internal CA** (the `step-ca` service):
 
-1. **Criação** — admin faz `POST /executores/` → executor em `pending`.
-2. **OTP** — `POST /executores/{id}/enroll-otp` gera um one-time password (tabela
+1. **Creation** — an admin does `POST /executores/` → executor in `pending`.
+2. **OTP** — `POST /executores/{id}/enroll-otp` generates a one-time password (table
    `executor_enrollment_otp`).
-3. **Enrollment** — o executor faz `POST /executores/enroll` com o OTP; o servidor emite um
-   **certificado mTLS** (via step-ca) e registra a **chave pública X25519** do executor
-   (usada só para cifrar o payload dos jobs). Status → `active`.
-4. **Conexão** — `WS /ws/executores/{id}`. O **Traefik** valida o client cert contra a CA
-   interna no handshake TLS e injeta `X-Forwarded-Tls-Client-Cert-Info` (CN + serial). O
-   handler (`validate_executor_mtls`) exige CN = `executor-{id}`, `status=active`, serial ==
-   `cert_serial` no DB, e serial fora da blacklist Redis. Falha → WS aceito e fechado com
-   código `44xx`.
-5. **Renovação** — `POST /executores/renew-cert` roda antes de expirar; `GET
-   /executores/ca-bundle` distribui o root cert da CA. O cert novo só é gravado se o
-   executor continua ativo e com o serial que apresentou (um UPDATE condicional): uma
-   revogação feita enquanto o step-ca assinava prevalece, o cert novo vai para a blacklist e
-   a resposta é 409. Limite de 6 por hora e 30 por dia, por executor (o CN do cert).
-6. **Heartbeat/capacity** — já conectado, o executor envia `heartbeat` e `capacity` (~30s),
-   renovando o TTL de presença no Redis (`executor:presence:{id}`, 120s).
-7. **A tela de executores** — cada worker da API segura só os WebSockets que conectaram nele,
-   então `GET /executores`, `/executores/my` e `/executores/{id}` leem de onde todos os
-   workers enxergam, inclusive o worker do WebSocket: presença e capacidade num MGET do Redis
-   (`executor:presence:{id}` e `executor:capacity:{id}`, esta publicada pelo worker do
-   WebSocket), e `executor_version`, `system_info` e `last_seen_at` do banco. A versão e o
-   `system_info` são gravados no primeiro handshake da conexão; o `system_info` só aparece
-   nas rotas de admin. A versão do executor Docker é gravada na imagem no build — a do
-   produto, a mesma do app desktop, mais o commit do checkout, lido do próprio `.git`
-   (`2.15.0+3f02f44`, ver `executor/versao.py`) — e vence o `EXECUTOR_VERSION` do `.env`;
-   o desktop declara a dele por `EXECUTOR_VERSION`. A coluna da tela corta a versão longa
-   e mostra a inteira no `title`. `last_seen_at` é gravado no enrollment, no início de cada sessão e no
-   fim dela (o último contato, e só se for posterior ao que está gravado), não na renovação
-   do cert: online, ele é o "no ar desde"; offline, o "visto há". As revogações
+3. **Enrollment** — the executor does `POST /executores/enroll` with the OTP; the server issues an
+   **mTLS certificate** (via step-ca) and records the executor's **X25519 public key**
+   (used only to encrypt the jobs' payload). Status → `active`.
+4. **Connection** — `WS /ws/executores/{id}`. **Traefik** validates the client cert against the internal
+   CA in the TLS handshake and injects `X-Forwarded-Tls-Client-Cert-Info` (CN + serial). The
+   handler (`validate_executor_mtls`) requires CN = `executor-{id}`, `status=active`, serial ==
+   `cert_serial` in the DB, and a serial not in the Redis blacklist. Failure → WS accepted and closed with
+   code `44xx`.
+5. **Renewal** — `POST /executores/renew-cert` runs before expiry; `GET
+   /executores/ca-bundle` distributes the CA's root cert. The new cert is only written if the
+   executor is still active and has the serial it presented (a conditional UPDATE): a
+   revocation made while step-ca was signing prevails, the new cert goes to the blacklist and
+   the response is 409. Limit of 6 per hour and 30 per day, per executor (the cert's CN).
+6. **Heartbeat/capacity** — once connected, the executor sends `heartbeat` and `capacity` (~30s),
+   renewing the presence TTL in Redis (`executor:presence:{id}`, 120s).
+7. **The executors screen** — each API worker holds only the WebSockets that connected to it,
+   so `GET /executores`, `/executores/my` and `/executores/{id}` read from where all the
+   workers can see, including the WebSocket's worker: presence and capacity in a Redis MGET
+   (`executor:presence:{id}` and `executor:capacity:{id}`, the latter published by the
+   WebSocket's worker), and `executor_version`, `system_info` and `last_seen_at` from the database. The version and
+   `system_info` are written on the connection's first handshake; `system_info` only appears
+   in the admin routes. The Docker executor's version is baked into the image at build time — the
+   product's, the same as the desktop app's, plus the checkout's commit, read from `.git` itself
+   (`2.15.0+3f02f44`, see `executor/versao.py`) — and it wins over the `EXECUTOR_VERSION` from `.env`;
+   the desktop declares its own through `EXECUTOR_VERSION`. The screen's column truncates the long version
+   and shows the whole one in the `title`. `last_seen_at` is written at enrollment, at the start of each session and at
+   its end (the last contact, and only if it is later than what is recorded), not on cert
+   renewal: online, it is the "up since"; offline, the "last seen". The revocations
    (`DELETE /executores/{id}`, `DELETE /executores/admin/executores/{id}/cert`,
-   `POST /admin/users/{id}/revoke-all-executores` e a suspensão/exclusão da conta do
-   operador) terminam todas em `executor_service.concluir_revogacoes`, depois do commit:
-   blacklist do cert, aviso aos donos de nível principal esvaziado e o fechamento do
-   WebSocket em qualquer worker, pelo relay. As do executor inteiro (todas menos a do cert)
-   passam antes por `revogar_executor`, que o tira dos níveis da política. O aviso pode se
-   perder (Redis reiniciando, listener da sessão
-   reconectando); por isso cada sessão também confere no banco, a cada 60 s, se ainda vale —
-   executor ativo e com cert — e fecha com 4403 se não (`_vigiar_revogacao`). A renovação
-   troca o serial sem zerá-lo, então não derruba a sessão que a fez.
+   `POST /admin/users/{id}/revoke-all-executores` and the suspension/deletion of the
+   operator's account) all end in `executor_service.concluir_revogacoes`, after the commit:
+   cert blacklist, a notice to the owners whose primary tier was emptied, and the closing of the
+   WebSocket on any worker, through the relay. Those of the whole executor (all but the cert one)
+   first go through `revogar_executor`, which removes it from the policy's tiers. The notice can be
+   lost (Redis restarting, the session's listener
+   reconnecting); that is why each session also checks the database, every 60 s, whether it is still valid —
+   executor active and with a cert — and closes with 4403 if not (`_vigiar_revogacao`). Renewal
+   swaps the serial without clearing it, so it does not drop the session that did it.
 
-> A cifra do **payload** dos jobs continua sendo X25519 + AES-256-GCM + assinatura Ed25519
-> (ver abaixo) — independente do mTLS, que protege o **canal** WebSocket.
+> The encryption of the jobs' **payload** is still X25519 + AES-256-GCM + an Ed25519 signature
+> (see below) — independent of mTLS, which protects the WebSocket **channel**.
 
-### Criptografia de Jobs (X25519 + Ed25519)
+### Job Encryption (X25519 + Ed25519)
 
-Cada job enviado ao executor e cifrado com forward secrecy e assinado digitalmente:
+Every job sent to the executor is encrypted with forward secrecy and digitally signed:
 
 ```mermaid
 flowchart LR
-    subgraph Servidor
-        EPHEMERAL["Gera par efemero<br/>X25519"]
+    subgraph Servidor["Server"]
+        EPHEMERAL["Generates ephemeral pair<br/>X25519"]
         ECDH["ECDH: ephemeral_priv<br/>x agent_pub → shared_secret"]
         HKDF["HKDF-SHA256<br/>shared_secret + nonce → AES key"]
-        AES["AES-256-GCM<br/>cifra payload"]
+        AES["AES-256-GCM<br/>encrypts payload"]
         SIGN["Ed25519.sign()<br/>envelope + ephemeral_pub + ciphertext"]
-        MSG["Mensagem final:<br/>envelope + ephemeral_pub<br/>+ ciphertext + signature"]
+        MSG["Final message:<br/>envelope + ephemeral_pub<br/>+ ciphertext + signature"]
     end
 
     subgraph Executor
-        VERIFY["Ed25519.verify()<br/>valida assinatura do servidor"]
+        VERIFY["Ed25519.verify()<br/>validates the server's signature"]
         ECDH2["ECDH: agent_priv<br/>x ephemeral_pub → shared_secret"]
         HKDF2["HKDF-SHA256<br/>shared_secret + nonce → AES key"]
-        DECRYPT["AES-256-GCM<br/>decifra payload"]
+        DECRYPT["AES-256-GCM<br/>decrypts payload"]
     end
 
     EPHEMERAL --> ECDH --> HKDF --> AES --> SIGN --> MSG
@@ -555,7 +556,7 @@ flowchart LR
     style Executor fill:#164e63,color:#e2e8f0
 ```
 
-**Formato da mensagem cifrada:**
+**Encrypted message format:**
 
 ```json
 {
@@ -574,294 +575,294 @@ flowchart LR
 }
 ```
 
-**Garantias de seguranca:**
+**Security guarantees:**
 
-- **Forward secrecy**: par efemero X25519 descartado apos cada job
-- **Integridade**: Ed25519 sobre `envelope_json(sorted) | ephemeral_pub_b64 | ciphertext_b64`
-- **Confidencialidade**: AES-256-GCM com chave derivada via HKDF (salt = nonce do envelope)
-- **Expiacao**: `expires_at` no envelope (padrao 5 minutos, configuravel via `EXECUTOR_JOB_TTL_SECONDS`)
-- **Replay protection**: nonce unico de 256 bits por job
+- **Forward secrecy**: ephemeral X25519 pair discarded after each job
+- **Integrity**: Ed25519 over `envelope_json(sorted) | ephemeral_pub_b64 | ciphertext_b64`
+- **Confidentiality**: AES-256-GCM with a key derived via HKDF (salt = the envelope's nonce)
+- **Expiration**: `expires_at` in the envelope (default 5 minutes, configurable via `EXECUTOR_JOB_TTL_SECONDS`)
+- **Replay protection**: unique 256-bit nonce per job
 
-### Protocolo de Mensagens WebSocket
+### WebSocket Message Protocol
 
-| Direcao | Tipo | Payload | Descricao |
+| Direction | Type | Payload | Description |
 |---------|------|---------|-----------|
-| Executor → Servidor | `heartbeat` | `{}` | Mantem conexao viva; renova TTL Redis |
-| Executor → Servidor | `capacity` | `{queued, running, max_concurrent, max_queue}` | Reporta carga atual (back-pressure) |
-| Executor → Servidor | `job_result` | `{job_id, status, output, error, stats, run_id}` | Resultado final do job |
-| Executor → Servidor | `node_event` | `{run_id, node, status, timestamp, ...}` | Evento de progresso por no |
-| Executor → Servidor | `sync_event` | `{event, dataset, progress, timestamp}` | Evento de sincronizacao de arquivos |
-| Executor → Servidor | `handshake` | `{agent_version}` | Identificacao pos-conexao |
-| Executor → Servidor | `ack` | `{job_id, status}` | O job chegou e entrou na fila local; promove o run de `pending` para `running` |
-| Executor → Servidor | `inventario` | `{ativos, resultados, truncado}` | Na conexao e a cada 60s: jobs que o executor TEM (ver Reconciliacao) |
-| Servidor → Executor | `job` | `{envelope, ephemeral_public, ciphertext, signature}` | Job cifrado |
-| Servidor → Executor | `error` | `{reason, ...}` | Recusa de uma mensagem do executor; ele registra em WARNING |
+| Executor → Server | `heartbeat` | `{}` | Keeps the connection alive; renews the Redis TTL |
+| Executor → Server | `capacity` | `{queued, running, max_concurrent, max_queue}` | Reports current load (back-pressure) |
+| Executor → Server | `job_result` | `{job_id, status, output, error, stats, run_id}` | Final result of the job |
+| Executor → Server | `node_event` | `{run_id, node, status, timestamp, ...}` | Per-node progress event |
+| Executor → Server | `sync_event` | `{event, dataset, progress, timestamp}` | File synchronization event |
+| Executor → Server | `handshake` | `{agent_version}` | Post-connection identification |
+| Executor → Server | `ack` | `{job_id, status}` | The job arrived and entered the local queue; promotes the run from `pending` to `running` |
+| Executor → Server | `inventario` | `{ativos, resultados, truncado}` | On connection and every 60s: the jobs the executor HAS (see Reconciliation) |
+| Server → Executor | `job` | `{envelope, ephemeral_public, ciphertext, signature}` | Encrypted job |
+| Server → Executor | `error` | `{reason, ...}` | Rejection of a message from the executor; it logs it at WARNING |
 
-### Escolha do executor
+### Choosing the executor
 
-Nao ha fila central no servidor. A cada disparo, `_resolve_candidates`
-(`app/services/workflow_execution_service.py`) monta a lista de candidatos em
-niveis — dedicado do workspace (ou os niveis da politica, com
-`EXECUTOR_POLICY_ROUTING=on`) e depois o pool padrao — e `_dispatch_job` tenta um
-por um ate algum aceitar. Se nenhum aceita, o run fecha como `failed`
-(`no_executor`); nada fica esperando um executor liberar.
+There is no central queue on the server. On every trigger, `_resolve_candidates`
+(`app/services/workflow_execution_service.py`) builds the list of candidates in
+tiers — the workspace's dedicated executor (or the policy's tiers, with
+`EXECUTOR_POLICY_ROUTING=on`) and then the default pool — and `_dispatch_job` tries them
+one by one until one accepts. If none accepts, the run closes as `failed`
+(`no_executor`); nothing sits waiting for an executor to free up.
 
-Dentro de cada nivel, a ordem sai da situacao de cada executor
+Within each tier, the order comes from each executor's situation
 (`_situacoes`/`_chave_de_ordem`):
 
 ```python
-carga  = runs pending/running do host no banco   # a declarada so se a contagem falhar
+carga  = runs pending/running do host no banco   # the declared one only if the count fails
 vagas  = menor entre max_concurrent declarado e o teto do banco
 fila   = menor entre max_queue declarado e o teto do banco
 livres = vagas - carga
 cheio  = is_full da capacidade declarada, ou carga >= vagas + fila
 ```
 
-1. **Com vaga livre** — o job comeca na hora. Sorteio ponderado pelas vagas
-   livres: quem tem 4 livres sai na frente duas vezes mais que quem tem 2.
-2. **Sem vaga, com lugar na fila local** — o job vai esperar em alguma fila:
-   menor `(carga + 1) / vagas` primeiro.
-3. **Cheios** — pelo relatorio do executor (o `send_job` recusaria; e onde cai o
-   executor em drenagem, que se anuncia cheio) ou pela contagem (a fila local
-   dele recusaria o job DEPOIS de o envio ser aceito, e o run falharia sem
-   failover). Vao por ultimo: so sao tentados se nao houver outro.
+1. **With a free slot** — the job starts right away. Weighted draw by free
+   slots: an executor with 4 free comes out ahead twice as often as one with 2.
+2. **No slot, but room in the local queue** — the job will wait in some queue:
+   lowest `(carga + 1) / vagas` first.
+3. **Full** — by the executor's report (`send_job` would refuse; this is where an
+   executor that is draining lands, since it announces itself as full) or by the count (its local queue
+   would refuse the job AFTER the send was accepted, and the run would fail without
+   failover). They go last: they are only tried if there is no other.
 
-Por que cada parte:
+Why each part:
 
-- **Contada pelo servidor**: runs `pending`/`running` com `host` =
-  `executor:{id}`. Muda no instante do despacho (o INSERT do run, com o host, e
-  commitado antes de o job sair) e e a mesma para todos os workers: um despacho
-  ve os que terminaram de despachar antes dele. Conta tambem runs que o banco
-  ainda acha vivos mas o executor ja perdeu, ate a reconciliacao pelo
-  inventario fecha-los — isso so empurra o executor para tras, nunca o faz
-  recusar.
-- **Declarada**: o `capacity` que o executor manda a cada 10 s — local se o
-  WebSocket esta neste worker, senao a copia publicada no Redis
-  (`executor:capacity:{id}`, lida numa ida so, MGET, para todos os candidatos).
-  Como carga ela era cega nos outros workers da API (executor contava zero) e
-  defasada: com ate 10 s, fazia executor recem-liberado parecer ocupado. Agora
-  serve para "cheio", para as vagas e como reserva quando a contagem nao sai.
-- **A consulta** roda num SAVEPOINT aberto na conexao da sessao. No Postgres, um
-  erro nela (lock, timeout) abortaria a transacao do request e derrubaria o
-  INSERT do run; com o savepoint, a ordem cai para a declarada e o despacho
-  segue. Na conexao, e nao com `Session.begin_nested()`, para nao descarregar
-  (flush) o que a sessao tem pendente. So erro do driver vira degradacao;
-  conexao perdida e bug sobem.
-- O **sorteio** entre quem tem vaga existe por causa das decisoes
-  **simultaneas**: requisicoes concorrentes e os varios workers partem do mesmo
-  retrato (nenhum INSERT entre elas), e com o minimo estrito todas escolhiam o
-  mesmo executor. O sorteio as espalha na proporcao da folga, e pelo retrato do
-  servidor nunca poe um executor sem vaga na frente de um com vaga. Ainda
-  assim, uma rajada simultanea pode passar da folga de alguem: o excesso espera
-  na fila local dele, e o que passar da fila local e recusado — o run falha.
-- **Vagas e fila pelo menor valor**: o executor pode subir com menos vagas que
-  o teto do banco, e antes do primeiro `capacity` o worker que segura o
-  WebSocket so tem um valor provisorio; pelo menor, todos os workers enxergam o
-  mesmo tamanho.
+- **Counted by the server**: `pending`/`running` runs with `host` =
+  `executor:{id}`. It changes at the instant of dispatch (the run's INSERT, with the host, is
+  committed before the job goes out) and it is the same for all workers: a dispatch
+  sees those that finished dispatching before it. It also counts runs that the database
+  still thinks are alive but the executor has already lost, until reconciliation through the
+  inventory closes them — that only pushes the executor back, it never makes it
+  refuse.
+- **Declared**: the `capacity` the executor sends every 10 s — local if the
+  WebSocket is on this worker, otherwise the copy published in Redis
+  (`executor:capacity:{id}`, read in a single round trip, MGET, for all candidates).
+  As load it was blind on the other API workers (the executor counted as zero) and
+  stale: at up to 10 s old, it made a freshly freed executor look busy. Now it
+  serves for "full", for the slots and as a fallback when the count does not come out.
+- **The query** runs in a SAVEPOINT opened on the session's connection. In Postgres, an
+  error in it (lock, timeout) would abort the request's transaction and bring down the
+  run's INSERT; with the savepoint, the order falls back to the declared one and the dispatch
+  goes on. On the connection, and not with `Session.begin_nested()`, so as not to flush
+  what the session has pending. Only a driver error becomes degradation;
+  a lost connection and bugs propagate.
+- The **draw** among those with a slot exists because of **simultaneous**
+  decisions: concurrent requests and the several workers start from the same
+  snapshot (no INSERT between them), and with a strict minimum they all picked the
+  same executor. The draw spreads them in proportion to the headroom, and by the
+  server's snapshot it never puts an executor without a slot ahead of one with a slot. Even
+  so, a simultaneous burst can exceed someone's headroom: the excess waits
+  in its local queue, and whatever exceeds the local queue is refused — the run fails.
+- **Slots and queue by the lower value**: the executor may start with fewer slots than
+  the database ceiling, and before the first `capacity` the worker holding the
+  WebSocket only has a provisional value; by taking the lower, all workers see the
+  same size.
 
-Na fila local do executor os jobs rodam por prioridade e, entre iguais, na ordem
-de chegada (`_QueueItem.seq` em `executor/job_queue.py`). O servidor nao manda
-prioridade, entao na pratica e FIFO.
+In the executor's local queue, jobs run by priority and, among equals, in order
+of arrival (`_QueueItem.seq` in `executor/job_queue.py`). The server does not send a
+priority, so in practice it is FIFO.
 
 ### Back-Pressure
 
-O servidor verifica a capacidade reportada pelo executor antes de despachar um job:
+The server checks the capacity reported by the executor before dispatching a job:
 
 ```python
 is_full = (queued + running) >= (max_concurrent + max_queue)
 ```
 
-Se o executor esta cheio, `send_job()` retorna `False` e o dispatch tenta o
-proximo candidato; so quando todos recusam o run fecha como `failed` e o cliente
-recebe 503.
+If the executor is full, `send_job()` returns `False` and the dispatch tries the
+next candidate; only when all of them refuse does the run close as `failed` and the client
+receive a 503.
 
 ### Relay via Redis Pub/Sub (Multi-Worker)
 
-Em ambientes com multiplos workers Uvicorn (`--workers N`), o WebSocket de um executor pode estar em um worker diferente do que recebe o request HTTP de execucao:
+In environments with multiple Uvicorn workers (`--workers N`), an executor's WebSocket may be on a different worker from the one that receives the HTTP execution request:
 
 ```mermaid
 flowchart LR
-    REQ["HTTP Request<br/>(Worker 1)"] -->|"executor nao esta<br/>neste worker"| REDIS_PUB["Redis PUBLISH<br/>executor:job_relay:{id}"]
+    REQ["HTTP Request<br/>(Worker 1)"] -->|"executor is not<br/>on this worker"| REDIS_PUB["Redis PUBLISH<br/>executor:job_relay:{id}"]
     REDIS_PUB --> RELAY["Relay Listener<br/>(Worker 2)"]
     RELAY -->|"WebSocket"| AGENT["Executor"]
 
-    PRESENCE["Redis executor:presence:{id}<br/>TTL 120s"] -.->|"verifica online"| REQ
+    PRESENCE["Redis executor:presence:{id}<br/>TTL 120s"] -.->|"checks online"| REQ
 
     style REDIS_PUB fill:#dc2626,color:#fff
 ```
 
-### Limpeza de Runs Orfaos
+### Orphan Run Cleanup
 
-Quando um executor desconecta inesperadamente, o servidor:
-1. Busca todos os `WorkflowRun` com `status=running` e `host=executor:{id}`
-2. Marca como `failed` com mensagem "Executor desconectou durante a execucao"
-3. Publica evento `__workflow_complete__` (failed) no Redis para cada run orfao
-4. O frontend recebe o evento e exibe o erro ao usuario
+When an executor disconnects unexpectedly, the server:
+1. Fetches every `WorkflowRun` with `status=running` and `host=executor:{id}`
+2. Marks them as `failed` with the message "Executor desconectou durante a execucao" (Executor disconnected during execution)
+3. Publishes a `__workflow_complete__` (failed) event in Redis for each orphan run
+4. The frontend receives the event and shows the error to the user
 
-### Reconciliacao pelo inventario do executor
+### Reconciliation through the executor's inventory
 
-O servidor so descobria um run perdido quando o executor desconectava — em 22/09
-o titan seguiu conectado com tres runs que nunca recebeu, e eles ficaram "Em
-andamento" ate ele cair, 16 min depois. Agora o executor manda, na conexao e a
-cada minuto, um `inventario` com os jobs `ativos` (fila, semaforo, execucao) e
-os com `resultados` ainda nao confirmados. Para cada inventario (no maximo um a
-cada 30 s por executor, sempre restrito aos runs com o `host` dele):
+The server only found out about a lost run when the executor disconnected — on September 22
+titan stayed connected with three runs it never received, and they stayed "Em
+andamento" (In progress) until it dropped, 16 min later. Now the executor sends, on connection and
+every minute, an `inventario` (inventory) with the `ativos` (active) jobs (queue, semaphore, execution) and
+those with `resultados` (results) not yet confirmed. For each inventory (at most one
+every 30 s per executor, always restricted to the runs with its `host`):
 
-1. `pending` que o executor tem vira `running` (ACK perdido).
-2. Run que o servidor ja fechou (`cancelled`/`failed`) e o executor segue
-   rodando recebe `cancel`.
-3. Run `pending`/`running` com mais de 3 min que o executor NAO tem vira
-   `failed` (`executor_lost`; `dispatch` se nunca saiu de `pending`) — exceto se
-   o `job_result` dele acabou de chegar (chave `executor:{id}:results:{job}`,
-   TTL 300 s), caso em que o consumer ainda vai grava-lo, ou se o job ainda
-   esta a caminho (ACK pendente vivo, TTL 600 s: um envio que estourou o prazo
-   segue escoando). Inventario `truncado` nao fecha nada por ausencia, nem o
-   que chega nos primeiros 45 s de uma conexao: o inbox da conexao ANTERIOR
-   pode ainda estar drenando o `job_result` de um run que terminou antes da
-   queda. Todo run fechado aqui recebe `cancel`: se o job ainda chegar, o
-   cancel vem logo atras dele pelo mesmo socket.
+1. A `pending` run the executor has becomes `running` (lost ACK).
+2. A run the server has already closed (`cancelled`/`failed`) and the executor is still
+   running gets a `cancel`.
+3. A `pending`/`running` run older than 3 min that the executor does NOT have becomes
+   `failed` (`executor_lost`; `dispatch` if it never left `pending`) — except if
+   its `job_result` has just arrived (key `executor:{id}:results:{job}`,
+   TTL 300 s), in which case the consumer will still write it, or if the job is still
+   on its way (live pending ACK, TTL 600 s: a send that blew past its deadline
+   keeps draining). A `truncado` (truncated) inventory closes nothing by absence, nor does
+   one that arrives in the first 45 s of a connection: the PREVIOUS connection's inbox
+   may still be draining the `job_result` of a run that finished before the
+   drop. Every run closed here gets a `cancel`: if the job still arrives, the
+   cancel comes right behind it over the same socket.
 
-O inventario passa pela drenadora da conexao, na mesma fila do `job_result`:
-um resultado enviado antes do inventario e gravado antes de ele ser conferido.
-Entre conexoes essa ordem nao vale, e o executor cobre o intervalo: um
-resultado enviado segue em `resultados` por 90 s depois do envio (o outbox o
-apaga assim que o `send` retorna), ocupando so o espaco que sobra e sem marcar
-`truncado` — num executor movimentado ele desligaria a reconciliacao. Outbox
-ilegivel manda o inventario `truncado`: uma lista vazia afirmaria "nada
-pendente".
+The inventory goes through the connection's drainer, in the same queue as `job_result`:
+a result sent before the inventory is written before the inventory is checked.
+Between connections that ordering does not hold, and the executor covers the gap: a
+sent result stays in `resultados` for 90 s after it is sent (the outbox
+deletes it as soon as `send` returns), taking up only the space that is left and without marking
+`truncado` — on a busy executor that would turn reconciliation off. An unreadable
+outbox sends the inventory as `truncado`: an empty list would claim "nothing
+pending".
 
-Dois resultados do mesmo run que passem juntos pela checagem do WS (o
-verdadeiro e um tardio) nao se sobrescrevem mais no consumer: o run e lido com
-`FOR UPDATE` e o primeiro desfecho gravado vale; reentrega do MESMO desfecho
-(dead letter) segue como antes, sem recontar o uso.
+Two results of the same run that pass the WS check together (the
+real one and a late one) no longer overwrite each other in the consumer: the run is read with
+`FOR UPDATE` and the first outcome written wins; redelivery of the SAME outcome
+(dead letter) goes on as before, without counting the usage again.
 
-No executor, o diario em disco (`jobs_em_voo`, no SQLite do outbox) fecha o
-outro lado: um job aceito so sai de la quando o resultado dele entra no outbox,
-e o que sobrar no boot vira falha com a causa provavel (reinicio abrupto; a mais
-comum e falta de memoria, com o limite do container).
+On the executor, the on-disk journal (`jobs_em_voo`, in the outbox's SQLite) closes the
+other side: an accepted job only leaves it when its result enters the outbox,
+and whatever is left at boot becomes a failure with the probable cause (abrupt restart; the most
+common is running out of memory, with the container's limit).
 
-Cancelar um run cujo executor esta fora do ar fecha o run no servidor
-(`cancelled`); cancelar um job que o executor nao tem devolve um resultado
-`cancelled` e deixa uma lapide de 10 min contra a chegada atrasada do job — a
-menos que o resultado dele esteja a caminho (outbox, fila em memoria ou enviado
-ha pouco): ai o job terminou, e um `cancelled` por cima seria mentira.
-Todo run que o SERVIDOR fecha (falha no despacho, cancelado antes de sair,
-cancelado com o executor fora do ar, orfao, nao entregue, perdido na
-reconciliacao) passa por `fechamento_de_run.fechar_runs`: UPDATE condicional no
-status — um desfecho ja gravado (o job_result, o cancelamento do usuario) nunca
-e sobrescrito nem contado de novo —, contabilizacao no usage_daily e o
-`__workflow_complete__` por `run_events_service.publicar_conclusao`, uma vez por
-run — sem ele o painel aberto seguia girando.
+Cancelling a run whose executor is down closes the run on the server
+(`cancelled`); cancelling a job the executor does not have returns a
+`cancelled` result and leaves a 10-min tombstone against the late arrival of the job — unless
+its result is on the way (outbox, in-memory queue or sent
+a moment ago): then the job finished, and a `cancelled` on top would be a lie.
+Every run the SERVER closes (dispatch failure, cancelled before going out,
+cancelled with the executor down, orphan, not delivered, lost in
+reconciliation) goes through `fechamento_de_run.fechar_runs`: a conditional UPDATE on the
+status — an outcome already written (the job_result, the user's cancellation) is never
+overwritten nor counted again —, accounting in usage_daily and the
+`__workflow_complete__` through `run_events_service.publicar_conclusao`, once per
+run — without it, an open panel kept spinning.
 
-### Run preso em `pending` ("Na fila")
+### Run stuck in `pending` ("Na fila")
 
-O dispatch grava o run como `pending` — ja com o host do executor escolhido —
-antes de enviar, e o promove para `running` quando `send_job` retorna. Um worker
-que morre nessa janela deixava o run em "Na fila" para sempre (incidente de
-22/09). Tres defesas:
+The dispatch writes the run as `pending` — already with the chosen executor's host —
+before sending, and promotes it to `running` when `send_job` returns. A worker
+that died in that window left the run in "Na fila" (Queued) forever (incident of
+September 22). Three defenses:
 
-1. **ACK promove.** O `ack` do executor promove `pending` → `running` (UPDATE
-   condicional em status e host), por qualquer worker. O UPDATE do proprio
-   dispatch aceita `pending` ou `running`, porque o ACK costuma chegar antes do
-   commit dele.
-2. **Varredura.** O `orphan_runs_watchdog` fecha como `failed`/`dispatch` todo
-   run em `pending` ha mais de 10 min sem ACK ("nao chegou a rodar"),
-   contabiliza no `usage_daily`, publica o `__workflow_complete__` e manda
-   `cancel` ao host por garantia. Excecao: o host online que nao manda
-   inventario (executor anterior a ele — marca `executor:{id}:inventario`,
-   renovada a cada inventario) nao tem como promover um job cujo ACK se perdeu
-   junto com o worker que despachou; para os runs dele a varredura espera 6 h,
-   o teto de duracao de um job com folga. Presenca desconhecida tambem espera.
-3. **Prazo de envio.** Quem manda ao WebSocket do executor espera com prazo
-   (30 s + 1 s por 512 KB) — antes, uma conexao parada segurava o envio (e o
-   agendador daquele worker) ate o ping timeout de 10 min.
+1. **ACK promotes.** The executor's `ack` promotes `pending` → `running` (a conditional
+   UPDATE on status and host), from any worker. The dispatch's own UPDATE
+   accepts `pending` or `running`, because the ACK usually arrives before its
+   commit.
+2. **Sweep.** `orphan_runs_watchdog` closes as `failed`/`dispatch` every
+   run in `pending` for more than 10 min without an ACK ("did not get to run"),
+   accounts for it in `usage_daily`, publishes the `__workflow_complete__` and sends
+   `cancel` to the host just in case. Exception: an online host that does not send an
+   inventory (an executor older than that feature — marker `executor:{id}:inventario`,
+   renewed on every inventory) has no way to promote a job whose ACK was lost
+   along with the worker that dispatched it; for its runs the sweep waits 6 h,
+   the duration ceiling of a job with some margin. Unknown presence also waits.
+3. **Send deadline.** Whoever sends to the executor's WebSocket waits with a deadline
+   (30 s + 1 s per 512 KB) — before, a stalled connection held the send (and that
+   worker's scheduler) until the 10-min ping timeout.
 
-   Cada socket tem uma **fila de saida com um unico escritor** (`_Saida`): o
-   `--ws websockets` do uvicorn (fixado no compose) escreve o frame inteiro e
-   so entao espera o drain, e o drain nao aceita dois esperando — dois
-   escritores levantavam AssertionError com o frame ja no buffer. O escritor
-   escreve em ordem, sem prazo sobre o drain; quem manda espera o proprio
-   desfecho (um Future — o cancelamento do escritor nunca vaza para ele) com um
-   prazo que conta o que esta na frente: o que falta do envio em curso e os
-   bytes da fila a 512 KB/s (a base de 30 s entra uma vez so; somada por
-   mensagem, 40 eventos pequenos prendiam um cancel por 20 minutos).
+   Each socket has an **outgoing queue with a single writer** (`_Saida`): uvicorn's
+   `--ws websockets` (pinned in the compose) writes the whole frame and
+   only then waits for the drain, and the drain does not accept two waiters — two
+   writers raised AssertionError with the frame already in the buffer. The writer
+   writes in order, with no deadline on the drain; whoever sends waits for their own
+   outcome (a Future — the writer's cancellation never leaks to them) with a
+   deadline that counts what is ahead: what remains of the send in progress and the
+   bytes in the queue at 512 KB/s (the 30 s base counts only once; added per
+   message, 40 small events held a cancel for 20 minutes).
 
-   | Desfecho | Significa | Quem manda |
+   | Outcome | Means | Sender |
    |---|---|---|
-   | `enviado` | saiu inteiro | segue |
-   | `escoando` | a escrita comecou e passou do prazo; o frame esta no buffer | entregue sem confirmacao (ACK pendente; sem failover, que faria dois executores rodarem o job) |
-   | `ocupado` | o prazo acabou ainda na fila, ou o envio em curso ja estava atrasado; nada foi escrito | recusa: o dispatch tenta o proximo candidato |
-   | `fechando` | o socket esta sendo fechado | recusa; se o socket foi **substituido** (takeover, posse perdida), cai no relay e a sessao nova entrega |
+   | `enviado` | it went out whole | carries on |
+   | `escoando` | the write started and passed the deadline; the frame is in the buffer | delivered without confirmation (pending ACK; no failover, which would make two executors run the job) |
+   | `ocupado` | the deadline ran out while still in the queue, or the send in progress was already late; nothing was written | refusal: the dispatch tries the next candidate |
+   | `fechando` | the socket is being closed | refusal; if the socket was **replaced** (takeover, lost ownership), it falls to the relay and the new session delivers |
 
-   Enquanto uma escrita passa do proprio prazo (link abaixo do piso), nada novo
-   entra na fila (quem manda recebe `ocupado` na hora; drive events sao
-   descartados — o GeoSync ressincroniza), a conexao fica fora do despacho
-   direto e o escritor liga a marca `executor:parada:{id}` no Redis, que faz os
-   outros workers recusarem o relay; ela e desligada quando a escrita termina e
-   limpa quando o executor reconecta. A conexao NAO e derrubada: um executor
-   vivo com link lento perdia a presenca e o watchdog fechava todos os runs
-   dele como orfaos. Conexao morta de verdade cai pelo timeout do heartbeat e
-   pela presenca. As respostas de erro do loop de recebimento so enfileiram,
-   sem esperar a vez: esse loop e o unico que renova a presenca.
+   While a write is past its own deadline (link below the floor), nothing new
+   enters the queue (the sender gets `ocupado` right away; drive events are
+   discarded — GeoSync resyncs), the connection is left out of direct
+   dispatch and the writer sets the `executor:parada:{id}` marker in Redis, which makes the
+   other workers refuse the relay; it is unset when the write finishes and
+   cleared when the executor reconnects. The connection is NOT dropped: a live
+   executor with a slow link used to lose its presence and the watchdog closed all of its runs
+   as orphans. A truly dead connection drops through the heartbeat timeout and
+   through presence. The receive loop's error responses are only enqueued,
+   without waiting their turn: that loop is the only one that renews presence.
 
-   O listener do relay so enfileira e segue (atende tambem o marker de close).
-   Quem publicou ja deu o job por entregue, entao o run e fechado na hora como
-   `dispatch` quando o job nao sai: nao teve a vez na fila, estava na fila
-   quando o socket comecou a fechar, bateu num socket morto, ou chegou a um
-   socket que fecha sem ter sido substituido (heartbeat, erro de protocolo, o
-   executor desconectando — o handler marca a saida como fechando ja no inicio
-   do teardown, antes de drenar a fila de entrada). Mas so quando nenhuma outra
-   sessao pode te-lo recebido: a posse (`executor:conn_owner:{id}`) ainda e
-   desta sessao, ou de ninguem. Com a posse de outra sessao — o executor
-   reconectou noutro worker — ela pode te-lo entregue, e fechar o run faria o
-   inventario mandar parar o job em execucao: fica para a reconciliacao.
+   The relay listener only enqueues and moves on (it also handles the close marker).
+   The publisher has already counted the job as delivered, so the run is closed right away as
+   `dispatch` when the job does not go out: it did not get its turn in the queue, it was in the queue
+   when the socket started closing, it hit a dead socket, or it reached a
+   socket that is closing without having been replaced (heartbeat, protocol error, the
+   executor disconnecting — the handler marks the outgoing queue as closing right at the start
+   of the teardown, before draining the incoming queue). But only when no other
+   session could have received it: ownership (`executor:conn_owner:{id}`) still belongs to
+   this session, or to no one. With ownership held by another session — the executor
+   reconnected on another worker — that session may have delivered it, and closing the run would make the
+   inventory order the running job to stop: it is left for reconciliation.
 
-   Toda sessao nova anuncia o takeover, com ou sem dono anterior no Redis (a
-   posse de uma sessao que ainda esta fechando pode vencer no meio do close), e
-   o aviso sai ANTES de o listener dela subscrever: o que foi publicado antes
-   fica so com a sessao antiga, que ao receber o aviso sabe que a fila dela so
-   existia ali e a da por nao entregue; o que chega depois, a sessao nova
-   entrega. Janela aceita: um job publicado entre o aviso e a inscricao do
-   listener novo (uma ida e volta ao Redis) nao sai por nenhuma das duas, e a
-   reconciliacao fecha o run quando o ACK pendente vence.
+   Every new session announces the takeover, with or without a previous owner in Redis (the
+   ownership of a session that is still closing can expire in the middle of the close), and
+   the notice goes out BEFORE its listener subscribes: whatever was published before
+   stays only with the old session, which, on receiving the notice, knows that its queue only
+   existed there and counts it as not delivered; whatever arrives afterwards, the new session
+   delivers. Accepted window: a job published between the notice and the new listener's
+   subscription (one round trip to Redis) does not go out through either, and
+   reconciliation closes the run when the pending ACK expires.
 
-   Todo close de socket de executor passa por `fechar_ws_do_executor`: marca a
-   saida como fechando (criando-a, se nada saiu ainda por aquele socket),
-   cancela a espera do escritor (o que ele ja escreveu sai antes do frame de
-   close) e roda o close numa tarefa propria, que chega ao abort mesmo que
-   quem pediu (o unregister espera no maximo 2 s) desista de esperar.
+   Every close of an executor socket goes through `fechar_ws_do_executor`: it marks the
+   outgoing queue as closing (creating it, if nothing has gone out through that socket yet),
+   cancels the writer's wait (what it has already written goes out before the close
+   frame) and runs the close in a task of its own, which gets to the abort even if
+   whoever asked (the unregister waits at most 2 s) gives up waiting.
 
-Cancelar com o envio do `cancel` falhando so fecha o run no servidor quando a
-presenca do executor esta comprovadamente ausente; com ele vivo (chave de
-assinatura ausente, relay reiniciando, Redis com erro) segue o 503 de sempre.
-Um run fechado por deducao do servidor (`failed` com `executor_lost` ou
-`dispatch`) e corrigido pelo resultado verdadeiro que ja estava na fila; um
-desfecho real ou o cancelamento do usuario, nao.
+Cancelling with the sending of the `cancel` failing only closes the run on the server when the
+executor's presence is provably absent; with it alive (signing key
+missing, relay restarting, Redis erroring) the usual 503 stands.
+A run closed by the server's deduction (`failed` with `executor_lost` or
+`dispatch`) is corrected by the real result that was already in the queue; a
+real outcome or the user's cancellation is not.
 
 ---
 
-## Agendamento (AsyncScheduler)
+## Scheduling (AsyncScheduler)
 
-O `AsyncScheduler` substituiu o Celery Beat como mecanismo de agendamento. E um loop asyncio que roda dentro do processo da API como background task.
+The `AsyncScheduler` replaced Celery Beat as the scheduling mechanism. It is an asyncio loop that runs inside the API process as a background task.
 
-### Funcionamento
+### How It Works
 
 ```mermaid
 flowchart TD
-    START["AsyncScheduler.start()"] --> LOOP["Loop a cada 30s"]
+    START["AsyncScheduler.start()"] --> LOOP["Loop every 30s"]
     LOOP --> QUERY["SELECT * FROM schedules<br/>WHERE active = true"]
-    QUERY --> FOREACH["Para cada schedule"]
+    QUERY --> FOREACH["For each schedule"]
 
     FOREACH --> LOCK["SELECT FOR NO KEY UPDATE<br/>SKIP LOCKED"]
-    LOCK --> CHECK_NULL{"next_run_at<br/>e NULL?"}
-    CHECK_NULL -->|"Sim"| COMPUTE_FIRST["Calcula primeiro<br/>next_run_at"]
-    CHECK_NULL -->|"Nao"| CHECK_TIME{"now >= next_run_at?"}
+    LOCK --> CHECK_NULL{"next_run_at<br/>is NULL?"}
+    CHECK_NULL -->|"Yes"| COMPUTE_FIRST["Computes the first<br/>next_run_at"]
+    CHECK_NULL -->|"No"| CHECK_TIME{"now >= next_run_at?"}
 
-    CHECK_TIME -->|"Nao"| SKIP["Ignora (ainda nao e hora)"]
-    CHECK_TIME -->|"Sim"| FIRE["WorkflowService.start_analysis()"]
+    CHECK_TIME -->|"No"| SKIP["Skips (not time yet)"]
+    CHECK_TIME -->|"Yes"| FIRE["WorkflowService.start_analysis()"]
 
-    FIRE --> UPDATE["Atualiza last_run_at<br/>+ calcula proximo next_run_at"]
-    UPDATE --> COMMIT["COMMIT<br/>(libera lock)"]
+    FIRE --> UPDATE["Updates last_run_at<br/>+ computes the next next_run_at"]
+    UPDATE --> COMMIT["COMMIT<br/>(releases lock)"]
 
     COMPUTE_FIRST --> COMMIT
     SKIP --> LOOP
@@ -871,28 +872,28 @@ flowchart TD
     style FIRE fill:#dc2626,color:#fff
 ```
 
-### Estrategias de Agendamento
+### Scheduling Strategies
 
-| Estrategia | Campo | Exemplo | Biblioteca |
+| Strategy | Field | Example | Library |
 |-----------|-------|---------|-----------|
-| **cron** | `cron_expression` | `"0 6 * * *"` (todo dia as 6h) | `croniter` |
-| **interval** | `interval` + `unit` | `60` + `minutes` (a cada 1 hora) | Built-in (timedelta) |
+| **cron** | `cron_expression` | `"0 6 * * *"` (every day at 6 a.m.) | `croniter` |
+| **interval** | `interval` + `unit` | `60` + `minutes` (every 1 hour) | Built-in (timedelta) |
 | **rrule** | `rrule_expression` | `"RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR"` | `python-dateutil` |
 
-### Concorrencia Segura (SELECT FOR NO KEY UPDATE SKIP LOCKED)
+### Safe Concurrency (SELECT FOR NO KEY UPDATE SKIP LOCKED)
 
-Em ambientes com multiplos workers Uvicorn, cada worker tem sua instancia do scheduler. O `SELECT ... FOR NO KEY UPDATE SKIP LOCKED` (`with_for_update(skip_locked=True, key_share=True)`) garante que apenas um worker processa cada schedule por ciclo. É `FOR NO KEY UPDATE` (não `FOR UPDATE`) de propósito: evita um auto-deadlock com o `FOR KEY SHARE` que o `INSERT` de `WorkflowRun` (FK `schedule_id`) pede na mesma linha.
+In environments with multiple Uvicorn workers, each worker has its own scheduler instance. `SELECT ... FOR NO KEY UPDATE SKIP LOCKED` (`with_for_update(skip_locked=True, key_share=True)`) ensures that only one worker processes each schedule per cycle. It is `FOR NO KEY UPDATE` (not `FOR UPDATE`) on purpose: it avoids a self-deadlock with the `FOR KEY SHARE` that the `INSERT` of `WorkflowRun` (FK `schedule_id`) requests on the same row.
 
-- Se outro worker ja travou a linha, `scalar_one_or_none()` retorna `None`
-- Sem bloqueio, sem duplicacao, sem overhead de lock distribuido
+- If another worker has already locked the row, `scalar_one_or_none()` returns `None`
+- No blocking, no duplication, no distributed-lock overhead
 
 ---
 
-## Eventos em Tempo Real
+## Real-Time Events
 
-O sistema de eventos conecta a execucao de workflows nos executores ao frontend em tempo real, usando Redis pub/sub como barramento.
+The event system connects the execution of workflows on the executors to the frontend in real time, using Redis pub/sub as the bus.
 
-### Arquitetura de Eventos
+### Event Architecture
 
 ```mermaid
 flowchart LR
@@ -900,9 +901,9 @@ flowchart LR
         EXEC["Executor<br/>(flow/executor.py)"]
     end
 
-    subgraph Servidor API
-        EXECUTOR_WS["agent_ws_router.py<br/>(WebSocket executor)"]
-        LOG_WS["log_workflows_router.py<br/>(WebSocket frontend)"]
+    subgraph API Server
+        EXECUTOR_WS["agent_ws_router.py<br/>(executor WebSocket)"]
+        LOG_WS["log_workflows_router.py<br/>(frontend WebSocket)"]
     end
 
     subgraph Redis
@@ -911,8 +912,8 @@ flowchart LR
     end
 
     subgraph Frontend
-        LOGS["run-logs.tsx<br/>(terminal de logs)"]
-        CANVAS["Canvas<br/>(status visual dos nos)"]
+        LOGS["run-logs.tsx<br/>(log terminal)"]
+        CANVAS["Canvas<br/>(visual node status)"]
     end
 
     EXEC -->|"node_event via WS"| EXECUTOR_WS
@@ -926,47 +927,47 @@ flowchart LR
     style Redis fill:#dc2626,color:#fff
 ```
 
-### Canais Redis
+### Redis Channels
 
-| Canal / Chave | Tipo | Uso |
+| Channel / Key | Type | Usage |
 |---------------|------|-----|
-| `workflow:{run_id}:events` | Pub/Sub | Eventos em tempo real (node_started, node_completed, node_failed, __workflow_complete__) |
-| `workflow:{run_id}:history` | List (TTL 1h) | Replay de eventos para clientes que conectam apos o inicio |
-| `executor:job_relay:{agent_id}` | Pub/Sub | Relay de jobs entre workers Uvicorn |
-| `executor:presence:{agent_id}` | String (TTL 120s) | Presenca online do executor |
-| `executor:{agent_id}:drive_events` | Pub/Sub | Eventos de mudanca no Drive do workspace |
-| `executor:{agent_id}:sync_events` | Pub/Sub | Eventos de sincronizacao de datasets |
-| `run_results` | List (fila) | Resultado final de execucao (BRPOP pelo consumer). **Não há mais `run_creates`** — o `WorkflowRun` é criado (status=pending) direto no dispatch |
-| `run_dead_letter` | List | Itens nao processaveis para analise manual |
-| `webhook_response:{run_id}` | List (TTL 5min) | Resposta sincrona do ResponseNode para webhook |
-| `login_failed:{username}` | String (TTL 15min) | Contador de falhas de login |
-| `login_locked:{username}` | String (TTL 15min) | Flag de bloqueio por forca bruta |
+| `workflow:{run_id}:events` | Pub/Sub | Real-time events (node_started, node_completed, node_failed, __workflow_complete__) |
+| `workflow:{run_id}:history` | List (TTL 1h) | Event replay for clients that connect after the start |
+| `executor:job_relay:{agent_id}` | Pub/Sub | Job relay between Uvicorn workers |
+| `executor:presence:{agent_id}` | String (TTL 120s) | Executor online presence |
+| `executor:{agent_id}:drive_events` | Pub/Sub | Change events in the workspace Drive |
+| `executor:{agent_id}:sync_events` | Pub/Sub | Dataset synchronization events |
+| `run_results` | List (queue) | Final run result (BRPOP by the consumer). **There is no `run_creates` anymore** — the `WorkflowRun` is created (status=pending) directly in the dispatch |
+| `run_dead_letter` | List | Unprocessable items for manual analysis |
+| `webhook_response:{run_id}` | List (TTL 5min) | Synchronous response from the ResponseNode for the webhook |
+| `login_failed:{username}` | String (TTL 15min) | Login failure counter |
+| `login_locked:{username}` | String (TTL 15min) | Brute-force lockout flag |
 
-### Eventos Publicados por No
+### Events Published per Node
 
-| Evento (status) | Quando | Dados Extras |
+| Event (status) | When | Extra Data |
 |--------|--------|-------------|
-| `started` | Antes de `node.execute()` | `node_name`, `node_type`, `nodes_total` |
-| `completed` | Apos `node.execute()` com sucesso (ou pin) | `duration_ms`, `output_keys`, `output_columns`, `cache_hit` (true no pin) |
-| `failed` | Quando `node.execute()` lanca excecao | `duration_ms`, `error`, `error_category`, `retryable`, `traceback` |
-| `skipped` | No de ramo nao selecionado (branch) | — |
-| `debug` | Em debug_mode, apos cada no | Resumo de inputs/outputs |
-| `__workflow_complete__` | Ao final do workflow | `status`, `duration_ms`, `error` |
+| `started` | Before `node.execute()` | `node_name`, `node_type`, `nodes_total` |
+| `completed` | After a successful `node.execute()` (or pin) | `duration_ms`, `output_keys`, `output_columns`, `cache_hit` (true on pin) |
+| `failed` | When `node.execute()` raises an exception | `duration_ms`, `error`, `error_category`, `retryable`, `traceback` |
+| `skipped` | Node on an unselected branch | — |
+| `debug` | In debug_mode, after each node | Summary of inputs/outputs |
+| `__workflow_complete__` | At the end of the workflow | `status`, `duration_ms`, `error` |
 
-> Não há evento `cached` distinto: o output de pin é publicado como `completed` com
-> `cache_hit: true` e `duration_ms: 0`.
+> There is no distinct `cached` event: the pin output is published as `completed` with
+> `cache_hit: true` and `duration_ms: 0`.
 
-### Conexao WebSocket do Frontend (Logs)
+### Frontend WebSocket Connection (Logs)
 
 ```
 WebSocket: ws://localhost:8000/ws/workflow/{task_id}
 ```
 
-1. Cliente conecta via WebSocket
-2. Envia JWT como **primeiro frame de texto** (token nao exposto na URL)
-3. Servidor valida; rejeita com codigo `4401` se invalido
-4. Servidor faz replay dos eventos ja publicados (via `LRANGE` no history)
-5. Assina o canal Redis e encaminha eventos em tempo real
+1. The client connects via WebSocket
+2. Sends the JWT as the **first text frame** (token not exposed in the URL)
+3. The server validates it; rejects with code `4401` if invalid
+4. The server replays the events already published (via `LRANGE` on the history)
+5. Subscribes to the Redis channel and forwards events in real time
 
 ```javascript
 ws.onopen = () => ws.send(session.user.access_token)
@@ -974,96 +975,96 @@ ws.onopen = () => ws.send(session.user.access_token)
 
 ---
 
-## Autenticacao e Autorizacao
+## Authentication and Authorization
 
-### Fluxo de Autenticacao (JWT)
+### Authentication Flow (JWT)
 
 ```mermaid
 sequenceDiagram
-    participant U as Usuario
+    participant U as User
     participant NEXT as Next.js
     participant NA as NextAuth
     participant API as FastAPI
 
-    U->>NEXT: Acessa /login
-    NEXT->>U: Formulario de login
+    U->>NEXT: Opens /login
+    NEXT->>U: Login form
 
-    U->>NEXT: Submete email + senha
+    U->>NEXT: Submits email + password
     NEXT->>API: POST /auth/login
-    API->>API: Valida credenciais<br/>Verifica lockout Redis
+    API->>API: Validates credentials<br/>Checks Redis lockout
     API-->>NEXT: {access_token, refresh_token}
 
     NEXT->>NA: signIn("credentials", tokens)
-    NA->>NA: Cria sessao (cookie HTTP-only)
-    NA-->>NEXT: Session criada
+    NA->>NA: Creates session (HTTP-only cookie)
+    NA-->>NEXT: Session created
 
-    Note over NEXT,API: Requests subsequentes
+    Note over NEXT,API: Subsequent requests
     NEXT->>API: GET /workflows<br/>Authorization: Bearer {access_token}
-    API->>API: decode_token(jwt)<br/>Carrega User do banco
+    API->>API: decode_token(jwt)<br/>Loads User from the database
     API-->>NEXT: [workflows...]
 
-    Note over NEXT,API: Refresh de token
+    Note over NEXT,API: Token refresh
     NEXT->>API: POST /auth/refresh<br/>{refresh_token}
-    API-->>NEXT: {access_token (novo), refresh_token (novo)}
+    API-->>NEXT: {access_token (new), refresh_token (new)}
 ```
 
-### Tokens JWT
+### JWT Tokens
 
-| Token | Duracao | Uso |
+| Token | Duration | Usage |
 |-------|---------|-----|
-| **Access token** | 30 minutos (fixo em `jwt_utils`) | Autenticacao de requests API |
-| **Refresh token** | 2 dias (rotacao de familia) | Renovacao do access token |
+| **Access token** | 30 minutes (fixed in `jwt_utils`) | Authentication of API requests |
+| **Refresh token** | 2 days (family rotation) | Renewal of the access token |
 
-> `APP_SECRET` é o segredo de **assinatura HMAC** dos JWTs (obrigatório), não a duração do
-> token. **Executores não usam JWT** — a conexão WebSocket é autenticada por **mTLS**
-> (ver "Protocolo de Enrollment e Conexao").
+> `APP_SECRET` is the **HMAC signing** secret for the JWTs (required), not the token's
+> duration. **Executors do not use JWT** — the WebSocket connection is authenticated by **mTLS**
+> (see "Enrollment and Connection Protocol").
 
-**Path do token na sessao NextAuth:** `session.user.access_token` (definido no callback de sessao em `web/auth.ts`).
+**Token path in the NextAuth session:** `session.user.access_token` (defined in the session callback in `web/auth.ts`).
 
 ### RBAC (Role-Based Access Control)
 
-Hierarquia de roles do menor para o maior:
+Role hierarchy from lowest to highest:
 
 ```mermaid
 graph LR
     V["viewer"] --> E["editor"] --> O["operator"] --> A["admin"]
 
-    V -.->|"le"| W["Workflows, Runs,<br/>Observabilidade"]
-    E -.->|"cria/edita"| C["Workflows,<br/>Credenciais"]
-    O -.->|"executa"| X["Workflows,<br/>Agendamentos"]
-    A -.->|"gerencia"| M["Executores, Templates,<br/>Usuarios, Config"]
+    V -.->|"reads"| W["Workflows, Runs,<br/>Observability"]
+    E -.->|"creates/edits"| C["Workflows,<br/>Credentials"]
+    O -.->|"runs"| X["Workflows,<br/>Schedules"]
+    A -.->|"manages"| M["Executors, Templates,<br/>Users, Config"]
 ```
 
-| Role | Permissoes |
+| Role | Permissions |
 |------|-----------|
-| `viewer` | Leitura de workflows, observabilidade, runs |
-| `editor` | viewer + criar/editar/deletar workflows e credenciais |
-| `operator` | editor + executar workflows e gerenciar agendamentos |
-| `admin` | operator + gerenciar executores, node templates, usuarios, configuracoes |
+| `viewer` | Read access to workflows, observability, runs |
+| `editor` | viewer + create/edit/delete workflows and credentials |
+| `operator` | editor + run workflows and manage schedules |
+| `admin` | operator + manage executors, node templates, users, settings |
 
-### Protecao contra Forca Bruta
+### Brute-Force Protection
 
-| Camada | Mecanismo | Limite |
+| Layer | Mechanism | Limit |
 |--------|-----------|--------|
-| IP | slowapi rate limiter | 5 req/min no `/auth/login` (e `/auth/register`) |
-| Username | Redis lockout | 5 falhas → bloqueio 15 min (`login_failed` / `login_locked`) |
+| IP | slowapi rate limiter | 5 req/min on `/auth/login` (and `/auth/register`) |
+| Username | Redis lockout | 5 failures → 15 min lockout (`login_failed` / `login_locked`) |
 
 ---
 
 ## Multi-tenancy (Workspaces)
 
-Cada usuario pertence a um ou mais workspaces. Todos os recursos sao isolados por `workspace_id`.
+Each user belongs to one or more workspaces. All resources are isolated by `workspace_id`.
 
 ```mermaid
 erDiagram
-    USER ||--o{ WORKSPACE_MEMBER : "pertence a"
-    WORKSPACE ||--o{ WORKSPACE_MEMBER : "tem membros"
-    WORKSPACE ||--o{ WORKFLOW : "contem"
-    WORKSPACE ||--o{ CREDENTIAL : "contem"
-    WORKSPACE ||--o{ SCHEDULE : "contem"
-    WORKSPACE ||--o{ AGENT : "pode ter"
+    USER ||--o{ WORKSPACE_MEMBER : "belongs to"
+    WORKSPACE ||--o{ WORKSPACE_MEMBER : "has members"
+    WORKSPACE ||--o{ WORKFLOW : "contains"
+    WORKSPACE ||--o{ CREDENTIAL : "contains"
+    WORKSPACE ||--o{ SCHEDULE : "contains"
+    WORKSPACE ||--o{ AGENT : "may have"
     WORKSPACE ||--o{ WORKSPACE_FILE : "Drive"
-    WORKSPACE ||--o{ ARTIFACT : "artefatos"
+    WORKSPACE ||--o{ ARTIFACT : "artifacts"
 
     USER {
         string id_hash PK
@@ -1085,68 +1086,68 @@ erDiagram
     }
 ```
 
-O escopo de workspace é passado como **query param `workspace_id`** (ou vem do próprio recurso resolvido, ex.: `workflow_com_papel`) e conferido contra as memberships do usuário por `verify_workspace_access` / `get_user_workspace_ids`. Não há header `x-workspace-id` nem dependência `get_workspace`.
+The workspace scope is passed as the **query param `workspace_id`** (or comes from the resolved resource itself, e.g.: `workflow_com_papel`) and checked against the user's memberships by `verify_workspace_access` / `get_user_workspace_ids`. There is no `x-workspace-id` header nor a `get_workspace` dependency.
 
-### Modelo de Isolamento
+### Isolation Model
 
-- **Workflows**: `workspace_id` obrigatorio; queries sempre filtram por workspace
-- **Credenciais**: a tabela `credentials` tem `owner_id` **e** um `workspace_id`
-  (nullable). A resolucao em runtime aceita apenas credenciais cujos donos tem acesso
-  ao workspace do workflow (`workspace_credential_owners`)
-- **Agendamentos**: vinculados ao workspace do workflow
-- **Artefatos/Drive**: particionados por workspace no MinIO (`artifacts/{workspace_id}/...`)
-- **Execucoes**: `WorkflowRun.workspace_id` e gravado no despacho e nunca muda. E
-  por ele que a observabilidade autoriza o acesso ao historico — nao pelo
-  workspace atual do workflow, que pode ter mudado (ver abaixo)
-- **Executores**: o pool padrão (`is_default`) é visível a todos; executores `dedicated` respeitam o workspace (`target_executor_id`) e/ou a atribuição a usuários
+- **Workflows**: `workspace_id` required; queries always filter by workspace
+- **Credentials**: the `credentials` table has `owner_id` **and** a `workspace_id`
+  (nullable). Resolution at runtime only accepts credentials whose owners have access
+  to the workflow's workspace (`workspace_credential_owners`)
+- **Schedules**: bound to the workflow's workspace
+- **Artifacts/Drive**: partitioned by workspace in MinIO (`artifacts/{workspace_id}/...`)
+- **Runs**: `WorkflowRun.workspace_id` is written at dispatch and never changes. It is
+  by it that observability authorizes access to the history — not by the
+  workflow's current workspace, which may have changed (see below)
+- **Executors**: the default pool (`is_default`) is visible to everyone; `dedicated` executors respect the workspace (`target_executor_id`) and/or the assignment to users
 
-### Mover um Workflow entre Workspaces
+### Moving a Workflow between Workspaces
 
-`POST /workflows/{id_hash}/move` troca o tenant do workflow preservando o
-`id_hash`. E rota propria porque o `PUT` nao pode aceitar `workspace_id`: la a
-autorizacao seria resolvida contra o workspace ANTERIOR a mudanca. Exige papel
-`admin` ou `owner` **nos dois** workspaces.
+`POST /workflows/{id_hash}/move` changes the workflow's tenant while preserving the
+`id_hash`. It is a route of its own because `PUT` cannot accept `workspace_id`: there the
+authorization would be resolved against the workspace PRIOR to the change. It requires the
+`admin` or `owner` role **in both** workspaces.
 
-A operacao **nao falha** por dependencia quebrada — devolve um relatorio de
-avisos (`warnings`) com o que deixa de funcionar no destino: credenciais cujo
-dono nao alcanca o novo workspace, sub-fluxos e arquivos de Drive que ficaram
-para tras, troca de executor, `notification_url` fora da allowlist.
+The operation **does not fail** because of a broken dependency — it returns a report of
+warnings (`warnings`) with what stops working at the destination: credentials whose
+owner cannot reach the new workspace, sub-workflows and Drive files that were left
+behind, a change of executor, a `notification_url` outside the allowlist.
 
-O que muda sempre, por ser consequencia da troca de tenant:
+What always changes, because it is a consequence of the tenant change:
 
-| Campo | Efeito | Porque |
+| Field | Effect | Why |
 |---|---|---|
-| `schedules.active` + no `ScheduleTrigger` | desligado | nao disparar sozinho no destino antes de alguem revisar |
-| `portal_access` / `portal_shared_with` | `disabled` / `null` | a lista compartilhada nomeia membros do tenant antigo |
-| `group_id` | `null` | `WorkflowGroup` pertence ao workspace de origem |
-| `pinned_outputs` / `pin_metadata` | limpos | as s3_keys estao sob `pin-cache/{ws_origem}/` e sao ilegiveis no destino |
+| `schedules.active` + the `ScheduleTrigger` node | turned off | so it does not trigger on its own at the destination before someone reviews it |
+| `portal_access` / `portal_shared_with` | `disabled` / `null` | the shared list names members of the old tenant |
+| `group_id` | `null` | `WorkflowGroup` belongs to the source workspace |
+| `pinned_outputs` / `pin_metadata` | cleared | the s3_keys are under `pin-cache/{ws_origem}/` and are unreadable at the destination |
 
-Historico (execucoes, artefatos, metricas) **permanece no workspace de origem** —
-os objetos vivem sob `artifacts/{ws_origem}/` e nao ha copia entre prefixos.
-`POST /workflows/{id_hash}/move/preview` devolve o mesmo relatorio sem gravar.
+History (runs, artifacts, metrics) **stays in the source workspace** —
+the objects live under `artifacts/{ws_origem}/` and there is no copying between prefixes.
+`POST /workflows/{id_hash}/move/preview` returns the same report without writing.
 
 ---
 
-## Gestao de Credenciais
+## Credential Management
 
-Credenciais (strings de conexao, chaves de API) sao armazenadas **criptografadas** com Fernet no banco de dados.
+Credentials (connection strings, API keys) are stored **encrypted** with Fernet in the database.
 
-### Fluxo de Criptografia
+### Encryption Flow
 
 ```mermaid
 flowchart LR
-    subgraph Criacao
-        USER["Usuario informa<br/>host, user, password..."]
-        BUILDER["connection_builder.py<br/>monta DSN"]
-        ENCRYPT["MultiFernet.encrypt(data)<br/>FERNET_KEYS (rotação)"]
-        SAVE["Credential.data (JSONB cifrado)<br/>(PostgreSQL)"]
+    subgraph Criacao["Creation"]
+        USER["User enters<br/>host, user, password..."]
+        BUILDER["connection_builder.py<br/>builds DSN"]
+        ENCRYPT["MultiFernet.encrypt(data)<br/>FERNET_KEYS (rotation)"]
+        SAVE["Credential.data (encrypted JSONB)<br/>(PostgreSQL)"]
     end
 
-    subgraph Execucao
-        LOAD["Carrega Credential<br/>do banco"]
+    subgraph Execucao["Execution"]
+        LOAD["Loads Credential<br/>from the database"]
         DECRYPT["Fernet.decrypt()"]
-        INJECT["Injeta connectionString<br/>no payload cifrado do job"]
-        EXECUTOR_RECV["Executor decifra job<br/>e usa a connectionString"]
+        INJECT["Injects connectionString<br/>into the job's encrypted payload"]
+        EXECUTOR_RECV["Executor decrypts the job<br/>and uses the connectionString"]
     end
 
     USER --> BUILDER --> ENCRYPT --> SAVE
@@ -1156,319 +1157,319 @@ flowchart LR
     style Execucao fill:#164e63,color:#e2e8f0
 ```
 
-### Seguranca
+### Security
 
-- Chave Fernet obrigatória via `FERNET_KEYS` (lista, permite rotação) ou `FERNET_KEY`
-  (base64url de 32 bytes); usa `MultiFernet` — `encrypt()` usa a 1ª chave, `decrypt()`
-  tenta todas na ordem
-- Credenciais sao descriptografadas apenas no momento do despacho ao executor
-- A connectionString e injetada **dentro do payload cifrado** (X25519 + AES-256-GCM)
-- O executor nunca recebe a `credential_id` — apenas a string de conexao ja resolvida
+- Fernet key required via `FERNET_KEYS` (a list, allows rotation) or `FERNET_KEY`
+  (base64url of 32 bytes); uses `MultiFernet` — `encrypt()` uses the 1st key, `decrypt()`
+  tries all of them in order
+- Credentials are decrypted only at the moment of dispatch to the executor
+- The connectionString is injected **inside the encrypted payload** (X25519 + AES-256-GCM)
+- The executor never receives the `credential_id` — only the already resolved connection string
 
-**Tipos suportados:** PostgreSQL, MySQL, S3, HTTP (API Key, Bearer Token).
+**Supported types:** PostgreSQL, MySQL, S3, HTTP (API Key, Bearer Token).
 
-### Segredo nao se grava na definition
+### Secrets are not written into the definition
 
-O unico lugar de credencial e a tabela `credentials`, cifrada. A `definition` do workflow guarda
-o **`credential_id`** — uma referencia —, e o servidor injeta o valor numa **copia** no despacho
-(`app/services/credential_resolver.py`), copia que morre com a execucao. A definition persistida
-nunca deve conter o valor.
+The only place for a credential is the `credentials` table, encrypted. The workflow's `definition` stores
+the **`credential_id`** — a reference —, and the server injects the value into a **copy** at dispatch
+(`app/services/credential_resolver.py`), a copy that dies with the run. The persisted definition
+must never contain the value.
 
-As bordas de escrita **recusam com 422** quem tentar: `POST /workflows` e `PUT /workflows/{id}`
-na REST, mais as tres tools de construcao do servidor MCP. Todas chamam a mesma funcao,
+The write boundaries **refuse with 422** anyone who tries: `POST /workflows` and `PUT /workflows/{id}`
+in REST, plus the three build tools of the MCP server. All of them call the same function,
 `definition_contem_segredo`
-(`app/core/utils/redacao.py`), que varre a definition inteira e devolve os **caminhos** dos
-campos — a mensagem de recusa nomeia o campo e **nunca** o valor.
+(`app/core/utils/redacao.py`), which scans the entire definition and returns the **paths** of the
+fields — the refusal message names the field and **never** the value.
 
-A tool `validate_workflow` do MCP tambem recusa, embora nao grave: o segredo ja viajou por
-transporte e log, e recusar ali faz o problema aparecer antes do save.
+The MCP `validate_workflow` tool also refuses, even though it does not write: the secret has already traveled through
+transport and logs, and refusing there makes the problem show up before the save.
 
-**A recusa cobre tambem os cabecalhos livres** (`Authorization`, `x-api-key`, `cookie`,
-`proxy-authorization`), e isso e **decisao de produto, nao consequencia tecnica**: quem precisa
-mandar token em header cria uma credencial (o caminho existe — tipo HTTP, campo `http_auth`).
-Registrado aqui para que ninguem "conserte" abrindo excecao.
+**The refusal also covers free-form headers** (`Authorization`, `x-api-key`, `cookie`,
+`proxy-authorization`), and that is a **product decision, not a technical consequence**: whoever needs
+to send a token in a header creates a credential (the path exists — HTTP type, `http_auth` field).
+Recorded here so that nobody "fixes" it by opening an exception.
 
-**Medicao que embasou a decisao** (2026-09-14, base de producao): 31 workflows vivos, 286 nos,
-56 com `credential_id` em 9 workflows, e **zero** segredos gravados — nem em `workflows`, nem em
-`workflow_versions`. A plataforma ja operava credential-only na pratica; a guarda transformou em
-invariante um estado que era verdade por convencao, sem recusar nada do que existia.
+**Measurement that backed the decision** (2026-09-14, production database): 31 live workflows, 286 nodes,
+56 with `credential_id` in 9 workflows, and **zero** secrets stored — neither in `workflows` nor in
+`workflow_versions`. The platform was already operating credential-only in practice; the guard turned into an
+invariant a state that was true by convention, without refusing anything that existed.
 
-#### O que a guarda recusa sem ser credencial (medido, e aceito)
+#### What the guard refuses without it being a credential (measured, and accepted)
 
-A regra casa por **nome de chave**, e existem mapas onde a chave e **dado do usuario**, nao nome
-de campo de configuracao. Uma revisao montou 30 definitions realistas, com as propriedades reais
-dos nos, e mediu quatro padroes legitimos que sao recusados:
+The rule matches by **key name**, and there are maps where the key is **user data**, not the name
+of a configuration field. A review put together 30 realistic definitions, with the nodes' real
+properties, and measured four legitimate patterns that are refused:
 
-| padrao | caminho acusado |
+| pattern | flagged path |
 |---|---|
-| bind nomeado `:token` numa query SQL, com valor literal em `queryParams` | `queryParams.token` |
-| renomear uma COLUNA chamada `senha` | `renameFields.senha` |
-| `WebhookTrigger` declarando o formato do payload que recebe | `payload_schema.token` |
-| `HttpRequest` com token de paginacao num `body` JSON | `body.token` |
+| named bind `:token` in an SQL query, with a literal value in `queryParams` | `queryParams.token` |
+| renaming a COLUMN called `senha` (password) | `renameFields.senha` |
+| `WebhookTrigger` declaring the format of the payload it receives | `payload_schema.token` |
+| `HttpRequest` with a pagination token in a JSON `body` | `body.token` |
 
-**Sao recusas deliberadas, nao defeitos.** Nesses quatro casos a saida e a mesma do resto: usar
-uma credencial em vez do valor literal. Quem topar com um deles vai ver um 422 nomeando o caminho
-exato — e a resposta certa e trocar por `credential_id`, nao afrouxar a regra.
+**These are deliberate refusals, not defects.** In these four cases the way out is the same as for everything else: use
+a credential instead of the literal value. Whoever runs into one of them will see a 422 naming the exact
+path — and the right answer is to switch to `credential_id`, not to loosen the rule.
 
-**O que NAO foi feito, e por que.** Isentar esses mapas da regra por nome resolveria os quatro,
-e foi considerado. Nao foi adotado por dois motivos: um token de verdade colado em `body` ou
-`queryParams` passaria a entrar em silencio; e a deteccao ficaria **mais estreita que a redacao**,
-que continua redigindo `params_schema.token` e afins — exatamente o que
-`app/core/utils/redacao.py` proibe por escrito, porque "a borda aceita o que a entrega depois
-apaga".
+**What was NOT done, and why.** Exempting those maps from the by-name rule would solve all four,
+and it was considered. It was not adopted for two reasons: a real token pasted into `body` or
+`queryParams` would start getting in silently; and detection would become **narrower than redaction**,
+which still redacts `params_schema.token` and the like — exactly what
+`app/core/utils/redacao.py` forbids in writing, because "the boundary accepts what the delivery later
+erases".
 
-`tests/unit/test_guarda_segredo_na_escrita.py` fixa os quatro. Se um deles deixar de ser recusado,
-o teste quebra — e a mensagem diz que mudar isso e decisao de produto, nao conserto de bug.
+`tests/unit/test_guarda_segredo_na_escrita.py` pins down all four. If one of them stops being refused,
+the test breaks — and the message says that changing that is a product decision, not a bug fix.
 
-#### Duas correcoes que a mesma revisao provocou
+#### Two fixes the same review prompted
 
-- `_residuo_literal` (`flow/utils/definition_lint.py`) juntava os pedacos da string **com nada**,
-  colando linhas de um texto livre e fabricando um `host:usuario@dominio` que ninguem escreveu —
-  o corpo de um e-mail e comentarios de um `PythonScript` eram acusados de guardar senha. A
-  assimetria denunciava: a MESMA URL com caminho no fim passava. Passa a juntar com espaco.
-- `POST /workflows/validate` rodava a guarda sobre o modelo Pydantic ja podado, e era portanto
-  **mais permissiva que a escrita**: o usuario passava na validacao e era recusado no save. Passou
-  a rodar sobre o corpo cru (a rota saiu depois, por nao ter chamador; a validacao segue no MCP).
+- `_residuo_literal` (`flow/utils/definition_lint.py`) joined the pieces of the string **with nothing**,
+  gluing together lines of free text and fabricating a `host:usuario@dominio` that nobody wrote —
+  the body of an email and comments in a `PythonScript` were flagged as storing a password. The
+  asymmetry gave it away: the SAME URL with a path at the end passed. It now joins with a space.
+- `POST /workflows/validate` ran the guard over the already pruned Pydantic model, and was therefore
+  **more permissive than the write**: the user passed validation and was refused on save. It
+  switched to running over the raw body (the route was removed later, for having no caller; validation remains in MCP).
 
 ---
 
-## Armazenamento (MinIO)
+## Storage (MinIO)
 
-O MinIO e usado como backend de armazenamento compativel com S3 para tres funcoes:
+MinIO is used as the S3-compatible storage backend for three functions:
 
-### Casos de Uso
+### Use Cases
 
-| Funcao | Prefixo S3 | Descricao |
+| Function | S3 Prefix | Description |
 |--------|-----------|-----------|
-| **Artifacts** | `artifacts/{workspace_id}/{run_id}/` | Artefatos produzidos por execucoes (GeoJSON, Shapefile, GeoParquet; PNG/JPG/PDF da carta imagem) |
-| **Drive** | `drive/{workspace_id}/` | Arquivos do workspace (upload manual ou sincronizados com executores) |
-| **Portal** | `portal/{workspace_id}/` | Camadas publicadas para visualizacao publica |
+| **Artifacts** | `artifacts/{workspace_id}/{run_id}/` | Artifacts produced by runs (GeoJSON, Shapefile, GeoParquet; PNG/JPG/PDF from the image map) |
+| **Drive** | `drive/{workspace_id}/` | Workspace files (manual upload or synchronized with executors) |
+| **Portal** | `portal/{workspace_id}/` | Layers published for public viewing |
 
-### Configuracao
+### Configuration
 
-| Variavel | Padrao | Descricao |
+| Variable | Default | Description |
 |----------|--------|-----------|
-| `MINIO_ENDPOINT` | `http://minio:9000` | Endpoint interno (server-side) |
-| `MINIO_EXTERNAL_ENDPOINT` | = `MINIO_ENDPOINT` | Endpoint externo (pre-signed URLs acessiveis por executores/browsers) |
-| `MINIO_ROOT_USER` | (obrigatória, sem default; o compose para sem ela) | Credencial de acesso |
-| `MINIO_ROOT_PASSWORD` | (obrigatória, sem default; o compose para sem ela) | Credencial de acesso |
-| `MINIO_BUCKET` | `atlans-drive` | Nome do bucket principal |
-| `MINIO_PRESIGN_EXPIRY` | `3600` sem a variavel; o `.env.example` grava `900` | Validade de URLs pre-assinadas (segundos) |
+| `MINIO_ENDPOINT` | `http://minio:9000` | Internal endpoint (server-side) |
+| `MINIO_EXTERNAL_ENDPOINT` | = `MINIO_ENDPOINT` | External endpoint (pre-signed URLs reachable by executors/browsers) |
+| `MINIO_ROOT_USER` | (required, no default; the compose stops without it) | Access credential |
+| `MINIO_ROOT_PASSWORD` | (required, no default; the compose stops without it) | Access credential |
+| `MINIO_BUCKET` | `atlans-drive` | Name of the main bucket |
+| `MINIO_PRESIGN_EXPIRY` | `3600` without the variable; `.env.example` sets `900` | Validity of pre-signed URLs (seconds) |
 
-### Operacoes
+### Operations
 
-O modulo `app/core/storage.py` fornece:
-- `upload()` — upload de conteudo em bytes
-- `download()` — download do conteudo completo
-- `presigned_put()` / `presigned_get()` — URLs pre-assinadas (usam endpoint externo)
-- `head()` — metadados do objeto (size, etag, content_type)
-- `delete()` — remocao de objetos
-- `ensure_bucket()` — cria bucket no startup se nao existir
+The `app/core/storage.py` module provides:
+- `upload()` — upload of content in bytes
+- `download()` — download of the full content
+- `presigned_put()` / `presigned_get()` — pre-signed URLs (use the external endpoint)
+- `head()` — object metadata (size, etag, content_type)
+- `delete()` — removal of objects
+- `ensure_bucket()` — creates the bucket at startup if it does not exist
 
-### Sincronizacao com Executores
+### Synchronization with Executors
 
-Artefatos com `destination: "drive"` sao registrados na tabela `WorkspaceFile` (Drive) em vez de `Artifact`, permitindo sincronizacao automatica com executores via eventos no canal `executor:{id}:drive_events`. O valor padrao `destination: "artifacts"` registra apenas na tabela `Artifact` (download via API).
+Artifacts with `destination: "drive"` are registered in the `WorkspaceFile` table (Drive) instead of `Artifact`, allowing automatic synchronization with executors via events on the `executor:{id}:drive_events` channel. The default value `destination: "artifacts"` registers only in the `Artifact` table (download via the API).
 
 ---
 
-## Banco de Dados
+## Database
 
 ### PostgreSQL + PostGIS
 
-O Atlans usa PostgreSQL com extensao PostGIS para operacoes geoespaciais. As migrations sao gerenciadas pelo **Alembic** (nao por `create_all`).
+Atlans uses PostgreSQL with the PostGIS extension for geospatial operations. Migrations are managed by **Alembic** (not by `create_all`).
 
-**Base zero (F3 da simplificação).** Existe UMA revisão alembic
-(`alembic/versions/20260924_0001_base_zero.py`, id `9ed006ca1660`), cujo corpo
-é o próprio `scripts/init_schema.sql` — a migração lê e executa o arquivo,
-tirando apenas os comandos sobre `alembic_version` e as linhas de comentário.
-Consequências práticas:
+**Zero base (F3 of the simplification).** There is ONE alembic revision
+(`alembic/versions/20260924_0001_base_zero.py`, id `9ed006ca1660`), whose body
+is `scripts/init_schema.sql` itself — the migration reads and runs the file,
+leaving out only the commands on `alembic_version` and the comment lines.
+Practical consequences:
 
-- **Banco novo**: `alembic upgrade head` (à mão: a API não migra sozinha, e o
-  entrypoint automático foi removido em 2026-05 — ver o comentário no
-  Dockerfile.api) ou `psql -f scripts/init_schema.sql` — os dois produzem o
-  mesmo banco, com o mesmo carimbo (o `psql` sem os schemas das extensões, que
-  vão à parte). Um deploy que confira `alembic current` × `heads` antes de
-  subir segue funcionando sem mudança.
-- **Mudança de schema enquanto nada está em produção**: edita-se o
-  `init_schema.sql` (e o model) e recria-se o banco — os testes
-  `test_init_schema_bootstrap.py` e `test_base_zero.py` prendem arquivo,
-  models e revisão uns aos outros. Quando houver produção de verdade, a
-  primeira migração incremental volta a nascer por cima da base zero.
-- **Banco criado pela cadeia antiga** (carimbo anterior ao squash): o schema é
-  o mesmo; rode uma vez `alembic stamp --purge 9ed006ca1660` para trocar o
-  carimbo, ou resete do zero com o script. Nenhum caminho automático purga um
-  banco com dados: com o carimbo antigo o alembic falha ANTES de tocar em
-  qualquer coisa, e a própria revisão recusa rodar num banco que tenha tabelas
-  sem carimbo (a mensagem aponta o stamp e o reset deliberado).
+- **New database**: `alembic upgrade head` (by hand: the API does not migrate on its own, and the
+  automatic entrypoint was removed in 2026-05 — see the comment in
+  Dockerfile.api) or `psql -f scripts/init_schema.sql` — both produce the
+  same database, with the same stamp (`psql` without the extensions' schemas, which
+  go separately). A deploy that checks `alembic current` × `heads` before
+  starting keeps working without changes.
+- **Schema change while nothing is in production**: you edit
+  `init_schema.sql` (and the model) and recreate the database — the tests
+  `test_init_schema_bootstrap.py` and `test_base_zero.py` tie the file,
+  the models and the revision to one another. When there is real production, the
+  first incremental migration will be born again on top of the zero base.
+- **Database created by the old chain** (stamp prior to the squash): the schema is
+  the same; run `alembic stamp --purge 9ed006ca1660` once to swap the
+  stamp, or reset from scratch with the script. No automatic path purges a
+  database with data: with the old stamp alembic fails BEFORE touching
+  anything, and the revision itself refuses to run on a database that has tables
+  without a stamp (the message points to the stamp and the deliberate reset).
 
-### Principais Tabelas
+### Main Tables
 
-| Tabela | Descricao |
+| Table | Description |
 |--------|-----------|
-| `users` | Usuarios (id_hash, username, email, hashed_password, role) |
+| `users` | Users (id_hash, username, email, hashed_password, role) |
 | `workspaces` | Workspaces (id_hash, name, owner_id) |
-| `workspace_members` | Vinculo usuario ↔ workspace com role |
-| `workflows` | Definicao do workflow (name, definition JSON, workspace_id, group_id, pinned_outputs, portal_access). **Não** tem `target_agent_id` — o roteamento é por `Workspace.target_executor_id` |
-| `workflow_versions` | Historico de versoes da definicao |
-| `workflow_runs` | Cada execucao (task_id, status, host, start_time, end_time, duration_seconds, node_stats) |
-| `workflow_groups` | Agrupamento logico de workflows |
-| `schedules` | Agendamentos (strategy, cron_expression, interval, unit, rrule_expression, next_run_at) |
-| `credentials` | Credenciais criptografadas (Fernet) por workspace |
-| `executors` | Executores registrados (id_hash, name, status, executor_type, is_default, public_key, cert_serial/fingerprint, capabilities, max_concurrent_jobs, max_queue_size) |
-| `workspace_executors` | Política de roteamento executor ↔ workspace (tiers / modo) |
-| `executor_enrollment_otp` | OTPs de enrollment de executores (one-time) |
-| `user_executor_assignments` | Vinculo usuario ↔ executor (para executores `dedicated`) |
-| `artifacts` | Artefatos produzidos por execucoes (s3_key, format, features, expires_at) |
-| `workspace_files` | Arquivos do Drive do workspace |
-| `portal_layers` | Camadas publicadas no portal |
-| `portal_features` | Features individuais de camadas do portal |
-| `workflow_run_metrics` | Metricas de execucao (CPU, RAM, bytes, spatial) |
-| `node_run_metrics` | Metricas por no (duration, features, geometry_type, CRS) |
-| `usage_daily` | Resumo diario de uso por workspace |
-| `system_config` | Configuracoes globais chave-valor |
-| `audit_events` | Trilha de auditoria de ações sensíveis |
-| `allowed_file_extensions` | Extensões permitidas no Drive (config) |
-| `platform_file_settings` | Limites / configuração de arquivos da plataforma |
+| `workspace_members` | User ↔ workspace link with a role |
+| `workflows` | Workflow definition (name, definition JSON, workspace_id, group_id, pinned_outputs, portal_access). It does **not** have `target_agent_id` — routing is by `Workspace.target_executor_id` |
+| `workflow_versions` | Version history of the definition |
+| `workflow_runs` | Each run (task_id, status, host, start_time, end_time, duration_seconds, node_stats) |
+| `workflow_groups` | Logical grouping of workflows |
+| `schedules` | Schedules (strategy, cron_expression, interval, unit, rrule_expression, next_run_at) |
+| `credentials` | Encrypted credentials (Fernet) per workspace |
+| `executors` | Registered executors (id_hash, name, status, executor_type, is_default, public_key, cert_serial/fingerprint, capabilities, max_concurrent_jobs, max_queue_size) |
+| `workspace_executors` | Executor ↔ workspace routing policy (tiers / mode) |
+| `executor_enrollment_otp` | Executor enrollment OTPs (one-time) |
+| `user_executor_assignments` | User ↔ executor link (for `dedicated` executors) |
+| `artifacts` | Artifacts produced by runs (s3_key, format, features, expires_at) |
+| `workspace_files` | Files of the workspace Drive |
+| `portal_layers` | Layers published on the portal |
+| `portal_features` | Individual features of portal layers |
+| `workflow_run_metrics` | Run metrics (CPU, RAM, bytes, spatial) |
+| `node_run_metrics` | Per-node metrics (duration, features, geometry_type, CRS) |
+| `usage_daily` | Daily usage summary per workspace |
+| `system_config` | Global key-value settings |
+| `audit_events` | Audit trail of sensitive actions |
+| `allowed_file_extensions` | Extensions allowed in the Drive (config) |
+| `platform_file_settings` | Platform file limits / configuration |
 
-### Conexao Async
+### Async Connection
 
-O projeto usa `asyncpg` como driver e `SQLAlchemy` com `AsyncSession`. Pool de conexoes configuravel:
+The project uses `asyncpg` as the driver and `SQLAlchemy` with `AsyncSession`. Configurable connection pool:
 
-| Variavel | Padrao | Descricao |
+| Variable | Default | Description |
 |----------|--------|-----------|
-| `POOL_SIZE` | 10 | Conexoes simultaneas no pool |
-| `MAX_OVERFLOW` | 5 | Conexoes extras temporarias |
-| `POOL_TIMEOUT` | 30 | Segundos de espera por conexao |
-| `POOL_RECYCLE` | 1800 | Reciclagem de conexoes (30 min) |
-| `POOL_PRE_PING` | true | Verifica conexao antes de usar |
-| `DB_STATEMENT_TIMEOUT` | 60 | Segundos ate o Postgres cancelar um comando (0 desliga) |
-| `DB_COMMAND_TIMEOUT` | 90 | Segundos ate o asyncpg desistir da resposta (0 desliga) |
-| `ECHO_SQL` | false | Log de queries SQL |
+| `POOL_SIZE` | 10 | Simultaneous connections in the pool |
+| `MAX_OVERFLOW` | 5 | Temporary extra connections |
+| `POOL_TIMEOUT` | 30 | Seconds of waiting for a connection |
+| `POOL_RECYCLE` | 1800 | Connection recycling (30 min) |
+| `POOL_PRE_PING` | true | Checks the connection before using it |
+| `DB_STATEMENT_TIMEOUT` | 60 | Seconds until Postgres cancels a statement (0 turns it off) |
+| `DB_COMMAND_TIMEOUT` | 90 | Seconds until asyncpg gives up on the response (0 turns it off) |
+| `ECHO_SQL` | false | Logging of SQL queries |
 
 ---
 
 ## Frontend (Next.js)
 
-### Tecnologias
+### Technologies
 
 - **Next.js 16** (App Router)
-- **React 19** com Server Components
-- **Radix UI** (primitivos) + **Tailwind CSS 4** como camada de componentes (**não** usa MUI)
-- **Zustand** para estado de UI (stores em `web/app/stores/`)
-- **@xyflow/react (XYFlow)** para o editor visual de DAGs
-- **@tanstack/react-virtual** para virtualizacao de listas grandes
-- **NextAuth v5** para autenticacao (cookie HTTP-only)
-- **TypeScript** em todo o codigo
+- **React 19** with Server Components
+- **Radix UI** (primitives) + **Tailwind CSS 4** as the component layer (it does **not** use MUI)
+- **Zustand** for UI state (stores in `web/app/stores/`)
+- **@xyflow/react (XYFlow)** for the visual DAG editor
+- **@tanstack/react-virtual** for virtualization of large lists
+- **NextAuth v5** for authentication (HTTP-only cookie)
+- **TypeScript** throughout the code
 
-### Roteamento
+### Routing
 
 ```
 app/
-├── (auth)/              # Sem autenticacao. As CINCO so REDIRECIONAM para a Home com o
-│   ├── login/           #   modal de entrada (/?entrar=1, /?cadastro=1, /?verificar=1&token=,
-│   ├── register/        #   /?recuperar=1, /?redefinir=1&token=). Ficam de pe porque e o que
-│   ├── forgot-password/ #   esta escrito nos e-mails ja enviados. Nenhuma e mais uma pagina.
+├── (auth)/              # No authentication. All FIVE only REDIRECT to the Home with the
+│   ├── login/           #   sign-in modal (/?entrar=1, /?cadastro=1, /?verificar=1&token=,
+│   ├── register/        #   /?recuperar=1, /?redefinir=1&token=). They stay up because that is what
+│   ├── forgot-password/ #   is written in the emails already sent. None of them is a page anymore.
 │   ├── reset-password/
 │   └── verify-email/
-├── (portal)/            # Portal publico (camadas publicadas, sem login)
-└── (dashboard)/         # Protegido por proxy.ts (NextAuth) — exceto a Home `/`, que abre sem sessao
-    ├── projects/            # Projetos (workflows)
-    ├── workflow/[id]/       # Editor visual
-    ├── credentials/         # Gerenciamento de credenciais
-    ├── workspaces/          # Gerenciamento de workspaces
-    ├── observability/       # Metricas e historico
-    ├── artifacts/           # Artefatos de execucao
-    ├── drive/               # Arquivos do workspace
-    ├── executores/          # Gerenciamento de executores
-    └── admin/               # Usuarios, nodes, workspaces (lixeira), config
+├── (portal)/            # Public portal (published layers, no login)
+└── (dashboard)/         # Protected by proxy.ts (NextAuth) — except the Home `/`, which opens without a session
+    ├── projects/            # Projects (workflows)
+    ├── workflow/[id]/       # Visual editor
+    ├── credentials/         # Credential management
+    ├── workspaces/          # Workspace management
+    ├── observability/       # Metrics and history
+    ├── artifacts/           # Run artifacts
+    ├── drive/               # Workspace files
+    ├── executores/          # Executor management
+    └── admin/               # Users, nodes, workspaces (trash), config
 ```
 
-### Estado Global
+### Global State
 
-Estado de UI é majoritariamente gerenciado por **stores Zustand** (`web/app/stores/`),
-complementadas por alguns React Contexts:
+UI state is mostly managed by **Zustand stores** (`web/app/stores/`),
+complemented by a few React Contexts:
 
-| Store / Contexto | O que gerencia |
+| Store / Context | What it manages |
 |----------|---------------|
-| `workflowExecutionStore` (Zustand) | Estado de execução do workflow (status dos nós em tempo real) |
-| `canvasViewStore` (Zustand) | Estado de visualização do canvas |
-| `runPanelStore` (Zustand) | Painel de runs / logs |
-| `workflowCatalogStore` / `workflowSaveStore` / `subflowDrilldownStore` (Zustand) | Catálogo, salvamento e drill-down de sub-fluxos |
-| `useFlowContext` | Grafo DAG do workflow em edicao (nos, arestas) |
-| `useCredentialsContext` | Lista de credenciais do workspace |
-| `WorkspaceContext` / `ThemeContext` | Workspace ativo / tema claro-escuro |
-| ~~`useProjectsContext`~~ (removido) | A lista de Projetos vive no hook `use-projetos-dados`; os diálogos recebem o workflow por prop |
+| `workflowExecutionStore` (Zustand) | The workflow's execution state (node status in real time) |
+| `canvasViewStore` (Zustand) | Canvas view state |
+| `runPanelStore` (Zustand) | Runs / logs panel |
+| `workflowCatalogStore` / `workflowSaveStore` / `subflowDrilldownStore` (Zustand) | Catalog, saving and drill-down into sub-workflows |
+| `useFlowContext` | DAG graph of the workflow being edited (nodes, edges) |
+| `useCredentialsContext` | List of the workspace's credentials |
+| `WorkspaceContext` / `ThemeContext` | Active workspace / light-dark theme |
+| ~~`useProjectsContext`~~ (removed) | The Projects list lives in the `use-projetos-dados` hook; the dialogs receive the workflow by prop |
 
-### Extensões do web (`web/extensoes`)
+### Web extensions (`web/extensoes`)
 
-O par do registro do servidor (ver [Extensões](#extensões-appextensoes)). O núcleo nunca importa
-uma extensão pelo nome: ele lê `EXTENSOES` de `@/extensoes`, e cada extensão é a descrição do que
-pendura em cada ponto de encaixe (`web/extensoes/tipos.ts`):
+The counterpart of the server's registry (see [Extensions](#extensions-appextensoes)). The core never imports
+an extension by name: it reads `EXTENSOES` from `@/extensoes`, and each extension is the description of what
+it hangs on each plug-in point (`web/extensoes/tipos.ts`):
 
-| Ponto de encaixe | Onde o núcleo o desenha | Sem extensão |
+| Plug-in point | Where the core draws it | Without an extension |
 |---|---|---|
-| `camadas` | uma vez na casca (`SidebarRoot`), nas duas cascas: modais e efeitos globais | nada |
-| `itensDaConta` | no menu da conta (`user-sidebar.tsx`), depois de Configurações, com a paleta do portal | o menu é Tema, Configurações e Log out |
-| `ofertaDaCota` | ao lado do aviso de cota cheia (`aviso-de-cota.tsx`), nas três superfícies que o mostram | o aviso fica sozinho |
-| `painelDoModelo` | envolve o seletor do modelo do assistente na administração (`modelo-do-assistente.tsx`), e soma uma frase à apresentação da seção | só o seletor |
+| `camadas` | once in the shell (`SidebarRoot`), in both shells: modals and global effects | nothing |
+| `itensDaConta` | in the account menu (`user-sidebar.tsx`), after Configurações (Settings), with the portal palette | the menu is Tema (Theme), Configurações and Log out |
+| `ofertaDaCota` | next to the full-quota notice (`aviso-de-cota.tsx`), on the three surfaces that show it | the notice stands alone |
+| `painelDoModelo` | wraps the assistant model selector in the administration (`modelo-do-assistente.tsx`), and adds a sentence to the section's introduction | just the selector |
 
-Quem lista as extensões presentes é `web/extensoes/instaladas.ts`; na distribuição livre a lista
-é vazia. Os arquivos soltos de `web/extensoes/` são o registro, e são núcleo; cada subpasta é
-uma extensão. Uma peça pesada que só uma tela usa entra sob demanda (`lazy`), porque o registro
-mora na casca, que toda rota carrega.
+What lists the extensions present is `web/extensoes/instaladas.ts`; in the free distribution the list
+is empty. The loose files in `web/extensoes/` are the registry, and they are core; each subfolder is
+an extension. A heavy piece that only one screen uses is loaded on demand (`lazy`), because the registry
+lives in the shell, which every route loads.
 
-Cada peça de extensão passa por um limite de erro (`LimiteDaExtensao`): se ela quebrar ao
-desenhar (um defeito dela, ou o pedaço sob demanda que não chegou), o lugar mostra o que o
-núcleo mostraria sem extensão, e o erro vai para o console com o nome dela. No painel do modelo,
-isso mantém o seletor e o «Voltar ao padrão do ambiente», que são a saída de emergência da tela.
+Each extension piece goes through an error boundary (`LimiteDaExtensao`): if it breaks while
+rendering (a defect of its own, or the on-demand chunk that did not arrive), the spot shows what the
+core would show without an extension, and the error goes to the console with its name. In the model panel,
+this keeps the selector and the "Voltar ao padrão do ambiente" (Back to the environment default), which are the screen's emergency exit.
 
-O que prende a fronteira:
+What holds the boundary in place:
 
-- o job **Frontend sem extensões (núcleo)** do CI roda o `scripts/sem_extensoes.sh` (apaga as
-  extensões e os testes delas e esvazia a lista das instaladas) e, depois, o typecheck, a suíte e
-  o build de sempre;
-- `web/__tests__/fronteira-das-extensoes.test.ts` falha se um arquivo do núcleo (ou um teste
-  dele) cita uma extensão pelo nome. Os caminhos saem da árvore sintática do TypeScript: imports,
-  exports, `import()`, `require` e os `vi.mock` e parentes, com ou sem comentário no meio;
-- para conferir na sua máquina sem apagar nada: `npm run typecheck:nucleo` (`tsconfig.nucleo.json`)
-  e `npm run test:nucleo` apontam a lista das instaladas para a vazia (`nenhuma.ts`).
+- the CI job **Frontend sem extensões (núcleo)** (Frontend without extensions (core)) runs
+  `scripts/sem_extensoes.sh` (deletes the extensions and their tests and empties the list of installed
+  ones) and, then, the usual typecheck, suite and build;
+- `web/__tests__/fronteira-das-extensoes.test.ts` fails if a core file (or one of its
+  tests) mentions an extension by name. The paths come from the TypeScript syntax tree: imports,
+  exports, `import()`, `require` and the `vi.mock` calls and relatives, with or without a comment in between;
+- to check on your machine without deleting anything: `npm run typecheck:nucleo` (`tsconfig.nucleo.json`)
+  and `npm run test:nucleo` point the list of installed extensions to the empty one (`nenhuma.ts`).
 
-Os testes de uma extensão moram em `web/__tests__/extensoes/<extensão>/`.
+An extension's tests live in `web/__tests__/extensoes/<extensão>/`.
 
-### Editor Visual
+### Visual Editor
 
-O editor usa `@xyflow/react` para renderizar o DAG interativo:
+The editor uses `@xyflow/react` to render the interactive DAG:
 
-- **Nos visuais** → `web/app/components/workflow/custom-nodes/`
-- **Arestas** → `web/app/components/workflow/custom-edges/`
-- **Painel lateral** → `web/app/components/workflow/nodes-configuration/`
-- **Paleta de nos** → `web/app/components/workflow/drawer/`
+- **Visual nodes** → `web/app/components/workflow/custom-nodes/`
+- **Edges** → `web/app/components/workflow/custom-edges/`
+- **Side panel** → `web/app/components/workflow/nodes-configuration/`
+- **Node palette** → `web/app/components/workflow/drawer/`
 
-O schema de configuracao de cada no e carregado via `GET /nodes/` — o frontend gera os campos do formulario dinamicamente a partir do schema `properties`.
+Each node's configuration schema is loaded via `GET /nodes/` — the frontend generates the form fields dynamically from the `properties` schema.
 
-#### Aparencia dos Nos (Card Visual)
+#### Node Appearance (Visual Card)
 
-Cada no e renderizado como um card `158x60px` com:
-- **Stripe colorida** a esquerda — cor pelo `type` (trigger=violeta, action=azul, spatial=esmeralda, datasource=ambar, output=rosa, control=laranja)
-- **Secao de icone** — background com 10% de opacidade da cor do tipo
-- **Secao de texto** — alias do no + label da categoria
-- **Toolbar flutuante** — aparece ao hover (editar, copiar, excluir)
-- **Indicador de status** — ring externo (azul=rodando, verde=concluido, vermelho=falhou)
+Each node is rendered as a `158x60px` card with:
+- **Colored stripe** on the left — color by `type` (trigger=violet, action=blue, spatial=emerald, datasource=amber, output=pink, control=orange)
+- **Icon section** — background at 10% opacity of the type's color
+- **Text section** — node alias + category label
+- **Floating toolbar** — appears on hover (edit, copy, delete)
+- **Status indicator** — outer ring (blue=running, green=completed, red=failed)
 
-#### Arestas
+#### Edges
 
-Arestas usam `getSmoothStepPath` e sao coloridas conforme o status:
+Edges use `getSmoothStepPath` and are colored according to status:
 
-| Estado | Cor | Efeito |
+| State | Color | Effect |
 |--------|-----|--------|
-| Rodando (`started`) | Azul | Animacao de dashes fluindo |
-| Concluido (`completed`) | Verde | Solido |
-| Falhou (`failed`) | Vermelho | Solido |
-| Handle `true` (Conditional) | Verde | Solido |
-| Handle `false` (Conditional) | Vermelho | Solido |
-| Sem status | Cinza (`slate-400`) | Solido |
+| Running (`started`) | Blue | Flowing dashes animation |
+| Completed (`completed`) | Green | Solid |
+| Failed (`failed`) | Red | Solid |
+| Handle `true` (Conditional) | Green | Solid |
+| Handle `false` (Conditional) | Red | Solid |
+| No status | Gray (`slate-400`) | Solid |
 
-#### Fluxo de Autenticacao no Frontend
+#### Authentication Flow in the Frontend
 
 ```mermaid
 sequenceDiagram
@@ -1477,41 +1478,41 @@ sequenceDiagram
     participant NA as NextAuth
     participant API as FastAPI
 
-    B->>MW: Acessa rota protegida
-    MW->>NA: Verifica sessao
-    alt Sessao valida
+    B->>MW: Opens protected route
+    MW->>NA: Checks session
+    alt Valid session
         NA-->>MW: session.user.access_token
-        MW-->>B: Renderiza pagina
-        B->>API: Request com Authorization header
-    else Sessao expirada
+        MW-->>B: Renders page
+        B->>API: Request with Authorization header
+    else Expired session
         NA->>API: POST /auth/refresh
-        API-->>NA: Novos tokens
-        NA-->>MW: Sessao renovada
-    else Sem sessao
-        MW-->>B: Redirect /?entrar=1&callbackUrl=... (a Home com o modal de entrada); em `/` a Home renderiza anonima
+        API-->>NA: New tokens
+        NA-->>MW: Session renewed
+    else No session
+        MW-->>B: Redirect /?entrar=1&callbackUrl=... (the Home with the sign-in modal); at `/` the Home renders anonymously
     end
 ```
 
 ---
 
-## Aplicativo Desktop (Electron)
+## Desktop App (Electron)
 
-O diretório `desktop/` é um shell **Electron** (processos `main` / `preload` / `renderer`,
-build via Vite, empacotamento via `electron-builder`) que **carrega a interface web a partir
-de uma URL remota** — a da instalação, gravada no build (`ATLANS_DESKTOP_UI_URL`, ver
-`desktop/scripts/enderecos.mjs`) — e não embute o frontend: é uma casca sobre o `web/`
-hospedado. Guardas de mesma-origem (`ehOrigemInterna`) permitem o host dessa URL e o `api.`
-dele, e bloqueiam origens externas (ex.: `docs.` do mesmo domínio, domínios de terceiros).
+The `desktop/` directory is an **Electron** shell (`main` / `preload` / `renderer` processes,
+build via Vite, packaging via `electron-builder`) that **loads the web interface from
+a remote URL** — the installation's, baked in at build time (`ATLANS_DESKTOP_UI_URL`, see
+`desktop/scripts/enderecos.mjs`) — and does not embed the frontend: it is a shell over the hosted
+`web/`. Same-origin guards (`ehOrigemInterna`) allow that URL's host and its `api.`,
+and block external origins (e.g.: `docs.` on the same domain, third-party domains).
 
 ---
 
-## Fluxo Completo de Execucao
+## Complete Execution Flow
 
-Diagrama end-to-end de um usuario executando um workflow pelo editor:
+End-to-end diagram of a user running a workflow from the editor:
 
 ```mermaid
 sequenceDiagram
-    participant U as Usuario
+    participant U as User
     participant NEXT as Next.js
     participant API as FastAPI API
     participant REDIS as Redis
@@ -1520,115 +1521,115 @@ sequenceDiagram
     participant AGENT as Executor
     participant MINIO as MinIO
 
-    Note over U,MINIO: 1. Usuario clica "Executar"
-    U->>NEXT: Clica botao "Executar"
+    Note over U,MINIO: 1. User clicks "Executar" (Run)
+    U->>NEXT: Clicks the "Executar" button
     NEXT->>API: POST /webhook/execute/{workflow_id}<br/>Authorization: Bearer JWT
 
-    Note over API: 2. Servidor prepara e despacha
-    API->>PG: Carrega Workflow + definition
-    API->>API: Descriptografa connectionStrings (Fernet)
-    API->>PG: Resolve candidatos (Workspace.target_executor_id + pool default / politica) + failover
-    API->>PG: Busca chave publica X25519 do executor
-    API->>REDIS: Verifica executor:presence:{id}
+    Note over API: 2. Server prepares and dispatches
+    API->>PG: Loads Workflow + definition
+    API->>API: Decrypts connectionStrings (Fernet)
+    API->>PG: Resolves candidates (Workspace.target_executor_id + default pool / policy) + failover
+    API->>PG: Fetches the executor's X25519 public key
+    API->>REDIS: Checks executor:presence:{id}
     API->>API: build_job_message()<br/>X25519 ECDH + AES-256-GCM + Ed25519
     API->>PG: INSERT WorkflowRun (status=pending, host=executor:{id})
-    API->>AGENT: WebSocket: {"type": "job", ...cifrado...}
+    API->>AGENT: WebSocket: {"type": "job", ...encrypted...}
     API-->>NEXT: HTTP 202 {task_id, run_id}
 
-    Note over API: 3. Run ja criado no dispatch
-    Note right of API: A fila run_creates foi removida — o run<br/>e inserido direto (status=pending) no dispatch.<br/>O consumer so processa run_results.
+    Note over API: 3. Run already created at dispatch
+    Note right of API: The run_creates queue was removed — the run<br/>is inserted directly (status=pending) at dispatch.<br/>The consumer only processes run_results.
 
-    Note over NEXT,REDIS: 4. Frontend conecta para logs
+    Note over NEXT,REDIS: 4. Frontend connects for logs
     NEXT->>API: WS /ws/workflow/{task_id}
-    NEXT->>API: Envia JWT (primeiro frame)
+    NEXT->>API: Sends JWT (first frame)
     API->>REDIS: SUBSCRIBE workflow:{task_id}:events
     API->>REDIS: LRANGE workflow:{task_id}:history (replay)
 
-    Note over AGENT: 5. Executor executa o workflow
-    AGENT->>AGENT: Ed25519.verify() — valida assinatura
+    Note over AGENT: 5. Executor runs the workflow
+    AGENT->>AGENT: Ed25519.verify() — validates signature
     AGENT->>AGENT: X25519 ECDH + HKDF → AES key
-    AGENT->>AGENT: AES-256-GCM.decrypt() — obtem payload
-    AGENT->>AGENT: WorkflowExecutor.run()<br/>topological sort → executa nos
+    AGENT->>AGENT: AES-256-GCM.decrypt() — obtains payload
+    AGENT->>AGENT: WorkflowExecutor.run()<br/>topological sort → runs nodes
 
-    loop Para cada no (ordem topologica)
+    loop For each node (topological order)
         AGENT->>API: {"type": "node_event", "status": "started", "node": "X"}
         API->>REDIS: PUBLISH + RPUSH
-        REDIS-->>NEXT: Evento → atualiza canvas
+        REDIS-->>NEXT: Event → updates canvas
 
         AGENT->>AGENT: node.execute(inputs)
 
         AGENT->>API: {"type": "node_event", "status": "completed", "node": "X"}
         API->>REDIS: PUBLISH + RPUSH
-        REDIS-->>NEXT: Evento → atualiza canvas
+        REDIS-->>NEXT: Event → updates canvas
     end
 
-    Note over AGENT,MINIO: 6. Upload de artefatos
-    AGENT->>MINIO: PUT artefatos (GeoJSON, Shapefile, etc.)
+    Note over AGENT,MINIO: 6. Artifact upload
+    AGENT->>MINIO: PUT artifacts (GeoJSON, Shapefile, etc.)
 
-    Note over AGENT,API: 7. Resultado final
+    Note over AGENT,API: 7. Final result
     AGENT->>API: {"type": "job_result", "status": "ok", "stats": {...}}
     API->>REDIS: LPUSH run_results {task_id, status, stats}
     API->>REDIS: PUBLISH __workflow_complete__
 
-    Note over CONSUMER,PG: 8. Consumer persiste resultado
+    Note over CONSUMER,PG: 8. Consumer persists the result
     CONSUMER->>REDIS: BRPOP run_results
     CONSUMER->>PG: UPDATE WorkflowRun (status, stats, duration)
-    CONSUMER->>PG: INSERT Artifacts (se houver)
+    CONSUMER->>PG: INSERT Artifacts (if any)
     CONSUMER->>PG: INSERT RunMetrics (CPU, RAM, bytes)
     CONSUMER->>PG: UPSERT UsageDaily
 
-    Note over CONSUMER: 9. Notificacao webhook (se configurado)
-    CONSUMER->>CONSUMER: POST notification_url<br/>(com retry e backoff)
+    Note over CONSUMER: 9. Webhook notification (if configured)
+    CONSUMER->>CONSUMER: POST notification_url<br/>(with retry and backoff)
 
-    REDIS-->>NEXT: __workflow_complete__ → fecha terminal
-    NEXT-->>U: Execucao concluida!
+    REDIS-->>NEXT: __workflow_complete__ → closes terminal
+    NEXT-->>U: Run completed!
 ```
 
-### Resumo do Fluxo de Dados
+### Data Flow Summary
 
 ```
-Usuario → Next.js → FastAPI → [cifra job] → WebSocket → Executor
+User → Next.js → FastAPI → [encrypts job] → WebSocket → Executor
                                                             ↓
                                                      Executor (DAG)
                                                             ↓
-                                                   node_events → Redis → Frontend (tempo real)
+                                                   node_events → Redis → Frontend (real time)
                                                             ↓
                                                    job_result → Redis → Consumer → PostgreSQL
                                                             ↓
-                                                   artefatos → MinIO
+                                                   artifacts → MinIO
 ```
 
 ---
 
-## Variaveis de Ambiente
+## Environment Variables
 
-| Variavel | Obrigatoria | Descricao |
+| Variable | Required | Description |
 |----------|------------|-----------|
-| `DATABASE_URL` | Sim | URL de conexao PostgreSQL (asyncpg) |
-| `REDIS_URL` | Nao | URL Redis (padrao: `redis://redis:6379/0`) |
-| `APP_SECRET` | Sim | Secret para JWT e assinatura HMAC |
-| `FERNET_KEYS` / `FERNET_KEY` | Sim | Chave(s) Fernet para criptografia de credenciais (`FERNET_KEYS` = lista, permite rotação via MultiFernet) |
-| `EXECUTOR_SIGNING_KEY` | Nao* | Chave Ed25519 para assinar jobs (*obrigatoria para despacho a executores) |
-| `MINIO_ENDPOINT` | Nao | Endpoint MinIO interno (padrao: `http://minio:9000`) |
-| `MINIO_EXTERNAL_ENDPOINT` | Nao | Endpoint MinIO externo para pre-signed URLs |
-| `MINIO_ROOT_USER` | Sim* | Credencial MinIO (*obrigatória para operações de storage; sem default) |
-| `MINIO_ROOT_PASSWORD` | Nao | Credencial MinIO |
-| `MINIO_BUCKET` | Nao | Bucket principal (padrao: `atlans-drive`) |
-| `ALLOWED_ORIGINS` | Nao | Origens CORS separadas por virgula (padrao: `*`) |
-| `EXECUTOR_POLICY_ROUTING` | Nao | `on`/`off` (padrao `off`) — ativa roteamento por política de workspace; senão, roteamento legado (target_executor_id + pool default) |
-| `EXECUTOR_JOB_TTL_SECONDS` | Nao | Validade de jobs em segundos (padrao: 300) |
-| `POOL_SIZE` | Nao | Tamanho do pool de conexoes (padrao: 10) |
-| `MAX_OVERFLOW` | Nao | Conexoes extras temporarias (padrao: 5) |
-| `DB_STATEMENT_TIMEOUT` | Nao | Prazo de cada comando no Postgres, em segundos (padrao: 60; 0 desliga) |
-| `DB_COMMAND_TIMEOUT` | Nao | Prazo do asyncpg pela resposta, em segundos (padrao: 90; 0 desliga) |
-| `ECHO_SQL` | Nao | Log de queries SQL (padrao: false) |
-| `EMAIL_BACKEND` | Nao | Transporte dos e-mails (verificacao, reset de senha, alertas, node SendEmail): `resend`, `smtp` ou `log`. Vazio = Resend com a chave, SMTP com o host, log sem nenhum dos dois. Valor desconhecido, `smtp` sem `SMTP_HOST` ou `resend` sem a chave impedem a API de subir |
-| `RESEND_API_KEY` | Nao | API key do Resend |
-| `SMTP_HOST` / `SMTP_PORT` | Nao | Servidor SMTP. Porta vazia = a do modo (587, 465 ou 25) |
-| `SMTP_SEGURANCA` | Nao | `starttls` (padrao), `ssl` ou `nenhuma`; outro valor impede a API de subir |
-| `SMTP_USERNAME` / `SMTP_PASSWORD` | Nao | Login no SMTP. Sem usuario, nao ha login |
-| `EMAIL_FROM` | Nao | Remetente de todo e-mail (padrao: `Atlans <noreply@host do FRONTEND_URL>`). `RESEND_FROM_EMAIL`, o nome antigo, continua valendo |
-| `EXIGIR_EMAIL_VERIFICADO` | Nao | `false` deixa entrar sem o e-mail verificado, para instalacao sem transporte (padrao: `true`). Com transporte, o convite para workspace continua exigindo a conta verificada |
-| `FRONTEND_URL` | Nao | URL do frontend para links em emails (padrao: `http://localhost:3000`) |
-| `EMAIL_VERIFY_TOKEN_TTL` | Nao | TTL do token de verificacao de email em minutos (padrao: 1440) |
-| `PASSWORD_RESET_TOKEN_TTL` | Nao | TTL do token de reset de senha em minutos (padrao: 30) |
+| `DATABASE_URL` | Yes | PostgreSQL connection URL (asyncpg) |
+| `REDIS_URL` | No | Redis URL (default: `redis://redis:6379/0`) |
+| `APP_SECRET` | Yes | Secret for JWT and HMAC signing |
+| `FERNET_KEYS` / `FERNET_KEY` | Yes | Fernet key(s) for credential encryption (`FERNET_KEYS` = a list, allows rotation via MultiFernet) |
+| `EXECUTOR_SIGNING_KEY` | No* | Ed25519 key for signing jobs (*required for dispatching to executors) |
+| `MINIO_ENDPOINT` | No | Internal MinIO endpoint (default: `http://minio:9000`) |
+| `MINIO_EXTERNAL_ENDPOINT` | No | External MinIO endpoint for pre-signed URLs |
+| `MINIO_ROOT_USER` | Yes* | MinIO credential (*required for storage operations; no default) |
+| `MINIO_ROOT_PASSWORD` | No | MinIO credential |
+| `MINIO_BUCKET` | No | Main bucket (default: `atlans-drive`) |
+| `ALLOWED_ORIGINS` | No | Comma-separated CORS origins (default: `*`) |
+| `EXECUTOR_POLICY_ROUTING` | No | `on`/`off` (default `off`) — turns on routing by workspace policy; otherwise, legacy routing (target_executor_id + default pool) |
+| `EXECUTOR_JOB_TTL_SECONDS` | No | Job validity in seconds (default: 300) |
+| `POOL_SIZE` | No | Connection pool size (default: 10) |
+| `MAX_OVERFLOW` | No | Temporary extra connections (default: 5) |
+| `DB_STATEMENT_TIMEOUT` | No | Deadline for each statement in Postgres, in seconds (default: 60; 0 turns it off) |
+| `DB_COMMAND_TIMEOUT` | No | asyncpg's deadline for the response, in seconds (default: 90; 0 turns it off) |
+| `ECHO_SQL` | No | Logging of SQL queries (default: false) |
+| `EMAIL_BACKEND` | No | Email transport (verification, password reset, alerts, SendEmail node): `resend`, `smtp` or `log`. Empty = Resend with the key, SMTP with the host, log with neither. An unknown value, `smtp` without `SMTP_HOST` or `resend` without the key prevent the API from starting |
+| `RESEND_API_KEY` | No | Resend API key |
+| `SMTP_HOST` / `SMTP_PORT` | No | SMTP server. Empty port = the mode's port (587, 465 or 25) |
+| `SMTP_SEGURANCA` | No | `starttls` (default), `ssl` or `nenhuma`; any other value prevents the API from starting |
+| `SMTP_USERNAME` / `SMTP_PASSWORD` | No | SMTP login. Without a username, there is no login |
+| `EMAIL_FROM` | No | Sender of every email (default: `Atlans <noreply@host do FRONTEND_URL>`). `RESEND_FROM_EMAIL`, the old name, still works |
+| `EXIGIR_EMAIL_VERIFICADO` | No | `false` lets people sign in without a verified email, for an installation without a transport (default: `true`). With a transport, the workspace invitation still requires a verified account |
+| `FRONTEND_URL` | No | Frontend URL for links in emails (default: `http://localhost:3000`) |
+| `EMAIL_VERIFY_TOKEN_TTL` | No | TTL of the email verification token in minutes (default: 1440) |
+| `PASSWORD_RESET_TOKEN_TTL` | No | TTL of the password reset token in minutes (default: 30) |

@@ -1,257 +1,257 @@
 # Atlans Executor Desktop
 
-App desktop do executor para **Windows x64**: empacota o executor Python, o motor
-`flow/` e um runtime CPython completo num instalador único — sem Docker, sem Git,
-sem Python instalado na máquina do usuário.
+Desktop app of the executor for **Windows x64**: it bundles the Python executor, the
+`flow/` engine and a full CPython runtime into a single installer — no Docker, no Git,
+no Python installed on the user's machine.
 
-O instalador, porém, é só metade do app. A **janela principal** não é uma UI local:
-ela carrega a interface web remota da instalação num `BrowserWindow` isolado, dando
-ao executor — que roda em segundo plano — a cara de um software próprio.
-Consequência prática: **mudanças no frontend web saem pelo site sem rebuild do
-desktop**; só alterações nos payloads embarcados (`flow/`/`executor/`) exigem um
-instalador novo.
+The installer, however, is only half of the app. The **main window** is not a local UI:
+it loads the installation's remote web interface in an isolated `BrowserWindow`, giving
+the executor — which runs in the background — the look of a standalone piece of software.
+Practical consequence: **changes to the web frontend ship through the site without rebuilding
+the desktop app**; only changes to the bundled payloads (`flow/`/`executor/`) require a
+new installer.
 
-- **Entry do Electron:** `dist/main/index.cjs` (processo main; ver `package.json`).
-- **Janela web:** `src/main/ui/janela-web.ts` carrega `UI_URL` (`src/shared/ui.ts`,
-  fixo no executável pelo build) em sessão isolada e persistente
-  (`partition: 'persist:atlans'`, `sandbox: true`, `nodeIntegration: false`) — o
-  login (cookie NextAuth same-origin) sobrevive a reinícios. Override apenas em
-  desenvolvimento, via `ATLANS_UI_URL`.
-- **Enrollment:** por deep link `atlans://` (registrado pelo NSIS na instalação),
-  não por copiar-colar de chave de API.
-- **Painel local + bandeja:** uma segunda janela (`src/renderer/`) mostra estado,
-  logs e ajustes do executor; o app vive na bandeja (tray) e se atualiza sozinho
+- **Electron entry:** `dist/main/index.cjs` (main process; see `package.json`).
+- **Web window:** `src/main/ui/janela-web.ts` loads `UI_URL` (`src/shared/ui.ts`,
+  baked into the executable by the build) in an isolated, persistent session
+  (`partition: 'persist:atlans'`, `sandbox: true`, `nodeIntegration: false`) — the
+  login (same-origin NextAuth cookie) survives restarts. Override only in
+  development, via `ATLANS_UI_URL`.
+- **Enrollment:** through an `atlans://` deep link (registered by NSIS at install time),
+  not by copy-pasting an API key.
+- **Local panel + tray:** a second window (`src/renderer/`) shows the executor's state,
+  logs and settings; the app lives in the system tray and updates itself
   via `electron-updater`.
 
-## Gerar o instalador
+## Building the installer
 
-O app grava no executável o servidor e a UI de UMA instalação, e o código não traz
-nenhum: os dois vêm do ambiente do build, que falha sem eles
-(`scripts/enderecos.mjs`). Trocar de servidor exige outro build — de propósito
-(ver `src/shared/servidor.ts`).
+The app bakes the server and the UI of ONE installation into the executable, and the code ships
+none: both come from the build environment, which fails without them
+(`scripts/enderecos.mjs`). Switching servers requires another build — on purpose
+(see `src/shared/servidor.ts`).
 
 ```bash
 cd desktop
-npm run runtime      # uma vez: baixa e monta resources/python (~390 MB)
+npm run runtime      # once: downloads and assembles resources/python (~390 MB)
 export ATLANS_DESKTOP_SERVIDOR=wss://agents.<seu-dominio>
 export ATLANS_DESKTOP_UI_URL=https://<seu-dominio>
-export ATLANS_RELEASES_DONO=<dono>     # o repositório do GitHub cujas releases
-export ATLANS_RELEASES_REPO=<repo>     # trazem as atualizações do app
-npm run dist         # gera dist-installer/Atlans Executor Setup <versão>.exe
+export ATLANS_RELEASES_DONO=<dono>     # the GitHub repository whose releases
+export ATLANS_RELEASES_REPO=<repo>     # carry the app's updates
+npm run dist         # produces dist-installer/Atlans Executor Setup <versão>.exe
 ```
 
-No CI (`.github/workflows/desktop-windows.yml`), o servidor e a UI vêm das
-variáveis do repositório de mesmo nome (*Settings → Secrets and variables →
-Actions → Variables*), e o feed de atualização é o próprio repositório. Em
-`npm run dev`, sem eles, valem a API e o web locais.
+In CI (`.github/workflows/desktop-windows.yml`), the server and the UI come from the
+repository variables of the same name (*Settings → Secrets and variables →
+Actions → Variables*), and the update feed is the repository itself. In
+`npm run dev`, without them, the local API and web apply.
 
-`npm run empacotar` sozinho empacota o que estiver em `dist/`, e só aceita o
-que saiu de `npm run build`: depois de um `npm run dev`, o `dist/main` aponta
-para a máquina local, e o empacotamento para pedindo o build.
+`npm run empacotar` on its own packages whatever is in `dist/`, and only accepts
+what came out of `npm run build`: after an `npm run dev`, `dist/main` points
+to the local machine, and packaging stops and asks for the build.
 
-Saída: **~182 MB** de instalador, ~708 MB instalados. Junto vão o `.blockmap`
-(download diferencial) e o `latest.yml` (auto-update) — sem esses dois não há
-atualização.
+Output: a **~182 MB** installer, ~708 MB installed. Alongside it go the `.blockmap`
+(differential download) and `latest.yml` (auto-update) — without those two there are no
+updates.
 
-O `desktop/.npmrc` liga `ignore-scripts`: nenhum pacote roda código no
-`npm install`/`npm ci` (a porta dos worms do npm). O `electron` não precisa de
-script: desde o 44, ele baixa o próprio binário na primeira vez que é chamado,
-conferindo o SHA-256 pelo `checksums.json` do pacote. O `npm run dev` faz esse
-download num passo à vista, e `npm run electron:binario` faz à mão. O
-`npm run dist` não depende disso: o electron-builder baixa o Electron por conta
-própria.
+`desktop/.npmrc` turns on `ignore-scripts`: no package runs code on
+`npm install`/`npm ci` (the door npm worms come through). `electron` does not need a
+script: since version 44, it downloads its own binary the first time it is called,
+checking the SHA-256 against the package's `checksums.json`. `npm run dev` does that
+download as a visible step, and `npm run electron:binario` does it by hand.
+`npm run dist` does not depend on this: electron-builder downloads Electron on its
+own.
 
-> **Antes do primeiro `npm run dist`, ative o Modo de Desenvolvedor do Windows**
-> (Configurações → Sistema → Para desenvolvedores).
+> **Before the first `npm run dist`, turn on Windows Developer Mode**
+> (Settings → System → For developers).
 >
-> O electron-builder baixa um pacote de ferramentas de assinatura que contém
-> **symlinks do macOS** (`libcrypto.dylib`, `libssl.dylib`). Criar symlink no
-> Windows exige privilégio, e sem ele a extração falha com
-> `Cannot create symbolic link` — o build nem chega a empacotar. Os arquivos em
-> questão são de outro sistema operacional e não são usados aqui; é a extração
-> que não sabe pulá-los.
+> electron-builder downloads a signing tools package that contains
+> **macOS symlinks** (`libcrypto.dylib`, `libssl.dylib`). Creating a symlink on
+> Windows requires privileges, and without them the extraction fails with
+> `Cannot create symbolic link` — the build does not even get to packaging. The files in
+> question belong to another operating system and are not used here; it is the extraction
+> that does not know how to skip them.
 >
-> Sem o Modo de Desenvolvedor, o contorno é
+> Without Developer Mode, the workaround is
 > `npx electron-builder --win --x64 --config.win.signAndEditExecutable=false`,
-> que pula a etapa inteira. **Custa o ícone e os metadados do `.exe`**, então
-> serve para validar o empacotamento, não para gerar uma release.
+> which skips the whole step. **It costs the `.exe`'s icon and metadata**, so it
+> is good for validating the packaging, not for producing a release.
 
 ---
 
-## Por que existe
+## Why it exists
 
-O único caminho de instalação no Windows hoje é manual: [`static/install.sh`](../static/install.sh)
-é bash puro (exige Git Bash ou WSL) e a UI em `/executores` gera comandos PowerShell
-que pressupõem Docker Desktop e o repositório clonado. Para quem só quer rodar
-workflows na própria máquina, isso é uma barreira.
+The only installation path on Windows today is manual: [`static/install.sh`](../static/install.sh)
+is pure bash (it requires Git Bash or WSL) and the UI at `/executores` generates PowerShell commands
+that assume Docker Desktop and a cloned repository. For someone who just wants to run
+workflows on their own machine, that is a barrier.
 
-Já existiu um `agent-desktop/` neste repositório (removido). Ele
-apodreceu por dois motivos que este projeto evita por construção:
+There used to be an `agent-desktop/` in this repository (removed). It
+rotted for two reasons that this project avoids by construction:
 
-- derivava status **parseando linhas de log** por regex — exatamente o que o
-  docstring de [`executor/stats.py`](../executor/stats.py) proíbe;
-- falava o protocolo `AGENT_API_KEY`, abandonado quando o executor migrou para
-  mTLS com enrollment por OTP.
+- it derived status by **parsing log lines** with regexes — exactly what the
+  docstring of [`executor/stats.py`](../executor/stats.py) forbids;
+- it spoke the `AGENT_API_KEY` protocol, abandoned when the executor moved to
+  mTLS with OTP-based enrollment.
 
-A substituição é um canal de eventos estruturados (NDJSON) alimentado pelo mesmo
-`Snapshot` que o painel `rich` já consome.
+The replacement is a structured event channel (NDJSON) fed by the same
+`Snapshot` that the `rich` panel already consumes.
 
 ---
 
-## Pipeline do runtime Python
+## Python runtime pipeline
 
 ```bash
 cd desktop
-npm run python:fetch     # baixa e verifica o CPython standalone
-npm run python:build     # pip install + poda + pré-compilação
-npm run payload:stage    # copia executor/ e flow/
-npm run python:smoke     # valida o bundle
+npm run python:fetch     # downloads and verifies the standalone CPython
+npm run python:build     # pip install + pruning + precompilation
+npm run payload:stage    # copies executor/ and flow/
+npm run python:smoke     # validates the bundle
 ```
 
-ou `npm run runtime` para os quatro em sequência. Nenhum script tem dependência de
-npm — tudo usa stdlib do Node 20 e o `tar` do próprio Windows.
+or `npm run runtime` for all four in sequence. No script has an npm
+dependency — everything uses the Node 20 stdlib and Windows' own `tar`.
 
-| Script | O que faz |
+| Script | What it does |
 |---|---|
-| `scripts/fetch-python.mjs` | Baixa o asset descrito em `python-runtime.json`, **confere o SHA-256** e extrai. Idempotente — é o que torna o cache do CI útil. |
-| `scripts/build-python-runtime.mjs` | `pip install --require-hashes` do lock do executor ([`executor/requirements-full.txt`](../executor/requirements-full.txt)), poda medida passo a passo, `compileall`, e escreve `resources/payload.json`. |
-| `scripts/check-lock.mjs` | `npm run python:lock:check` (roda no CI): instala o lock do executor num CPython do Windows limpo, com hash e só wheel, e roda o `pip check`. |
-| `scripts/payload-stage.mjs` | Copia `executor/` e `flow/` em ordem determinística, excluindo `.env`, `certs/` e `__pycache__`. |
-| `scripts/smoke-python.mjs` + `smoke.py` | 12 passos que provam que o bundle importa e opera. |
+| `scripts/fetch-python.mjs` | Downloads the asset described in `python-runtime.json`, **checks the SHA-256** and extracts it. Idempotent — that is what makes the CI cache useful. |
+| `scripts/build-python-runtime.mjs` | `pip install --require-hashes` from the executor's lock ([`executor/requirements-full.txt`](../executor/requirements-full.txt)), pruning measured step by step, `compileall`, and writes `resources/payload.json`. |
+| `scripts/check-lock.mjs` | `npm run python:lock:check` (runs in CI): installs the executor's lock into a clean Windows CPython, with hashes and wheels only, and runs `pip check`. |
+| `scripts/payload-stage.mjs` | Copies `executor/` and `flow/` in deterministic order, excluding `.env`, `certs/` and `__pycache__`. |
+| `scripts/smoke-python.mjs` + `smoke.py` | 12 steps that prove the bundle imports and works. |
 
-### Três decisões que não são óbvias
+### Three decisions that are not obvious
 
-**Sem venv.** As dependências são instaladas direto no interpretador. Um venv grava
-`home = <caminho do build agent>` em `pyvenv.cfg` e embute o mesmo caminho nos `.exe`
-de `Scripts/` — nada disso existe na máquina do usuário. Instalar direto torna a
-árvore relocável por construção, sem passo de "primeira execução" (o `conda-unpack`
-do app antigo extraía ~600 MB no primeiro boot).
+**No venv.** The dependencies are installed directly into the interpreter. A venv writes
+`home = <caminho do build agent>` into `pyvenv.cfg` and embeds the same path in the `.exe` files
+in `Scripts/` — none of that exists on the user's machine. Installing directly makes the
+tree relocatable by construction, with no "first run" step (the old app's `conda-unpack`
+extracted ~600 MB on first boot).
 
-**Sem conda.** Todas as 65 dependências têm wheel `win_amd64`/`cp312` no PyPI,
-incluindo o stack GDAL. `--only-binary=:all:` garante que o build fica **vermelho**
-se alguma perder a wheel, em vez de um runner tentar compilar GDAL.
+**No conda.** All 65 dependencies have a `win_amd64`/`cp312` wheel on PyPI,
+including the GDAL stack. `--only-binary=:all:` guarantees that the build goes **red**
+if any of them loses its wheel, instead of a runner trying to compile GDAL.
 
-**`flow/` é irmão de `executor/`.** [`job_executor.py`](../executor/job_executor.py)
-insere o diretório-pai no `sys.path` para importar `flow.executor`. Daí o layout
-obrigatório, com `cwd` e `PYTHONPATH` apontando para `resources/`:
+**`flow/` is a sibling of `executor/`.** [`job_executor.py`](../executor/job_executor.py)
+inserts the parent directory into `sys.path` to import `flow.executor`. Hence the
+mandatory layout, with `cwd` and `PYTHONPATH` pointing to `resources/`:
 
 ```
 resources/
-├── python/     interpretador + site-packages
-├── executor/   cópia de ../executor
-└── flow/       cópia de ../flow
+├── python/     interpreter + site-packages
+├── executor/   copy of ../executor
+└── flow/       copy of ../flow
 ```
 
-### Tamanho (medido, não estimado)
+### Size (measured, not estimated)
 
 ```
-119 MB runtime limpo  →  453 MB após pip  →  353 MB podado  →  392 MB com .pyc
+119 MB clean runtime  →  453 MB after pip  →  353 MB pruned  →  392 MB with .pyc
 ```
 
-A poda corta 100 MB: stdlib GUI/test, suites de teste dos pacotes, headers e fontes,
-`pip`/`setuptools`, e `botocore/data` exceto `s3` e `sts`. O `compileall` devolve
-39 MB em `.pyc` — e vale: sem ele cada boot recompila pandas e geopandas, e os `.pyc`
-gerados em runtime ficariam órfãos após a desinstalação. Comprimido, o payload fica
-em ~83 MB.
+Pruning cuts 100 MB: GUI/test stdlib, the packages' test suites, headers and sources,
+`pip`/`setuptools`, and `botocore/data` except `s3` and `sts`. `compileall` adds back
+39 MB in `.pyc` — and it is worth it: without it every boot recompiles pandas and geopandas, and the `.pyc` files
+generated at runtime would be left orphaned after uninstalling. Compressed, the payload comes
+to ~83 MB.
 
-Os números de cada passo ficam em `resources/payload.json` a cada build.
+The numbers for each step are written to `resources/payload.json` on every build.
 
 ---
 
-## Versões
+## Versions
 
-`python-runtime.json` pina o CPython por **release e SHA-256** — sem o hash, uma
-release republicada trocaria o interpretador sem ninguém notar. Python 3.12 não é
-escolha livre: alinha com [`Dockerfile.executor`](../Dockerfile.executor), com o
-[`Dockerfile.api`](../Dockerfile.api) e com o `setup-python` do CI. Trocar a versão
-exige regerar os locks Python (`python scripts/travar_python.py`), porque as wheels
-são por versão do CPython (`cp312`).
+`python-runtime.json` pins CPython by **release and SHA-256** — without the hash, a
+republished release would swap the interpreter without anyone noticing. Python 3.12 is not a
+free choice: it aligns with [`Dockerfile.executor`](../Dockerfile.executor), with
+[`Dockerfile.api`](../Dockerfile.api) and with the CI's `setup-python`. Changing the version
+requires regenerating the Python locks (`python scripts/travar_python.py`), because wheels
+are per CPython version (`cp312`).
 
-As dependências vêm do **lock do executor**,
-[`executor/requirements-full.txt`](../executor/requirements-full.txt): as mesmas
-versões e os mesmos arquivos do executor do Docker, e o build instala com
-`--require-hashes`. Não há lock próprio do desktop. Havia um, cópia do lock do
-executor, regerada no Windows a cada mudança; o Dependabot o via como arquivo solto e
-subia as transitivas só nele, deixando a imagem para trás. Para mudar uma versão,
-edite `executor/requirements-full.in` e regere os locks (`python scripts/travar_python.py`,
-ver CONTRIBUTING, "Dependências Python").
+The dependencies come from the **executor's lock**,
+[`executor/requirements-full.txt`](../executor/requirements-full.txt): the same
+versions and the same files as the Docker executor, and the build installs with
+`--require-hashes`. There is no desktop-specific lock. There used to be one, a copy of the
+executor's lock, regenerated on Windows on every change; Dependabot saw it as a standalone file and
+bumped the transitive dependencies only in it, leaving the image behind. To change a version,
+edit `executor/requirements-full.in` and regenerate the locks (`python scripts/travar_python.py`,
+see CONTRIBUTING, "Python dependencies").
 
-O lock é resolvido no Linux. O CI prova que ele serve ao Windows com
-`npm run python:lock:check`: instala o lock num CPython do Windows limpo, com
-`--require-hashes` e `--only-binary=:all:`, e roda o `pip check`. Uma wheel que falte
-para `win_amd64`, ou uma dependência que só o Windows pede, quebra ali, e não no build
-do instalador.
+The lock is resolved on Linux. CI proves that it works for Windows with
+`npm run python:lock:check`: it installs the lock into a clean Windows CPython, with
+`--require-hashes` and `--only-binary=:all:`, and runs `pip check`. A wheel missing
+for `win_amd64`, or a dependency that only Windows asks for, breaks there, and not in the
+installer build.
 
-Isso não é cerimônia: antes do lock, `requirements-full.txt` usava pins soltos e
-resolvia geopandas **1.1.4** enquanto o `requirements.txt` da raiz pinava **1.1.3** —
-o executor do Docker e o do desktop rodariam bibliotecas diferentes, e o bug que só
-aparece num dos dois é o mais caro de achar.
+This is not ceremony: before the lock, `requirements-full.txt` used loose pins and
+resolved geopandas **1.1.4** while the root `requirements.txt` pinned **1.1.3** —
+the Docker executor and the desktop one would run different libraries, and the bug that only
+shows up in one of the two is the most expensive one to find.
 
 ---
 
-## Onde ficam os dados do usuário
+## Where the user's data lives
 
-Nada é gravado no diretório de instalação. O app aponta as variáveis que o
-[`config.py`](../executor/config.py) já expõe para o perfil do usuário:
+Nothing is written to the installation directory. The app points the variables that
+[`config.py`](../executor/config.py) already exposes to the user's profile:
 
-| Caminho | Variável |
+| Path | Variable |
 |---|---|
 | `%APPDATA%\AtlansExecutor\config\.env` | `EXECUTOR_ENV_PATH` |
 | `%APPDATA%\AtlansExecutor\certs\` | `EXECUTOR_CERT_DIR` |
 | `%APPDATA%\AtlansExecutor\logs\` | `EXECUTOR_LOG_DIR` |
 | `%USERPROFILE%\AtlansExecutor\artifacts\` | `EXECUTOR_ARTIFACTS_DIR` |
 
-O spawn também **remove** `GDAL_DATA`, `PROJ_LIB`, `PROJ_DATA`, `PYTHONHOME` e
-`PYTHONPATH` do ambiente herdado. Numa máquina com QGIS ou ArcGIS instalado, essas
-variáveis apontam para os dados daquela instalação e o pyogrio/pyproj do bundle
-carregaria tabelas de projeção incompatíveis — um `to_crs()` que devolve coordenada
-errada em vez de estourar.
+The spawn also **removes** `GDAL_DATA`, `PROJ_LIB`, `PROJ_DATA`, `PYTHONHOME` and
+`PYTHONPATH` from the inherited environment. On a machine with QGIS or ArcGIS installed, those
+variables point to that installation's data and the bundle's pyogrio/pyproj
+would load incompatible projection tables — a `to_crs()` that returns a wrong
+coordinate instead of blowing up.
 
 ---
 
-## Solução de problemas
+## Troubleshooting
 
-**`SHA-256 nao confere`** — a release do python-build-standalone mudou. Se foi
-intencional, atualize `release`, `asset` e `sha256` em `python-runtime.json` no mesmo
+**`SHA-256 nao confere`** (SHA-256 does not match) — the python-build-standalone release changed. If it was
+intentional, update `release`, `asset` and `sha256` in `python-runtime.json` in the same
 PR.
 
-**`In --require-hashes mode, all requirements must have their versions pinned`** no
-`python:lock:check` — o Windows pede uma dependência que o lock do executor (resolvido
-no Linux) não tem. Se ela é Python puro, acrescente-a com versão exata ao
-`executor/requirements-full.in` e regere os locks: ela entra no lock e, no Linux, só
-fica instalada à toa (o `requirements-dev.in` traz o `colorama` pelo mesmo motivo).
-Se ela só existe para Windows (um `pywin32`), o lock do Linux não consegue trazê-la
-— com marcador `sys_platform`, o pip-compile a descarta — e o desktop volta a
-precisar de um lock próprio. Hoje não há nenhuma assim.
+**`In --require-hashes mode, all requirements must have their versions pinned`** in
+`python:lock:check` — Windows asks for a dependency that the executor's lock (resolved
+on Linux) does not have. If it is pure Python, add it with an exact version to
+`executor/requirements-full.in` and regenerate the locks: it goes into the lock and, on Linux, is just
+installed needlessly (`requirements-dev.in` brings in `colorama` for the same reason).
+If it only exists for Windows (a `pywin32`), the Linux lock cannot bring it in
+— with a `sys_platform` marker, pip-compile drops it — and the desktop app once again
+needs its own lock. Today there is no such dependency.
 
-**`Could not find a version that satisfies the requirement`** no `python:lock:check` —
-uma versão do lock não tem wheel `win_amd64` para o `cp312`. Escolha, no `.in`, uma
-versão que tenha.
+**`Could not find a version that satisfies the requirement`** in `python:lock:check` —
+a version in the lock has no `win_amd64` wheel for `cp312`. Pick, in the `.in`, a
+version that has one.
 
-**`falha ao extrair … com tar`** — o GNU tar do Git Bash lê `C:\...` como
-`host:caminho`. Os scripts já resolvem o `tar.exe` do System32 por caminho absoluto;
-se o erro voltar, é porque `%SystemRoot%` não está definido.
+**`falha ao extrair … com tar`** (failed to extract … with tar) — Git Bash's GNU tar reads `C:\...` as
+`host:caminho` (host:path). The scripts already resolve System32's `tar.exe` by absolute path;
+if the error comes back, it is because `%SystemRoot%` is not defined.
 
-**Smoke falha no passo 4 (registry)** — a poda removeu algo de que um nó precisa, ou
-um nó novo importa uma dependência que não está no `requirements-full.in`.
+**Smoke fails at step 4 (registry)** — pruning removed something a node needs, or
+a new node imports a dependency that is not in `requirements-full.in`.
 
-**O app instalado abre e fecha na hora, sem erro nenhum** — verifique
+**The installed app opens and closes immediately, with no error at all** — check
 `ELECTRON_RUN_AS_NODE`:
 
 ```powershell
-$env:ELECTRON_RUN_AS_NODE     # se devolver 1, é isso
+$env:ELECTRON_RUN_AS_NODE     # if it returns 1, that's it
 ```
 
-Com essa variável definida, o executável do Electron vira **Node puro**: não há
-módulo `electron`, não há janela, e o processo morre com
-`Cannot find module 'electron'` num stderr que ninguém vê, porque o app é GUI.
-O sintoma é indistinguível de "o app não instalou".
+With that variable set, the Electron executable becomes **plain Node**: there is no
+`electron` module, there is no window, and the process dies with
+`Cannot find module 'electron'` on a stderr nobody sees, because the app is a GUI.
+The symptom is indistinguishable from "the app did not install".
 
-Algumas ferramentas de build e extensões de editor definem essa variável no
-ambiente e ela é herdada por tudo que for lançado dali. Abra o app de um
-terminal limpo, ou remova a variável antes.
+Some build tools and editor extensions set this variable in the
+environment and it is inherited by everything launched from there. Open the app from a
+clean terminal, or remove the variable first.
 
-**Duas instâncias** — o app usa `requestSingleInstanceLock()`. Um `npm run dev`
-aberto segura o mesmo lock do app instalado (mesmo `app.setName`), e a segunda
-instância sai em silêncio, com código 0. Feche o dev antes de testar o
-empacotado.
+**Two instances** — the app uses `requestSingleInstanceLock()`. An open `npm run dev`
+holds the same lock as the installed app (same `app.setName`), and the second
+instance exits silently, with code 0. Close the dev instance before testing the
+packaged one.

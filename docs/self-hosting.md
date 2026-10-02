@@ -1,61 +1,61 @@
-# Instalação própria
+# Self-hosting
 
-Como subir o Atlans no seu servidor, do zero. No fim você tem o site (o web e
-a API), o S3 (MinIO), a CA interna que identifica os executores (step-ca) e o
-Traefik na frente de tudo. Os executores, que rodam os fluxos, ficam em outras
-máquinas (ou na mesma) e se conectam por mTLS.
+How to bring Atlans up on your own server, from scratch. At the end you have the site (the web and
+the API), the S3 (MinIO), the internal CA that identifies the executors (step-ca) and
+Traefik in front of everything. The executors, which run the workflows, live on other
+machines (or the same one) and connect over mTLS.
 
-Para operar depois — atualizar, voltar de versão, backup, troubleshooting —,
-ver [operations.md](operations.md).
+To operate it afterwards — updating, rolling back a version, backup, troubleshooting —,
+see [operations.md](operations.md).
 
-## Antes de começar
+## Before you start
 
-- **Um host Linux** com Docker 24+, Docker Compose v2.17 ou mais novo (o
-  compose usa `additional_contexts`), `openssl`, `make` e `git`.
-- **Um PostgreSQL 15+ com PostGIS 3** e a extensão `uuid-ossp`, fora do
-  compose: no mesmo host, em outro ou gerenciado. No mesmo host, a API (num
-  container) não o alcança por `localhost`, que ali é o próprio container: use
-  `host.docker.internal` no `DATABASE_URL` (o `api-prod` já aponta esse nome
-  para o host), e faça o Postgres escutar na interface do Docker
-  (`listen_addresses`) e aceitar as redes dele no `pg_hba.conf` (dentro de
-  `172.16.0.0/12`, por padrão).
-- **Um domínio, com três nomes** apontando para o IP do host. São as variáveis
-  `PUBLIC_HOST`, `AGENTS_HOST` e `S3_HOST` do `.env`:
+- **A Linux host** with Docker 24+, Docker Compose v2.17 or newer (the
+  compose file uses `additional_contexts`), `openssl`, `make` and `git`.
+- **A PostgreSQL 15+ with PostGIS 3** and the `uuid-ossp` extension, outside the
+  compose: on the same host, on another one or managed. On the same host, the API (in a
+  container) does not reach it through `localhost`, which there is the container itself: use
+  `host.docker.internal` in `DATABASE_URL` (`api-prod` already points that name
+  at the host), and make Postgres listen on the Docker interface
+  (`listen_addresses`) and accept its networks in `pg_hba.conf` (within
+  `172.16.0.0/12`, by default).
+- **A domain, with three names** pointing to the host's IP. They are the variables
+  `PUBLIC_HOST`, `AGENTS_HOST` and `S3_HOST` in `.env`:
 
-  | Variável | Exemplo | Para quê | CDN na frente |
+  | Variable | Example | What for | CDN in front |
   |---|---|---|---|
-  | `PUBLIC_HOST` | `atlans.example.org` | o site, a API pública, o `/mcp` | pode |
-  | `AGENTS_HOST` | `agents.atlans.example.org` | os executores (mTLS) | **nunca** |
-  | `S3_HOST` | `s3.atlans.example.org` | downloads e uploads (URLs pré-assinadas) | pode |
+  | `PUBLIC_HOST` | `atlans.example.org` | the site, the public API, `/mcp` | allowed |
+  | `AGENTS_HOST` | `agents.atlans.example.org` | the executors (mTLS) | **never** |
+  | `S3_HOST` | `s3.atlans.example.org` | downloads and uploads (presigned URLs) | allowed |
 
-  Um CDN termina o TLS e descarta o certificado do cliente: com o
-  `AGENTS_HOST` atrás de um (na Cloudflare, *proxied*), nenhum executor
-  conecta. Na Cloudflare, ele fica *DNS-only*.
+  A CDN terminates TLS and discards the client certificate: with
+  `AGENTS_HOST` behind one (on Cloudflare, *proxied*), no executor
+  connects. On Cloudflare, it stays *DNS-only*.
 
-  Use `agents.` + o `PUBLIC_HOST` para o `AGENTS_HOST`, como no exemplo. O
-  compose anuncia aos executores o próprio `AGENTS_HOST` (`AGENTS_URL` =
-  `https://<AGENTS_HOST>`, a menos que o `.env` defina outro), e o executor
-  acha o site tirando o `agents.` do endereço. Com um `AGENTS_HOST` que não
-  siga a convenção, defina `EXECUTOR_PUBLIC_SERVER_URL` em cada executor (o
-  `install.sh` já o traz). O `make smoke` confere que o `install.sh` servido
-  anuncia o `AGENTS_HOST`.
-- **Um certificado TLS para o `PUBLIC_HOST` e o `S3_HOST`**: o de origem da
-  Cloudflare, um do Let's Encrypt ou outro, com os dois nomes. Um curinga só
-  cobre um nível: `*.example.org` vale para `atlans.example.org`, mas não para
-  `s3.atlans.example.org`. O do `AGENTS_HOST` sai da CA interna; não precisa
-  providenciar.
-- **E-mail** (Resend ou qualquer SMTP): o cadastro manda o link de verificação
-  por e-mail, e o login exige o e-mail verificado. Sem e-mail, ver
-  `EXIGIR_EMAIL_VERIFICADO` no `.env.example` e o risco que ele descreve; e
-  sem transporte a redefinição de senha não funciona (o link com o token não
-  vai para o log).
+  Use `agents.` + the `PUBLIC_HOST` for `AGENTS_HOST`, as in the example. The
+  compose file announces `AGENTS_HOST` itself to the executors (`AGENTS_URL` =
+  `https://<AGENTS_HOST>`, unless `.env` sets another), and the executor
+  finds the site by stripping `agents.` from the address. With an `AGENTS_HOST` that does not
+  follow the convention, set `EXECUTOR_PUBLIC_SERVER_URL` on each executor (the
+  `install.sh` already includes it). `make smoke` checks that the served `install.sh`
+  announces the `AGENTS_HOST`.
+- **A TLS certificate for `PUBLIC_HOST` and `S3_HOST`**: the Cloudflare origin
+  certificate, one from Let's Encrypt or another, with both names. A wildcard only
+  covers one level: `*.example.org` is valid for `atlans.example.org`, but not for
+  `s3.atlans.example.org`. The one for `AGENTS_HOST` comes from the internal CA; you do not need to
+  provide it.
+- **Email** (Resend or any SMTP): sign-up sends the verification link
+  by email, and login requires a verified email. Without email, see
+  `EXIGIR_EMAIL_VERIFICADO` in `.env.example` and the risk it describes; and
+  without a transport, password reset does not work (the link with the token does not
+  go to the log).
 
-Opcionais: o assistente, que monta fluxos por linguagem natural, precisa de
-um modelo (`LLM_API_KEY`: o OpenRouter, um gateway ou um servidor local como
-o Ollama); o satélite do mapa precisa de um provedor de tiles à sua escolha
+Optional: the assistant, which builds workflows from natural language, needs
+a model (`LLM_API_KEY`: OpenRouter, a gateway or a local server such as
+Ollama); the map's satellite view needs a tile provider of your choice
 (`MAPA_*`).
 
-## 1. Preparar o host
+## 1. Prepare the host
 
 ```bash
 git clone https://github.com/jlanio/atlans-studio.git atlans
@@ -63,70 +63,70 @@ cd atlans
 make bootstrap
 ```
 
-O `make bootstrap` cria o volume `step-ca-data` (a chave da CA), as pastas
-`secrets/`, `traefik/atlans-ca/`, `certs/` e `backups/`, a senha do
-provisioner da step-ca e o `.env`, copiado do `.env.example` com segredos
-fortes no lugar dos vazios. Rodar de novo não apaga nada. O `.env` e a pasta
-`secrets/` nunca vão para o git.
+`make bootstrap` creates the `step-ca-data` volume (the CA's key), the folders
+`secrets/`, `traefik/atlans-ca/`, `certs/` and `backups/`, the step-ca
+provisioner password and the `.env`, copied from `.env.example` with strong
+secrets in place of the empty ones. Running it again deletes nothing. The `.env` and the
+`secrets/` folder never go into git.
 
-Ponha o certificado do site em `certs/cert.pem` (com a cadeia) e
-`certs/key.pem`, ou aponte `SSL_CERT_DIR` para uma pasta com esses dois nomes.
-Do certbot, copie o `fullchain.pem` como `cert.pem` e o `privkey.pem` como
-`key.pem` (cópias, e não os links da pasta `live/`, que apontam para fora do
-que o Traefik monta). O Traefik só relê o certificado ao reiniciar: a cada
-renovação, `docker compose --profile prod restart traefik`.
+Put the site's certificate in `certs/cert.pem` (with the chain) and
+`certs/key.pem`, or point `SSL_CERT_DIR` to a folder with those two names.
+From certbot, copy `fullchain.pem` as `cert.pem` and `privkey.pem` as
+`key.pem` (copies, not the links in the `live/` folder, which point outside
+what Traefik mounts). Traefik only rereads the certificate when it restarts: on every
+renewal, `docker compose --profile prod restart traefik`.
 
-## 2. Configurar o `.env`
+## 2. Configure the `.env`
 
-O `.env.example` explica cada variável. Para produção, o mínimo:
+`.env.example` explains each variable. For production, the minimum:
 
-| Variável | Valor |
+| Variable | Value |
 |---|---|
 | `DATABASE_URL` | `postgresql+asyncpg://<usuário>:<senha>@<host>:5432/<banco>` |
-| `PUBLIC_HOST`, `AGENTS_HOST`, `S3_HOST` | os três nomes |
+| `PUBLIC_HOST`, `AGENTS_HOST`, `S3_HOST` | the three names |
 | `FRONTEND_URL`, `AUTH_URL` | `https://<PUBLIC_HOST>` |
 | `ALLOWED_ORIGINS` | `https://<PUBLIC_HOST>` |
-| `MINIO_EXTERNAL_ENDPOINT` | `https://<S3_HOST>` (com `localhost`, nenhum download abre fora do Docker) |
+| `MINIO_EXTERNAL_ENDPOINT` | `https://<S3_HOST>` (with `localhost`, no download opens outside Docker) |
 | `MINIO_API_CORS_ALLOW_ORIGIN` | `https://<PUBLIC_HOST>` |
-| `MINIO_ROOT_USER` | troque o padrão |
-| `EXECUTOR_REPO_URL` | a URL deste repositório: o instalador do executor clona dele |
-| `RESEND_API_KEY` ou `SMTP_*`, e `EMAIL_FROM` | o transporte de e-mail e o remetente |
-| `AGENDAMENTO_FUSO_PADRAO` | o fuso da sua região (`America/Sao_Paulo`, `Europe/Lisbon`…), **antes** de criar agendamentos |
-| `CODIGO_FONTE_URL` | a URL do repositório de onde vem o código que roda (o oficial, ou o seu fork) |
-| `NOME_NA_TELA` | o nome que a tela mostra (barra lateral, entrada, aba); vazio = `Atlans`. Quem distribui uma versão modificada ou a oferece como serviço põe o nome dela ([TRADEMARKS.md](../TRADEMARKS.md)) |
+| `MINIO_ROOT_USER` | change the default |
+| `EXECUTOR_REPO_URL` | the URL of this repository: the executor installer clones from it |
+| `RESEND_API_KEY` or `SMTP_*`, and `EMAIL_FROM` | the email transport and the sender |
+| `AGENDAMENTO_FUSO_PADRAO` | your region's time zone (`America/Sao_Paulo`, `Europe/Lisbon`…), **before** creating schedules |
+| `CODIGO_FONTE_URL` | the URL of the repository the running code comes from (the official one, or your fork) |
+| `NOME_NA_TELA` | the name the screen shows (sidebar, sign-in, tab); empty = `Atlans`. Whoever distributes a modified version or offers it as a service puts its own name there ([TRADEMARKS.md](../TRADEMARKS.md)) |
 
-Depende de onde a instalação roda:
+It depends on where the installation runs:
 
-- **Atrás da Cloudflare**: `BORDA_MIDDLEWARE=cloudflare-only` e as faixas
-  dela em `BORDA_FAIXAS_CONFIAVEIS` (a lista está no `.env.example`). Sem CDN,
-  os padrões (`borda-aberta`) já servem. O nome da borda escolhe também de
-  onde vem o IP do cliente nos rate limits dos routers públicos
-  (`rate-mcp-<borda>` e `rate-download-<borda>` no
-  `traefik-dynamic/dynamic.yml`): sem CDN é o da conexão; atrás da Cloudflare
-  é o que ela anexa ao `X-Forwarded-For`. Uma borda própria (outro CDN)
-  precisa dos dois rate limits dela no `dynamic.yml`.
+- **Behind Cloudflare**: `BORDA_MIDDLEWARE=cloudflare-only` and its
+  ranges in `BORDA_FAIXAS_CONFIAVEIS` (the list is in `.env.example`). Without a CDN,
+  the defaults (`borda-aberta`) already work. The edge name also chooses where
+  the client IP comes from in the rate limits of the public routers
+  (`rate-mcp-<borda>` and `rate-download-<borda>` in
+  `traefik-dynamic/dynamic.yml`): without a CDN it is the connection's; behind Cloudflare
+  it is the one Cloudflare appends to `X-Forwarded-For`. A custom edge (another CDN)
+  needs its own two rate limits in `dynamic.yml`.
 
-  A lista de faixas **não autentica a Cloudflare**: ela só diz que a conexão
-  saiu de um IP dela — de qualquer conta, um Worker inclusive. Quem souber o
-  IP do origin (o `AGENTS_HOST` é DNS-only e o publica) e falar com ele de
-  dentro dessas faixas passa pela borda e escolhe o `X-Forwarded-For`. Para a
-  borda ser real, ligue na Cloudflare os *Authenticated Origin Pulls* e exija
-  o certificado de cliente dela nos hosts públicos: uma `tls.options` no
-  `dynamic.yml` com `clientAuth.caFiles` apontando para o certificado da
-  Cloudflare e `clientAuthType: RequireAndVerifyClientCert`, referenciada
-  pelos routers do `PUBLIC_HOST` e do `S3_HOST` (nunca pelos do
-  `AGENTS_HOST`, que têm o mTLS dos executores).
-- **Num host com systemd**: `LOG_DRIVER=journald`, para o log da API e do web
-  sobreviver à troca de container ([operations.md](operations.md#logs-que-sobrevivem-ao-deploy)).
-- **Engine do Docker antigo**: `DOCKER_API_VERSION` (ex.: `1.41`), se o Traefik
-  não conseguir falar com ele.
+  The range list **does not authenticate Cloudflare**: it only says that the connection
+  came from one of its IPs — from any account, a Worker included. Anyone who knows the
+  origin's IP (`AGENTS_HOST` is DNS-only and publishes it) and talks to it from
+  inside those ranges gets through the edge and chooses the `X-Forwarded-For`. For the
+  edge to be real, turn on *Authenticated Origin Pulls* in Cloudflare and require
+  its client certificate on the public hosts: a `tls.options` in
+  `dynamic.yml` with `clientAuth.caFiles` pointing to Cloudflare's
+  certificate and `clientAuthType: RequireAndVerifyClientCert`, referenced
+  by the routers of `PUBLIC_HOST` and `S3_HOST` (never by those of
+  `AGENTS_HOST`, which have the executors' mTLS).
+- **On a host with systemd**: `LOG_DRIVER=journald`, so the API and web logs
+  survive container replacement ([operations.md](operations.md#logs-that-survive-the-deploy)).
+- **Old Docker Engine**: `DOCKER_API_VERSION` (e.g. `1.41`), if Traefik
+  cannot talk to it.
 
-Os segredos (`APP_SECRET`, `FERNET_KEY`, `AUTH_SECRET`, `OTP_PEPPER`,
-`EXECUTOR_SIGNING_KEY`, as senhas do Redis, do MinIO e da step-ca) o
-bootstrap já gerou. Guarde uma cópia do `.env` fora do host: sem a
-`FERNET_KEY`, as credenciais salvas no banco não abrem mais.
+The secrets (`APP_SECRET`, `FERNET_KEY`, `AUTH_SECRET`, `OTP_PEPPER`,
+`EXECUTOR_SIGNING_KEY`, the Redis, MinIO and step-ca passwords) were already generated by the
+bootstrap. Keep a copy of the `.env` off the host: without the
+`FERNET_KEY`, the credentials saved in the database can no longer be opened.
 
-## 3. Subir
+## 3. Bring it up
 
 ```bash
 make up-prod                # constrói as imagens e sobe a stack; a step-ca cria a CA no 1º boot
@@ -140,61 +140,61 @@ make smoke                  # confere API, schema, Redis, MinIO, step-ca, web, o
 make seed-admin             # cria o admin (pede e-mail e senha)
 ```
 
-Um container lê o `.env` só quando é criado: depois de mudar o `.env`, é
-`docker compose --profile prod up -d <serviço>`, e não `restart`.
+A container reads the `.env` only when it is created: after changing the `.env`, it is
+`docker compose --profile prod up -d <serviço>`, not `restart`.
 
-O catálogo de fontes (`catalogo/geoservicos`, [sources.md](sources.md)) é
-importado pela API na subida, assim que as tabelas existem: com o schema
-criado antes de recriá-la, a recriação acima já o importa.
+The source catalog (`catalogo/geoservicos`, [sources.md](sources.md)) is
+imported by the API at startup, as soon as the tables exist: with the schema
+created before recreating it, the recreation above already imports it.
 
-Se o `make up-prod` parar em «Pool overlaps with other one on this address
-space», outra rede do Docker já usa a faixa da rede do Traefik: ver
-`PROXY_NET_SUBNET` no `.env.example`.
+If `make up-prod` stops at "Pool overlaps with other one on this address
+space", another Docker network already uses the range of the Traefik network: see
+`PROXY_NET_SUBNET` in `.env.example`.
 
-As migrações nunca rodam sozinhas: o `alembic upgrade head` volta a cada
-versão que mude o schema. O roteiro manual da CA, passo a passo, está em
+Migrations never run on their own: the `alembic upgrade head` comes back with every
+version that changes the schema. The manual step-by-step procedure for the CA is in
 [mtls-bootstrap.md](mtls-bootstrap.md).
 
-Abra `https://<PUBLIC_HOST>` e entre com o admin.
+Open `https://<PUBLIC_HOST>` and sign in with the admin.
 
-## 4. Os executores
+## 4. The executors
 
-Todo fluxo roda num executor. Para matricular um:
+Every workflow runs on an executor. To enroll one:
 
-1. No painel, em **Executores**, crie o executor e gere o código de matrícula
-   (um OTP de uso único, que vale 24 horas).
-2. Na máquina dele, siga [executor/README.md](../executor/README.md): o
-   instalador, a matrícula (`python -m executor enroll`) e a execução. Com
-   Docker, o [docker-compose.executor.yml](../docker-compose.executor.yml);
-   no Windows, o app desktop ([desktop/](../desktop/)), que precisa ser
-   construído apontando para a sua instalação (`ATLANS_DESKTOP_SERVIDOR` e
-   `ATLANS_DESKTOP_UI_URL`, ver o `desktop-windows.yml`).
+1. In the dashboard, under **Executores** (Executors), create the executor and generate the enrollment code
+   (a single-use OTP, valid for 24 hours).
+2. On its machine, follow [executor/README.md](../executor/README.md): the
+   installer, the enrollment (`python -m executor enroll`) and running it. With
+   Docker, [docker-compose.executor.yml](../docker-compose.executor.yml);
+   on Windows, the desktop app ([desktop/](../desktop/)), which has to be
+   built pointing at your installation (`ATLANS_DESKTOP_SERVIDOR` and
+   `ATLANS_DESKTOP_UI_URL`, see `desktop-windows.yml`).
 
-O executor fala com o `AGENTS_HOST`. Se ele não conecta, comece por
-[operations.md, "Agent não conecta"](operations.md#agent-não-conecta).
+The executor talks to `AGENTS_HOST`. If it does not connect, start with
+[operations.md, "Agent does not connect"](operations.md#agent-does-not-connect).
 
-## 5. Depois de subir
+## 5. After bringing it up
 
-- **Backup.** O volume da CA (`make backup-stepca`, num cron diário), o banco
-  (`pg_dump`) e o volume do MinIO. Perder a CA invalida todos os executores
-  matriculados. Ver [operations.md](operations.md#backup-e-restore).
-- **Atualizar.** `git pull`, `docker compose --profile prod up -d --build` e
-  as migrações; antes, compare o `.env.example` novo com o seu `.env`. Ver
-  [operations.md](operations.md#atualizar-a-instalação).
-- **Segurança.** As correções chegam pelo repositório; aplicá-las é de cada
-  instalação ([SECURITY.md](../SECURITY.md)).
-- **Modificou o código?** A AGPL pede que quem usa a sua instalação pela rede
-  possa obter o código-fonte da versão que roda nela (seção 13 da
-  [LICENSE](../LICENSE)): publique o seu fork e aponte `CODIGO_FONTE_URL`, no
-  `.env`, para ele. O link aparece na tela de entrada e no menu da conta.
+- **Backup.** The CA volume (`make backup-stepca`, in a daily cron), the database
+  (`pg_dump`) and the MinIO volume. Losing the CA invalidates every enrolled
+  executor. See [operations.md](operations.md#backup-and-restore).
+- **Updating.** `git pull`, `docker compose --profile prod up -d --build` and
+  the migrations; before that, compare the new `.env.example` with your `.env`. See
+  [operations.md](operations.md#update-the-installation).
+- **Security.** Fixes arrive through the repository; applying them is up to each
+  installation ([SECURITY.md](../SECURITY.md)).
+- **Modified the code?** The AGPL requires that whoever uses your installation over the network
+  can obtain the source code of the version running on it (section 13 of the
+  [LICENSE](../LICENSE)): publish your fork and point `CODIGO_FONTE_URL`, in the
+  `.env`, to it. The link appears on the sign-in screen and in the account menu.
 
-## O que a instalação não traz
+## What the installation does not include
 
-- **Cobrança.** O núcleo não cobra nada de ninguém: cada pessoa tem a cota
-  diária do assistente (`ASSISTENTE_TETO_DE_TOKENS_POR_DIA`), e só. Recursos à
-  parte entram como extensões (`app/extensoes/` e `web/extensoes/`, ver
+- **Billing.** The core does not charge anyone anything: each person has the
+  assistant's daily quota (`ASSISTENTE_TETO_DE_TOKENS_POR_DIA`), and that is it. Separate
+  features come in as extensions (`app/extensoes/` and `web/extensoes/`, see
   [architecture.md](architecture.md)).
-- **Satélite.** O código não traz servidor de tiles de satélite: sem os
-  `MAPA_*`, o mapa mostra as ruas do OpenStreetMap.
-- **A marca.** O código é livre; o nome e os logotipos têm regras próprias
+- **Satellite.** The code does not include a satellite tile server: without the
+  `MAPA_*` variables, the map shows OpenStreetMap streets.
+- **The brand.** The code is free; the name and the logos have their own rules
   ([TRADEMARKS.md](../TRADEMARKS.md)).

@@ -1,501 +1,503 @@
-# Assistente da Home — conversas sobre o globo
+# Home assistant — conversations over the globe
 
-O assistente da Home é o assistente de **outra superfície**. O laço é o mesmo
-(`app/services/assistente_service.py`), a autorização é a mesma (as tools do MCP,
-pelo mesmo `call_tool`), a cota de tokens é a mesma (`assistente:tokens:{user}`).
-O que muda é o pacote da superfície `HOME` (`app/services/assistente_superficie.py`)
-e o fato de a conversa ser **persistida no banco** — veja "Superfícies" em
-`docs/editor-assistant.md` para a fronteira do laço.
+The Home assistant is the assistant of **another surface**. The loop is the same
+(`app/services/assistente_service.py`), the authorization is the same (the MCP tools,
+through the same `call_tool`), the token quota is the same (`assistente:tokens:{user}`).
+What changes is the `HOME` surface package (`app/services/assistente_superficie.py`)
+and the fact that the conversation is **persisted in the database** — see "Surfaces" in
+`docs/editor-assistant.md` for the boundary of the loop.
 
-Este documento é a **API** (`/assistente`): as rotas, os quadros do SSE, a
-confirmação por clique e a persistência.
+This document is the **API** (`/assistente`): the routes, the SSE frames, the
+click confirmation and the persistence.
 
-## A página (a Home, `/`)
+## The page (the Home, `/`)
 
-O assistente vive na **Home** — a rota `/`, a landing de todo mundo (ela abre
-**sem login**; a entrada é pedida no primeiro envio — ver "A Home sem sessão"). É
-um **globo 3D** em tela cheia (MapLibre GL, projeção `globe`, sobre a imagem
-híbrida do Google) que recebe as geometrias de saída das execuções; a conversa flutua
-sobre ele. A casca é "como o Claude Code": um `HomeSidebar` só, com a marca no
-topo, **Nova conversa**, e o grupo **Meus → Agendamentos, Artefatos, Chats**; o
-rodapé é o `UserSidebar` de sempre (Tema, Configurações, Sair — sem
-atalho de navegação); sem sessão, o rodapé vira **Entrar** e **Criar conta**. A
-Home é **sempre escura** (paleta quase preta `.home` em `globals.css`),
-independente do tema do app.
+The assistant lives on the **Home** — the `/` route, everyone's landing page (it opens
+**without login**; sign-in is requested on the first send — see "The Home without a session"). It is
+a full-screen **3D globe** (MapLibre GL, `globe` projection, over Google's hybrid
+imagery) that receives the output geometries of runs; the conversation floats
+over it. The shell is "like Claude Code": a single `HomeSidebar`, with the brand at the
+top, **Nova conversa** (New conversation), and the group **Meus → Agendamentos, Artefatos, Chats**
+(Mine → Schedules, Artifacts, Chats); the footer is the usual `UserSidebar` (Tema, Configurações,
+Sair — Theme, Settings, Sign out — with no navigation shortcut); without a session, the footer becomes
+**Entrar** (Sign in) and **Criar conta** (Create account). The
+Home is **always dark** (the near-black `.home` palette in `globals.css`),
+regardless of the app's theme.
 
-**Quem não administra o sistema não alcança outra página além da Home.** É a
-direção do produto — a Home é a ÚNICA página de quem não é admin, migrando o resto
-aos poucos. Hoje isso é controle de acesso, não só oferta: o
-middleware (`web/proxy.ts`) devolve `/` para qualquer página fora dela
+**Anyone who does not administer the system cannot reach any page other than the Home.** That is the
+product's direction — the Home is the ONLY page for non-admins, with the rest migrating
+over little by little. Today this is access control, not just what is offered: the
+middleware (`web/proxy.ts`) sends any page outside it back to `/`
 (`/projects`, `/workflow/…`, `/drive`, `/settings/tokens`, `/admin`,
-`/dashboard`…) quando o papel não é admin — o proxy `/terra`, do qual a Home
-vive, e os arquivos do `public/` ficam fora do portão; sessão sem papel falha
-fechada. Antes disso, as saídas da própria Home já tinham sido fechadas, nesta
-ordem:
+`/dashboard`…) when the role is not admin — the `/terra` proxy, which the Home
+lives on, and the `public/` files stay outside the gate; a session without a role fails
+closed. Before that, the exits from the Home itself had already been closed, in this
+order:
 
-| saída | estado |
+| exit | state |
 |---|---|
-| Marca do sidebar → `/projects` | só admin. Sem `href`, o `Marca` vira `<span>`: some o destino **e** o realce de hover que dizia "isto é clicável" |
-| Linha de Agendamentos → `/workflow/{id}` | fechada. A linha é `<div>`: um `<button>` sem ação prometeria um clique que não acontece |
-| **Paleta Ctrl+K** | **não abre em `/` para quem não é admin** (`paletaDisponivel`) |
-| **Badge do fluxo → `/workflow/{id}`** | **substituído**: a faixa passou a mostrar os ARTEFATOS da conversa, e clicar põe no globo |
-| Menu de conta → `/settings/tokens` | **fechada**: o item "Tokens de acesso" saiu do menu; e a rota, como toda página fora de `/`, devolve `/` a quem não é admin (o admin chega pela paleta Ctrl+K ou pela URL) |
-| `signOut` | aberta — a única saída do app |
+| Sidebar brand → `/projects` | admin only. Without an `href`, the `Marca` becomes a `<span>`: both the destination **and** the hover highlight that said "this is clickable" go away |
+| Agendamentos (Schedules) row → `/workflow/{id}` | closed. The row is a `<div>`: a `<button>` with no action would promise a click that does not happen |
+| **Ctrl+K palette** | **does not open on `/` for non-admins** (`paletaDisponivel`) |
+| **Workflow badge → `/workflow/{id}`** | **replaced**: the strip now shows the conversation's ARTIFACTS, and clicking puts one on the globe |
+| Account menu → `/settings/tokens` | **closed**: the "Tokens de acesso" (Access tokens) item left the menu; and the route, like every page outside `/`, sends non-admins back to `/` (the admin gets there through the Ctrl+K palette or the URL) |
+| `signOut` | open — the only exit from the app |
 
-**As saídas da tabela eram OFERTA; o controle de acesso é o middleware** — que
-devolve `/` a quem não é admin fora da Home (desde o #155) e, sem sessão, só
-deixa a Home abrir: qualquer outra página vai para a Home com o modal de entrada
-(ver "A Home sem sessão e o modal de entrada", no fim desta seção).
+**The exits in the table were what was OFFERED; the access control is the middleware** — which
+sends non-admins outside the Home back to `/` (since #155) and, without a session, only
+lets the Home open: any other page goes to the Home with the sign-in modal
+(see "The Home without a session and the sign-in modal", at the end of this section).
 
-Duas notas sobre as duas últimas:
+Two notes on the last two:
 
-- **A paleta não abre, em vez de filtrar item a item**, porque HOJE todo item
-  dela sai da Home: os oito estáticos não-admin levam a outras rotas, e os
-  dinâmicos são um por fluxo (`/workflow/{id}`) e um por credencial — estes nem
-  passavam pela `itensVisiveis`. Filtrar deixaria uma caixa vazia. De brinde, o
-  `loadItems` não roda: some o `getWorkflows()` que disparava a cada Ctrl+K na
-  Home. Fora de `/`, e para admin, nada muda.
-- **A faixa de badges supera a decisão 4** ("o usuário nunca vê o fluxo, a não
-  ser que clique no badge"): o fluxo deixa de ser alcançável pela Home. Ele
-  continua em Projetos, com o interruptor "mostrar os do assistente" ligado,
-  para quem chegar lá. O quadro `fluxo` segue sendo emitido e decodificado — o
-  que some é a oferta.
+- **The palette does not open, instead of filtering item by item**, because TODAY every item
+  in it leaves the Home: the eight static non-admin ones lead to other routes, and the
+  dynamic ones are one per workflow (`/workflow/{id}`) and one per credential — these did not even
+  go through `itensVisiveis`. Filtering would leave an empty box. As a bonus, the
+  `loadItems` does not run: the `getWorkflows()` that fired on every Ctrl+K on the
+  Home goes away. Outside `/`, and for admins, nothing changes.
+- **The badge strip supersedes decision 4** ("the user never sees the workflow, unless
+  they click the badge"): the workflow is no longer reachable from the Home. It
+  remains in Projects, with the "mostrar os do assistente" (show the assistant's ones) switch on,
+  for whoever gets there. The `fluxo` frame is still emitted and decoded — what
+  goes away is the offer.
 
-- **A rota** mora em `web/app/(dashboard)/page.tsx` (o grupo não contribui
-  segmento). O layout `(dashboard)` é compartilhado; um `ShellSidebar` (client,
-  `usePathname`) escolhe `HomeSidebar` em `/` e `AppSidebar` nas demais rotas. O
-  `AppHeader` retorna `null` em `/`, como no canvas.
-- **O grupo Meus do `HomeSidebar`** (Agendamentos, Artefatos, Chats) são três
-  itens colapsáveis com a MESMA linha (`home/linha.tsx`: `LinhaDoMeu` +
-  `GatilhoDeAcoes`): o texto principal é `min-w-0 flex-1` e trunca com
-  reticências e `title`; o "⋯" é irmão no flex, nunca sobre o texto — no
-  telefone o alvo de 40px só empurra o título. O aberto/fechado dos três é
-  lembrado no navegador (`atlans:home:meu`, lido em `hidratar()`), então
-  sobrevive à gaveta do telefone, à troca de rota e ao redimensionar; só Chats
-  nasce aberto. Fechar um item ESCONDE a lista (`hidden`), não a desmonta —
-  reabrir não refaz requisições nem perde o "Ver mais" —, e a lista só monta
-  depois de hidratar (no telefone o primeiro render ainda é o ramo desktop, e
-  montar ali disparava um GET perdido). No **trilho de 3rem** (Ctrl+B, o
-  gatilho ou a borda arrastável, o `SidebarRail`), clicar um item expande a
-  barra E o abre — nunca alterna um estado invisível; a marca fica como glifo
-  (para o admin, ainda o link para Projetos, com tooltip) e só o wordmark some.
-- **Portais na paleta da Home.** Todo `*Content` do Radix aberto a partir da
-  Home (os menus "⋯", tooltips, `RenomearDialog`, `DeleteDialog`,
-  `MetadataDialog`, `ExecuteParamsDialog`, o menu de conta e as Preferências)
-  vai ao `<body>`, fora da árvore `.home dark`, e por isso leva `home-portal`
-  (globals.css). Os componentes compartilhados ganharam `className` /
-  `portalClassName` opcionais para isso; fora da Home, nada muda.
-- **O basemap é a imagem híbrida da instalação** (satélite + vias e rótulos,
-  `MAPA_HIBRIDO_URL`; sem ela, o satélite `MAPA_SATELITE_URL` e, sem este, as
-  ruas do OpenStreetMap — `web/lib/fundos-do-mapa.ts`), a mesma que o portal
-  `/share` oferece no alternador dele. Não há estado "sem basemap". É o **único**
-  basemap da Home (o Dark Matter da CARTO, que exigia chave gratuita, saiu),
-  então a Home **não tem alternador**: o `Globo` monta o `MapLibreMap` com
-  `basemapInicial="hybrid"` e `basemapToggle={false}`. Raster na esfera deforma
-  um pouco ao mudar de zoom (o MapLibre recomenda vetorial para o globo); com a
-  imagem como basemap único isso é permanente e aceito.
-- **A atribuição nunca é escrita por nós.** Todo basemap que usamos já declara a
-  própria na fonte (`MAPA_*_CREDITO`; "© OpenStreetMap contributors" nas ruas padrão).
-  Passar um `customAttribution` por cima **não substituía** a da fonte — o
-  MapLibre concatena os dois com `" | "`, e a Home mostrava a mesma coisa duas
-  vezes.
-- **A chrome do mapa é discreta** (`controlesDiscretos`): zoom, bússola e escala
-  vestem um vidro translúcido em vez da caixa branca sólida do MapLibre; o
-  ícone fica em 0,65 de opacidade e sobe a 1 no hover/foco (no toque o piso é
-  mais alto, porque não há hover para revelar). A atribuição entra em modo
-  `compact`: vira um **"ⓘ" que abre no clique**. Ela fica discreta, nunca some —
-  os termos dos provedores (e a ODbL do OSM) a exigem, e um clique é a
-  forma que o próprio MapLibre oferece para isso. O portal segue no padrão do
-  MapLibre.
-- **Os Chats** são a lista de conversas (`GET /assistente/conversas`): renomear
-  (`PATCH`) e apagar (`DELETE`, soft) pelo menu ⋯ de cada linha. Clicar num chat
-  abre o painel com o **replay** daquela conversa. A lista **espelha o servidor
-  sem F5**: o 1º quadro `conversa` de cada mensagem (id, título, `nova`) e a
-  confirmação aceita viram um anúncio na store (`anuncioDeConversa` — um slot,
-  não uma fila: a lista pode estar desmontada) que a `ChatsLista` aplica sem
-  GET (`useConversas.anunciar`): a conversa nova entra no topo com o título, a
-  existente sobe; renomear também sobe (o servidor carimba `updated_at` no
-  PATCH). Apagar a conversa **ativa** deixa a Home como o botão "Nova conversa"
-  (o stream em curso para; painel e pilha esvaziam; a mensagem seguinte cria
-  outra, em vez de bater num 404). No rodapé, "Ver mais" pede a página
-  seguinte e "Tentar de novo" refaz **o que falhou** (a página, ou a recarga);
-  a recarga relê todas as páginas já na tela, em paralelo e tudo-ou-nada,
-  porque o servidor apara `limit` em 100 em silêncio.
-- **Meus → Agendamentos** (`GET /me/schedules`, `useAgendamentos`): os agendamentos
-  da pessoa entre TODOS os workspaces, ativos e pausados (o pausado mostra o
-  `motivoPausa` de `resumirAgendamento`). O menu ⋯
-  — só para operator+ NAQUELE workspace (`hasMinRole` por item, pois a lista cruza
-  vários) — traz pausar/ativar (`PUT /workflows/{id}/schedules/{job}`, otimista) e
-  rodar agora (busca `params_schema`, abre o `ExecuteParamsDialog` se houver). A
-  linha NÃO abre mais o fluxo no editor (é uma das saídas fechadas): por isso é
-  `<div>` e não `<button>` — um botão sem ação prometeria um clique que não
-  acontece. O fluxo do assistente leva um selo. Religar não dispara na hora (o
-  `schedule_service` zera `next_run_at`).
-- **Meus → Artefatos** (`useAcervo`): o acervo do workspace atual — artefatos de
-  execução (`GET /artifacts`) e arquivos do Drive (`GET /drive`) na MESMA lista,
-  unidos por `Promise.allSettled` (a falha de uma fonte não derruba a outra),
-  distinguidos só por ícone e pelo estado **permanente / efêmero / local no
-  executor** (cor neutra no formato; `LocalBadge`/`RetencaoHint` no estado). O
-  painel **não troca de workspace**: segue o `current` do `WorkspaceContext` (o
-  padrão da pessoa, ou o último usado). O `WorkspaceSwitcher` que vivia no topo
-  saiu por decisão de produto e volta depois, em outro lugar da casca — como o
-  `AppHeader` também não aparece em `/`, hoje a Home inteira opera num escopo só.
-  Clicar num artefato geojson/publicado o põe no globo (a lista enfileira o pedido na store; o
-  HomeView o drena para `useCamadas.adicionar`); arquivo do Drive não vai ao globo
-  na v1 — abre os metadados. O menu ⋯: exibir no globo, baixar, metadados, excluir
-  (excluir por editor+). Acima de 150 itens a lista vira virtual
+- **The route** lives in `web/app/(dashboard)/page.tsx` (the group does not contribute a
+  segment). The `(dashboard)` layout is shared; a `ShellSidebar` (client,
+  `usePathname`) picks `HomeSidebar` on `/` and `AppSidebar` on the other routes. The
+  `AppHeader` returns `null` on `/`, as on the canvas.
+- **The Meus (Mine) group of the `HomeSidebar`** (Agendamentos, Artefatos, Chats) are three
+  collapsible items with the SAME row (`home/linha.tsx`: `LinhaDoMeu` +
+  `GatilhoDeAcoes`): the main text is `min-w-0 flex-1` and truncates with an
+  ellipsis and a `title`; the "⋯" is a flex sibling, never over the text — on the
+  phone the 40px target just pushes the title. The open/closed state of the three is
+  remembered in the browser (`atlans:home:meu`, read in `hidratar()`), so it
+  survives the phone drawer, a route change and resizing; only Chats
+  starts open. Closing an item HIDES the list (`hidden`), it does not unmount it —
+  reopening does not redo requests nor lose the "Ver mais" (See more) —, and the list only mounts
+  after hydrating (on the phone the first render is still the desktop branch, and
+  mounting there fired a wasted GET). On the **3rem rail** (Ctrl+B, the
+  trigger or the draggable edge, the `SidebarRail`), clicking an item expands the
+  bar AND opens it — it never toggles an invisible state; the brand stays as a glyph
+  (for the admin, still the link to Projects, with a tooltip) and only the wordmark goes away.
+- **Portals in the Home palette.** Every Radix `*Content` opened from the
+  Home (the "⋯" menus, tooltips, `RenomearDialog`, `DeleteDialog`,
+  `MetadataDialog`, `ExecuteParamsDialog`, the account menu and the Preferences)
+  goes to the `<body>`, outside the `.home dark` tree, and that is why it carries `home-portal`
+  (globals.css). The shared components gained optional `className` /
+  `portalClassName` for this; outside the Home, nothing changes.
+- **The basemap is the installation's hybrid imagery** (satellite + roads and labels,
+  `MAPA_HIBRIDO_URL`; without it, the `MAPA_SATELITE_URL` satellite and, without that, the
+  OpenStreetMap streets — `web/lib/fundos-do-mapa.ts`), the same one the `/share`
+  portal offers in its switcher. There is no "no basemap" state. It is the **only**
+  basemap of the Home (CARTO's Dark Matter, which required a free key, was removed),
+  so the Home **has no switcher**: the `Globo` mounts the `MapLibreMap` with
+  `basemapInicial="hybrid"` and `basemapToggle={false}`. Raster on the sphere distorts
+  a little when the zoom changes (MapLibre recommends vector for the globe); with the
+  imagery as the only basemap this is permanent and accepted.
+- **The attribution is never written by us.** Every basemap we use already declares its
+  own in the source (`MAPA_*_CREDITO`; "© OpenStreetMap contributors" on the default streets).
+  Passing a `customAttribution` on top **did not replace** the source's —
+  MapLibre concatenates the two with `" | "`, and the Home showed the same thing twice.
+- **The map chrome is discreet** (`controlesDiscretos`): zoom, compass and scale
+  wear a translucent glass instead of MapLibre's solid white box; the
+  icon sits at 0.65 opacity and rises to 1 on hover/focus (on touch the floor is
+  higher, because there is no hover to reveal it). The attribution goes into
+  `compact` mode: it becomes an **"ⓘ" that opens on click**. It stays discreet, it never disappears —
+  the providers' terms (and OSM's ODbL) require it, and a click is the
+  way MapLibre itself offers for this. The portal keeps MapLibre's
+  default.
+- **The Chats** are the list of conversations (`GET /assistente/conversas`): rename
+  (`PATCH`) and delete (`DELETE`, soft) through the ⋯ menu of each row. Clicking a chat
+  opens the panel with the **replay** of that conversation. The list **mirrors the server
+  without F5**: the 1st `conversa` frame of each message (id, title, `nova`) and the
+  accepted confirmation become an announcement in the store (`anuncioDeConversa` — a slot,
+  not a queue: the list may be unmounted) that the `ChatsLista` applies without a
+  GET (`useConversas.anunciar`): the new conversation enters at the top with its title, the
+  existing one moves up; renaming also moves it up (the server stamps `updated_at` on the
+  PATCH). Deleting the **active** conversation leaves the Home as the "Nova conversa" button does
+  (the ongoing stream stops; panel and stack empty out; the next message creates
+  another, instead of hitting a 404). In the footer, "Ver mais" (See more) requests the next
+  page and "Tentar de novo" (Try again) redoes **what failed** (the page, or the reload);
+  the reload rereads every page already on screen, in parallel and all-or-nothing,
+  because the server silently clips `limit` at 100.
+- **Meus → Agendamentos** (Mine → Schedules; `GET /me/schedules`, `useAgendamentos`): the person's
+  schedules across ALL workspaces, active and paused (the paused one shows the
+  `motivoPausa` from `resumirAgendamento`). The ⋯ menu
+  — only for operator+ IN THAT workspace (`hasMinRole` per item, since the list spans
+  several) — offers pause/activate (`PUT /workflows/{id}/schedules/{job}`, optimistic) and
+  run now (fetches `params_schema`, opens the `ExecuteParamsDialog` if there is one). The
+  row NO LONGER opens the workflow in the editor (it is one of the closed exits): that is why it is a
+  `<div>` and not a `<button>` — a button with no action would promise a click that does not
+  happen. The assistant's workflow carries a badge. Turning it back on does not trigger right away (the
+  `schedule_service` resets `next_run_at`).
+- **Meus → Artefatos** (Mine → Artifacts; `useAcervo`): the collection of the current workspace — run
+  artifacts (`GET /artifacts`) and Drive files (`GET /drive`) in the SAME list,
+  joined by `Promise.allSettled` (the failure of one source does not bring down the other),
+  distinguished only by icon and by the **permanent / ephemeral / local on the
+  executor** state (neutral color on the format; `LocalBadge`/`RetencaoHint` on the state). The
+  panel **does not switch workspaces**: it follows the `current` of the `WorkspaceContext` (the
+  person's default, or the last one used). The `WorkspaceSwitcher` that lived at the top
+  was removed by product decision and will come back later, somewhere else in the shell — since the
+  `AppHeader` does not appear on `/` either, today the whole Home operates in a single scope.
+  Clicking a geojson/published artifact puts it on the globe (the list queues the request in the store; the
+  HomeView drains it into `useCamadas.adicionar`); a Drive file does not go to the globe
+  in v1 — it opens the metadata. The ⋯ menu: show on the globe, download, metadata, delete
+  (delete for editor+). Above 150 items the list becomes virtual
   (`@tanstack/react-virtual`).
-- **A conversa ao centro, e o painel sob demanda.** Todo acesso começa no
-  **hero**: o globo velado rumo ao sul, a chamada ("Menos ferramentas. **Mais
+- **The conversation in the center, and the panel on demand.** Every visit starts on the
+  **hero**: the globe veiled toward the south, the headline ("Menos ferramentas. **Mais
   respostas.**" / "Pergunte em português. O Atlans escolhe os dados e monta cada
-  etapa — você recebe o resultado.") e a barra de comando grande ao centro,
-  com sugestões digitadas e chips. A chamada existe para dizer que **escolher a
-  operação não é trabalho de quem pergunta** — por isso o placeholder da barra e
-  o convite do painel são a mesma pergunta ("O que você quer saber?"), e não um
-  pedido de comando; mudar um deles sozinho reabre a contradição que o
-  comentário de `Primeira()` em `painel.tsx` registra. **Assim que a pessoa
-  ENVIA** a barra escorrega para o rodapé e a última troca aparece acima dela, na
-  **faixa** (`assistente/pilha.tsx`): a legenda do globo, colada à barra — a
-  pergunta numa linha e, da resposta, só o último texto (cortado em 4 linhas),
-  os erros, os cartões, as respostas rápidas e o passo em curso; o resto fica no
-  painel. O gatilho é o ENVIO (`agente.correndo`), não o primeiro token de
-  TEXTO: com o assistente consultando o catálogo e o WFS (várias ferramentas)
-  antes de escrever, esperar o texto deixava a barra travada no centro por
-  segundos, sem carregar o diálogo (relato de uso). Enquanto o assistente
-  pensa, o item pendente (faixa e painel) mostra a **marca animada** do site
-  (`assistente/marca-animada.tsx`: três nós, sem o fundo laranja; parada e
-  inteira sob `prefers-reduced-motion`), **e a barra do rodapé mostra o PASSO da
-  vez** (`assistente/etapa.tsx`): "Pensando…", ou a ferramenta em curso com o
-  rótulo do painel («Consultando o guia · edges»); some quando a resposta começa
-  a ser escrita, porque aí ela já aparece na faixa. Os movimentos
-  são poucos e curtos — o flash ao enviar, o cursor no parágrafo que está sendo
-  escrito, o pop do cartão de camada, a faixa deslizando para a lateral ao
-  expandir e o painel entrando da direita — e todos zeram sob
-  `prefers-reduced-motion`. **Expandir**,
-  o chevron ou Ctrl+I levam a
-  conversa inteira ao painel flutuante (`assistente/painel.tsx`, fork da gaveta
-  do editor); "Recolher" volta ao centro. As decisões estão em
-  `docs/home-refactor.md`. `useAgente` (fork de `useAssistente`) consome os SSE de
-  `/assistente`: `enviar` (`POST /conversa`), `confirmar` (`POST /confirmacoes`, o 2º
-  stream do clique) e `carregar` (o replay). Os quadros novos (`fluxo`/`camada`/
-  `confirmacao`) são aditivos em `web/app/components/home/assistente/quadros.ts` — o editor os ignora.
-- **A entrega chega ao globo**: cada quadro `camada` vira uma busca em
-  `GET /assistente/camadas/{id}` (`useCamadas`) e uma `MapLayer` — GeoJSON pela URL
-  pré-assinada (em memória; teto de 25 MB) ou tiles MVT de uma camada publicada.
-  O mesmo artefato aparece em TRÊS recortes, que não se duplicam: o
-  `CartaoCamada` inline é o momento "entrou no globo" e **rola** com a conversa;
-  a **faixa de badges**, entre o cabeçalho e o rolo, é o índice fixo do que a
-  conversa toda produziu, e clicar um põe no globo (pela fila do `homeStore`,
-  igual à lista de Artefatos); o **painel de camadas** (canto do globo) é o que
-  está no globo AGORA, com olho, enquadrar, **baixar** e remover. Os fluxos que o
-  assistente criou não aparecem em lugar nenhum da Home.
-- **Baixar do próprio painel de camadas**, sem ir procurar o mesmo arquivo na
-  lista de Artefatos. O ícone aparece ao passar o mouse na linha (onde HÁ mouse:
-  no toque é permanente, e o foco do teclado sempre o revela), e **só quando o
-  servidor disse que há arquivo** — `CamadaDoGlobo.baixavel`, que é diferente de
-  `available`: uma camada publicada aparece no globo com o conteúdo no PostGIS e
-  pode não ter arquivo no storage, e um artefato marcado `keepLocal` nunca sai do
-  executor. Nos dois o download responderia 409/404, e botão vivo que falha é
-  pior que botão ausente. Quem baixa é `lib/baixar-artefato`, um caminho só para
-  as três telas que precisam dele.
+  etapa — você recebe o resultado." — "Fewer tools. More answers." / "Ask in Portuguese. Atlans
+  picks the data and builds each step — you get the result.") and the large command bar in the center,
+  with typed suggestions and chips. The headline exists to say that **choosing the
+  operation is not the job of whoever is asking** — that is why the bar's placeholder and
+  the panel's invitation are the same question ("O que você quer saber?" — "What do you want to
+  know?"), and not a request for a command; changing one of them alone reopens the contradiction that the
+  comment on `Primeira()` in `painel.tsx` records. **As soon as the person
+  SENDS**, the bar slides down to the footer and the latest exchange appears above it, in the
+  **strip** (`assistente/pilha.tsx`): the globe's caption, attached to the bar — the
+  question on one line and, from the answer, only the latest text (cut at 4 lines),
+  the errors, the cards, the quick replies and the step in progress; the rest stays in the
+  panel. The trigger is the SEND (`agente.correndo`), not the first TEXT
+  token: with the assistant querying the catalog and the WFS (several tools)
+  before writing, waiting for the text left the bar stuck in the center for
+  seconds, without loading the dialog (usage report). While the assistant
+  thinks, the pending item (strip and panel) shows the site's **animated brand**
+  (`assistente/marca-animada.tsx`: three nodes, without the orange background; still and
+  whole under `prefers-reduced-motion`), **and the footer bar shows the current
+  STEP** (`assistente/etapa.tsx`): "Pensando…" (Thinking…), or the tool in progress with the
+  panel's label ("Consultando o guia · edges" — "Consulting the guide · edges"); it goes away when the
+  answer starts being written, because by then it already appears in the strip. The movements
+  are few and short — the flash on send, the cursor in the paragraph being
+  written, the pop of the layer card, the strip sliding to the side on
+  expanding and the panel coming in from the right — and all of them drop to zero under
+  `prefers-reduced-motion`. **Expandir** (Expand),
+  the chevron or Ctrl+I take the
+  whole conversation to the floating panel (`assistente/painel.tsx`, a fork of the editor's
+  drawer); "Recolher" (Collapse) goes back to the center. The decisions are in
+  `docs/home-refactor.md`. `useAgente` (a fork of `useAssistente`) consumes the SSE from
+  `/assistente`: `enviar` (`POST /conversa`), `confirmar` (`POST /confirmacoes`, the 2nd
+  stream of the click) and `carregar` (the replay). The new frames (`fluxo`/`camada`/
+  `confirmacao`) are additive in `web/app/components/home/assistente/quadros.ts` — the editor ignores them.
+- **The delivery reaches the globe**: each `camada` frame becomes a fetch from
+  `GET /assistente/camadas/{id}` (`useCamadas`) and a `MapLayer` — GeoJSON through the
+  pre-signed URL (in memory; 25 MB ceiling) or MVT tiles of a published layer.
+  The same artifact appears in THREE views, which do not duplicate each other: the
+  inline `CartaoCamada` is the "it got onto the globe" moment and **scrolls** with the conversation;
+  the **badge strip**, between the header and the scroll, is the fixed index of what the
+  whole conversation produced, and clicking one puts it on the globe (through the `homeStore` queue,
+  same as the Artefatos list); the **layers panel** (corner of the globe) is what
+  is on the globe NOW, with eye, zoom-to-fit, **download** and remove. The workflows the
+  assistant created do not appear anywhere on the Home.
+- **Downloading from the layers panel itself**, without going to look for the same file in the
+  Artefatos list. The icon appears on hovering the row (where there IS a mouse:
+  on touch it is permanent, and keyboard focus always reveals it), and **only when the
+  server said there is a file** — `CamadaDoGlobo.baixavel`, which is different from
+  `available`: a published layer appears on the globe with its content in PostGIS and
+  may not have a file in storage, and an artifact marked `keepLocal` never leaves the
+  executor. In both cases the download would respond 409/404, and a live button that fails is
+  worse than an absent button. What downloads is `lib/baixar-artefato`, a single path for
+  the three screens that need it.
 
-### A barra lateral
+### The sidebar
 
-- **A borda redimensiona.** Ela sempre mostrou `cursor-w-resize` e só sabia
-  **recolher** — quem arrastava para ler o nome inteiro de um artefato via a
-  barra fechar na cara. Agora, expandida, ela é um separador
-  (`role="separator"`, o padrão WAI-ARIA de janela): arrastar redimensiona entre
-  180 e 480 px, ←/→ ajustam pelo teclado (com Shift, em passos maiores),
-  Home/End vão aos limites e o duplo clique volta aos 256 px. **Recolhida** ela
-  continua o botão que expande, que é o único caminho de volta do trilho de 3rem
-  por ali; recolher segue no `SidebarTrigger` do cabeçalho e no Ctrl/Cmd+B.
-- **A largura sobrevive ao F5**, no mesmo molde do recolhido: um cookie
-  (`sidebar_width`) que o layout lê **no servidor** e devolve como
-  `defaultWidth`. Em `localStorage` a barra nasceria com 16 rem e saltaria no
-  primeiro efeito. O valor é saneado no provider, então cookie adulterado não
-  estica nada.
-- **O nome do artefato é cortado NO MEIO**, não no fim (`NomeDeArquivo`).
-  `truncate` comia justamente a versão e a extensão: numa lista de `…_v1`,
-  `…_v2`, `…_v3` todas as linhas viravam o mesmo prefixo. O corte encosta no
-  separador (`_`, `-`, `.`) mais próximo para não partir palavra no meio, e o
-  `data-nome` carrega o nome íntegro para quem precisa dele como um valor só.
-  Vale para NOME DE ARQUIVO; título de conversa é prosa, e ali o corte no fim
-  continua certo.
+- **The edge resizes.** It always showed `cursor-w-resize` and only knew how to
+  **collapse** — whoever dragged it to read the full name of an artifact saw the
+  bar close in their face. Now, when expanded, it is a separator
+  (`role="separator"`, the WAI-ARIA window splitter pattern): dragging resizes between
+  180 and 480 px, ←/→ adjust from the keyboard (with Shift, in larger steps),
+  Home/End go to the limits and double-click returns to 256 px. **Collapsed**, it
+  remains the button that expands, which is the only way back from the 3rem rail
+  from there; collapsing stays in the header's `SidebarTrigger` and in Ctrl/Cmd+B.
+- **The width survives F5**, in the same mold as the collapsed state: a cookie
+  (`sidebar_width`) that the layout reads **on the server** and returns as
+  `defaultWidth`. In `localStorage` the bar would be born at 16 rem and jump on the
+  first effect. The value is sanitized in the provider, so a tampered cookie does not
+  stretch anything.
+- **The artifact name is cut IN THE MIDDLE**, not at the end (`NomeDeArquivo`).
+  `truncate` ate precisely the version and the extension: in a list of `…_v1`,
+  `…_v2`, `…_v3` every row became the same prefix. The cut snaps to the nearest
+  separator (`_`, `-`, `.`) so as not to split a word in the middle, and the
+  `data-nome` carries the whole name for whoever needs it as a single value.
+  This applies to FILE NAMES; a conversation title is prose, and there the cut at the end
+  is still right.
 
-### A Home sem sessão e o modal de entrada
+### The Home without a session and the sign-in modal
 
-A Home **abre sem login**: globo, hero (título, frase, a barra com as sugestões
-digitadas e os chips) — tudo à vista, e **nenhuma requisição** sai (o `useAgente`
-não consulta o `/assistente/estado` quando `anonimo`; o sidebar não monta o grupo
-Meu; o `WorkspaceContext` e o `ActiveRunsContext` já ficavam parados sem
-sessão). O sidebar anônimo mostra a marca, o gatilho de recolher, a **vitrine do
-catálogo** e, no rodapé, **Entrar** e **Criar conta**.
+The Home **opens without login**: globe, hero (title, sentence, the bar with the typed
+suggestions and the chips) — all in view, and **no request** goes out (the `useAgente`
+does not query `/assistente/estado` when `anonimo`; the sidebar does not mount the
+Meu group; the `WorkspaceContext` and the `ActiveRunsContext` were already idle without a
+session). The anonymous sidebar shows the brand, the collapse trigger, the **catalog
+showcase** and, in the footer, **Entrar** (Sign in) and **Criar conta** (Create account).
 
-- **A vitrine** (`VitrineDoCatalogo`, em `home-sidebar.tsx`) ocupa o corpo que
-  antes era o convite "Entre para ver seus chats, artefatos e agendamentos.": o
-  tamanho do catálogo (25.492 camadas, 76 instituições, 11 países) e três fitas
-  deslizantes de siglas — duas do Brasil e uma dos países, sob os rótulos
-  BRASIL e FORA DO BRASIL. A troca é de argumento: prova verificável no lugar de
-  uma promessa de recurso, e o vocabulário de quem já procurou um WFS na mão no
-  lugar de três palavras que quem chega não conhece.
-  Os números e os nomes são CONSTANTES em `web/lib/catalogo.ts` — a casca
-  anônima não faz requisição —, presos à semente de `catalogo/geoservicos/` por
-  `tests/unit/test_vitrine_do_catalogo.py`, que recalcula tudo e falha dizendo o
-  número novo. As fitas param inteiras em `prefers-reduced-motion`
-  (`.home-fita`, em globals.css), e o grupo some no trilho de 3rem.
+- **The showcase** (`VitrineDoCatalogo`, in `home-sidebar.tsx`) takes up the body that
+  used to be the invitation "Entre para ver seus chats, artefatos e agendamentos." (Sign in to see your
+  chats, artifacts and schedules.): the size of the catalog (25,492 layers, 76 institutions, 11
+  countries) and three sliding ribbons of acronyms — two from Brazil and one of the countries, under the labels
+  BRASIL and FORA DO BRASIL (BRAZIL and OUTSIDE BRAZIL). The change is one of argument: verifiable proof in place of
+  a feature promise, and the vocabulary of someone who has already hunted for a WFS by hand in
+  place of three words that a newcomer does not know.
+  The numbers and the names are CONSTANTS in `web/lib/catalogo.ts` — the anonymous
+  shell makes no request —, pinned to the `catalogo/geoservicos/` seed by
+  `tests/unit/test_vitrine_do_catalogo.py`, which recomputes everything and fails stating the
+  new number. The ribbons stop completely under `prefers-reduced-motion`
+  (`.home-fita`, in globals.css), and the group disappears on the 3rem rail.
 
-- **O primeiro envio pede a entrada.** Enter, "Enviar" ou um chip + Enter abrem
-  o **modal de entrada** (`web/app/components/home/entrada/`) sobre o globo, no
-  tema da Home (`home-portal`) e com o fundo levemente ofuscado; a mensagem fica
-  **pendente** (`homeStore.envioPendente`) e o texto continua na barra. O modal é
-  **fechável** (Esc, X, clique fora — não durante um envio): fechar sem entrar
-  desiste do envio, e o texto fica na barra.
-- **O login bem-sucedido não navega**: o `signIn` do next-auth (sem redirect)
-  grava o cookie e atualiza o `useSession` da aba; a Home consulta o `/estado` e
-  **manda a mensagem pendente sozinha** (respeitando a cota estourada, como a
-  barra). Com `callbackUrl` (o admin que pediu `/projects` sem sessão) a pessoa
-  vai para lá, sem enviar nada.
-- **O cadastro** é um painel do mesmo modal; criada a conta, o modal troca para
-  "Verifique seu e-mail" (com o reenvio do link) — a conta exige verificar o
-  e-mail antes do primeiro login, e a mensagem fica esperando na barra.
-- **A verificação do e-mail é do mesmo painel**, `verificar`. Sem token ele é a
-  tela de "abra o link do e-mail", com o reenvio
-  (`POST /auth/resend-verification`); **com** o token do link ele o gasta no
-  `GET /auth/verify-email`, ativa a conta e volta ao login já com o aviso. O
-  token vale UMA vez por modal (ele continua na URL depois de gasto): voltar ao
-  painel — pelo 403 do login, ou pelo "Reenviar" de uma falha — dá a tela do
-  reenvio, não um segundo GET com um link que já não vale. O "Reenviar e-mail de
-  verificação" do erro 403 é um BOTÃO, e leva o que foi digitado quando aquilo
-  já é um e-mail (o campo aceita e-mail OU usuário).
-- **O caminho da senha também é do modal**, nos painéis `recuperar` ("Esqueceu
-  a senha?", `POST /auth/forgot-password`) e `redefinir` ("Nova senha",
-  `POST /auth/reset-password` com o token do e-mail). O "Esqueceu a senha?" do
-  login é um BOTÃO que troca de painel, não um link: navegar levaria para fora
-  da Home e jogaria fora a mensagem pendente. O sucesso do pedido é mostrado
-  mesmo quando o servidor recusa — dizer "este e-mail não existe" entregaria
-  quem tem conta aqui, e o backend já responde igual nos dois casos.
-- **Os painéis do e-mail** (`verificar`, `recuperar`, `redefinir`) **abrem COM
-  ou SEM sessão**, ao contrário de `entrar` e `cadastro`: quem esqueceu a senha
-  — ou ainda não verificou o e-mail — costuma ter uma sessão velha no mesmo
-  navegador, e o link chega nele; com o portão de `anonimo` valendo para todos,
-  esse link abria a Home e não fazia nada. Pelo mesmo motivo a sessão que chega
-  no meio não os fecha: o token é de uso único. A regra é uma só, em
+- **The first send asks for sign-in.** Enter, "Enviar" (Send) or a chip + Enter open
+  the **sign-in modal** (`web/app/components/home/entrada/`) over the globe, in the
+  Home theme (`home-portal`) and with the background slightly dimmed; the message stays
+  **pending** (`homeStore.envioPendente`) and the text remains in the bar. The modal is
+  **dismissible** (Esc, X, click outside — not during a send): closing without signing in
+  gives up the send, and the text stays in the bar.
+- **A successful login does not navigate**: next-auth's `signIn` (without redirect)
+  writes the cookie and updates the tab's `useSession`; the Home queries `/estado` and
+  **sends the pending message on its own** (respecting an exhausted quota, as the
+  bar does). With a `callbackUrl` (the admin who requested `/projects` without a session) the person
+  goes there, without sending anything.
+- **Registration** is a panel of the same modal; once the account is created, the modal switches to
+  "Verifique seu e-mail" (Check your email) (with the link resend) — the account requires verifying the
+  email before the first login, and the message stays waiting in the bar.
+- **Email verification belongs to the same panel**, `verificar`. Without a token it is the
+  "open the link in the email" screen, with the resend
+  (`POST /auth/resend-verification`); **with** the token from the link it spends it on
+  `GET /auth/verify-email`, activates the account and goes back to the login already with the notice. The
+  token is good ONCE per modal (it stays in the URL after being spent): going back to the
+  panel — through the login's 403, or through the "Reenviar" (Resend) of a failure — gives the
+  resend screen, not a second GET with a link that is no longer valid. The "Reenviar e-mail de
+  verificação" (Resend verification email) of the 403 error is a BUTTON, and carries what was typed when that
+  is already an email (the field accepts email OR username).
+- **The password path also belongs to the modal**, in the `recuperar` ("Esqueceu
+  a senha?" — "Forgot your password?", `POST /auth/forgot-password`) and `redefinir` ("Nova senha" — "New
+  password", `POST /auth/reset-password` with the token from the email) panels. The login's "Esqueceu a senha?"
+  is a BUTTON that switches panels, not a link: navigating would take the user out
+  of the Home and throw away the pending message. The success of the request is shown
+  even when the server refuses — saying "this email does not exist" would give away
+  who has an account here, and the backend already responds the same way in both cases.
+- **The email panels** (`verificar`, `recuperar`, `redefinir`) **open WITH
+  or WITHOUT a session**, unlike `entrar` and `cadastro`: whoever forgot their password
+  — or has not yet verified their email — often has an old session in the same
+  browser, and the link lands there; with the `anonimo` gate applying to everyone,
+  that link opened the Home and did nothing. For the same reason a session that arrives
+  midway does not close them: the token is single-use. There is a single rule, in
   `ehPainelDeEmail` (`web/lib/entrada.ts`).
-- **As rotas.** `/login`, `/register`, `/verify-email`, `/forgot-password` e
-  `/reset-password` viraram redirecionamentos para `/?entrar=1`, `/?cadastro=1`,
-  `/?verificar=1&token=…`, `/?recuperar=1` e `/?redefinir=1&token=…`
-  (`web/lib/entrada.ts`; só um `callbackUrl` interno passa). As três últimas
-  ficam de pé porque é o que está escrito nos e-mails **já enviados**; sem token,
-  `/reset-password` cai no painel que pede um link novo e `/verify-email` na
-  tela do reenvio. **Nenhuma tela deste fluxo é mais uma página**: com a
-  verificação foi embora a última `AuthShell`, e a casca saiu do código. O middleware manda para a entrada
-  quem pede uma página sem sessão ou com a sessão vencida. Em `/` o middleware
-  **nunca redireciona** — nem com a sessão vencida, que o `SessionSync` limpa no
-  cliente (redirecioná-la para um destino dentro do matcher seria um laço);
-  nesse instante a Home e o sidebar a tratam como anônima. Sair cai na Home
-  anônima.
+- **The routes.** `/login`, `/register`, `/verify-email`, `/forgot-password` and
+  `/reset-password` became redirects to `/?entrar=1`, `/?cadastro=1`,
+  `/?verificar=1&token=…`, `/?recuperar=1` and `/?redefinir=1&token=…`
+  (`web/lib/entrada.ts`; only an internal `callbackUrl` passes through). The last three
+  stay up because that is what is written in the emails **already sent**; without a token,
+  `/reset-password` falls into the panel that asks for a new link and `/verify-email` into the
+  resend screen. **No screen of this flow is a page anymore**: with the
+  verification went the last `AuthShell`, and the shell left the code. The middleware sends to sign-in
+  anyone who requests a page without a session or with an expired session. On `/` the middleware
+  **never redirects** — not even with an expired session, which the `SessionSync` clears on the
+  client (redirecting it to a destination inside the matcher would be a loop);
+  at that moment the Home and the sidebar treat it as anonymous. Signing out lands on the anonymous
+  Home.
 
-## O que ele faz de diferente do editor
+## What it does differently from the editor
 
-- **A entrega é uma camada no globo**, não um desenho no canvas. O assistente
-  cria e roda os PRÓPRIOS fluxos (marcados `origem="assistente"` pela
-  identidade) SEM clique — é assim que a resposta chega ao globo — e põe uma
-  saída de execução no globo com `exibir_no_globo`.
-- **Os fluxos dele aparecem no painel inteiro, com selo.** Projetos, Dashboard,
-  Histórico, paleta (⌘K) e o seletor de sub-fluxo do editor listam os fluxos do
-  assistente ao lado dos demais, sempre com o selo da faísca
-  (`shared/selo-assistente.tsx`) — antes eles só apareciam nos Agendamentos da
-  Home e passavam despercebidos. O recorte "só os do assistente" é um chip nas
-  duas telas de lista: `/projects?filtro=assistente` (predicado local) e
-  `/observability?assistente=1` (que vira `workflow_origem=assistente` em
-  `GET /observability/runs`, e um filtro local na visão "Por workflow"). O
-  padrão de `GET /workflows` continua ESCONDENDO-OS: quem quer inclui
-  `assistente=1` — é o que essas telas passaram a fazer.
-- **Respostas rápidas.** Ao terminar uma resposta que abre continuação natural,
-  o assistente chama `sugerir_respostas` (a segunda ferramenta local; até três
-  frases curtas, como a pessoa as diria) e elas aparecem como chips sob a
-  resposta, na faixa e no painel; o clique manda a frase como a próxima
-  mensagem, e o turno novo tira os chips da tela.
-- **Alcance completo, com confirmação por clique.** Ele tem os seis escopos do
-  PAT (`escopo_do_assistente`). O que segura o destrutivo não é a ausência de
-  escopo: é o **portão de confirmação verificado no servidor**. Editar/rodar um
-  fluxo que a pessoa criou, mexer em agendamento, apagar arquivo do Drive,
-  publicar, restaurar, ligar/desligar — tudo isso pede um clique.
-- **Conversas persistidas**, várias por pessoa, sem prazo (as tabelas
-  `conversas` e `mensagens`), no lugar do transcrito no Redis com TTL de 24 h do
-  editor.
-- **Catálogo antes de prospectar.** Para dado externo (WFS) o roteiro manda
-  chamar `search_sources` e `describe_source` ANTES de qualquer outra coisa — a
-  fonte vem pré-mapeada do catálogo (`docs/sources.md`), sem rede e sem chute de
-  `url`/`typeName`. Só quando o catálogo não tem a fonte ele sonda
-  (`probe_source`) e registra (`register_source`) — as duas passam SEM clique
-  (`ESCRITAS_SEM_CLIQUE`): sondar e guardar uma fonte é a via normal de trabalho,
-  não uma ação destrutiva.
+- **The delivery is a layer on the globe**, not a drawing on the canvas. The assistant
+  creates and runs its OWN workflows (marked `origem="assistente"` by the
+  identity) WITHOUT a click — that is how the answer reaches the globe — and puts a
+  run output on the globe with `exibir_no_globo`.
+- **Its workflows appear across the whole dashboard, with a badge.** Projects, Dashboard,
+  History, the palette (⌘K) and the editor's sub-workflow picker list the assistant's
+  workflows alongside the others, always with the spark badge
+  (`shared/selo-assistente.tsx`) — before, they only appeared in the Home's Agendamentos
+  (Schedules) and went unnoticed. The "only the assistant's" view is a chip on the
+  two list screens: `/projects?filtro=assistente` (a local predicate) and
+  `/observability?assistente=1` (which becomes `workflow_origem=assistente` in
+  `GET /observability/runs`, and a local filter in the "Por workflow" (By workflow) view). The
+  default of `GET /workflows` still HIDES THEM: whoever wants them includes
+  `assistente=1` — which is what these screens now do.
+- **Quick replies.** When finishing an answer that opens a natural follow-up,
+  the assistant calls `sugerir_respostas` (the second local tool; up to three
+  short sentences, as the person would say them) and they appear as chips under the
+  answer, in the strip and in the panel; the click sends the sentence as the next
+  message, and the new turn takes the chips off the screen.
+- **Full reach, with click confirmation.** It has the six
+  PAT scopes (`escopo_do_assistente`). What holds back destructive actions is not the absence of a
+  scope: it is the **confirmation gate verified on the server**. Editing/running a
+  workflow the person created, touching a schedule, deleting a Drive file,
+  publishing, restoring, turning on/off — all of this asks for a click.
+- **Persisted conversations**, several per person, with no expiry (the
+  `conversas` and `mensagens` tables), in place of the editor's transcript in Redis with a 24 h
+  TTL.
+- **Catalog before hunting.** For external data (WFS) the playbook says to
+  call `search_sources` and `describe_source` BEFORE anything else — the
+  source comes pre-mapped from the catalog (`docs/sources.md`), with no network and no guessing of
+  `url`/`typeName`. Only when the catalog does not have the source does it probe
+  (`probe_source`) and register (`register_source`) — both go through WITHOUT a click
+  (`ESCRITAS_SEM_CLIQUE`): probing and storing a source is the normal way of working,
+  not a destructive action.
 
-## Arrastar arquivos para o Drive
+## Dragging files to the Drive
 
-A tela `/drive` tem a zona de envio desde sempre, mas o middleware devolve `/`
-para quem não administra o sistema (`web/proxy.ts`) — então, na prática, o
-usuário comum nunca alcançou um campo de upload. A Home é a única página dele, e
-a regra da casa manda todo fluxo visual para dentro dela.
+The `/drive` screen has had the upload zone from the start, but the middleware sends
+anyone who does not administer the system back to `/` (`web/proxy.ts`) — so, in practice, the
+regular user never reached an upload field. The Home is their only page, and
+the house rule sends every visual flow into it.
 
-**O gesto.** Arrastar um ou mais arquivos para qualquer canto da Home acende a
-**caixa do assistente** (o alvo visual), e soltar os leva ao Drive do workspace
-ativo. A área que ACEITA é a janela inteira (`useArrasteDeArquivos`, um listener
-global); só o realce é da caixa — nenhum véu cobre o globo. Os arquivos viram
-**chips na caixa** (`anexos.tsx`): um spinner enquanto sobem, um ✓ quando chegam.
+**The gesture.** Dragging one or more files onto any corner of the Home lights up the
+**assistant box** (the visual target), and dropping them takes them to the Drive of the active
+workspace. The area that ACCEPTS is the whole window (`useArrasteDeArquivos`, a global
+listener); only the highlight belongs to the box — no veil covers the globe. The files become
+**chips in the box** (`anexos.tsx`): a spinner while they upload, a ✓ when they arrive.
 
-**A mensagem leva o que subiu.** Enviar uma pergunta com anexos prontos acrescenta
-ao texto a linha «Arquivos que acabei de enviar ao Drive deste workspace: …»
-(`comReferencia`) — sem ela, «analise isso» chega ao assistente sem nenhum «isso»
-(ele enxerga o workspace por `list_drive_files`, mas não sabe QUAIS arquivos são
-os desta pergunta). Só os PRONTOS são citados e só eles saem da caixa ao enviar;
-o que ainda sobe fica (não estava na mensagem) e o recusado também (nunca teve
-relação com ela). Com anexo pronto, a caixa passa a sugerir «Analise <arquivo>»
-no lugar das frases do hero.
+**The message carries what was uploaded.** Sending a question with finished attachments appends
+to the text the line "Arquivos que acabei de enviar ao Drive deste workspace: …" (Files I just
+sent to this workspace's Drive: …) (`comReferencia`) — without it, "analise isso" (analyze this)
+reaches the assistant without any "this"
+(it sees the workspace through `list_drive_files`, but does not know WHICH files are
+the ones for this question). Only the FINISHED ones are cited and only they leave the box on send;
+what is still uploading stays (it was not in the message) and so does what was refused (it never had
+anything to do with it). With a finished attachment, the box starts suggesting "Analise <arquivo>"
+(Analyze <file>) in place of the hero's sentences.
 
-**Os filtros são os do backend, e não são reescritos.** Extensão permitida,
-extensão interna perigosa (`notas.sh.csv`), teto em MB e arquivo vazio vivem
-todos em `drive_service.py`/`drive_router.py`, valem para qualquer caminho de
-upload e este caminho manda ao mesmo `POST /drive/upload`. A recusa é traduzida
-com a MESMA `classifyUploadError` da tela `/drive` e mostrada no MESMO painel
-(`ResultadoDoUpload`), num aviso à parte dos chips — o recusado não entra na
-mensagem, e deixá-lo na fileira faria a pessoa mandar a pergunta achando que ele
-foi. A única checagem feita ANTES de subir é o papel no workspace
-(`useWorkspace().canEdit`, o espelho do papel `editor` que o Drive exige): subir um
-arquivo inteiro para colher um 403 previsível é desperdício de rede. Sem sessão,
-soltar abre o modal de entrada — a mesma porta do primeiro envio.
+**The filters are the backend's, and they are not rewritten.** Allowed extension,
+dangerous inner extension (`notas.sh.csv`), MB ceiling and empty file all live
+in `drive_service.py`/`drive_router.py`, apply to any upload
+path, and this path sends to the same `POST /drive/upload`. The refusal is translated
+with the SAME `classifyUploadError` as the `/drive` screen and shown in the SAME panel
+(`ResultadoDoUpload`), in a notice separate from the chips — the refused file does not enter the
+message, and leaving it in the row would make the person send the question thinking it
+went. The only check done BEFORE uploading is the role in the workspace
+(`useWorkspace().canEdit`, the mirror of the `editor` role that the Drive requires): uploading a
+whole file to collect a predictable 403 is a waste of network. Without a session,
+dropping opens the sign-in modal — the same door as the first send.
 
-**Estado na store, não no componente.** Os anexos e o `arrastando` vivem no
-`homeStore`, pelo mesmo motivo do rascunho: Ctrl+I troca a barra pelo painel e
-DESMONTA quem estava na tela — num `useState` da caixa, os chips sumiriam no
-atalho com os uploads ainda correndo. Por isso a barra E o painel montam as
-mesmas peças (o achado 4 da 3ª revisão: um recurso numa superfície e não na
-outra é uma venda que some conforme a tela).
+**State in the store, not in the component.** The attachments and `arrastando` live in the
+`homeStore`, for the same reason as the draft: Ctrl+I swaps the bar for the panel and
+UNMOUNTS whatever was on screen — in a `useState` of the box, the chips would disappear on the
+shortcut with the uploads still running. That is why the bar AND the panel mount the
+same pieces (finding 4 of the 3rd review: a feature on one surface and not on the
+other is a promise that disappears depending on the screen).
 
-## Rotas
+## Routes
 
-Todas exigem sessão JWT (o PAT é para clientes externos, que falam por `/mcp`).
+All of them require a JWT session (the PAT is for external clients, which talk through `/mcp`).
 
 | | |
 |---|---|
-| `POST /assistente/conversa` | `{mensagem, conversa_id?, workspace_id?}` → `text/event-stream`. `conversa_id` nulo cria uma conversa nova; o 1º quadro devolve id, título e `nova` |
-| `POST /assistente/conversas/{id}/confirmacoes/{tool_use_id}` | `{token, decisao}` → `text/event-stream`. Executa (ou recusa) uma ação e RETOMA a conversa no mesmo stream |
-| `GET /assistente/conversas?limit&offset` | as minhas conversas não apagadas, mais recentemente ativas em cima (`updated_at`, carimbado ao fim de cada turno e no renomear). `limit` é aparado em **100 sem aviso**; `offset` é livre |
-| `GET /assistente/conversas/{id}` | o **replay** da conversa, em quadros (para o painel reaplicar) |
-| `PATCH /assistente/conversas/{id}` | `{titulo}` — renomear |
-| `DELETE /assistente/conversas/{id}` | soft delete (204): some da lista, o histórico fica |
-| `GET /assistente/estado` | `{ativo, motivo?, cota?, plano, assinaturas_ativas}` — a cota é a MESMA do editor; sem extensão, `plano` é `null` e `assinaturas_ativas` é `false` |
+| `POST /assistente/conversa` | `{mensagem, conversa_id?, workspace_id?}` → `text/event-stream`. A null `conversa_id` creates a new conversation; the 1st frame returns id, title and `nova` |
+| `POST /assistente/conversas/{id}/confirmacoes/{tool_use_id}` | `{token, decisao}` → `text/event-stream`. Executes (or refuses) an action and RESUMES the conversation in the same stream |
+| `GET /assistente/conversas?limit&offset` | my non-deleted conversations, most recently active on top (`updated_at`, stamped at the end of each turn and on rename). `limit` is clipped at **100 without warning**; `offset` is free |
+| `GET /assistente/conversas/{id}` | the **replay** of the conversation, in frames (for the panel to reapply) |
+| `PATCH /assistente/conversas/{id}` | `{titulo}` — rename |
+| `DELETE /assistente/conversas/{id}` | soft delete (204): it leaves the list, the history stays |
+| `GET /assistente/estado` | `{ativo, motivo?, cota?, plano, assinaturas_ativas}` — the quota is the SAME as the editor's; without the extension, `plano` is `null` and `assinaturas_ativas` is `false` |
 
-`GET /assistente/camadas/{id}` e `GET /assistente/tiles/…` (as camadas do globo) moram no
-`assistente_camadas_router` e têm portão de MEMBRO — não são conversa.
+`GET /assistente/camadas/{id}` and `GET /assistente/tiles/…` (the globe's layers) live in the
+`assistente_camadas_router` and have a MEMBER gate — they are not conversation.
 
-## Os quadros do SSE
+## The SSE frames
 
-O vocabulário do editor mais quatro: `conversa` (o primeiro, sempre), `fluxo`,
-`camada` e `respostas_rapidas`. Os do editor (`pensando`, `texto`, `cota`, `ferramenta`,
-`progresso`, `ferramenta_fim`, `erro`, `fim`) valem igual; `proposta` (o canvas)
-não aparece.
+The editor's vocabulary plus four: `conversa` (the first, always), `fluxo`,
+`camada` and `respostas_rapidas`. The editor's (`pensando`, `texto`, `cota`, `ferramenta`,
+`progresso`, `ferramenta_fim`, `erro`, `fim`) apply the same way; `proposta` (the canvas)
+does not appear.
 
-| `event` | `data` | quando |
+| `event` | `data` | when |
 |---|---|---|
-| `conversa` | `{conversa_id, titulo, nova}` | **sempre o primeiro** de `POST /conversa` — o cliente aprende o id de uma conversa nova |
-| `fluxo` | `{workflow_id, nome}` | um `create_workflow` do assistente deu certo. **Não é renderizado**: a Home não oferece caminho para o editor. Segue no contrato porque o servidor o emite e o replay o reconstrói |
-| `camada` | `{artifact_id, nome?, format?, available, hint?}` | uma saída GeoJSON de uma execução, ou um `exibir_no_globo`. É PONTEIRO; a verdade é `GET /assistente/camadas/{id}` |
-| `confirmacao` | `{tool_use_id, token, acao{tool, argumentos, alvo}}` | uma ação que mexe no que já existia espera o clique |
-| `respostas_rapidas` | `{opcoes: [até 3 frases]}` | um `sugerir_respostas` do assistente: continuações curtas que a pessoa escolhe com um clique (viram a próxima mensagem dela). Valem só para aquela vez — a web só as desenha no último turno, fora do stream; o replay as traz de volta enquanto forem as do último turno |
+| `conversa` | `{conversa_id, titulo, nova}` | **always the first** of `POST /conversa` — the client learns the id of a new conversation |
+| `fluxo` | `{workflow_id, nome}` | a `create_workflow` by the assistant succeeded. **It is not rendered**: the Home offers no path to the editor. It stays in the contract because the server emits it and the replay rebuilds it |
+| `camada` | `{artifact_id, nome?, format?, available, hint?}` | a GeoJSON output of a run, or an `exibir_no_globo`. It is a POINTER; the truth is `GET /assistente/camadas/{id}` |
+| `confirmacao` | `{tool_use_id, token, acao{tool, argumentos, alvo}}` | an action that touches what already existed waits for the click |
+| `respostas_rapidas` | `{opcoes: [até 3 frases]}` | a `sugerir_respostas` by the assistant: short follow-ups that the person picks with a click (they become their next message). They are good only for that one time — the web only draws them on the last turn, outside the stream; the replay brings them back as long as they are the last turn's |
 
-O `fim` é sempre o último, mesmo quando deu errado — como no editor. Um `: ping`
-(comentário SSE, ignorado pelo decodificador) sai a cada 15 s no silêncio, para
-o stream não morrer atrás de um proxy numa execução longa.
+The `fim` is always the last, even when something went wrong — as in the editor. A `: ping`
+(an SSE comment, ignored by the decoder) goes out every 15 s of silence, so that
+the stream does not die behind a proxy during a long run.
 
-## A confirmação, por dentro
+## The confirmation, from the inside
 
-Nunca por texto. O portão da Home intercepta a chamada confirmável, guarda
-`{token, tool, args}` no Redis por 15 min sob
-`agente:confirmacao:{user}:{conversa}:{tool_use_id}`, emite o quadro
-`confirmacao` e devolve ao modelo um `tool_result` NÃO-erro "aguardando" — um
-erro faria o modelo repetir a chamada e duplicar o botão. O prompt manda o
-modelo dizer uma linha e encerrar o turno.
+Never by text. The Home's gate intercepts the confirmable call, stores
+`{token, tool, args}` in Redis for 15 min under
+`agente:confirmacao:{user}:{conversa}:{tool_use_id}`, emits the
+`confirmacao` frame and returns to the model a NON-error "waiting" `tool_result` — an
+error would make the model repeat the call and duplicate the button. The prompt tells the
+model to say one line and end the turn.
 
-O clique (`POST /conversas/{id}/confirmacoes/{tool_use_id}`) **valida** no
-handler, em ordem:
+The click (`POST /conversas/{id}/confirmacoes/{tool_use_id}`) **validates** in the
+handler, in order:
 
-1. **posse** — a conversa é da pessoa (senão 404);
-2. **existência** — a chave ainda está no Redis (senão 409, expirou);
-3. **token** — `hmac.compare_digest` com o token guardado (senão 403).
+1. **ownership** — the conversation belongs to the person (otherwise 404);
+2. **existence** — the key is still in Redis (otherwise 409, it expired);
+3. **token** — `hmac.compare_digest` with the stored token (otherwise 403).
 
-O **consumo** (o `delete` one-shot) NÃO é feito no handler: ele mora no gerador
-do stream, **sob a trava** e imediatamente antes de executar. Se o cliente cair
-entre o retorno do handler e o efeito rodar, a confirmação sobrevive e pode ser
-refeita — consumir no handler a apagaria mesmo sem a ação ter acontecido, e a
-ação confirmada se perderia sem repetição. A trava serializa as abas, então o
-`delete` ainda decide a corrida: quem apagou executa (`delete` = 1), quem chegou
-depois perde (`delete` = 0, e um quadro de erro fecha o stream).
+The **consumption** (the one-shot `delete`) is NOT done in the handler: it lives in the
+stream generator, **under the lock** and immediately before executing. If the client drops
+between the handler's return and the effect running, the confirmation survives and can be
+redone — consuming it in the handler would erase it even without the action having happened, and the
+confirmed action would be lost with no retry. The lock serializes the tabs, so the
+`delete` still decides the race: whoever deleted executes (`delete` = 1), whoever arrived
+later loses (`delete` = 0, and an error frame closes the stream).
 
-Aí ele executa os argumentos **ARMAZENADOS** — nunca os que o cliente mandar no
-clique — por `chamar_no_servidor`, sob o escopo do assistente, injeta uma
-mensagem de usuário gerada pelo servidor (`[Ação confirmada pela pessoa pelo
-botão]…`, ou `[Ação recusada pela pessoa]`) e **retoma** o laço no mesmo SSE. A
-mensagem sintética é gravada com `meta={"tipo":"confirmacao",…}`.
+Then it executes the **STORED** arguments — never the ones the client sends with the
+click — through `chamar_no_servidor`, under the assistant's scope, injects a
+server-generated user message (`[Ação confirmada pela pessoa pelo
+botão]…`, or `[Ação recusada pela pessoa]`) and **resumes** the loop in the same SSE. The
+synthetic message is recorded with `meta={"tipo":"confirmacao",…}`.
 
-**O prefixo `[Ação` é do servidor.** Uma mensagem digitada que comece com ele é
-recusada com 422 (`POST /conversa`) — senão alguém forjaria "a pessoa confirmou".
+**The `[Ação` prefix belongs to the server.** A typed message that starts with it is
+refused with 422 (`POST /conversa`) — otherwise someone could forge "the person confirmed".
 
-## A persistência
+## Persistence
 
-O transcrito fica no **banco**, não no cliente — a mesma razão do editor: um
-`tool_result` é a palavra do servidor, e um cliente que guardasse o transcrito
-poderia reescrevê-lo. `POST /conversa` aceita **apenas** a mensagem nova
-(`extra="forbid"`), e a grava no handler (antes do stream). Os turnos do
-assistente são gravados **incrementalmente**, turno a turno, pelo gancho
-`ao_fechar_turno` do laço — não num blob no fim. Fechar a aba no meio não perde
-o que já veio.
+The transcript lives in the **database**, not on the client — the same reason as the editor: a
+`tool_result` is the server's word, and a client that stored the transcript
+could rewrite it. `POST /conversa` accepts **only** the new message
+(`extra="forbid"`), and records it in the handler (before the stream). The assistant's
+turns are recorded **incrementally**, turn by turn, through the loop's
+`ao_fechar_turno` hook — not in a blob at the end. Closing the tab midway does not lose
+what has already come.
 
-- `conversas` — id, dona (FK `users`), workspace/fluxo de contexto (opcionais),
-  título, origem, `tokens_total`, datas, `deleted_at` (soft delete).
-- `mensagens` — `ordem` única por conversa, papel, `blocos` (o conteúdo VERBATIM
-  na forma que a API aceita de volta), `meta` (a marca da confirmação).
+- `conversas` — id, owner (FK `users`), context workspace/workflow (optional),
+  title, origin, `tokens_total`, dates, `deleted_at` (soft delete).
+- `mensagens` — `ordem` unique per conversation, role, `blocos` (the content VERBATIM
+  in the form the API accepts back), `meta` (the confirmation mark).
 
-`mensagens.blocos` guarda inclusive a `signature` do bloco de raciocínio: sem
-ela, a API recusa a próxima volta na retomada.
+`mensagens.blocos` stores even the `signature` of the reasoning block: without
+it, the API refuses the next round on resumption.
 
-## O replay
+## The replay
 
-`GET /assistente/conversas/{id}` devolve a conversa nos **mesmos quadros do SSE**,
-para o painel reaplicar pelo mesmo caminho de um quadro ao vivo. Duas regras:
+`GET /assistente/conversas/{id}` returns the conversation in the **same SSE frames**,
+for the panel to reapply through the same path as a live frame. Two rules:
 
-- um `tool_result` **nunca** sai (é a palavra do servidor, não conteúdo de
-  tela); o `fluxo`/`camada` de uma execução — e as `respostas_rapidas` de um
-  `sugerir_respostas` — são reconstruídos pelo mesmo `quadros_extras` da Home,
-  casando cada `tool_use` com o seu resultado;
-- uma `confirmacao` só reaparece **com o token** se a chave dela ainda existe no
-  Redis — uma chave sumida (decidida ou expirada) não vira botão morto.
+- a `tool_result` **never** goes out (it is the server's word, not screen
+  content); the `fluxo`/`camada` of a run — and the `respostas_rapidas` of a
+  `sugerir_respostas` — are rebuilt by the Home's same `quadros_extras`,
+  matching each `tool_use` with its result;
+- a `confirmacao` only reappears **with the token** if its key still exists in
+  Redis — a vanished key (decided or expired) does not become a dead button.
 
-## Limites conhecidos
+## Known limits
 
-- **A cota é compartilhada com o editor** (`assistente:tokens:{user}`): o modelo é
-  o mesmo, o orçamento por pessoa é um só. Sem `OPENROUTER_API_KEY`, `POST` responde
-  503 e `GET /estado` responde `ativo:false` — nunca 404.
-- **Sem Redis não há confirmação nem trava**: uma ação confirmável é recusada
-  fechada (não há como guardar o token para validar o clique). É a degradação do
-  resto da plataforma — a API nem sobe sem Redis.
-- **Arrastar arquivo com o assistente indisponível não mostra os chips.** A
-  caixa (barra ou painel) é quem desenha os anexos; enquanto o `/estado` carrega
-  ela some por um aviso, e se ele falhou (`ativo:false`, 502) a caixa não monta.
-  O upload ao Drive é independente e ACONTECE de qualquer jeito — o arquivo
-  aparece na tela `/drive` —, mas o retorno na Home só surge quando/se a caixa
-  voltar. O caso é estreito: sem assistente, nada mais na Home funciona também.
-- **Os anexos são da sessão, não da conversa.** Um F5 perde o `File` (e os chips
-  ainda em `enviando`); o que já subiu está no Drive. Trocar de conversa não
-  limpa os chips — eles são "o que acabei de soltar", não parte do histórico.
-  **Trocar de WORKSPACE, sim, limpa:** os arquivos foram para o Drive do
-  workspace anterior, e a referência da mensagem casa com o workspace da
-  conversa — mantê-los apontaria para arquivos que o assistente do novo
-  workspace não acha.
-- **Sem caminho por teclado.** O envio é só por arraste (o botão de clipe é um
-  follow-up). Quem não usa mouse não importa arquivo pela Home — não é
-  regressão (a tela `/drive`, que tem o campo acessível, já é inalcançável para
-  quem não é admin), mas fica registrado como o próximo passo.
-- **Deploy não roda migração.** Ao subir esta versão:
+- **The quota is shared with the editor** (`assistente:tokens:{user}`): the model is
+  the same, the budget per person is a single one. Without `OPENROUTER_API_KEY`, `POST` responds
+  503 and `GET /estado` responds `ativo:false` — never 404.
+- **Without Redis there is no confirmation and no lock**: a confirmable action is refused
+  closed (there is no way to store the token to validate the click). It is the degradation of the
+  rest of the platform — the API does not even start without Redis.
+- **Dragging a file with the assistant unavailable does not show the chips.** The
+  box (bar or panel) is what draws the attachments; while `/estado` loads
+  it gives way to a notice, and if it failed (`ativo:false`, 502) the box does not mount.
+  The upload to the Drive is independent and HAPPENS anyway — the file
+  appears on the `/drive` screen —, but the feedback on the Home only shows up when/if the box
+  comes back. The case is narrow: without the assistant, nothing else on the Home works either.
+- **The attachments belong to the session, not to the conversation.** An F5 loses the `File` (and the chips
+  still in `enviando`); what has already been uploaded is in the Drive. Switching conversations does not
+  clear the chips — they are "what I just dropped", not part of the history.
+  **Switching WORKSPACES, however, does clear them:** the files went to the Drive of the
+  previous workspace, and the message's reference matches the conversation's
+  workspace — keeping them would point to files that the assistant of the new
+  workspace cannot find.
+- **No keyboard path.** Uploading is drag-only (the paperclip button is a
+  follow-up). Someone who does not use a mouse cannot import files through the Home — it is not a
+  regression (the `/drive` screen, which has the accessible field, is already unreachable for
+  non-admins), but it is recorded as the next step.
+- **Deploy does not run migrations.** When rolling out this version:
   `docker compose exec api-prod alembic upgrade head`.

@@ -1,331 +1,332 @@
-# Refactor da Home — decisões
+# Home refactor — decisions
 
-Previewer aprovado: https://claude.ai/artifact/LKnVqCYZFXQYYh76aUXQZd (versão 6).
-Fora deste documento: tudo o que é do mapa/globo (basemap, atmosfera, fronteiras, rótulos).
+Approved previewer: https://claude.ai/artifact/LKnVqCYZFXQYYh76aUXQZd (version 6).
+Outside this document: everything that belongs to the map/globe (basemap, atmosphere, borders, labels).
 
-| PR | escopo | estado |
+| PR | scope | status |
 |---|---|---|
-| 1 | hero do primeiro acesso, barra em destaque, transição, conversa ao centro (pilha) | **aplicado** |
-| 2 | respostas rápidas e a marca animada no item pendente — **entregues** (2026-09-19); ainda pendentes: a marca no ícone da barra e no status do hero, o verbo cintilante e o cronômetro; as animações das interações (§6) entraram em seguida | parcial |
-| 3 | agendamento e alerta (cartões, e-mail pelo `SendEmail`, aviso in-app) | pendente |
+| 1 | first-visit hero, highlighted bar, transition, conversation in the center (stack) | **applied** |
+| 2 | quick replies and the animated mark on the pending item — **delivered** (2026-09-19); still pending: the mark on the bar icon and in the hero status, the shimmering verb and the timer; the interaction animations (§6) came in right after | partial |
+| 3 | scheduling and alert (cards, email through `SendEmail`, in-app notice) | pending |
 
-## Objetivo
+## Goal
 
-Melhorar o visual ao acessar o site: a barra de diálogo em destaque, no centro, e a conversa
-evoluindo ali mesmo — sem abrir o painel lateral por padrão como antes (`homeStore.painel` começava
-em `"aberto"`).
+Improve the visuals when you open the site: the dialog bar highlighted, in the center, and the conversation
+unfolding right there — without opening the side panel by default as before (`homeStore.painel` started
+at `"aberto"`).
 
-## 1. Quando o hero aparece
+## 1. When the hero appears
 
-- É o **estado inicial de todo acesso ao site** (carregar a página). Não é "primeira vez do
-  usuário": sem flag, sem `localStorage`, sem consulta ao servidor.
-- Vale **também sem login**: a Home abre anônima com o mesmo hero; o primeiro envio abre o modal
-  de entrada (login/cadastro) sobre o globo, e a mensagem vai sozinha quando o login dá certo
-  (`docs/assistant.md`, "A Home sem sessão e o modal de entrada").
-- Termina no **primeiro token visível da primeira resposta** — texto, erro ou cartão. Raciocínio
-  (`pensando`) e chamadas de ferramenta ainda são "processando": a barra fica no centro, com o
-  status. *Decidido no PR 1: primeiro token, e não o fim da resposta — a barra escorrega enquanto a
-  resposta começa, o que esconde a latência.*
-- Abrir um chat antigo (replay) ou o painel (Ctrl+I, chevron) também encerra o hero: há conversa
-  para ler.
-- Uma vez encerrado, não volta nesta carga. "Nova conversa" no meio da sessão cai no layout normal,
-  vazio.
+- It is the **initial state of every visit to the site** (loading the page). It is not "the user's
+  first time": no flag, no `localStorage`, no server query.
+- It applies **also without login**: the Home opens anonymously with the same hero; the first send opens the sign-in
+  modal (login/sign-up) over the globe, and the message goes out on its own when the login succeeds
+  (`docs/assistant.md`, "The Home without a session and the sign-in modal").
+- It ends at the **first visible token of the first reply** — text, error or card. Reasoning
+  (`pensando`) and tool calls are still "processing": the bar stays in the center, with the
+  status. *Decided in PR 1: the first token, and not the end of the reply — the bar slides away while the
+  reply starts, which hides the latency.*
+- Opening an old chat (replay) or the panel (Ctrl+I, chevron) also ends the hero: there is a conversation
+  to read.
+- Once ended, it does not come back during this page load. "Nova conversa" (New conversation) in the middle of the session falls into the normal layout,
+  empty.
 
-## 2. Layout do hero
+## 2. Hero layout
 
-- O globo ocupa a tela com a parte norte visível e um degradê para o sul até sumir (`.home-veu`,
-  um overlay que some na transição).
-- O globo **gira devagar** enquanto o hero está na tela: meio grau por segundo para oeste, em
-  passos lineares de 1 s (`giroLento` no `MapLibreMap`, como no previewer). Um gesto da pessoa
-  pausa o giro por 2,5 s; com `prefers-reduced-motion` ele não gira. No primeiro token o giro para
-  e o mapa **volta ao Brasil** (o `center`/`zoom` do Globo) em 900 ms, junto com a barra.
-- A barra fica no **centro**; acima dela, o título e a frase que a Home já usava ("Peça uma análise
-  espacial…"); abaixo, três chips de sugestão.
+- The globe fills the screen with its northern part visible and a gradient toward the south until it fades out (`.home-veu`,
+  an overlay that disappears in the transition).
+- The globe **spins slowly** while the hero is on screen: half a degree per second westward, in
+  linear 1 s steps (`giroLento` in `MapLibreMap`, as in the previewer). A gesture from the user
+  pauses the spin for 2.5 s; with `prefers-reduced-motion` it does not spin. At the first token the spin stops
+  and the map **returns to Brazil** (the Globe's `center`/`zoom`) in 900 ms, along with the bar.
+- The bar sits in the **center**; above it, the title and the phrase the Home already used ("Peça uma análise
+  espacial…" (Ask for a spatial analysis…)); below it, three suggestion chips.
 
-## 3. Barra de diálogo
+## 3. Dialog bar
 
-- Mais destaque: 56 px de altura e texto de 16 px no hero (rodapé: 44 px / 14 px), anel e brilho
-  laranja discretos, ícone num círculo tingido. No foco o brilho sobe um pouco.
-- **Sugestões digitadas** no campo enquanto ele está vazio, com cursor laranja piscando, ciclando
-  quatro frases do produto (`SUGESTOES` em `barra.tsx`). **Tab** aceita, **Enter** envia (vazio
-  envia a sugestão da vez); qualquer tecla interrompe; apagar tudo traz a sugestão de volta. Chips
-  clicáveis preenchem o campo.
-- Depois do primeiro token, o **mesmo elemento** escorrega para o rodapé e encolhe para a barra de
-  hoje — 900 ms, `cubic-bezier(.22,.9,.3,1)` (`.home-barra` em `globals.css`); sem movimento com
+- More prominence: 56 px tall and 16 px text in the hero (footer: 44 px / 14 px), a discreet orange ring and
+  glow, the icon in a tinted circle. On focus the glow rises a little.
+- **Typed-out suggestions** in the field while it is empty, with a blinking orange cursor, cycling through
+  four product phrases (`SUGESTOES` in `barra.tsx`). **Tab** accepts, **Enter** sends (empty
+  sends the current suggestion); any key interrupts; deleting everything brings the suggestion back. Clickable
+  chips fill in the field.
+- After the first token, the **same element** slides to the footer and shrinks into today's
+  bar — 900 ms, `cubic-bezier(.22,.9,.3,1)` (`.home-barra` in `globals.css`); no motion with
   `prefers-reduced-motion`.
-- Enviar **não abre o painel**: a conversa segue ao centro. O chevron abre o painel lateral.
+- Sending **does not open the panel**: the conversation stays in the center. The chevron opens the side panel.
 
-## 4. Conversa ao centro
+## 4. Conversation in the center
 
-- Uma **faixa** colada à barra, no lugar do painel — a legenda do globo (decisão de produto em
-  2026-09-19, a Opção 4 do previewer; antes era uma pilha de texto solto, com degradê no topo e
-  rolagem, e a resposta escorregava para cima durante o stream). A faixa é fixa, com fundo quase
-  preto, sem degradê nem rolagem, e mostra só a **última troca** (2 itens): a pergunta numa linha
-  ("Você · …", truncada, o texto inteiro no `title`) e, da resposta, **o que ficou** — o último
-  texto cortado em 4 linhas, os erros e os cartões — e **o que está vivo** enquanto o turno corre
-  ("Trabalhando…" ou o passo em curso). Raciocínio, passos concluídos e textos anteriores ficam para
-  o painel. Abaixo dos itens, o rodapé: o contador "N mensagens anteriores" à esquerda e
-  **Expandir** à direita.
-- **Expandir** (link na pilha, chevron da barra ou **Ctrl+I**) leva tudo ao painel lateral como já
-  ocorria; o painel tem o campo próprio; "Recolher" volta ao centro. Enquanto o painel está aberto,
-  a barra e a pilha somem.
-- Um único modelo de conversa alimenta as duas vistas: a pilha é a mesma `Conversa` do painel
-  recortada aos últimos turnos, e os cartões (confirmação, camada) vêm do mesmo hook
-  (`useExtrasDoAssistente`). Nada é duplicado.
-- A preferência "painel aberto/recolhido" **não é mais gravada** no navegador: o hero a ignoraria
-  de qualquer jeito, e o painel passou a ser sob demanda.
-- A resposta pode trazer **respostas rápidas**: até três chips sob o texto (`sugerir_respostas`,
-  uma ferramenta local do assistente; quadro `respostas_rapidas`), na faixa e no painel. Valem só
-  para aquela vez: só no último turno e fora do stream; o clique manda a frase como a próxima
-  mensagem e o turno novo os tira da tela; no replay, os do último turno voltam. (Entregue em
-  2026-09-19, junto com a marca animada do item pendente.)
+- A **strip** attached to the bar, in place of the panel — the globe's caption (product decision on
+  2026-09-19, the previewer's Option 4; before it was a stack of loose text, with a gradient at the top and
+  scrolling, and the reply slid upward during the stream). The strip is fixed, with a nearly
+  black background, no gradient and no scrolling, and shows only the **last exchange** (2 items): the question on one line
+  ("Você · …" (You · …), truncated, the full text in the `title`) and, from the reply, **what remained** — the last
+  text cut to 4 lines, the errors and the cards — and **what is live** while the turn runs
+  ("Trabalhando…" (Working…) or the step in progress). Reasoning, completed steps and earlier texts are left for
+  the panel. Below the items, the footer: the "N mensagens anteriores" (N earlier messages) counter on the left and
+  **Expandir** (Expand) on the right.
+- **Expandir** (a link in the stack, the bar's chevron or **Ctrl+I**) takes everything to the side panel as it already
+  did; the panel has its own field; "Recolher" (Collapse) goes back to the center. While the panel is open,
+  the bar and the stack disappear.
+- A single conversation model feeds both views: the stack is the same `Conversa` as the panel,
+  clipped to the last turns, and the cards (confirmation, layer) come from the same hook
+  (`useExtrasDoAssistente`). Nothing is duplicated.
+- The "panel open/collapsed" preference **is no longer saved** in the browser: the hero would ignore it
+  anyway, and the panel became on-demand.
+- The reply can bring **quick replies**: up to three chips under the text (`sugerir_respostas`,
+  a local tool of the assistant; `respostas_rapidas` frame), in the strip and in the panel. They are valid only
+  for that one time: only on the last turn and outside the stream; clicking sends the phrase as the next
+  message and the new turn removes them from the screen; on replay, those of the last turn come back. (Delivered on
+  2026-09-19, together with the animated mark on the pending item.)
 
-## 5. Processando
+## 5. Processing
 
-- *PR 1:* enquanto processa, os chips dão lugar a uma linha de status ("Trabalhando…") com "Esc para
-  parar"; **Esc de fato cancela** (`agente.parar`), exceto de dentro de um diálogo ou menu, onde a
-  tecla já tem dono. O ícone da barra vira o indicador de atividade do produto (`ExecActivity`).
-- A **marca animada** — a marca do site sem o fundo laranja, só o grafo de três nós e três linhas
-  em laranja; um traço percorre cada aresta (n1 → n2 → n3 → n1) e acende o nó ao chegar, ciclo de
-  2,4 s com uma respiração leve do conjunto (`assistente/marca-animada.tsx`, CSS em `globals.css`;
-  parada e inteira sob `prefers-reduced-motion`) — **entrou no item pendente da conversa** (faixa e
-  painel), por decisão de produto em 2026-09-19. A marca estática do sidebar segue com dois nós.
-- *Pendente:* a mesma marca no ícone da barra e na linha de status do hero e, ao lado, no estilo
-  Claude Code, o verbo cintilante que troca a cada ~1,7 s ("Trabalhando…", o passo em curso) e o
-  cronômetro.
+- *PR 1:* while processing, the chips give way to a status line ("Trabalhando…" (Working…)) with "Esc para
+  parar" (Esc to stop); **Esc actually cancels** (`agente.parar`), except from inside a dialog or menu, where the
+  key already has an owner. The bar icon becomes the product's activity indicator (`ExecActivity`).
+- The **animated mark** — the site's mark without the orange background, just the graph of three nodes and three lines
+  in orange; a stroke travels each edge (n1 → n2 → n3 → n1) and lights up the node on arrival, a
+  2.4 s cycle with a light breathing of the whole (`assistente/marca-animada.tsx`, CSS in `globals.css`;
+  still and complete under `prefers-reduced-motion`) — **went into the conversation's pending item** (strip and
+  panel), by product decision on 2026-09-19. The sidebar's static mark keeps two nodes.
+- *Pending:* the same mark on the bar icon and in the hero's status line and, next to it, in the
+  Claude Code style, the shimmering verb that changes every ~1.7 s ("Trabalhando…", the step in progress) and the
+  timer.
 
-## 6. Animações das interações (PR 2)
+## 6. Interaction animations (PR 2)
 
-- **Entregue (2026-09-19):** ao enviar, um anel terracota pisca na caixa da barra (`data-flash`, o
-  `::after` de `.home-barra-caixa` — só opacidade, porque um `box-shadow` não interpola entre listas
-  de tamanhos diferentes) e o botão de enviar afunda (`active:scale-90`, também no painel).
-- Na faixa, **nada desliza**: a faixa e cada mensagem nova entram só com um fade curto (o mesmo
-  token de duração do hero, zerado por `prefers-reduced-motion`), e não há animação de saída — o
-  texto só troca. (Entregue com a faixa em 2026-09-19; substitui o deslize com escala e o fade para
-  cima planejados aqui.)
-- **Entregue:** o parágrafo que está sendo escrito termina num cursor terracota (`cursorAoEscrever`
-  da `Conversa`, o mesmo `.home-caret` da sugestão digitada; some quando uma ferramenta o segue ou o
-  turno acaba); o cartão de camada pipoca ao chegar (`home-pop`, ~320 ms com sobressalto).
-- **Entregue:** ao expandir para a lateral, a faixa desliza para a direita e apaga, a barra apaga e
-  o painel entra da direita (~300 ms). A HomeView segura a faixa e a barra montadas por `SAIDA_MS`
-  (`useSaida`) — sem cliques e sem roubar o foco do painel — e recolher dentro do prazo cancela.
-  Tudo zera sob `prefers-reduced-motion` (o flash, de duração fixa, é desligado à parte).
+- **Delivered (2026-09-19):** on send, a terracotta ring flashes on the bar's box (`data-flash`, the
+  `::after` of `.home-barra-caixa` — opacity only, because a `box-shadow` does not interpolate between lists
+  of different sizes) and the send button sinks (`active:scale-90`, also in the panel).
+- In the strip, **nothing slides**: the strip and each new message come in with just a short fade (the same
+  duration token as the hero, zeroed by `prefers-reduced-motion`), and there is no exit animation — the
+  text simply swaps. (Delivered with the strip on 2026-09-19; it replaces the slide with scaling and the upward
+  fade planned here.)
+- **Delivered:** the paragraph being written ends in a terracotta cursor (`cursorAoEscrever`
+  of `Conversa`, the same `.home-caret` as the typed-out suggestion; it disappears when a tool follows it or the
+  turn ends); the layer card pops when it arrives (`home-pop`, ~320 ms with overshoot).
+- **Delivered:** when expanding to the side, the strip slides to the right and fades out, the bar fades out and
+  the panel comes in from the right (~300 ms). The HomeView keeps the strip and the bar mounted for `SAIDA_MS`
+  (`useSaida`) — without clicks and without stealing focus from the panel — and collapsing within that window cancels it.
+  Everything zeroes under `prefers-reduced-motion` (the flash, of fixed duration, is turned off separately).
 
-## 7. Agendamento e alerta (PR 3)
+## 7. Scheduling and alert (PR 3)
 
-- A resposta de uma análise termina oferecendo o agendamento: "Quer que eu rode isso todo dia e te
-  avise — aqui e por e-mail — se passar de N?", com a resposta rápida "Sim, agende e me avise".
-- Ao aceitar, a resposta traz dois cartões: **Agendamento** (todo dia · 07:00 · ativo) e **Alerta**
-  (aviso se > 500 focos · vigiando); o item novo aparece em **Agendamentos** no sidebar.
-- Quando o alerta dispara: notificação no topo do globo (com "Ver no globo" e fechar), mensagem
-  "Alerta disparado" na conversa e **e-mail pelo nó `SendEmail`** que já existe no fluxo, com resumo
-  e link. Na vida real, dispara na próxima execução.
-- Onde entra: `schedule_service` + `execution_alert_service` com um fluxo terminando no
-  `SendEmail`; o aviso **in-app** é o pedaço novo (canal a decidir: polling do estado ou evento).
+- The reply to an analysis ends by offering scheduling: "Quer que eu rode isso todo dia e te
+  avise — aqui e por e-mail — se passar de N?" (Want me to run this every day and let you know — here and by
+  email — if it goes over N?), with the quick reply "Sim, agende e me avise" (Yes, schedule it and let me know).
+- On accepting, the reply brings two cards: **Agendamento** (Schedule) (every day · 07:00 · active) and **Alerta** (Alert)
+  (notice if > 500 fire hotspots · watching); the new item appears under **Agendamentos** (Schedules) in the sidebar.
+- When the alert fires: a notification at the top of the globe (with "Ver no globo" (See on the globe) and close), an
+  "Alerta disparado" (Alert triggered) message in the conversation and an **email through the `SendEmail` node** that already exists in the workflow, with a summary
+  and a link. In real life, it fires on the next run.
+- Where it fits: `schedule_service` + `execution_alert_service` with a workflow ending in
+  `SendEmail`; the **in-app** notice is the new piece (channel to be decided: state polling or event).
 
-## 8. Onde está no código (PR 1)
+## 8. Where it is in the code (PR 1)
 
-- `components/home/index.tsx`: o estado `hero` (inicial, encerra no primeiro token), o véu, o
-  título, a transição e o Esc.
-- `assistente/barra.tsx`: as variantes `hero`/`rodape` do mesmo elemento, as sugestões digitadas,
-  os chips, o status "Trabalhando…" e o botão de parar.
-- `assistente/pilha.tsx`: a última troca ao centro; `assistente/extras.tsx`: os cartões, partilhados
-  com o painel.
-- `stores/homeStore.ts`: `painel` começa em `"barra"` e não é gravado.
-- `globals.css`, seção "Home: o hero do primeiro acesso": o véu, as transições e a pilha.
+- `components/home/index.tsx`: the `hero` state (initial, ends at the first token), the veil, the
+  title, the transition and Esc.
+- `assistente/barra.tsx`: the `hero`/`rodape` variants of the same element, the typed-out suggestions,
+  the chips, the "Trabalhando…" status and the stop button.
+- `assistente/pilha.tsx`: the last exchange in the center; `assistente/extras.tsx`: the cards, shared
+  with the panel.
+- `stores/homeStore.ts`: `painel` starts at `"barra"` and is not saved.
+- `globals.css`, section "Home: o hero do primeiro acesso" (Home: the first-visit hero): the veil, the transitions and the stack.
 
-## 9. Localização no globo — "me achar e me locomover"
+## 9. Location on the globe — "find me and get me around"
 
-Previewer aprovado: https://claude.ai/artifact/4zTeXh5ooRGmSe8NT3L5Hb (versão 2).
+Approved previewer: https://claude.ai/artifact/4zTeXh5ooRGmSe8NT3L5Hb (version 2).
 
-O botão de localização do MapLibre no globo da Home, no modo **seguir**: mostra a
-pessoa no mapa e acompanha em tempo real enquanto ela anda. É o único controle de
-mapa que a Home ganha além do zoom/bússola/escala que já existiam.
+MapLibre's location button on the Home globe, in **follow** mode: it shows the
+user on the map and tracks them in real time as they move. It is the only map
+control the Home gains besides the zoom/compass/scale that already existed.
 
-Decisões de produto:
+Product decisions:
 
-- **Só por clique** (opção A). O navegador exige um gesto para pedir a permissão,
-  e puxar a localização sozinho ao abrir seria invasivo. O aviso de permissão é o
-  do **navegador** (a aparência não é nossa) e aparece só na primeira vez; depois
-  de autorizado, clicar localiza direto.
-- **Botão no canto superior direito**, na mesma pilha de vidro discreto do zoom e
-  da bússola — onde os controles do mapa já vivem. O painel da conversa abre em
-  baixo à direita e não o cobre.
-- **Localizar manda no globo**: o giro do hero pausa e a "volta ao Brasil" não
-  dispara enquanto o seguir estiver ativo — senão o mapa puxaria a pessoa para
-  longe no instante em que a encontrou.
-- **Só na web na v1.** No app desktop a precisão cai no IP (sem GPS); fica
-  desligado por ora.
+- **Click only** (option A). The browser requires a gesture to ask for permission,
+  and pulling the location on its own at open time would be invasive. The permission prompt is the
+  **browser's** (its look is not ours) and appears only the first time; once
+  authorized, clicking locates directly.
+- **Button in the top-right corner**, in the same discreet glass stack as the zoom and
+  the compass — where the map controls already live. The conversation panel opens at the
+  bottom right and does not cover it.
+- **Locating takes over the globe**: the hero spin pauses and the "return to Brazil" does not
+  fire while follow is active — otherwise the map would pull the user
+  away at the very moment it found them.
+- **Web only in v1.** In the desktop app the accuracy falls back to IP (no GPS); it stays
+  turned off for now.
 
-Onde está no código:
+Where it is in the code:
 
-- `components/share/MapLibreMap.tsx`: a prop `geolocalizar` (opt-in) adiciona o
-  `GeolocateControl` (`trackUserLocation`), pausa o giro por um ref lido no laço,
-  e o `_cssDoMapa` repinta o botão ativo e o ponto do usuário na cor da marca. Os
-  textos do controle entram no `locale` em pt-BR.
-- `components/home/globo.tsx`: passa `geolocalizar` — o `/share` não passa, e por
-  isso não ganha o controle.
-- `next.config.ts`: `Permissions-Policy: geolocation=(self)` — sem isso o próprio
-  site fica proibido de pedir a localização.
+- `components/share/MapLibreMap.tsx`: the `geolocalizar` prop (opt-in) adds the
+  `GeolocateControl` (`trackUserLocation`), pauses the spin through a ref read in the loop,
+  and `_cssDoMapa` repaints the active button and the user's dot in the brand color. The
+  control's texts go into the `locale` in pt-BR.
+- `components/home/globo.tsx`: passes `geolocalizar` — `/share` does not pass it, and
+  so it does not get the control.
+- `next.config.ts`: `Permissions-Policy: geolocation=(self)` — without it the site
+  itself is forbidden from asking for the location.
 
-## 10. Localização no assistente — "análise perto de mim"
+## 10. Location in the assistant — "analysis near me"
 
-Previewers aprovados: o fluxo (https://claude.ai/artifact/QK4bRnBzUqBrvszfsJmnR5)
-e a posição do botão (https://claude.ai/artifact/8PjQ2Ra49t7N3WY2vA8zci).
+Approved previewers: the flow (https://claude.ai/artifact/QK4bRnBzUqBrvszfsJmnR5)
+and the button position (https://claude.ai/artifact/8PjQ2Ra49t7N3WY2vA8zci).
 
-A localização do globo (a §9) passa a **entrar na conversa**: a coordenada vira um
-chip removível no compositor e viaja no turno, e o assistente a usa como ponto de
-referência para pedidos relativos ("perto de mim", "num raio de N km").
+The globe's location (§9) now **enters the conversation**: the coordinate becomes a
+removable chip in the composer and travels with the turn, and the assistant uses it as a reference
+point for relative requests ("near me", "within a radius of N km").
 
-Decisões de produto:
+Product decisions:
 
-- **A coordenada entra por um menu "+", não por um botão sempre visível** (a opção
-  **B'**). Como o compositor não tinha nenhum "+" (anexo era só arrasta-e-solta), o
-  "+" novo dá um lar descobrível às DUAS ações: "Anexar arquivo" (o mesmo caminho
-  do arraste) e "Usar minha localização". Um menu, e não dois botões soltos, para
-  não inchar a pílula da barra.
-- **O estado fica à vista e sob controle**: o chip mostra a coordenada e a precisão
-  e some no ×; a precisão exata é o padrão (o "aproximar" ficou de follow-up).
-- **Uma fonte só**: "Usar minha localização" aciona o MESMO `GeolocateControl` do
-  globo (via `localizar()` no handle), então o mapa também segue a pessoa; o
-  `geolocate` sobe a coordenada. Vale enquanto definida — os próximos turnos a
-  levam sem relocalizar.
+- **The coordinate comes in through a "+" menu, not an always-visible button** (option
+  **B'**). Since the composer had no "+" at all (attaching was drag-and-drop only), the
+  new "+" gives a discoverable home to BOTH actions: "Anexar arquivo" (Attach file) (the same path
+  as dragging) and "Usar minha localização" (Use my location). One menu, and not two loose buttons, so as
+  not to bloat the bar's pill.
+- **The state stays in sight and under control**: the chip shows the coordinate and the accuracy
+  and goes away on the ×; exact accuracy is the default ("aproximar" (approximate) was left as a follow-up).
+- **A single source**: "Usar minha localização" triggers the SAME `GeolocateControl` as the
+  globe (via `localizar()` on the handle), so the map also follows the user; the
+  `geolocate` event passes the coordinate up. It holds while set — the next turns
+  carry it without relocating.
 
-Ajustes da revisão adversarial (mesmo dia, antes do PR):
+Adjustments from the adversarial review (same day, before the PR):
 
-- **Intenção ≠ posição.** `compartilharLocalizacao` é estado à parte: o × desliga
-  a intenção e ela FICA desligada — antes, o próximo tick do modo seguir
-  regravava a posição e o chip ressuscitava sozinho, mandando de volta a
-  coordenada que a pessoa acabara de remover.
-- **O botão nativo do globo voltou a ser só "me achar no mapa"**: ele atualiza a
-  última posição, mas NÃO anexa nada à conversa — só o gesto no "+" anexa.
-- **`localizar()` nunca alterna para OFF**: o `trigger()` do MapLibre é um
-  alternador (já seguindo, desligava o rastreio em silêncio); já ativo, o handle
-  só reemite a última posição.
-- **A confirmação reenvia a coordenada** (`DecisaoDeConfirmacao.localizacao`): a
-  retomada do laço não esquece o "perto de mim" — o servidor não guarda a
-  posição (ela vive só no prompt do stream, nunca no transcrito).
-- **Permissão negada solta o giro do hero** (o MapLibre não emite
-  `trackuserlocationend` nesse erro) **e vira toast** — o botão do controle fica
-  escondido atrás do painel no telefone. Cair para o 2º plano (arrastar) NÃO
-  devolve o giro: o watch segue vivo em zoom alto.
-- **Histerese de ~25 m** na posição: o jitter de GPS parado não muda o texto do
-  prompt (cache do histórico) nem re-renderiza os compositores a cada tick.
+- **Intent ≠ position.** `compartilharLocalizacao` is separate state: the × turns off
+  the intent and it STAYS off — before, the next tick of follow mode
+  rewrote the position and the chip came back to life on its own, sending back the
+  coordinate the user had just removed.
+- **The globe's native button is once again only "find me on the map"**: it updates the
+  last position, but does NOT attach anything to the conversation — only the gesture on the "+" attaches.
+- **`localizar()` never toggles to OFF**: MapLibre's `trigger()` is a
+  toggle (when already following, it silently turned off tracking); when already active, the handle
+  only re-emits the last position.
+- **The confirmation resends the coordinate** (`DecisaoDeConfirmacao.localizacao`): the
+  resumption of the loop does not forget the "near me" — the server does not store the
+  position (it lives only in the stream's prompt, never in the transcript).
+- **Denied permission releases the hero spin** (MapLibre does not emit
+  `trackuserlocationend` on that error) **and becomes a toast** — the control's button is
+  hidden behind the panel on a phone. Going to the background state (dragging) does NOT
+  give the spin back: the watch stays alive at high zoom.
+- **Hysteresis of ~25 m** on the position: the jitter of a stationary GPS does not change the prompt
+  text (history cache) nor re-render the composers on every tick.
 
-Onde está no código:
+Where it is in the code:
 
-- `components/share/MapLibreMap.tsx`: a prop `aoLocalizar` (o evento `geolocate` →
-  `{ lat, lon, precisao_m }`) e `localizar()` no handle (aciona o controle de fora
-  do mapa).
-- `components/home/assistente/mais.tsx`: `BotaoMais` (o menu "+") e
-  `ChipDeLocalizacao` — montados pela barra e pelo painel.
+- `components/share/MapLibreMap.tsx`: the `aoLocalizar` prop (the `geolocate` event →
+  `{ lat, lon, precisao_m }`) and `localizar()` on the handle (triggers the control from outside
+  the map).
+- `components/home/assistente/mais.tsx`: `BotaoMais` (the "+" menu) and
+  `ChipDeLocalizacao` — mounted by the bar and by the panel.
 - `stores/homeStore.ts`: `localizacao` + `definirLocalizacao`/`limparLocalizacao`
-  (na store pelo mesmo motivo do `rascunho`/anexos: Ctrl+I troca as superfícies).
-- `hooks/home/useAssistente.ts`: lê a localização por ref e a inclui no corpo do
-  turno só quando definida (sem ela, o corpo é o de sempre).
-- Backend: `schemas/assistente.py` (`Localizacao` + campo em `MensagemDaHome`),
-  `api/routers/assistente_router.py` (`_localizacao_extra`, dobrada em
-  `instrucoes_extras` como o workspace já fazia) e `services/assistente_superficie.py`
-  (uma linha ensinando o modelo a usar a localização nos pedidos relativos).
+  (in the store for the same reason as `rascunho`/attachments: Ctrl+I swaps the surfaces).
+- `hooks/home/useAssistente.ts`: reads the location through a ref and includes it in the turn's
+  body only when set (without it, the body is the usual one).
+- Backend: `schemas/assistente.py` (`Localizacao` + a field in `MensagemDaHome`),
+  `api/routers/assistente_router.py` (`_localizacao_extra`, folded into
+  `instrucoes_extras` as the workspace already was) and `services/assistente_superficie.py`
+  (one line teaching the model to use the location in relative requests).
 
-Follow-ups: "aproximar (~1 km)" a um toque para quem não quiser o ponto cravado;
-localização no app desktop (fica na web na v1, como a §9).
+Follow-ups: one-tap "aproximar (~1 km)" (approximate) for those who do not want a pinpointed location;
+location in the desktop app (it stays web-only in v1, like §9).
 
-## 11. Idiomas e região — a Home em inglês e espanhol
+## 11. Languages and region — the Home in English and Spanish
 
-Pedido: a Home em pt-BR, inglês e espanhol, escolhida sozinha pela
-região de quem acessa, com uma escolha fixa nas Preferências — e o globo
-começando (e voltando) na região da pessoa, não mais sempre na América do Sul.
+Request: the Home in pt-BR, English and Spanish, chosen automatically by the
+region of whoever visits, with a fixed choice in "Preferências" (Preferences) — and the globe
+starting (and returning) at the user's region, no longer always in South America.
 
-**Qual idioma** (`lib/idioma.ts`, resolvido no layout do dashboard, no servidor —
-a primeira pintura já sai no idioma certo):
+**Which language** (`lib/idioma.ts`, resolved in the dashboard layout, on the server —
+the first paint already comes out in the right language):
 
-1. a escolha nas Preferências (cookie `idioma`, 365 dias, o mesmo modelo do tema);
-2. o `Accept-Language` do navegador, respeitando os pesos `q` — é o sinal mais
-   fiel do que a pessoa LÊ;
-3. o país da conexão (`CF-IPCountry`): lusófonos → pt-BR, hispanófonos → es,
-   os demais → en — só quando o navegador mandou um `Accept-Language` sem
-   nenhum dos três idiomas;
-4. sem `Accept-Language`, pt-BR: todo navegador o manda, e quem não manda é
-   robô de busca ou script (o Googlebot sai dos EUA e indexaria a Home em
-   inglês); com ele, mas sem nenhum dos três idiomas e sem país útil, en.
+1. the choice in "Preferências" (`idioma` cookie, 365 days, the same model as the theme);
+2. the browser's `Accept-Language`, honoring the `q` weights — it is the most
+   faithful signal of what the user READS;
+3. the connection's country (`CF-IPCountry`): Portuguese-speaking → pt-BR, Spanish-speaking → es,
+   the rest → en — only when the browser sent an `Accept-Language` with
+   none of the three languages;
+4. without `Accept-Language`, pt-BR: every browser sends it, and whoever does not is
+   a search crawler or a script (Googlebot comes from the US and would index the Home in
+   English); with it, but with none of the three languages and no useful country, en.
 
-Nas Preferências, "Automático" é uma opção de verdade (apaga o cookie e mostra o
-idioma detectado); a troca vale na hora, sem recarregar. Um `router.refresh()`
-traz a escolha que o servidor leu — se o cookie mudou noutra aba, a tela, o
-cookie e as Preferências voltam a concordar.
+In "Preferências", "Automático" (Automatic) is a real option (it deletes the cookie and shows the
+detected language); the change takes effect immediately, without reloading. A `router.refresh()`
+brings back the choice the server read — if the cookie changed in another tab, the screen, the
+cookie and "Preferências" agree again.
 
-**Só a Home traduz.** O `EscopoPelaRota` limita a tradução à rota `/`: a
-administração (editor, projetos, admin) segue em português, e os componentes
-compartilhados com ela — o menu da conta, a conversa do assistente do editor,
-o campo de senha — não ficam metade em cada língua. Sem provider (testes, o
-portal `/share`), vale o português.
+**Only the Home is translated.** `EscopoPelaRota` limits translation to the `/` route: the
+administration area (editor, projects, admin) stays in Portuguese, and the components
+shared with it — the account menu, the editor assistant's conversation,
+the password field — do not end up half in each language. Without a provider (tests, the
+`/share` portal), Portuguese applies.
 
-**Os textos** moram em `components/home/i18n/secoes/` (casca, assistente,
-entrada, listas), com o português como molde: `en` e `es` são `typeof pt`, então
-chave faltando é erro de compilação. O português ficou byte a byte o de antes,
-com uma exceção de propósito: as quatro ferramentas do catálogo de fontes
-(`search_sources`, `describe_source`, `probe_source`, `register_source`), que
-apareciam na linha do tempo com o nome cru da API, ganharam rótulo ("Procurando
-fontes de dados"…) — também na conversa do assistente do editor, que usa a
-mesma `Conversa`. Componentes de fora da Home que ela usa ganharam uma prop de
-textos com o português como padrão (o mapa, o painel de recusas do Drive, o X do
-diálogo, os rótulos de leitor de tela da barra lateral, o trilho de largura).
+**The texts** live in `components/home/i18n/secoes/` (shell, assistant,
+sign-in, lists), with Portuguese as the template: `en` and `es` are `typeof pt`, so
+a missing key is a compile error. The Portuguese stayed byte-for-byte what it was before,
+with one deliberate exception: the source catalog's four tools
+(`search_sources`, `describe_source`, `probe_source`, `register_source`), which
+showed up in the timeline with the raw API name, got a label ("Procurando
+fontes de dados" (Looking for data sources)…) — also in the editor assistant's conversation, which uses the
+same `Conversa`. Components from outside the Home that it uses got a texts prop
+with Portuguese as the default (the map, the Drive rejections panel, the dialog's X,
+the sidebar's screen-reader labels, the width rail).
 
-A casca do app (barra lateral, cabeçalho, conta, Preferências, as listas do
-"Meus") mora no layout do dashboard, que TODA rota carrega — e importa os
-textos de `i18n/da-casca` (comum, casca, listas), não do índice. Pelo índice,
-o bloco do layout levava junto os dicionários do assistente e da entrada, nos
-três idiomas (~20 KB gzip), para a administração inteira; a tabela de rotas do
-`next build` não mostra isso. O teste `i18n-layout` segue os imports do layout
-e falha se ele voltar a alcançar o índice. A barra lateral e o gatilho do menu
-declaram o próprio `lang`: são irmãos da HomeView, e o `lang` do `<html>` só
-troca num efeito, depois da hidratação.
+The app shell (sidebar, header, account, "Preferências", the lists in
+"Meus" (Mine)) lives in the dashboard layout, which EVERY route loads — and it imports the
+texts from `i18n/da-casca` (common, shell, lists), not from the index. Through the index,
+the layout chunk carried along the assistant and sign-in dictionaries, in
+all three languages (~20 KB gzip), for the whole administration area; the route table of
+`next build` does not show this. The `i18n-layout` test follows the layout's imports
+and fails if it reaches the index again. The sidebar and the menu trigger
+declare their own `lang`: they are siblings of the HomeView, and the `lang` of `<html>` only
+changes in an effect, after hydration.
 
-**O que o servidor diz.** O servidor só fala português. Em inglês e espanhol,
-as recusas FIXAS têm o texto do idioma, escolhido pelo status: no login a
-credencial inválida (401), o e-mail não verificado (403 + `X-Error-Code`), a
-conta indisponível (os outros 403) e o bloqueio (429, com os minutos do
-`Retry-After`); no cadastro o "já em uso" (o único 400); nos links do e-mail
-(verificar, redefinir) o token inválido (400 e 404); o "link reenviado" da
-verificação; e o aviso do assistente desligado (o `motivo` do servidor é para
-quem administra). A tradução por status vale só para a recusa que É do
-servidor — o corpo do `http_exception_handler` (`error: "http_exception"`),
-ver `entrada/recusas.ts`: o 429 do limitador por IP não é conta bloqueada
-("muitas tentativas desta conexão"), e o 502 do proxy `/terra`, o 500
-inesperado e a página de erro de uma CDN viram o erro genérico do idioma, não
-"esta conta não pode entrar" nem o português do proxy. Os erros do assistente
-com código conhecido também — a conversa travada por outra aba
-(`conversa_em_andamento`) e o
-`rate_limited` do stream é a cota DIÁRIA, e o 429 da própria rota ganhou código
-próprio (`muitas_requisicoes`); o quadro do `loop_limit` leva o `teto` para a
-frase citar o número. Em português segue a mensagem do servidor, a de sempre.
-Continua como veio o que o servidor escreve caso a caso: a validação campo a
-campo do cadastro, a dica de uma camada, o motivo da recusa de um arquivo, e
-qualquer erro de código desconhecido.
+**What the server says.** The server only speaks Portuguese. In English and Spanish,
+the FIXED rejections have text in the language, chosen by status: at login the
+invalid credential (401), the unverified email (403 + `X-Error-Code`), the
+unavailable account (the other 403s) and the lockout (429, with the minutes from
+`Retry-After`); at sign-up the "already in use" (the only 400); in the email links
+(verify, reset) the invalid token (400 and 404); the verification's "link resent";
+and the notice that the assistant is turned off (the server's `motivo` is for
+whoever administers). Translation by status applies only to a rejection that IS the
+server's — the body of `http_exception_handler` (`error: "http_exception"`),
+see `entrada/recusas.ts`: the 429 of the per-IP limiter is not a locked account
+("too many attempts from this connection"), and the 502 of the `/terra` proxy, the unexpected 500
+and a CDN's error page become the language's generic error, not
+"this account cannot sign in" nor the proxy's Portuguese. The assistant's errors
+with a known code too — the conversation locked by another tab
+(`conversa_em_andamento`) and the
+stream's `rate_limited` is the DAILY quota, and the route's own 429 got its own
+code (`muitas_requisicoes`); the `loop_limit` frame carries the `teto` so the
+sentence can cite the number. In Portuguese the server's message stays, the usual one.
+What the server writes case by case stays as it came: the field-by-field
+validation of the sign-up, a layer's hint, the reason a file was rejected, and
+any error with an unknown code.
 
-**O assistente responde no idioma da tela.** O turno leva `idioma` (`en`/`es`;
-ausente em português) e o router soma um bloco ao prompt, depois da regra de
-idioma da instalação, dizendo que ela vale no lugar daquela. O bloco vai no
-EXTRA não cacheado: o prompt em português fica byte a byte o de sempre. A
-confirmação reenvia o idioma, como já fazia com a localização. Limitação: numa
-instalação com `ASSISTENTE_IDIOMA` que não seja português, a tela em português
-recebe a resposta no idioma da instalação — o turno em português não leva
-`idioma`, e o servidor não tem como pedir o português (era assim antes também).
+**The assistant replies in the screen's language.** The turn carries `idioma` (`en`/`es`;
+absent in Portuguese) and the router adds a block to the prompt, after the installation's language
+rule, saying that it applies in place of that one. The block goes in the
+uncached EXTRA: the Portuguese prompt stays byte-for-byte the usual one. The
+confirmation resends the language, as it already did with the location. Limitation: on an
+installation with an `ASSISTENTE_IDIOMA` other than Portuguese, the screen in Portuguese
+gets the reply in the installation's language — the turn in Portuguese does not carry
+`idioma`, and the server has no way to ask for Portuguese (it was like this before too).
 
-**O globo pela região** (`components/home/mapa/regiao.ts`), sem pedir permissão:
-o fuso do navegador → a cidade de referência do fuso (tabela IANA gerada por
-`web/scripts/gerar-fusos.mjs`); sem fuso útil, o país da conexão — e o fuso
-dos modos de privacidade não é útil: o "UTC", e o fuso da Islândia que o
-Firefox com `resistFingerprinting`, o Tor Browser e o Mullvad Browser informam
-(só a própria Islândia, pelo país da conexão, o mantém); depois o continente do nome do fuso; por fim o Brasil de
-antes. A latitude fica entre 45° S e 50° N para o globo não abrir num polo. O
-centro é lido uma vez, na montagem, e serve de início e de volta do hero. É a
-REGIÃO que decide o globo, não o idioma: uma brasileira com a tela em inglês
-continua vendo o Brasil.
+**The globe by region** (`components/home/mapa/regiao.ts`), without asking for permission:
+the browser's time zone → the time zone's reference city (IANA table generated by
+`web/scripts/gerar-fusos.mjs`); with no useful time zone, the connection's country — and the time zone
+of privacy modes is not useful: "UTC", and the Iceland time zone that
+Firefox with `resistFingerprinting`, Tor Browser and Mullvad Browser report
+(only Iceland itself, through the connection's country, keeps it); then the continent from the time zone's name; finally the Brazil of
+before. The latitude stays between 45° S and 50° N so the globe does not open at a pole. The
+center is read once, on mount, and serves as the hero's start and return point. It is the
+REGION that decides the globe, not the language: a Brazilian user with the screen in English
+still sees Brazil.
 
-Follow-ups: a preferência é por navegador (cookie) — sincronizar entre
-aparelhos pede uma coluna no usuário; o diálogo de parâmetros de execução, os
-modais das extensões e os e-mails seguem em português; os títulos dos controles do mapa
-(zoom, bússola) valem os da montagem — trocar de idioma sem recarregar não os
-atualiza.
+Follow-ups: the preference is per browser (cookie) — syncing across
+devices requires a column on the user; the run parameters dialog, the
+extension modals and the emails stay in Portuguese; the titles of the map controls
+(zoom, compass) are the ones from mount time — switching languages without reloading does not
+update them.

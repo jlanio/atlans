@@ -1,103 +1,103 @@
-# Histórico (métricas de execução) — redesenho
+# History (run metrics) — redesign
 
-Data: 2026-09-06. Estado: em implementação.
+Date: 2026-09-06. Status: being implemented.
 
-A rota `/observability` ("Histórico" na sidebar) passa a responder quatro
-perguntas, nesta ordem: **está tudo bem agora?** · **como foi o período?** ·
-**o que precisa de atenção?** · **qual execução, exatamente?**
+The `/observability` route ("Histórico" (History) in the sidebar) now answers four
+questions, in this order: **is everything fine right now?** · **how did the period go?** ·
+**what needs attention?** · **which run, exactly?**
 
-Este documento é o contrato entre backend e web. O que está aqui é o que os
-dois lados implementam; o que não está, não entra nesta rodada.
+This document is the contract between backend and web. What is here is what both
+sides implement; what is not here does not go into this round.
 
-## 1. Decisões
+## 1. Decisions
 
-| Decisão | Motivo |
+| Decision | Reason |
 |---|---|
-| Período (7/30/90 dias) no cabeçalho, uma vez, e todos os blocos obedecem | Hoje o seletor mora no gráfico e governa oito cards sem dizer isso |
-| Quatro indicadores do período, cada um comparado ao período anterior de mesmo tamanho | 1.284 execuções é muito ou pouco? Só a comparação responde |
-| Taxa de sucesso = concluídas ÷ (concluídas + falhas) | A fórmula atual põe em andamento e canceladas no denominador e cai em pico de carga |
-| Duração típica = mediana das concluídas, com p95 ao lado | A média inclui falhas, zeros do agendador e órfãos; uma execução de 40 min entre cem de 30 s vira "54 s" |
-| Faixa "Agora": em andamento, na fila, presas, executores online, confirmações atrasadas | Nada na tela diz o que está acontecendo neste instante |
-| "Precisa de atenção": falhas repetidas (com último erro), presas, executor no teto | O backend calcula `top_failing_workflows` e a tela descarta |
-| Tabela de execuções em português, com erro na linha, nível (reserva/pool), origem e clique que abre a execução num painel | Linhas parecem clicáveis e não abrem nada; status em inglês; `error_message` e `dispatch_tier` chegam e não aparecem |
-| Visões da mesma tabela: Execuções · Por workflow · Por executor · Confirmações (admin) | A aba Workflows é uma lista de nomes; a de Executores repete cards |
-| Filtros por workspace, workflow, executor, status, origem e busca, todos na URL | A página soma todos os workspaces e ignora o seletor; F5 zera tudo |
-| Saem: Total de workflows, Workflows ativos, Execuções (24h), Execuções (7 dias), Duração média, interruptor "Ativo" por linha de execução | Cadastro não é execução; três recortes do mesmo contador; desligar um workflow é ação de workflow, não de execução |
-| Migração aditiva: `trigger_source`, `triggered_by`, `error_category` em `workflow_runs`; `schedule_id` gravado no despacho normal | "Agendado às 03:00" e "manual · ana" mudam o diagnóstico; hoje `schedule_id` só é gravado quando o agendamento falha |
+| Period (7/30/90 days) in the header, once, and every block obeys it | Today the selector lives in the chart and governs eight cards without saying so |
+| Four indicators for the period, each compared with the previous period of the same length | Is 1,284 runs a lot or a little? Only the comparison answers that |
+| Success rate = completed ÷ (completed + failed) | The current formula puts in-progress and cancelled runs in the denominator and drops at load peaks |
+| Typical duration = median of the completed runs, with p95 beside it | The mean includes failures, scheduler zeros and orphans; one 40 min run among a hundred of 30 s becomes "54 s" |
+| "Agora" (Now) strip: in progress, queued, stuck, executors online, overdue acknowledgments | Nothing on the screen says what is happening at this instant |
+| "Precisa de atenção" (Needs attention): repeated failures (with the last error), stuck runs, executor at the ceiling | The backend computes `top_failing_workflows` and the screen discards it |
+| Runs table in Portuguese, with the error on the row, tier (fallback/pool), source and a click that opens the run in a panel | Rows look clickable and open nothing; status in English; `error_message` and `dispatch_tier` arrive and do not show |
+| Views of the same table: Execuções (Runs) · Por workflow (By workflow) · Por executor (By executor) · Confirmações (Acknowledgments) (admin) | The Workflows tab is a list of names; the Executors one repeats cards |
+| Filters by workspace, workflow, executor, status, source and search, all in the URL | The page adds up every workspace and ignores the selector; F5 resets everything |
+| Removed: Total de workflows, Workflows ativos, Execuções (24h), Execuções (7 dias), Duração média, the "Ativo" (Active) toggle per run row | Registration is not execution; three slices of the same counter; turning a workflow off is a workflow action, not a run action |
+| Additive migration: `trigger_source`, `triggered_by`, `error_category` in `workflow_runs`; `schedule_id` written on normal dispatch | "Agendado às 03:00" (Scheduled at 03:00) and "manual · ana" change the diagnosis; today `schedule_id` is only written when the schedule fails |
 
-## 2. Banco
+## 2. Database
 
-`workflow_runs` ganha três colunas anuláveis (migração `20260909_0001`, revisão
-`e1f4a2b7c935`, down `d9e3f1a5b624`; reversível):
+`workflow_runs` gets three nullable columns (migration `20260909_0001`, revision
+`e1f4a2b7c935`, down `d9e3f1a5b624`; reversible):
 
-| coluna | tipo | valores |
+| column | type | values |
 |---|---|---|
-| `trigger_source` | VARCHAR(16) | `manual` · `retry` · `webhook` · `schedule` · `mcp` (agente via servidor MCP, `docs/specs/mcp-server.md`) |
-| `triggered_by` | VARCHAR(36) | `id_hash` do usuário (nulo em webhook e agendamento) |
-| `error_category` | VARCHAR(16) | taxonomia do flow (`user`, `validation`, `timeout`, `resource`, `transient`, `internal`) mais as do servidor: `no_executor` (despacho sem executor), `executor_lost` (executor desconectou), `isolation` (barreira de isolamento), `dispatch` (exceção no despacho) |
+| `trigger_source` | VARCHAR(16) | `manual` · `retry` · `webhook` · `schedule` · `mcp` (agent via the MCP server, `docs/specs/mcp-server.md`) |
+| `triggered_by` | VARCHAR(36) | the user's `id_hash` (null for webhook and schedule) |
+| `error_category` | VARCHAR(16) | the flow taxonomy (`user`, `validation`, `timeout`, `resource`, `transient`, `internal`) plus the server's: `no_executor` (dispatch without an executor), `executor_lost` (executor disconnected), `isolation` (isolation barrier), `dispatch` (exception during dispatch) |
 
-Escrita:
+Writing:
 
-- `WorkflowService.start_analysis(..., triggered_by, trigger_source="manual", schedule_id=None)` repassa a `_dispatch_job`, que grava os três no `INSERT` do run `pending`.
-- Chamadores: `POST /workflows/{id}/execute` → `manual`; `POST …/retry` → `retry`; webhook → `webhook`; agendador → `schedule` + `schedule_id`. O caminho de falha do agendador (`_registrar_falha_agendada`) grava `schedule`, `schedule_id` e `error_category="no_executor"` (falta de executor) ou `"internal"` (qualquer outra falha do dispatch agendado — antes engolida no log).
-- `error_category`: no `job_result` (consumer) a partir de `payload["error_category"]`; `executor_lost` na desconexão; `no_executor` no despacho esgotado; `isolation` na barreira; `dispatch` na exceção do despacho.
+- `WorkflowService.start_analysis(..., triggered_by, trigger_source="manual", schedule_id=None)` passes them to `_dispatch_job`, which writes all three in the `INSERT` of the `pending` run.
+- Callers: `POST /workflows/{id}/execute` → `manual`; `POST …/retry` → `retry`; webhook → `webhook`; scheduler → `schedule` + `schedule_id`. The scheduler's failure path (`_registrar_falha_agendada`) writes `schedule`, `schedule_id` and `error_category="no_executor"` (no executor available) or `"internal"` (any other failure of the scheduled dispatch — previously swallowed in the log).
+- `error_category`: in the `job_result` (consumer) from `payload["error_category"]`; `executor_lost` on disconnection; `no_executor` on exhausted dispatch; `isolation` at the barrier; `dispatch` on the dispatch exception.
 
-Runs anteriores à migração ficam com tudo nulo; a web mostra "—".
+Runs from before the migration have everything null; the web shows "—".
 
 ## 3. API (`/observability`)
 
-Filtros comuns (opcionais). `workspace_id` vale nos cinco endpoints (`/metrics`, `/runs-by-day`, `/metrics/workflows`, `/metrics/executores` e `/runs`); `workflow_id` só em `/metrics`, `/runs-by-day` e `/runs` (as visões "por workflow" e "por executor" não recebem recorte por workflow); `tz` só em `/runs-by-day`:
+Common filters (optional). `workspace_id` applies to the five endpoints (`/metrics`, `/runs-by-day`, `/metrics/workflows`, `/metrics/executores` and `/runs`); `workflow_id` only to `/metrics`, `/runs-by-day` and `/runs` (the "by workflow" and "by executor" views take no per-workflow slice); `tz` only to `/runs-by-day`:
 
-- `workspace_id`: para usuário comum precisa estar entre os seus workspaces (senão 403 `workspace_access_denied`); admin filtra qualquer um.
-- `workflow_id` (só `/metrics`, `/runs-by-day`, `/runs`): precisa pertencer a um workspace acessível (senão 404).
-- `tz` (só `/runs-by-day`): nome IANA (ex. `America/Sao_Paulo`) para cortar o dia; default `UTC`; inválido → 422.
+- `workspace_id`: for a regular user it must be among their workspaces (otherwise 403 `workspace_access_denied`); an admin filters any of them.
+- `workflow_id` (only `/metrics`, `/runs-by-day`, `/runs`): must belong to an accessible workspace (otherwise 404).
+- `tz` (only `/runs-by-day`): IANA name (e.g. `America/Sao_Paulo`) used to cut the day; default `UTC`; invalid → 422.
 
-Escopo continua o de hoje (admin vê tudo; usuário vê os workspaces onde é dono ou membro). Cache Redis de 45 s inclui os filtros na chave.
+The scope stays as it is today (admin sees everything; a user sees the workspaces where they are owner or member). The 45 s Redis cache includes the filters in the key.
 
 ### 3.1 `GET /metrics?days=&workspace_id=&workflow_id=&force=`
 
-Campos existentes continuam (`period_days`, `total_workflows`, `active_workflows`, `total_runs`, `failed_runs`, `avg_duration_seconds`, `runs_last_24h`, `runs_last_7d`, `runs_prev_7d`, `success_rate_prev_7d`, `by_status`, `top_failing_workflows`), com estas mudanças:
+Existing fields stay (`period_days`, `total_workflows`, `active_workflows`, `total_runs`, `failed_runs`, `avg_duration_seconds`, `runs_last_24h`, `runs_last_7d`, `runs_prev_7d`, `success_rate_prev_7d`, `by_status`, `top_failing_workflows`), with these changes:
 
-- `success_rate` = `success / (success + failed)` na janela; `0.0` quando o denominador é zero. `success_rate_prev_7d` segue a mesma fórmula.
-- `by_status` ganha `cancelled` e `pending`; `other` passa a ser só o que não é nenhum dos cinco.
-- `top_failing_workflows[]` passa a trazer `workflow_name`, `total_runs`, `failure_rate` (falhas ÷ total do workflow na janela), `last_error` (texto, até 200 caracteres), `last_error_category`, `last_failed_at`. Top 5 por `failure_count`.
+- `success_rate` = `success / (success + failed)` in the window; `0.0` when the denominator is zero. `success_rate_prev_7d` follows the same formula.
+- `by_status` gains `cancelled` and `pending`; `other` becomes only what is none of the five.
+- `top_failing_workflows[]` now carries `workflow_name`, `total_runs`, `failure_rate` (failures ÷ the workflow's total in the window), `last_error` (text, up to 200 characters), `last_error_category`, `last_failed_at`. Top 5 by `failure_count`.
 
-Campos novos:
+New fields:
 
 ```jsonc
 {
   "success_runs": 1235, "cancelled_runs": 3, "running_runs": 3, "pending_runs": 1,
-  "prev_period": {            // janela anterior de mesmo tamanho (days..2*days atrás)
+  "prev_period": {            // previous window of the same length (days..2*days ago)
     "total_runs": 1147, "success_runs": 1118, "failed_runs": 29, "success_rate": 0.975,
     "p50_seconds": 38.0
   },
-  "duration": { "p50_seconds": 42.0, "p95_seconds": 190.0 },   // só status success com duration > 0; null sem dados
-  "now": {                    // SEM janela: o instante da consulta
+  "duration": { "p50_seconds": 42.0, "p95_seconds": 190.0 },   // only success status with duration > 0; null without data
+  "now": {                    // NO window: the instant of the query
     "running": 3, "pending": 1,
     "stuck_count": 1,
     "stuck": [{ "run_id": "…", "workflow_hash": "…", "workflow_name": "Cadastro rural · lote 7",
                 "agent_host": "executor:…", "executor_name": "geo-02", "started_at": "…",
-                "elapsed_seconds": 8040, "typical_seconds": 360 }],   // até 5, mais antigas primeiro
-    "executors": { "online": 4, "total": 5 },                         // executores ativos no escopo
-    "queued_on_executors": 12,                                        // soma de capacity.queued dos online; null se nenhum publica
-    "overdue_acks": 2                                                 // admin; null para os demais
+                "elapsed_seconds": 8040, "typical_seconds": 360 }],   // up to 5, oldest first
+    "executors": { "online": 4, "total": 5 },                         // active executors in scope
+    "queued_on_executors": 12,                                        // sum of capacity.queued of the online ones; null if none publishes
+    "overdue_acks": 2                                                 // admin; null for everyone else
   }
 }
 ```
 
-"Presa" = `status IN ('running','pending')` há mais que `max(3 × p50 do workflow nos últimos 90 dias, 900 s)`; sem p50, `3600 s`.
+"Stuck" = `status IN ('running','pending')` for longer than `max(3 × p50 do workflow nos últimos 90 dias, 900 s)` (3 × the workflow's p50 over the last 90 days, at least 900 s); without a p50, `3600 s`.
 
-Executores no escopo: admin → todos com `status='active'`; usuário → os acessíveis (`get_user_accessible_agents`). `online` via presença no Redis.
+Executors in scope: admin → all with `status='active'`; user → the accessible ones (`get_user_accessible_agents`). `online` via presence in Redis.
 
 ### 3.2 `GET /runs-by-day?days=&workspace_id=&workflow_id=&tz=`
 
 `{ "days": [ { "day": "2026-09-06", "total", "success", "failed", "running", "cancelled", "other" } ] }`
 
-- Todos os dias da janela, em ordem, com zeros onde não houve execução.
-- Dia calculado em `tz` (`start_time AT TIME ZONE tz` no PostgreSQL; em SQLite, cálculo em Python).
-- `running` = só `running` + `pending`; `cancelled` à parte; `other` = o resto.
+- Every day of the window, in order, with zeros where there was no run.
+- Day computed in `tz` (`start_time AT TIME ZONE tz` in PostgreSQL; in SQLite, computed in Python).
+- `running` = only `running` + `pending`; `cancelled` separate; `other` = the rest.
 
-### 3.3 `GET /metrics/workflows?days=&workspace_id=&force=` (novo)
+### 3.3 `GET /metrics/workflows?days=&workspace_id=&force=` (new)
 
 ```jsonc
 { "period_days": 30, "workflows": [ {
@@ -109,75 +109,75 @@ Executores no escopo: admin → todos com `status='active'`; usuário → os ace
 } ] }
 ```
 
-Todos os workflows acessíveis (inclusive sem execução na janela, com zeros); ordem: `total_runs` desc, nome asc. Cache de 45 s.
+All accessible workflows (including those without runs in the window, with zeros); order: `total_runs` desc, name asc. 45 s cache.
 
-`origem` é a do FLUXO (`workflows.origem`: `usuario` | `assistente` — quem o criou), e não a do disparo. A visão "Por workflow" usa esse campo para o selo do assistente e para o chip de filtro, sem uma segunda chamada: o inventário vem inteiro e o recorte é local.
+`origem` is the WORKFLOW's origin (`workflows.origem`: `usuario` | `assistente` — who created it), not the trigger's. The "Por workflow" view uses this field for the assistant badge and for the filter chip, without a second call: the inventory comes in full and the slicing is local.
 
 ### 3.4 `GET /metrics/executores?days=&workspace_id=&force=`
 
-Cada item continua com `agent_host`, `display_name`, `total_runs`, `success_runs`, `failed_runs`, `success_rate`, `avg_duration_seconds`, `last_run_at` e ganha:
+Each item keeps `agent_host`, `display_name`, `total_runs`, `success_runs`, `failed_runs`, `success_rate`, `avg_duration_seconds`, `last_run_at` and gains:
 
-`executor_id`, `executor_type` (`default`|`dedicated`), `is_default`, `status`, `online` (bool), `capacity` (`{running, queued, max_concurrent, max_queue}` ou `null` quando o executor não publica), `p50_seconds`.
+`executor_id`, `executor_type` (`default`|`dedicated`), `is_default`, `status`, `online` (bool), `capacity` (`{running, queued, max_concurrent, max_queue}` or `null` when the executor does not publish), `p50_seconds`.
 
-A linha de runs sem host deixa de se chamar "desconhecido": `agent_host: null`, `display_name: "Sem executor"`, `unassigned: true` (são falhas de despacho). Executores online sem execução na janela também entram (com zeros), para a visão mostrar a frota inteira.
+The row of runs without a host is no longer called "desconhecido" (unknown): `agent_host: null`, `display_name: "Sem executor"`, `unassigned: true` (they are dispatch failures). Online executors without runs in the window are included too (with zeros), so the view shows the whole fleet.
 
 ### 3.5 `GET /runs`
 
-Filtros novos: `workspace_id`, `trigger_source`, `tier` (`primary`|`fallback`|`pool`), `q` (busca `ILIKE` em `error_message`, no nome do workflow e no id da execução). `date_from` já existe e a web passa a enviar o início da janela.
+New filters: `workspace_id`, `trigger_source`, `tier` (`primary`|`fallback`|`pool`), `q` (`ILIKE` search in `error_message`, the workflow name and the run id). `date_from` already exists and the web now sends the start of the window.
 
-`workflow_origem` (`usuario`|`assistente`) recorta pela origem do FLUXO — o chip "Assistente" da barra. É outro eixo que `trigger_source` (o disparo) e combina com ele: um fluxo do assistente executado à mão casa `workflow_origem=assistente` e `trigger_source=manual`. Como `q`, exige o join com `workflows`, então runs de fluxos apagados de vez ficam fora do recorte (o recorte é sobre fluxos vivos); sem o parâmetro, a listagem segue sem join nenhum.
+`workflow_origem` (`usuario`|`assistente`) slices by the WORKFLOW's origin — the bar's "Assistente" (Assistant) chip. It is a different axis from `trigger_source` (the trigger) and combines with it: an assistant workflow run by hand matches `workflow_origem=assistente` and `trigger_source=manual`. Like `q`, it requires the join with `workflows`, so runs of permanently deleted workflows fall outside the slice (the slice is over live workflows); without the parameter, the listing still runs with no join at all.
 
-Cada run ganha, para qualquer usuário no escopo: `workflow_name`, `workspace_id`, `workspace_name`, `executor_id`, `executor_name` (nome amigável; `null` sem host), `trigger_source`, `triggered_by`, `triggered_by_username`, `error_category`, `schedule_id`, `workflow_origem` (`null` quando o fluxo foi apagado de vez). `workflow_active` e `owner_username` continuam admin-only.
+Each run gains, for any user in scope: `workflow_name`, `workspace_id`, `workspace_name`, `executor_id`, `executor_name` (friendly name; `null` without a host), `trigger_source`, `triggered_by`, `triggered_by_username`, `error_category`, `schedule_id`, `workflow_origem` (`null` when the workflow was permanently deleted). `workflow_active` and `owner_username` remain admin-only.
 
 ### 3.6 `GET /runs/{run_id}`
 
-Mesmos campos novos do 3.5, mais `typical_seconds` (p50 do workflow nos últimos 90 dias, `null` sem dados).
+The same new fields as 3.5, plus `typical_seconds` (the workflow's p50 over the last 90 days, `null` without data).
 
 ## 4. Web
 
-Tudo novo em `web/app/components/observability/`; a página `page.tsx` só compõe.
+Everything new in `web/app/components/observability/`; the `page.tsx` page only composes.
 
-### 4.1 Estado na URL (`historico-url.ts`, puro)
+### 4.1 State in the URL (`historico-url.ts`, pure)
 
 `?periodo=7|30|90&visao=execucoes|workflows|executores|confirmacoes&status=&workspace=&workflow=&executor=&origem=&assistente=1&q=&execucao=`
 
-- `lerEstado(searchParams)` valida e devolve `EstadoDoHistorico` com defaults (`periodo=30`, `visao=execucoes`); valores inválidos caem no default.
-- `assistente=1` é o chip "Assistente" (booleano; só "1" liga). O nome é próprio porque `origem` já é o DISPARO (`trigger_source`) e este recorta por quem CRIOU o fluxo — os dois convivem na URL e se combinam.
-- `escreverEstado(estado)` devolve a query string sem os defaults (URL limpa).
-- O hook `useHistoricoUrl()` lê com `useSearchParams` e grava com `router.replace` (sem scroll).
+- `lerEstado(searchParams)` validates and returns `EstadoDoHistorico` with defaults (`periodo=30`, `visao=execucoes`); invalid values fall back to the default.
+- `assistente=1` is the "Assistente" chip (boolean; only "1" turns it on). It has its own name because `origem` is already the TRIGGER (`trigger_source`) and this one slices by who CREATED the workflow — the two coexist in the URL and combine.
+- `escreverEstado(estado)` returns the query string without the defaults (clean URL).
+- The `useHistoricoUrl()` hook reads with `useSearchParams` and writes with `router.replace` (no scroll).
 
-### 4.2 Textos (`formatos.ts` e `shared/status-rotulos.ts`, puros)
+### 4.2 Copy (`formatos.ts` and `shared/status-rotulos.ts`, pure)
 
-- `rotuloDoStatus`: `success`→"Concluída", `failed`/`error`→"Falhou", `running`→"Em andamento", `pending`→"Na fila", `cancelled`→"Cancelada", `cached`→"Cache", outro→o próprio texto. O `StatusBadge` passa a usar isto (vale para todas as telas).
-- `formatarDuracao(segundos)`: `< 60` → "31 s"; `< 3600` → "4 min 02 s"; senão "2 h 14 min"; `null` → "—".
-- `formatarInicio(iso, agora)`: `< 60 min` → "há 12 min"; hoje → "hoje, 03:00"; ontem → "ontem, 17:22"; mesmo ano → "4 set, 03:00"; senão "4 set 2025, 03:00".
-- `rotuloDaOrigem`: `manual`→"manual", `retry`→"reexecução", `webhook`→"webhook", `schedule`→"agendado", nulo→null.
-- `rotuloDaCategoria`: `timeout`→"tempo esgotado", `no_executor`→"sem executor", `executor_lost`→"executor caiu", `isolation`→"isolamento", `user`→"erro do fluxo", `validation`→"validação", `resource`→"recursos", `transient`→"transitório", `internal`→"interno", `dispatch`→"despacho".
-- `rotuloDoNivel`: `primary`→null (não se marca o normal), `fallback`→"reserva", `pool`→"pool".
+- `rotuloDoStatus`: `success`→"Concluída" (Completed), `failed`/`error`→"Falhou" (Failed), `running`→"Em andamento" (In progress), `pending`→"Na fila" (Queued), `cancelled`→"Cancelada" (Cancelled), `cached`→"Cache", other→the text itself. `StatusBadge` now uses this (it applies to every screen).
+- `formatarDuracao(segundos)`: `< 60` → "31 s"; `< 3600` → "4 min 02 s"; otherwise "2 h 14 min"; `null` → "—".
+- `formatarInicio(iso, agora)`: `< 60 min` → "há 12 min" (12 min ago); today → "hoje, 03:00" (today, 03:00); yesterday → "ontem, 17:22" (yesterday, 17:22); same year → "4 set, 03:00"; otherwise "4 set 2025, 03:00".
+- `rotuloDaOrigem`: `manual`→"manual", `retry`→"reexecução" (re-run), `webhook`→"webhook", `schedule`→"agendado" (scheduled), null→null.
+- `rotuloDaCategoria`: `timeout`→"tempo esgotado" (timed out), `no_executor`→"sem executor" (no executor), `executor_lost`→"executor caiu" (executor dropped), `isolation`→"isolamento" (isolation), `user`→"erro do fluxo" (workflow error), `validation`→"validação" (validation), `resource`→"recursos" (resources), `transient`→"transitório" (transient), `internal`→"interno" (internal), `dispatch`→"despacho" (dispatch).
+- `rotuloDoNivel`: `primary`→null (the normal case is not marked), `fallback`→"reserva" (fallback), `pool`→"pool".
 - `variacao(atual, anterior)` → `{ pct, delta, direcao: 'sobe'|'desce'|'igual' } | null`.
 
-### 4.3 Blocos
+### 4.3 Blocks
 
-- **Cabeçalho**: "Histórico" + subtítulo "Execuções dos seus workflows · comparado com os N dias anteriores"; à direita, segmentado 7/30/90 e "Atualizar" (`<Button variant="ghost" size="sm" disabled={carregando}>`). NOTA: o carimbo de frescor "atualizado há X s" **não é renderizado** hoje — `textoDeFrescor` existe em `cabecalho.tsx` mas nunca é chamado, e `atualizadoEm` é rastreado no hook (`use-historico-dados.ts`) sem ser exibido.
-- **Faixa Agora** (`agora-faixa.tsx`): "Agora · N em andamento · N na fila · N presa(s) há X · Executores a de b online · N confirmações atrasadas (admin)" + link "Ver em andamento →" (aplica `status=running`). Some o que é zero, exceto "em andamento". Atualiza a cada 30 s enquanto a aba está visível (o poll de ACK de 10 s continua só para admin).
-- **Indicadores** (`indicadores.tsx`): Execuções (tendência vs anterior, sparkline do total por dia), Taxa de sucesso (tendência em pontos, sparkline da taxa por dia), Duração típica ("42 s" + "5% mais lentas acima de 3 min 10 s"; mediana anterior na descrição), Falhas (delta absoluto, "28 delas em «X»" a partir de `top_failing_workflows[0]`). Menos falhas é verde. Cada card tem `aria-label` com o texto completo.
-- **Gráfico por dia** (`grafico-por-dia.tsx`): Recharts sob `dynamic()`, barras empilhadas Concluídas / Falhas / Em andamento / Canceladas nas cores dos status; eixo X "8 ago"; tooltip em português; sem reanimar ao trocar de período (`isAnimationActive={false}` após a primeira pintura).
-- **Precisa de atenção** (`atencao.ts` puro + `atencao-lista.tsx`): até 5 itens, nesta ordem: presas (`now.stuck`), falhas repetidas (`top_failing_workflows` com `failure_count ≥ 3` ou `failure_rate ≥ 0.2`), executores no teto (`capacity.running ≥ max_concurrent` e `queued > 0`). Cada item leva a uma ação: abrir a execução, filtrar a tabela pelo workflow com `status=failed`, abrir o executor. Itens que têm fluxo levam o selo do assistente quando a origem é resolvível (as métricas não a trazem: quem compõe a tela passa `origemDoWorkflow`, do inventário por workflow — no Dashboard, da listagem de fluxos). Vazio: "Nada pendente. Última falha há X." (ou "Nenhuma falha no período.").
-- **Filtros** (`filtros.tsx`): chips de status (Todas / Falhas / Em andamento / Concluídas / Canceladas) com contagens de `by_status`; depois de um separador, o chip "Assistente" — alternador independente (combina com o status), SEM número, porque a contagem disponível é de fluxos e os outros chips contam execuções; selects Workspace (se o usuário tem mais de um, ou admin), Workflow (com a faísca nos do assistente), Executor, Origem; busca com debounce de 300 ms. O chip vira `workflow_origem=assistente` em `/runs` e, na visão "Por workflow", um recorte local do inventário.
-- **Visões**: `tabela-execucoes.tsx` (Status · Workflow (workspace · origem · quem) · Início · Duração · Executor (+nível) · Erro · ›; ficha empilhada no telefone com `CELULA_COM_ROTULO`), `visao-workflows.tsx` (Workflow · Execuções · Sucesso · Duração típica · Última · Falhas/último erro · Ativo (admin, com confirmação ao desligar)), `visao-executores.tsx` (Executor · online · Em execução/fila · Execuções · Sucesso · Duração típica · Última), `visao-confirmacoes.tsx` (o card de ACK de hoje, com textos em português).
-- **Painel da execução** (`painel-execucao.tsx`): `Sheet` à direita (largura padrão 520, redimensionável como o de executor); cabeçalho (workflow, status, nível, origem, quem disparou); fatos (início, duração + típica, executor, workspace); erro inteiro com categoria; nós com duração e o que falhou; ações: "Executar de novo" (`POST /workflows/{id}/runs/{run}/retry`, com confirmação), "Abrir workflow" (`/workflow/{id}`), "Ver log" (`/runs/{id}/events`, reaproveitando o painel de log existente quando houver), "Abrir em página" (`/observability/run/{id}`), "Copiar ID". Abre por `?execucao=` na URL.
-- **Dados** (`use-historico-dados.ts`): quatro chamadas em paralelo por (período, filtros) com cache de 60 s por chave e carimbo de sequência (a resposta velha nunca sobrescreve a nova); falha parcial vira aviso na seção afetada, não silêncio.
+- **Header**: "Histórico" + subtitle "Execuções dos seus workflows · comparado com os N dias anteriores" (Runs of your workflows · compared with the previous N days); on the right, a 7/30/90 segmented control and "Atualizar" (Refresh) (`<Button variant="ghost" size="sm" disabled={carregando}>`). NOTE: the freshness stamp "atualizado há X s" (updated X s ago) is **not rendered** today — `textoDeFrescor` exists in `cabecalho.tsx` but is never called, and `atualizadoEm` is tracked in the hook (`use-historico-dados.ts`) without being displayed.
+- **Now strip** (`agora-faixa.tsx`): "Agora · N em andamento · N na fila · N presa(s) há X · Executores a de b online · N confirmações atrasadas (admin)" (Now · N in progress · N queued · N stuck for X · Executors a of b online · N overdue acknowledgments) + the link "Ver em andamento →" (See in progress →) (applies `status=running`). Whatever is zero disappears, except "em andamento". It refreshes every 30 s while the tab is visible (the 10 s ACK poll remains admin-only).
+- **Indicators** (`indicadores.tsx`): Execuções (Runs) (trend vs previous, sparkline of the total per day), Taxa de sucesso (Success rate) (trend in points, sparkline of the rate per day), Duração típica (Typical duration) ("42 s" + "5% mais lentas acima de 3 min 10 s" (slowest 5% above 3 min 10 s); previous median in the description), Falhas (Failures) (absolute delta, "28 delas em «X»" (28 of them in "X") from `top_failing_workflows[0]`). Fewer failures is green. Each card has an `aria-label` with the full text.
+- **Per-day chart** (`grafico-por-dia.tsx`): Recharts under `dynamic()`, stacked bars Concluídas / Falhas / Em andamento / Canceladas (Completed / Failed / In progress / Cancelled) in the status colors; X axis "8 ago"; tooltip in Portuguese; no re-animation when the period changes (`isAnimationActive={false}` after the first paint).
+- **Needs attention** (`atencao.ts` pure + `atencao-lista.tsx`): up to 5 items, in this order: stuck runs (`now.stuck`), repeated failures (`top_failing_workflows` with `failure_count ≥ 3` or `failure_rate ≥ 0.2`), executors at the ceiling (`capacity.running ≥ max_concurrent` and `queued > 0`). Each item leads to an action: open the run, filter the table by the workflow with `status=failed`, open the executor. Items that have a workflow carry the assistant badge when the origin can be resolved (the metrics do not carry it: whoever composes the screen passes `origemDoWorkflow`, from the per-workflow inventory — on the Dashboard, from the workflow listing). Empty: "Nada pendente. Última falha há X." (Nothing pending. Last failure X ago.) (or "Nenhuma falha no período." (No failures in the period.)).
+- **Filters** (`filtros.tsx`): status chips (Todas / Falhas / Em andamento / Concluídas / Canceladas — All / Failures / In progress / Completed / Cancelled) with counts from `by_status`; after a separator, the "Assistente" chip — an independent toggle (it combines with the status), WITHOUT a number, because the available count is of workflows and the other chips count runs; Workspace selects (if the user has more than one, or is admin), Workflow (with the sparkle on the assistant's), Executor, Origem (Source); search with a 300 ms debounce. The chip becomes `workflow_origem=assistente` in `/runs` and, in the "Por workflow" view, a local slice of the inventory.
+- **Views**: `tabela-execucoes.tsx` (Status · Workflow (workspace · source · who) · Start · Duration · Executor (+tier) · Error · ›; stacked card on the phone with `CELULA_COM_ROTULO`), `visao-workflows.tsx` (Workflow · Runs · Success · Typical duration · Last · Failures/last error · Active (admin, with confirmation when turning off)), `visao-executores.tsx` (Executor · online · Running/queue · Runs · Success · Typical duration · Last), `visao-confirmacoes.tsx` (today's ACK card, with copy in Portuguese).
+- **Run panel** (`painel-execucao.tsx`): `Sheet` on the right (default width 520, resizable like the executor one); header (workflow, status, tier, source, who triggered it); facts (start, duration + typical, executor, workspace); full error with category; nodes with duration and which one failed; actions: "Executar de novo" (Run again) (`POST /workflows/{id}/runs/{run}/retry`, with confirmation), "Abrir workflow" (Open workflow) (`/workflow/{id}`), "Ver log" (View log) (`/runs/{id}/events`, reusing the existing log panel when there is one), "Abrir em página" (Open as a page) (`/observability/run/{id}`), "Copiar ID" (Copy ID). It opens via `?execucao=` in the URL.
+- **Data** (`use-historico-dados.ts`): four parallel calls per (period, filters) with a 60 s cache per key and a sequence stamp (the stale response never overwrites the new one); a partial failure becomes a warning in the affected section, not silence.
 
-Taxas coloridas por faixa usam `successRateColor(taxa, "amber")`: o amarelo padrão não tem contraste no tema claro.
+Rates colored by band use `successRateColor(taxa, "amber")`: the default yellow has no contrast in the light theme.
 
-### 4.4 Colaterais tratados
+### 4.4 Side effects handled
 
-- `StatusBadge` em português (todas as telas).
-- Visão geral (`/dashboard`): usa a `success_rate` corrigida automaticamente; o card "Workflows" deixa de mostrar sparkline de execuções.
-- Detalhe do workflow (`/observability/{id}`): linhas levam à execução; link para o editor.
-- Links "Ver todas no Observability"/"Abrir na observabilidade" passam a dizer "Histórico".
-- `page.tsx.bak` removido.
+- `StatusBadge` in Portuguese (every screen).
+- Overview (`/dashboard`): uses the corrected `success_rate` automatically; the "Workflows" card no longer shows a runs sparkline.
+- Workflow detail (`/observability/{id}`): rows lead to the run; link to the editor.
+- The "Ver todas no Observability"/"Abrir na observabilidade" links now say "Histórico".
+- `page.tsx.bak` removed.
 
-## 5. Fora desta rodada
+## 5. Out of this round
 
-Histórico de capacidade dos executores, rollup de `workflow_runs`, tempo real na fila (`acked_at`), métricas por usuário com RBAC próprio, saúde do agendamento ("não rodou às 03:00" exige comparar `next_run_at` com o último run agendado; entra quando `schedule_id` tiver histórico).
+Executor capacity history, `workflow_runs` rollup, real time in the queue (`acked_at`), per-user metrics with their own RBAC, schedule health ("didn't run at 03:00" requires comparing `next_run_at` with the last scheduled run; it comes in when `schedule_id` has history).

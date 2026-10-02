@@ -1,59 +1,59 @@
-# Padrão Webhook + ResponseNode
+# Webhook + ResponseNode pattern
 
-Este documento descreve o protocolo de requisição/resposta entre cliente e servidor para execução de workflows via webhook, incluindo o modo síncrono habilitado pelo `ResponseNode`.
-
----
-
-## Sumário
-
-- [Visão Geral](#visão-geral)
-- [Modos de Execução](#modos-de-execução)
-- [Fluxo Assíncrono (padrão)](#fluxo-assíncrono-padrão)
-- [Fluxo Síncrono (ResponseNode)](#fluxo-síncrono-responsenode)
-- [Parâmetro no_wait](#parâmetro-no_wait)
-- [Diagrama de Sequência Completo](#diagrama-de-sequência-completo)
-- [Referência da API](#referência-da-api)
-- [Autenticação e limites](#autenticação-e-limites)
-- [ResponseNode — Propriedades](#responsenode--propriedades)
-- [Exemplos](#exemplos)
+This document describes the request/response protocol between client and server for running workflows via webhook, including the synchronous mode enabled by the `ResponseNode`.
 
 ---
 
-## Visão Geral
+## Contents
 
-O endpoint `POST /webhook/execute/{id_hash}` é o ponto de entrada para disparo externo de workflows. Ele suporta dois modos:
+- [Overview](#overview)
+- [Execution Modes](#execution-modes)
+- [Asynchronous Flow (default)](#asynchronous-flow-default)
+- [Synchronous Flow (ResponseNode)](#synchronous-flow-responsenode)
+- [The no_wait parameter](#the-no_wait-parameter)
+- [Complete Sequence Diagram](#complete-sequence-diagram)
+- [API Reference](#api-reference)
+- [Authentication and limits](#authentication-and-limits)
+- [ResponseNode — Properties](#responsenode--properties)
+- [Examples](#examples)
 
-| Modo | Comportamento | Uso |
+---
+
+## Overview
+
+The `POST /webhook/execute/{id_hash}` endpoint is the entry point for triggering workflows externally. It supports two modes:
+
+| Mode | Behavior | Use |
 |---|---|---|
-| **Assíncrono** | Retorna `202 Accepted` imediatamente com `task_id` | Callers que só enfileiram; progresso consumido via WebSocket |
-| **Síncrono** | Bloqueia até o workflow completar, retorna a resposta HTTP do `ResponseNode` | Integrações externas que precisam da resposta inline |
+| **Asynchronous** | Returns `202 Accepted` immediately with `task_id` | Callers that only enqueue; progress consumed via WebSocket |
+| **Synchronous** | Blocks until the workflow completes, returns the `ResponseNode`'s HTTP response | External integrations that need the response inline |
 
-A chave de controle é o parâmetro `no_wait` no body da requisição e a presença do `ResponseNode` na definição do workflow.
+What controls it is the `no_wait` parameter in the request body and the presence of the `ResponseNode` in the workflow definition.
 
 ---
 
-## Modos de Execução
+## Execution Modes
 
 ```
-has_response_node=False  →  sempre retorna 202 imediatamente
+has_response_node=False  →  always returns 202 immediately
 has_response_node=True
-  ├─ no_wait=True   →  retorna 202 imediatamente (caller pediu retorno assíncrono)
-  └─ no_wait=False  →  bloqueia até ResponseNode completar (caller externo)
+  ├─ no_wait=True   →  returns 202 immediately (caller asked for an asynchronous return)
+  └─ no_wait=False  →  blocks until ResponseNode completes (external caller)
 ```
 
 ---
 
-## Fluxo Assíncrono (padrão)
+## Asynchronous Flow (default)
 
-Usado quando o workflow **não** contém `ResponseNode`, ou quando `no_wait=true`.
+Used when the workflow does **not** contain a `ResponseNode`, or when `no_wait=true`.
 
 ```
-Cliente                 Servidor                  Executor
+Client                  Server                    Executor
   │                        │                         │
   │── POST /webhook/... ──►│                         │
   │                        │── WebSocket job ───────►│
   │◄─── 202 {task_id} ─────│                         │
-  │                        │                         │ executa...
+  │                        │                         │ executes...
   │── WS /ws/workflow/{id}►│                         │
   │                        │◄── node_event ──────────│
   │◄── node status ────────│                         │
@@ -62,76 +62,76 @@ Cliente                 Servidor                  Executor
   │── WS close ───────────►│                         │
 ```
 
-**Detalhes:**
-1. Cliente recebe `task_id` imediatamente
-2. Abre WebSocket `GET /ws/workflow/{task_id}` enviando JWT no primeiro frame
-3. Recebe eventos de nós em tempo real (`started`, `completed`, `failed`)
-4. Recebe `__workflow_complete__` ao final e fecha o WebSocket
+**Details:**
+1. The client receives `task_id` immediately
+2. Opens the WebSocket `GET /ws/workflow/{task_id}`, sending the JWT in the first frame
+3. Receives node events in real time (`started`, `completed`, `failed`)
+4. Receives `__workflow_complete__` at the end and closes the WebSocket
 
 ---
 
-## Fluxo Síncrono (ResponseNode)
+## Synchronous Flow (ResponseNode)
 
-Usado quando o workflow contém `ResponseNode` **e** o caller **não** envia `no_wait=true`.
+Used when the workflow contains a `ResponseNode` **and** the caller does **not** send `no_wait=true`.
 
 ```
-Cliente                 Servidor                      Executor
+Client                  Server                        Executor
   │                        │                             │
   │── POST /webhook/... ──►│                             │
-  │   (no_wait ausente)    │── WebSocket job ───────────►│
+  │   (no_wait absent)     │── WebSocket job ───────────►│
   │                        │                             │
-  │                        │  BRPOP webhook_response:id  │ executa nós...
-  │         (bloqueado)    │  (aguardando)               │
-  │                        │                             │── publica node events
-  │                        │◄── node_event (N vezes) ────│    via Redis pub/sub
+  │                        │  BRPOP webhook_response:id  │ executes nodes...
+  │         (blocked)      │  (waiting)                  │
+  │                        │                             │── publishes node events
+  │                        │◄── node_event (N times) ────│    via Redis pub/sub
   │                        │                             │
   │                        │◄── job_result ──────────────│
   │                        │    (stats.__response__)     │
   │                        │                             │
   │                        │  LPUSH webhook_response:id  │
-  │                        │  (BRPOP retorna)            │
+  │                        │  (BRPOP returns)            │
   │                        │                             │
   │◄── HTTP Response ───── │                             │
   │    status: 200          │── RPUSH __workflow_complete►│
-  │    body: {...}          │   (histórico Redis)         │
+  │    body: {...}          │   (Redis history)           │
   │    headers: {...}       │                             │
 ```
 
-**Detalhes:**
-1. Servidor detecta `ResponseNode` na definição do workflow → `has_response_node=True`
-2. Após despachar o job, executa `BRPOP webhook_response:{task_id}` com timeout configurável
-3. Executor executa o workflow; `ResponseNode` produz `{"__response__": {...}}` nos outputs
-4. `executor_ws_router` recebe `job_result`, extrai `stats.__response__`, faz `LPUSH webhook_response:{task_id}`
-5. `webhook_router` acorda do BRPOP e retorna a resposta HTTP construída a partir do `ResponseNode`
-6. Se o workflow falhar antes do `ResponseNode`, o servidor retorna `HTTP 500`
-7. Se o executor não responder dentro de `WEBHOOK_RESPONSE_TIMEOUT` segundos, retorna `HTTP 504`
+**Details:**
+1. The server detects a `ResponseNode` in the workflow definition → `has_response_node=True`
+2. After dispatching the job, it runs `BRPOP webhook_response:{task_id}` with a configurable timeout
+3. The executor runs the workflow; the `ResponseNode` produces `{"__response__": {...}}` in the outputs
+4. `executor_ws_router` receives `job_result`, extracts `stats.__response__`, does `LPUSH webhook_response:{task_id}`
+5. `webhook_router` wakes up from the BRPOP and returns the HTTP response built from the `ResponseNode`
+6. If the workflow fails before the `ResponseNode`, the server returns `HTTP 500`
+7. If the executor does not respond within `WEBHOOK_RESPONSE_TIMEOUT` seconds, it returns `HTTP 504`
 
 ---
 
-## Parâmetro no_wait
+## The no_wait parameter
 
-`no_wait` é uma opção **do servidor** que força o retorno assíncrono (`202`) mesmo
-em workflows com `ResponseNode`. Hoje **nenhum cliente do repositório o envia** —
-ele existe para callers externos que preferem consumir o resultado via WebSocket
-em vez de bloquear na resposta HTTP.
+`no_wait` is a **server-side** option that forces the asynchronous return (`202`) even
+in workflows with a `ResponseNode`. Today **no client in the repository sends it** —
+it exists for external callers that prefer to consume the result via WebSocket
+instead of blocking on the HTTP response.
 
-> **O canvas não usa este endpoint.** A execução manual pelo canvas passa por
-> `POST /workflows/{id}/execute` (autenticado por JWT), que devolve
-> `{"task_id", "workflow"}` e nunca envia `no_wait` — ver `executeWorkflow` em
-> `web/service/GisFlowService.ts`. O `/webhook/execute` exige um `WebhookTrigger`
-> no fluxo e recusa qualquer outro tipo de trigger, por isso não serve ao canvas.
+> **The canvas does not use this endpoint.** Manual execution from the canvas goes through
+> `POST /workflows/{id}/execute` (authenticated by JWT), which returns
+> `{"task_id", "workflow"}` and never sends `no_wait` — see `executeWorkflow` in
+> `web/service/GisFlowService.ts`. `/webhook/execute` requires a `WebhookTrigger`
+> in the workflow and rejects any other type of trigger, which is why it does not suit the canvas.
 
-### Quando usar
+### When to use it
 
-| Caller | Valor recomendado | Motivo |
+| Caller | Recommended value | Reason |
 |---|---|---|
-| Integração externa | ausente / `false` | Obtém a resposta HTTP do `ResponseNode` de forma síncrona |
-| Script / curl | ausente / `false` | Mesmo que integração externa |
-| Caller que prefere WebSocket | `true` | Recebe `202 {task_id}` na hora e consome eventos em `/ws/workflow/{task_id}` |
+| External integration | absent / `false` | Gets the `ResponseNode`'s HTTP response synchronously |
+| Script / curl | absent / `false` | Same as external integration |
+| Caller that prefers WebSocket | `true` | Receives `202 {task_id}` right away and consumes events at `/ws/workflow/{task_id}` |
 
-### Como funciona
+### How it works
 
-O parâmetro é lido do body JSON e removido antes de ser passado como `inputs` ao workflow:
+The parameter is read from the JSON body and removed before being passed as `inputs` to the workflow:
 
 ```python
 # webhook_router.py
@@ -143,13 +143,13 @@ if no_wait or not getattr(async_result, "has_response_node", False):
 
 ---
 
-## Diagrama de Sequência Completo
+## Complete Sequence Diagram
 
-### Infraestrutura envolvida
+### Infrastructure involved
 
 ```
 ┌─────────┐    ┌──────────┐    ┌───────────┐    ┌───────┐    ┌───────┐
-│ Cliente │    │ FastAPI  │    │  Executor   │    │ Redis │    │  DB   │
+│ Client  │    │ FastAPI  │    │  Executor   │    │ Redis │    │  DB   │
 └────┬────┘    └────┬─────┘    └─────┬─────┘    └───┬───┘    └───┬───┘
      │              │                │               │             │
      │ POST /webhook│                │               │             │
@@ -164,7 +164,7 @@ if no_wait or not getattr(async_result, "has_response_node", False):
      │              │ BRPOP webhook_response:{id}    │             │
      │              │───────────────────────────────►│             │
      │              │                │               │             │
-     │              │                │ executa nós   │             │
+     │              │                │ executes nodes│             │
      │              │                │───────────────►             │
      │              │                │               │             │
      │              │ PUBLISH node_event             │             │
@@ -172,7 +172,7 @@ if no_wait or not getattr(async_result, "has_response_node", False):
      │              │                │               │             │
      │              │ LPUSH webhook_response:{id}    │             │
      │              │◄───────────────────────────────│             │
-     │              │ (BRPOP retorna)│               │             │
+     │              │ (BRPOP returns)│               │             │
      │              │                │               │             │
      │ HTTP Response│                │               │             │
      │◄─────────────│                │               │             │
@@ -186,47 +186,47 @@ if no_wait or not getattr(async_result, "has_response_node", False):
 
 ---
 
-## Referência da API
+## API Reference
 
 ### `POST /webhook/execute/{id_hash}`
 
-**Parâmetros de path:**
-- `id_hash` — identificador público do workflow
+**Path parameters:**
+- `id_hash` — public identifier of the workflow
 
 **Body (JSON):**
 
-| Campo | Tipo | Padrão | Descrição |
+| Field | Type | Default | Description |
 |---|---|---|---|
-| `no_wait` | `boolean` | `false` | Se `true`, retorna 202 imediatamente sem aguardar `ResponseNode` |
-| `debug_mode` | `boolean` | `false` | Ativa modo debug (publica eventos com inputs/outputs dos nós) |
-| `*` | `any` | — | Demais campos são passados como `inputs` ao workflow |
+| `no_wait` | `boolean` | `false` | If `true`, returns 202 immediately without waiting for the `ResponseNode` |
+| `debug_mode` | `boolean` | `false` | Enables debug mode (publishes events with the nodes' inputs/outputs) |
+| `*` | `any` | — | All other fields are passed as `inputs` to the workflow |
 
-**Respostas:**
+**Responses:**
 
-| Status | Condição | Body |
+| Status | Condition | Body |
 |---|---|---|
-| `202 Accepted` | Sem `ResponseNode`, ou `no_wait=true` | `{"task_id": "uuid"}` |
-| `200` (ou configurado) | Com `ResponseNode` e `no_wait=false` | Payload definido pelo `ResponseNode` |
-| `413 Payload Too Large` | Body acima de 10 MB (via `Content-Length`) | `{"detail": "Payload excede 10MB."}` |
-| `429 Too Many Requests` | Rate limit: 20/min por par (IP, `id_hash`) | resposta padrão do rate-limiter |
-| `500 Internal Server Error` | Workflow falhou antes do `ResponseNode` | `{"error": "...", "task_id": "uuid"}` |
-| `502 Bad Gateway` | `body_ref.s3_key` rejeitado, ou falha ao baixar o body do MinIO | `{"error": "...", "task_id": "uuid"}` |
-| `503 Service Unavailable` | Nenhum executor disponível (header `Retry-After: 60`) | `{"detail": "Execução temporariamente indisponível para este workflow."}` |
-| `504 Gateway Timeout` | Executor não respondeu em `WEBHOOK_RESPONSE_TIMEOUT`s | `{"error": "timeout", "task_id": "uuid", "message": "..."}` |
-| `404 Not Found` | Workflow não existe | `{"detail": "Workflow não encontrado"}` |
-| `403 Forbidden` | Workflow desativado | `{"detail": "Workflow está desativado..."}` |
-| `403 Forbidden` | Workflow sem node `WebhookTrigger` | `{"detail": "Workflow não possui node WebhookTrigger..."}` |
+| `202 Accepted` | No `ResponseNode`, or `no_wait=true` | `{"task_id": "uuid"}` |
+| `200` (or configured) | With `ResponseNode` and `no_wait=false` | Payload defined by the `ResponseNode` |
+| `413 Payload Too Large` | Body above 10 MB (via `Content-Length`) | `{"detail": "Payload excede 10MB."}` |
+| `429 Too Many Requests` | Rate limit: 20/min per (IP, `id_hash`) pair | the rate limiter's default response |
+| `500 Internal Server Error` | Workflow failed before the `ResponseNode` | `{"error": "...", "task_id": "uuid"}` |
+| `502 Bad Gateway` | `body_ref.s3_key` rejected, or failure downloading the body from MinIO | `{"error": "...", "task_id": "uuid"}` |
+| `503 Service Unavailable` | No executor available (header `Retry-After: 60`) | `{"detail": "Execução temporariamente indisponível para este workflow."}` |
+| `504 Gateway Timeout` | Executor did not respond within `WEBHOOK_RESPONSE_TIMEOUT`s | `{"error": "timeout", "task_id": "uuid", "message": "..."}` |
+| `404 Not Found` | Workflow does not exist | `{"detail": "Workflow não encontrado"}` |
+| `403 Forbidden` | Workflow deactivated | `{"detail": "Workflow está desativado..."}` |
+| `403 Forbidden` | Workflow without a `WebhookTrigger` node | `{"detail": "Workflow não possui node WebhookTrigger..."}` |
 
 ### `GET /ws/workflow/{task_id}`
 
-WebSocket para receber eventos de execução em tempo real.
+WebSocket for receiving run events in real time.
 
-**Protocolo:**
-1. Conectar
-2. Enviar JWT no primeiro frame (texto puro)
-3. Receber eventos JSON até `__workflow_complete__`
+**Protocol:**
+1. Connect
+2. Send the JWT in the first frame (plain text)
+3. Receive JSON events until `__workflow_complete__`
 
-**Formato de evento de nó:**
+**Node event format:**
 ```json
 {
   "run_id":      "uuid",
@@ -242,7 +242,7 @@ WebSocket para receber eventos de execução em tempo real.
 }
 ```
 
-**Evento de conclusão:**
+**Completion event:**
 ```json
 {
   "run_id":      "uuid",
@@ -254,138 +254,138 @@ WebSocket para receber eventos de execução em tempo real.
 }
 ```
 
-**Replay de histórico:** O servidor armazena todos os eventos no Redis (`workflow:{run_id}:history`). Ao conectar, o WebSocket replaya automaticamente o histórico antes de escutar novos eventos. Isso garante que nenhum evento seja perdido mesmo que o cliente conecte após o início da execução.
+**History replay:** The server stores all events in Redis (`workflow:{run_id}:history`). On connecting, the WebSocket automatically replays the history before listening for new events. This guarantees that no event is lost even if the client connects after the run has started.
 
 ---
 
-## Autenticação e limites
+## Authentication and limits
 
-- **Sem JWT global.** O `/webhook/execute` não passa pela autenticação JWT. O
-  controle de acesso é a credencial do node `WebhookTrigger`: sem `credential_id`,
-  acesso livre; com `credential_id`, o token é validado em `start_analysis`.
-- **Rate limit:** 20 req/min por par (IP, `id_hash`) — saturar *um* workflow
-  específico exige rotação de IP a cada janela.
-- **Body máximo:** 10 MB (`413` acima disso).
-- **TTL da resposta:** a chave Redis `webhook_response:{task_id}` expira em 300 s.
+- **No global JWT.** `/webhook/execute` does not go through JWT authentication. The
+  access control is the credential of the `WebhookTrigger` node: without `credential_id`,
+  open access; with `credential_id`, the token is validated in `start_analysis`.
+- **Rate limit:** 20 req/min per (IP, `id_hash`) pair — saturating *one* specific
+  workflow requires rotating IPs every window.
+- **Maximum body:** 10 MB (`413` above that).
+- **Response TTL:** the Redis key `webhook_response:{task_id}` expires in 300 s.
 
 ---
 
-## ResponseNode — Propriedades
+## ResponseNode — Properties
 
-| Propriedade | Tipo | Padrão | Descrição |
+| Property | Type | Default | Description |
 |---|---|---|---|
-| `statusCode` | `select` (valores string) | `"200"` | Código HTTP. Lista fechada: 200, 201, 204, 301, 302, 400, 401, 403, 404, 422, 500 |
-| `contentType` | `select` | `application/json` | `Content-Type` da resposta. Lista fechada: `application/json`, `text/plain`, `text/html`, `application/xml`, `text/csv` |
-| `bodyMode` | `select` | `field` | Origem do body: `empty` (sem body), `literal` (texto/template Jinja em `customBody`), `field` (campo do input) |
-| `customBody` | `code` | `""` | Texto literal ou template Jinja (visível quando `bodyMode=literal`). Ex.: `Olá {{ WebhookTrigger.output.nome }}` |
-| `bodyField` | `string` | `""` | Campo de entrada a usar como body (visível quando `bodyMode=field`). Vazio = primeiro input |
-| `headers` | `object` | `{}` | Headers adicionais (chave → valor) |
+| `statusCode` | `select` (string values) | `"200"` | HTTP code. Closed list: 200, 201, 204, 301, 302, 400, 401, 403, 404, 422, 500 |
+| `contentType` | `select` | `application/json` | The response's `Content-Type`. Closed list: `application/json`, `text/plain`, `text/html`, `application/xml`, `text/csv` |
+| `bodyMode` | `select` | `field` | Source of the body: `empty` (no body), `literal` (text/Jinja template in `customBody`), `field` (input field) |
+| `customBody` | `code` | `""` | Literal text or Jinja template (visible when `bodyMode=literal`). E.g.: `Olá {{ WebhookTrigger.output.nome }}` |
+| `bodyField` | `string` | `""` | Input field to use as the body (visible when `bodyMode=field`). Empty = first input |
+| `headers` | `object` | `{}` | Additional headers (key → value) |
 
-**Prioridade do body:** `customBody` > `bodyField` > primeiro input disponível.
+**Body priority:** `customBody` > `bodyField` > first available input.
 
-**Output interno:** O nó produz `{"__response__": {...}}` nos outputs (chaves `status_code`, `content_type`, `headers` e `body` ou `body_ref`). Esta chave é tratada especialmente pelo servidor e pelo executor — não é passada para nós downstream.
+**Internal output:** The node produces `{"__response__": {...}}` in the outputs (keys `status_code`, `content_type`, `headers` and `body` or `body_ref`). This key is handled specially by the server and by the executor — it is not passed on to downstream nodes.
 
-**Conversão automática:** Se o body for um `GeoDataFrame`, é convertido automaticamente para GeoJSON via `__geo_interface__` (e um `DataFrame` puro vira lista de records).
+**Automatic conversion:** If the body is a `GeoDataFrame`, it is automatically converted to GeoJSON via `__geo_interface__` (and a plain `DataFrame` becomes a list of records).
 
-### Saneamento da resposta
+### Response sanitization
 
-`/webhook/execute` não tem JWT, e o `content_type`/`headers` da resposta vêm do
-autor do workflow. O servidor os saneia antes de responder (`webhook_router.py`):
+`/webhook/execute` has no JWT, and the response's `content_type`/`headers` come from the
+workflow's author. The server sanitizes them before responding (`webhook_router.py`):
 
-- **Allowlist de `content_type`:** tipos fora de `application/json`, `application/xml`,
-  `application/geo+json`, `text/plain`, `text/csv`, `text/xml`, `text/html` são
-  **rebaixados para `text/plain`** — o conteúdo chega ao caller, só deixa de ser
-  interpretado como markup pelo navegador.
-- **Blocklist de headers:** o workflow não pode definir headers de segurança/identidade
+- **`content_type` allowlist:** types other than `application/json`, `application/xml`,
+  `application/geo+json`, `text/plain`, `text/csv`, `text/xml`, `text/html` are
+  **downgraded to `text/plain`** — the content reaches the caller, it just stops being
+  interpreted as markup by the browser.
+- **Header blocklist:** the workflow cannot set security/identity headers
   (`content-security-policy`, `x-frame-options`, `set-cookie`, `content-type`, …).
-- **CSP endurecida para `text/html`:** respostas HTML recebem uma CSP com `sandbox`
-  (origem opaca, sem script), contendo XSS refletido na origem da API.
+- **Hardened CSP for `text/html`:** HTML responses get a CSP with `sandbox`
+  (opaque origin, no scripts), containing reflected XSS at the API's origin.
 
-### Body grande (body_ref)
+### Large body (body_ref)
 
-Se o body serializado passa de `WEBHOOK_RESPONSE_INLINE_LIMIT` (padrão **1 MB**), o
-`ResponseNode` sobe o conteúdo para o MinIO e retorna `__response__.body_ref`
-(`{s3_key, size, content_type}`) em vez do body inline — evitando head-of-line
-blocking no WebSocket executor→servidor. O `webhook_router` então baixa o objeto do
-MinIO, streama para o caller e agenda a remoção.
+If the serialized body exceeds `WEBHOOK_RESPONSE_INLINE_LIMIT` (default **1 MB**), the
+`ResponseNode` uploads the content to MinIO and returns `__response__.body_ref`
+(`{s3_key, size, content_type}`) instead of the inline body — avoiding head-of-line
+blocking on the executor→server WebSocket. The `webhook_router` then downloads the object from
+MinIO, streams it to the caller and schedules its removal.
 
-> **Limitação conhecida (em correção):** o caminho > 1 MB está sob conserto e não
-> se deve assumir que funciona ponta a ponta hoje. Para respostas grandes, prefira
-> paginar ou compactar o body por ora.
+> **Known limitation (being fixed):** the > 1 MB path is under repair and you
+> should not assume it works end to end today. For large responses, prefer to
+> paginate or compress the body for now.
 
 ---
 
-## Exemplos
+## Examples
 
-### Disparo assíncrono (sem ResponseNode)
+### Asynchronous trigger (without ResponseNode)
 
 ```bash
 curl -X POST https://api.exemplo.com/webhook/execute/wf_abc123 \
   -H "Content-Type: application/json" \
   -d '{"cidade": "São Paulo", "raio_km": 5}'
 
-# Resposta imediata:
+# Immediate response:
 # HTTP 202
 # {"task_id": "550e8400-e29b-41d4-a716-446655440000"}
 ```
 
-### Disparo síncrono (com ResponseNode)
+### Synchronous trigger (with ResponseNode)
 
 ```bash
 curl -X POST https://api.exemplo.com/webhook/execute/wf_abc123 \
   -H "Content-Type: application/json" \
   -d '{"cidade": "São Paulo", "raio_km": 5}'
 
-# Resposta após execução completa:
+# Response after the run completes:
 # HTTP 200
 # Content-Type: application/json
 # {"total_areas": 42, "geometrias": [...]}
 ```
 
-### Forçar retorno assíncrono mesmo com ResponseNode
+### Forcing an asynchronous return even with ResponseNode
 
 ```bash
 curl -X POST https://api.exemplo.com/webhook/execute/wf_abc123 \
   -H "Content-Type: application/json" \
   -d '{"cidade": "São Paulo", "no_wait": true}'
 
-# Resposta imediata:
+# Immediate response:
 # HTTP 202
 # {"task_id": "550e8400-e29b-41d4-a716-446655440000"}
 ```
 
-### Variável de ambiente
+### Environment variable
 
 ```env
-# Tempo máximo de espera pela resposta do ResponseNode (segundos)
+# Maximum time to wait for the ResponseNode's response (seconds)
 WEBHOOK_RESPONSE_TIMEOUT=60
 ```
 
 ---
 
-## Considerações de Design
+## Design Considerations
 
-### Por que oferecer retorno assíncrono?
+### Why offer an asynchronous return?
 
-Um caller que queira **eventos de nó em tempo real** precisa abrir o WebSocket
-**antes** de a execução terminar. Se a resposta HTTP bloqueasse até o `ResponseNode`,
-o caller só receberia o `task_id` no fim e perderia a progressividade (os eventos
-existem no histórico Redis, mas chegariam todos de uma vez). Por isso o modo síncrono
-é opcional: `no_wait=true` (ou a ausência de `ResponseNode`) devolve o `task_id` na
-hora, para o caller escutar `/ws/workflow/{task_id}`.
+A caller that wants **real-time node events** has to open the WebSocket
+**before** the run finishes. If the HTTP response blocked until the `ResponseNode`,
+the caller would only receive the `task_id` at the end and would lose the progressive updates (the events
+exist in the Redis history, but they would all arrive at once). That is why the synchronous mode
+is optional: `no_wait=true` (or the absence of a `ResponseNode`) returns the `task_id` right
+away, so the caller can listen on `/ws/workflow/{task_id}`.
 
-O canvas obtém esse mesmo feedback ao vivo por outro caminho — dispara em
-`POST /workflows/{id}/execute` (autenticado) e consome o WebSocket pelo `task_id`
-retornado —, sem tocar no `/webhook/execute`.
+The canvas gets this same live feedback by another path — it triggers via
+`POST /workflows/{id}/execute` (authenticated) and consumes the WebSocket using the returned
+`task_id` —, without touching `/webhook/execute`.
 
-### Por que usar Redis BRPOP/LPUSH?
+### Why use Redis BRPOP/LPUSH?
 
-O `webhook_router` (FastAPI) e o `executor_ws_router` são duas corrotinas independentes no mesmo servidor. O Redis atua como canal de comunicação entre elas:
-- `executor_ws_router` faz `LPUSH webhook_response:{task_id}` quando o job completa
-- `webhook_router` acorda do `BRPOP` e retorna a resposta HTTP
+The `webhook_router` (FastAPI) and the `executor_ws_router` are two independent coroutines in the same server. Redis acts as the communication channel between them:
+- `executor_ws_router` does `LPUSH webhook_response:{task_id}` when the job completes
+- `webhook_router` wakes up from the `BRPOP` and returns the HTTP response
 
-Isso evita qualquer acoplamento direto entre os dois handlers e funciona mesmo com múltiplos workers.
+This avoids any direct coupling between the two handlers and works even with multiple workers.
 
-### Compatibilidade com histórico de eventos
+### Compatibility with the event history
 
-O `log_workflows_router` subscreve o canal Redis **antes** de ler o histórico, garantindo que nenhum evento seja perdido independentemente do timing de conexão do cliente.
+The `log_workflows_router` subscribes to the Redis channel **before** reading the history, guaranteeing that no event is lost regardless of the timing of the client's connection.
