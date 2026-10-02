@@ -143,7 +143,7 @@ desenvolvedores de agentes próprios.
   coluna `String(16)` sem CHECK, `workflow_run.py:50`); `start_analysis` já aceita
   `trigger_source` (`workflow_service.py:552-564`). Pontos web: `TriggerSource`
   (`web/service/types.ts:12`), `rotuloDaOrigem` (`observability/formatos.ts:95-97`),
-  `docs/specs/historico-metricas.md:35`.
+  `docs/specs/metrics-history.md:35`.
 - Erros de domínio: `AtlasBaseError` mapeado só pelo handler HTTP (`error_handlers.py:14-29`);
   workflow inativo no execute é **409 `workflow_inactive`** (`exceptions.py:38-40`), 403 só no retry.
 - `WorkflowCreate`/`WorkflowUpdate` **aceitam `params_schema`** (`schemas/workflow.py:17,248`);
@@ -606,7 +606,7 @@ de workspace, `move_workflow`, tudo de `/admin`.
    migração da REST segue na Fase 2.
 2. **`trigger_source="mcp"`**: regex do router (`observability_router.py:139-141`), união
    `TriggerSource` (`web/service/types.ts:12`), `rotuloDaOrigem` (`formatos.ts:95-97`),
-   `docs/specs/historico-metricas.md`. `start_analysis` já aceita o valor.
+   `docs/specs/metrics-history.md`. `start_analysis` já aceita o valor.
 3. **Validate — FEITO (PR 3)**: nome inexistente/ciclo/id duplicado/erro de construção →
    **422 estruturado** `invalid_definition` (era 500), lint antes do executor e `__report__`
    sempre na 201 (contrato em B e em `docs/specs/edge-data-contract.md` §7); `workspace_id`

@@ -42,7 +42,7 @@
 
 O **Atlans** é uma plataforma para criar, executar, agendar e monitorar pipelines de análise geoespacial através de uma interface visual baseada em grafos DAG. Os workflows são compostos por nós conectáveis — leitura de dados, transformações espaciais, filtros, saídas — e executados por **executores distribuídos** que se conectam ao servidor via WebSocket sobre **mTLS**.
 
-É **software livre** ([AGPL-3.0-only](LICENSE)): você pode instalá-lo no seu servidor, estudar e modificar o código e redistribuí-lo nos termos da licença. O roteiro de uma instalação própria está em [docs/instalacao-propria.md](docs/instalacao-propria.md).
+É **software livre** ([AGPL-3.0-only](LICENSE)): você pode instalá-lo no seu servidor, estudar e modificar o código e redistribuí-lo nos termos da licença. O roteiro de uma instalação própria está em [docs/self-hosting.md](docs/self-hosting.md).
 
 ### Principais Funcionalidades
 
@@ -192,7 +192,7 @@ make smoke                        # valida API, Redis, MinIO, step-ca, web, inst
 make seed-admin                   # cria o admin inicial
 ```
 
-O roteiro completo, passo a passo, está em [docs/instalacao-propria.md](docs/instalacao-propria.md); atualizar, voltar de versão, backup/restore e troubleshooting em [docs/operations.md](docs/operations.md); bootstrap do mTLS em [docs/mtls-bootstrap.md](docs/mtls-bootstrap.md).
+O roteiro completo, passo a passo, está em [docs/self-hosting.md](docs/self-hosting.md); atualizar, voltar de versão, backup/restore e troubleshooting em [docs/operations.md](docs/operations.md); bootstrap do mTLS em [docs/mtls-bootstrap.md](docs/mtls-bootstrap.md).
 
 ---
 
@@ -467,7 +467,7 @@ a conta já alcançava.
 URL, escopos, ferramentas, limites, erros e snippets de conexão por cliente:
 [docs/mcp.md](docs/mcp.md). O catálogo de fontes (a semente em `catalogo/`, a
 regra "catálogo primeiro" do assistente, a verificação por endpoint):
-[docs/fontes.md](docs/fontes.md).
+[docs/sources.md](docs/sources.md).
 
 ---
 
@@ -589,7 +589,7 @@ O Atlans isola dados por **workspaces**. Cada workspace agrupa workflows, creden
 | MinIO Console | `http://localhost:9001` | Gerenciamento de objetos S3 |
 | Telemetria WS | `/ws/telemetry?token=<JWT>` | CPU, memória e disco em tempo real |
 
-A API expõe métricas agregadas de execução (gerais, por workflow, por executor e série temporal por dia) — ver a página `/observability` no web e [docs/specs/historico-metricas.md](docs/specs/historico-metricas.md).
+A API expõe métricas agregadas de execução (gerais, por workflow, por executor e série temporal por dia) — ver a página `/observability` no web e [docs/specs/metrics-history.md](docs/specs/metrics-history.md).
 
 ---
 

@@ -1,7 +1,7 @@
 # Operações em produção
 
 Playbook para quem opera uma instalação do Atlans. Para subir uma do zero, veja
-[instalacao-propria.md](instalacao-propria.md) e
+[self-hosting.md](self-hosting.md) e
 [mtls-bootstrap.md](mtls-bootstrap.md).
 
 Nos exemplos, `<PUBLIC_HOST>`, `<AGENTS_HOST>` e `<S3_HOST>` são os hosts do

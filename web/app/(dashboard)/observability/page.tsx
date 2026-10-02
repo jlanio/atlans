@@ -27,7 +27,7 @@ import { VisaoWorkflows } from "@/app/components/observability/visao-workflows"
 import { VisoesAbas, type ContagensDasVisoes } from "@/app/components/observability/visoes-abas"
 
 /**
- * Histórico (docs/specs/historico-metricas.md §4.3). A página só compõe: o
+ * Histórico (docs/specs/metrics-history.md §4.3). A página só compõe: o
  * estado mora na URL, os dados nos dois hooks, e cada bloco decide o próprio
  * texto. O `Suspense` é exigido pelo `useSearchParams` na build estática.
  */

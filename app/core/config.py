@@ -462,7 +462,7 @@ if "hibrido" not in MAPA_FUNDOS and "satelite" in MAPA_FUNDOS:
 # A pasta do Vault versionada no repositório (`catalogo/geoservicos/`), importada
 # no arranque de forma idempotente. VAZIA ou inexistente = não importa nada;
 # AUSENTE = a pasta do repositório. Não é o `.strip() or` das outras: com ele, o
-# vazio que o .env.example e docs/fontes.md ensinam voltava ao padrão, e não
+# vazio que o .env.example e docs/sources.md ensinam voltava ao padrão, e não
 # havia como desligar. O compose passa `${FONTES_CATALOGO_DIR-…}` (sem os
 # dois-pontos) para o vazio do .env chegar vazio.
 _catalogo_dir = os.getenv("FONTES_CATALOGO_DIR")

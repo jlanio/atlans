@@ -88,7 +88,7 @@ _webhook_tasks: set[asyncio.Task] = set()
 
 
 
-# Vocabulario de `workflow_runs.error_category` (docs/specs/historico-metricas.md
+# Vocabulario de `workflow_runs.error_category` (docs/specs/metrics-history.md
 # §2): a taxonomia do flow mais as categorias do servidor. Um valor fora dele
 # nao e gravado — cortado em 16 caracteres viraria "no_executor_chai", uma
 # categoria que ninguem mapeia e que a tela agruparia como se fosse outra.

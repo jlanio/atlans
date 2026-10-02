@@ -21,7 +21,7 @@ em `"aberto"`).
   usuário": sem flag, sem `localStorage`, sem consulta ao servidor.
 - Vale **também sem login**: a Home abre anônima com o mesmo hero; o primeiro envio abre o modal
   de entrada (login/cadastro) sobre o globo, e a mensagem vai sozinha quando o login dá certo
-  (`docs/assistente.md`, "A Home sem sessão e o modal de entrada").
+  (`docs/assistant.md`, "A Home sem sessão e o modal de entrada").
 - Termina no **primeiro token visível da primeira resposta** — texto, erro ou cartão. Raciocínio
   (`pensando`) e chamadas de ferramenta ainda são "processando": a barra fica no centro, com o
   status. *Decidido no PR 1: primeiro token, e não o fim da resposta — a barra escorrega enquanto a

@@ -17,7 +17,7 @@ import type {
  * app/api/routers/observability_router.py (`days`, `force`).
  */
 /**
- * Filtros comuns do Histórico (docs/specs/historico-metricas.md §3):
+ * Filtros comuns do Histórico (docs/specs/metrics-history.md §3):
  * `workspace_id` e `workflow_id` recortam a janela; `tz` só importa para
  * `runs-by-day`, que corta o dia no fuso do usuário.
  */

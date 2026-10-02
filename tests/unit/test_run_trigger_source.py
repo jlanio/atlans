@@ -1,6 +1,6 @@
 # tests/unit/test_run_trigger_source.py
 """
-Origem, autor e categoria de erro do run (docs/specs/historico-metricas.md §2).
+Origem, autor e categoria de erro do run (docs/specs/metrics-history.md §2).
 
 Antes, `workflow_runs` não sabia dizer se um run nasceu de um clique, de um
 webhook ou do cron — e `schedule_id` só chegava ao banco quando o agendamento

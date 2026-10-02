@@ -7,7 +7,7 @@ import { Button } from "@/app/components/ui/button"
 import { cn } from "@/lib/utils"
 
 /**
- * Molduras dos estados de tela (contrato padrao-telas.md §3): o cartão
+ * Molduras dos estados de tela (contrato screen-patterns.md §3): o cartão
  * centralizado de erro, vazio e sem-resultado, e a linha âmbar de falha parcial.
  * Cada tela guarda no seu `estados.tsx` só o que é dela — os Skeleton*, que
  * desenham o layout real, e as frases — e monta os estados com estas peças.

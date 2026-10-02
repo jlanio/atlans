@@ -1,6 +1,6 @@
 "use client"
 
-// Tela «Tokens de acesso» (/settings/tokens) — contrato padrao-telas.md.
+// Tela «Tokens de acesso» (/settings/tokens) — contrato screen-patterns.md.
 //
 // Lista pessoal: os tokens do usuário logado, mais recente primeiro. Cada um
 // vale só para o que a conta já pode fazer, recortado por escopos, workspaces

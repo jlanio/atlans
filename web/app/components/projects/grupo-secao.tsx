@@ -54,7 +54,7 @@ export function textoDaContagemDoGrupo(total: number, ativos: number, comFiltro:
 }
 
 /**
- * Um grupo como seção (docs/specs/projetos.md §3.8): cabeçalho com alça,
+ * Um grupo como seção (docs/specs/projects.md §3.8): cabeçalho com alça,
  * recolher, nome, contagem, descrição e menu; corpo com as linhas; os mesmos
  * alvos e estados de arrasto de antes — "receber um workflow" e "trocar de
  * posição" acontecem sobre o mesmo retângulo, por isso cada um tem a sua cara.

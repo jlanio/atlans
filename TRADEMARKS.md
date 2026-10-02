@@ -68,5 +68,5 @@ step-ca, as variáveis `ATLANS_*`) não aparecem para quem usa e podem ficar.
 O código publicado mostra «Atlans» na barra lateral, na tela de entrada e no
 título da aba. A forma com o domínio é a instalação do titular, e não vai no
 código: cada instalação define o nome que mostra em `NOME_NA_TELA`, no `.env`
-([instalação própria](docs/instalacao-propria.md)). Quem precisa trocar o
+([instalação própria](docs/self-hosting.md)). Quem precisa trocar o
 nome, pelas regras acima, troca ali — e os logotipos, nos arquivos citados.

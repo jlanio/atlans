@@ -3,7 +3,7 @@ import type { IExecutorMetrics, IObservabilityMetrics } from "@/service/types"
 import { formatarDuracao, plural, rotuloDaCategoria } from "@/lib/formatos"
 
 /**
- * "Precisa de atenção" (docs/specs/historico-metricas.md §4.3): o que mudaria
+ * "Precisa de atenção" (docs/specs/metrics-history.md §4.3): o que mudaria
  * uma decisão hoje, em até 5 itens, nesta ordem — presas, falhas repetidas,
  * executores no teto. Puro: recebe o que o hook de dados já tem e devolve
  * texto e ação; quem renderiza e quem navega ficam fora daqui.

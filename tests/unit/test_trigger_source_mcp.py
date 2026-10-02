@@ -1,6 +1,6 @@
 # tests/unit/test_trigger_source_mcp.py
 """
-`trigger_source="mcp"` (docs/specs/historico-metricas.md §2; mcp-server.md §1).
+`trigger_source="mcp"` (docs/specs/metrics-history.md §2; mcp-server.md §1).
 
 O servidor MCP vai carimbar as execuções que dispara com uma origem própria,
 para o Histórico distinguir "um agente rodou" de "alguém clicou". A coluna não

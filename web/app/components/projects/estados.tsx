@@ -7,7 +7,7 @@ import { formatarInteiro } from "@/lib/formatos"
 import { ESTADO_PADRAO, type Filtro } from "./projetos-url"
 
 /**
- * Estados da tela de Projetos (docs/specs/projetos.md §3.10): carregando,
+ * Estados da tela de Projetos (docs/specs/projects.md §3.10): carregando,
  * vazio de primeiro uso, sem resultado, erro de carga e métricas
  * indisponíveis. Cada um diz o que aconteceu e o que fazer a seguir. Aqui
  * ficam o skeleton e as frases; a moldura é a de `shared/estados.tsx`.

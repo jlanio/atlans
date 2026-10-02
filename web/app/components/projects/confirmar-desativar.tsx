@@ -27,7 +27,7 @@ export function textoDeDesativar(wf: Alvo): string {
 }
 
 /**
- * Confirmação de "Desativar…" (docs/specs/projetos.md §3.9). O interruptor
+ * Confirmação de "Desativar…" (docs/specs/projects.md §3.9). O interruptor
  * saiu do card porque a ação arriscada morava no lugar mais visível, sem
  * confirmação; aqui ela diz o que pausa. A troca em si é otimista, com
  * reversão, em quem compõe a página.

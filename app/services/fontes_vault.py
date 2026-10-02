@@ -15,7 +15,7 @@ uma subpasta por instituição, e dentro dela três notas geradas por script —
   `| Campo | Tipo XSD | Nulo | Ocorrência |` do DescribeFeatureType.
 
 O parser lê esse formato COMO ESTÁ e, por cima dele, três extensões opcionais
-que o Obsidian já sabe editar (ver `docs/fontes.md`):
+que o Obsidian já sabe editar (ver `docs/sources.md`):
 
 - **frontmatter YAML** na nota da instituição (`sigla`, `pais`, `uf`,
   `endpoint_wfs`, `versao_wfs`, `temas`, `prioridade`, `coletada_em`) — só o

@@ -5,7 +5,7 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
 
 /**
- * Estados da tela de Tokens de acesso (contrato padrao-telas.md §3):
+ * Estados da tela de Tokens de acesso (contrato screen-patterns.md §3):
  * carregando, erro de carga e primeiro uso. Não há busca nem filtro aqui, então
  * não existe o «sem resultado». Aqui ficam o skeleton e as frases da tela; a
  * moldura de cada estado é a de `shared/estados.tsx`.

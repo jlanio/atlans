@@ -2,7 +2,7 @@
 //
 // O cliente do @tanstack/react-query, com os padrões das telas de HOJE.
 //
-// A camada de dados migra tela a tela (docs/specs/padrao-telas.md §10). Cada
+// A camada de dados migra tela a tela (docs/specs/screen-patterns.md §10). Cada
 // padrão abaixo reproduz o que os hooks feitos à mão já fazem, para que migrar
 // uma tela não mude o que ela mostra: repetir, reler no foco ou guardar cache é
 // decisão de cada consulta, declarada nela — nunca herança silenciosa daqui.

@@ -50,7 +50,7 @@ function consultaDeArtefatos({ kind, search, fmt, workspaceId }: Filtros) {
 /**
  * Uma página de artefatos por vez, com acumulação no "ver mais".
  *
- * É a prova da camada de dados (docs/specs/padrao-telas.md §10): o que o hook
+ * É a prova da camada de dados (docs/specs/screen-patterns.md §10): o que o hook
  * fazia à mão agora é da consulta. A chave (os filtros) descarta a resposta de
  * um filtro que já não é o atual — era o `seq`; o offset é derivado das
  * páginas; e `fetchNextPage` tem identidade estável — é o que obriga o

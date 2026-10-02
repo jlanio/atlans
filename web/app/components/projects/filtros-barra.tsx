@@ -37,7 +37,7 @@ const ATRASO_DA_BUSCA_MS = 200
 const SEPARADOR_DEPOIS_DE: Filtro[] = ["inativos", "portal"]
 
 /**
- * Barra de busca, ordenação, recolher e chips (docs/specs/projetos.md §3.6).
+ * Barra de busca, ordenação, recolher e chips (docs/specs/projects.md §3.6).
  * O arquivo não se chama `filtros.tsx` de propósito: ao lado de `filtros.ts`,
  * o mesmo `import "./filtros"` cairia no `.ts` para o tsc e o Vite e no
  * `.tsx` para o webpack do Next — e a página quebraria só no build.

@@ -49,7 +49,7 @@ export function textoDoSubtitulo(c: ContagensDoCabecalho): string {
 }
 
 /**
- * Cabeçalho de Projetos (docs/specs/projetos.md §3.1): uma ação primária —
+ * Cabeçalho de Projetos (docs/specs/projects.md §3.1): uma ação primária —
  * criar workflow —, "Novo grupo" em outline e "Atualizar" em ghost. Antes
  * eram três botões do mesmo peso, e criar grupo acontece uma vez por mês.
  *

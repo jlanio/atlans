@@ -5,7 +5,7 @@ O assistente da Home é o assistente de **outra superfície**. O laço é o mesm
 pelo mesmo `call_tool`), a cota de tokens é a mesma (`assistente:tokens:{user}`).
 O que muda é o pacote da superfície `HOME` (`app/services/assistente_superficie.py`)
 e o fato de a conversa ser **persistida no banco** — veja "Superfícies" em
-`docs/assistente-editor.md` para a fronteira do laço.
+`docs/editor-assistant.md` para a fronteira do laço.
 
 Este documento é a **API** (`/assistente`): as rotas, os quadros do SSE, a
 confirmação por clique e a persistência.
@@ -326,7 +326,7 @@ catálogo** e, no rodapé, **Entrar** e **Criar conta**.
   editor.
 - **Catálogo antes de prospectar.** Para dado externo (WFS) o roteiro manda
   chamar `search_sources` e `describe_source` ANTES de qualquer outra coisa — a
-  fonte vem pré-mapeada do catálogo (`docs/fontes.md`), sem rede e sem chute de
+  fonte vem pré-mapeada do catálogo (`docs/sources.md`), sem rede e sem chute de
   `url`/`typeName`. Só quando o catálogo não tem a fonte ele sonda
   (`probe_source`) e registra (`register_source`) — as duas passam SEM clique
   (`ESCRITAS_SEM_CLIQUE`): sondar e guardar uma fonte é a via normal de trabalho,

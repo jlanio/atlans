@@ -62,7 +62,7 @@ COPY scripts/init_schema.sql ./scripts/init_schema.sql
 COPY static ./static
 
 # Catálogo de fontes (a cópia versionada do Vault de geosserviços). A API o
-# importa na subida (FONTES_CATALOGO_DIR, ver docs/fontes.md); sem esta cópia a
+# importa na subida (FONTES_CATALOGO_DIR, ver docs/sources.md); sem esta cópia a
 # importação não roda em produção e o assistente fica sem catálogo.
 COPY catalogo ./catalogo
 

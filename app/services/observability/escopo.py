@@ -1,6 +1,6 @@
 # app/services/observability/escopo.py
 # Lógica de negócio e consultas de observabilidade extraídas do router.
-# Contrato com a web: docs/specs/historico-metricas.md (§3).
+# Contrato com a web: docs/specs/metrics-history.md (§3).
 
 import hashlib
 import json

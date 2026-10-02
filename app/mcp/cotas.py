@@ -56,7 +56,7 @@ MAX_ESPERAS_GLOBAL = 40
 # folgada de alguns fluxos por dia por pessoa, e ainda assim põe um teto no que
 # uma conta sozinha pode gastar.
 #
-# Revise com o número real: `docs/assistente-editor.md` registra o custo medido, e este
+# Revise com o número real: `docs/editor-assistant.md` registra o custo medido, e este
 # valor deve sair de lá, não de estimativa. Cada instalação pode trocá-lo por
 # ASSISTENTE_TETO_DE_TOKENS_POR_DIA (`app/core/config.py`).
 JANELA_DO_ASSISTENTE_SEGUNDOS = 24 * 60 * 60
@@ -212,7 +212,7 @@ async def cobrar_tokens_do_assistente(redis, user_id: str, tokens: int) -> int |
 # lê `GET /assistente/estado` e `GET /assistente/estado`, ambos nesta mesma chave)
 # mostra só gasto, teto e prazo: dizer ali que o orçamento é único foi tentado
 # e retirado — é ruído para quem lê um medidor. O fato fica registrado em
-# docs/assistente.md, "Limites conhecidos".
+# docs/assistant.md, "Limites conhecidos".
 def chave_de_tokens(user_id: str) -> str:
     return f"assistente:tokens:{user_id}"
 

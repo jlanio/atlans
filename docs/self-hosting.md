@@ -143,7 +143,7 @@ make seed-admin             # cria o admin (pede e-mail e senha)
 Um container lê o `.env` só quando é criado: depois de mudar o `.env`, é
 `docker compose --profile prod up -d <serviço>`, e não `restart`.
 
-O catálogo de fontes (`catalogo/geoservicos`, [fontes.md](fontes.md)) é
+O catálogo de fontes (`catalogo/geoservicos`, [sources.md](sources.md)) é
 importado pela API na subida, assim que as tabelas existem: com o schema
 criado antes de recriá-la, a recriação acima já o importa.
 

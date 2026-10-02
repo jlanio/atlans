@@ -281,7 +281,7 @@ nunca atravessa o escopo de membro, mesmo que a conta seja admin da plataforma.
 | `register_source` | `workflows:write` | editor | Sonda e guarda uma camada no catálogo do workspace, com título, temas e dicas. Idempotente: a mesma URL+camada atualiza a linha |
 
 As quatro ferramentas de fontes vivem em torno do **catálogo interno** de camadas
-WFS pré-mapeadas (`docs/fontes.md`): a regra do guia é consultar `search_sources`
+WFS pré-mapeadas (`docs/sources.md`): a regra do guia é consultar `search_sources`
 antes de preencher qualquer `url`/`typeName`, e só sondar (`probe_source`) e
 registrar (`register_source`) o que o catálogo não tem. Essas duas são as únicas
 ferramentas anotadas com `openWorldHint: true` — fazem o servidor falar com uma

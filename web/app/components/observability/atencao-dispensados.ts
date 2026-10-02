@@ -5,7 +5,7 @@ import type { ItemDeAtencao } from "./atencao"
 
 /**
  * "Dispensar" itens da lista Precisa de atenção — uma conveniência por
- * navegador (docs/specs/padrao-telas.md §5: localStorage para conveniências do
+ * navegador (docs/specs/screen-patterns.md §5: localStorage para conveniências do
  * visitante). Os itens são derivados de métricas ao vivo, então guardar um
  * "resolvido" no servidor seria pesado e enganoso; aqui só ESCONDEMOS o que o
  * usuário já viu.

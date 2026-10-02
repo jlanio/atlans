@@ -1,5 +1,5 @@
 /**
- * Estado do Histórico na URL (docs/specs/historico-metricas.md §4.1).
+ * Estado do Histórico na URL (docs/specs/metrics-history.md §4.1).
  *
  * Tudo o que muda a tela vive na query string: F5, voltar do detalhe e um
  * link colado no chat reabrem exatamente a mesma visão. Os defaults não vão

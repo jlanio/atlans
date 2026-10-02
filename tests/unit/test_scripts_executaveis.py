@@ -4,7 +4,7 @@ Todo script que o Makefile chama como `./scripts/...` precisa do bit de
 execução no git.
 
 O `make bootstrap` é o primeiro passo de uma instalação nova
-(docs/instalacao-propria.md), e os quatro scripts do Makefile estavam no git
+(docs/self-hosting.md), e os quatro scripts do Makefile estavam no git
 sem o bit: num clone limpo, `make bootstrap` parava em «Permission denied»
 antes de fazer qualquer coisa. Conferido no índice do git, e não no disco,
 porque é o modo do índice que chega a cada clone.

@@ -1,5 +1,5 @@
 /**
- * Estados de tela (contrato padrao-telas.md §3 e §5), tela a tela.
+ * Estados de tela (contrato screen-patterns.md §3 e §5), tela a tela.
  *
  * O cartão de erro/vazio era recopiado em cada `estados.tsx` (e inline em mais
  * seis telas), e as cópias divergiram: só Planos, Tokens e Admin ›

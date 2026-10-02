@@ -670,7 +670,7 @@ class WorkflowService:
         alcançando apenas as compartilhadas.
 
         `trigger_source` e `schedule_id` são só rótulo do run
-        (docs/specs/historico-metricas.md §2): "manual" | "retry" | "webhook"
+        (docs/specs/metrics-history.md §2): "manual" | "retry" | "webhook"
         | "schedule" | "mcp". Não entram em nenhuma decisão de despacho — existem para
         o Histórico distinguir "agendado às 03:00" de "manual · fulano". O
         default "manual" mantém os chamadores antigos funcionando.

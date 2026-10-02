@@ -719,7 +719,7 @@ async def _dispatch_job(
     'failed' com a mensagem do erro antes do re-raise.
 
     `trigger_source`, `triggered_by` e `schedule_id` entram no INSERT junto
-    com o host (docs/specs/historico-metricas.md §2): sao rotulos do run, nao
+    com o host (docs/specs/metrics-history.md §2): sao rotulos do run, nao
     do despacho — um UPDATE separado depois custaria mais um commit no caminho
     critico. Quem fecha o run por aqui tambem grava `error_category`
     ("isolation", "no_executor", "dispatch"), para o Historico agrupar "por que

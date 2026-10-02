@@ -1,7 +1,7 @@
 # app/api/routers/observability_router.py
 """
 Observability endpoints — métricas agregadas de execução dos workflows.
-Contrato com a web: docs/specs/historico-metricas.md (§3).
+Contrato com a web: docs/specs/metrics-history.md (§3).
 
 Regras de escopo:
   - admin  → vê tudo (sem filtro)

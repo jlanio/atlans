@@ -9,7 +9,7 @@
 //
 // Os sete arquivos são os mesmos, byte a byte, que o build baixava (Inter v20
 // do Google Fonts, variável, um por faixa de caracteres; origem e SHA-256 em
-// inter/LEIA-ME.md), e o CSS reproduz o que o Google servia: uma @font-face por
+// inter/README.md), e o CSS reproduz o que o Google servia: uma @font-face por
 // faixa, todas com a família "Inter" e o `unicode-range` de cada uma. O
 // navegador baixa só as faixas que a página usa, e só a latina é pré-carregada.
 // Peso 400–700, como antes: um peso fora disso cai no mais próximo, e não num

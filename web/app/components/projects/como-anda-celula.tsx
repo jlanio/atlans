@@ -6,7 +6,7 @@ import { formatarDuracaoGrossa, plural } from "@/lib/formatos"
 import { JANELA_EM_DIAS, type ComoAnda } from "./como-anda"
 
 /**
- * Coluna "como anda" da linha (docs/specs/projetos.md §3.5). O arquivo não se
+ * Coluna "como anda" da linha (docs/specs/projects.md §3.5). O arquivo não se
  * chama `como-anda.tsx` de propósito: ao lado de `como-anda.ts`, o mesmo
  * `import "./como-anda"` cairia no `.ts` para o tsc e o Vite e no `.tsx` para
  * o webpack do Next, que prefere `.tsx` — e a página quebraria só no build.

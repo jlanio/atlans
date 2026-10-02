@@ -1,7 +1,7 @@
 """Base zero: o banco nasce pronto.
 
 Colapsa a cadeia de 53 migracoes numa revisao inicial unica (F3 da
-simplificacao — docs/specs/simplificacao.md, A9/N3; premissa dada pelo dono:
+simplificacao — docs/specs/simplification.md, A9/N3; premissa dada pelo dono:
 nada esta em producao de verdade, nao ha banco legado a preservar).
 
 O corpo NAO mora aqui: e o proprio `scripts/init_schema.sql`, lido e executado

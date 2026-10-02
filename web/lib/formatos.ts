@@ -3,7 +3,7 @@
 // A casa ÚNICA de formatação de apresentação do web: durações, datas, números,
 // dinheiro, percentuais e os rótulos pt-BR dos vocabulários de execução.
 // Nasceu em components/observability/ e foi promovida na F2 da simplificação
-// (docs/specs/simplificacao.md, A8) quando 40+ arquivos de todas as áreas já
+// (docs/specs/simplification.md, A8) quando 40+ arquivos de todas as áreas já
 // importavam de lá — cópias locais divergem, e duas telas mostrando a mesma
 // grandeza em formatos diferentes é defeito, não estilo.
 

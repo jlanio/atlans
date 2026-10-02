@@ -1,5 +1,5 @@
 # tests/unit/test_observability_metricas_v2.py
-"""Métricas v2 do Histórico (docs/specs/historico-metricas.md §3).
+"""Métricas v2 do Histórico (docs/specs/metrics-history.md §3).
 
 O que a spec mudou de propósito e que estes testes fixam:
 

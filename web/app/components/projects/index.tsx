@@ -37,7 +37,7 @@ import { useProjetosDados } from "./use-projetos-dados"
 import { useProjetosUrl } from "./use-projetos-url"
 
 /**
- * Projetos (docs/specs/projetos.md §3.1). Este arquivo só orquestra: o estado
+ * Projetos (docs/specs/projects.md §3.1). Este arquivo só orquestra: o estado
  * de busca/chip/ordem mora na URL, os dados no hook, os runs vivos no
  * `ActiveRunsContext`, as permissões no `WorkspaceContext`; a lógica pura fica
  * nos módulos ao lado e cada bloco decide o próprio texto.

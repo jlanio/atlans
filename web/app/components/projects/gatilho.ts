@@ -3,7 +3,7 @@ import { fromBackend, dayjs } from "@/lib/dayjs"
 import { formatarInicio } from "@/lib/formatos"
 
 /**
- * "O que ele é": gatilho e agendamento de um workflow (docs/specs/projetos.md
+ * "O que ele é": gatilho e agendamento de um workflow (docs/specs/projects.md
  * §3.4). Puro — recebe os booleanos e o resumo que a listagem já traz e
  * devolve tipo, rótulo e texto; o ícone é do componente, que é quem sabe de
  * cor e tamanho.

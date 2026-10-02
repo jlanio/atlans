@@ -2,7 +2,7 @@
 //
 // A casa ÚNICA dos tipos do web que espelham a API. O diretório
 // `web/interface/` foi absorvido aqui na F2 da simplificação
-// (docs/specs/simplificacao.md, A7): duas casas para o mesmo tipo de
+// (docs/specs/simplification.md, A7): duas casas para o mesmo tipo de
 // coisa era convite para a terceira.
 import type { ActionsType, ControlsType, TriggersType } from "@/consts/WorkflowIcons"
 
@@ -46,7 +46,7 @@ export interface IStuckRun {
   typical_seconds: number | null
 }
 
-/** O instante da consulta, sem janela (docs/specs/historico-metricas.md §3.1). */
+/** O instante da consulta, sem janela (docs/specs/metrics-history.md §3.1). */
 export interface INowBlock {
   running: number
   pending: number
@@ -1245,7 +1245,7 @@ export interface IPinNodeMeta {
 }
 
 /**
- * Resumo do agendamento que a listagem traz (spec docs/specs/projetos.md §2.1).
+ * Resumo do agendamento que a listagem traz (spec docs/specs/projects.md §2.1).
  * `next_run_at` nulo com `active` = true é "recém-criado, o agendador ainda
  * calcula" (≤30 s); com `active` = false é "pausado".
  */

@@ -3,7 +3,7 @@
 O catálogo de fontes se desliga como a documentação diz, e as variáveis dele
 chegam ao container.
 
-O .env.example e docs/fontes.md diziam que FONTES_CATALOGO_DIR vazia desliga a
+O .env.example e docs/sources.md diziam que FONTES_CATALOGO_DIR vazia desliga a
 importação, mas o `.strip() or` a devolvia ao padrão; e o compose nem repassava
 as três FONTES_* ao container. Na prática, só uma pasta inexistente desligava.
 """

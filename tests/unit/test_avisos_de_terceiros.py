@@ -213,7 +213,7 @@ def test_o_que_mora_no_repositorio_tem_a_licenca_ao_lado(avisos):
             assert (RAIZ / texto).is_file(), (obra, texto)
         # Uma fonte servida à parte pode ser OFL (AGREGAVEIS); o que é compilado
         # junto do programa precisa ser compatível de verdade.
-        agregada = "à parte" in obra
+        agregada = "separate file" in obra
         assert avisos.compativel(licenca) or (agregada and licenca in avisos.AGREGAVEIS), obra
 
 

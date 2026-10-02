@@ -8,7 +8,7 @@ import type {
 import type { EstadoDoHistorico, Periodo } from "./historico-url"
 
 /**
- * Dados do topo do Histórico (docs/specs/historico-metricas.md §4.3 "Dados").
+ * Dados do topo do Histórico (docs/specs/metrics-history.md §4.3 "Dados").
  *
  * Quatro chamadas em paralelo por (período, filtros): métricas, execuções por
  * dia, executores e workflows. As duas últimas só se recortam por workspace —

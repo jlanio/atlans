@@ -10,7 +10,7 @@ import type { IWorkflowMetricsRow } from "@/service/types"
 import { JANELA_EM_DIAS } from "./como-anda"
 
 /**
- * Dados de Projetos (docs/specs/projetos.md §3.3).
+ * Dados de Projetos (docs/specs/projects.md §3.3).
  *
  * Três chamadas partem juntas por workspace: listagem, grupos e métricas
  * (`/observability/metrics/workflows`, janela de 30 dias). As duas primeiras

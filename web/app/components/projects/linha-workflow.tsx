@@ -121,7 +121,7 @@ export function textoDeAutoria(wf: CamposDeAutoria, agora: Date = new Date()): s
 }
 
 /**
- * A linha de um workflow na tela de Projetos (docs/specs/projetos.md §3.9).
+ * A linha de um workflow na tela de Projetos (docs/specs/projects.md §3.9).
  *
  * Memoizada de propósito, como o card que ela substitui: as linhas nascem
  * dentro de um `.map`, e QUALQUER render da página (uma tecla na busca, o

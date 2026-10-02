@@ -302,7 +302,7 @@ atlans/
 │   ├── auth.ts                     # Configuração NextAuth
 │   └── proxy.ts                    # Proteção de rotas (o middleware do Next)
 │
-├── catalogo/                       # Catálogo de fontes: cópia versionada do Vault de geosserviços (docs/fontes.md)
+├── catalogo/                       # Catálogo de fontes: cópia versionada do Vault de geosserviços (docs/sources.md)
 │   ├── README.md                   # O formato das notas e como atualizar
 │   └── geoservicos/                # Uma pasta por instituição (nota, Camadas.md, Atributos.md)
 │

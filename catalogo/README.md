@@ -5,7 +5,7 @@ vault de notas Markdown: uma pasta por instituição, com a nota da instituiçã
 lista de camadas e os atributos de cada camada. A API importa esta pasta na subida e transforma cada
 camada WFS numa **fonte de dados** da plataforma (tabela `fontes_de_dados`), que
 o assistente consulta ANTES de prospectar qualquer dado externo — ver
-`docs/fontes.md`.
+`docs/sources.md`.
 
 Nada aqui é lido pela interface: o catálogo alimenta as tools MCP
 `search_sources` / `describe_source` e os avisos da validação.

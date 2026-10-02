@@ -13,7 +13,7 @@ diverge, diz o número novo na mensagem — atualizar a vitrine é copiar de vol
 O conjunto que conta é o MESMO que a importação leva a sério: pasta com
 `Camadas.md`, `Atributos.md` e uma nota de instituição que declara endpoint WFS.
 As outras (ArcGIS REST, "metadados em validação") ficam de fora com o motivo
-`sem_endpoint_wfs` — ver `docs/fontes.md`.
+`sem_endpoint_wfs` — ver `docs/sources.md`.
 """
 import re
 from pathlib import Path
@@ -25,7 +25,7 @@ SEMENTE = RAIZ / "catalogo" / "geoservicos"
 VITRINE = RAIZ / "web" / "lib" / "catalogo.ts"
 
 # O CMR é da FUNAI: duas pastas, uma instituição. É a diferença entre as 77
-# pastas com WFS e as 76 instituições que `docs/fontes.md` anuncia.
+# pastas com WFS e as 76 instituições que `docs/sources.md` anuncia.
 PASTAS_DA_MESMA_INSTITUICAO = {"FUNAI CMR": "FUNAI"}
 
 # O vocabulário de países da semente (o prefixo com que as pastas de fora do

@@ -9,7 +9,7 @@ lado errado de errar numa tabela de custo.
 **Nenhum conteudo mora aqui.** Contagens, o modelo e o custo. O que esta tabela
 responde e de quanto foi a conta, nao do que se falou.
 
-Contrato em docs/assistente-editor.md.
+Contrato em docs/editor-assistant.md.
 """
 from uuid import uuid4
 

@@ -1,6 +1,6 @@
 """Taxa de sucesso e percentil: uma conta só para todas as telas.
 
-A taxa de sucesso da spec (docs/specs/historico-metricas.md §3) é concluídas ÷
+A taxa de sucesso da spec (docs/specs/metrics-history.md §3) é concluídas ÷
 (concluídas + falhas): em andamento e canceladas ficam fora do denominador. O
 Histórico, a visão por workflow e a por executor já usavam essa conta; o
 detalhe do workflow a reescrevia como `(total - failed) / total`, contando

@@ -5,7 +5,7 @@ import type { ComoAnda } from "./como-anda"
 import { resumirAgendamento, type ResumoDoAgendamento } from "./gatilho"
 
 /**
- * Chips, busca e ordenação de Projetos (docs/specs/projetos.md §3.6). Puro:
+ * Chips, busca e ordenação de Projetos (docs/specs/projects.md §3.6). Puro:
  * o `index` monta o contexto uma vez por render ("como anda" e resumo do
  * agendamento por workflow) e cada predicado só lê.
  */

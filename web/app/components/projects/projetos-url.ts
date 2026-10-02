@@ -1,5 +1,5 @@
 /**
- * Estado de Projetos na URL (docs/specs/projetos.md §3.6).
+ * Estado de Projetos na URL (docs/specs/projects.md §3.6).
  *
  * Busca, chip e ordenação vivem na query string: F5, voltar do editor e um
  * link colado no chat reabrem a mesma estante. Os defaults não vão para a

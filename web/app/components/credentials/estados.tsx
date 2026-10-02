@@ -5,7 +5,7 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
 
 /**
- * Estados da tela de Credenciais (contrato padrao-telas.md §3): carregando,
+ * Estados da tela de Credenciais (contrato screen-patterns.md §3): carregando,
  * erro de carga, primeiro uso e sem resultado. Cada um diz o que aconteceu e o
  * que fazer a seguir. Aqui ficam o skeleton e as frases da tela; a moldura de
  * cada estado é a de `shared/estados.tsx`.

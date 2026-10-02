@@ -43,7 +43,7 @@ class WorkflowRun(Base):
     # "rodou no fallback/pool" observável por run, mesmo que a política do
     # workspace mude depois. Nulo em runs anteriores à coluna.
     dispatch_tier = Column(String(8), nullable=True)
-    # Origem do disparo e quem disparou (docs/specs/historico-metricas.md §2):
+    # Origem do disparo e quem disparou (docs/specs/metrics-history.md §2):
     # "manual" | "retry" | "webhook" | "schedule". `triggered_by` é o id_hash
     # do usuário nas rotas autenticadas; nulo em webhook e agendamento. Runs
     # anteriores à coluna ficam nulos — a tela mostra "—".

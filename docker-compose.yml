@@ -74,7 +74,7 @@ x-api-env: &api-env
   # de uma API compatível com a da OpenAI: o OpenRouter (padrão), um gateway ou
   # um servidor local. A chave e da PLATAFORMA (quem paga os tokens e a
   # instalacao, e o teto por pessoa vive no Redis). Vazia = o assistente nao existe
-  # e o resto do editor continua inteiro. Ver docs/assistente.md.
+  # e o resto do editor continua inteiro. Ver docs/assistant.md.
   # LLM_* são os nomes genéricos; OPENROUTER_* continuam valendo.
   LLM_API_KEY: ${LLM_API_KEY:-}
   LLM_BASE_URL: ${LLM_BASE_URL:-}
@@ -88,7 +88,7 @@ x-api-env: &api-env
   ASSISTENTE_IDIOMA: ${ASSISTENTE_IDIOMA:-}
   # Tokens por pessoa em 24 h. Vazio = 1500000.
   ASSISTENTE_TETO_DE_TOKENS_POR_DIA: ${ASSISTENTE_TETO_DE_TOKENS_POR_DIA:-}
-  # Catalogo de fontes (docs/fontes.md). FONTES_CATALOGO_DIR VAZIA desliga a
+  # Catalogo de fontes (docs/sources.md). FONTES_CATALOGO_DIR VAZIA desliga a
   # importacao, e fora do .env vale a pasta do repositorio: sem os dois-pontos
   # no `-`, de proposito, para o vazio chegar vazio.
   FONTES_CATALOGO_DIR: ${FONTES_CATALOGO_DIR-catalogo/geoservicos}

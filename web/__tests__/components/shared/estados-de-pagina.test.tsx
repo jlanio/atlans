@@ -2,7 +2,7 @@
  * Os cartões de estado que moravam inline nas páginas (fora de um
  * `estados.tsx`): o erro de 1ª carga do editor (`/workflow/[id]`) e o mapa sem
  * camadas do portal (`/share`). Mesmo contrato das telas com módulo próprio
- * (padrao-telas.md §3 e §5): o erro anuncia com a mensagem e oferece "Tentar de
+ * (screen-patterns.md §3 e §5): o erro anuncia com a mensagem e oferece "Tentar de
  * novo"; o vazio mantém o texto de sempre e não é alerta.
  */
 import { afterEach, describe, expect, it, vi } from "vitest"

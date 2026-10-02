@@ -5,7 +5,7 @@ import { fromBackend, dayjs } from "@/lib/dayjs"
 import { formatarDecorridoGrosso, formatarQuando, rotuloDaOrigem } from "@/lib/formatos"
 
 /**
- * "Como anda": a última execução de um workflow (docs/specs/projetos.md
+ * "Como anda": a última execução de um workflow (docs/specs/projects.md
  * §3.5). Puro — cruza a linha de métricas (janela de 30 dias, cache de 45 s)
  * com o run vivo do `ActiveRunsContext` (10 s), que vence por ser mais
  * fresco. Devolve strings prontas onde a tela só mostra ("quando", "desde")
