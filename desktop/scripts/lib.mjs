@@ -1,9 +1,9 @@
 // desktop/scripts/lib.mjs
 //
-// Helpers compartilhados pelos scripts de build do runtime Python.
-// Sem dependencias de npm: tudo aqui usa stdlib do Node 20 + o `tar` que o
-// Windows 10+ ja traz em System32. Uma dependencia a menos e um `npm ci` a
-// menos entre o CI e o interpretador.
+// Helpers shared by the Python runtime build scripts.
+// No npm dependencies: everything here uses the Node 20 stdlib + the `tar` that
+// Windows 10+ already ships in System32. One dependency fewer is one `npm ci`
+// fewer between CI and the interpreter.
 import { execFileSync, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
@@ -16,8 +16,8 @@ export const REPO     = path.resolve(DESKTOP, '..')
 export const RESOURCES = path.join(DESKTOP, 'resources')
 export const PY_DIR   = path.join(RESOURCES, 'python')
 export const PY_EXE   = path.join(PY_DIR, 'python.exe')
-// O lock do executor (scripts/travar_python.py, com o hash de cada arquivo): o
-// runtime do desktop instala direto dele, com as mesmas versoes do Docker.
+// The executor lock (scripts/travar_python.py, with each file's hash): the
+// desktop runtime installs directly from it, with the same versions as Docker.
 export const LOCK     = path.join(REPO, 'executor', 'requirements-full.txt')
 export const RUNTIME_JSON = path.join(DESKTOP, 'python-runtime.json')
 
@@ -37,16 +37,16 @@ export function fail(msg) {
 // ── Ambiente ─────────────────────────────────────────────────────────────────
 
 /**
- * Ambiente sanitizado para invocar o Python embarcado.
+ * Sanitized environment for invoking the embedded Python.
  *
- * As variaveis removidas nao sao paranoia: numa maquina com QGIS ou ArcGIS
- * instalado, GDAL_DATA/PROJ_LIB apontam para os dados DAQUELA instalacao, e o
- * pyogrio/pyproj do bundle carrega tabelas de projecao incompativeis com as
- * DLLs que ele empacota. O sintoma e um to_crs() que devolve coordenada errada
- * em vez de estourar — o pior tipo de bug.
+ * The removed variables are not paranoia: on a machine with QGIS or ArcGIS
+ * installed, GDAL_DATA/PROJ_LIB point to THAT installation's data, and the
+ * bundle's pyogrio/pyproj load projection tables incompatible with the DLLs it
+ * ships. The symptom is a to_crs() that returns a wrong coordinate instead of
+ * blowing up — the worst kind of bug.
  *
- * PYTHONHOME/PYTHONPATH herdados apontariam para outro interpretador.
- * SSL_CERT_FILE/REQUESTS_CA_BUNDLE atrapalham o _ca_bootstrap do executor.
+ * Inherited PYTHONHOME/PYTHONPATH would point to another interpreter.
+ * SSL_CERT_FILE/REQUESTS_CA_BUNDLE get in the way of the executor's _ca_bootstrap.
  */
 export function pythonEnv(extra = {}) {
   const env = { ...process.env }
@@ -89,7 +89,7 @@ export function sha256(file) {
   return createHash('sha256').update(fs.readFileSync(file)).digest('hex')
 }
 
-/** Tamanho em bytes de uma arvore. Usado para medir cada passo da poda. */
+/** Size in bytes of a tree. Used to measure each pruning step. */
 export function dirSize(dir) {
   let total = 0
   const stack = [dir]
@@ -112,9 +112,9 @@ export function rmrf(target) {
 }
 
 /**
- * Percorre a arvore chamando `visit(caminho, dirent)`. Diretorios sao visitados
- * ANTES de descer, e devolver `false` para um diretorio poda a descida — assim
- * remover uma pasta grande nao custa varrer o que havia dentro dela.
+ * Walks the tree calling `visit(caminho, dirent)`. Directories are visited
+ * BEFORE descending, and returning `false` for a directory prunes the descent —
+ * so removing a large folder does not cost scanning what was inside it.
  */
 export function walk(dir, visit) {
   let entries
@@ -126,7 +126,7 @@ export function walk(dir, visit) {
   }
 }
 
-/** Ordena para que a copia seja deterministica — o blockmap do updater depende disso. */
+/** Sorts so that the copy is deterministic — the updater's blockmap depends on it. */
 export function sortedEntries(dir) {
   return fs.readdirSync(dir, { withFileTypes: true })
     .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
@@ -147,12 +147,12 @@ export function assertRuntimeExists() {
 }
 
 /**
- * Extrai com o bsdtar do Windows (System32), resolvido por caminho absoluto.
+ * Extracts with Windows' bsdtar (System32), resolved by absolute path.
  *
- * O caminho absoluto NAO e preciosismo: quem roda o build de dentro do Git Bash
- * tem o GNU tar na frente do PATH, e o GNU tar le `C:\...` como `host:caminho`
- * (sintaxe de fita remota). O erro que sai e "Cannot connect to C: resolve
- * failed", que nao ajuda ninguem. O bsdtar entende letra de unidade.
+ * The absolute path is NOT fussiness: whoever runs the build from inside Git
+ * Bash has GNU tar first on the PATH, and GNU tar reads `C:\...` as `host:path`
+ * (remote tape syntax). The resulting error is "Cannot connect to C: resolve
+ * failed", which helps nobody. bsdtar understands drive letters.
  */
 export function tarExtract(archive, cwd) {
   fs.mkdirSync(cwd, { recursive: true })

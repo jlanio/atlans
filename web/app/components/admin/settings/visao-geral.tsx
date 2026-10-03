@@ -1,7 +1,8 @@
 "use client"
 
-// «Visão geral» das Configurações do admin: os indicadores, e a tradução do
-// estado bruto das leituras em pendências acionáveis (cada uma leva à seção).
+// "Visão geral" (overview) of the admin Settings: the indicators, and the
+// translation of the reads' raw state into actionable pending items (each one
+// leads to its section).
 
 import type { INodeAdminEntry, IStorageUsageAdmin, IWorkspacePolicyAdmin, IWorkspaceTrash } from "@/service/types"
 import { semOndeRodar } from "@/app/components/admin/isolation-floor-section"
@@ -22,11 +23,12 @@ export interface SettingsAlert {
 }
 
 /**
- * Traduz o estado bruto das 4 chamadas em pendências acionáveis.
+ * Translates the raw state of the 4 calls into actionable pending items.
  *
- * O ganho de usabilidade real está aqui: antes, saber que algo precisava de
- * atenção exigia abrir cada seção e interpretar números soltos. Cada alerta
- * carrega a seção de destino, então o clique leva direto ao lugar de agir.
+ * The real usability gain is here: before, knowing that something needed
+ * attention required opening each section and interpreting loose numbers. Each
+ * alert carries the destination section, so the click leads straight to where
+ * to act.
  */
 export function buildAlerts(
   health: { webhook_whitelist: string[] } | null,
@@ -38,8 +40,8 @@ export function buildAlerts(
 ): SettingsAlert[] {
   const alerts: SettingsAlert[] = []
 
-  // Piso fixado num workspace sem executor principal: nada roda nele, e o
-  // dono não tem como afrouxar — só o admin resolve (ou o dono inclui um).
+  // A floor set on a workspace with no main executor: nothing runs in it, and the
+  // owner has no way to loosen it — only the admin can fix it (or the owner adds one).
   for (const ws of (policies ?? []).filter(semOndeRodar)) {
     alerts.push({
       section: "execucao", severity: "warn",
@@ -111,8 +113,8 @@ export function buildAlerts(
   return alerts
 }
 
-// Cores das pendências: os pares de status permitidos pelo contrato (§6), com o
-// par claro/escuro completo. `info` fica em tokens neutros.
+// Pending-item colors: the status pairs allowed by the contract (§6), with the
+// full light/dark pair. `info` stays on neutral tokens.
 const SEVERITY_STYLE: Record<Severity, string> = {
   danger: "border-red-500/30 bg-red-50 dark:bg-red-500/10",
   warn:   "border-amber-500/30 bg-amber-50 dark:bg-amber-500/10",
@@ -125,9 +127,10 @@ const SEVERITY_ICON: Record<Severity, string> = {
 }
 
 /**
- * Indicador da visão geral, no padrão de stat do contrato (§2): rótulo em
- * versalete, valor `text-2xl tabular-nums`. Clicável — leva à seção onde o
- * número se resolve — então é um `<button>` com foco visível e alvo de toque.
+ * Overview indicator, following the contract's stat pattern (§2): label in
+ * small caps, value `text-2xl tabular-nums`. Clickable — it leads to the section
+ * where the number is resolved — so it is a `<button>` with visible focus and a
+ * touch target.
  */
 function Indicador({
   rotulo, valor, apoio, onClick,

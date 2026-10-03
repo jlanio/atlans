@@ -25,7 +25,7 @@ const RecentRuns = () => {
   const [open, setOpen]       = useState(false)
   const [runs, setRuns]       = useState<IRunSummary[]>([])
   const [loading, setLoading] = useState(false)
-  // A lista não chegou: o lugar do "nenhuma execução" diz isso, e não o vazio.
+  // The list didn't arrive: the "nenhuma execução" slot says so, not the empty state.
   const [falhou, setFalhou] = useState(false)
   const [runningId, setRunningId] = useState<string | null>(null)
 
@@ -69,11 +69,11 @@ const RecentRuns = () => {
 
       {open && (
         <>
-          {/* Overlay para fechar ao clicar fora */}
+          {/* Overlay to close on click outside */}
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
 
           <div className="absolute left-full ml-2 bottom-0 z-20 w-80 bg-background border border-border rounded-lg shadow-lg overflow-hidden">
-            {/* Cabeçalho */}
+            {/* Header */}
             <div className="flex items-center justify-between px-3 py-2 border-b bg-muted/40">
               <span className="text-xs font-medium text-muted-foreground">Execuções recentes</span>
               <button
@@ -122,8 +122,8 @@ const RecentRuns = () => {
                 >
                   <AnimatePresence>
                     {runs.map(run => (
-                      // Sem `layout`: a projeção medida por render (layout thrash)
-                      // não é necessária — entrada/saída seguem por variants.
+                      // No `layout`: the per-render measured projection (layout thrash)
+                      // isn't needed — enter/exit go through variants.
                       <motion.div
                         key={run.run_id}
                         variants={_fadeUp}
@@ -156,7 +156,7 @@ const RecentRuns = () => {
               )}
             </div>
 
-            {/* Rodapé */}
+            {/* Footer */}
             <div className="border-t px-3 py-2 bg-muted/20">
               <button
                 onClick={() => { router.push(`/observability/${id}`); setOpen(false) }}

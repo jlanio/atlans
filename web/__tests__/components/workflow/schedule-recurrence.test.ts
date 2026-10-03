@@ -4,8 +4,8 @@ import {
   type EstadoAgenda,
 } from "@/app/components/workflow/nodes-configuration/schedule-recurrence"
 
-// Lê os componentes "de parede" de uma data num fuso (para checar a prévia sem
-// depender do fuso da máquina de teste).
+// Reads the "wall clock" components of a date in a time zone (to check the
+// preview without depending on the test machine's time zone).
 function parts(d: Date, tz: string) {
   const f = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz, hour12: false, year: "numeric", month: "2-digit", day: "2-digit",
@@ -20,7 +20,7 @@ function parts(d: Date, tz: string) {
 }
 
 const SP = "America/Sao_Paulo"
-const AGORA = new Date("2026-03-10T15:00:00Z") // 12:00 em São Paulo (−3)
+const AGORA = new Date("2026-03-10T15:00:00Z") // 12:00 in São Paulo (−3)
 
 function base(over: Partial<EstadoAgenda> = {}): EstadoAgenda {
   return {
@@ -120,16 +120,16 @@ describe("robustez de lerEstado (achados da revisão)", () => {
   })
 
   it("rrule que casa um modo simples carrega com advTipo='rrule' (não apaga ao abrir Avançado)", () => {
-    // strategy=rrule salva ("a cada 3 dias") mapeia para o modo diário, mas o
-    // TIPO do modo avançado tem de ser 'rrule' — não o default 'cron'. Sem isso,
-    // abrir "Avançado" mostrava a aba de cron e um "Salvar" dali gravava
-    // strategy=cron com o CRON_PADRAO, apagando a rrule em silêncio.
+    // A saved strategy=rrule ("every 3 days") maps to the daily mode, but the
+    // advanced mode's TYPE has to be 'rrule' — not the default 'cron'. Without
+    // it, opening "Avançado" (advanced) showed the cron tab and a "Salvar" (save)
+    // from there wrote strategy=cron with CRON_PADRAO, silently erasing the rrule.
     const RRULE = "FREQ=DAILY;INTERVAL=3;BYHOUR=9;BYMINUTE=0;BYSECOND=0"
     const lido = lerEstado({ strategy: "rrule", rrule_expression: RRULE })
     expect(lido).toMatchObject({ freq: "diario", everyDays: 3, hora: 9, minuto: 0 })
     expect(lido.advTipo).toBe("rrule")
     expect(lido.advRrule).toBe(RRULE)
-    // Trocar para "Avançado" e salvar preserva a rrule — não vira o cron padrão.
+    // Switching to "Avançado" and saving preserves the rrule — it doesn't become the default cron.
     const salvo = gerarCampos({ ...lido, freq: "avancado" })
     expect(salvo).toMatchObject({ strategy: "rrule", rrule_expression: RRULE })
     expect(salvo.cron_expression).toBe("")
@@ -232,10 +232,10 @@ describe("proximasExecucoes — mesma semântica do agendador", () => {
     const runs = proximasExecucoes(base({ freq: "mensal", monthDay: 31, hora: 9, minuto: 0 }), 4, AGORA)!
     expect(runs.length).toBe(4)
     for (const r of runs) { const p = parts(r, SP); expect(p.d).toBe(31) }
-    // Confirma que houve salto maior que um mês em algum ponto (fev foi pulado).
+    // Confirms there was a jump larger than a month at some point (Feb was skipped).
     const meses = runs.map(r => parts(r, SP).mo)
-    expect(meses).not.toContain(2) // fevereiro nunca tem dia 31
-    expect(meses).not.toContain(4) // abril tem 30
+    expect(meses).not.toContain(2) // February never has a 31st
+    expect(meses).not.toContain(4) // April has 30
   })
 
   it("mensal último dia: cada execução no último dia do mês", () => {
@@ -257,7 +257,7 @@ describe("proximasExecucoes — mesma semântica do agendador", () => {
   it("respeita o fuso: 09:00 em UTC ≠ 09:00 em São Paulo", () => {
     const spRun = proximasExecucoes(base({ freq: "diario", hora: 9, minuto: 0, timezone: SP }), 1, AGORA)![0]
     const utcRun = proximasExecucoes(base({ freq: "diario", hora: 9, minuto: 0, timezone: "UTC" }), 1, AGORA)![0]
-    // 09:00 São Paulo = 12:00Z; 09:00 UTC = 09:00Z. Instantes diferentes.
+    // 09:00 São Paulo = 12:00Z; 09:00 UTC = 09:00Z. Different instants.
     expect(spRun.getTime()).not.toBe(utcRun.getTime())
     expect(parts(spRun, SP).h).toBe(9)
     expect(parts(utcRun, "UTC").h).toBe(9)

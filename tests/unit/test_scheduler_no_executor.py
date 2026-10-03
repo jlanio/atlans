@@ -1,8 +1,8 @@
 # tests/unit/test_scheduler_no_executor.py
 """
-Agendador sem executor (spec §7.4): a ocorrência não some. Antes, o laço
-engolia a exceção e só avançava `next_run_at` — um cron cujo grupo (ou o
-pool) estava fora desaparecia sem run e sem aviso.
+Scheduler without an executor (spec §7.4): the occurrence does not vanish.
+Before, the loop swallowed the exception and only advanced `next_run_at` — a
+cron whose group (or the pool) was down disappeared with no run and no warning.
 """
 from __future__ import annotations
 
@@ -70,16 +70,16 @@ async def test_ocorrencia_que_roda_registra_recuperacao():
          patch("app.services.execution_alert_service.record_success", AsyncMock(return_value=False)) as recuperou:
         await AsyncScheduler()._fire_workflow("wf-1", schedule_id=7)
     recuperou.assert_awaited_once()
-    db.add.assert_not_called()   # nenhum run sintético quando o dispatch deu certo
-    # o workflow já carregado vai no start_analysis (sem SELECT duplicado)
+    db.add.assert_not_called()   # no synthetic run when the dispatch succeeded
+    # the already loaded workflow goes into start_analysis (no duplicate SELECT)
     assert service.start_analysis.await_args.kwargs["workflow"] is not None
 
 
 @pytest.mark.asyncio
 async def test_outras_excecoes_tambem_materializam_run_e_alerta():
-    """Qualquer falha do dispatch agendado — não só a falta de executor — vira um
-    run `failed` visível + alerta, em vez de sumir no log enquanto o `next_run_at`
-    avança. A exceção original ainda sobe (o laço a registra)."""
+    """Any failure of the scheduled dispatch — not only a missing executor — becomes
+    a visible `failed` run + alert, instead of vanishing into the log while
+    `next_run_at` advances. The original exception still propagates (the loop logs it)."""
     from app.core.async_scheduler import AsyncScheduler
 
     db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock()
@@ -96,7 +96,7 @@ async def test_outras_excecoes_tambem_materializam_run_e_alerta():
     run = db.add.call_args.args[0]
     assert type(run).__name__ == "WorkflowRun"
     assert run.status == "failed" and run.schedule_id == 7 and run.workspace_id == "ws-1"
-    assert run.error_category == "internal"   # única categoria legal (≤16) p/ erro genérico
+    assert run.error_category == "internal"   # the only legal category (≤16) for a generic error
     assert "boom" in (run.error_message or "")
     db.commit.assert_awaited()
     fechar.assert_awaited_once()
@@ -106,9 +106,9 @@ async def test_outras_excecoes_tambem_materializam_run_e_alerta():
 
 @pytest.mark.asyncio
 async def test_excecao_com_run_id_nao_materializa_segundo_run():
-    """`_dispatch_job` já criou e fechou um run `failed` (dedicado caiu na
-    janela de graça, fila cheia): o agendador NÃO grava outro — senão o
-    histórico e o usage_daily contam a mesma falha duas vezes."""
+    """`_dispatch_job` already created and closed a `failed` run (dedicated one
+    dropped within the grace window, queue full): the scheduler does NOT write
+    another — otherwise the history and usage_daily count the same failure twice."""
     from app.core.async_scheduler import AsyncScheduler
 
     db = MagicMock(); db.add = MagicMock(); db.commit = AsyncMock()
@@ -126,5 +126,5 @@ async def test_excecao_com_run_id_nao_materializa_segundo_run():
 
     db.add.assert_not_called()
     fechar.assert_not_awaited()
-    # O alerta ao dono continua: a ocorrência falhou de qualquer jeito.
+    # The alert to the owner still goes out: the occurrence failed either way.
     alerta.assert_awaited_once()

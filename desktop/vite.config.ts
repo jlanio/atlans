@@ -5,20 +5,22 @@ import { defineConfig, type Plugin } from 'vite'
 import { defineDosEnderecos, enderecosDoBuild } from './scripts/enderecos.mjs'
 
 /**
- * Barra `electron` e `node:*` no bundle do renderer.
+ * Blocks `electron` and `node:*` in the renderer bundle.
  *
- * O renderer roda no Chromium, com `sandbox: true` e sem integração com Node.
- * Nada disso existe lá. O jeito de cair nessa armadilha é importar um VALOR de
- * um módulo do main — `import { INTERVALO_SYNC } from '../../main/state/config'`
- * — que por sua vez importa `node:fs` e `paths.ts`. Tipos são seguros (somem na
- * compilação); valores arrastam a árvore inteira.
+ * The renderer runs in Chromium, with `sandbox: true` and no Node integration.
+ * None of that exists there. The way to fall into this trap is importing a
+ * VALUE from a main-process module —
+ * `import { INTERVALO_SYNC } from '../../main/state/config'` — which in turn
+ * imports `node:fs` and `paths.ts`. Types are safe (they vanish at compile
+ * time); values drag the whole tree along.
  *
- * O sintoma sem esta guarda é cruel: o `tsc` passa, o `vite build` passa, e o
- * app abre com a JANELA PINTADA E VAZIA — o fundo já foi desenhado pelo
- * `backgroundColor`, e o módulo estoura antes de o React montar. Nenhum erro
- * aparece no terminal, só no DevTools que ninguém abriu.
+ * The symptom without this guard is cruel: `tsc` passes, `vite build` passes,
+ * and the app opens with the WINDOW PAINTED AND EMPTY — the background has
+ * already been drawn by `backgroundColor`, and the module blows up before React
+ * mounts. No error shows up in the terminal, only in the DevTools nobody
+ * opened.
  *
- * Aqui vira erro de build, apontando quem importou o quê.
+ * Here it becomes a build error, pointing at who imported what.
  */
 function proibirModulosDoMain(): Plugin {
   return {
@@ -37,11 +39,11 @@ function proibirModulosDoMain(): Plugin {
 
 export default defineConfig(({ command }) => ({
   root: 'src/renderer',
-  // O servidor e a UI da instalação (scripts/enderecos.mjs): o `vite build`
-  // exige os do ambiente; o servidor de desenvolvimento cai nos locais.
+  // The installation's server and UI (scripts/enderecos.mjs): `vite build`
+  // requires those from the environment; the dev server falls back to the local ones.
   define: defineDosEnderecos(enderecosDoBuild({ dev: command === 'serve' })),
-  // Caminho relativo é obrigatório: empacotado, a janela carrega por `file://`,
-  // e o `/assets/...` absoluto do padrão do Vite apontaria para a raiz do disco.
+  // A relative path is mandatory: packaged, the window loads via `file://`, and
+  // Vite's default absolute `/assets/...` would point to the root of the disk.
   base: './',
   plugins: [proibirModulosDoMain(), tailwindcss(), react()],
   build: {

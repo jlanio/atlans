@@ -1,22 +1,22 @@
 # app/api/routers/executores_router.py
 """
-Endpoints REST para gerenciamento de Executores externos.
+REST endpoints for managing external Executors.
 
-Fluxo de uso (mTLS + Bootstrap OTP):
-  1. Admin   → POST /executores/                  → cria executor em status=pending
-  2. Admin   → POST /executores/{id}/enroll-otp   → gera OTP de uso unico (24h)
-  3. Operador entrega o OTP ao executor via canal seguro
-  4. Executor   → POST /executores/enroll            → Bearer OTP + CSR, recebe cert mTLS
-  5. Executor   → WS   /ws/executores/{id}           → conecta via mTLS (ver executor_ws_router.py)
-  6. Executor   → POST /executores/renew-cert        → mTLS, renova cert antes do vencimento
+Usage flow (mTLS + Bootstrap OTP):
+  1. Admin   → POST /executores/                  → creates executor with status=pending
+  2. Admin   → POST /executores/{id}/enroll-otp   → generates a single-use OTP (24h)
+  3. Operator hands the OTP to the executor over a secure channel
+  4. Executor   → POST /executores/enroll            → Bearer OTP + CSR, receives mTLS cert
+  5. Executor   → WS   /ws/executores/{id}           → connects via mTLS (see executor_ws_router.py)
+  6. Executor   → POST /executores/renew-cert        → mTLS, renews cert before expiry
 
-Endpoints administrativos (requerem JWT de usuario com role=admin):
-  GET    /executores/                          — lista executores
-  DELETE /executores/{id}                      — revoga executor + cert
-  DELETE /executores/{id}/permanent            — soft-delete (somente se status=revoked)
-  DELETE /admin/executores/{id}/cert       — revoga apenas o cert atual
-  POST   /executores/{id}/enroll-otp           — gera OTP para enrollment
-  GET    /executores/server-public-key         — chave publica Ed25519 do servidor
+Administrative endpoints (require a user JWT with role=admin):
+  GET    /executores/                          — lists executors
+  DELETE /executores/{id}                      — revokes executor + cert
+  DELETE /executores/{id}/permanent            — soft-delete (only if status=revoked)
+  DELETE /admin/executores/{id}/cert       — revokes only the current cert
+  POST   /executores/{id}/enroll-otp           — generates OTP for enrollment
+  GET    /executores/server-public-key         — server's Ed25519 public key
 """
 import re
 from datetime import datetime, timezone
@@ -112,19 +112,19 @@ class ExecutorOut(BaseModel):
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _assert_executor_owner_or_admin(current_user, ag) -> None:
-    """Lança 403 se o usuário não for admin global nem dono (created_by) do executor."""
+    """Raises 403 if the user is neither a global admin nor the owner (created_by) of the executor."""
     if current_user.role != "admin" and ag.created_by != current_user.id_hash:
         raise HTTPException(status_code=403, detail="Acesso negado a este executor.")
 
 
 def _assert_pode_gerenciar_executor(current_user, ag) -> None:
-    """Como `_assert_executor_owner_or_admin`, mas para operações de GESTÃO
-    (gerar OTP de enrollment, revogar): auditoria SEG-94.
+    """Like `_assert_executor_owner_or_admin`, but for MANAGEMENT operations
+    (generating an enrollment OTP, revoking): audit SEG-94.
 
-    Um executor promovido ao pool padrão (`is_default`) atende TODOS os
-    inquilinos. O dono original não pode mais gerar OTP nem revogá-lo — só um
-    admin da plataforma. A LEITURA do próprio executor continua permitida ao
-    dono (`_assert_executor_owner_or_admin`); só a gestão é restrita.
+    An executor promoted to the default pool (`is_default`) serves ALL
+    tenants. The original owner can no longer generate an OTP or revoke it — only
+    a platform admin can. READING the executor itself is still allowed for the
+    owner (`_assert_executor_owner_or_admin`); only management is restricted.
     """
     if current_user.role == "admin":
         return
@@ -137,45 +137,45 @@ def _assert_pode_gerenciar_executor(current_user, ag) -> None:
 
 
 def _assert_pode_ler_executor(quem: "ExecutorOuUsuario", ag) -> None:
-    """Autoriza a leitura de UM executor por mTLS do próprio executor ou por
-    admin/dono.
+    """Authorizes reading ONE executor via the executor's own mTLS or by
+    admin/owner.
 
-    Estas rotas dependiam apenas de `agent_mtls_or_user_auth`, que só autentica —
-    qualquer conta ativa lia o status e, pior, a lista de workspaces (id_hash +
-    nome) de qualquer executor da plataforma, enquanto as rotas irmãs
-    (`GET /executores/{id}` e `/{id}/users`) já exigiam admin.
+    These routes depended only on `agent_mtls_or_user_auth`, which only authenticates —
+    any active account could read the status and, worse, the workspace list (id_hash +
+    name) of any executor on the platform, while the sibling routes
+    (`GET /executores/{id}` and `/{id}/users`) already required admin.
 
-    Função pura, testável sem subir a aplicação — mesmo padrão de
+    Pure function, testable without starting the application — same pattern as
     `_assert_executor_owner_or_admin`.
     """
     if quem.is_executor:
-        # Um executor só fala de si mesmo. Sem isto, um executor enrolado
-        # (qualquer usuário pode criar um) enumeraria a frota inteira.
+        # An executor only talks about itself. Without this, an enrolled executor
+        # (any user can create one) could enumerate the entire fleet.
         if quem.executor.id_hash != ag.id_hash:
             raise HTTPException(status_code=403, detail="Acesso negado a este executor.")
         return
     _assert_executor_owner_or_admin(quem.user, ag)
 
 
-# O estado AO VIVO de um executor — online, capacidade, desde quando está
-# conectado — só existe inteiro no worker da API que segura o WebSocket dele.
-# A tela lia `executor_registry.get(id)`, que é LOCAL: com `--workers 4`, 3 em
-# cada 4 atualizações (a lista refaz a consulta a cada 15 s) mostravam um
-# executor lotado como ocioso ("0/4") e um conectado há dias como "visto há 2
-# dias". Aqui cada dado vem de onde todos os workers o enxergam — o Redis e o
-# banco —, inclusive no worker do WebSocket: a memória dele tem valores alguns
-# segundos mais novos, e misturá-los fazia a resposta mudar conforme o worker.
+# The LIVE state of an executor — online, capacity, since when it has been
+# connected — only exists in full in the API worker holding its WebSocket.
+# The screen read `executor_registry.get(id)`, which is LOCAL: with `--workers 4`,
+# 3 out of 4 refreshes (the list re-queries every 15 s) showed a fully loaded
+# executor as idle ("0/4") and one connected for days as "seen 2 days ago".
+# Here every piece of data comes from where all workers can see it — Redis and
+# the database — including in the WebSocket worker: its memory has values a few
+# seconds newer, and mixing them made the response change depending on the worker.
 
 _CONTADORES_DA_CAPACIDADE = ("queued", "running", "max_concurrent", "max_queue")
 _MEDIDAS_DA_CAPACIDADE = ("disk_free_gb", "ram_available_gb")
 
 
 def _capacidade_para_a_tela(cap) -> dict | None:
-    """A cópia do Redis revalidada no formato que o worker do WebSocket grava
-    (`_sanitize_capacity`): só os campos do contrato, com o tipo certo. Este
-    módulo não confia no que lê do Redis (o relay é assinado pelo mesmo motivo),
-    e o valor vai para a tela de todo usuário. Contador inválido descarta a
-    capacidade inteira; medida inválida vira None."""
+    """The Redis copy, revalidated against the format the WebSocket worker writes
+    (`_sanitize_capacity`): only the contract fields, with the right type. This
+    module does not trust what it reads from Redis (the relay is signed for the
+    same reason), and the value goes to every user's screen. An invalid counter
+    discards the whole capacity; an invalid measurement becomes None."""
     if not isinstance(cap, dict):
         return None
     erros: list[str] = []
@@ -187,43 +187,43 @@ def _capacidade_para_a_tela(cap) -> dict | None:
 
 
 async def _estado_ao_vivo(ids: list[str]) -> tuple[dict[str, bool], dict[str, dict | None]]:
-    """(online por executor, capacidade dos online), do mesmo retrato do Redis
-    em qualquer worker (ver `read_presence_and_capacities`), com a capacidade
-    revalidada (`_capacidade_para_a_tela`)."""
+    """(online per executor, capacity of the online ones), from the same Redis
+    snapshot in any worker (see `read_presence_and_capacities`), with the capacity
+    revalidated (`_capacidade_para_a_tela`)."""
     online, publicadas = await executor_registry.read_presence_and_capacities(ids)
     return online, {i: _capacidade_para_a_tela(cap) for i, cap in publicadas.items()}
 
 
 def _conectado_desde(online: bool, last_seen_at) -> str | None:
-    """Início da sessão WebSocket atual, em ISO com fuso. Offline não tem sessão.
+    """Start of the current WebSocket session, in ISO with time zone. Offline has no session.
 
-    É o `last_seen_at` do banco: gravado no handshake de cada sessão e, no fim
-    dela, só se o último contato for posterior (`registrar_fim_da_sessao`) — o
-    fim de uma sessão substituída não apaga o início da nova. A renovação do
-    cert não o toca. O `connected_at` da conexão diria o mesmo com milissegundos
-    de diferença, mas só no worker do WebSocket."""
+    It is the database's `last_seen_at`: written on each session's handshake and, at
+    its end, only if the last contact is later (`registrar_fim_da_sessao`) — the
+    end of a replaced session does not erase the start of the new one. Cert
+    renewal does not touch it. The connection's `connected_at` would say the same,
+    milliseconds apart, but only in the WebSocket worker."""
     if not online or not last_seen_at:
         return None
     if isinstance(last_seen_at, str):
         last_seen_at = datetime.fromisoformat(last_seen_at)
     if last_seen_at.tzinfo is None:
-        last_seen_at = last_seen_at.replace(tzinfo=timezone.utc)  # coluna em UTC sem fuso
+        last_seen_at = last_seen_at.replace(tzinfo=timezone.utc)  # UTC column without time zone
     return last_seen_at.isoformat()
 
 
 def _serialize_agent(ag, *, online: bool, capacidade: dict | None) -> dict:
-    """Serializa executor com status online, capacidade ao vivo e system_info.
+    """Serializes an executor with online status, live capacity and system_info.
 
-    `online` e `capacidade` vêm de `_estado_ao_vivo`, que lê de onde todos os
-    workers enxergam (ver acima)."""
+    `online` and `capacidade` come from `_estado_ao_vivo`, which reads from where
+    all workers can see (see above)."""
     data = {
         **ExecutorOut.from_model(ag).model_dump(),
         "online":       online,
         "capacity":     capacidade,
         "connected_at": _conectado_desde(online, ag.last_seen_at),
     }
-    # Mescla o system_info estático (do banco, gravado no primeiro handshake da
-    # conexão) com as métricas dinâmicas da capacidade.
+    # Merges the static system_info (from the database, written on the connection's
+    # first handshake) with the dynamic capacity metrics.
     base_info = ag.system_info or {}
     if base_info:
         dynamic = {
@@ -244,14 +244,14 @@ async def create_executor(
     current_user=Depends(get_current_user),
 ):
     """
-    Cria um executor em status=pending.
+    Creates an executor with status=pending.
 
-    Admin global cria qualquer tipo (default/dedicated) sem restrição. Usuário
-    comum cria apenas executores dedicados, limitado pela sua cota individual
-    (User.agent_quota); o executor é vinculado automaticamente a ele.
+    A global admin creates any type (default/dedicated) without restriction. A
+    regular user creates only dedicated executors, limited by their individual quota
+    (User.agent_quota); the executor is automatically linked to them.
 
-    Para finalizar o enrollment, gere um OTP via
-    POST /executores/{executor_id}/enroll-otp e entregue ao operador.
+    To finish enrollment, generate an OTP via
+    POST /executores/{executor_id}/enroll-otp and hand it to the operator.
     """
     try:
         if current_user.role == "admin":
@@ -291,9 +291,9 @@ async def create_executor(
 
 @router.get("/pending-acks", summary="[Admin] Jobs enviados aguardando ACK do executor")
 async def list_pending_acks(_=Depends(require_admin)):
-    """Lista completa de jobs em voo — inclui recentes (<15s) que ainda podem
-    receber ACK. Útil para visão em tempo real do que o servidor despachou
-    e ainda não foi confirmado pelo executor.
+    """Full list of in-flight jobs — includes recent ones (<15s) that may still
+    receive an ACK. Useful for a real-time view of what the server dispatched
+    and the executor has not yet confirmed.
     """
     items = await executor_registry.list_pending_acks()
     return {
@@ -308,11 +308,11 @@ async def list_overdue_acks(
     min_elapsed_seconds: float = 15.0,
     _=Depends(require_admin),
 ):
-    """Retorna apenas jobs cujo ACK ultrapassou o limiar (default 15s).
+    """Returns only jobs whose ACK exceeded the threshold (default 15s).
 
-    Útil para diagnóstico quando um workflow fica "running" sem progresso:
-    permite ver se o job saiu do server mas nunca chegou ao executor (frame
-    TCP perdido, executor crashou após receber, relay sem listener ativo).
+    Useful for diagnosis when a workflow stays "running" with no progress:
+    shows whether the job left the server but never reached the executor (lost
+    TCP frame, executor crashed after receiving, relay with no active listener).
     """
     items = await executor_registry.overdue_acks()
     filtered = [
@@ -343,14 +343,14 @@ async def server_public_key():
 @limiter.limit("60/minute")
 async def ca_bundle(request: Request):
     """
-    Retorna o root cert da CA interna (step-ca) em formato PEM.
+    Returns the internal CA's (step-ca) root cert in PEM format.
 
-    Endpoint publico — root cert e' info publica por design. Todo executor
-    precisa dele para validar a chain TLS do host dos executores (assinada
-    pela CA privada).
+    Public endpoint — the root cert is public info by design. Every executor
+    needs it to validate the TLS chain of the executors host (signed
+    by the private CA).
 
-    Usado pelo script `install.sh` durante o onboarding: executor novo baixa
-    o root daqui e adiciona ao trust store local antes do enroll.
+    Used by the `install.sh` script during onboarding: a new executor downloads
+    the root from here and adds it to the local trust store before enrolling.
     """
     from app.core.config import STEPCA_ROOT_CERT_PATH
     try:
@@ -372,16 +372,16 @@ _RE_FINGERPRINT = "0123456789abcdef"
 
 
 def _normalizar_fingerprint(bruto: str) -> str:
-    """Hex minusculo, sem ':' nem espacos — o formato que o install.sh compara.
+    """Lowercase hex, without ':' or spaces — the format install.sh compares.
 
-    `step certificate fingerprint` devolve hex puro e `openssl x509 -fingerprint`
-    devolve com ':'. O operador cola o que tiver em maos.
+    `step certificate fingerprint` returns plain hex and `openssl x509 -fingerprint`
+    returns it with ':'. The operator pastes whatever they have at hand.
 
-    Aceita VARIOS fingerprints separados por virgula e devolve a lista
-    normalizada, tambem separada por virgula. Sem isso, o valor de rotacao que a
-    documentacao prescreve (`<fp_antigo>,<fp_novo>`) era rejeitado pela
-    validacao de tamanho e o install.sh saia SEM pinning — TOFU puro exatamente
-    na janela em que a CA esta trocando.
+    Accepts SEVERAL comma-separated fingerprints and returns the normalized
+    list, also comma-separated. Without this, the rotation value the
+    documentation prescribes (`<fp_antigo>,<fp_novo>`) was rejected by the
+    length validation and install.sh ran WITHOUT pinning — pure TOFU exactly
+    in the window when the CA is being swapped.
     """
     partes = [
         "".join(p.split()).replace(":", "").lower()
@@ -391,17 +391,17 @@ def _normalizar_fingerprint(bruto: str) -> str:
 
 
 def _injetar_fingerprint_da_ca(script: str) -> str:
-    """Publica STEPCA_ROOT_FINGERPRINT como default no install.sh servido.
+    """Publishes STEPCA_ROOT_FINGERPRINT as the default in the served install.sh.
 
-    Sem isto, `STEPCA_ROOT_FINGERPRINT` era lida da config e nunca usada: o
-    executor tem suporte a pinning (`ATLANS_CA_SHA256`, ver
-    executor/_ca_bootstrap.py), mas o script era servido estatico e nunca o
-    definia. O download do ca-bundle ficava sendo TOFU, enquanto docs/
-    mtls-bootstrap.md afirmava que o backend usava o valor "ao montar o
-    install.sh". Este e o codigo que torna aquela frase verdadeira.
+    Without this, `STEPCA_ROOT_FINGERPRINT` was read from config and never used: the
+    executor supports pinning (`ATLANS_CA_SHA256`, see
+    executor/_ca_bootstrap.py), but the script was served static and never
+    set it. The ca-bundle download stayed TOFU, while docs/
+    mtls-bootstrap.md claimed the backend used the value "when building
+    install.sh". This is the code that makes that sentence true.
 
-    Config vazia devolve o script intacto — o cliente avisa e segue sem pinning,
-    que e o comportamento anterior.
+    Empty config returns the script untouched — the client warns and proceeds
+    without pinning, which is the previous behavior.
     """
     from app.core.config import STEPCA_ROOT_FINGERPRINT
 
@@ -409,9 +409,9 @@ def _injetar_fingerprint_da_ca(script: str) -> str:
     if not fp:
         return script
 
-    # Um valor que nao seja hex de 32 bytes nao e um fingerprint SHA-256; injeta-lo
-    # so faria o instalador abortar com uma comparacao que nunca casa. Cada
-    # fingerprint da lista e validado separadamente.
+    # A value that is not 32-byte hex is not a SHA-256 fingerprint; injecting it
+    # would only make the installer abort with a comparison that never matches.
+    # Each fingerprint in the list is validated separately.
     invalidos = [
         p for p in fp.split(",")
         if len(p) != 64 or any(c not in _RE_FINGERPRINT for c in p)
@@ -433,19 +433,19 @@ def _injetar_fingerprint_da_ca(script: str) -> str:
     return script.replace(_LINHA_PIN_CA, f'CA_SHA256_PIN="${{ATLANS_CA_SHA256:-{fp}}}"', 1)
 
 
-# Os enderecos que o install.sh servido traz como padrao. Uma linha de cada
-# (`SERVER=""` etc., no inicio da linha) e substituida pelo valor desta
-# instalacao; o arquivo no repositorio nao aponta para nenhuma.
+# The addresses the served install.sh carries as defaults. One line for each
+# (`SERVER=""` etc., at the start of the line) is replaced by this
+# installation's value; the file in the repository points to none.
 _ENDERECO_SEGURO = re.compile(r"(?:https?|wss?)://[A-Za-z0-9.-]+(?::[0-9]{1,5})?(?:/[A-Za-z0-9._~/-]*)?")
 
 
 def _injetar_enderecos(script: str) -> str:
-    """Preenche SERVER, PUBLIC_SERVER e REPO_URL com a config deste servidor.
+    """Fills SERVER, PUBLIC_SERVER and REPO_URL with this server's config.
 
-    So entra um valor que seja URL simples (esquema, host, porta e caminho, sem
-    aspas, `$` nem espaco): ele vai dentro de aspas duplas num script que o
-    operador roda com `bash`. Um valor fora disso, ou vazio, deixa a linha
-    vazia, e o script pede a flag.
+    Only a value that is a plain URL gets in (scheme, host, port and path, no
+    quotes, `$` or spaces): it goes inside double quotes in a script the
+    operator runs with `bash`. Any other value, or an empty one, leaves the line
+    empty, and the script asks for the flag.
     """
     from app.core.config import AGENTS_URL, EXECUTOR_REPO_URL, FRONTEND_URL
 
@@ -476,22 +476,22 @@ def _injetar_enderecos(script: str) -> str:
 @limiter.limit("60/minute")
 async def install_script(request: Request):
     """
-    Retorna o script bash de instalacao do executor (self-contained).
+    Returns the executor's bash installation script (self-contained).
 
-    Uso pelo operador (o comando pronto sai da tela de matricula):
+    Operator usage (the ready-made command comes from the enrollment screen):
         curl -fsSL https://<site>/executores/install | bash -s -- \\
             --executor-id=<ID> --otp=<OTP>
 
-    O script:
-      1. Verifica docker + git
-      2. Clona o repo (se ausente) em ~/atlans-executor
-      3. Baixa root cert via /executores/ca-bundle
-      4. Builda imagem + roda enroll + sobe service
+    The script:
+      1. Checks docker + git
+      2. Clones the repo (if missing) into ~/atlans-executor
+      3. Downloads the root cert via /executores/ca-bundle
+      4. Builds the image + runs enroll + starts the service
 
-    O script em si nao tem segredos; e' a mesma coisa que o operador
-    montaria a mao seguindo o README. O fingerprint da CA injetado abaixo
-    tambem nao e segredo — e o hash de um certificado publico, e serve para o
-    cliente detectar que baixou a CA ERRADA.
+    The script itself has no secrets; it is the same thing the operator
+    would assemble by hand following the README. The CA fingerprint injected
+    below is not a secret either — it is the hash of a public certificate, and
+    it lets the client detect that it downloaded the WRONG CA.
     """
     from pathlib import Path
     script_path = Path(__file__).resolve().parent.parent.parent.parent / "static" / "install.sh"
@@ -510,32 +510,32 @@ async def install_script(request: Request):
     )
 
 
-# ── App desktop para Windows ─────────────────────────────────────────────────
+# ── Desktop app for Windows ──────────────────────────────────────────────────
 #
-# O instalador vive nos GitHub Releases (tag `desktop/v*`) do repositório em
-# DESKTOP_RELEASES_REPO, publicados pelo workflow desktop-windows.yml. Estes dois
-# endpoints existem para que o painel ofereça o download sem que o usuário
-# precise saber onde procurar. Sem o repositório configurado, não há oferta.
+# The installer lives in the GitHub Releases (tag `desktop/v*`) of the repository in
+# DESKTOP_RELEASES_REPO, published by the desktop-windows.yml workflow. These two
+# endpoints exist so the dashboard can offer the download without the user
+# needing to know where to look. Without the repository configured, there is no offer.
 #
-# O binário NÃO é proxiado: são ~180 MB por download, e passá-los pelo backend
-# consumiria worker e banda por nada. O redirect manda o navegador direto ao
-# CDN do GitHub.
+# The binary is NOT proxied: it is ~180 MB per download, and passing it through the
+# backend would consume worker time and bandwidth for nothing. The redirect sends the
+# browser straight to GitHub's CDN.
 
 _DESKTOP_TAG_PREFIX = "desktop/v"
 _DESKTOP_CACHE_TTL = 300  # segundos
 
-# Cache em memória por worker. A consulta ao GitHub é lenta e tem rate limit de
-# 60/h sem token — sem cache, um punhado de usuários abrindo o diálogo de OTP
-# esgotaria a cota e o botão de download sumiria para todo mundo.
+# Per-worker in-memory cache. The GitHub query is slow and has a rate limit of
+# 60/h without a token — without a cache, a handful of users opening the OTP
+# dialog would exhaust the quota and the download button would vanish for everyone.
 _desktop_cache: dict = {"em": 0.0, "dados": None}
 
 
 async def _ultima_release_desktop() -> dict | None:
-    """Metadados do instalador Windows mais recente, ou None se não houver.
+    """Metadata of the latest Windows installer, or None if there is none.
 
-    Nunca levanta: a ausência de release é estado normal (nenhuma publicada
-    ainda), e uma falha de rede com o GitHub não pode derrubar a página de
-    executores.
+    Never raises: the absence of a release is a normal state (none published
+    yet), and a network failure with GitHub must not bring down the executors
+    page.
     """
     import time as _time
     from app.core.config import DESKTOP_RELEASES_REPO
@@ -585,7 +585,7 @@ async def _ultima_release_desktop() -> dict | None:
             summary="Metadados do instalador Windows (publico)")
 @limiter.limit("60/minute")
 async def desktop_latest(request: Request):
-    """Versão, tamanho e URL do instalador — para a UI mostrar antes do clique."""
+    """Installer version, size and URL — for the UI to show before the click."""
     dados = await _ultima_release_desktop()
     if not dados:
         raise HTTPException(
@@ -598,7 +598,7 @@ async def desktop_latest(request: Request):
 @router.get("/install/windows", summary="Baixar o app desktop para Windows (publico)")
 @limiter.limit("60/minute")
 async def desktop_install(request: Request):
-    """Redireciona para o instalador `.exe` da última release `desktop/v*`."""
+    """Redirects to the `.exe` installer of the latest `desktop/v*` release."""
     from fastapi.responses import RedirectResponse
 
     dados = await _ultima_release_desktop()
@@ -607,8 +607,8 @@ async def desktop_install(request: Request):
             status_code=404,
             detail="Nenhuma versão do app desktop foi publicada ainda.",
         )
-    # 302 e não 301: a URL do asset muda a cada release, e um permanente ficaria
-    # cravado no cache do navegador apontando para a versão antiga.
+    # 302 and not 301: the asset URL changes with each release, and a permanent one
+    # would get stuck in the browser cache pointing to the old version.
     return RedirectResponse(url=dados["url"], status_code=302)
 
 
@@ -617,7 +617,7 @@ async def my_agents(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Retorna executores default + dedicated atribuídos via workspaces do usuário."""
+    """Returns default + dedicated executors assigned via the user's workspaces."""
     executores = await user_executor_service.get_user_accessible_agents(db, current_user.id_hash)
     online, capacidades = await _estado_ao_vivo([ag["id_hash"] for ag in executores])
     for ag in executores:
@@ -632,8 +632,8 @@ async def my_agents_count(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Contagem leve (sem checagem de presença) — usada para decidir se a UI
-    exibe o menu de executores ao usuário."""
+    """Lightweight count (no presence check) — used to decide whether the UI
+    shows the executors menu to the user."""
     executores = await user_executor_service.get_user_accessible_agents(db, current_user.id_hash)
     return {"count": len(executores)}
 
@@ -644,7 +644,7 @@ async def list_agents(
     db: AsyncSession = Depends(get_db),
     _=Depends(require_admin),
 ):
-    """Lista todos os executores."""
+    """Lists all executors."""
     executores = await executor_service.list_agents(db)
     filtered = [ag for ag in executores if not executor_type or ag.executor_type == executor_type]
     online, capacidades = await _estado_ao_vivo([ag.id_hash for ag in filtered])
@@ -663,11 +663,11 @@ async def agent_status(
 ):
     _assert_pode_ler_executor(quem, ag)
 
-    # Resolver workspaces disponíveis para o executor (GeoSync)
+    # Resolve the workspaces available to the executor (GeoSync)
     agent_workspaces = await _get_agent_workspaces(db, ag)
     resolved_ws_id = None
     if agent_workspaces:
-        # Auto-seleciona: default primeiro, senão o primeiro da lista
+        # Auto-select: default first, otherwise the first in the list
         default_ws = next((w for w in agent_workspaces if w["is_default"]), None)
         resolved_ws_id = (default_ws or agent_workspaces[0])["id_hash"]
 
@@ -688,9 +688,9 @@ async def agent_workspaces_endpoint(
     quem=Depends(agent_mtls_or_user_auth),
     ag=Depends(get_agent_or_404),
 ):
-    """Retorna workspaces acessíveis ao executor (via usuário atribuído).
+    """Returns workspaces accessible to the executor (via the assigned user).
 
-    Auth: mTLS do próprio executor, ou JWT de admin/dono do executor.
+    Auth: the executor's own mTLS, or JWT of an admin/owner of the executor.
     """
     _assert_pode_ler_executor(quem, ag)
     return await _get_agent_workspaces(db, ag)
@@ -698,18 +698,18 @@ async def agent_workspaces_endpoint(
 
 async def _get_agent_workspaces(db: AsyncSession, ag) -> list[dict]:
     """
-    Retorna workspaces disponíveis para o executor (usado pelo GeoSync para auto-detecção).
+    Returns workspaces available to the executor (used by GeoSync for auto-detection).
 
-    Regras:
-      - Executor default → [] (GeoSync desabilitado; escopo de todos os workspaces é amplo demais)
-      - Executor dedicated com >1 workspace → [] (requer EXECUTOR_WORKSPACE_ID explícito)
-      - Executor dedicated com 0 ou 1 workspace → retorna normalmente
+    Rules:
+      - Default executor → [] (GeoSync disabled; the scope of all workspaces is too broad)
+      - Dedicated executor with >1 workspace → [] (requires explicit EXECUTOR_WORKSPACE_ID)
+      - Dedicated executor with 0 or 1 workspace → returns normally
     """
     if ag.is_default:
         return []
 
-    # Ponteiro legado ∪ níveis da política: o GeoSync precisa do workspace
-    # cujos jobs este executor de fato recebe.
+    # Legacy pointer ∪ policy tiers: GeoSync needs the workspace
+    # whose jobs this executor actually receives.
     from app.services.workspace_executor_service import workspace_ids_for_executor
     ids = await workspace_ids_for_executor(db, ag.id_hash)
     workspaces = []
@@ -735,7 +735,7 @@ async def list_agent_users(
     _=Depends(require_admin),
     _ag=Depends(get_agent_or_404),
 ):
-    """Retorna usuários que têm este executor atribuído diretamente pelo admin."""
+    """Returns users who have this executor assigned directly by the admin."""
     return await user_executor_service.list_agent_users(db, executor_id)
 
 
@@ -751,7 +751,7 @@ async def assign_agent_to_user(
     current_user=Depends(require_admin),
     _ag=Depends(get_agent_or_404),
 ):
-    """Atribui um executor dedicated diretamente a um usuário."""
+    """Assigns a dedicated executor directly to a user."""
     try:
         await user_executor_service.assign_user_to_agent(
             db, executor_id, payload.user_id, assigned_by=current_user.id_hash
@@ -778,7 +778,7 @@ async def remove_agent_user(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_admin),
 ):
-    """Remove a atribuição direta de um executor a um usuário."""
+    """Removes the direct assignment of an executor to a user."""
     try:
         await user_executor_service.remove_user_from_agent(db, executor_id, user_id)
     except ValueError as exc:
@@ -822,10 +822,10 @@ async def revoke_executor(
     ag=Depends(get_agent_or_404),
 ):
     _assert_pode_gerenciar_executor(current_user, ag)
-    # Política de execução (spec §4.4): um executor revogado some dos níveis; se
-    # isso esvaziaria o nível principal de alguém, 409 — salvo `force`. Os
-    # passos (níveis, status, cert, aviso aos donos, sessão derrubada) são os de
-    # todo caminho que revoga — ver `executor_service.revogar_executor`.
+    # Execution policy (spec §4.4): a revoked executor drops out of the tiers; if
+    # that would empty someone's main tier, 409 — unless `force`. The
+    # steps (tiers, status, cert, notice to owners, session dropped) are those of
+    # every path that revokes — see `executor_service.revogar_executor`.
     revogacao = await executor_service.revogar_executor(
         db, ag, force=force, actor_id=current_user.id_hash, motivo="revoked",
         aviso="Executor revogado pelo administrador.", fechamento="Executor revogado.",
@@ -845,10 +845,10 @@ async def delete_agent(
     ag=Depends(get_agent_or_404),
 ):
     """
-    Soft-delete de um executor revogado.
+    Soft-delete of a revoked executor.
 
-    Preenche deleted_at e oculta o executor das listagens.
-    Somente executores com status='revoked' podem ser removidos.
+    Fills deleted_at and hides the executor from listings.
+    Only executors with status='revoked' can be removed.
     """
     _assert_pode_gerenciar_executor(current_user, ag)
     from app.services import workspace_executor_service as politica
@@ -864,7 +864,7 @@ async def delete_agent(
     logger.info("Usuário '%s' removeu executor '%s' (soft-delete).", current_user.username, executor_id)
 
 
-# ── Atribuição de executores a usuários (admin) ──────────────────────────
+# ── Assignment of executors to users (admin) ─────────────────────────────
 
 @router.post("/set-default", summary="[Admin] Definir executor padrão da plataforma")
 async def set_default(
@@ -872,8 +872,8 @@ async def set_default(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(require_admin),
 ):
-    # Lido ANTES da promoção: é o que diz quais níveis principais vão esvaziar
-    # (a promoção retira o executor de todos os níveis — Q3).
+    # Read BEFORE the promotion: it tells which main tiers will be emptied
+    # (the promotion removes the executor from all tiers — Q3).
     from app.services import workspace_executor_service as politica
     afetados = await politica.workspaces_depending_on(db, payload.executor_id)
     try:
@@ -916,13 +916,13 @@ async def admin_create_enrollment_otp(
     ag=Depends(get_agent_or_404),
 ):
     """
-    Gera um OTP de 32 bytes urlsafe que o operador usa para fazer
-    enrollment do executor. Expiracao: 24h. Uso unico.
+    Generates a 32-byte urlsafe OTP that the operator uses to
+    enroll the executor. Expiration: 24h. Single use.
 
-    Acessível ao admin global ou ao dono do executor (created_by).
+    Accessible to the global admin or to the executor's owner (created_by).
 
-    O plaintext aparece UMA UNICA VEZ — armazene em canal seguro
-    (1Password, Signal). Subsequentemente so o HMAC fica no DB.
+    The plaintext appears ONLY ONCE — store it in a secure channel
+    (1Password, Signal). Afterwards only the HMAC stays in the DB.
     """
     _assert_pode_gerenciar_executor(current_user, ag)
     otp, expires_at = await executor_enrollment_service.create_enrollment_otp(
@@ -947,12 +947,12 @@ async def agent_enroll(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Unico endpoint sem mTLS. Aceita Bearer OTP, valida CSR, pede a step-ca
-    para assinar e devolve cert + chain + CA.
+    The only endpoint without mTLS. Accepts a Bearer OTP, validates the CSR, asks
+    step-ca to sign it and returns cert + chain + CA.
 
-    Apos a primeira chamada bem-sucedida o OTP e marcado como consumido e
-    nao pode ser reutilizado. Em caso de falha (CSR invalido, step-ca down),
-    o OTP NAO e marcado como consumido — operador pode tentar de novo.
+    After the first successful call the OTP is marked as consumed and
+    cannot be reused. On failure (invalid CSR, step-ca down),
+    the OTP is NOT marked as consumed — the operator can try again.
     """
     if not authorization.lower().startswith("bearer "):
         raise HTTPException(status_code=401, detail="Authorization Bearer ausente.")
@@ -960,45 +960,45 @@ async def agent_enroll(
     if not otp:
         raise HTTPException(status_code=401, detail="OTP ausente.")
 
-    # Atras do Traefik, `request.client.host` e o IP do PROXY para todo mundo —
-    # a trilha de auditoria do enrollment (`consumed_from_ip`) gravava sempre o
-    # mesmo endereco e nao servia para nada forense. `get_client_ip` so aceita o
-    # X-Forwarded-For quando o peer e um proxy confiavel.
+    # Behind Traefik, `request.client.host` is the PROXY's IP for everyone —
+    # the enrollment audit trail (`consumed_from_ip`) always recorded the
+    # same address and was useless forensically. `get_client_ip` only accepts
+    # X-Forwarded-For when the peer is a trusted proxy.
     from app.core.trusted_proxy import get_client_ip
     from_ip = get_client_ip(
         request.client.host if request.client else None,
         request.headers.get("x-forwarded-for"),
     )
 
-    # Validacoes que NAO consomem o OTP — falhar antes evita queimar tentativas validas.
+    # Validations that do NOT consume the OTP — failing early avoids burning valid attempts.
     try:
         executor_enrollment_service.parse_and_validate_csr(payload.csr_pem)
     except ValueError as exc:
         logger.warning("CSR invalido no enrollment de %s: %s", from_ip, exc)
         raise HTTPException(status_code=400, detail=f"CSR invalido: {exc}")
 
-    # A chave X25519 e usada para cifrar todo job enviado a este executor —
-    # validar aqui evita persistir um PEM que so quebra no dispatch.
+    # The X25519 key is used to encrypt every job sent to this executor —
+    # validating here avoids persisting a PEM that only breaks at dispatch.
     try:
         executor_enrollment_service.validate_x25519_public_key(payload.public_key_pem)
     except ValueError as exc:
         logger.warning("public_key_pem invalida no enrollment de %s: %s", from_ip, exc)
         raise HTTPException(status_code=400, detail=f"Chave publica invalida: {exc}")
 
-    # Consome OTP (atomico) — apos este ponto, falha do step-ca queima a tentativa.
+    # Consumes the OTP (atomic) — past this point, a step-ca failure burns the attempt.
     try:
         executor_id = await executor_enrollment_service.consume_otp(db, otp, from_ip)
     except ValueError:
         raise HTTPException(status_code=401, detail="OTP invalido, expirado ou ja utilizado.")
 
-    # Pede assinatura na CA interna.
+    # Request a signature from the internal CA.
     try:
         cert_data = await executor_enrollment_service.sign_csr_via_stepca(payload.csr_pem, executor_id)
     except RuntimeError as exc:
         logger.error("Falha ao assinar CSR para executor '%s': %s", executor_id, exc)
         raise HTTPException(status_code=503, detail="CA interna indisponivel — tente novamente.")
 
-    # Persiste metadata do cert no executor + chave publica X25519 do CSR.
+    # Persists the cert metadata on the executor + the CSR's X25519 public key.
     await executor_enrollment_service.attach_cert_to_agent(db, executor_id, cert_data)
     await executor_enrollment_service.attach_public_key_to_agent(db, executor_id, payload.public_key_pem)
 
@@ -1017,10 +1017,10 @@ async def agent_enroll(
 
 
 def _chave_do_executor_no_mtls(request: Request) -> str:
-    """Balde de rate limit por executor (o CN do cert que o Traefik repassa),
-    nao por IP: uma frota atras do mesmo NAT, matriculada no mesmo dia, renova
-    no mesmo dia. O limite so e conferido depois das dependencias da rota, entao
-    so conta requests que ja passaram pelo mTLS. Sem o header, cai no IP."""
+    """Rate-limit bucket per executor (the cert CN that Traefik forwards),
+    not per IP: a fleet behind the same NAT, enrolled on the same day, renews
+    on the same day. The limit is only checked after the route's dependencies, so
+    it only counts requests that already passed mTLS. Without the header, it falls back to the IP."""
     cn, _ = _parse_traefik_client_cert(request.headers.get("x-forwarded-tls-client-cert-info", ""))
     return f"cert:{cn}" if cn else _client_key(request)
 
@@ -1028,9 +1028,9 @@ def _chave_do_executor_no_mtls(request: Request) -> str:
 @router.post("/renew-cert",
              response_model=EnrollResponse,
              summary="[Executor] Renovar cert mTLS antes do vencimento")
-# Um executor legitimo renova a cada ~83 dias e tenta no maximo 1x por hora.
-# Sem limite, um executor autenticado fazia o step-ca assinar sem parar, e cada
-# renovacao deixa o serial anterior na blacklist do Redis por ate 90 dias.
+# A legitimate executor renews every ~83 days and tries at most once per hour.
+# Without a limit, an authenticated executor made step-ca sign nonstop, and each
+# renewal leaves the previous serial in the Redis blacklist for up to 90 days.
 @limiter.limit("6/hour;30/day", key_func=_chave_do_executor_no_mtls)
 async def agent_renew_cert(
     request: Request,
@@ -1039,9 +1039,9 @@ async def agent_renew_cert(
     executor=Depends(get_agent_from_mtls),
 ):
     """
-    Renova o cert usando o cert atual valido + novo CSR. Sem mTLS retorna 401.
-    Se o executor for revogado enquanto o step-ca assina, o cert novo e
-    descartado e a resposta e 409.
+    Renews the cert using the current valid cert + a new CSR. Without mTLS returns 401.
+    If the executor is revoked while step-ca is signing, the new cert is
+    discarded and the response is 409.
     """
     try:
         executor_enrollment_service.parse_and_validate_csr(payload.csr_pem)
@@ -1054,9 +1054,9 @@ async def agent_renew_cert(
         logger.error("Falha ao renovar cert do executor '%s': %s", executor.id_hash, exc)
         raise HTTPException(status_code=503, detail="CA interna indisponivel.")
 
-    # Antes de atachar o novo cert, revoga o serial antigo no Redis blacklist.
-    # TTL acompanha a validade restante do cert (impede que cert revogado seja
-    # aceito apos o TTL expirar, ate o cert expirar naturalmente).
+    # Before attaching the new cert, revoke the old serial in the Redis blacklist.
+    # The TTL follows the cert's remaining validity (prevents a revoked cert from being
+    # accepted after the TTL expires, until the cert expires naturally).
     if executor.cert_serial:
         await executor_enrollment_service.revoke_cert(
             executor.cert_serial, cert_expires_at=executor.cert_expires_at,
@@ -1066,10 +1066,10 @@ async def agent_renew_cert(
         db, executor.id_hash, executor.cert_serial, cert_data,
     )
     if not renovou:
-        # Revogado (ou renovado em paralelo) enquanto o step-ca assinava. O
-        # banco ficou como a revogacao deixou; o cert recem-emitido nao pode
-        # valer. A blacklist e cinto duplo: o mTLS ja o recusa, porque o serial
-        # dele nao e o do banco.
+        # Revoked (or renewed in parallel) while step-ca was signing. The
+        # database stayed as the revocation left it; the newly issued cert must not
+        # be valid. The blacklist is belt and suspenders: mTLS already rejects it,
+        # because its serial is not the one in the database.
         try:
             await executor_enrollment_service.revoke_cert(
                 cert_data["serial"], cert_expires_at=cert_data["expires_at"],
@@ -1107,18 +1107,18 @@ async def admin_revoke_cert(
     ag=Depends(get_agent_or_404),
 ):
     """
-    Revoga o cert mTLS atual sem alterar o status do executor. Util para forcar
-    rotacao sem desativar o executor. Para revogacao completa, use DELETE /executores/{id}.
+    Revokes the current mTLS cert without changing the executor's status. Useful to force
+    rotation without deactivating the executor. For full revocation, use DELETE /executores/{id}.
     """
     if not ag.cert_serial:
         raise HTTPException(status_code=404, detail="Executor sem cert ativo.")
 
-    # So o cert: status e niveis da politica ficam. O resto e o de toda
-    # revogacao (`executor_service.concluir_revogacoes`), depois do commit:
-    # blacklist, `control: revoked` e o close 4403 — que faz relay pelo Redis
-    # quando o WS esta em outro worker, e e o que faz o executor parar. Sem o
-    # listener da sessao inscrito (Redis reiniciando), a vigia da sessao a
-    # derruba ao ver o cert anulado no banco.
+    # Only the cert: status and policy tiers stay. The rest is that of every
+    # revocation (`executor_service.concluir_revogacoes`), after the commit:
+    # blacklist, `control: revoked` and the 4403 close — which relays through Redis
+    # when the WS is in another worker, and is what makes the executor stop. Without
+    # the session's listener subscribed (Redis restarting), the session watchdog
+    # drops it when it sees the cert voided in the database.
     revogacao = executor_service.Revogacao(
         executor_id=executor_id, nome=ag.name, serial=ag.cert_serial,
         serial_expira_em=ag.cert_expires_at,

@@ -23,15 +23,15 @@ const concluida: ComoAnda = { tipo: "concluida", quando: "há 3 h", instante: 3_
 const falhou: ComoAnda = { tipo: "falhou", quando: "há 40 min", instante: 5_000, erro: "boom", total: 10, falhas: 1, mediana: null }
 const executando: ComoAnda = { tipo: "executando", desde: "há 4 min", instante: 9_000, origem: null, executor: null, tipica: null }
 
-// Uma estante pequena que passa por todos os predicados.
+// A small shelf that goes through every predicate.
 const a = wf({ id_hash: "a", name: "Consolidação de outorgas", has_schedule_trigger: true, schedule: schedule(true), group_id: "g1" })
 const b = wf({ id_hash: "b", name: "Bacia do rio Doce", flag_ative: false, has_schedule_trigger: true, schedule: schedule(false) })
 const c = wf({ id_hash: "c", name: "Alerta de cheia", has_webhook_trigger: true, description: "Recebe o nível pelo WEBHOOK da ANA" })
 const d = wf({ id_hash: "d", name: "Recorte por município", is_subworkflow: true })
 const e = wf({ id_hash: "e", name: "Mapa de risco", has_publish_map: true, portal_access: "public", updated_at: "2026-09-06T10:00:00Z" })
 const f = wf({ id_hash: "f", name: "Zoneamento", has_publish_map: true, portal_access: "disabled", updated_at: "2026-09-01T10:00:00Z" })
-// Criado pelo assistente da Home: aparece na estante como qualquer outro e só
-// o chip "Assistente" o separa.
+// Created by the Home assistant: it shows up on the shelf like any other and only
+// the "Assistente" chip sets it apart.
 const g = wf({ id_hash: "g", name: "Embargos no Brasil", origem: "assistente" })
 const todos = [a, b, c, d, e, f, g]
 
@@ -69,9 +69,9 @@ describe("predicadoDoFiltro", () => {
   })
 
   it("'executando' lê o «como anda», não runningHashes: conta métricas-running sem run vivo", () => {
-    // "a" está em execução pelas métricas (janela de cache de 45 s) sem estar
-    // em runningHashes. A linha mostra "Em execução"; o chip/filtro têm de
-    // concordar, senão a contagem diz 0 com uma linha azul na tela.
+    // "a" is running according to the metrics (45 s cache window) without being
+    // in runningHashes. The row shows "Em execução"; the chip/filter have to
+    // agree, otherwise the count says 0 with a blue row on screen.
     const ctx: ContextoDeFiltro = {
       comoAndaPorHash: new Map<string, ComoAnda>([["a", executando]]),
       resumoDoAgendamentoPorHash: new Map(),
@@ -131,7 +131,7 @@ describe("busca", () => {
   it("acha pelo nome do grupo: o grupo que bate mostra os seus workflows", () => {
     expect(casaBusca(a, grupos, "hidro")).toBe(true)
     expect(casaBusca(b, grupos, "hidro")).toBe(false)
-    // Grupo que a lista não conhece não derruba a busca.
+    // A group the list does not know does not break the search.
     expect(casaBusca(wf({ group_id: "g-fantasma" }), grupos, "hidro")).toBe(false)
   })
 
@@ -152,8 +152,8 @@ describe("ordenar", () => {
     expect(ordenar(todos, "execucao", ctx).map(w => w.id_hash)).toEqual([
       "c",  // executando (instante 9000)
       "d",  // falhou (5000)
-      "a",  // concluída (3000)
-      "b", "g", "e", "f",  // sem instante (nunca/sem métricas), pelo nome: Bacia, Embargos, Mapa, Zoneamento
+      "a",  // finished (3000)
+      "b", "g", "e", "f",  // no timestamp (never/no metrics), by name: Bacia, Embargos, Mapa, Zoneamento
     ])
   })
 

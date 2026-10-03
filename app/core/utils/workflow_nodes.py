@@ -1,21 +1,21 @@
 # app/core/utils/workflow_nodes.py
-"""Leitura das propriedades de um nó da definition.
+"""Reading the properties of a definition node.
 
-Mora em `core/utils` — e não dentro de um service — porque três caminhos
-independentes precisam concordar na extração: o dispatch (que valida e injeta
-credenciais), o relatório de impacto do move e qualquer coletor futuro. Enquanto
-a função era privada de `workflow_execution_service`, o relatório a importava
-com underscore, atando um service ao interior de outro.
+Lives in `core/utils` — and not inside a service — because three independent
+paths need to agree on the extraction: the dispatch (which validates and
+injects credentials), the move's impact report and any future collector. While
+the function was private to `workflow_execution_service`, the report imported
+it with the underscore, tying one service to another's internals.
 """
 
 
 def node_props(node: dict) -> dict:
-    """Extrai o dict de propriedades efetivo do nó.
+    """Extracts the node's effective properties dict.
 
-    Usa a mesma cadeia de fallback do frontend/worker: `data.properties` tem
-    precedência sobre `properties`. Centralizado para que coletor e validador
-    concordem em qual campo do nó contém `credential_id` — evita que um atacante
-    contorne a validação forjando um `data.properties` sem `credential_id` ao
-    lado de um `properties.credential_id` real.
+    Uses the same fallback chain as the frontend/worker: `data.properties` takes
+    precedence over `properties`. Centralized so that collector and validator
+    agree on which node field contains `credential_id` — prevents an attacker
+    from bypassing validation by forging a `data.properties` without
+    `credential_id` alongside a real `properties.credential_id`.
     """
     return node.get("data", {}).get("properties") or node.get("properties") or {}

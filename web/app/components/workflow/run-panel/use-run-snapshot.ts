@@ -2,15 +2,15 @@ import { useCallback, useSyncExternalStore } from "react"
 import { RunEvent, useWorkflowExecutionStore } from "@/app/stores/workflowExecutionStore"
 import { NodeRun, RunTimeline, buildHudTimeline, buildTimeline } from "./timeline"
 
-/** Janela de agregação das atualizações do painel.
+/** Aggregation window for panel updates.
  *
- * Um run movimentado emite dezenas de eventos por segundo, e cada um deles
- * mudava `events` E `statusWorkflow.nodes`. Assinando a store por selector, o
- * painel re-renderizava — e reconstruía a linha do tempo inteira — uma vez por
- * mensagem, com todas as linhas de nó junto. Agregar em ~8 quadros por segundo
- * é imperceptível para o olho e corta o trabalho por uma ordem de grandeza.
- * Os cronômetros (`Elapsed`) têm tique próprio, então a sensação de "ao vivo"
- * não depende desta taxa.
+ * A busy run emits dozens of events per second, and each of them changed
+ * `events` AND `statusWorkflow.nodes`. Subscribed to the store via selector, the
+ * panel re-rendered — and rebuilt the whole timeline — once per message, along
+ * with every node row. Aggregating at ~8 frames per second is imperceptible to
+ * the eye and cuts the work by an order of magnitude. The stopwatches
+ * (`Elapsed`) have their own tick, so the "live" feel does not depend on this
+ * rate.
  */
 const REFRESH_MS = 120
 
@@ -21,17 +21,17 @@ export interface RunSnapshot {
 }
 
 /**
- * Um único snapshot por janela, compartilhado por todos os consumidores.
+ * A single snapshot per window, shared by all consumers.
  *
- * O painel de execução e o visualizador de sub-fluxo pedem a mesma linha do
- * tempo. Com um timer e uma reconstrução por hook, abrir o visualizador durante
- * um run dobrava o custo: `buildTimeline` percorre a lista inteira de eventos
- * (até 2000) e ordena os nós, oito vezes por segundo, na mesma thread que anima
- * o canvas. Aqui a reconstrução acontece uma vez e os dois leem o mesmo objeto.
+ * The run panel and the sub-workflow viewer ask for the same timeline. With one
+ * timer and one rebuild per hook, opening the viewer during a run doubled the
+ * cost: `buildTimeline` walks the whole event list (up to 2000) and sorts the
+ * nodes, eight times per second, on the same thread that animates the canvas.
+ * Here the rebuild happens once and both read the same object.
  */
 const inscritos = new Set<() => void>()
-/** Subconjunto que precisa da linha do tempo COMPLETA (painel aberto,
- *  visualizador de sub-fluxo). Vazio ⇒ só o resumo da barra é construído. */
+/** Subset that needs the FULL timeline (panel open, sub-workflow viewer).
+ *  Empty ⇒ only the bar summary is built. */
 const querTimeline = new Set<() => void>()
 let timer: ReturnType<typeof setTimeout> | null = null
 let cancelarStore: (() => void) | null = null
@@ -49,12 +49,12 @@ function readSnapshot(anterior: RunSnapshot | null): RunSnapshot {
   }
 }
 
-/** Um `NodeRun` é intercambiável com o anterior? Comparação rasa e barata.
+/** Is a `NodeRun` interchangeable with the previous one? Cheap shallow comparison.
  *
- * `startedAt` entra junto com `prints.length` de propósito: dois runs diferentes
- * nunca começam no mesmo instante, então nenhum array de prints atravessa a
- * troca de execução. Dentro de um mesmo run os prints só crescem, e o tamanho
- * igual implica conteúdo igual.
+ * `startedAt` goes in together with `prints.length` on purpose: two different
+ * runs never start at the same instant, so no prints array crosses over a run
+ * change. Within the same run prints only grow, and equal length implies equal
+ * content.
  */
 function mesmoNo(a: NodeRun, b: NodeRun): boolean {
   return a.nodeId === b.nodeId
@@ -76,13 +76,13 @@ function mesmoNo(a: NodeRun, b: NodeRun): boolean {
 }
 
 /**
- * Devolve a linha do tempo nova reusando os objetos da anterior onde nada mudou.
+ * Returns the new timeline reusing the previous one's objects where nothing changed.
  *
- * `buildTimeline` é pura e realoca TODOS os `NodeRun` a cada chamada, então as
- * linhas do painel (memoizadas) re-renderizavam oito vezes por segundo mesmo
- * quando um único nó havia mudado. Aqui a identidade é restaurada por
- * comparação de valor — e, quando nada mudou em nenhum nó, o snapshot inteiro
- * anterior é devolvido, o que também segura os `useMemo` de `visible`/`groups`.
+ * `buildTimeline` is pure and reallocates ALL `NodeRun`s on every call, so the
+ * (memoized) panel rows re-rendered eight times per second even when a single
+ * node had changed. Here identity is restored by value comparison — and, when
+ * nothing changed in any node, the whole previous snapshot is returned, which
+ * also holds the `useMemo`s of `visible`/`groups`.
  */
 function reaproveitar(anterior: RunTimeline, nova: RunTimeline): RunTimeline {
   const antes = new Map<string, NodeRun>()
@@ -112,8 +112,8 @@ function reaproveitar(anterior: RunTimeline, nova: RunTimeline): RunTimeline {
     return anterior
   }
 
-  // `problems`/`slowest` apontam para os objetos recém-criados; sem remapear,
-  // a mesma linha existiria em duas instâncias diferentes na mesma tela.
+  // `problems`/`slowest` point to the freshly created objects; without remapping,
+  // the same row would exist as two different instances on the same screen.
   return {
     ...nova,
     nodes,
@@ -125,7 +125,7 @@ function reaproveitar(anterior: RunTimeline, nova: RunTimeline): RunTimeline {
 let snapshot: RunSnapshot = readSnapshot(null)
 
 function agendarFlush() {
-  if (timer) return // já há um flush agendado nesta janela
+  if (timer) return // a flush is already scheduled in this window
   timer = setTimeout(() => {
     timer = null
     snapshot = readSnapshot(snapshot)
@@ -137,15 +137,16 @@ function inscrever(notificar: () => void, precisaTimeline: boolean) {
   const primeiroCompleto = precisaTimeline && querTimeline.size === 0
   inscritos.add(notificar)
   if (precisaTimeline) querTimeline.add(notificar)
-  // Assina a store uma única vez, enquanto houver algum consumidor. O primeiro
-  // a chegar recolhe na hora o que já existe — esperar a janela deixaria o
-  // painel vazio por um instante ao abrir um run já carregado. O React relê o
-  // snapshot logo após inscrever, então isto não precisa notificar ninguém.
+  // Subscribes to the store only once, while there is any consumer. The first
+  // to arrive collects what already exists right away — waiting for the window
+  // would leave the panel empty for an instant when opening an already loaded
+  // run. React re-reads the snapshot right after subscribing, so this does not
+  // need to notify anyone.
   if (!cancelarStore) {
     cancelarStore = useWorkflowExecutionStore.subscribe(agendarFlush)
     snapshot = readSnapshot(null)
   } else if (primeiroCompleto) {
-    // O painel acabou de abrir e o snapshot vigente só tem o resumo da barra.
+    // The panel just opened and the current snapshot only has the bar summary.
     agendarFlush()
   }
 
@@ -163,15 +164,15 @@ function inscrever(notificar: () => void, precisaTimeline: boolean) {
 }
 
 /**
- * Snapshot agregado da execução.
+ * Aggregated snapshot of the run.
  *
- * A store é assinada de forma imperativa (e não via selector) justamente para
- * que a alta frequência de escrita não vire alta frequência de render: os
- * componentes só atualizam quando o timer dispara.
+ * The store is subscribed imperatively (and not via selector) precisely so that
+ * a high write frequency does not turn into a high render frequency: the
+ * components only update when the timer fires.
  *
- * `precisaTimeline` diz se este consumidor mostra a linha do tempo por nó. O
- * painel passa `open`: recolhido, ele só desenha a barra de resumo, e a
- * reconstrução completa deixa de acontecer.
+ * `precisaTimeline` says whether this consumer shows the per-node timeline. The
+ * panel passes `open`: when collapsed it only draws the summary bar, and the
+ * full rebuild stops happening.
  */
 export function useRunSnapshot(precisaTimeline = true): RunSnapshot {
   const subscribe = useCallback(

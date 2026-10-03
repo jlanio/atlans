@@ -1,5 +1,5 @@
 # tests/unit/test_nodes.py
-"""Testes unitarios para nodes do flow engine."""
+"""Unit tests for the flow engine nodes."""
 import pytest
 try:
     from flow.registry import NODE_REGISTRY as _NODE_REGISTRY  # noqa: F401
@@ -18,14 +18,14 @@ class TestNodeRegistry:
         assert len(NODE_REGISTRY) > 0
 
     def test_registry_has_core_nodes(self):
-        """Deve conter nodes essenciais."""
+        """Must contain the essential nodes."""
         from flow.registry import NODE_REGISTRY
         expected = ["HttpRequest", "Buffer", "Merge", "Conditional", "DataOutput", "DataInput", "WFS"]
         for name in expected:
             assert name in NODE_REGISTRY, f"Node '{name}' nao encontrado no registry"
 
     def test_all_nodes_have_description(self):
-        """Todos os nodes devem ter description() valido."""
+        """Every node must have a valid description()."""
         from flow.registry import NODE_REGISTRY
         for name, node_cls in NODE_REGISTRY.items():
             desc = node_cls.description()
@@ -34,7 +34,7 @@ class TestNodeRegistry:
             assert "type" in desc, f"Node '{name}' description() sem 'type'"
 
     def test_all_nodes_have_valid_type(self):
-        """Todos os nodes devem ter type valido."""
+        """Every node must have a valid type."""
         from flow.registry import NODE_REGISTRY
         valid_types = {"datasource", "action", "spatial", "output", "control", "trigger"}
         for name, node_cls in NODE_REGISTRY.items():
@@ -46,7 +46,7 @@ class TestNodeRegistry:
 class TestNodeFactory:
 
     def test_create_known_node(self):
-        """Deve criar instancia de node conhecido."""
+        """Must create an instance of a known node."""
         from flow.factory import NodeFactory
         factory = NodeFactory()
         node = factory.create({"id": "node-1", "name": "Buffer", "properties": {}})
@@ -54,7 +54,7 @@ class TestNodeFactory:
         assert node.node_id == "node-1"
 
     def test_create_unknown_node_raises(self):
-        """Deve lancar erro para node desconhecido."""
+        """Must raise an error for an unknown node."""
         from flow.factory import NodeFactory
         factory = NodeFactory()
         with pytest.raises((ValueError, KeyError)):
@@ -62,16 +62,16 @@ class TestNodeFactory:
 
 
 class TestDatasetScanner:
-    """Testes para o scanner de datasets do GeoSync."""
+    """Tests for the GeoSync dataset scanner."""
 
     def test_supported_extensions(self):
-        """Deve incluir extensoes geoespaciais comuns."""
+        """Must include common geospatial extensions."""
         from executor.sync.scanner import SUPPORTED_EXTENSIONS
         for ext in [".geojson", ".shp", ".gpkg", ".tiff", ".csv", ".kml"]:
             assert ext in SUPPORTED_EXTENSIONS, f"Extensao '{ext}' nao suportada"
 
     def test_ignore_names(self):
-        """Deve incluir arquivos de sistema na lista de ignorados."""
+        """Must include system files in the ignore list."""
         from executor.sync.scanner import _IGNORE_NAMES
         assert ".atlans-sync.json" in _IGNORE_NAMES
         assert ".DS_Store" in _IGNORE_NAMES

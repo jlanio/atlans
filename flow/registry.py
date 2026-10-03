@@ -1,6 +1,6 @@
 """
-Registry de nós e decorator para registro automático via descrição.
-Importa recursivamente todos os submódulos em 'nodes/' para disparar decorators.
+Node registry and decorator for automatic registration via description.
+Recursively imports all submodules in 'nodes/' to trigger the decorators.
 """
 import logging
 import pkgutil
@@ -15,12 +15,12 @@ NODE_REGISTRY = {}
 
 def register_node(cls):
     """
-    Decora uma classe de nó, registrando-a pelo campo 'name' de sua description().
+    Decorates a node class, registering it by the 'name' field of its description().
 
-    O description inteiro é validado aqui, na importação (`validar_description`):
-    categoria, tipos de propriedade, campos de saída e chaves conhecidas. Um nó
-    malformado morre no CI com a causa exata — não na tela, como campo sem
-    editor ou porta sem tipo.
+    The whole description is validated here, at import (`validar_description`):
+    category, property types, output fields and known keys. A malformed
+    node dies in CI with the exact cause — not on screen, as a field without
+    an editor or a port without a type.
     """
     if not issubclass(cls, BaseNode):
         raise ValueError(f"{cls.__name__} não herda de BaseNode")
@@ -38,11 +38,11 @@ def register_node(cls):
 
 def auto_discover_nodes():
     """
-    Descobre e importa todos os submódulos dentro de 'nodes/' para registrar nós automaticamente.
+    Discovers and imports all submodules inside 'nodes/' to register nodes automatically.
 
-    Falha ALTO: engolir o erro fazia um nó com description inválido (ou import
-    quebrado) simplesmente sumir do catálogo — a paleta, o MCP e o validate
-    seguiam no ar sem ele, e ninguém descobria o porquê.
+    Fails LOUDLY: swallowing the error made a node with an invalid description (or a
+    broken import) simply vanish from the catalog — the palette, the MCP and validate
+    stayed up without it, and nobody found out why.
     """
     for finder, module_name, ispkg in pkgutil.walk_packages(nodes.__path__, prefix=nodes.__name__ + '.'):
         try:
@@ -52,7 +52,7 @@ def auto_discover_nodes():
 
 def show_registered_nodes():
     """
-    Exibe os nós registrados, agrupados por tipo (action, trigger, etc).
+    Displays the registered nodes, grouped by type (action, trigger, etc).
     """
     grouped = {}
     for node in NODE_REGISTRY.values():
@@ -71,7 +71,7 @@ def show_registered_nodes():
             lines.extend(f"    - {n}" for n in sorted(names))
         logger.debug("\n".join(lines))
 
-# Executa a descoberta automática ao carregar
+# Runs automatic discovery on load
 auto_discover_nodes()
 show_registered_nodes()
 

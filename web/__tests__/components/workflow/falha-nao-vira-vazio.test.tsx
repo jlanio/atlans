@@ -1,19 +1,20 @@
 /**
- * Falha do serviço não é lista vazia.
+ * A service failure is not an empty list.
  *
- * O `GisFlowService` NUNCA rejeita: a queda de rede, o 4xx e o 5xx voltam
- * resolvidos, com `error` preenchido e `data` indefinido (service/http.ts). Os
- * `try/catch` em volta das chamadas eram código morto, e quem lia só o `data`
- * transformava a falha numa afirmação falsa:
+ * `GisFlowService` NEVER rejects: a network drop, a 4xx and a 5xx come back
+ * resolved, with `error` filled in and `data` undefined (service/http.ts). The
+ * `try/catch` blocks around the calls were dead code, and whoever read only
+ * `data` turned the failure into a false statement:
  *
- * - o log de uma execução "expirou" quando a rede caiu (history-empty);
- * - "nenhuma execução registrada" quando a lista nem chegou (history-empty e
- *   o popover de execuções recentes);
- * - "nenhum artefato"/"nenhum arquivo no Drive" nos seletores do nó.
+ * - a run's log "expirou" (expired) when the network dropped (history-empty);
+ * - "nenhuma execução registrada" (no run recorded) when the list never even
+ *   arrived (history-empty and the recent runs popover);
+ * - "nenhum artefato"/"nenhum arquivo no Drive" (no artifact / no file in
+ *   Drive) in the node's pickers.
  *
- * Em todos, a falha agora avisa (toast com a mensagem do servidor, o padrão das
- * telas vizinhas do editor) e o lugar do "vazio" diz que não foi possível
- * carregar.
+ * In all of them, the failure now warns (a toast with the server's message, the
+ * pattern of the editor's neighboring screens) and the "empty" spot says it
+ * couldn't load.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/react"
@@ -50,7 +51,7 @@ import type { INodesPropertyAPI } from "@/service/types"
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const ok = (data: unknown) => ({ status: 200, success: true, data }) as any
-/** O que `resolveAxiosError` devolve numa queda de rede (sem resposta do servidor). */
+/** What `resolveAxiosError` returns on a network drop (no response from the server). */
 const falha = (message = "Erro inesperado.", status = 500) =>
   ({ status, success: false, error: { name: "AxiosError", message } }) as any
 /* eslint-enable @typescript-eslint/no-explicit-any */
@@ -73,10 +74,10 @@ describe("history-empty", () => {
     render(<HistoryEmpty />)
     fireEvent.click(await screen.findByRole("button", { name: /5\.00s/ }))
 
-    // Espera QUALQUER aviso sair, para então conferir qual foi.
+    // Waits for ANY warning to come out, to then check which one it was.
     await waitFor(() => expect(toast.error.mock.calls.length + toast.info.mock.calls.length).toBeGreaterThan(0))
-    // "Expirou" é o veredito de uma resposta que CHEGOU vazia — não de uma que
-    // nem chegou.
+    // "Expirou" (expired) is the verdict for a response that ARRIVED empty — not for one
+    // that never arrived.
     expect(toast.info).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith("Erro ao carregar o log da execução", "Erro inesperado.")
   })
@@ -143,8 +144,8 @@ describe("seletores do nó", () => {
   })
 
   it("Drive: a falha de UMA extensão não diz 'Nenhum arquivo no Drive' — e avisa uma vez só", async () => {
-    // Duas extensões, duas chamadas: a lista montada só com a que respondeu
-    // esconderia os arquivos da outra sem dizer nada.
+    // Two extensions, two calls: a list built only from the one that answered
+    // would hide the other's files without saying anything.
     servico.getDriveFiles
       .mockResolvedValueOnce(ok({ items: [], total: 0 }))
       .mockResolvedValueOnce(falha("Erro inesperado."))

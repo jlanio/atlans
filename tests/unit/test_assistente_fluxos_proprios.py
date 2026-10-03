@@ -1,17 +1,17 @@
 # tests/unit/test_agente_fluxos_proprios.py
 """
-`list_workflows` e os fluxos que o PROPRIO assistente criou.
+`list_workflows` and the workflows the assistant ITSELF created.
 
-A listagem esconde `origem = "assistente"` por padrao — os fluxos do assistente
-sao meio de entrega da Home, nao itens que o dono gerencia. O efeito colateral
-era cruel e silencioso: quem chama a tool NA HOME e o proprio assistente, e o
-default `False` o cegava para o que ele mesmo tinha criado. Num chat novo, «roda
-de novo aquele do desmatamento» nao encontrava nada e nascia um fluxo duplicado
-a cada pergunta recorrente.
+The listing hides `origem = "assistente"` by default — the assistant's workflows
+are a Home delivery vehicle, not items the owner manages. The side effect was
+cruel and silent: whoever calls the tool ON THE HOME is the assistant itself, and
+the `False` default blinded it to what it had itself created. In a new chat, "run
+that deforestation one again" found nothing, and a duplicate workflow was born on
+every recurring question.
 
-O corte e pelo ESCOPO (`origem_dos_fluxos == "assistente"`), nao por um
-parametro que o modelo precise lembrar de passar: um PAT comum continua com o
-default `False`, e o campo `origem` de cada item diz o que e de quem.
+The cut is by SCOPE (`origem_dos_fluxos == "assistente"`), not by a parameter the
+model has to remember to pass: a regular PAT keeps the `False` default, and each
+item's `origem` field says what belongs to whom.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ DELE = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
 
 @pytest.fixture
 async def banco(monkeypatch):
-    """Um workspace com DOIS fluxos: um da pessoa, um do assistente."""
+    """A workspace with TWO workflows: one from the person, one from the assistant."""
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all, tables=TABELAS)
@@ -92,7 +92,7 @@ async def test_pat_comum_continua_sem_ver_os_do_assistente(banco):
 
 
 async def test_pat_pode_pedir_os_do_assistente_explicitamente(banco):
-    """O equivalente ao `?assistente=1` da REST, para quem quiser o acervo todo."""
+    """The equivalent of the REST `?assistente=1`, for whoever wants the whole collection."""
     saida = await list_workflows(_ctx(), incluir_do_assistente=True)
 
     assert {i["id"] for i in saida["items"]} == {DELA, DELE}

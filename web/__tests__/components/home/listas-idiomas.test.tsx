@@ -3,14 +3,14 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { IAgendamentoMeu, IArtifactItem, IConversaResumo, IDriveFile } from "@/service/types"
 
 /**
- * As três listas do grupo Meus (Chats, Agendamentos, Artefatos) em inglês e em
- * espanhol: o idioma chega pelo `IdiomaProvider`, como no layout do dashboard.
- * Os hooks são os de verdade, com o serviço dublado — assim a microcopy que o
- * HOOK escolhe (a falha de carga, o fallback de um toast) também é conferida.
+ * The three lists of the Meus group (Chats, Agendamentos, Artefatos) in English and
+ * Spanish: the language arrives through the `IdiomaProvider`, as in the dashboard layout.
+ * The hooks are the real ones, with the service doubled — so the microcopy the
+ * HOOK chooses (the load failure, a toast's fallback) is also checked.
  *
- * Sem provider tudo continua em português, byte a byte: os testes de cada
- * lista conferem isso, e o fim deste arquivo prova que os componentes
- * compartilhados com o painel de administração seguem iguais sem os textos.
+ * Without a provider everything stays in Portuguese, byte for byte: each list's tests
+ * check that, and the end of this file proves that the components
+ * shared with the administration panel stay the same without the texts.
  */
 
 const H = vi.hoisted(() => ({
@@ -43,7 +43,7 @@ vi.mock("@/service/GisFlowService", () => ({
   },
 }))
 vi.mock("@/context/WorkspaceContext", () => {
-  // Definido DENTRO da factory: `vi.mock` é içado acima dos consts do módulo.
+  // Defined INSIDE the factory: `vi.mock` is hoisted above the module's consts.
   const ROLE_ORDER = ["viewer", "editor", "operator", "admin", "owner"]
   return {
     ROLE_ORDER,
@@ -57,7 +57,7 @@ vi.mock("@/context/WorkspaceContext", () => {
   }
 })
 vi.mock("@/context/ActiveRunsContext", () => ({ useActiveRuns: () => ({ refresh: H.refresh }) }))
-// A rota decide se a tela segue o idioma (`EscopoPelaRota`): só a Home é traduzida.
+// The route decides whether the screen follows the language (`EscopoPelaRota`): only the Home is translated.
 vi.mock("next/navigation", () => ({ usePathname: () => H.rota, useRouter: () => ({ push: vi.fn() }) }))
 vi.mock("@/utils/createToast", () => ({
   createToast: {
@@ -65,15 +65,15 @@ vi.mock("@/utils/createToast", () => ({
     error: (...a: unknown[]) => H.toastErro(...a),
   },
 }))
-// O diálogo de parâmetros é do editor (não se traduz aqui) e os metadados são
-// do Drive: dublês, como nos testes de cada lista.
+// The parameters dialog belongs to the editor (not translated here) and the metadata belongs
+// to the Drive: doubles, as in each list's tests.
 vi.mock("@/app/components/workflow/execute-params-dialog", () => ({
   default: (props: { open: boolean }) => (props.open ? <div data-testid="exec-dialog" /> : null),
 }))
 vi.mock("@/app/components/drive/dialogs", () => ({
   MetadataDialog: (props: { open: boolean }) => (props.open ? <div data-testid="meta-dialog" /> : null),
 }))
-// Passthrough do menu: sem portal/pointer, os itens ficam no DOM e clicáveis.
+// Menu passthrough: without portal/pointer, the items stay in the DOM and clickable.
 vi.mock("@/app/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -96,7 +96,7 @@ import { Dialog } from "@/app/components/ui/dialog"
 import { DeleteDialog } from "@/app/components/shared/DeleteDialog"
 import { useHomeStore } from "@/app/stores/homeStore"
 
-// ── Dublês ──────────────────────────────────────────────────────────────────
+// ── Doubles ─────────────────────────────────────────────────────────────────
 
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 const falhou = (status = 500, message?: string) => ({
@@ -143,10 +143,10 @@ function arquivo(extra: Partial<IDriveFile> = {}): IDriveFile {
   }
 }
 
-// 3,5 dias à frente: a dica de retenção diz "3 dias" em qualquer fuso.
+// 3.5 days ahead: the retention hint says "3 dias" (3 days) in any time zone.
 const daquiATresDias = () => new Date(Date.now() + 3.5 * 86_400_000).toISOString()
 
-/** O acervo de sempre: geojson, shapefile (inerte), um efêmero e um arquivo do Drive. */
+/** The usual collection: geojson, shapefile (inert), an ephemeral one and a Drive file. */
 function acervoPadrao() {
   H.getArtifacts.mockResolvedValue(ok({
     items: [
@@ -188,7 +188,7 @@ beforeEach(() => {
   acervoPadrao()
 })
 
-/** Um botão que troca o idioma pelo contexto, como as Preferências fazem. */
+/** A button that switches the language through the context, as Preferências does. */
 function TrocarIdioma({ para }: { para: Idioma }) {
   const { escolher } = useIdioma()
   return <button type="button" onClick={() => escolher(para)}>trocar idioma</button>
@@ -203,7 +203,7 @@ function montar(idioma: Idioma, lista: React.ReactNode, trocarPara?: Idioma) {
   )
 }
 
-// O nome do arquivo é desenhado em dois pedaços; `data-nome` carrega o inteiro.
+// The file name is drawn in two pieces; `data-nome` carries the whole one.
 function nome(n: string): HTMLElement {
   const el = document.querySelector<HTMLElement>(`[data-nome="${n}"]`)
   if (!el) throw new Error(`Nenhum nome de arquivo "${n}" na tela`)
@@ -212,7 +212,7 @@ function nome(n: string): HTMLElement {
 const acharNome = (n: string) => waitFor(() => nome(n))
 const menuDaLinha = (i = 0) => screen.getAllByTestId("menu")[i]
 
-// ── Inglês ──────────────────────────────────────────────────────────────────
+// ── English ─────────────────────────────────────────────────────────────────
 
 describe("em inglês — Chats", () => {
   it("a linha sem título, o menu e o rodapé do corte", async () => {
@@ -235,7 +235,7 @@ describe("em inglês — Chats", () => {
     H.listarConversas.mockResolvedValue(falhou(500, "Erro inesperado."))
     montar("en", <ChatsLista />)
     expect(await screen.findByText("Couldn’t load chats.")).toBeTruthy()
-    // O `detail` cru de um 500 não chega à tela.
+    // The raw `detail` of a 500 does not reach the screen.
     expect(screen.queryByText("Erro inesperado.")).toBeNull()
 
     H.listarConversas.mockResolvedValue(ok({ itens: [], total: 0 }))
@@ -267,7 +267,7 @@ describe("em inglês — Chats", () => {
     expect(within(apagar).getByRole("button", { name: "Cancel" })).toBeTruthy()
     expect(within(apagar).getByRole("button", { name: "Close" })).toBeTruthy()
     fireEvent.click(within(apagar).getByRole("button", { name: "Delete" }))
-    // Sem mensagem do servidor, o fallback é o do hook — no idioma em uso.
+    // With no message from the server, the fallback is the hook's — in the language in use.
     await waitFor(() => expect(H.toastErro).toHaveBeenCalledWith("Couldn’t delete the chat", "Try again."))
   })
 })
@@ -299,7 +299,7 @@ describe("em inglês — Agendamentos", () => {
     H.updateSchedule.mockResolvedValue(ok({}))
     montar("en", <AgendamentosLista />)
     await screen.findByText("Fluxo A")
-    // A recarga que ativar dispara já traz o agendamento ativo.
+    // The reload that activating fires already brings the schedule as active.
     H.getMySchedules.mockResolvedValue(pagina([ag()], 1))
     fireEvent.click(screen.getByText("Activate"))
     await waitFor(() => expect(H.toastSucesso).toHaveBeenCalledWith("Schedule activated"))
@@ -359,14 +359,14 @@ describe("em inglês — Artefatos", () => {
 
     expect(nome("saida.geojson").closest("button")!.getAttribute("title"))
       .toBe("saida.geojson · GEOJSON — show on the globe")
-    // A linha inerte diz por quê — no `title` e em texto para o teclado/toque.
+    // The inert row says why — in the `title` and in text for keyboard/touch.
     const inerte = nome("malha.zip").closest<HTMLElement>("div[title]")!
     const motivo = "no preview on the globe for this format — publish the map to show it"
     expect(inerte.getAttribute("title")).toBe(`malha.zip · SHAPEFILE — ${motivo}`)
     expect(within(inerte).getByText(motivo)).toBeTruthy()
 
     const dica = screen.getByText("expires in 3 days")
-    // Mês por extenso: "09/01/2026" seria lido ao contrário por quem lê en-GB.
+    // Month spelled out: "09/01/2026" would be read backward by an en-GB reader.
     expect(dica.getAttribute("title")).toMatch(/^Deleted automatically on [A-Z][a-z]{2} \d{1,2}, \d{4}, \d{1,2}:\d{2}\s[AP]M$/)
     expect(screen.getByText("showing 4 of 900")).toBeTruthy()
   })
@@ -459,7 +459,7 @@ describe("em espanhol — Chats", () => {
       '"Focos em Rondônia" saldrá de la lista. El historial se queda en el servidor.',
     )).toBeTruthy()
     fireEvent.click(within(apagar).getByRole("button", { name: "Eliminar" }))
-    // A mensagem do servidor passa como veio: o que se traduz é o título do toast.
+    // The server's message passes through as it came: what gets translated is the toast's title.
     await waitFor(() => expect(H.toastErro).toHaveBeenCalledWith("No se pudo eliminar la conversación", "servidor fuera"))
   })
 
@@ -554,12 +554,12 @@ describe("em espanhol — Artefatos", () => {
   })
 })
 
-// ── Trocar de idioma com a tela aberta ──────────────────────────────────────
+// ── Switching language with the screen open ─────────────────────────────────
 
 describe("trocar de idioma nas Preferências, com a lista na tela", () => {
   it("a falha que o hook guardou muda de idioma sem recarregar", async () => {
-    // O hook guarda a CHAVE da falha, não a frase: trocar de idioma não
-    // recarrega a lista, e a frase velha ficaria no idioma anterior.
+    // The hook keeps the failure's KEY, not the sentence: switching language does not
+    // reload the list, and the old sentence would stay in the previous language.
     H.getMySchedules.mockResolvedValue(falhou(500))
     montar("en", <AgendamentosLista />, "es")
     expect(await screen.findByText("Couldn’t load schedules.")).toBeTruthy()
@@ -607,7 +607,7 @@ describe("fora da Home, a lista fica inteira em português", () => {
   })
 })
 
-// ── Os compartilhados ───────────────────────────────────────────────────────
+// ── The shared ones ─────────────────────────────────────────────────────────
 
 describe("compartilhados com o painel de administração: sem os textos, o português de sempre", () => {
   it("AvisoAmbar", () => {
@@ -647,7 +647,7 @@ describe("compartilhados com o painel de administração: sem os textos, o portu
       items: [artefato({ id_hash: "art-efe", filename: "temporario.geojson", expires_at: exp })],
       total: 1,
     }))
-    // Sem provider: é a Home em português, com os textos do dicionário.
+    // No provider: it is the Home in Portuguese, with the dictionary's texts.
     render(<SidebarProvider><ArtefatosLista /></SidebarProvider>)
     await acharNome("temporario.geojson")
     const naHome = screen.getByText("expira em 3 dias")

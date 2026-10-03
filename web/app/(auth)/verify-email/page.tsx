@@ -1,18 +1,19 @@
 import { redirect } from "next/navigation";
 import { destinoDaVerificacao } from "@/lib/entrada";
 
-// A tela de "Verifique seu e-mail" virou um painel do modal de entrada da Home
-// (`components/home/entrada/painel-verificar.tsx`). Esta rota fica porque é o
-// que está escrito nos e-mails JÁ ENVIADOS (`auth_router.py` monta
-// `{FRONTEND_URL}/verify-email?token=…` na criação da conta e no reenvio): ela
-// leva o token para a Home, onde o painel o gasta no GET.
+// The "Verifique seu e-mail" (verify your email) screen became a panel of the
+// Home's sign-in modal (`components/home/entrada/painel-verificar.tsx`). This route
+// stays because it is what is written in emails ALREADY SENT (`auth_router.py`
+// builds `{FRONTEND_URL}/verify-email?token=…` on account creation and on resend):
+// it carries the token to the Home, where the panel spends it in the GET.
 //
-// Sem token, cai no mesmo painel sem token — a tela de "abra o link do e-mail",
-// com o reenvio —, que é o que a página mostrava a quem chegava direto.
+// Without a token, it lands on the same panel without a token — the "open the
+// email link" screen, with resend — which is what the page showed to whoever
+// arrived directly.
 //
-// Era a última página do modelo antigo (`AuthShell`) neste fluxo: com ela, todo
-// o caminho de conta (entrar, criar, verificar, esquecer e redefinir a senha)
-// acontece sem sair do globo.
+// It was the last page of the old model (`AuthShell`) in this flow: with it, the
+// whole account path (sign in, sign up, verify, forget and reset the password)
+// happens without leaving the globe.
 export default async function VerifyEmailPage({
   searchParams,
 }: {

@@ -1,6 +1,6 @@
 # app/services/observability_service.py
-# Lógica de negócio e consultas de observabilidade extraídas do router.
-# Contrato com a web: docs/specs/metrics-history.md (§3).
+# Business logic and observability queries extracted from the router.
+# Contract with the web app: docs/specs/metrics-history.md (§3).
 
 import json
 from datetime import datetime, time as dt_time, timedelta, timezone
@@ -24,11 +24,11 @@ from app.models.workspace import Workspace
 
 logger = get_logger(__name__)
 
-# Janela padrao das agregacoes de dashboard. Sem ela, a contagem por status, a
-# media de duracao e o top de falhas varriam workflow_runs INTEIRA a cada
-# abertura da tela — e `avg(duration_seconds)` nao tem indice de suporte nenhum,
-# entao era seq scan garantido, piorando todo mes. Com o recorte, as mesmas
-# contagens passam a caber em ix_wfrun_workspace_time.
+# Default window for the dashboard aggregations. Without it, the per-status count,
+# the average duration and the top failures scanned the ENTIRE workflow_runs on every
+# opening of the screen — and `avg(duration_seconds)` has no supporting index at all,
+# so it was a guaranteed seq scan, getting worse every month. With the cut, the same
+# counts fit in ix_wfrun_workspace_time.
 _METRICS_DEFAULT_DAYS = 90
 
 from app.services.observability.escopo import (  # noqa: F401 — fachada p/ testes e rotas
@@ -64,35 +64,35 @@ class ObservabilityService:
         workflow_id: Optional[str] = None,
         como_admin: bool = False,
     ) -> dict:
-        """Métricas agregadas do dashboard e do Histórico, todas com recorte temporal.
+        """Aggregated metrics for the dashboard and the History, all with a time cut.
 
-        `como_admin` é a visão total (sem filtro de workspace, frota inteira,
-        ACKs atrasados): só a borda que confirmou o papel global a liga —
-        ver `e_admin_global`.
+        `como_admin` is the full view (no workspace filter, entire fleet,
+        late ACKs): only the edge that confirmed the global role turns it on —
+        see `e_admin_global`.
 
-        Eram 8 queries sequenciais, três delas SEM filtro de data nenhum
-        (contagem por status, `avg(duration_seconds)` e top de falhas sobre TODO
-        o histórico). Como nenhum índice cobre `duration_seconds`, a média era um
-        seq scan da tabela inteira a cada abertura da tela — e piorava todo mês,
-        porque `workflow_runs` não tem política de retenção.
+        There used to be 8 sequential queries, three of them with NO date filter at all
+        (per-status count, `avg(duration_seconds)` and top failures over the ENTIRE
+        history). Since no index covers `duration_seconds`, the average was a
+        seq scan of the whole table on every opening of the screen — and it got worse every
+        month, because `workflow_runs` has no retention policy.
 
-        As agregações por status sobre `workflow_runs` cabem numa só, com
-        `count(*) FILTER (WHERE ...)` por recorte. `total_runs` deixou de ser
-        vitalício: é o total DA JANELA, e o `period_days` da resposta existe
-        para a UI rotular isso.
+        The per-status aggregations over `workflow_runs` fit into a single one, with
+        `count(*) FILTER (WHERE ...)` per cut. `total_runs` is no longer
+        lifetime: it is the total OF THE WINDOW, and the response's `period_days` exists
+        so the UI can label that.
 
-        O WHERE dessa query é `max(janela pedida, 14 dias)` porque os recortes de
-        7d/14d moram nos `FILTER` dela: um WHERE de 7 dias tornaria a comparação
-        semana-a-semana matematicamente vazia (ver `janela_where` abaixo). O
-        período anterior de mesmo tamanho (`prev_period`) fica numa query
-        própria em vez de alargar esse WHERE para 2×days: com `days=90` isso
-        dobraria o custo da agregação principal para servir quatro números.
+        This query's WHERE is `max(requested window, 14 days)` because the
+        7d/14d cuts live in its `FILTER`s: a 7-day WHERE would make the
+        week-over-week comparison mathematically empty (see `janela_where` below). The
+        previous period of the same size (`prev_period`) gets a query of its
+        own instead of widening that WHERE to 2×days: with `days=90` that would
+        double the cost of the main aggregation to serve four numbers.
 
-        NÃO usar `asyncio.gather` aqui. Uma `AsyncSession` mapeia para UMA
-        conexão asyncpg, e uma conexão não aceita statements concorrentes: o
-        `gather` que existia antes prometia "8 queries em paralelo" e não
-        entregava paralelismo nenhum — na melhor hipótese o driver serializava
-        (ganho zero), na pior levantava InvalidRequestError sob concorrência.
+        Do NOT use `asyncio.gather` here. An `AsyncSession` maps to ONE
+        asyncpg connection, and a connection does not accept concurrent statements: the
+        `gather` that existed before promised "8 queries in parallel" and delivered
+        no parallelism at all — at best the driver serialized them
+        (zero gain), at worst it raised InvalidRequestError under concurrency.
         """
         run_f, wf_f = await _resolver_escopo(
             db, user, workspace_ids, workspace_id=workspace_id, workflow_id=workflow_id,
@@ -106,9 +106,9 @@ class ObservabilityService:
         if not force:
             cached = await _cache_get(cache_key)
             if cached is not None:
-                # As agregacoes da janela vem do cache; o bloco "now" e o
-                # instante desta consulta e nunca e servido velho — e o que a
-                # faixa Agora consulta a cada 30 s.
+                # The window aggregations come from the cache; the "now" block is the
+                # instant of this query and is never served stale — it is what the
+                # Agora strip queries every 30 s.
                 fresco = dict(cached)
                 fresco["now"] = await _bloco_agora(db, user, run_f, now, como_admin=como_admin)
                 return fresco
@@ -120,17 +120,17 @@ class ObservabilityService:
         since_prev = now - timedelta(days=2 * days)
         prev_7d   = and_(WorkflowRun.start_time >= since_14d, WorkflowRun.start_time < since_7d)
 
-        # O WHERE tem de cobrir o MAIOR dos dois recortes, nao o pedido. Os
-        # contadores de 7d/14d sao `FILTER` DENTRO desta query: com
-        # `?days=7` o WHERE `>= now-7d` interseccionado com o predicado de
-        # prev_7d (`>= now-14d AND < now-7d`) da conjunto vazio, e o dashboard
-        # passava a mostrar `runs_prev_7d: 0` e `success_rate_prev_7d: null`
-        # para sempre — a seta de tendencia sumia em silencio. Com `days=1`,
-        # pior: `runs_last_7d` valia o mesmo que `runs_last_24h`.
+        # The WHERE has to cover the LARGER of the two cuts, not the requested one. The
+        # 7d/14d counters are `FILTER`s INSIDE this query: with
+        # `?days=7` the WHERE `>= now-7d` intersected with the prev_7d
+        # predicate (`>= now-14d AND < now-7d`) gives an empty set, and the dashboard
+        # started showing `runs_prev_7d: 0` and `success_rate_prev_7d: null`
+        # forever — the trend arrow vanished silently. With `days=1`,
+        # worse: `runs_last_7d` was worth the same as `runs_last_24h`.
         janela_where = min(since, since_14d)
-        # ...e os agregados que SAO da janela pedida ganham o recorte de volta
-        # como FILTER, senao `total_runs` inflaria para 14 dias quando o
-        # usuario pediu 7.
+        # ...and the aggregates that DO belong to the requested window get the cut back
+        # as a FILTER, otherwise `total_runs` would inflate to 14 days when the
+        # user asked for 7.
         na_janela = WorkflowRun.start_time >= since
 
         def _na_janela(status: str):
@@ -164,8 +164,8 @@ class ObservabilityService:
             ).where(WorkflowRun.start_time >= janela_where, *run_f)
         )).one()
 
-        # Periodo anterior de mesmo tamanho: [now-2d, now-d). E o que da
-        # sentido a "1.284 execucoes" — muito ou pouco so a comparacao diz.
+        # Previous period of the same size: [now-2d, now-d). It is what gives
+        # meaning to "1,284 runs" — whether that is a lot or a little only the comparison tells.
         no_prev = [WorkflowRun.start_time >= since_prev, WorkflowRun.start_time < since]
         prev = (await db.execute(
             select(
@@ -211,16 +211,16 @@ class ObservabilityService:
             "running_runs":    running_runs,
             "pending_runs":    pending_runs,
             "cancelled_runs":  cancelled_runs,
-            # Concluidas ÷ (concluidas + falhas): em andamento e canceladas
-            # nao sao veredito — com elas no denominador a taxa caia em todo
-            # pico de carga.
+            # Completed ÷ (completed + failed): in-progress and cancelled ones
+            # are not a verdict — with them in the denominator the rate dropped on every
+            # load peak.
             "success_rate":    taxa_de_sucesso(success_runs, failed_runs),
             "avg_duration_seconds": round(float(row.avg_duration or 0.0), 3),
             "runs_last_24h":   row.last_24h or 0,
             "runs_last_7d":    row.last_7d or 0,
             "runs_prev_7d":    runs_prev_7d,
-            # `null` (e nao 0.0) sem denominador: e o que esconde a seta de
-            # tendencia na Visao geral em vez de mostrar "caiu para 0%".
+            # `null` (and not 0.0) with no denominator: it is what hides the trend
+            # arrow in the Overview instead of showing "dropped to 0%".
             "success_rate_prev_7d": (
                 taxa_de_sucesso(prev_7d_ok, prev_7d_falha) if (prev_7d_ok + prev_7d_falha) else None
             ),
@@ -249,37 +249,37 @@ class ObservabilityService:
         *,
         como_admin: bool = False,
     ) -> dict:
-        """Métricas detalhadas de um workflow específico.
+        """Detailed metrics for a specific workflow.
 
-        O resumo por nó vem de `node_run_metrics`, que já guarda o dado
-        normalizado (duration_ms, status, cache_hit, features por nó). Antes
-        este método baixava o JSON `node_stats` das últimas N execuções e
-        reagregava tudo em Python a cada request: o tempo da página passava a
-        depender do TAMANHO dos fluxos executados, e o event loop do worker
-        ficava preso desserializando JSON.
+        The per-node summary comes from `node_run_metrics`, which already stores the
+        normalized data (duration_ms, status, cache_hit, features per node). This
+        method used to download the `node_stats` JSON of the last N runs and
+        re-aggregate everything in Python on every request: the page's time came to
+        depend on the SIZE of the executed workflows, and the worker's event loop
+        was stuck deserializing JSON.
         """
         wf_conditions = [
             Workflow.id_hash == workflow_hash,
             *_wf_filter(user, workspace_ids, como_admin=como_admin),
         ]
 
-        # Só o nome é usado — `select(Workflow)` arrastava junto a `definition`
-        # inteira do fluxo (dezenas de KB) para nada.
+        # Only the name is used — `select(Workflow)` dragged along the workflow's entire
+        # `definition` (tens of KB) for nothing.
         wf_result = await db.execute(select(Workflow.name).where(*wf_conditions))
         workflow_name = wf_result.scalar_one_or_none()
         if workflow_name is None:
             raise _WfNotFound("Workflow não encontrado.")
 
-        # Meta admin (dono + workspace) para exibir no detalhe do workflow.
+        # Admin meta (owner + workspace) to show in the workflow detail.
         admin_meta = {}
         if como_admin:
             meta_map = await _resolve_workflow_meta(db, [workflow_hash])
             admin_meta = meta_map.get(workflow_hash) or {}
 
-        # O acesso ao workflow (acima) não autoriza o histórico: um workflow
-        # movido de workspace carregaria consigo runs produzidos no workspace
-        # anterior. Os runs são filtrados pelo próprio workspace_id — ver
-        # _run_filter, que reusamos para não duplicar a regra.
+        # Access to the workflow (above) does not authorize the history: a workflow
+        # moved between workspaces would carry with it runs produced in the previous
+        # workspace. The runs are filtered by their own workspace_id — see
+        # _run_filter, which we reuse so as not to duplicate the rule.
         runs_result = await db.execute(
             select(*_RUN_LIST_COLUMNS)
             .where(
@@ -314,10 +314,10 @@ class ObservabilityService:
         contexto = await _contexto_dos_runs(db, runs)
         last_runs = [_serialize_run(r, admin=como_admin, **contexto) for r in runs]
 
-        # Resumo por nó: uma agregação em SQL sobre node_run_metrics, restrita
-        # aos run_ids acima (ix_node_metrics_run cobre o IN). Runs cujo executor
-        # não chegou a mandar métricas — falha antes de executar qualquer nó —
-        # simplesmente não têm linha aqui, que é o mesmo que ter node_stats vazio.
+        # Per-node summary: one SQL aggregation over node_run_metrics, restricted
+        # to the run_ids above (ix_node_metrics_run covers the IN). Runs whose executor
+        # never sent metrics — failure before executing any node —
+        # simply have no row here, which is the same as having empty node_stats.
         run_ids = [r.task_id for r in runs if r.task_id]
         node_stats_summary: list[dict] = []
         if run_ids:
@@ -359,8 +359,8 @@ class ObservabilityService:
             "workflow_name":         workflow_name,
             "total_runs":            total,
             "failed_runs":           failed,
-            # A mesma taxa das outras telas. Era `(total - failed) / total`, que
-            # contava em andamento e canceladas como sucesso.
+            # The same rate as the other screens. It was `(total - failed) / total`, which
+            # counted in-progress and cancelled runs as successes.
             "success_rate":          taxa_de_sucesso(success, failed),
             "avg_duration_seconds":  round(sum(durations) / len(durations), 3) if durations else 0.0,
             "min_duration_seconds":  round(min(durations), 3) if durations else None,
@@ -381,16 +381,16 @@ class ObservabilityService:
         workspace_id: Optional[str] = None,
         como_admin: bool = False,
     ) -> dict:
-        """Visao "Por workflow" (spec §3.3): TODOS os workflows acessiveis, com
-        zeros para os que nao rodaram na janela — a lista e um inventario, e um
-        workflow ativo que nunca roda e informacao, nao ausencia.
+        """The "Por workflow" (per workflow) view (spec §3.3): ALL accessible workflows, with
+        zeros for those that did not run in the window — the list is an inventory, and an
+        active workflow that never runs is information, not absence.
 
-        Quatro consultas, nenhuma por linha: o inventario (workflows +
-        workspace), a agregacao por `workflow_hash` na janela, a mediana por
-        workflow e a ultima execucao de cada um (funcao de janela). A "ultima"
-        e a ultima DA JANELA: buscar a ultima vitalicia de cada workflow e uma
-        varredura do escopo inteiro a cada abertura, e o periodo governa todos
-        os blocos da tela.
+        Four queries, none per row: the inventory (workflows +
+        workspace), the aggregation by `workflow_hash` in the window, the median per
+        workflow and each one's last run (window function). The "last"
+        is the last one IN THE WINDOW: fetching each workflow's lifetime last one is a
+        scan of the whole scope on every opening, and the period governs all
+        the blocks of the screen.
         """
         run_f, wf_f = await _resolver_escopo(
             db, user, workspace_ids, workspace_id=workspace_id, como_admin=como_admin,
@@ -438,9 +438,9 @@ class ObservabilityService:
         medianas = await _percentis_por(db, WorkflowRun.workflow_hash, na_janela, [0.5])
         com_execucao = list(agregados)
         ultimas = await _ultima_execucao_por_workflow(db, na_janela, workflow_hashes=com_execucao, com_erro=False)
-        # "Ultimo erro" e o da ultima FALHA, como no top de falhas e na lista de
-        # atencao — a ultima execucao pode ter concluido e o workflow ainda
-        # assim ter dezenas de falhas na janela.
+        # "Last error" is that of the last FAILURE, as in the top failures and the
+        # attention list — the last run may have completed and the workflow still
+        # have dozens of failures in the window.
         com_falha = [h for h, row in agregados.items() if (row.failed or 0) > 0]
         ultimas_falhas = (
             await _ultima_execucao_por_workflow(
@@ -461,8 +461,8 @@ class ObservabilityService:
                 "workspace_id":   wf.workspace_id,
                 "workspace_name": wf.workspace_name,
                 "active":         bool(wf.flag_ative),
-                # Quem criou o fluxo ("usuario" | "assistente") — o selo da
-                # lista. Nao confundir com `trigger_source`, que e o disparo.
+                # Who created the workflow ("usuario" | "assistente") — the list's
+                # badge. Not to be confused with `trigger_source`, which is the trigger.
                 "origem":         wf.origem,
                 "total_runs":     (agg.total or 0) if agg else 0,
                 "success_runs":   success,
@@ -493,18 +493,18 @@ class ObservabilityService:
         workspace_id: Optional[str] = None,
         como_admin: bool = False,
     ) -> dict:
-        """Estatísticas por executor, na janela de `days` (spec §3.4).
+        """Per-executor statistics, in the `days` window (spec §3.4).
 
-        Eram DUAS agregações completas sobre `workflow_runs` (`GROUP BY host` e
-        `GROUP BY host, status`) sem recorte de data nenhum — dois seq scans +
-        hash aggregate por request, já que não havia índice em `host`. Agora é
-        uma query só, com os contadores por status em `FILTER`, limitada pela
-        janela (que cabe em ix_wfrun_workspace_time) e servida do mesmo cache
-        curto de `get_metrics`.
+        There used to be TWO full aggregations over `workflow_runs` (`GROUP BY host` and
+        `GROUP BY host, status`) with no date cut at all — two seq scans +
+        hash aggregate per request, since there was no index on `host`. Now it is
+        a single query, with the per-status counters in `FILTER`, bounded by the
+        window (which fits in ix_wfrun_workspace_time) and served from the same short
+        cache as `get_metrics`.
 
-        A frota entra inteira: executores online do escopo que nao rodaram
-        nada na janela aparecem com zeros, senao a visao "Por executor" so
-        mostraria quem trabalhou e esconderia justamente o ocioso.
+        The whole fleet goes in: online executors in scope that ran
+        nothing in the window appear with zeros, otherwise the "Por executor" view would
+        only show who worked and would hide precisely the idle ones.
         """
         run_f, _ = await _resolver_escopo(
             db, user, workspace_ids, workspace_id=workspace_id, como_admin=como_admin,
@@ -540,9 +540,9 @@ class ObservabilityService:
             e["id_hash"]: e
             for e in await _executores_do_escopo(db, user, como_admin=como_admin)
         }
-        # Hosts com execucao que nao estao na frota do escopo (executor
-        # removido de um workspace, inativado, ou fora do acesso do usuario)
-        # ainda precisam de nome — um SELECT IN para todos eles.
+        # Hosts with runs that are not in the scope's fleet (executor
+        # removed from a workspace, deactivated, or outside the user's access)
+        # still need a name — one SELECT IN for all of them.
         ids_da_frota = list(frota.keys())
         ids_com_runs = [_executor_id_do_host(row.host) for row in rows if _executor_id_do_host(row.host)]
         faltantes = [i for i in ids_com_runs if i not in frota]
@@ -559,9 +559,9 @@ class ObservabilityService:
                     "is_default": bool(r.is_default), "status": r.status,
                 }
 
-        # Presenca e capacidade SO da frota acessivel: quem rodou uma execucao
-        # do usuario e depois saiu do escopo aparece com nome, mas o estado
-        # atual dele (online, fila) nao e informacao do usuario.
+        # Presence and capacity ONLY for the accessible fleet: an executor that ran one of
+        # the user's runs and then left the scope shows up with a name, but its
+        # current state (online, queue) is not the user's information.
         online, capacidade = await _presenca(ids_da_frota)
 
         def _linha(host: Optional[str], executor_id: Optional[str], row) -> dict:
@@ -585,8 +585,8 @@ class ObservabilityService:
                 "status":         info["status"] if info else None,
                 "online":         bool(online.get(executor_id)) if executor_id else False,
                 "capacity":       capacidade.get(executor_id) if executor_id else None,
-                # Runs sem host sao falhas de despacho (nenhum executor
-                # chegou a receber o job) — a tela precisa dessa distincao.
+                # Runs without a host are dispatch failures (no executor
+                # ever received the job) — the screen needs that distinction.
                 "unassigned":     host is None,
                 "total_runs":     total,
                 "success_runs":   success,
@@ -634,35 +634,35 @@ class ObservabilityService:
         with_total: bool = False,
         como_admin: bool = False,
     ) -> dict:
-        """Lista execuções paginada com filtros.
+        """Lists runs, paginated, with filters.
 
-        O `COUNT(*)` completo saiu do caminho padrão: ele não usa LIMIT, cresce
-        com a tabela e era pago em TODA página — inclusive no polling de runs
-        ativos, que roda a cada 10s em toda tela do dashboard. Agora só é
-        calculado com `with_total=True` (a UI pede na primeira página, para o
-        rótulo "N execuções"); a navegação usa `has_more`, obtido pedindo
-        `limit + 1` linhas e descartando a sobra.
+        The full `COUNT(*)` left the default path: it does not use LIMIT, grows
+        with the table and was paid on EVERY page — including the polling of active
+        runs, which runs every 10s on every dashboard screen. Now it is only
+        computed with `with_total=True` (the UI asks for it on the first page, for the
+        "N execuções" label); navigation uses `has_more`, obtained by requesting
+        `limit + 1` rows and discarding the extra one.
 
-        A busca `q` e a unica coisa que junta `workflows` a esta query (para
-        casar o nome), e so quando presente: no caminho comum a listagem
-        continua sendo um scan de indice em `workflow_runs` apenas.
+        The `q` search is the only thing that joins `workflows` to this query (to
+        match the name), and only when present: on the common path the listing
+        is still just an index scan on `workflow_runs`.
 
-        `workflow_origem` filtra pela origem do FLUXO ("usuario" |
-        "assistente" — quem criou o workflow, nao quem disparou o run; o
-        disparo e `trigger_source`). E o chip "Assistente" do Historico.
-        Como `q`, precisa do join com `workflows`; runs de workflows deletados
-        permanentemente ficam de fora do recorte, que e sobre fluxos vivos.
+        `workflow_origem` filters by the WORKFLOW's origin ("usuario" |
+        "assistente" — who created the workflow, not who triggered the run; the
+        trigger is `trigger_source`). It is the History's "Assistente" chip.
+        Like `q`, it needs the join with `workflows`; runs of permanently deleted
+        workflows are left out of the slice, which is about live workflows.
 
-        `q_inclui_erro=False` tira `error_message` do `or_` da busca, deixando
-        so o nome do workflow e o `task_id`. Existe para o chamador que NAO
-        entrega a mensagem de erro como ela esta no banco: o servidor MCP so a
-        publica depois de `scrub_text`, e um filtro de substring sobre a coluna
-        bruta devolveria o mesmo texto por outro canal, em forma de sim/nao —
-        quem chama repete a consulta estendendo o prefixo (`...:a` sem
-        resultado, `...:b` sem resultado, `...:S` com um item) e recupera
-        caractere a caractere justamente o que a redacao apagou. O default e
-        `True` porque a REST mostra a mensagem inteira na tela: ali a busca nao
-        revela nada que a propria resposta ja nao traga.
+        `q_inclui_erro=False` removes `error_message` from the search's `or_`, leaving
+        only the workflow name and the `task_id`. It exists for the caller that does NOT
+        hand out the error message as it is in the database: the MCP server only
+        publishes it after `scrub_text`, and a substring filter on the raw
+        column would return the same text through another channel, as yes/no —
+        the caller repeats the query extending the prefix (`...:a` with no
+        result, `...:b` with no result, `...:S` with one item) and recovers,
+        character by character, exactly what the redaction erased. The default is
+        `True` because REST shows the whole message on screen: there the search
+        reveals nothing the response itself does not already carry.
         """
         filters, _ = await _resolver_escopo(
             db, user, workspace_ids, workspace_id=workspace_id, workflow_id=workflow_id,
@@ -692,7 +692,7 @@ class ObservabilityService:
         if busca:
             alvos = [
                 contem(Workflow.name, busca),
-                # O id colado do botao "Copiar ID" do painel tambem acha a execucao.
+                # The id pasted from the panel's "Copiar ID" (copy ID) button also finds the run.
                 contem(WorkflowRun.task_id, busca),
             ]
             if q_inclui_erro:
@@ -728,8 +728,8 @@ class ObservabilityService:
         contexto = await _contexto_dos_runs(db, runs)
 
         return {
-            # `null` quando o cliente não pediu `with_total` — a UI usa
-            # `has_more` para decidir se ainda há o que carregar.
+            # `null` when the client did not ask for `with_total` — the UI uses
+            # `has_more` to decide whether there is still more to load.
             "total":    total,
             "has_more": has_more,
             "limit":  limit,
@@ -749,14 +749,14 @@ class ObservabilityService:
         *,
         como_admin: bool = False,
     ) -> dict:
-        """Detalhes de uma execução específica."""
-        # Acesso pelo workspace DO RUN, não pelo do workflow: o workflow pode ter
-        # sido movido depois desta execução, e o histórico pertence a quem tinha
-        # acesso a ele quando aconteceu. A regra vem de `_run_filter`, a mesma
-        # que a listagem e as métricas usam — reescrevê-la em Python aqui daria
-        # duas formulações do mesmo critério. Aplicada na query, "sem acesso" e
-        # "não existe" caem no mesmo 404, que é o comportamento desejado: um 403
-        # confirmaria a existência do run.
+        """Details of a specific run."""
+        # Access by the RUN's workspace, not the workflow's: the workflow may have
+        # been moved after this run, and the history belongs to whoever had
+        # access to it when it happened. The rule comes from `_run_filter`, the same
+        # one the listing and the metrics use — rewriting it in Python here would give
+        # two formulations of the same criterion. Applied in the query, "no access" and
+        # "does not exist" fall into the same 404, which is the desired behavior: a 403
+        # would confirm the run's existence.
         run_f = _run_filter(user, workspace_ids, como_admin=como_admin)
 
         run_result = await db.execute(
@@ -775,12 +775,12 @@ class ObservabilityService:
 
         contexto = await _contexto_dos_runs(db, [run])
 
-        # A mediana de 90 dias (typical_seconds) so importa quando o run TERMINOU:
-        # ela existe para o painel dizer "levou 8 min; costuma levar 40 s".
-        # Enquanto o run corre, o cliente faz poll (run_workflow instrui "acompanhe
-        # com get_run") e recomputar o percentil de 90 dias a cada poll era um scan
-        # por chamada sem valor — a comparacao ainda nem faz sentido. So computa em
-        # status terminal (nao-ATIVO).
+        # The 90-day median (typical_seconds) only matters once the run has FINISHED:
+        # it exists so the panel can say "took 8 min; usually takes 40 s".
+        # While the run is going, the client polls (run_workflow instructs "follow
+        # with get_run") and recomputing the 90-day percentile on every poll was a scan
+        # per call with no value — the comparison does not even make sense yet. Only computes
+        # on a terminal (non-ACTIVE) status.
         tipicos: dict = {}
         if run.status not in _STATUS_ATIVOS:
             tipicos = await _p50_por_workflow(db, [run.workflow_hash], _agora_utc())
@@ -789,8 +789,8 @@ class ObservabilityService:
             run, include_workflow_hash=True, include_node_stats=True,
             admin=como_admin, **contexto,
         )
-        # Mediana do workflow nos ultimos 90 dias: e o que permite ao painel
-        # dizer "levou 8 min; costuma levar 40 s". None enquanto o run nao termina.
+        # The workflow's median over the last 90 days: it is what lets the panel
+        # say "took 8 min; usually takes 40 s". None while the run has not finished.
         detalhe["typical_seconds"] = tipicos.get(run.workflow_hash) if isinstance(run.workflow_hash, str) else None
         return detalhe
 
@@ -803,16 +803,16 @@ class ObservabilityService:
         *,
         como_admin: bool = False,
     ) -> dict:
-        """Eventos brutos de uma execução, na ordem em que foram publicados.
+        """Raw events of a run, in the order they were published.
 
-        Mesma lista que o WebSocket reproduz ao (re)conectar — aqui exposta por
-        HTTP para que o painel de execução consiga abrir o log de um run que já
-        terminou. Sem isto, fechar o workflow apagava o log para sempre: a store
-        do frontend é volátil e a página de observabilidade só tem node_stats.
+        The same list the WebSocket replays on (re)connecting — exposed here over
+        HTTP so the execution panel can open the log of a run that has already
+        finished. Without this, closing the workflow erased the log forever: the
+        frontend store is volatile and the observability page only has node_stats.
 
-        O histórico vive no Redis com TTL de 1h; passado esse prazo devolvemos
-        lista vazia com `expired=True` para o painel dizer "o log expirou" em
-        vez de "não houve saída".
+        The history lives in Redis with a 1h TTL; after that we return an
+        empty list with `expired=True` so the panel says "the log expired" instead
+        of "there was no output".
         """
         eventos, _ = await ObservabilityService.get_run_events_com_detalhe(
             db, run_id, user, workspace_ids, como_admin=como_admin,
@@ -828,23 +828,23 @@ class ObservabilityService:
         *,
         como_admin: bool = False,
     ) -> tuple[dict, dict]:
-        """Os eventos MAIS o detalhe do run que os autorizou.
+        """The events PLUS the detail of the run that authorized them.
 
-        Existe para quem precisa dos dois — hoje a tool `get_run_events` do MCP,
-        que usa status e datas do run para dizer se a lista vazia é "expirou",
-        "ainda rodando" ou "não houve saída". Sem isto, ela carregava o detalhe
-        por fora e o serviço carregava de novo por dentro: `get_run_detail` não
-        tem cache e faz de 3 a 6 consultas (entre elas um join de três tabelas e
-        um percentil sobre janela de 90 dias), então eram de 6 a 12 idas ao
-        banco por chamada, metade desperdício.
+        It exists for whoever needs both — today the MCP `get_run_events` tool,
+        which uses the run's status and dates to say whether the empty list is "expired",
+        "still running" or "there was no output". Without this, it loaded the detail
+        from outside and the service loaded it again inside: `get_run_detail` has no
+        cache and does 3 to 6 queries (among them a three-table join and
+        a percentile over a 90-day window), so it was 6 to 12 database round trips
+        per call, half of them waste.
 
-        Não há parâmetro para "pular a autorização" de propósito: quem chama
-        recebe o detalhe que ESTE método autorizou, em vez de poder entregar um
-        detalhe de outra procedência. A economia é a mesma e não abre caminho
-        para um IDOR por argumento mal passado.
+        There is deliberately no parameter to "skip authorization": the caller
+        receives the detail THIS method authorized, instead of being able to pass in a
+        detail of other provenance. The savings are the same and it does not open a path
+        to an IDOR through a badly passed argument.
         """
-        # Reusa a checagem de acesso do detalhe — levanta RunNotFoundError se o
-        # run não existe ou não pertence ao(s) workspace(s) do usuário.
+        # Reuses the detail's access check — raises RunNotFoundError if the
+        # run does not exist or does not belong to the user's workspace(s).
         detalhe = await ObservabilityService.get_run_detail(
             db, run_id, user, workspace_ids, como_admin=como_admin,
         )
@@ -852,14 +852,14 @@ class ObservabilityService:
         from app.core.redis import get_redis_pool
         from app.services.run_events_service import chave_do_historico
 
-        # A chave sai do `task_id` CANÔNICO do run, nunca do que o chamador
-        # digitou. `get_run_detail` resolve também pelo id NUMÉRICO da linha
-        # (ver o ramo `run_id.isdigit()` acima), e a chave do histórico é
-        # `workflow:{task_id}:history`. Usar o cru autorizava um run e lia a
-        # chave de outro: `GET /observability/runs/123/events` respondia 200 com
-        # `expired: true` e o log inteiro vivo sob a outra chave. Não é
-        # vazamento — as chaves são escritas com uuid e um número nunca colide —,
-        # é resposta silenciosamente errada, que é o pior tipo de log ausente.
+        # The key comes from the run's CANONICAL `task_id`, never from what the caller
+        # typed. `get_run_detail` also resolves by the row's NUMERIC id
+        # (see the `run_id.isdigit()` branch above), and the history key is
+        # `workflow:{task_id}:history`. Using the raw value authorized one run and read the
+        # key of another: `GET /observability/runs/123/events` answered 200 with
+        # `expired: true` and the whole log alive under the other key. It is not a
+        # leak — the keys are written with a uuid and a number never collides —,
+        # it is a silently wrong response, which is the worst kind of missing log.
         alvo = str(detalhe.get("run_id") or run_id)
 
         history_key = chave_do_historico(alvo)
@@ -890,19 +890,19 @@ class ObservabilityService:
         tz: str = "UTC",
         como_admin: bool = False,
     ) -> dict:
-        """Contagem de execuções por dia para o gráfico (spec §3.2).
+        """Run count per day for the chart (spec §3.2).
 
-        O dia e cortado no fuso pedido — para quem esta em Cuiaba, uma
-        execucao das 22h nao pode aparecer no dia seguinte so porque em UTC ja
-        era 2h. A janela comeca a meia-noite LOCAL de `days - 1` dias atras,
-        para o grafico ter exatamente `days` barras de dias inteiros (a ultima
-        e hoje, ate agora); e todos os dias saem, com zeros, porque um dia sem
-        execucao e informacao e a barra ausente parecia um buraco no eixo.
+        The day is cut in the requested time zone — for someone in Cuiaba, a
+        run at 10 p.m. cannot show up on the next day just because in UTC it was already
+        2 a.m. The window starts at LOCAL midnight `days - 1` days ago,
+        so the chart has exactly `days` bars of whole days (the last one
+        is today, up to now); and every day comes out, with zeros, because a day without
+        runs is information and the missing bar looked like a hole in the axis.
 
-        No PostgreSQL o corte e `start_time AT TIME ZONE tz` (a funcao
-        `timezone()`), agrupado no banco. Fora dele (SQLite, nos testes e no
-        harness) projeta so `(start_time, status)` da janela e agrupa em
-        Python — o antigo `CAST(start_time AS DATE)` devolvia o ANO no SQLite.
+        On PostgreSQL the cut is `start_time AT TIME ZONE tz` (the
+        `timezone()` function), grouped in the database. Elsewhere (SQLite, in tests and the
+        harness) it projects only `(start_time, status)` of the window and groups in
+        Python — the old `CAST(start_time AS DATE)` returned the YEAR on SQLite.
         """
         zona = _zona(tz)
         run_f, _ = await _resolver_escopo(

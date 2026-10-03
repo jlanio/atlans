@@ -1,40 +1,41 @@
 # executor/requirements.in
-# Dependências mínimas do executor Atlas (cliente autônomo, instalação manual
-# pela CLI). Edite AQUI; o executor/requirements.txt é gerado daqui, travado e
-# com o hash de cada arquivo (python scripts/travar_python.py). É ele que se
-# instala — `pip install -r executor/requirements.txt`, de preferência num venv;
-# o pip confere os hashes sozinho.
+# Minimal dependencies of the Atlas executor (standalone client, manual
+# installation via the CLI). Edit HERE; executor/requirements.txt is generated
+# from this, locked and with each file's hash (python scripts/travar_python.py).
+# That is what gets installed — `pip install -r executor/requirements.txt`,
+# preferably in a venv; pip checks the hashes on its own.
 #
-# Antes eram pisos (>=), e cada máquina baixava a versão mais nova de tudo na
-# hora da instalação: sem revisão e sem quarentena, a porta de entrada de uma
-# versão maliciosa recém-publicada. Agora as versões vêm do lock completo: o
-# script compila este arquivo com `--constraint executor/requirements-full.txt`
-# (pela linha de comando, e não num `-c` aqui, por causa do Dependabot — ver
-# PARES em scripts/travar_python.py). São as mesmas do Docker e do app desktop,
-# e só mudam por PR.
+# These used to be floors (>=), and each machine downloaded the newest version
+# of everything at install time: no review and no quarantine, the entry point
+# for a freshly published malicious version. Now the versions come from the
+# full lock: the script compiles this file with
+# `--constraint executor/requirements-full.txt` (on the command line, and not
+# via a `-c` here, because of Dependabot — see PARES in
+# scripts/travar_python.py). They are the same as Docker's and the desktop
+# app's, and only change through a PR.
 
 # WebSocket client
 websockets
 
-# HTTP client assíncrono (autenticação + registro de chave)
+# Async HTTP client (authentication + key registration)
 httpx
 
-# Certificados CA (resolve SSL no macOS onde Python não usa o keychain do sistema)
+# CA certificates (fixes SSL on macOS where Python doesn't use the system keychain)
 certifi
 
 # Criptografia (X25519, Ed25519, AES-256-GCM, HKDF)
 cryptography
 
-# Variáveis de ambiente
+# Environment variables
 python-dotenv
 
-# Métricas de sistema (CPU, RAM, disco)
+# System metrics (CPU, RAM, disk)
 psutil
 
-# Painel ao vivo no terminal. Opcional na prática: sem ele o executor sobe
-# normalmente e mantém o log linha a linha (ver EXECUTOR_DASHBOARD no README).
+# Live dashboard in the terminal. Optional in practice: without it the executor
+# starts normally and keeps the line-by-line log (see EXECUTOR_DASHBOARD in the README).
 rich
 
-# Flow engine (instalado via pip install -e . na raiz do repo)
-# ou via PYTHONPATH apontando para a raiz
+# Flow engine (installed via pip install -e . at the repo root)
+# or via PYTHONPATH pointing to the root
 OWSLib

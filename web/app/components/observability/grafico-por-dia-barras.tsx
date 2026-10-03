@@ -9,9 +9,9 @@ import { formatarDiaCurto, formatarInteiro, plural } from "@/lib/formatos"
 import { SERIES } from "./grafico-por-dia"
 
 /**
- * O corpo Recharts do gráfico por dia. Vive num módulo próprio para entrar
- * pelo `dynamic()` de `grafico-por-dia.tsx`: importado estaticamente, os
- * ~250 KB da lib iriam para o first-load da rota.
+ * The Recharts body of the per-day chart. It lives in its own module so it
+ * comes in through the `dynamic()` of `grafico-por-dia.tsx`: statically
+ * imported, the lib's ~250 KB would go into the route's first load.
  */
 
 type ChaveDaSerie = typeof SERIES[number]["chave"]
@@ -19,7 +19,7 @@ const ROTULO: Record<string, string> = Object.fromEntries(SERIES.map(s => [s.cha
 
 type Ponto = { day: string; total: number } & Record<ChaveDaSerie, number>
 
-/** Quantos rótulos pular no eixo X para caber ~7 por gráfico. */
+/** How many labels to skip on the X axis to fit ~7 per chart. */
 export function intervaloDosTicks(n: number): number {
   return Math.max(0, Math.ceil(n / 7) - 1)
 }
@@ -54,8 +54,8 @@ function GraficoPorDiaBarrasImpl({ dias }: { dias: IRunsByDay[] }) {
     running: d.running,
     cancelled: d.cancelled ?? 0,
   }))
-  // `initialDimension`: na primeira pintura o contêiner ainda não foi medido
-  // e o Recharts avisava "width(-1) and height(-1)" no console.
+  // `initialDimension`: on the first paint the container has not been measured
+  // yet and Recharts warned "width(-1) and height(-1)" in the console.
   return (
     <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 640, height: 220 }}>
       <BarChart data={pontos} margin={{ top: 4, right: 4, left: -16, bottom: 0 }} barCategoryGap="25%">
@@ -75,11 +75,11 @@ function GraficoPorDiaBarrasImpl({ dias }: { dias: IRunsByDay[] }) {
           tickLine={false}
         />
         <Tooltip content={<DicaDoDia />} cursor={{ fill: "var(--accent)", opacity: 0.5 }} />
-        {/* A legenda é a do cabeçalho do card (texto, em `grafico-por-dia.tsx`);
-            duplicá-la aqui só roubava altura do gráfico no telefone. */}
-        {/* Sem animação: trocar de período redesenha com os dados novos, sem
-            as barras "crescerem" de novo — e o poll da faixa Agora não passa
-            por aqui, então nada reanima sozinho. */}
+        {/* The legend is the one in the card header (text, in `grafico-por-dia.tsx`);
+            duplicating it here only stole height from the chart on the phone. */}
+        {/* No animation: switching periods redraws with the new data, without
+            the bars "growing" again — and the Now strip's poll does not go
+            through here, so nothing re-animates on its own. */}
         {SERIES.map(s => (
           <Bar key={s.chave} dataKey={s.chave} stackId="dia" fill={s.cor} isAnimationActive={false} />
         ))}

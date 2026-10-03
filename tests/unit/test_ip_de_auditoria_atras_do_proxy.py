@@ -1,30 +1,30 @@
 # tests/unit/test_ip_de_auditoria_atras_do_proxy.py
 """
-IP real do cliente nos registros de auditoria e telemetria.
+Real client IP in the audit and telemetry records.
 
-Dois campos gravavam `client.host` cru:
+Two fields stored the raw `client.host`:
 
-  consumed_from_ip     trilha de auditoria do enrollment de executor
-  RunMetrics.executor_ip  telemetria de qual maquina rodou o job
+  consumed_from_ip     audit trail of the executor enrollment
+  RunMetrics.executor_ip  telemetry of which machine ran the job
 
-Atras do Traefik, `client.host` e o IP do PROXY para todo mundo. Os dois campos
-registravam sempre o mesmo endereco — a trilha de auditoria do enrollment nao
-distinguia nada, e a telemetria dizia que a frota inteira vinha de uma maquina
-so. `app/core/trusted_proxy.get_client_ip` ja existia e a docstring dele nomeia
-exatamente esse problema.
+Behind Traefik, `client.host` is the PROXY's IP for everyone. Both fields
+always recorded the same address — the enrollment audit trail distinguished
+nothing, and the telemetry said the whole fleet came from a single machine.
+`app/core/trusted_proxy.get_client_ip` already existed and its docstring names
+exactly this problem.
 
-Duas propriedades importam, e a segunda e a que impede a correcao de virar um
-buraco novo:
+Two properties matter, and the second is the one that keeps the fix from
+becoming a new hole:
 
-  RESOLVE     atras de proxy CONFIAVEL, vale o primeiro IP do X-Forwarded-For.
-  NAO FORJA   vindo de peer NAO confiavel, o header e ignorado — senao qualquer
-              cliente trocaria de identidade a cada request e a "auditoria"
-              passaria a registrar o que o auditado quisesse.
+  RESOLVE     behind a TRUSTED proxy, the first IP of X-Forwarded-For wins.
+  NAO FORJA   (no forging) from an UNtrusted peer, the header is ignored — otherwise
+              any client would switch identity on every request and the "audit"
+              would record whatever the audited party wanted.
 
-E uma terceira, especifica da coluna:
+And a third, specific to the column:
 
-  NULL        `executor_ip` e nullable. Sem peer, o valor tem de continuar NULL
-              e nao virar a string "unknown", que parece um dado e nao e.
+  NULL        `executor_ip` is nullable. Without a peer, the value must stay NULL
+              and not become the string "unknown", which looks like data and isn't.
 """
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ import pytest
 
 @pytest.fixture
 def proxy_confiavel(monkeypatch):
-    """Recarrega trusted_proxy com uma rede confiavel configurada."""
+    """Reloads trusted_proxy with a trusted network configured."""
     monkeypatch.setenv("TRUSTED_PROXIES", "172.16.0.0/12")
     import app.core.trusted_proxy as tp
     importlib.reload(tp)
@@ -44,7 +44,7 @@ def proxy_confiavel(monkeypatch):
     importlib.reload(tp)
 
 
-# ── RESOLVE / NAO FORJA ──────────────────────────────────────────────────────
+# ── RESOLVE / NAO FORJA (no forging) ─────────────────────────────────────────
 
 def test_atras_de_proxy_confiavel_usa_o_forwarded_for(proxy_confiavel):
     ip = proxy_confiavel.get_client_ip("172.18.0.5", "203.0.113.9, 172.18.0.5")
@@ -52,7 +52,7 @@ def test_atras_de_proxy_confiavel_usa_o_forwarded_for(proxy_confiavel):
 
 
 def test_peer_nao_confiavel_nao_pode_forjar_o_header(proxy_confiavel):
-    """Sem esta guarda, o auditado escolheria o que a auditoria registra."""
+    """Without this guard, the audited party would choose what the audit records."""
     ip = proxy_confiavel.get_client_ip("198.51.100.7", "203.0.113.9")
     assert ip == "198.51.100.7"
 
@@ -61,10 +61,10 @@ def test_sem_forwarded_for_cai_no_peer(proxy_confiavel):
     assert proxy_confiavel.get_client_ip("172.18.0.5", None) == "172.18.0.5"
 
 
-# ── Os dois sitios de fato usam o helper ─────────────────────────────────────
+# ── Both call sites actually use the helper ──────────────────────────────────
 
 def test_enrollment_resolve_o_ip_pelo_helper():
-    """`consumed_from_ip` nao pode voltar a ser o IP do Traefik."""
+    """`consumed_from_ip` must not go back to being Traefik's IP."""
     import inspect
     from app.api.routers import executores_router as mod
 
@@ -87,7 +87,7 @@ def test_registro_de_executor_resolve_o_ip_pelo_helper():
 # ── NULL ─────────────────────────────────────────────────────────────────────
 
 def test_executor_ip_continua_NULL_quando_nao_ha_peer(proxy_confiavel):
-    """A coluna e nullable de proposito: 'unknown' parece um valor e nao e."""
+    """The column is nullable on purpose: 'unknown' looks like a value and isn't."""
     import inspect
     from app.core import executor_connections as mod
 
@@ -98,12 +98,12 @@ def test_executor_ip_continua_NULL_quando_nao_ha_peer(proxy_confiavel):
 
 
 def test_helper_devolve_unknown_apenas_sem_host(proxy_confiavel):
-    """Documenta por que o `if ws.client` externo e necessario."""
+    """Documents why the outer `if ws.client` is necessary."""
     assert proxy_confiavel.get_client_ip(None, None) == "unknown"
 
 
 def test_ipv6_com_zona_no_forwarded_for_e_pulado(proxy_confiavel):
-    """A zona (`%eth0`) é texto livre, sem limite de tamanho: estourava o
-    VARCHAR(45) das colunas de IP. Não é endereço de cliente na internet."""
+    """The zone (`%eth0`) is free text, with no size limit: it overflowed the
+    VARCHAR(45) of the IP columns. It is not a client address on the internet."""
     ip = proxy_confiavel.get_client_ip("172.18.0.5", "203.0.113.9, fe80::1%" + "A" * 200)
     assert ip == "203.0.113.9"

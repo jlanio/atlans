@@ -36,21 +36,21 @@ class PortalSettingsSchema(BaseModel):
     portal_shared_with: Optional[List[str]] = None
 
 def _recusar_segredo(definition: Any, *, schema: bool = False) -> None:
-    """Recusa definition que traga segredo LITERAL gravado.
+    """Rejects a definition that carries a LITERAL secret written into it.
 
-    Credencial mora em `credentials`, cifrada; a definition guarda o
-    `credential_id` e o servidor injeta o valor numa CÓPIA no despacho
-    (`credential_resolver`). Um segredo escrito aqui ficaria cifrado no banco,
-    mas já teria viajado por transporte e log — e a redação da saída o
-    apagaria depois, dando a falsa impressão de que ele não está lá.
+    A credential lives in `credentials`, encrypted; the definition stores the
+    `credential_id` and the server injects the value into a COPY at dispatch
+    (`credential_resolver`). A secret written here would be encrypted in the database,
+    but it would already have traveled through transport and logs — and output
+    redaction would erase it later, giving the false impression that it is not there.
 
-    A borda do servidor MCP já recusava (`app/mcp/tools/construcao.py`); a REST,
-    que é por onde o editor grava, não. Levantamento em produção (2026-09-14):
-    286 nós, 56 com `credential_id`, ZERO segredos gravados — a recusa torna
-    invariante um estado que já era verdade por convenção.
+    The MCP server's edge already rejected it (`app/mcp/tools/construcao.py`); REST,
+    which is where the editor saves, did not. Production survey (2026-09-14):
+    286 nodes, 56 with `credential_id`, ZERO saved secrets — the refusal makes
+    invariant a state that was already true by convention.
 
-    Cita o CAMINHO do campo e nunca o valor: a mensagem de recusa não pode ser
-    o vazamento que ela evita.
+    Cites the field's PATH and never the value: the refusal message cannot be
+    the leak it prevents.
     """
     caminhos = (
         params_schema_contem_segredo(definition) if schema
@@ -76,42 +76,42 @@ async def create_workflow(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
-    # O workspace vem do corpo, não do path: por isso a checagem é aqui, e não
-    # na dependência `workflow_com_papel` das rotas `/{id_hash}`.
+    # The workspace comes from the body, not the path: that is why the check is here, and not
+    # in the `workflow_com_papel` dependency of the `/{id_hash}` routes.
     await exigir_papel_no_workspace(
         db, payload.workspace_id, current_user.id_hash, ROLE_EDITOR,
         "Requer role 'editor' ou superior para criar workflows.",
     )
 
     _recusar_segredo(payload.definition)
-    # `params_schema` e coluna irma, gravavel no mesmo corpo, e — diferente da
-    # definition — NAO passa por `encrypt_workflow_connections`: vai crua para o
-    # banco. A saida do MCP ja redige `params_schema.token`, entao deixa-la fora
-    # da guarda quebraria a regra do proprio modulo de redacao: a deteccao nao
-    # pode ser mais estreita que a entrega.
+    # `params_schema` is a sibling column, writable in the same body, and — unlike the
+    # definition — it does NOT go through `encrypt_workflow_connections`: it goes raw to
+    # the database. MCP output already redacts `params_schema.token`, so leaving it out
+    # of the guard would break the redaction module's own rule: detection cannot
+    # be narrower than delivery.
     _recusar_segredo(payload.params_schema, schema=True)
 
-    # As credenciais da definition (SEG-12) o serviço confere no
-    # `create_workflow`, pelo `created_by_id` — mesma guarda do MCP.
+    # The definition's credentials (SEG-12) are checked by the service in
+    # `create_workflow`, via `created_by_id` — same guard as MCP.
 
-    # Validacao cross-workflow: SubWorkflows referenciados precisam existir,
-    # estar ativos, no mesmo workspace e com contrato compativel com o mapping.
+    # Cross-workflow validation: referenced SubWorkflows must exist,
+    # be active, in the same workspace and with a contract compatible with the mapping.
     from flow.utils.workflow_contract import validate_subworkflow_references_against_db
     cross_errors = await validate_subworkflow_references_against_db(
         payload.definition or {}, db, workspace_id=payload.workspace_id,
     )
     if cross_errors:
-        # detail como string para o front mostrar no toast (resolveAxiosError
-        # le `detail`). Lista de erros concatenada — uma por linha.
+        # detail as a string for the front end to show in the toast (resolveAxiosError
+        # reads `detail`). Concatenated error list — one per line.
         raise HTTPException(
             status_code=422,
             detail="Sub-workflows invalidos:\n- " + "\n- ".join(cross_errors),
         )
 
     try:
-        # Carimba o autor no INSERT: sem isso `created_by_id`/`updated_by_id`
-        # nasciam nulos e "criado há X por Y" na listagem nunca mostrava o nome
-        # (o campo só era preenchido na primeira edição, via update_workflow).
+        # Stamps the author on INSERT: without this `created_by_id`/`updated_by_id`
+        # were born null and "criado há X por Y" (created X ago by Y) in the listing
+        # never showed the name (the field was only filled on the first edit, via update_workflow).
         wf = await service.create_workflow(
             payload.name,
             payload.definition,
@@ -132,17 +132,17 @@ async def list_workflows(
     service: WorkflowService = Depends(get_workflow_service),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
-    """Retorna listagem leve de workflows (sem definition e outros campos JSON pesados).
+    """Returns a lightweight listing of workflows (without definition and other heavy JSON fields).
 
-    `assistente=1` inclui os fluxos criados pelo assistente da Home (escondidos
-    por padrao): o interruptor "mostrar os do assistente" da tela de Projetos e
-    o `ActiveRunsContext` passam esse parametro."""
+    `assistente=1` includes the workflows created by the Home assistant (hidden
+    by default): the "mostrar os do assistente" (show the assistant's) toggle on the
+    Projects screen and `ActiveRunsContext` pass this parameter."""
     if workspace_id:
         verify_workspace_access(workspace_id, workspace_ids)
         return await service.list_workflows_metadata(
             workspace_id=workspace_id, incluir_do_assistente=assistente,
         )
-    # Sem workspace_id: retorna workflows de todos os workspaces do usuário numa única query
+    # Without workspace_id: returns workflows from all of the user's workspaces in a single query
     return await service.list_workflows_metadata_by_ids(
         workspace_ids, incluir_do_assistente=assistente,
     )
@@ -160,13 +160,13 @@ async def list_workflows(
     },
 )
 async def read_workflow(
-    wf=Depends(workflow_com_papel(None)),   # leitura: basta pertencer ao workspace
+    wf=Depends(workflow_com_papel(None)),   # read: belonging to the workspace is enough
 ):
-    # Auditoria (SEG-67): a definition vem com a connectionString legada JÁ
-    # descriptografada, e a rota é acessível a viewer. Redige os segredos numa
-    # CÓPIA (redigir_definition) antes de responder — sem tocar no objeto do ORM,
-    # para o marcador "<REDACTED>" nunca ser gravado por um flush do GET. Fluxos
-    # modernos usam credential_id (resolvido só no dispatch) e não expõem nada.
+    # Audit (SEG-67): the definition comes with the legacy connectionString ALREADY
+    # decrypted, and the route is accessible to viewer. Redacts the secrets in a
+    # COPY (redigir_definition) before responding — without touching the ORM object,
+    # so the "<REDACTED>" marker is never written by a flush of the GET. Modern
+    # workflows use credential_id (resolved only at dispatch) and expose nothing.
     from app.core.utils.redacao import redigir_definition
     dados = WorkflowRead.model_validate(wf)
     if isinstance(dados.definition, dict) and dados.definition:
@@ -191,15 +191,15 @@ async def get_workflow_contract(wf=Depends(workflow_com_papel(None))):
     from flow.utils.workflow_contract import extract_contract
     from app.core.utils.encryption import decrypt_workflow_connections
 
-    # decrypt_workflow_connections so toca credenciais — nodes/edges
-    # ficam expostos como estao. extract_contract le apenas o grafo.
+    # decrypt_workflow_connections only touches credentials — nodes/edges
+    # stay exposed as they are. extract_contract reads only the graph.
     try:
         definition = decrypt_workflow_connections(wf.definition or {})
     except Exception:
         definition = wf.definition or {}
     contract = extract_contract(definition)
-    # is_active permite o canvas marcar SubWorkflow apontando para alvo
-    # desativado com badge visual antes mesmo de tentar salvar.
+    # is_active lets the canvas mark a SubWorkflow pointing to a deactivated
+    # target with a visual badge even before trying to save.
     contract["is_active"] = bool(wf.flag_ative)
     return contract
 
@@ -226,16 +226,16 @@ async def duplicate_workflow(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """A cópia fica no MESMO workspace do original.
+    """The copy stays in the SAME workspace as the original.
 
-    `workflow_com_papel` já barra quem não alcança o workflow, e como o destino
-    é o workspace dele, o acesso ao original mais `editor` cobrem a operação —
-    não há como usar esta rota para plantar um workflow em workspace alheio.
+    `workflow_com_papel` already blocks whoever cannot reach the workflow, and since the
+    destination is its workspace, access to the original plus `editor` cover the operation —
+    there is no way to use this route to plant a workflow in someone else's workspace.
     """
-    # Mesma checagem do POST / e do PUT: um SubWorkflow referenciado pode ter
-    # sido desativado ou removido depois que o original foi salvo. Sem isto, a
-    # cópia nasceria quebrada e só falharia na execução, com erro bem menos
-    # claro do que a lista de referências inválidas.
+    # Same check as POST / and PUT: a referenced SubWorkflow may have
+    # been deactivated or removed after the original was saved. Without this, the
+    # copy would be born broken and would only fail at run time, with an error far
+    # less clear than the list of invalid references.
     from flow.utils.workflow_contract import validate_subworkflow_references_against_db
     cross_errors = await validate_subworkflow_references_against_db(
         wf.definition or {}, db, workspace_id=wf.workspace_id,
@@ -246,8 +246,8 @@ async def duplicate_workflow(
             detail="Sub-workflows invalidos:\n- " + "\n- ".join(cross_errors),
         )
 
-    # Auditoria (SEG-12): a cópia não pode carregar credencial que o duplicador
-    # não acessa — o serviço confere, pelo `duplicated_by`.
+    # Audit (SEG-12): the copy cannot carry a credential the duplicator
+    # cannot access — the service checks, via `duplicated_by`.
     try:
         copia = await service.duplicate_workflow(
             wf.id_hash, payload.name if payload else None,
@@ -260,24 +260,24 @@ async def duplicate_workflow(
     return {"id": copia.id_hash, "name": copia.name}
 
 
-# ── Mover entre workspaces ───────────────────────────────────────────────────
+# ── Move between workspaces ──────────────────────────────────────────────────
 #
-# Exige admin (ou owner) nos DOIS workspaces. Mover atravessa a fronteira de
-# tenant: leva a definition — que traz `credential_id` em texto puro e ids de
-# arquivos do Drive — para dentro de outro workspace, e passa a produzir dados
-# lá. Papel de editor, que basta para criar e duplicar dentro do próprio
-# workspace, não cobre isso.
+# Requires admin (or owner) in BOTH workspaces. Moving crosses the tenant
+# boundary: it carries the definition — which holds `credential_id` in plain text and
+# Drive file ids — into another workspace, and starts producing data
+# there. The editor role, which is enough to create and duplicate within one's own
+# workspace, does not cover that.
 #
-# Exigir nos dois lados fecha os dois abusos simétricos: tirar um workflow de um
-# workspace onde só se tem acesso parcial, e plantar um workflow dentro de um
-# workspace alheio. É exatamente a lacuna que o comentário de `WorkflowUpdate`
-# descreve ao recusar `workspace_id` no PUT.
+# Requiring it on both sides closes the two symmetric abuses: pulling a workflow out of a
+# workspace where one only has partial access, and planting a workflow inside
+# someone else's workspace. It is exactly the gap the `WorkflowUpdate` comment
+# describes when rejecting `workspace_id` in the PUT.
 #
-# A origem é conferida pela dependência da rota (`workflow_com_papel`), o
-# destino — que vem do corpo — em `_move`. A mensagem do destino é a mesma para
-# "não sou membro", "workspace não existe" e "workspace na lixeira":
-# `get_workspace_member_role` devolve None nos três, e distinguir permitiria
-# enumerar workspaces alheios pelo id.
+# The origin is checked by the route's dependency (`workflow_com_papel`), the
+# destination — which comes from the body — in `_move`. The destination message is the
+# same for "not a member", "workspace does not exist" and "workspace in the trash":
+# `get_workspace_member_role` returns None in all three, and distinguishing them would
+# allow enumerating other people's workspaces by id.
 _MOVER_ORIGEM = "Requer role 'admin' ou 'owner' no workspace de origem para mover workflows."
 _MOVER_DESTINO = "Requer role 'admin' ou 'owner' no workspace de destino para mover workflows."
 
@@ -291,9 +291,9 @@ async def _move(
     *,
     dry_run: bool,
 ) -> WorkflowMoveResult:
-    """Corpo comum de /move e /move/preview — só muda o `dry_run`."""
-    # Só autorização e serialização vivem aqui: "destino ≠ origem" é invariante
-    # da operação e mora no serviço (WorkflowMoveTargetError → 400).
+    """Common body of /move and /move/preview — only `dry_run` changes."""
+    # Only authorization and serialization live here: "destination ≠ origin" is an
+    # invariant of the operation and lives in the service (WorkflowMoveTargetError → 400).
     await exigir_papel_no_workspace(
         db, payload.target_workspace_id, current_user.id_hash, ROLE_ADMIN, _MOVER_DESTINO,
     )
@@ -328,15 +328,15 @@ async def move_workflow(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> WorkflowMoveResult:
-    """Troca o workspace do workflow, preservando o `id_hash`.
+    """Changes the workflow's workspace, preserving the `id_hash`.
 
-    A operação NÃO falha por dependência quebrada: o que deixa de funcionar no
-    destino volta em `warnings` — credenciais que não resolvem mais,
-    sub-fluxos e arquivos do Drive que ficaram para trás, troca de executor.
+    The operation does NOT fail because of a broken dependency: what stops working in
+    the destination comes back in `warnings` — credentials that no longer resolve,
+    sub-workflows and Drive files left behind, executor change.
 
-    O que muda sempre: agendamento chega desligado, portal volta a "disabled",
-    grupo e pins são limpos. Histórico (execuções, artefatos, métricas)
-    permanece no workspace de origem.
+    What always changes: the schedule arrives turned off, the portal goes back to "disabled",
+    group and pins are cleared. History (runs, artifacts, metrics)
+    stays in the origin workspace.
     """
     return await _move(payload, service, wf, db, current_user, dry_run=False)
 
@@ -355,10 +355,10 @@ async def preview_move_workflow(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ) -> WorkflowMoveResult:
-    """Mesmo relatório do move, sem escrever nada.
+    """Same report as the move, without writing anything.
 
-    Alimenta o diálogo antes de confirmar. Exige a mesma permissão do move real
-    para não virar um oráculo sobre o conteúdo de workspaces alheios.
+    Feeds the dialog before confirming. Requires the same permission as the real move
+    so as not to become an oracle about the contents of other people's workspaces.
     """
     return await _move(payload, service, wf, db, current_user, dry_run=True)
 
@@ -375,21 +375,21 @@ async def update_workflow(
     current_user=Depends(get_current_user),
 ):
     """
-    Atualiza campos de um workflow já existente.
-    Só os campos enviados no payload serão alterados.
-    Se `definition` for alterada, a versão atual é salva automaticamente como snapshot.
+    Updates fields of an existing workflow.
+    Only the fields sent in the payload are changed.
+    If `definition` is changed, the current version is saved automatically as a snapshot.
     """
-    # Se definition mudou, valida referencias cross-workflow contra DB.
-    # `WorkflowUpdate` e parcial: `definition` ausente significa "nao mexe nela",
-    # e recusar ai barraria ate renomear um workflow.
+    # If the definition changed, validate cross-workflow references against the DB.
+    # `WorkflowUpdate` is partial: an absent `definition` means "do not touch it",
+    # and refusing there would block even renaming a workflow.
     novo_schema = getattr(workflow_in, "params_schema", None)
     if novo_schema is not None:
-        _recusar_segredo(novo_schema, schema=True)   # mesma razao do POST
+        _recusar_segredo(novo_schema, schema=True)   # same reason as the POST
 
     new_def = getattr(workflow_in, "definition", None)
     if new_def is not None:
         _recusar_segredo(new_def)
-        # As credenciais (SEG-12) o serviço confere no `update_workflow`.
+        # The credentials (SEG-12) are checked by the service in `update_workflow`.
 
         from flow.utils.workflow_contract import validate_subworkflow_references_against_db
         cross_errors = await validate_subworkflow_references_against_db(
@@ -414,7 +414,7 @@ async def update_workflow(
 
 
 # ------------------------------------------------------------------ #
-# Execução direta                                                      #
+# Direct execution                                                   #
 # ------------------------------------------------------------------ #
 
 @router.post(
@@ -434,12 +434,12 @@ async def execute_workflow(
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
 ):
     """
-    Despacha o workflow para execução imediata via executor.
+    Dispatches the workflow for immediate execution via an executor.
 
-    **Idempotência**: envie o header `Idempotency-Key: <uuid>` para garantir
-    que requisições duplicadas (ex: retry de rede) não disparem execuções extras.
-    A mesma chave, para o MESMO usuário e o MESMO workflow, retorna o `task_id`
-    da execução original por 24h (a chave não colide entre usuários).
+    **Idempotency**: send the `Idempotency-Key: <uuid>` header to ensure
+    that duplicate requests (e.g. network retry) do not trigger extra runs.
+    The same key, for the SAME user and the SAME workflow, returns the `task_id`
+    of the original run for 24h (the key does not collide between users).
     """
     try:
         async_result = await service.start_analysis(
@@ -448,20 +448,20 @@ async def execute_workflow(
             request=request,
             debug_mode=payload.debug_mode,
             idempotency_key=idempotency_key,
-            # A dependency de autorização já carregou e descriptografou este
-            # workflow: sem repassar o objeto, o dispatch refazia o SELECT e
-            # desserializava a `definition` inteira de novo (~1,7 MB num fluxo
-            # grande) só para descartar o resultado.
+            # The authorization dependency already loaded and decrypted this
+            # workflow: without passing the object along, the dispatch redid the SELECT and
+            # deserialized the entire `definition` again (~1.7 MB in a large
+            # workflow) only to discard the result.
             workflow=wf,
-            # Escopo de credenciais (opção D): quem disparou é uma das duas
-            # dimensões — resolvem-se as credenciais DESTE usuário mais as
-            # compartilhadas com o workspace do workflow.
+            # Credential scope (option D): who triggered is one of the two
+            # dimensions — the credentials of THIS user are resolved, plus those
+            # shared with the workflow's workspace.
             triggered_by=current_user.id_hash,
             trigger_source="manual",
-            # Quem chega aqui já passou pela sessão e tem papel de operator. O
-            # token do gatilho autentica CHAMADA EXTERNA ao endpoint de webhook;
-            # exigi-lo aqui só comparava o JWT do usuário com o token e
-            # respondia "Token inválido", sem impedir nada.
+            # Whoever gets here has already passed through the session and has the operator role. The
+            # trigger token authenticates an EXTERNAL CALL to the webhook endpoint;
+            # requiring it here only compared the user's JWT with the token and
+            # responded "Token inválido" (invalid token), without preventing anything.
             autenticar_entrada=False,
         )
         return {"task_id": async_result.id, "workflow": wf.id_hash}
@@ -484,30 +484,30 @@ async def cancel_run(
     current_user=Depends(get_current_user),
 ):
     """
-    Interrompe um run em andamento.
+    Interrupts a run in progress.
 
-    Até então um workflow disparado só terminava sozinho ou por timeout do
-    executor — o usuário não tinha como parar um job caro ou travado.
+    Until then a triggered workflow only ended on its own or by executor
+    timeout — the user had no way to stop an expensive or stuck job.
 
-    Exige role `operator` ou superior no workspace DO RUN, o mesmo necessário
-    para tê-lo iniciado.
+    Requires the `operator` role or higher in the RUN's workspace, the same needed
+    to have started it.
     """
     from app.services.workflow_execution_service import cancel_run as _cancel
 
-    # A autorização (papel `operator` no workspace DO RUN, com atalho de
-    # administrador global) mora agora dentro de `cancel_run`, junto do SELECT
-    # que carrega o run: era regra só de rota, então o serviço cancelava
-    # execução de qualquer conta para quem o chamasse direto. Nenhum chamador
-    # assim existe hoje — a rota é o único —, mas as ferramentas do servidor
-    # MCP não passam por aqui, e é para elas que a guarda tinha de descer.
-    # Esta rota deixou de repeti-la para que não existam duas versões da mesma
-    # regra divergindo com o tempo.
+    # The authorization (`operator` role in the RUN's workspace, with a global
+    # administrator shortcut) now lives inside `cancel_run`, next to the SELECT
+    # that loads the run: it was a route-only rule, so the service would cancel
+    # any account's run for whoever called it directly. No such caller
+    # exists today — the route is the only one —, but the MCP server's tools
+    # do not go through here, and it is for them that the guard had to move down.
+    # This route stopped repeating it so that there are not two versions of the same
+    # rule diverging over time.
     #
-    # Erros de domínio sobem para o handler global (app/main.py), que já mapeia
-    # cada um ao seu status: 404 para run inexistente, 403 para papel
-    # insuficiente. Capturar aqui colapsaria os dois num código genérico.
-    # Executor fora do ar não é mais erro: o run é fechado no servidor e o
-    # outcome volta "cancelled".
+    # Domain errors bubble up to the global handler (app/main.py), which already maps
+    # each one to its status: 404 for a nonexistent run, 403 for an insufficient
+    # role. Catching them here would collapse both into a generic code.
+    # An executor being down is no longer an error: the run is closed on the server and the
+    # outcome comes back "cancelled".
     outcome = await _cancel(
         db,
         run_id,
@@ -528,7 +528,7 @@ async def cancel_run(
 )
 async def list_versions(
     service: WorkflowService = Depends(get_workflow_service),
-    wf=Depends(workflow_com_papel(None)),   # leitura: basta pertencer ao workspace
+    wf=Depends(workflow_com_papel(None)),   # read: belonging to the workspace is enough
 ):
     return await service.list_versions(wf.id_hash)
 
@@ -546,14 +546,14 @@ async def restore_version(
     wf=Depends(workflow_com_papel(ROLE_EDITOR)),
     current_user=Depends(get_current_user),
 ):
-    # Auditoria (SEG-12): restaurar uma versão antiga não pode reintroduzir uma
-    # credencial que o autor da restauração não acessa — o serviço confere.
+    # Audit (SEG-12): restoring an old version cannot reintroduce a
+    # credential the person restoring cannot access — the service checks.
     return await service.restore_version(
         wf.id_hash, version_number, restored_by=current_user.id_hash,
     )
 
 # ------------------------------------------------------------------ #
-# Retry de execução                                                    #
+# Run retry                                                          #
 # ------------------------------------------------------------------ #
 
 @router.post(
@@ -573,18 +573,18 @@ async def retry_run(
     current_user=Depends(get_current_user),
 ):
     """
-    Despacha uma execução NOVA do workflow, com a definição ATUAL dele.
+    Dispatches a NEW run of the workflow, with its CURRENT definition.
 
-    Importante, porque o nome sugere outra coisa: não é um replay da run
-    apontada. `WorkflowRun` não guarda os parâmetros de entrada, então
-    reexecutar exatamente aquela run não é possível hoje — e prometer isso na
-    resposta seria mentir para quem depende do resultado.
+    Important, because the name suggests something else: it is not a replay of the
+    given run. `WorkflowRun` does not store the input parameters, so
+    re-running exactly that run is not possible today — and promising it in the
+    response would be lying to whoever depends on the result.
 
-    O `run_id` do path é VALIDADO, e não decorativo: ele precisa existir e
-    pertencer a este workflow. Antes era recebido e ignorado, então qualquer
-    string passava e a rota disparava a execução do mesmo jeito, inclusive com
-    o id de uma run de outro workflow — o chamador achava estar reexecutando uma
-    coisa e estava disparando outra.
+    The path's `run_id` is VALIDATED, not decorative: it must exist and
+    belong to this workflow. Before, it was received and ignored, so any
+    string passed and the route triggered the run all the same, even with
+    the id of a run from another workflow — the caller thought it was re-running one
+    thing and was triggering another.
     """
     from app.models.models import WorkflowRun as _Run
 
@@ -601,12 +601,12 @@ async def retry_run(
         )
 
     try:
-        # Mesmo caso do POST /execute: já autenticado, já com papel checado.
+        # Same case as POST /execute: already authenticated, role already checked.
         async_result = await service.start_analysis(
             wf.id_hash, autenticar_entrada=False, workflow=wf,
             triggered_by=current_user.id_hash,
-            # "retry" e nao "manual": no Historico, uma sequencia de reexecucoes
-            # do mesmo fluxo conta uma historia diferente de disparos avulsos.
+            # "retry" and not "manual": in History, a sequence of re-runs
+            # of the same workflow tells a different story from one-off triggers.
             trigger_source="retry",
         )
         return {"task_id": async_result.id, "message": "Execução reenfileirada com sucesso."}
@@ -615,7 +615,7 @@ async def retry_run(
 
 
 # ------------------------------------------------------------------ #
-# Portal de compartilhamento                                           #
+# Sharing portal                                                     #
 # ------------------------------------------------------------------ #
 
 @router.patch("/{id_hash}/portal", summary="Configura acesso ao portal público do workflow")
@@ -626,7 +626,7 @@ async def update_portal_settings(
     wf=Depends(workflow_com_papel(ROLE_EDITOR)),
     db: AsyncSession = Depends(get_db),
 ):
-    """Define portal_access (disabled/public/private) e lista de usuários permitidos."""
+    """Sets portal_access (disabled/public/private) and the list of allowed users."""
     wf.portal_access = body.portal_access
     wf.portal_shared_with = body.portal_shared_with if body.portal_access == "private" else None
     await db.commit()
@@ -641,11 +641,11 @@ async def update_portal_settings(
 # ── Pin Data ─────────────────────────────────────────────────────────────────
 
 class PinOutputPayload(BaseModel):
-    # `node_id` continua aceito e continua IGNORADO — o path sempre venceu, e
-    # `PUT /pin/A` com `{"node_id": "B"}` gravava em A, calado. Deixou de ser
-    # obrigatório (nenhum chamador precisa repetir o que já está na URL) e não
-    # pode simplesmente sumir: com `extra="forbid"`, um cliente que ainda o
-    # envie passaria a receber 422 numa chamada que funcionava.
+    # `node_id` is still accepted and still IGNORED — the path always won, and
+    # `PUT /pin/A` with `{"node_id": "B"}` wrote to A, silently. It is no longer
+    # required (no caller needs to repeat what is already in the URL) and cannot
+    # simply disappear: with `extra="forbid"`, a client that still
+    # sends it would start getting 422 on a call that used to work.
     node_id: Optional[str] = Field(
         None, description="Ignorado — o nó é o do caminho da URL. Mantido por compatibilidade.",
     )
@@ -673,12 +673,12 @@ async def pin_node_output(
     db: AsyncSession = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    """Fixa o output de um nó para reutilização em execuções futuras."""
+    """Pins a node's output for reuse in future runs."""
     try:
-        # `exigir_no_existente=False`: fixar um id que a definition não tem é
-        # inútil, mas recusá-lo mudaria o contrato de uma rota que a tela usa.
-        # O portão do nó de SAÍDA é outra história e vale aqui — o pin que ele
-        # recusa nunca funcionou.
+        # `exigir_no_existente=False`: pinning an id the definition does not have is
+        # useless, but rejecting it would change the contract of a route the screen uses.
+        # The OUTPUT node gate is another story and applies here — the pin it
+        # rejects never worked.
         return await pin_service.fixar_saida(
             db, wf, node_id,
             outputs=body.outputs,
@@ -698,7 +698,7 @@ async def unpin_node_output(
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
 ):
-    """Remove o output fixado de um nó e deleta o artefato de cache do MinIO."""
+    """Removes a node's pinned output and deletes the cache artifact from MinIO."""
     return await pin_service.desfixar_saida(db, wf, node_id)
 
 
@@ -710,15 +710,15 @@ async def list_pinned_nodes(
     )),
     _user=Depends(get_current_user),
 ):
-    """Lista os nós com output fixado e seus metadados.
+    """Lists the nodes with pinned output and their metadata.
 
-    Exige `viewer`, e não apenas pertencimento ao workspace. Era a única das
-    três rotas de pin sem papel nenhum — as irmãs `PUT`/`DELETE` pedem `editor`
-    —, e a tool `list_pins` do MCP já exigia `viewer` (`app/mcp/guardas.py`).
-    A mesma leitura respondia com duas réguas conforme a porta de entrada.
+    Requires `viewer`, and not just workspace membership. It was the only one of the
+    three pin routes with no role at all — the sibling `PUT`/`DELETE` ask for `editor`
+    —, and the MCP `list_pins` tool already required `viewer` (`app/mcp/guardas.py`).
+    The same read answered by two standards depending on the entry point.
     """
-    # Sem `node_ids_existentes`: a rota continua listando tudo o que está
-    # gravado, inclusive pin de nó já apagado. É o MCP que filtra pelos nós que
-    # a definition ainda tem — a tela precisa enxergar o órfão para limpá-lo.
+    # No `node_ids_existentes`: the route keeps listing everything that is
+    # saved, including the pin of an already deleted node. It is MCP that filters by the nodes
+    # the definition still has — the screen needs to see the orphan to clean it up.
     pins = pin_service.listar_pins(wf.pin_metadata, wf.pinned_outputs)
     return {"pinned_nodes": pins, "total": len(pins)}

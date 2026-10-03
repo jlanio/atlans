@@ -1,56 +1,56 @@
 # app/core/trusted_proxy.py
 """
-Confianca no proxy reverso (Traefik) e resolucao do IP real do cliente.
+Trust in the reverse proxy (Traefik) and resolution of the client's real IP.
 
-Dois problemas resolvidos aqui:
+Two problems solved here:
 
-1. **Headers de identidade injetados pelo proxy.** `X-Forwarded-Tls-Client-Cert-Info`
-   carrega a identidade mTLS do executor. O Traefik so o *sobrescreve* quando ha
-   client cert; um cliente sem cert teria o header proprio repassado intacto.
-   O strip acontece no Traefik (`strip-executor-cert-header@file`), e aqui fica a
-   segunda camada: so aceitamos esse header se a conexao TCP veio de um proxy
-   listado em `TRUSTED_PROXIES`.
+1. **Identity headers injected by the proxy.** `X-Forwarded-Tls-Client-Cert-Info`
+   carries the executor's mTLS identity. Traefik only *overwrites* it when there
+   is a client cert; a client without a cert would have its own header passed
+   through intact. The strip happens in Traefik (`strip-executor-cert-header@file`),
+   and the second layer is here: we only accept this header if the TCP connection
+   came from a proxy listed in `TRUSTED_PROXIES`.
 
-2. **IP real do cliente** (chave de rate limit, trilha de auditoria do
-   enrollment, telemetria do executor). Atras do proxy, `request.client.host` e
-   sempre o IP do Traefik — todos os limites viravam um unico balde global para
-   a plataforma inteira. `get_client_ip` le `X-Forwarded-For` (XFF) quando (e
-   somente quando) o peer e um proxy confiavel.
+2. **The client's real IP** (rate limit key, enrollment audit trail, executor
+   telemetry). Behind the proxy, `request.client.host` is always Traefik's IP —
+   every limit became a single global bucket for the whole platform.
+   `get_client_ip` reads `X-Forwarded-For` (XFF) when (and only when) the peer
+   is a trusted proxy.
 
-O caminho em producao e cliente -> Cloudflare -> Traefik -> API, e isso muda
-COMO o XFF tem de ser lido:
+The production path is client -> Cloudflare -> Traefik -> API, and that changes
+HOW the XFF has to be read:
 
-- A Cloudflare nao substitui o XFF que o cliente mandou: ela ANEXA o IP real
-  do cliente ao fim dele. O primeiro elemento do header e o que o cliente
-  escreveu — forjavel. "Pegar o primeiro IP" atras da Cloudflare devolvia o
-  que o atacante quisesse, uma identidade nova por request.
-- O Traefik confia nas faixas da Cloudflare (`forwardedHeaders.trustedIPs` no
-  docker-compose.yml): repassa o XFF como veio e anexa o IP do seu peer (o
-  edge da Cloudflare). Vindo de um peer fora dessas faixas (acesso direto ao
-  origin, ou o AGENTS_HOST, que fica fora do CDN), ele DESCARTA o XFF recebido
-  e o reescreve so com o IP do peer.
-- A API ve, portanto, `<o que o cliente escreveu>, <IP real>, <edge Cloudflare>`
-  atras da Cloudflare, e `<IP real>` sem ela. Nos dois casos o lado DIREITO e
-  o confiavel: cada elemento a direita foi escrito por um salto em que
-  confiamos. Por isso `get_client_ip` caminha o header da direita para a
-  esquerda, pula os proxies conhecidos (`TRUSTED_PROXIES` mais `EDGE_PROXIES`)
-  e devolve o primeiro IP que sobra.
-- `CF-Connecting-IP` NAO e usado: a Cloudflare o define, mas quem chega direto
-  ao origin escreve nele o que quiser, e o Traefik so saneia os
-  `X-Forwarded-*` — nunca os `CF-*`. Sem uma origem confiavel para o header,
-  ele vale tanto quanto o primeiro elemento do XFF.
+- Cloudflare does not replace the XFF the client sent: it APPENDS the client's
+  real IP to its end. The first element of the header is what the client
+  wrote — forgeable. "Take the first IP" behind Cloudflare returned whatever
+  the attacker wanted, a new identity per request.
+- Traefik trusts the Cloudflare ranges (`forwardedHeaders.trustedIPs` in
+  docker-compose.yml): it passes the XFF through as it came and appends its
+  peer's IP (the Cloudflare edge). Coming from a peer outside those ranges
+  (direct access to the origin, or AGENTS_HOST, which sits outside the CDN), it
+  DISCARDS the received XFF and rewrites it with only the peer's IP.
+- The API therefore sees `<what the client wrote>, <real IP>, <Cloudflare edge>`
+  behind Cloudflare, and `<real IP>` without it. In both cases the RIGHT side is
+  the trustworthy one: each element on the right was written by a hop we
+  trust. That is why `get_client_ip` walks the header from right to left,
+  skips the known proxies (`TRUSTED_PROXIES` plus `EDGE_PROXIES`) and returns
+  the first IP left over.
+- `CF-Connecting-IP` is NOT used: Cloudflare sets it, but whoever reaches the
+  origin directly writes whatever they want in it, and Traefik only sanitizes
+  the `X-Forwarded-*` headers — never the `CF-*` ones. Without a trusted origin
+  for the header, it is worth as much as the first element of the XFF.
 
-Variaveis (IPs e CIDRs separados por virgula, ex: `172.16.0.0/12,10.0.0.0/8`):
+Variables (comma-separated IPs and CIDRs, e.g. `172.16.0.0/12,10.0.0.0/8`):
 
-- `TRUSTED_PROXIES`: proxies que falam DIRETAMENTE com a API (rede do Traefik).
-  E o que autoriza o header de cert mTLS e a leitura do XFF. Vazio desativa
-  ambas as checagens — util em dev, onde a API e acessada direto sem proxy.
-- `EDGE_PROXIES`: proxies de BORDA que anexam o cliente ao XFF (Cloudflare).
-  Sao pulados na caminhada direita -> esquerda e nada mais: NAO avalizam o
-  header de cert mTLS (`is_trusted_proxy` olha so `TRUSTED_PROXIES` — a
-  Cloudflare nunca e o peer TCP da API, e o cert so faz sentido vindo do
-  Traefik). Variavel AUSENTE = faixas publicadas da Cloudflare
-  (`CLOUDFLARE_RANGES`); `EDGE_PROXIES=` (vazia) desliga.
+- `TRUSTED_PROXIES`: proxies that talk DIRECTLY to the API (the Traefik network).
+  It is what authorizes the mTLS cert header and reading the XFF. Empty disables
+  both checks — useful in dev, where the API is accessed directly without a proxy.
+- `EDGE_PROXIES`: EDGE proxies that append the client to the XFF (Cloudflare).
+  They are skipped in the right -> left walk and nothing more: they do NOT vouch
+  for the mTLS cert header (`is_trusted_proxy` only looks at `TRUSTED_PROXIES` —
+  Cloudflare is never the API's TCP peer, and the cert only makes sense coming
+  from Traefik). Variable ABSENT = Cloudflare's published ranges
+  (`CLOUDFLARE_RANGES`); `EDGE_PROXIES=` (empty) turns it off.
 """
 import ipaddress
 import os
@@ -59,10 +59,10 @@ from app.core.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Faixas publicadas pela Cloudflare em https://www.cloudflare.com/ips/
-# (https://www.cloudflare.com/ips-v4 e https://www.cloudflare.com/ips-v6),
-# copia de 2026-09-13. As IPv4 sao as mesmas de `forwardedHeaders.trustedIPs`
-# no docker-compose.yml — quando a Cloudflare mudar a lista, atualize os dois.
+# Ranges published by Cloudflare at https://www.cloudflare.com/ips/
+# (https://www.cloudflare.com/ips-v4 and https://www.cloudflare.com/ips-v6),
+# copied on 2026-09-13. The IPv4 ones are the same as `forwardedHeaders.trustedIPs`
+# in docker-compose.yml — when Cloudflare changes the list, update both.
 CLOUDFLARE_RANGES = (
     "173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,"
     "141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,"
@@ -75,11 +75,11 @@ CLOUDFLARE_RANGES = (
 
 def _parse_networks(raw: str, var: str) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
     """
-    Converte `raw` (IPs/CIDRs separados por virgula) em redes.
+    Convert `raw` (comma-separated IPs/CIDRs) into networks.
 
-    `var` e o nome da variavel de ambiente, so para a mensagem de log. Entradas
-    invalidas sao ignoradas com log de erro em vez de levantar: uma faixa mal
-    digitada nao pode derrubar o import do modulo — e a API — na subida.
+    `var` is the environment variable's name, only for the log message. Invalid
+    entries are ignored with an error log instead of raising: a mistyped range
+    must not break the module import — and the API — at startup.
     """
     nets = []
     for part in raw.split(","):
@@ -95,8 +95,8 @@ def _parse_networks(raw: str, var: str) -> list[ipaddress.IPv4Network | ipaddres
 
 TRUSTED_PROXIES = _parse_networks(os.getenv("TRUSTED_PROXIES", ""), "TRUSTED_PROXIES")
 
-# Variavel AUSENTE (None) e diferente de VAZIA (""): sem ela vale a lista da
-# Cloudflare; `EDGE_PROXIES=` explicito significa "nenhum proxy de borda".
+# An ABSENT variable (None) is different from an EMPTY one (""): without it the
+# Cloudflare list applies; an explicit `EDGE_PROXIES=` means "no edge proxy".
 _edge_raw = os.getenv("EDGE_PROXIES")
 EDGE_PROXIES = _parse_networks(
     CLOUDFLARE_RANGES if _edge_raw is None else _edge_raw, "EDGE_PROXIES"
@@ -126,7 +126,7 @@ def _in_any(
 
 
 def is_trusted_proxy(client_host: str | None) -> bool:
-    """True se o peer TCP e um proxy confiavel (ou se a checagem esta desativada)."""
+    """True if the TCP peer is a trusted proxy (or if the check is disabled)."""
     if not TRUSTED_PROXIES:
         return True  # checagem desativada — dev/local
     if not client_host:
@@ -140,46 +140,46 @@ def is_trusted_proxy(client_host: str | None) -> bool:
 
 def get_client_ip(client_host: str | None, forwarded_for: str | None) -> str:
     """
-    IP real do cliente (rate limit, auditoria de enrollment, telemetria).
+    The client's real IP (rate limit, enrollment audit, telemetry).
 
-    - `TRUSTED_PROXIES` vazio, ou peer fora dele: devolve o peer e IGNORA o
-      `X-Forwarded-For` — senao o proprio cliente forjaria o header e trocaria
-      de "identidade" a cada request, anulando rate limit e auditoria.
-    - Senao, caminha o XFF da DIREITA para a esquerda: pula os saltos da nossa
-      infra (`TRUSTED_PROXIES`, contiguos a direita), depois NO MAXIMO UM salto
-      de borda (`EDGE_PROXIES` — o edge da Cloudflare que falou com o Traefik)
-      e devolve o elemento seguinte, seja ele qual for. Esse e o IP que a
-      Cloudflare anexou: o do cliente que se conectou a ela.
-    - UM salto de borda, e nao todos: um Cloudflare Worker que chama a
-      instalacao chega a Cloudflare com o IP de saida dos Workers (que esta
-      nas faixas dela) e manda o XFF que quiser. Pulando todos os saltos da
-      Cloudflare, o valor escrito pelo Worker virava a identidade — um balde
-      de rate limit novo por request. Com um salto so, todo trafego de Worker
-      cai no IP de saida dos Workers.
-    - Se todos os elementos sao proxies conhecidos, devolve o mais a esquerda
-      (deterministico; so acontece com trafego dos proprios proxies).
-    - Elementos vazios ou que nao sao IP (`unknown`, `ip:porta`, lixo, IPv6
-      com zona `fe80::1%eth0`) sao pulados — so IPs validos sao devolvidos,
-      na forma canonica (`2001:DB8::9` -> `2001:db8::9`), para o mesmo
-      cliente cair sempre no mesmo balde. Se nenhum elemento e valido,
-      devolve o peer.
-    - Sem XFF: peer. Sem peer: "unknown".
+    - `TRUSTED_PROXIES` empty, or peer outside it: returns the peer and IGNORES
+      `X-Forwarded-For` — otherwise the client itself would forge the header and
+      change "identity" on every request, defeating rate limit and audit.
+    - Otherwise, walks the XFF from RIGHT to left: skips our infrastructure's
+      hops (`TRUSTED_PROXIES`, contiguous on the right), then AT MOST ONE edge
+      hop (`EDGE_PROXIES` — the Cloudflare edge that talked to Traefik) and
+      returns the next element, whatever it is. That is the IP Cloudflare
+      appended: that of the client that connected to it.
+    - ONE edge hop, and not all of them: a Cloudflare Worker calling the
+      installation reaches Cloudflare with the Workers' egress IP (which is
+      within its ranges) and sends whatever XFF it wants. Skipping all the
+      Cloudflare hops, the value written by the Worker became the identity — a
+      new rate limit bucket per request. With a single hop, all Worker traffic
+      lands on the Workers' egress IP.
+    - If all elements are known proxies, returns the leftmost one
+      (deterministic; only happens with traffic from the proxies themselves).
+    - Empty or non-IP elements (`unknown`, `ip:port`, garbage, IPv6
+      with a zone `fe80::1%eth0`) are skipped — only valid IPs are returned,
+      in canonical form (`2001:DB8::9` -> `2001:db8::9`), so the same
+      client always lands in the same bucket. If no element is valid,
+      returns the peer.
+    - No XFF: peer. No peer: "unknown".
     """
     if forwarded_for and TRUSTED_PROXIES and is_trusted_proxy(client_host):
-        saltos = []  # IPs validos, da direita para a esquerda
+        saltos = []  # valid IPs, from right to left
         for hop in reversed(forwarded_for.split(",")):
             try:
                 addr = ipaddress.ip_address(hop.strip())
             except ValueError:
-                continue  # vazio ou nao-IP: pula
+                continue  # empty or non-IP: skip
             if getattr(addr, "scope_id", None):
-                continue  # `fe80::1%zona`: a zona e texto livre e sem limite de tamanho
+                continue  # `fe80::1%zone`: the zone is free text with no length limit
             saltos.append(addr)
         i = 0
         while i < len(saltos) and _in_any(saltos[i], TRUSTED_PROXIES):
             i += 1  # nossa infra, anexada a direita
         if i < len(saltos) and _in_any(saltos[i], EDGE_PROXIES):
-            i += 1  # um edge da Cloudflare, o que falou com o Traefik
+            i += 1  # a Cloudflare edge, the one that talked to Traefik
         if i < len(saltos):
             return str(saltos[i])
         if saltos:

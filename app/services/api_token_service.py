@@ -1,16 +1,18 @@
 # app/services/api_token_service.py
 """
-Tokens pessoais de acesso (PAT): criação, listagem, revogação e resolução.
+Personal access tokens (PAT): creation, listing, revocation and resolution.
 
-Regras de segurança concentradas aqui (ver app/models/api_token.py):
-- O segredo só existe no retorno de `criar`; no banco fica o SHA-256.
-- `resolver` é o ÚNICO caminho de autenticação por PAT (usado pelo servidor
-  MCP): hash → linha → não revogado → não expirado → usuário ativo.
-- Revogação nunca apaga; a cascata (reset de senha, suspensão, exclusão)
-  roda na sessão do chamador e NÃO commita — quem abriu a transação fecha.
-- `marcar_uso` é best-effort com throttle no Redis: nunca falha uma request,
-  e COMMITA por padrão — a sessão de request (`get_session_async`) faz
-  rollback no `finally`, então um carimbo sem commit se perderia em silêncio.
+Security rules concentrated here (see app/models/api_token.py):
+- The secret only exists in the return value of `criar`; the database keeps the SHA-256.
+- `resolver` is the ONLY PAT authentication path (used by the MCP
+  server): hash → row → not revoked → not expired → active user.
+- Revocation never deletes; the cascade (password reset, suspension, deletion)
+  runs in the caller's session and does NOT commit — whoever opened the
+  transaction closes it.
+- `marcar_uso` is best-effort with a throttle in Redis: it never fails a
+  request, and it COMMITS by default — the request session
+  (`get_session_async`) rolls back in the `finally`, so an uncommitted stamp
+  would be silently lost.
 """
 from __future__ import annotations
 
@@ -43,7 +45,7 @@ THROTTLE_ULTIMO_USO_SEGUNDOS = 60
 
 
 class ApiTokenError(AtlasBaseError):
-    """Entrada inválida ao criar um token (escopo, workspace, validade, nome)."""
+    """Invalid input when creating a token (scope, workspace, validity, name)."""
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     error_code = "api_token_invalid"
 
@@ -82,7 +84,7 @@ async def _contar_ativos(db: AsyncSession, user_id: str, agora) -> int:
     return int(resultado.scalar_one() or 0)
 
 
-# ── Ciclo de vida ─────────────────────────────────────────────────────────────
+# ── Lifecycle ─────────────────────────────────────────────────────────────────
 
 
 async def criar(
@@ -94,11 +96,11 @@ async def criar(
     workspace_ids: Iterable[str] | None = None,
     expires_in_days: int = VALIDADE_PADRAO_DIAS,
 ) -> tuple[ApiToken, str]:
-    """Cria um token e devolve (linha persistida, segredo em texto claro).
+    """Creates a token and returns (persisted row, plaintext secret).
 
-    O segredo NÃO é guardado nem logado. `workspace_ids` precisa ser um
-    subconjunto dos workspaces do usuário (dono ou membro); `None` = todos,
-    inclusive os futuros.
+    The secret is NOT stored or logged. `workspace_ids` must be a subset of
+    the user's workspaces (owner or member); `None` = all of them, including
+    future ones.
     """
     nome = (name or "").strip()
     if not nome or len(nome) > 80:
@@ -112,9 +114,9 @@ async def criar(
         alcance = list(dict.fromkeys(w.strip() for w in workspace_ids if w and w.strip()))
         if not alcance:
             raise ApiTokenError("Informe ao menos um workspace, ou deixe em branco para todos.")
-        # A dependency aceita os argumentos posicionais fora do FastAPI — é a
-        # MESMA query (dono OU membro, sem workspaces na lixeira) que autoriza a
-        # REST. Import tardio: app.api.dependencies importa services.
+        # The dependency accepts positional arguments outside FastAPI — it is the
+        # SAME query (owner OR member, no workspaces in the trash) that
+        # authorizes REST. Late import: app.api.dependencies imports services.
         from app.api.dependencies import get_user_workspace_ids
 
         permitidos = set(await get_user_workspace_ids(db, user))
@@ -123,10 +125,10 @@ async def criar(
             raise ApiTokenError("Você não participa de todos os workspaces informados.")
 
     agora = utc_now_naive()
-    # O teto é conforto, não segurança: dois POSTs simultâneos podem terminar
-    # em 21. Um SELECT ... FOR UPDATE na linha do usuário fecharia a fresta ao
-    # custo de serializar toda criação de token por conta — não vale por um
-    # limite que só existe para a lista não virar bagunça.
+    # The ceiling is a convenience, not security: two simultaneous POSTs can end
+    # up at 21. A SELECT ... FOR UPDATE on the user's row would close the gap
+    # at the cost of serializing every token creation per account — not worth
+    # it for a limit that only exists so the list does not become a mess.
     if await _contar_ativos(db, user.id_hash, agora) >= MAX_TOKENS_ATIVOS_POR_USUARIO:
         raise ApiTokenLimitError(
             f"Limite de {MAX_TOKENS_ATIVOS_POR_USUARIO} tokens ativos atingido. "
@@ -146,8 +148,8 @@ async def criar(
     db.add(token)
     await db.commit()
     await db.refresh(token)
-    # id_hash + prefixo no log, nunca o nome: é texto livre e uma quebra de
-    # linha nele forjaria um registro inteiro.
+    # id_hash + prefix in the log, never the name: it is free text and a line
+    # break in it would forge a whole log entry.
     logger.info(
         "Token de acesso %s (%s) criado por '%s': escopos=%s workspaces=%s expira=%s",
         token.id_hash, token.token_prefix, user.id_hash, ",".join(escopos),
@@ -157,7 +159,7 @@ async def criar(
 
 
 async def listar(db: AsyncSession, user_id: str) -> list[ApiToken]:
-    """Todos os tokens do usuário (ativos, expirados e revogados), mais recentes primeiro."""
+    """All of the user's tokens (active, expired and revoked), most recent first."""
     resultado = await db.execute(
         select(ApiToken)
         .where(ApiToken.user_id == user_id)
@@ -167,7 +169,7 @@ async def listar(db: AsyncSession, user_id: str) -> list[ApiToken]:
 
 
 async def revogar(db: AsyncSession, user_id: str, id_hash: str, motivo: str = "user") -> ApiToken:
-    """Revoga um token do próprio usuário. Idempotente; 404 se não é dele."""
+    """Revokes one of the user's own tokens. Idempotent; 404 if it is not theirs."""
     resultado = await db.execute(
         select(ApiToken).where(ApiToken.id_hash == id_hash, ApiToken.user_id == user_id)
     )
@@ -184,12 +186,13 @@ async def revogar(db: AsyncSession, user_id: str, id_hash: str, motivo: str = "u
 
 
 async def revogar_todos_do_usuario(db: AsyncSession, user_ids: Iterable[str] | str, motivo: str) -> int:
-    """Cascata: revoga todo token ativo dos usuários — UM UPDATE, SEM commit.
+    """Cascade: revokes every active token of the users — ONE UPDATE, NO commit.
 
-    Chamado dentro da transação de quem muda o estado da conta (reset de
-    senha, suspensão, exclusão); é o chamador que commita. Devolve quantas
-    linhas foram revogadas quando o driver informa. Aceita um `id_hash` só
-    (string) ou vários — uma string iterada como letras não revogaria nada.
+    Called inside the transaction of whoever changes the account's state
+    (password reset, suspension, deletion); the caller is the one who commits.
+    Returns how many rows were revoked when the driver reports it. Accepts a
+    single `id_hash` (string) or several — a string iterated as letters would
+    revoke nothing.
     """
     if isinstance(user_ids, str):
         user_ids = [user_ids]
@@ -208,14 +211,14 @@ async def revogar_todos_do_usuario(db: AsyncSession, user_ids: Iterable[str] | s
     return n
 
 
-# ── Autenticação ──────────────────────────────────────────────────────────────
+# ── Authentication ────────────────────────────────────────────────────────────
 
 
 async def resolver(db: AsyncSession, segredo: str | None) -> tuple[ApiToken, User] | None:
-    """Do segredo ao (token, usuário) — ou None, sem dizer por quê.
+    """From the secret to (token, user) — or None, without saying why.
 
-    Uma query: hash → token não revogado e não expirado → usuário com
-    `status == "active"` (a coluna; `User.is_active` é property e não serve no SQL).
+    One query: hash → token not revoked and not expired → user with
+    `status == "active"` (the column; `User.is_active` is a property and does not work in SQL).
     """
     if not e_segredo_pat(segredo):
         return None
@@ -237,22 +240,23 @@ async def resolver(db: AsyncSession, segredo: str | None) -> tuple[ApiToken, Use
 
 
 async def marcar_uso(db: AsyncSession, redis, token: ApiToken, *, commit: bool = True) -> bool:
-    """Carimba `last_used_at` no máximo uma vez por minuto — best-effort.
+    """Stamps `last_used_at` at most once per minute — best-effort.
 
-    O throttle é um `SET NX EX 60` no Redis: quem ganha o lock escreve; os
-    demais nem tocam no banco. Redis indisponível = não marca. O UPDATE roda
-    num SAVEPOINT para não envenenar a transação do chamador (molde de
-    `credential_loader._marcar_last_used`) e é COMMITADO aqui mesmo: a sessão
-    de request faz rollback no `finally`, e um carimbo pendente sumiria sem
-    ninguém notar. `commit=False` só para quem já está dentro de uma transação
-    própria e vai commitá-la. Se o UPDATE falha, o lock do Redis é devolvido
-    para a próxima request tentar de novo — senão o minuto ficaria queimado
-    sem carimbo. Nunca levanta.
+    The throttle is a `SET NX EX 60` in Redis: whoever wins the lock writes;
+    the others do not even touch the database. Redis unavailable = no stamp.
+    The UPDATE runs in a SAVEPOINT so as not to poison the caller's
+    transaction (modeled on `credential_loader._marcar_last_used`) and is
+    COMMITTED right here: the request session rolls back in the `finally`,
+    and a pending stamp would vanish without anyone noticing. `commit=False`
+    only for those already inside their own transaction who will commit it.
+    If the UPDATE fails, the Redis lock is released for the next request to
+    try again — otherwise the minute would be burned without a stamp. Never
+    raises.
     """
     chave = f"pat:lu:{token.id_hash}"
     try:
         ganhou = await redis.set(chave, "1", nx=True, ex=THROTTLE_ULTIMO_USO_SEGUNDOS)
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         logger.debug("Throttle de last_used_at indisponível: %s", exc)
         return False
     if not ganhou:

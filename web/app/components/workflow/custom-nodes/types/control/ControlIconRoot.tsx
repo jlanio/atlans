@@ -8,7 +8,7 @@ interface ControlIconRootProps extends NodeProps {
   children: ReactNode
 }
 
-// `selected` vem da prop do React Flow — ver o comentário em default-type.tsx.
+// `selected` comes from the React Flow prop — see the comment in default-type.tsx.
 const ControlIconRoot = ({ children, id, data, selected }: ControlIconRootProps) => {
 
   const { toolState, handleToolState } = useTools()
@@ -32,6 +32,6 @@ const ControlIconRoot = ({ children, id, data, selected }: ControlIconRootProps)
   )
 }
 
-// memo: evita re-render quando o pai (ex: ConditionalIcon) re-renderiza sem
-// mudança real nos props do node.
+// memo: avoids re-rendering when the parent (e.g. ConditionalIcon) re-renders
+// without a real change in the node's props.
 export default memo(ControlIconRoot);

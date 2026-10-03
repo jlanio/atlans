@@ -1,16 +1,16 @@
 /**
- * Quais grupos ficam recolhidos, entre uma visita e outra.
+ * Which groups stay collapsed, from one visit to the next.
  *
- * Era `useState` puro: quem recolhia os grupos que não usa via tudo aberto de
- * novo ao recarregar, e recolhia tudo outra vez. Numa lista com muitos grupos,
- * o estado é justamente o que torna a página utilizável.
+ * It was plain `useState`: whoever collapsed the groups they do not use saw
+ * everything open again on reload, and collapsed everything once more. In a
+ * list with many groups, this state is exactly what makes the page usable.
  *
- * `localStorage` lança em janela privada e com a cota cheia — e um erro ao
- * LER não pode impedir a página de abrir. Toda operação é protegida, e o
- * fracasso é "nenhum grupo recolhido", que é o estado inicial de sempre.
+ * `localStorage` throws in a private window and with the quota full — and an
+ * error when READING must not keep the page from opening. Every operation is
+ * guarded, and failure is "no group collapsed", which is the usual initial state.
  *
- * A chave é por workspace: recolher um grupo num workspace não deve mexer na
- * leitura de outro, onde os ids nem existem.
+ * The key is per workspace: collapsing a group in one workspace must not touch
+ * the reading of another, where the ids do not even exist.
  */
 const PREFIXO = "atlans:grupos-recolhidos"
 
@@ -23,8 +23,8 @@ export function lerColapsados(chave: string): Set<string> {
     const cru = window.localStorage.getItem(chave)
     if (!cru) return new Set()
     const lista = JSON.parse(cru)
-    // Conteúdo de outra versão, ou editado à mão: vale mais começar do zero do
-    // que deixar um `Set` com números dentro chegar ao `has()`.
+    // Content from another version, or edited by hand: better to start from scratch
+    // than to let a `Set` with numbers inside reach `has()`.
     if (!Array.isArray(lista)) return new Set()
     return new Set(lista.filter((x): x is string => typeof x === "string"))
   } catch {
@@ -36,6 +36,6 @@ export function gravarColapsados(chave: string, recolhidos: Set<string>): void {
   try {
     window.localStorage.setItem(chave, JSON.stringify([...recolhidos]))
   } catch {
-    // Preferência de exibição não vale interromper nada.
+    // A display preference is not worth interrupting anything.
   }
 }

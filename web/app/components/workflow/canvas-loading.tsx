@@ -4,22 +4,22 @@ import { useEffect, useRef, useState } from "react"
 import { useStore } from "@xyflow/react"
 import { CAMADA_SO_LEITURA } from "./canvas-layers"
 
-/** Espera antes de mostrar a animação: uma carga que termina antes disso não
- *  merece indicador — ele só piscaria. */
+/** Wait before showing the animation: a load that finishes before this doesn't
+ *  deserve an indicator — it would only blink. */
 export const ATRASO_PARA_MOSTRAR_MS = 150
 
-/** Tendo aparecido, fica pelo menos isto. Sumir logo depois de aparecer é o
- *  mesmo piscar, visto do outro lado. */
+/** Once it has appeared, it stays at least this long. Disappearing right after
+ *  appearing is the same blink, seen from the other side. */
 export const EXIBICAO_MINIMA_MS = 450
 
-/** Quanto tempo a classe de revelação fica no canvas (cobre a animação de
- *  entrada do grafo, em globals.css). */
+/** How long the reveal class stays on the canvas (covers the graph's entrance
+ *  animation, in globals.css). */
 const DURACAO_DA_REVELACAO_MS = 700
 
 /**
- * Traduz "o canvas está carregando" em "a animação está visível", com as duas
- * folgas acima. Se a carga volta a ficar pendente enquanto a animação ainda
- * está no ar (troca rápida de workflow), ela simplesmente continua.
+ * Translates "the canvas is loading" into "the animation is visible", with the two
+ * margins above. If the load becomes pending again while the animation is still
+ * on air (quick workflow switch), it simply continues.
  */
 export function useCarregamentoVisivel(carregando: boolean): boolean {
   const [visivel, setVisivel] = useState(false)
@@ -44,27 +44,28 @@ export function useCarregamentoVisivel(carregando: boolean): boolean {
 }
 
 interface Props {
-  /** A rota tem id e o grafo ainda não foi hidratado no canvas. */
+  /** The route has an id and the graph hasn't been hydrated on the canvas yet. */
   carregando: boolean
 }
 
 /**
- * O que o canvas mostra enquanto o workflow não chega.
+ * What the canvas shows while the workflow hasn't arrived.
  *
- * Antes, nada: a página abria com o canvas vazio, a trilha dizendo "Sem nome"
- * e o botão de adicionar nó pulsando como se o workflow fosse novo — durante a
- * busca, a tela afirmava coisas que não eram verdade.
+ * Before, nothing: the page opened with an empty canvas, the breadcrumb saying
+ * "Sem nome" (untitled) and the add-node button pulsing as if the workflow were
+ * new — during the fetch, the screen asserted things that weren't true.
  *
- * Um mini fluxo de três nós no centro: um pacote na cor da marca percorre as
- * ligações e cada nó acende ao ser alcançado. É um pedaço do editor, não um
- * spinner por cima dele. Os estilos moram em globals.css ("Canvas em espera").
+ * A mini workflow of three nodes in the center: a packet in the brand color
+ * travels the links and each node lights up when reached. It's a piece of the
+ * editor, not a spinner on top of it. The styles live in globals.css
+ * ("Canvas em espera").
  *
- * Também marca o contêiner `.react-flow` com `rf-carregando` — é o que esmaece
- * as colunas de botões sem que cada uma precise saber da carga — e, ao
- * terminar, com `rf-revelando`, que faz o grafo entrar em fade em vez de corte.
- * Mesmo mecanismo do CanvasViewLayer para o realce de caminho.
+ * It also marks the `.react-flow` container with `rf-carregando` — which is what
+ * fades the button columns without each one needing to know about the load — and,
+ * when done, with `rf-revelando`, which makes the graph fade in instead of cut in.
+ * Same mechanism as CanvasViewLayer for the path highlight.
  *
- * Renderizar como filho de `<ReactFlow>`.
+ * Render as a child of `<ReactFlow>`.
  */
 export default function CanvasLoading({ carregando }: Props) {
   const domNode = useStore(s => s.domNode)
@@ -79,8 +80,8 @@ export default function CanvasLoading({ carregando }: Props) {
       estavaCarregando.current = true
       return
     }
-    // Só revela o que de fato esperou: abrir a tela de criação, ou trocar de
-    // workflow com o grafo já em mãos, não é chegada de nada.
+    // Only reveals what actually waited: opening the create screen, or switching
+    // workflows with the graph already in hand, isn't an arrival of anything.
     if (!estavaCarregando.current) return
     estavaCarregando.current = false
     domNode.classList.add("rf-revelando")

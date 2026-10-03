@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 
-// Shimmer contínuo: comunica "dado chegando" em vez de "tela congelada".
-// Gradiente animado move-se horizontalmente com background-size 200%.
+// Continuous shimmer: conveys "data arriving" instead of "frozen screen".
+// An animated gradient moves horizontally with background-size 200%.
 function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

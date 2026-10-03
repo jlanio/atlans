@@ -1,25 +1,27 @@
 // web/lib/fundos-do-mapa.ts
 //
-// Os fundos (basemaps) do mapa: ruas, satélite e satélite com rótulos.
+// The map's basemaps: streets, satellite and satellite with labels.
 //
-// O código não traz servidor de tiles nenhum além do OpenStreetMap (as ruas):
-// imagem de satélite exige um provedor e os termos dele, e cada instalação
-// escolhe o seu. As URLs vêm do ambiente do servidor web — as MESMAS variáveis
-// que a API usa para os nós Carta (`app/core/config.py`, MAPA_*) — lidas pelo
-// layout raiz a cada pedido e passadas ao cliente por contexto
-// (`app/components/share/fundos-do-mapa.tsx`). NEXT_PUBLIC_* não serviria: o
-// valor seria gravado no build, e a imagem é a mesma para toda instalação.
+// The code ships no tile server other than OpenStreetMap (the streets):
+// satellite imagery requires a provider and its terms, and each installation
+// picks its own. The URLs come from the web server's environment — the SAME
+// variables the API uses for the Carta nodes (`app/core/config.py`, MAPA_*) —
+// read by the root layout on every request and passed to the client via
+// context (`app/components/share/fundos-do-mapa.tsx`). NEXT_PUBLIC_* would not
+// work: the value would be baked in at build time, and the image is the same
+// for every installation.
 //
-// Sem satélite configurado, o portal não oferece o alternador, e a Home (que
-// nasce no híbrido) cai no satélite e, sem ele, nas ruas.
+// Without satellite configured, the portal does not offer the switcher, and
+// the Home (which starts on hybrid) falls back to satellite and, without it,
+// to streets.
 
-/** Os três fundos que o mapa conhece. */
+/** The three basemaps the map knows. */
 export type Basemap = "streets" | "satellite" | "hybrid"
 
 export interface FundoDoMapa {
   /** Template com {z}, {x} e {y}. */
   url: string
-  /** A atribuição exigida pelo provedor, em texto puro. */
+  /** The attribution required by the provider, in plain text. */
   credito: string
 }
 
@@ -46,7 +48,7 @@ function lerFundo(env: Record<string, string | undefined>, prefixo: string): Fun
   return { url, credito: (env[`MAPA_${prefixo}_CREDITO`] ?? "").trim() }
 }
 
-/** Os fundos desta instalação, a partir do ambiente do servidor (MAPA_*). */
+/** This installation's basemaps, from the server's environment (MAPA_*). */
 export function lerFundosDoAmbiente(env: Record<string, string | undefined>): FundosDoMapa {
   const fundos: FundosDoMapa = { ruas: lerFundo(env, "RUAS") ?? RUAS_PADRAO }
   const satelite = lerFundo(env, "SATELITE")
@@ -56,14 +58,15 @@ export function lerFundosDoAmbiente(env: Record<string, string | undefined>): Fu
   return fundos
 }
 
-/** O crédito vai como HTML no controle de atribuição do MapLibre: escapado. */
+/** The credit goes as HTML in MapLibre's attribution control: escaped. */
 function escapar(texto: string): string {
   return texto.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
 }
 
 /**
- * O fundo que o mapa usa para um basemap pedido: o híbrido cai no satélite, e o
- * satélite nas ruas, quando a instalação não os configurou.
+ * The basemap the map uses for a requested basemap: hybrid falls back to
+ * satellite, and satellite to streets, when the installation has not
+ * configured them.
  */
 export function conjuntoDoFundo(fundos: FundosDoMapa, basemap: Basemap): { tiles: string[]; attribution: string } {
   const fundo =

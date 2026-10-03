@@ -1,5 +1,5 @@
 "use client"
-// Diálogo de parâmetros de execução — gerado dinamicamente a partir do params_schema do workflow
+// Execution parameters dialog — generated dynamically from the workflow's params_schema
 import { useState } from "react"
 import {
   Dialog, DialogContent, DialogDescription,
@@ -22,7 +22,7 @@ interface ExecuteParamsDialogProps {
   paramsSchema: Record<string, ParamSchema>
   onConfirm: (inputs: Record<string, unknown>) => void
   onCancel: () => void
-  /** A Home passa `home-portal`: o conteúdo é portado ao <body>, fora da paleta dela. */
+  /** Home passes `home-portal`: the content is portaled to <body>, outside its palette. */
   className?: string
 }
 

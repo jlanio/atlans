@@ -1,21 +1,21 @@
-"""Helpers de datetime — evitam o deprecated `datetime.utcnow()` do Python 3.12+.
+"""Datetime helpers — avoid Python 3.12+'s deprecated `datetime.utcnow()`.
 
-Contexto: `datetime.utcnow()` foi deprecado na 3.12 e será removido em versões
-futuras. O substituto oficial é `datetime.now(timezone.utc)`, que retorna um
-datetime timezone-aware.
+Context: `datetime.utcnow()` was deprecated in 3.12 and will be removed in
+future versions. The official replacement is `datetime.now(timezone.utc)`,
+which returns a timezone-aware datetime.
 
-Porém, muitas colunas SQLAlchemy do projeto são `DateTime` (sem `timezone=True`)
-e esperam valores naive. Para preservar esse contrato, `utc_now_naive()` remove
-o tzinfo antes de retornar.
+However, many of the project's SQLAlchemy columns are `DateTime` (without
+`timezone=True`) and expect naive values. To preserve that contract,
+`utc_now_naive()` strips the tzinfo before returning.
 """
 from datetime import datetime, timezone
 
 
 def utc_now_naive() -> datetime:
-    """Retorna datetime UTC naive (sem tzinfo).
+    """Returns a naive UTC datetime (no tzinfo).
 
-    Substituto drop-in para `datetime.utcnow()` — compatível com colunas
-    SQLAlchemy DateTime sem timezone. Preserva o comportamento histórico
-    do projeto.
+    Drop-in replacement for `datetime.utcnow()` — compatible with SQLAlchemy
+    DateTime columns without timezone. Preserves the project's historical
+    behavior.
     """
     return datetime.now(timezone.utc).replace(tzinfo=None)

@@ -1,9 +1,9 @@
 "use client"
 
-// "Esqueceu a senha?", dentro do modal: o que a página /forgot-password fazia,
-// sem sair da Home. Pede o e-mail, dispara o link de redefinição e mostra o
-// aviso de "olhe a caixa de entrada" no mesmo lugar — o painel troca, o modal
-// não fecha, e a mensagem que ficou na barra continua esperando.
+// "Esqueceu a senha?", inside the modal: what the /forgot-password page did,
+// without leaving the Home. Asks for the e-mail, sends the reset link and shows
+// the "check your inbox" notice in the same place — the panel switches, the
+// modal does not close, and the message left in the bar keeps waiting.
 
 import { useState } from "react"
 import axios from "axios"
@@ -17,9 +17,9 @@ import { BotaoDoModal, LinkDoModal } from "./botao-do-modal"
 
 interface Props {
   onEnviando: (enviando: boolean) => void
-  /** "Lembrou a senha? Entrar" — troca para o painel de login. */
+  /** "Lembrou a senha? Entrar" — switches to the login panel. */
   onEntrar: () => void
-  /** O pedido saiu: o modal troca a descrição do cabeçalho. */
+  /** The request went out: the modal changes the header description. */
   onEnviado: (enviado: boolean) => void
 }
 
@@ -36,9 +36,9 @@ export function PainelRecuperar({ onEnviando, onEntrar, onEnviado }: Props) {
     try {
       await axios.post(`${API_URL}/auth/forgot-password`, { email })
     } catch {
-      // O sucesso é mostrado mesmo no erro, DE PROPÓSITO: dizer "este e-mail
-      // não existe" entrega quem tem conta aqui (enumeração). O backend já
-      // responde igual nos dois casos; a interface não pode desmentir isso.
+      // Success is shown even on error, ON PURPOSE: saying "this e-mail does not
+      // exist" gives away who has an account here (enumeration). The backend
+      // already answers the same in both cases; the interface must not contradict that.
     } finally {
       setLoading(false)
       onEnviando(false)

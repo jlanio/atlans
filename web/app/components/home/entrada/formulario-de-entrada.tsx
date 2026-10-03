@@ -1,9 +1,9 @@
 "use client"
 
-// O formulário de login do modal de entrada. A lógica é a da antiga página
-// /login, movida para cá sem a navegação: o POST /auth/login devolve os tokens,
-// o `signIn` do next-auth (sem redirect) grava o cookie E atualiza o
-// `useSession` da aba — o modal fecha e a Home segue no lugar.
+// The login form of the sign-in modal. The logic is that of the old /login
+// page, moved here without the navigation: POST /auth/login returns the tokens,
+// next-auth's `signIn` (without redirect) writes the cookie AND updates the
+// tab's `useSession` — the modal closes and the Home stays in place.
 
 import { useState } from "react"
 import { signIn } from "next-auth/react"
@@ -21,25 +21,26 @@ import { ehRecusaDoServidor } from "./recusas"
 interface Props {
   /** Um envio em voo: o modal trava o fechamento enquanto durar. */
   onEnviando: (enviando: boolean) => void
-  /** O login deu certo — a sessão já está atualizada. */
+  /** Login succeeded — the session is already updated. */
   onEntrou: () => void
-  /** "Não tem conta? Criar conta": troca para o painel de cadastro. */
+  /** "Não tem conta? Criar conta": switches to the sign-up panel. */
   onCriarConta: () => void
-  /** "Esqueceu a senha?": troca para o painel de recuperação. */
+  /** "Esqueceu a senha?": switches to the recovery panel. */
   onRecuperar: () => void
   /**
-   * "Reenviar e-mail de verificação" (o 403 de conta não verificada): troca
-   * para o painel de verificação. Leva o que foi digitado quando isso já é um
-   * e-mail — o campo aceita e-mail OU usuário, e o reenvio só sabe e-mail.
+   * "Reenviar e-mail de verificação" (the 403 for an unverified account):
+   * switches to the verification panel. Carries what was typed when it is
+   * already an e-mail — the field accepts e-mail OR username, and the resend
+   * only knows e-mail.
    */
   onVerificar: (email: string) => void
 }
 
 export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecuperar, onVerificar }: Props) {
   const t = useTextos().entrada.formularioDeEntrada
-  // Em português, a recusa do servidor COMO VEIO (a de sempre); em inglês e
-  // espanhol, a mesma recusa pelo texto do idioma — o servidor só fala
-  // português (ver ./recusas).
+  // In Portuguese, the server's rejection AS IT CAME (as always); in English and
+  // Spanish, the same rejection via the language's text — the server only speaks
+  // Portuguese (see ./recusas).
   const traduzir = useIdiomaDaTela() !== "pt-BR"
   const [identifier, setIdentifier] = useState("")
   const [password, setPassword] = useState("")
@@ -75,19 +76,19 @@ export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecu
       } else if (status === 403 && errCode === "email_not_verified") {
         setError({ message: traduzir ? t.emailNaoVerificado : message, emailNotVerified: true })
       } else if (status === 429) {
-        // Dois 429 diferentes: o bloqueio da CONTA (do servidor, com
-        // Retry-After) e o limite por conexão (5 por minuto, do limitador —
-        // conta nenhuma bloqueada, e a janela passa em um minuto).
+        // Two different 429s: the ACCOUNT lockout (from the server, with
+        // Retry-After) and the per-connection limit (5 per minute, from the
+        // limiter — no account locked, and the window passes in a minute).
         const minutos = minutosDoRetryAfter(axiosErr.response.headers?.["retry-after"])
         const texto = doServidor ? t.contaBloqueada(minutos) : t.muitasTentativas
         setError({ message: traduzir ? texto : message, locked: true })
       } else if (traduzir && !doServidor) {
-        // O proxy fora do ar, um 500 inesperado, a página de erro de uma CDN.
+        // The proxy down, an unexpected 500, a CDN's error page.
         setError({ message: t.erroAoEntrar })
       } else if (traduzir && status === 401) {
         setError({ message: t.credenciaisInvalidas })
       } else if (traduzir && status === 403) {
-        // Conta suspensa, excluída ou desativada: o status não diz qual.
+        // Account suspended, deleted or deactivated: the status does not say which.
         setError({ message: t.contaIndisponivel })
       } else {
         setError({ message })
@@ -128,9 +129,9 @@ export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecu
           required
           disabled={bloqueado}
           labelRight={
-            // Botão, não link: a recuperação virou um painel deste mesmo modal
-            // (/forgot-password só redireciona para cá). Navegar levaria a
-            // pessoa para fora da Home e jogaria fora a mensagem pendente.
+            // Button, not link: recovery became a panel of this same modal
+            // (/forgot-password only redirects here). Navigating would take the
+            // person out of the Home and throw away the pending message.
             <LinkDoModal onClick={onRecuperar} className="text-xs underline-offset-2">
               {t.esqueceuASenha}
             </LinkDoModal>
@@ -156,7 +157,7 @@ export function FormularioDeEntrada({ onEnviando, onEntrou, onCriarConta, onRecu
   )
 }
 
-/** `Retry-After` em segundos → minutos inteiros para a frase (null quando não veio). */
+/** `Retry-After` in seconds → whole minutes for the sentence (null when absent). */
 function minutosDoRetryAfter(valor: unknown): number | null {
   const segundos = Number(valor)
   return Number.isFinite(segundos) && segundos > 0 ? Math.ceil(segundos / 60) : null

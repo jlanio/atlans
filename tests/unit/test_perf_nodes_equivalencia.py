@@ -1,8 +1,8 @@
-"""Equivalência de saída dos nós otimizados no batch de desempenho.
+"""Output equivalence of the nodes optimized in the performance batch.
 
-Os refactors (índice espacial no PartitionNode, compilação única do template no
-SetFields) mudam o COMO, não o QUE: estes testes fixam o resultado esperado para
-uma entrada conhecida, de modo que qualquer regressão de comportamento apareça.
+The refactors (spatial index in PartitionNode, single template compilation in
+SetFields) change the HOW, not the WHAT: these tests pin the expected result for
+a known input, so that any behavior regression shows up.
 """
 import pytest
 
@@ -15,9 +15,9 @@ from flow.nodes.action.field_transformer import SetFields  # noqa: E402
 
 
 async def test_partition_indexado_mantem_todas_as_feicoes():
-    """Grade 2x2 sobre 4 pontos, um por quadrante: 4 tiles não-vazios, 1 feição
-    cada, nenhuma feição perdida ou duplicada. Prova que o índice espacial
-    devolve o mesmo conjunto que o scan elementwise antigo (predicado intersects)."""
+    """2x2 grid over 4 points, one per quadrant: 4 non-empty tiles, 1 feature
+    each, no feature lost or duplicated. Proves the spatial index returns the
+    same set as the old elementwise scan (intersects predicate)."""
     pts = gpd.GeoDataFrame(
         {"id": [1, 2, 3, 4]},
         geometry=[Point(1, 1), Point(9, 1), Point(1, 9), Point(9, 9)],
@@ -26,34 +26,34 @@ async def test_partition_indexado_mantem_todas_as_feicoes():
     node = PartitionNode("n", {"nPartitions": 4})  # ceil(sqrt(4)) = 2 → grade 2x2
     tiles = (await node.execute({"input": pts}))["output"]
 
-    assert len(tiles) == 4                      # um por quadrante, todos não-vazios
-    assert all(len(t) == 1 for t in tiles)      # uma feição por tile
+    assert len(tiles) == 4                      # one per quadrant, all non-empty
+    assert all(len(t) == 1 for t in tiles)      # one feature per tile
     ids = sorted(int(t.iloc[0]["id"]) for t in tiles)
-    assert ids == [1, 2, 3, 4]                  # nenhuma perdida, nenhuma duplicada
+    assert ids == [1, 2, 3, 4]                  # none lost, none duplicated
 
 
 async def test_partition_tile_vazio_e_omitido():
-    """Um ponto só numa grade 2x2: só o tile que o contém entra no resultado."""
+    """A single point in a 2x2 grid: only the tile that contains it enters the result."""
     pts = gpd.GeoDataFrame(
         {"id": [1]}, geometry=[Point(0, 0)], crs="EPSG:3857",
     )
-    # bbox degenerada (um ponto) → o nó devolve a cópia inteira num tile só.
+    # degenerate bbox (a point) → the node returns the whole copy in a single tile.
     tiles = (await PartitionNode("n", {"nPartitions": 4}).execute({"input": pts}))["output"]
     assert len(tiles) == 1
     assert len(tiles[0]) == 1
 
 
 async def test_setfields_compila_uma_vez_rende_por_linha():
-    """Expressão por linha, valor fixo e coerção numérica: o resultado por linha
-    é o mesmo com a compilação única do template."""
+    """Per-row expression, fixed value and numeric coercion: the per-row result
+    is the same with the single template compilation."""
     gdf = gpd.GeoDataFrame(
         {"area": [1_000_000, 2_000_000, 3_000_000]},
         geometry=[Point(0, 0), Point(1, 1), Point(2, 2)],
         crs="EPSG:3857",
     )
     node = SetFields("n", {"setFields": {
-        "area_km2": "{{ row.area / 1000000 }}",   # expressão → float por linha
-        "dobro":    "{{ row.area * 2 }}",          # expressão → int por linha
+        "area_km2": "{{ row.area / 1000000 }}",   # expression → float per row
+        "dobro":    "{{ row.area * 2 }}",          # expression → int per row
         "status":   "ativo",                        # valor fixo
     }})
     out = (await node.execute({"input": gdf}))["output"]
@@ -64,7 +64,7 @@ async def test_setfields_compila_uma_vez_rende_por_linha():
 
 
 async def test_setfields_sem_expressao_usa_caminho_vetorial():
-    """Só valores fixos: atribuição direta, resultado inalterado."""
+    """Fixed values only: direct assignment, unchanged result."""
     gdf = gpd.GeoDataFrame(
         {"a": [1, 2]}, geometry=[Point(0, 0), Point(1, 1)], crs="EPSG:3857",
     )
@@ -73,15 +73,15 @@ async def test_setfields_sem_expressao_usa_caminho_vetorial():
 
 
 async def test_setfields_valor_fixo_lista_e_replicado_por_linha():
-    """Regressão: valor fixo NÃO-escalar (lista) num campo misto com expressão.
-    Sem o cuidado, `gdf[col] = ["x","y"]` atribuiria elemento a elemento; o
-    esperado (como o comportamento antigo) é a MESMA lista em cada célula."""
+    """Regression: a NON-scalar fixed value (list) in a field mixed with an expression.
+    Without care, `gdf[col] = ["x","y"]` would assign element by element; the
+    expected result (like the old behavior) is the SAME list in every cell."""
     gdf = gpd.GeoDataFrame(
         {"a": [1, 2]}, geometry=[Point(0, 0), Point(1, 1)], crs="EPSG:3857",
     )
     node = SetFields("n", {"setFields": {
-        "e": "{{ row.a }}",       # força o caminho linha-a-linha
-        "tags": ["x", "y"],       # valor fixo não-escalar
+        "e": "{{ row.a }}",       # forces the row-by-row path
+        "tags": ["x", "y"],       # non-scalar fixed value
     }})
     out = (await node.execute({"input": gdf}))["output"]
     assert list(out["tags"]) == [["x", "y"], ["x", "y"]]
@@ -89,8 +89,8 @@ async def test_setfields_valor_fixo_lista_e_replicado_por_linha():
 
 
 async def test_spatial_filter_intersects_indice_nao_unico():
-    """Regressão: índice duplicado não pode super-selecionar. b(0) está FORA da
-    máscara e não pode entrar só por compartilhar o rótulo 0 com a(0)."""
+    """Regression: a duplicate index must not over-select. b(0) is OUTSIDE the
+    mask and must not get in just because it shares label 0 with a(0)."""
     layer = gpd.GeoDataFrame(
         {"id": ["a", "b", "c"]},
         geometry=[Point(1, 1), Point(100, 100), Point(2, 2)],
@@ -104,8 +104,8 @@ async def test_spatial_filter_intersects_indice_nao_unico():
 
 
 async def test_spatial_filter_intersects_com_coluna_index_right():
-    """Regressão: uma coluna 'index_right' pré-existente (ex.: saída de um
-    SpatialJoin anterior) não pode fazer o sjoin levantar ValueError."""
+    """Regression: a pre-existing 'index_right' column (e.g. output of an earlier
+    SpatialJoin) must not make sjoin raise ValueError."""
     layer = gpd.GeoDataFrame(
         {"id": ["a"], "index_right": [99]},
         geometry=[Point(1, 1)], crs="EPSG:3857",

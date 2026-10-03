@@ -1,41 +1,41 @@
 """
-Validação de uma definição de workflow sem executar — o núcleo por trás da
-tool `validate_workflow` do servidor MCP e da validação que as tools de
-construção rodam antes de gravar. Existia também a casca REST
-`POST /workflows/validate`; saiu por não ter chamador (a web nunca a usou, e a
-skill que a chamava foi absorvida pelo MCP).
+Validation of a workflow definition without executing it — the core behind the
+MCP server's `validate_workflow` tool and the validation that the building
+tools run before saving. There was also the REST shell
+`POST /workflows/validate`; it was removed for having no caller (the web never used it, and the
+skill that called it was absorbed by the MCP).
 
-Ordem, e o porquê dela:
+Order, and the reason for it:
 
-1. Corpo (Pydantic) — `properties` é sinônimo de `parameters` (a definição
-   persistida usa um nome, o corpo do validate usa o outro), `alias` chega ao
-   executor, `position` é ignorado, `workspace_id` é opcional.
-2. Lint puro (`flow/utils/definition_lint.py`), ANTES de construir o executor:
-   nó inexistente e ciclo estouravam dentro de `WorkflowExecutor.__init__` e
-   viravam um 500 genérico com a causa mascarada; id duplicado sobrescrevia o
-   nó em silêncio. Agora os três viram **422** com o relatório no corpo
-   (`DefinicaoInvalidaError`) — e `credential_id` que não é UUID também (era
-   403; fatal por contrato, para quem só olha o status HTTP seguir reprovando).
-3. Sessão de banco só quando há o que checar — credencial ou `workspace_id`.
-   O caso comum (definição solta, sem credencial) continua sem abrir sessão
-   própria: o CI não tem Postgres e a validação não deve pagar por uma
-   conexão que não usa. Referências de sub-fluxo só são conferidas COM
-   `workspace_id`: sem a filiação provada, a consulta por hash seria um
-   oráculo de existência, estado e portas de workflows de outros workspaces.
-4. Com `workspace_id`: primeiro a filiação (403 antes de olhar credenciais,
-   para não revelar a existência de uma credencial a quem não é do
-   workspace); as credenciais compartilhadas com o workspace só entram no
-   escopo para quem tem papel `operator` ou superior — o mesmo exigido para
-   executar, porque a simulação do DatabaseSpatialQuery CONECTA ao banco da
-   credencial; abaixo disso vale só o escopo do próprio usuário. Depois, as
-   checagens que precisam de banco (nós desabilitados pelo admin, referências
-   de sub-fluxo).
-5. Executor → simulação → diagnósticos de aresta; o resultado é
-   `{node_id: {...}}` + `__edge_diagnostics__` (só quando há) + `__report__`
-   (sempre; consumidores pulam as chaves `__*`).
+1. Body (Pydantic) — `properties` is a synonym of `parameters` (the persisted
+   definition uses one name, the validate body uses the other), `alias` reaches the
+   executor, `position` is ignored, `workspace_id` is optional.
+2. Pure lint (`flow/utils/definition_lint.py`), BEFORE building the executor:
+   a nonexistent node and a cycle blew up inside `WorkflowExecutor.__init__` and
+   became a generic 500 with the cause masked; a duplicate id silently overwrote the
+   node. Now all three become **422** with the report in the body
+   (`DefinicaoInvalidaError`) — and a `credential_id` that is not a UUID too (it was
+   403; fatal by contract, so that whoever only looks at the HTTP status keeps failing it).
+3. Database session only when there is something to check — a credential or `workspace_id`.
+   The common case (standalone definition, no credential) still does not open its own
+   session: the CI has no Postgres and validation should not pay for a
+   connection it does not use. Sub-workflow references are only checked WITH
+   `workspace_id`: without proven membership, the lookup by hash would be an
+   oracle of the existence, state and ports of other workspaces' workflows.
+4. With `workspace_id`: membership first (403 before looking at credentials,
+   so as not to reveal the existence of a credential to someone who is not in the
+   workspace); credentials shared with the workspace only enter the
+   scope for those with the `operator` role or higher — the same required to
+   execute, because the DatabaseSpatialQuery simulation CONNECTS to the
+   credential's database; below that only the user's own scope applies. Then, the
+   checks that need the database (nodes disabled by the admin, sub-workflow
+   references).
+5. Executor → simulation → edge diagnostics; the result is
+   `{node_id: {...}}` + `__edge_diagnostics__` (only when present) + `__report__`
+   (always; consumers skip the `__*` keys).
 
-O cerco de credenciais é o que impede alguém que conheça o UUID de uma
-credencial alheia de executar SQL na infraestrutura de outro usuário.
+The credential fence is what prevents someone who knows the UUID of someone else's
+credential from executing SQL on another user's infrastructure.
 """
 from __future__ import annotations
 
@@ -86,18 +86,18 @@ class NodeParameter(BaseModel):
     name: str
     type: str
     parameters: Dict[str, Any] = {}
-    # O alias vive no topo do nó na definição persistida e é o que o executor lê
-    # (`flow/core/aliases.py`); sem ele aqui, o lint de alias não teria o que ver.
+    # The alias lives at the top of the node in the persisted definition and is what the executor reads
+    # (`flow/core/aliases.py`); without it here, the alias lint would have nothing to see.
     alias: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
     def _fundir_properties(cls, data: Any) -> Any:
-        # A definição persistida usa `properties`; o corpo do validate, `parameters`.
-        # Colar uma na outra perdia todos os valores em silêncio (extra='ignore').
-        # Em conflito, `parameters` (o formato deste corpo) vence. Um `parameters`
-        # que não é objeto fica como está, para o Pydantic acusar 422 — um
-        # TypeError aqui dentro viraria 500.
+        # The persisted definition uses `properties`; the validate body, `parameters`.
+        # Pasting one into the other silently lost all values (extra='ignore').
+        # On conflict, `parameters` (this body's format) wins. A `parameters`
+        # that is not an object is left as is, so Pydantic reports 422 — a
+        # TypeError in here would become a 500.
         if isinstance(data, dict) and isinstance(data.get("properties"), dict):
             atuais = data.get("parameters")
             if atuais is None or isinstance(atuais, dict):
@@ -109,11 +109,11 @@ class NodeParameter(BaseModel):
 class EdgeDefinition(BaseModel):
     source: str
     target: str
-    # O Pydantic descarta o que nao esta declarado, e `payload = definition.dict()`
-    # ia direto para o WorkflowExecutor. Sem estes campos a simulacao caia sempre
-    # no ramo "sem from_key" (core.py:765) e nomeava as entradas com o parent_id:
-    # o schema do preview divergia do que o run produzia de fato. Um painel que
-    # discorda do runtime e pior que painel nenhum.
+    # Pydantic discards what is not declared, and `payload = definition.dict()`
+    # went straight to the WorkflowExecutor. Without these fields the simulation always fell
+    # into the "no from_key" branch (core.py:765) and named the inputs with the parent_id:
+    # the preview schema diverged from what the run actually produced. A panel that
+    # disagrees with the runtime is worse than no panel at all.
     from_key: Optional[str] = None
     to_key: Optional[str] = None
     condition: Optional[bool] = None
@@ -122,18 +122,18 @@ class EdgeDefinition(BaseModel):
 class WorkflowDefinition(BaseModel):
     nodes: List[NodeParameter]
     edges: List[EdgeDefinition]
-    # Opcional de propósito: sem ele a validação continua funcionando sem banco;
-    # com ele, entram as checagens que dependem do workspace (§4 do módulo).
+    # Optional on purpose: without it validation keeps working without a database;
+    # with it, the checks that depend on the workspace come in (§4 of the module).
     workspace_id: Optional[str] = None
 
 
 # --- HELPERS ---
 def _payload_para_o_executor(definition: WorkflowDefinition) -> dict:
-    """Definição no formato que o executor e os helpers do servidor leem.
+    """Definition in the format the executor and the server helpers read.
 
-    `parameters` e `properties` apontam para o MESMO dict: `simulate_runner` lê
-    `parameters`, `node_props` (servidor) e `collect_subworkflow_references` leem
-    `properties`. Um dict só, para não haver como divergirem.
+    `parameters` and `properties` point to the SAME dict: `simulate_runner` reads
+    `parameters`, `node_props` (server) and `collect_subworkflow_references` read
+    `properties`. A single dict, so there is no way for them to diverge.
     """
     nos = []
     for n in definition.nodes:
@@ -146,10 +146,10 @@ def _payload_para_o_executor(definition: WorkflowDefinition) -> dict:
 
 
 def _credential_ids_validos(nodes: list) -> set:
-    """UUIDs de `credential_id` que vão à guarda de banco. Os malformados não
-    referenciam credencial nenhuma e já reprovaram a definição com 422
-    (`invalid_credential_id` é fatal no lint) antes de chegar aqui — em vez do
-    403 de antes, que mascarava um typo; o filtro fica como cinto e suspensório."""
+    """`credential_id` UUIDs that go to the database guard. The malformed ones do not
+    reference any credential and have already failed the definition with 422
+    (`invalid_credential_id` is fatal in the lint) before getting here — instead of the
+    403 from before, which masked a typo; the filter stays as belt and suspenders."""
     ids: set = set()
     for n in nodes:
         cid = (n.get("parameters") or {}).get("credential_id")
@@ -164,18 +164,18 @@ def _credential_ids_validos(nodes: list) -> set:
 
 
 def _conferir_credenciais(lint: RelatorioLint, nodes: list, descriptors: Dict[str, dict], credenciais: dict) -> None:
-    """Diagnósticos para a credencial que a resolução NÃO vai entregar ao nó:
-    de um tipo que ele não aceita, ou que não tem onde entrar nele
-    (`credential_type_mismatch`), ou vencida (`credential_expired`).
+    """Diagnostics for the credential that the resolution will NOT deliver to the node:
+    of a type it does not accept, or that has nowhere to go in it
+    (`credential_type_mismatch`), or expired (`credential_expired`).
 
-    Só a tela filtra a credencial pelo tipo; pela API e pelo assistente chega
-    qualquer uma, e a resolução a deixa de fora em silêncio. Onde o nó CONSOME
-    o segredo injetado (WFS, HttpRequest, os de banco — declaram `http_auth`
-    ou `connectionString`) isso é execução recusada: erro (não fatal). Onde o
-    nó usa o próprio id (DataOutput e os SaveTo*, com `webhook_token`) a
-    execução segue e só o download do artefato é recusado: aviso — um erro
-    aqui impediria o assistente de gravar uma edição em outro nó.
-    `credenciais` é o que `tipos_e_validades` devolveu para os ids acessíveis.
+    Only the screen filters the credential by type; through the API and the assistant
+    any one arrives, and the resolution silently leaves it out. Where the node CONSUMES
+    the injected secret (WFS, HttpRequest, the database ones — they declare `http_auth`
+    or `connectionString`) this is a refused execution: an error (not fatal). Where the
+    node uses the id itself (DataOutput and the SaveTo*, with `webhook_token`) the
+    execution proceeds and only the artifact download is refused: a warning — an error
+    here would prevent the assistant from saving an edit to another node.
+    `credenciais` is what `tipos_e_validades` returned for the accessible ids.
     """
     for n in nodes:
         cid = (n.get("parameters") or {}).get("credential_id")
@@ -189,8 +189,8 @@ def _conferir_credenciais(lint: RelatorioLint, nodes: list, descriptors: Dict[st
         descriptor = descriptors.get(n.get("name")) or {}
         declaradas = {p.get("name") for p in descriptor.get("properties") or [] if isinstance(p, dict)}
         recebe = propriedade_que_recebe(tipo)
-        # O SaveToS3 declara `s3_auth` e também aceita o Webhook Token do uso
-        # antigo (protege a cópia): consome o segredo só quando é a do S3.
+        # SaveToS3 declares `s3_auth` and also accepts the Webhook Token from the
+        # old usage (protects the copy): it consumes the secret only when it is the S3 one.
         consome = bool(declaradas & {"http_auth", "connectionString"}) or (
             recebe == "s3_auth" and recebe in declaradas
         )
@@ -209,19 +209,19 @@ def _conferir_credenciais(lint: RelatorioLint, nodes: list, descriptors: Dict[st
                 node_id=n.get("id"),
             )
         elif recebe is not None and declaradas and recebe not in declaradas:
-            # Sem `credential_types` declarados (os nós de banco), a FORMA da
-            # credencial decide: uma HTTP não tem onde entrar num nó que só
-            # recebe `connectionString` — a resolução deixa o id e nada mais.
+            # With no declared `credential_types` (the database nodes), the SHAPE of the
+            # credential decides: an HTTP one has nowhere to go in a node that only
+            # receives `connectionString` — the resolution leaves the id and nothing else.
             registrar(
                 "credential_type_mismatch",
                 f"{onde} aponta uma credencial do tipo '{tipo}', que ele não tem onde receber "
                 f"(o nó não declara `{recebe}`) — {desfecho}.",
                 node_id=n.get("id"),
             )
-        # O SaveToS3 usa o MESMO `credential_id` para as duas coisas: com a
-        # credencial S3 escolhida, a cópia registrada como artefato fica sem o
-        # Webhook Token que a protegia — download pelo link, como no nó sem
-        # credencial. É uma escolha possível, mas não pode ser silenciosa.
+        # SaveToS3 uses the SAME `credential_id` for both things: with the
+        # S3 credential chosen, the copy registered as an artifact loses the
+        # Webhook Token that protected it — download via the link, as in the node without a
+        # credential. It is a possible choice, but it cannot be silent.
         if (
             tipo == "s3" and "s3_auth" in declaradas
             and (n.get("parameters") or {}).get("registerArtifact") in (True, "true", "True", 1, "1")
@@ -264,13 +264,13 @@ def _montar_report(
     hints: list,
     source_warnings: Optional[list] = None,
 ) -> dict:
-    """`__report__`: tudo o que a validação achou, num formato só.
+    """`__report__`: everything the validation found, in a single format.
 
-    `errors` junta o lint com o que depende de banco (nó desabilitado, sub-fluxo)
-    e com o que a simulação produziu (aresta com `from_key` inexistente, nó com
-    `status: error`). `ok` é "sem erros" — avisos não derrubam. `source_warnings`
-    são os avisos do catálogo de fontes (`unknown_source`, `failing_source`):
-    também avisos, porque a validação não sonda a fonte — só diz o que sabe.
+    `errors` combines the lint with what depends on the database (disabled node, sub-workflow)
+    and with what the simulation produced (edge with a nonexistent `from_key`, node with
+    `status: error`). `ok` is "no errors" — warnings do not fail it. `source_warnings`
+    are the source catalog warnings (`unknown_source`, `failing_source`):
+    also warnings, because validation does not probe the source — it only says what it knows.
     """
     errors = [d.as_dict() for d in lint.errors]
     warnings = [d.as_dict() for d in lint.warnings]
@@ -330,31 +330,31 @@ def _mensagem_fatal(lint: RelatorioLint) -> str:
     return mensagem
 
 
-# --- NÚCLEO ---
+# --- CORE ---
 async def validar_definicao(
     definition: Union[dict, WorkflowDefinition],
     *,
     user_id: str,
     workspace_id: Optional[str],
 ) -> dict:
-    """Lint da definição, schema de saída de cada nó e diagnósticos de aresta.
+    """Lint of the definition, output schema of each node and edge diagnostics.
 
-    Devolve `{node_id: {status, schema, schema_source} | {status: "error", error}}`
-    + `__edge_diagnostics__` (só quando há) + `__report__` (sempre; `ok` = sem
-    erros). Um `dict` passa por `WorkflowDefinition.model_validate`, com
-    `properties` fundido em `parameters`; um corpo mal formado sobe como
-    `pydantic.ValidationError` para o chamador traduzir.
+    Returns `{node_id: {status, schema, schema_source} | {status: "error", error}}`
+    + `__edge_diagnostics__` (only when present) + `__report__` (always; `ok` = no
+    errors). A `dict` goes through `WorkflowDefinition.model_validate`, with
+    `properties` merged into `parameters`; a malformed body propagates as
+    `pydantic.ValidationError` for the caller to translate.
 
-    `workspace_id` explícito vence o do corpo: o chamador é quem sabe em que
-    workspace está validando (o MCP resolve id-ou-nome antes de chegar aqui);
-    `None` deixa valer o do corpo, onde o campo é opcional.
+    An explicit `workspace_id` wins over the body's: the caller is the one who knows in which
+    workspace it is validating (the MCP resolves id-or-name before getting here);
+    `None` lets the body's apply, where the field is optional.
 
-    Levanta `DefinicaoInvalidaError` (com `.report`) quando o executor nem
-    construiria — nó inexistente, id duplicado, ciclo, `credential_id` que não é
-    UUID, erro de construção; `HTTPException(403)` quando o usuário não é membro
-    do workspace; `HTTPException(503)` com registry vazio (falha de boot, não
-    da definição); `CredentialAccessDeniedError` quando alguma credencial está
-    fora do escopo (com a dica de `workspace_id` quando não houve workspace).
+    Raises `DefinicaoInvalidaError` (with `.report`) when the executor would not even
+    build — nonexistent node, duplicate id, cycle, a `credential_id` that is not a
+    UUID, build error; `HTTPException(403)` when the user is not a member
+    of the workspace; `HTTPException(503)` with an empty registry (boot failure, not
+    of the definition); `CredentialAccessDeniedError` when some credential is
+    out of scope (with the `workspace_id` hint when there was no workspace).
     """
     from flow.executor import WorkflowExecutor
     from flow.registry import NODE_REGISTRY
@@ -365,8 +365,8 @@ async def validar_definicao(
         workspace_id = definition.workspace_id
 
     if not NODE_REGISTRY:
-        # Registry vazio é falha de boot do servidor, não da definição: acusar
-        # "nó inexistente" aqui mandaria o cliente corrigir um nome certo.
+        # An empty registry is a server boot failure, not a definition one: reporting
+        # "nonexistent node" here would send the client to fix a correct name.
         raise HTTPException(status_code=503, detail="Catálogo de nós indisponível neste servidor.")
 
     payload = _payload_para_o_executor(definition)
@@ -381,7 +381,7 @@ async def validar_definicao(
             continue
         try:
             descriptors[nome] = cls.description()
-        except Exception:  # descriptor quebrado não pode derrubar a validação
+        except Exception:  # a broken descriptor cannot bring down the validation
             continue
 
     lint = lint_definition(nodes, payload["edges"], registry_names=NODE_REGISTRY.keys(), descriptors=descriptors)
@@ -397,8 +397,8 @@ async def validar_definicao(
     escopo_compartilhado: Optional[str] = None
     avisos_de_fonte: list = []
     if cred_ids or workspace_id:
-        # UMA sessão, e só aqui — sem Depends(get_db): a maioria das validações
-        # não referencia credencial nem workspace e não deve pagar por uma conexão.
+        # ONE session, and only here — no Depends(get_db): most validations
+        # reference neither a credential nor a workspace and should not pay for a connection.
         async with get_session_async() as db:
             if workspace_id:
                 papel = await get_workspace_member_role(db, workspace_id, user_id)
@@ -416,11 +416,11 @@ async def validar_definicao(
                 except CredentialAccessDeniedError as exc:
                     if workspace_id:
                         raise
-                    # Sem workspace o escopo é só o do usuário: a credencial pode
-                    # ser compartilhada e a pessoa só não sabe que precisa dizer onde.
+                    # Without a workspace the scope is only the user's: the credential may
+                    # be shared and the person just does not know they need to say where.
                     raise CredentialAccessDeniedError(f"{exc.detail} {HINT_WORKSPACE}") from exc
-                # Acessível não é usável: o tipo e a validade decidem se o
-                # Executar a resolve — e é aqui, e não no run, que se avisa.
+                # Accessible is not usable: the type and the validity decide whether
+                # Run resolves it — and it is here, not in the run, that the warning is given.
                 _conferir_credenciais(lint, nodes, descriptors, await tipos_e_validades(db, cred_ids))
             desabilitados = await disabled_names(db)
             disabled_nodes = sorted(nomes & set(desabilitados))
@@ -428,35 +428,35 @@ async def validar_definicao(
                 subworkflow_errors = list(
                     await validate_subworkflow_references_against_db(payload, db, workspace_id=workspace_id)
                 )
-                # O catálogo de fontes: sem rede, uma consulta por definição. Falha
-                # ABERTA aqui também — a validação não depende do catálogo.
+                # The source catalog: no network, one query per definition. Fails
+                # OPEN here too — validation does not depend on the catalog.
                 try:
                     avisos_de_fonte = await fontes_service.conferir_fontes_da_definicao(
                         db, nodes, descriptors, workspace_id,
                     )
-                except Exception:  # pragma: no cover - o serviço já falha aberto
+                except Exception:  # pragma: no cover - the service already fails open
                     avisos_de_fonte = []
 
     try:
         executor = WorkflowExecutor(payload)
     except ValueError as exc:
-        # Rede de segurança: o lint cobre o que se conhece; qualquer outro erro
-        # de construção também é da definição, não do servidor.
+        # Safety net: the lint covers what is known; any other build
+        # error also belongs to the definition, not the server.
         lint.erro("construction_error", str(exc))
         raise DefinicaoInvalidaError(f"Definição inválida: {exc}", report=_montar_report(
             lint, nodes, disabled_nodes=disabled_nodes, subworkflow_errors=subworkflow_errors,
             edge_diagnostics=[], simulated_outputs={}, hints=hints, source_warnings=avisos_de_fonte,
         ))
 
-    # Mesmo escopo do despacho: as credenciais do usuário mais as compartilhadas
-    # com o workspace informado (para quem pode executar) — e nada além disso,
-    # mesmo que um `simulate()` novo apareça.
+    # Same scope as the dispatch: the user's credentials plus those shared
+    # with the given workspace (for whoever can execute) — and nothing beyond that,
+    # even if a new `simulate()` shows up.
     with credential_scope({user_id}, shared_workspace_id=escopo_compartilhado):
         await executor.simulate_runner()
 
-    # Diagnósticos de aresta (from_key defasado = erro; spread ambíguo = aviso).
-    # Sob uma chave reservada, no mesmo padrão de __artifacts__/__response__, para
-    # não se confundir com os schemas por node_id. Só aparece quando há algo.
+    # Edge diagnostics (stale from_key = error; ambiguous spread = warning).
+    # Under a reserved key, in the same pattern as __artifacts__/__response__, so as
+    # not to be confused with the per-node_id schemas. Only appears when there is something.
     diagnostics = executor.validate_edges()
     saida = executor.simulated_outputs
     if diagnostics:

@@ -1,20 +1,20 @@
 # flow/utils/http_retry.py
 """
-Retry com backoff exponencial para chamadas HTTP transitorias executor -> servidor.
+Retry with exponential backoff for transient executor -> server HTTP calls.
 
-Dois entrypoints:
-  - async_request_with_retry: 1 request httpx async, retenta 5xx transitorio e
-    erros de transporte. Usado pelo ChangeDetector.
-  - retry_sync: envolve um bloco sincrono arbitrario (ex: presign + upload do
-    pin.py, onde a pre-signed URL precisa ser re-obtida a cada tentativa).
+Two entrypoints:
+  - async_request_with_retry: 1 async httpx request, retries transient 5xx and
+    transport errors. Used by ChangeDetector.
+  - retry_sync: wraps an arbitrary synchronous block (e.g. presign + upload in
+    pin.py, where the pre-signed URL must be re-obtained on every attempt).
 
-Politica: status 502/503/504 e erros de conexao/timeout sao transitorios.
-4xx (incl. 404) e 500 generico nao sao retentados — propagam imediato.
+Policy: status 502/503/504 and connection/timeout errors are transient.
+4xx (incl. 404) and generic 500 are not retried — they propagate immediately.
 
-Quanto esperar entre as tentativas NAO se decide aqui: vem de
-`flow/utils/backoff.py`, que e onde a politica de crescimento, teto e jitter
-passou a morar. O que este modulo decide e so o que e especifico de HTTP —
-quais status e quais excecoes contam como transitorios.
+How long to wait between attempts is NOT decided here: it comes from
+`flow/utils/backoff.py`, which is where the growth, ceiling and jitter policy
+now lives. What this module decides is only what is HTTP-specific —
+which statuses and which exceptions count as transient.
 """
 import asyncio
 import time
@@ -54,20 +54,20 @@ async def async_request_with_retry(
     label: str = "",
     **request_kwargs: Any,
 ) -> httpx.Response:
-    """Executa 1 request httpx async com retry exponencial.
+    """Executes 1 async httpx request with exponential retry.
 
-    - Erros de transporte (connect/read/timeout): retenta; propaga o ultimo se esgotar.
-    - Status em retryable_status (502/503/504 default): retenta; retorna o ultimo
-      Response se esgotar (caller decide raise_for_status).
-    - Demais status (200/4xx/500): retorna imediato, sem retry.
+    - Transport errors (connect/read/timeout): retries; propagates the last one when exhausted.
+    - Status in retryable_status (502/503/504 by default): retries; returns the last
+      Response when exhausted (the caller decides raise_for_status).
+    - Other statuses (200/4xx/500): returns immediately, no retry.
     """
     retryable = frozenset(retryable_status)
     last_exc: Exception | None = None
     tag = label or f"{method} {url}"
 
     for attempt in range(1, max_attempts + 1):
-        # A espera que SEGUE esta tentativa. Calculada antes de dormir porque
-        # entra no log — quem lê precisa saber quanto tempo vai passar.
+        # The wait that FOLLOWS this attempt. Computed before sleeping because
+        # it goes into the log — the reader needs to know how much time will pass.
         espera = espera_exponencial(attempt - 1, inicial=base_delay, teto=max_delay)
         try:
             async with httpx.AsyncClient(**(client_kwargs or {})) as client:
@@ -91,14 +91,14 @@ async def async_request_with_retry(
             else:
                 logger.error("HTTP %s falhou apos %d tentativas: %s", tag, max_attempts, exc)
                 raise
-    # Inalcancavel na pratica, mas satisfaz o type checker.
+    # Unreachable in practice, but satisfies the type checker.
     if last_exc:
         raise last_exc
     raise RuntimeError(f"HTTP {tag}: retry esgotado sem resposta nem excecao.")
 
 
-# Transitórios "amplos" para uploads best-effort: inclui os builtins de rede
-# além dos erros de transporte do httpx.
+# "Broad" transients for best-effort uploads: includes the network builtins
+# besides httpx's transport errors.
 _SYNC_DEFAULT_RETRYABLE: tuple[type[BaseException], ...] = _TRANSPORT_ERRORS + (
     ConnectionError, TimeoutError, OSError,
 )
@@ -113,12 +113,12 @@ def retry_sync(
     retryable_exc: tuple[type[BaseException], ...] = _SYNC_DEFAULT_RETRYABLE,
     label: str = "",
 ) -> T:
-    """Executa um bloco sincrono `fn` com retry exponencial.
+    """Executes a synchronous block `fn` with exponential retry.
 
-    Util quando o retry abrange mais de um request (ex: re-obter pre-signed URL
-    e re-tentar upload). Retenta exceções em `retryable_exc` (default: erros de
-    rede/transporte). Para uploads best-effort, passe `retryable_exc=(Exception,)`
-    para retentar qualquer falha. Demais exceções propagam imediato.
+    Useful when the retry spans more than one request (e.g. re-obtaining a pre-signed
+    URL and retrying the upload). Retries exceptions in `retryable_exc` (default: network/
+    transport errors). For best-effort uploads, pass `retryable_exc=(Exception,)`
+    to retry any failure. Other exceptions propagate immediately.
     """
     for attempt in range(1, max_attempts + 1):
         espera = espera_exponencial(attempt - 1, inicial=base_delay, teto=max_delay)

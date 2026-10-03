@@ -1,24 +1,24 @@
 # app/core/authorization/credential_loader.py
 """
-Resolução de credenciais para execução — com escopo de autorização obrigatório.
+Credential resolution for execution — with a mandatory authorization scope.
 
-Antes a busca era por ID puro (`WHERE id IN (...)`), sem olhar dono nem
-workspace. Como o `credential_id` fica em texto puro na definition e é legível
-por qualquer membro que abra o workflow, bastava copiá-lo para um workflow de
-outro workspace — criado pelo próprio atacante — para usar a credencial alheia
-indefinidamente. O mesmo buraco valia para `POST /workflows/validate`, que
-aceita uma definition arbitrária e chega a CONECTAR ao banco pelo `simulate()`.
+Before, the lookup was by bare ID (`WHERE id IN (...)`), without looking at owner or
+workspace. Since the `credential_id` sits in plain text in the definition and is readable
+by any member who opens the workflow, it was enough to copy it into a workflow in
+another workspace — created by the attacker themselves — to use someone else's credential
+indefinitely. The same hole applied to `POST /workflows/validate`, which
+accepts an arbitrary definition and even CONNECTS to the database through `simulate()`.
 
-O escopo tem duas dimensões (basta uma casar): os `owner_id` autorizados e o
-workspace de compartilhamento. Na EXECUÇÃO, resolve-se uma credencial se ela é
-de QUEM DISPAROU (`triggered_by`) OU está EXPLICITAMENTE compartilhada com o
-workspace do workflow (`workspace_id`). Ser apenas membro do workspace não
-basta — senão um membro usaria a credencial PRIVADA de outro só copiando o
-`credential_id` da definition. Disparos sem usuário (cron/webhook) alcançam
-apenas as credenciais compartilhadas. Na SIMULAÇÃO/validação, o escopo é o
-usuário autenticado e, quando a validação informa um workspace, as credenciais
-compartilhadas com ele — a MESMA cláusula, aplicada antes de conectar
-(`assert_credentials_accessible`) e durante o `simulate()` (`credential_scope`).
+The scope has two dimensions (one match is enough): the authorized `owner_id`s and the
+sharing workspace. In EXECUTION, a credential is resolved if it belongs
+to WHOEVER TRIGGERED (`triggered_by`) OR is EXPLICITLY shared with the
+workflow's workspace (`workspace_id`). Merely being a member of the workspace is not
+enough — otherwise a member would use another's PRIVATE credential just by copying the
+`credential_id` from the definition. Triggers without a user (cron/webhook) reach
+only the shared credentials. In SIMULATION/validation, the scope is the
+authenticated user and, when the validation provides a workspace, the credentials
+shared with it — the SAME clause, applied before connecting
+(`assert_credentials_accessible`) and during `simulate()` (`credential_scope`).
 """
 
 from contextlib import contextmanager
@@ -41,42 +41,42 @@ logger = get_logger(__name__)
 
 
 class CredentialScopeMissing(RuntimeError):
-    """Resolução tentada sem escopo de autorização.
+    """Resolution attempted without an authorization scope.
 
-    Erro de programação, não de dados: sinaliza um call site novo que não
-    declarou de quem as credenciais podem ser. Falhar alto aqui é o que impede
-    a regressão silenciosa para o comportamento antigo.
+    A programming error, not a data error: it flags a new call site that did not
+    declare whose credentials may be used. Failing loudly here is what prevents
+    a silent regression to the old behavior.
     """
 
 
 @dataclass(frozen=True)
 class EscopoDeCredenciais:
-    """O que um `credential_scope` delimita: donos autorizados e, opcionalmente,
-    o workspace cujas credenciais compartilhadas também valem.
+    """What a `credential_scope` delimits: authorized owners and, optionally,
+    the workspace whose shared credentials also count.
 
-    São as MESMAS duas dimensões dos kwargs de `resolve_credentials_from_ids`.
-    O ContextVar carregava só a de dono, e a validação com workspace ficava
-    incoerente: a guarda (`assert_credentials_accessible`) aceitava a credencial
-    compartilhada, mas o `simulate()` — que não recebe parâmetros — não a
-    resolvia, porque o escopo implícito não sabia do workspace.
+    These are the SAME two dimensions as the kwargs of `resolve_credentials_from_ids`.
+    The ContextVar carried only the owner one, and validation with a workspace was
+    inconsistent: the guard (`assert_credentials_accessible`) accepted the shared
+    credential, but `simulate()` — which takes no parameters — did not
+    resolve it, because the implicit scope did not know about the workspace.
     """
     owner_ids: frozenset[str]
     shared_workspace_id: str | None = None
 
 
-# Escopo implícito para código que não recebe parâmetros — hoje só o `simulate()`
-# dos nós, invocado genericamente por `simulate_runner`.
+# Implicit scope for code that takes no parameters — today only the nodes'
+# `simulate()`, invoked generically by `simulate_runner`.
 _scope: ContextVar[EscopoDeCredenciais | None] = ContextVar("credential_scope", default=None)
 
 
 @contextmanager
 def credential_scope(owner_ids: Iterable[str], shared_workspace_id: str | None = None):
-    """Delimita de quem as credenciais podem ser resolvidas no bloco.
+    """Delimits whose credentials may be resolved within the block.
 
-    `shared_workspace_id` estende o escopo às credenciais EXPLICITAMENTE
-    compartilhadas com esse workspace (a mesma regra do dispatch). Só o passe
-    quando o chamador já verificou que o usuário pertence ao workspace — o
-    resolver confia no que recebe aqui.
+    `shared_workspace_id` extends the scope to the credentials EXPLICITLY
+    shared with that workspace (the same rule as the dispatch). Only pass it
+    when the caller has already verified that the user belongs to the workspace — the
+    resolver trusts what it receives here.
     """
     token = _scope.set(EscopoDeCredenciais(frozenset(owner_ids), shared_workspace_id))
     try:
@@ -86,18 +86,18 @@ def credential_scope(owner_ids: Iterable[str], shared_workspace_id: str | None =
 
 
 async def workspace_credential_owners(db, workspace_id: str | None) -> set[str]:
-    """Usuários com acesso ao workspace: o dono mais os membros.
+    """Users with access to the workspace: the owner plus the members.
 
-    Serve a checagens de PERTENCIMENTO — hoje, o relatório de mudança de
-    workspace, que avisa quais donos de credencial deixam de alcançar o destino.
-    NÃO é escopo de credenciais: passá-lo como `allowed_owner_ids` (ou usá-lo
-    numa guarda) entregaria a credencial PRIVADA de cada membro a qualquer outro
-    membro que copiasse o `credential_id` da definition. O escopo de resolução é
-    {quem disparou} + `shared_workspace_id` — ver `resolve_credentials_from_ids`
-    e `assert_credentials_accessible`.
+    Serves MEMBERSHIP checks — today, the workspace change report, which warns
+    which credential owners no longer reach the destination.
+    It is NOT a credential scope: passing it as `allowed_owner_ids` (or using it
+    in a guard) would hand each member's PRIVATE credential to any other
+    member who copied the `credential_id` from the definition. The resolution scope is
+    {whoever triggered} + `shared_workspace_id` — see `resolve_credentials_from_ids`
+    and `assert_credentials_accessible`.
 
-    Um workspace inexistente/deletado devolve conjunto vazio, e o chamador
-    decide se isso é erro.
+    A nonexistent/deleted workspace returns an empty set, and the caller
+    decides whether that is an error.
     """
     from app.models.workspace import Workspace
     from app.models.workspace_member import WorkspaceMember
@@ -105,11 +105,11 @@ async def workspace_credential_owners(db, workspace_id: str | None) -> set[str]:
     if not workspace_id:
         return set()
 
-    # Dono e membros numa consulta so. Eram dois SELECTs sequenciais dentro do
-    # caminho quente do POST /execute — e o segundo nem filtrava o workspace por
-    # `deleted_at`, de modo que um workspace na lixeira continuava autorizando
-    # suas credenciais pela lista de membros. O outerjoin parte do Workspace,
-    # entao workspace inexistente ou deletado nao devolve linha nenhuma.
+    # Owner and members in a single query. They were two sequential SELECTs in the
+    # hot path of POST /execute — and the second did not even filter the workspace by
+    # `deleted_at`, so a workspace in the trash kept authorizing
+    # its credentials through the member list. The outerjoin starts from Workspace,
+    # so a nonexistent or deleted workspace returns no row at all.
     rows = (await db.execute(
         select(Workspace.owner_id, WorkspaceMember.user_id)
         .outerjoin(WorkspaceMember, WorkspaceMember.workspace_id == Workspace.id_hash)
@@ -125,25 +125,25 @@ async def workspace_credential_owners(db, workspace_id: str | None) -> set[str]:
 async def assert_credentials_accessible(
     db, credential_ids: Iterable[str], owner_id: str, shared_workspace_id: str | None = None,
 ) -> None:
-    """Recusa se algum id não for de `owner_id` nem estiver compartilhado com o workspace.
+    """Refuses if any id neither belongs to `owner_id` nor is shared with the workspace.
 
-    Guarda da validação (`validate_service`), que aceita uma definition
-    arbitrária: o `simulate()` de nós dinâmicos chega a CONECTAR ao banco,
-    então um credential_id alheio ali significava executar SQL na
-    infraestrutura de outro usuário. Barrar aqui dá 403 claro antes de
-    qualquer conexão. As escritas do `WorkflowService` usam a mesma guarda.
+    Guard for validation (`validate_service`), which accepts an arbitrary
+    definition: the `simulate()` of dynamic nodes even CONNECTS to the database,
+    so someone else's credential_id there meant running SQL on
+    another user's infrastructure. Blocking here gives a clear 403 before
+    any connection. The `WorkflowService` writes use the same guard.
 
-    A cláusula é a MESMA do dispatch (`_resolver_na_sessao`): (id pedido) AND
-    (owner_id IS NOT NULL) AND (owner_id == usuário OR workspace_id ==
-    shared_workspace_id). Manter as duas iguais garante que o validate aceite
-    exatamente o que o Executar resolveria — nem mais (conectaria a uma
-    credencial que a execução recusaria) nem menos (403 numa credencial que a
-    execução usa). `owner_id IS NOT NULL` é fail-closed: uma órfã compartilhada
-    não passa. A cláusula de workspace só entra quando `shared_workspace_id` é
-    informado; sem ele a guarda é "só dono".
+    The clause is the SAME as the dispatch's (`_resolver_na_sessao`): (requested id) AND
+    (owner_id IS NOT NULL) AND (owner_id == user OR workspace_id ==
+    shared_workspace_id). Keeping the two identical ensures validate accepts
+    exactly what Run would resolve — no more (it would connect to a
+    credential the execution would refuse) and no less (a 403 on a credential the
+    execution uses). `owner_id IS NOT NULL` is fail-closed: a shared orphan
+    does not pass. The workspace clause only applies when `shared_workspace_id` is
+    provided; without it the guard is "owner only".
 
-    Nunca troque o workspace por `workspace_credential_owners`: ser membro do
-    workspace não dá direito à credencial PRIVADA de outro membro.
+    Never swap the workspace for `workspace_credential_owners`: being a member of the
+    workspace grants no right to another member's PRIVATE credential.
     """
     from sqlalchemy import or_
 
@@ -187,12 +187,12 @@ async def assert_credentials_accessible(
 
 
 def validade_da_credencial(expires_at_raw) -> str:
-    """O que o `expires_at` gravado no `data` da credencial diz dela:
-    `"valida"` (ainda vale, ou não tem validade), `"expirada"` ou
-    `"invalida"` (não é uma data — ignorada por segurança na resolução).
+    """What the `expires_at` stored in the credential's `data` says about it:
+    `"valida"` (still valid, or has no expiry), `"expirada"` (expired) or
+    `"invalida"` (not a date — ignored for safety during resolution).
 
-    É a regra da resolução (`_resolver_na_sessao`); a validação a usa para
-    avisar ANTES do Executar que a credencial do nó não vai ser resolvida.
+    It is the resolution rule (`_resolver_na_sessao`); validation uses it to
+    warn BEFORE Run that the node's credential will not be resolved.
     """
     if not expires_at_raw:
         return "valida"
@@ -206,12 +206,12 @@ def validade_da_credencial(expires_at_raw) -> str:
 
 
 async def tipos_e_validades(db, credential_ids: Iterable[str]) -> dict:
-    """`{id: (tipo, validade, expires_at)}` das credenciais pedidas — só o
-    tipo e a validade, nunca o `data` decifrado.
+    """`{id: (tipo, validade, expires_at)}` (type, validity) of the requested credentials — only the
+    type and validity, never the decrypted `data`.
 
-    Para a validação dizer o que a resolução faria em silêncio: deixar de fora
-    uma credencial vencida, ou de um tipo que o nó não aceita. Chame DEPOIS de
-    `assert_credentials_accessible` — aqui não há escopo.
+    So validation can say what resolution would do silently: leave out
+    an expired credential, or one of a type the node does not accept. Call AFTER
+    `assert_credentials_accessible` — there is no scope here.
     """
     uuid_ids: List[UUID] = []
     for cid in credential_ids:
@@ -234,10 +234,10 @@ async def tipos_e_validades(db, credential_ids: Iterable[str]) -> dict:
 async def _explain_missing(session, uuid_ids: List[UUID], resolvidos: set[str],
                            allowed: Collection[str],
                            shared_workspace_id: str | None = None) -> None:
-    """Loga por que cada credencial pedida não foi resolvida.
+    """Logs why each requested credential was not resolved.
 
-    Sem isto o sintoma chega ao operador como "o workflow parou de funcionar".
-    Consulta apenas id/owner_id/workspace_id — nunca toca em `data`.
+    Without this the symptom reaches the operator as "the workflow stopped working".
+    Queries only id/owner_id/workspace_id — never touches `data`.
     """
     faltando = [uid for uid in uuid_ids if str(uid) not in resolvidos]
     if not faltando:
@@ -262,16 +262,16 @@ async def _explain_missing(session, uuid_ids: List[UUID], resolvidos: set[str],
                 cid, cid,
             )
         elif owner not in allowed and not (shared_workspace_id and ws == shared_workspace_id):
-            # Escopo D: não é de quem disparou e não está compartilhada com o
-            # workspace do workflow. A saída é o dono compartilhar a credencial
-            # com o workspace (ou disparar quem é dono dela).
+            # Scope D: it does not belong to whoever triggered and is not shared with the
+            # workflow's workspace. The way out is for the owner to share the credential
+            # with the workspace (or for its owner to trigger).
             logger.warning(
                 "Credencial %s pertence a '%s' e não está compartilhada com o workspace "
                 "deste workflow — não resolvida. Compartilhe-a com o workspace ou execute "
                 "como o dono dela.",
                 cid, owner,
             )
-        # Restante: existe, no escopo, mas expirada — já logado no laço principal.
+        # Remainder: exists, in scope, but expired — already logged in the main loop.
 
 
 async def resolve_credentials_from_ids(
@@ -281,40 +281,40 @@ async def resolve_credentials_from_ids(
     shared_workspace_id: str | None = None,
     db=None,
 ) -> dict:
-    """Resolve e descriptografa credenciais, restrito ao escopo de autorização.
+    """Resolves and decrypts credentials, restricted to the authorization scope.
 
-    Uma credencial é resolvida quando (id pedido) E (dono NÃO nulo) E
-    (`owner_id ∈ allowed_owner_ids` OU `workspace_id == shared_workspace_id`):
+    A credential is resolved when (requested id) AND (owner NOT null) AND
+    (`owner_id ∈ allowed_owner_ids` OR `workspace_id == shared_workspace_id`):
 
-    - `allowed_owner_ids` — donos autorizados. Na execução é {quem disparou}
-      (ver workflow_service); na simulação/validação, o próprio usuário.
-    - `shared_workspace_id` — o workspace do workflow em execução (ou o que o
-      a validação informou). Casa com credenciais EXPLICITAMENTE compartilhadas
-      com ele (workspace_id preenchido), de qualquer dono. É o que permite um
-      disparo sem usuário (cron/webhook) alcançar as credenciais compartilhadas
-      do workspace.
+    - `allowed_owner_ids` — authorized owners. In execution it is {whoever triggered}
+      (see workflow_service); in simulation/validation, the user themselves.
+    - `shared_workspace_id` — the workspace of the workflow being executed (or the one
+      the validation provided). Matches credentials EXPLICITLY shared
+      with it (workspace_id set), from any owner. It is what lets a
+      trigger without a user (cron/webhook) reach the workspace's shared
+      credentials.
 
-    Os dois kwargs são o escopo INTEIRO assim que qualquer um deles é passado.
-    Só na ausência de AMBOS vale o `credential_scope` ativo — que carrega as
-    mesmas duas dimensões (`EscopoDeCredenciais`). Não há mistura: um kwarg
-    explícito nunca é completado pelo ContextVar, para que o escopo de um call
-    site seja sempre o que está escrito nele.
+    The two kwargs are the ENTIRE scope as soon as either of them is passed.
+    Only in the absence of BOTH does the active `credential_scope` apply — which carries the
+    same two dimensions (`EscopoDeCredenciais`). There is no mixing: an explicit
+    kwarg is never completed by the ContextVar, so that a call
+    site's scope is always what is written in it.
 
-    Sem NENHUM dos dois escopos (nem kwargs, nem credential_scope) levanta
-    `CredentialScopeMissing` — nunca resolve "aberto". Dono nulo (órfã) nunca
-    resolve, mesmo compartilhada: fail-closed.
+    With NEITHER scope (no kwargs, no credential_scope) it raises
+    `CredentialScopeMissing` — it never resolves "open". A null owner (orphan) never
+    resolves, even if shared: fail-closed.
 
-    `db` é a sessão do chamador, quando ele já tem uma. Sem esse parâmetro esta
-    função abria a SUA própria sessão mesmo rodando dentro do request — uma
-    espera aninhada por conexão do MESMO pool (8 + 5 por worker), com a primeira
-    conexão retida enquanto a segunda era aguardada. A partir de ~7 disparos
-    simultâneos no mesmo worker o botão Executar ficava pendurado no
-    `pool_timeout` de 30 s. Quem não tem sessão (simulate/credential_scope)
-    continua caindo no `get_session_async()`.
+    `db` is the caller's session, when it already has one. Without this parameter this
+    function opened ITS OWN session even when running inside the request — a
+    nested wait for a connection from the SAME pool (8 + 5 per worker), with the first
+    connection held while the second was awaited. From ~7 simultaneous
+    triggers on the same worker the Run button hung on the
+    30 s `pool_timeout`. Callers without a session (simulate/credential_scope)
+    still fall back to `get_session_async()`.
     """
     if allowed_owner_ids is None and shared_workspace_id is None:
-        # Só sem NENHUM kwarg de escopo é que o ContextVar entra — e entra com as
-        # duas dimensões de uma vez.
+        # Only with NO scope kwarg at all does the ContextVar come in — and it comes in with
+        # both dimensions at once.
         escopo = _scope.get()
         if escopo is None:
             raise CredentialScopeMissing(
@@ -324,13 +324,13 @@ async def resolve_credentials_from_ids(
         allowed = escopo.owner_ids
         shared_workspace_id = escopo.shared_workspace_id
     else:
-        # Kwargs explícitos são o escopo INTEIRO: o ContextVar nunca completa a
-        # dimensão ausente. Senão um `allowed_owner_ids` passado dentro de um
-        # `credential_scope(..., shared_workspace_id=...)` herdaria o workspace
-        # sem o chamador saber — e vice-versa.
+        # Explicit kwargs are the ENTIRE scope: the ContextVar never completes the
+        # missing dimension. Otherwise an `allowed_owner_ids` passed inside a
+        # `credential_scope(..., shared_workspace_id=...)` would inherit the workspace
+        # without the caller knowing — and vice versa.
         allowed = allowed_owner_ids
 
-    # Converte strings para UUID objects — asyncpg não faz cast automático para colunas UUID
+    # Converts strings to UUID objects — asyncpg does not auto-cast for UUID columns
     uuid_ids: List[UUID] = []
     for cid in credential_ids:
         try:
@@ -349,51 +349,51 @@ async def resolve_credentials_from_ids(
         return {}
 
     if db is not None:
-        # Sessão do request: quem commita é o chamador. Não commitamos aqui para
-        # não gravar por engano trabalho pendente dele.
+        # Request session: the caller is the one who commits. We don't commit here so we
+        # don't accidentally write its pending work.
         return await _resolver_na_sessao(
             db, uuid_ids, allowed, shared_workspace_id=shared_workspace_id, own_session=False
         )
 
     async with get_session_async() as session:
-        # Sessão própria (simulate): o get_session_async faz rollback na saída,
-        # então o carimbo de last_used_at só persiste se commitarmos aqui.
+        # Own session (simulate): get_session_async rolls back on exit,
+        # so the last_used_at stamp only persists if we commit here.
         return await _resolver_na_sessao(
             session, uuid_ids, allowed, shared_workspace_id=shared_workspace_id, own_session=True
         )
 
 
 async def _marcar_last_used(session, usados: List[UUID], now, *, own_session: bool) -> None:
-    """Carimba last_used_at nas credenciais efetivamente resolvidas — best-effort.
+    """Stamps last_used_at on the credentials actually resolved — best-effort.
 
-    Roda no caminho MAIS quente (POST /execute). Regras de segurança:
-    - Usa a MESMA sessão já em mãos (nunca abre conexão nova — foi por causa de
-      esgotamento de pool que o parâmetro `db` existe).
-    - Nunca é fatal: qualquer falha aqui é engolida e logada; a execução do
-      workflow não pode cair porque um carimbo de auditoria falhou.
-    - Só commita quando a sessão é NOSSA; na do request, o chamador commita.
+    Runs on the HOTTEST path (POST /execute). Safety rules:
+    - Uses the SAME session already in hand (never opens a new connection — pool
+      exhaustion is the reason the `db` parameter exists).
+    - Never fatal: any failure here is swallowed and logged; the workflow
+      execution must not fail because an audit stamp failed.
+    - Only commits when the session is OURS; in the request's, the caller commits.
     """
     if not usados:
         return
     from sqlalchemy import update
     try:
-        # SAVEPOINT (begin_nested) isola a falha do carimbo. Sem ele, um erro no
-        # UPDATE (lock, statement_timeout, deadlock entre dois dispatches na mesma
-        # credencial) deixaria a transação COMPARTILHADA do request em
-        # PendingRollback — e o commit seguinte do WorkflowRun explodiria,
-        # derrubando o dispatch com 500. Exatamente o "jamais derruba a execução"
-        # que este bloco promete. Com o savepoint, a falha reverte só o ponto
-        # aninhado; a transação do chamador segue íntegra e ele commita normal.
+        # SAVEPOINT (begin_nested) isolates the stamp's failure. Without it, an error in the
+        # UPDATE (lock, statement_timeout, deadlock between two dispatches on the same
+        # credential) would leave the request's SHARED transaction in
+        # PendingRollback — and the following WorkflowRun commit would blow up,
+        # bringing the dispatch down with a 500. Exactly the "never brings down the execution"
+        # that this block promises. With the savepoint, the failure reverts only the nested
+        # point; the caller's transaction stays intact and it commits normally.
         async with session.begin_nested():
             await session.execute(
                 update(Credential).where(Credential.id.in_(usados)).values(last_used_at=now)
             )
         if own_session:
             await session.commit()
-    except Exception as exc:  # best-effort — jamais derruba a execução
+    except Exception as exc:  # best-effort — never brings down the execution
         logger.warning("Falha best-effort ao marcar last_used_at (%d cred): %s", len(usados), exc)
-        # No caminho do request NÃO tocamos na transação do chamador: o savepoint
-        # já reverteu o que era nosso. Na sessão própria, desfazemos o que abrimos.
+        # On the request path we do NOT touch the caller's transaction: the savepoint
+        # already reverted what was ours. In our own session, we undo what we opened.
         if own_session:
             try:
                 await session.rollback()
@@ -405,29 +405,29 @@ async def _resolver_na_sessao(
     session, uuid_ids: List[UUID], allowed: list,
     *, shared_workspace_id: str | None = None, own_session: bool = False,
 ) -> dict:
-    """Corpo da resolução, já com uma sessão em mãos (própria ou do request)."""
+    """Body of the resolution, with a session already in hand (own or the request's)."""
     from sqlalchemy import or_
 
-    # Naive, em UTC: `Credential.last_used_at` é `DateTime` SEM fuso, e o
-    # asyncpg recusa um datetime com fuso para essa coluna ("can't subtract
-    # offset-naive and offset-aware datetimes"). O savepoint do carimbo engolia
-    # o erro, e no Postgres o last_used_at nunca era gravado. Mesmo helper do
-    # carimbo dos tokens de API (api_token_service).
+    # Naive, in UTC: `Credential.last_used_at` is a `DateTime` WITHOUT timezone, and
+    # asyncpg rejects a timezone-aware datetime for that column ("can't subtract
+    # offset-naive and offset-aware datetimes"). The stamp's savepoint swallowed
+    # the error, and on Postgres last_used_at was never written. Same helper as the
+    # API token stamp (api_token_service).
     now = utc_now_naive()
 
-    # Escopo: dono autorizado (quem disparou) OU compartilhada com o workspace
-    # do workflow. `owner_id IS NOT NULL` é fail-closed: uma credencial órfã
-    # nunca resolve, nem que casasse pela cláusula de workspace — o mesmo
-    # comportamento que o antigo `owner_id.in_(...)` tinha por consequência (IN
-    # nunca casa NULL), agora explícito porque a cláusula de workspace poderia
-    # alcançar uma órfã compartilhada.
+    # Scope: authorized owner (whoever triggered) OR shared with the workflow's
+    # workspace. `owner_id IS NOT NULL` is fail-closed: an orphan credential
+    # never resolves, even if it matched through the workspace clause — the same
+    # behavior the old `owner_id.in_(...)` had as a side effect (IN
+    # never matches NULL), now explicit because the workspace clause could
+    # reach a shared orphan.
     escopo = []
     if allowed:
         escopo.append(Credential.owner_id.in_(allowed))
     if shared_workspace_id:
         escopo.append(Credential.workspace_id == shared_workspace_id)
     if not escopo:
-        # Guardado pelos chamadores, mas defensivo: sem escopo, não resolve nada.
+        # Guarded by the callers, but defensive: without a scope, resolves nothing.
         return {}
 
     result = await session.execute(
@@ -442,7 +442,7 @@ async def _resolver_na_sessao(
     auth = {}
     usados: List[UUID] = []
     for cred in credentials:
-        # Ignora credenciais expiradas (expires_at está dentro do JSONB data, não como coluna)
+        # Ignores expired credentials (expires_at is inside the JSONB data, not a column)
         expires_at_raw = (cred.data or {}).get("expires_at")
         validade = validade_da_credencial(expires_at_raw)
         if validade == "expirada":
@@ -454,9 +454,9 @@ async def _resolver_na_sessao(
                 cred.id, expires_at_raw,
             )
             continue
-        # `decrypt_credential_data` devolve um dict NOVO: nada é atribuído de
-        # volta ao objeto ORM, então rodar na sessão do request não faz o commit
-        # seguinte gravar credencial descriptografada no banco.
+        # `decrypt_credential_data` returns a NEW dict: nothing is assigned
+        # back to the ORM object, so running in the request session does not make the
+        # next commit write a decrypted credential to the database.
         decrypted = decrypt_credential_data(cred.data)
         decrypted["type"] = cred.type
         auth[str(cred.id)] = decrypted

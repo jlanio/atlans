@@ -1,10 +1,10 @@
 /**
- * Matrícula de executor — os comandos usam os endereços DESTA instalação.
+ * Executor enrollment — the commands use THIS install's addresses.
  *
- * Antes, a tela trazia o host dos executores e o site de uma instalação
- * específica fixos no código: numa instalação de outra pessoa, o quickstart
- * mandava rodar `curl <site do dono>/executores/install | bash`. Agora os dois
- * vêm do servidor, junto com o OTP.
+ * Before, the screen had a specific install's executor host and site
+ * hard-coded: in someone else's install, the quickstart
+ * told you to run `curl <site do dono>/executores/install | bash`. Now both
+ * come from the server, along with the OTP.
  */
 import { describe, it, expect, vi } from "vitest"
 import { render, screen, fireEvent, within } from "@testing-library/react"
@@ -58,7 +58,7 @@ describe("EnrollConnect — endereços da instalação", () => {
     expect(within(aviso).getByText(SERVIDOR_A_PREENCHER)).toBeInTheDocument()
     metodo("Python local")
     expect(comando()).toContain(`--server=${SERVIDOR_A_PREENCHER}`)
-    // O install.sh servido também sai sem o host: o quickstart leva a flag.
+    // The served install.sh also goes out without the host: the quickstart carries the flag.
     metodo("Quickstart")
     expect(comando()).toContain(`--server=${SERVIDOR_A_PREENCHER}`)
   })

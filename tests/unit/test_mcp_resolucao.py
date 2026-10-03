@@ -1,25 +1,25 @@
 # tests/unit/test_mcp_resolucao.py
 """
-Resolver nome ou id para um recurso — sem entregar o que o token não alcança.
+Resolving a name or id to a resource — without handing over what the token can't reach.
 
-Aceitar nome é o que torna as ferramentas usáveis por quem conversa ("rode o
-Recorte mensal"), e é também onde um servidor desatento vaza informação: um
-"não encontrado" diferente de um "proibido" já diz se o recurso existe do outro
-lado do muro, e escolher "o primeiro" de dois homônimos faz a ferramenta agir
-sobre algo que ninguém apontou.
+Accepting names is what makes the tools usable by someone chatting ("run the
+Recorte mensal"), and it is also where a careless server leaks information: a
+"not found" different from a "forbidden" already says whether the resource
+exists on the other side of the wall, and picking "the first" of two namesakes
+makes the tool act on something nobody pointed at.
 
-O que este arquivo fixa:
+What this file pins down:
 
-- nome repetido vira `ambiguous` com os ids dos candidatos — nunca um palpite;
-- workflow inexistente, workflow apagado e workflow de OUTRA conta respondem o
-  mesmo `not_found`, com a mesma frase: a diferença entre "não existe" e
-  "existe e você não alcança" é justamente o que um cliente com um laço de ids
-  usaria para mapear o que há do outro lado;
-- o alcance do TOKEN corta antes do papel do usuário: um token restrito a um
-  workspace não enxerga o workflow do vizinho nem quando o dono é dono dos dois;
-- com um workspace só no alcance, `workspace_id` é dispensável.
+- a repeated name becomes `ambiguous` with the candidates' ids — never a guess;
+- a nonexistent workflow, a deleted workflow and ANOTHER account's workflow
+  answer the same `not_found`, with the same sentence: the difference between
+  "doesn't exist" and "exists and you can't reach it" is precisely what a client
+  with a loop over ids would use to map what is on the other side;
+- the TOKEN's reach cuts before the user's role: a token restricted to one
+  workspace doesn't see the neighbor's workflow even when the owner owns both;
+- with a single workspace in reach, `workspace_id` is optional.
 
-Banco SQLite em memória, porque o que se testa aqui SÃO as consultas.
+In-memory SQLite database, because what is tested here ARE the queries.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ ID_B = "22222222-2222-4222-8222-222222222222"
 
 
 def corpo(exc: ToolError) -> dict:
-    """O JSON que viaja dentro do `ToolError`."""
+    """The JSON that travels inside the `ToolError`."""
     return json.loads(str(exc))
 
 
@@ -68,7 +68,7 @@ async def tornar_membro(db, workspace_id: str, user_id: str, papel: str = "viewe
 
 @pytest.fixture
 async def banco():
-    """Dois workspaces do mesmo dono, para os casos de ambiguidade e de alcance."""
+    """Two workspaces of the same owner, for the ambiguity and reach cases."""
     async with banco_em_memoria() as fabrica:
         async with fabrica() as db:
             await criar_usuario(db, "usr-1", "ana")
@@ -125,11 +125,11 @@ async def test_nome_repetido_em_dois_workspaces_vira_ambiguous(banco):
 
 
 async def test_id_de_workspace_fora_do_escopo_e_proibido(banco):
-    """Existe, o usuário é dono — mas o token não alcança.
+    """It exists, the user is the owner — but the token can't reach it.
 
-    A referência tem forma de id (é um UUID, como todo `id_hash` do Atlans), e a
-    recusa é `forbidden` sem consultar o banco: nenhuma consulta significa
-    nenhuma chance de a resposta contar se aquele id existe.
+    The reference is id-shaped (it is a UUID, like every `id_hash` in Atlans),
+    and the refusal is `forbidden` without querying the database: no query
+    means no chance of the response revealing whether that id exists.
     """
     async with banco() as db:
         await criar_workspace(db, ID_B, "usr-1", "Terceiro")
@@ -166,7 +166,7 @@ async def test_carrega_por_id_e_devolve_o_papel(banco):
     async with banco() as db:
         wf, papel = await carregar_workflow(db, escopo, ID_A)
     assert wf.id_hash == ID_A
-    # Dono do workspace: o papel mais alto, acima de admin.
+    # Workspace owner: the highest role, above admin.
     assert papel == "owner"
 
 
@@ -194,7 +194,7 @@ async def test_nome_repetido_em_dois_workspaces_lista_os_ids(banco):
 
 
 async def test_workflow_apagado_responde_not_found(banco):
-    """A lixeira não é 403: para quem chama, o workflow não existe mais."""
+    """The trash is not a 403: for the caller, the workflow no longer exists."""
     async with banco() as db:
         await criar_workflow(db, id_hash=ID_A, nome="Antigo", workspace_id="ws-1", apagado=True)
     escopo = escopo_falso(workspace_ids={"ws-1"})
@@ -202,7 +202,7 @@ async def test_workflow_apagado_responde_not_found(banco):
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, ID_A)
     assert corpo(exc.value)["code"] == "not_found"
-    # E o mesmo pela busca por nome.
+    # And the same through the name lookup.
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, "Antigo")
@@ -218,14 +218,14 @@ async def test_id_inexistente_e_not_found_antes_de_qualquer_403(banco):
 
 
 async def test_id_de_outra_conta_responde_byte_a_byte_como_id_inexistente(banco):
-    """O oráculo de existência entre contas, fechado no texto e no código.
+    """The cross-account existence oracle, closed in the text and in the code.
 
-    O workflow existe, num workspace de outra conta, e o usuário não é membro.
-    O núcleo responde 403 (e continua respondendo — a REST depende disso); aqui
-    a resposta é a MESMA de um id que nunca existiu, byte a byte. Se sobrasse
-    qualquer diferença — o `code`, uma palavra na frase, o `hint` —, quem
-    tivesse um token de leitura poderia varrer identificadores e descobrir
-    quais existem do outro lado do muro.
+    The workflow exists, in a workspace of another account, and the user is not
+    a member. The core answers 403 (and keeps answering it — REST depends on
+    that); here the response is the SAME as for an id that never existed, byte
+    for byte. If any difference remained — the `code`, a word in the sentence,
+    the `hint` —, whoever had a read token could sweep identifiers and find out
+    which ones exist on the other side of the wall.
     """
     async with banco() as db:
         await criar_usuario(db, "usr-2", "bruno")
@@ -242,13 +242,14 @@ async def test_id_de_outra_conta_responde_byte_a_byte_como_id_inexistente(banco)
 
     assert corpo(alheio.value)["code"] == "not_found"
     assert str(alheio.value) == str(inexistente.value)
-    # E a referência recebida não volta na mensagem: ecoar o id seria o mesmo
-    # oráculo por outra porta (a frase distinguiria as duas chamadas).
+    # And the received reference doesn't come back in the message: echoing the id
+    # would be the same oracle through another door (the sentence would tell the
+    # two calls apart).
     assert ID_B not in str(alheio.value)
 
 
 async def test_nome_de_workflow_fora_do_escopo_nao_revela_existencia(banco):
-    """Pelo nome a resposta é `not_found`: o filtro do escopo entra na consulta."""
+    """By name the answer is `not_found`: the scope filter goes into the query."""
     async with banco() as db:
         await criar_usuario(db, "usr-2", "bruno")
         await criar_workspace(db, "ws-9", "usr-2", "De outro")
@@ -261,17 +262,18 @@ async def test_nome_de_workflow_fora_do_escopo_nao_revela_existencia(banco):
 
 
 async def test_token_restrito_nao_ve_workspace_do_proprio_dono(banco):
-    """O dono alcança os dois workspaces; o token, só um. Vence o token.
+    """The owner reaches both workspaces; the token, only one. The token wins.
 
-    É o caso que separa "o que o usuário pode" de "o que este token pode" — e o
-    que impede que um token de leitura emitido para um projeto sirva de chave
-    para todos os outros.
+    It is the case that separates "what the user can do" from "what this token
+    can do" — and what keeps a read token issued for one project from serving
+    as a key to all the others.
 
-    Aqui a recusa é `forbidden`, e não o `not_found` do caso entre contas, de
-    propósito: o recurso é da própria conta que emitiu o token, que já o vê na
-    interface e com qualquer outro token seu. Não há existência a esconder de
-    quem é dono dela — há um alcance a explicar, e dizer "este token não chega
-    aqui" é o que evita meia hora procurando um workflow que não sumiu.
+    Here the refusal is `forbidden`, and not the cross-account case's
+    `not_found`, on purpose: the resource belongs to the very account that
+    issued the token, which already sees it in the interface and with any other
+    token of its own. There is no existence to hide from its owner — there is a
+    reach to explain, and saying "this token doesn't get here" is what saves
+    half an hour looking for a workflow that didn't vanish.
     """
     async with banco() as db:
         await criar_workflow(db, id_hash=ID_B, nome="Do outro projeto", workspace_id="ws-2")
@@ -280,7 +282,7 @@ async def test_token_restrito_nao_ve_workspace_do_proprio_dono(banco):
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, ID_B)
     assert corpo(exc.value)["code"] == "forbidden"
-    # Pelo nome, não aparece sequer como existente.
+    # By name, it doesn't even show up as existing.
     async with banco() as db:
         with pytest.raises(ToolError) as exc:
             await carregar_workflow(db, escopo, "Do outro projeto")
@@ -299,10 +301,10 @@ async def test_membro_comum_carrega_com_o_papel_de_membro(banco):
 
 
 async def test_carregar_por_id_nao_decifra_por_padrao(banco, monkeypatch):
-    """`decifrar=False` é o default: nada de definition em claro na sessão."""
+    """`decifrar=False` is the default: no cleartext definition in the session."""
     from app.services import workflow_service
 
-    async def _nao_deveria(*args, **kwargs):  # pragma: no cover - o teste falha antes
+    async def _nao_deveria(*args, **kwargs):  # pragma: no cover - the test fails first
         raise AssertionError("o caminho que decifra não pode ser usado pelo MCP")
 
     monkeypatch.setattr(

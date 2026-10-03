@@ -14,20 +14,20 @@ export function GeneralSection({ workspace }: { workspace: Workspace }) {
   const nameId = useId()
   const descId = useId()
 
-  // Só o dono edita nome e descrição: `update_workspace` no backend passa por
-  // `_get_owned_workspace`, enquanto membros e executor aceitam admin. Um admin
-  // vê os campos travados, com a regra escrita — esconder a seção faria o painel
-  // mudar de forma sem explicar por quê.
+  // Only the owner edits name and description: `update_workspace` in the backend
+  // goes through `_get_owned_workspace`, while members and executor accept admin.
+  // An admin sees the fields locked, with the rule written out — hiding the
+  // section would make the panel change shape without explaining why.
   const canEdit = workspace.my_role === "owner"
 
   const [name, setName] = useState(workspace.name)
   const [description, setDescription] = useState(workspace.description ?? "")
   const [saving, setSaving] = useState(false)
 
-  // O objeto muda sob os pés a cada reload (polling de 90s, volta de foco, ou
-  // renomeação feita em outra aba). Sincronizar cegamente apagaria o que o
-  // usuário está digitando no meio da edição, então `touched` protege o
-  // rascunho: quem tem alteração pendente decide o que fazer com ela.
+  // The object changes underfoot on every reload (90s polling, focus return, or
+  // a rename made in another tab). Syncing blindly would erase what the user is
+  // typing mid-edit, so `touched` protects the draft: whoever has a pending
+  // change decides what to do with it.
   const touched = useRef(false)
   useEffect(() => {
     if (touched.current) return
@@ -44,13 +44,13 @@ export function GeneralSection({ workspace }: { workspace: Workspace }) {
     setSaving(true)
     try {
       await updateWorkspace(workspace.id_hash, name.trim(), description.trim() || null)
-      // Salvo: o rascunho virou o valor de verdade, então volta a acompanhar
-      // o servidor.
+      // Saved: the draft became the real value, so it goes back to following
+      // the server.
       touched.current = false
       createToast.success("Workspace atualizado.")
     } catch (e) {
-      // O context lança com a mensagem real do backend; engoli-la aqui era o que
-      // transformava qualquer 403/422 num "Erro ao atualizar" sem pista nenhuma.
+      // The context throws with the backend's real message; swallowing it here is
+      // what turned any 403/422 into an "Erro ao atualizar" with no clue at all.
       createToast.error(e instanceof Error ? e.message : "Erro ao atualizar workspace.")
     } finally {
       setSaving(false)

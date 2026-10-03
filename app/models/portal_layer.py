@@ -9,9 +9,9 @@ from app.models.base import Base
 
 class PortalLayer(Base):
     """
-    Camada publicada no portal de compartilhamento de um workflow.
-    Mantém sempre a última versão do GeoJSON por workflow+layer_key.
-    Atualizada via POST /artifacts/portal/publish pelo nó PublishMap.
+    Layer published on a workflow's sharing portal.
+    Always keeps the latest GeoJSON version per workflow+layer_key.
+    Updated via POST /artifacts/portal/publish by the PublishMap node.
     """
     __tablename__ = "portal_layers"
     __table_args__ = (
@@ -26,18 +26,18 @@ class PortalLayer(Base):
     workflow_hash = Column(String(36), nullable=False, index=True)
     layer_key     = Column(String(255), nullable=False)
 
-    # Dados GeoJSON (última versão — FeatureCollection completo)
+    # GeoJSON data (latest version — complete FeatureCollection)
     geojson_data  = Column(JSON, nullable=False)
     features      = Column(Integer, nullable=True)
 
-    # Configuração de visualização (colunas separadas)
+    # Display configuration (separate columns)
     title          = Column(String(255), nullable=False, server_default="Camada")
     color          = Column(String(16), nullable=False, server_default="#3b82f6")
     opacity        = Column(Float, nullable=False, server_default="0.5")
     description    = Column(String(1024), nullable=True)
     visible_fields = Column(JSON, nullable=True)
 
-    # Metadados espaciais (preenchidos na publicacao)
+    # Spatial metadata (filled in on publishing)
     bbox          = Column(JSON, nullable=True)    # [minX, minY, maxX, maxY]
     geometry_type = Column(String(32), nullable=True)  # "Point", "Polygon", etc.
 

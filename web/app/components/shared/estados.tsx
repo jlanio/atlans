@@ -7,30 +7,33 @@ import { Button } from "@/app/components/ui/button"
 import { cn } from "@/lib/utils"
 
 /**
- * Molduras dos estados de tela (contrato screen-patterns.md §3): o cartão
- * centralizado de erro, vazio e sem-resultado, e a linha âmbar de falha parcial.
- * Cada tela guarda no seu `estados.tsx` só o que é dela — os Skeleton*, que
- * desenham o layout real, e as frases — e monta os estados com estas peças.
+ * Frames for the screen states (contract screen-patterns.md §3): the centered
+ * error, empty and no-results card, and the amber partial-failure line.
+ * Each screen keeps in its own `estados.tsx` only what is its own — the Skeleton*,
+ * which draw the real layout, and the sentences — and builds the states from
+ * these pieces.
  *
- * Antes cada tela recopiava a moldura, e as cópias divergiram: só três
- * anunciavam o erro ao leitor de tela, uma não pintava a borda destrutiva e
- * três não tinham onde pôr a mensagem do servidor. Aqui o anúncio
- * (`role="alert"`, §5) vem do tom do cartão, não de quem lembra de pô-lo.
+ * Before, each screen re-copied the frame, and the copies diverged: only three
+ * announced the error to the screen reader, one didn't paint the destructive
+ * border and three had nowhere to put the server message. Here the announcement
+ * (`role="alert"`, §5) comes from the card's tone, not from whoever remembers to
+ * add it.
  */
 
 type Tom = "erro" | "neutro"
 
 /**
- * - `compacto` (padrão): erro, sem-resultado e o vazio de uma seção — ícone de
- *   26 px, título `text-sm`, o botão logo abaixo da frase.
- * - `amplo`: o vazio que toma a tela (primeiro uso, sem acesso) — ícone de
- *   36 px, título `text-base`, e a ação primária (ou os passos) abaixo do texto.
+ * - `compacto` (default): error, no-results and the empty state of a section —
+ *   26 px icon, `text-sm` title, the button right below the sentence.
+ * - `amplo`: the empty state that takes over the screen (first use, no access) —
+ *   36 px icon, `text-base` title, and the primary action (or the steps) below
+ *   the text.
  */
 type Tamanho = "compacto" | "amplo"
 
 /**
- * O cartão centralizado (§3.2 e §3.3). `tom="erro"` pinta a moldura
- * destrutiva — borda e círculo do ícone — e anuncia o cartão (`role="alert"`).
+ * The centered card (§3.2 and §3.3). `tom="erro"` paints the destructive
+ * frame — border and icon circle — and announces the card (`role="alert"`).
  */
 export function CartaoDeEstado({
   icone: Icone, tom = "neutro", tamanho = "compacto", titulo, descricao, acao, children, tituloId, className,
@@ -40,11 +43,11 @@ export function CartaoDeEstado({
   tamanho?: Tamanho
   titulo: ReactNode
   descricao?: ReactNode
-  /** Botão(ões) sob o texto. */
+  /** Button(s) under the text. */
   acao?: ReactNode
-  /** Conteúdo entre o texto e a ação (os passos do primeiro uso). */
+  /** Content between the text and the action (the first-use steps). */
   children?: ReactNode
-  /** `id` do título, para uma região rotulada por ele (`aria-labelledby`). */
+  /** The title's `id`, for a region labeled by it (`aria-labelledby`). */
   tituloId?: string
   className?: string
 }) {
@@ -95,13 +98,14 @@ export function CartaoDeEstado({
 }
 
 /**
- * A fonte-espinha caiu na 1ª carga (§3.2): o cartão de erro toma o lugar do
- * conteúdo. Só entra quando nunca houve carga aceita — a recarga que falha
- * sobre dados na tela vira toast ou `AvisoAmbar`, e esse gate é de quem compõe
- * a tela. `mensagem` é a do servidor, quando a tela a tem.
+ * The backbone source failed on the 1st load (§3.2): the error card takes the
+ * place of the content. It only comes in when there was never an accepted load —
+ * a reload that fails over data on screen becomes a toast or `AvisoAmbar`, and
+ * that gate belongs to whoever composes the screen. `mensagem` is the server's,
+ * when the screen has it.
  */
 export function ErroDeCarga({ titulo, mensagem, onTentar, className }: {
-  /** "Não foi possível carregar os arquivos" — a frase é da tela. */
+  /** "Não foi possível carregar os arquivos" — the sentence belongs to the screen. */
   titulo: string
   mensagem?: string | null
   onTentar?: () => void
@@ -122,11 +126,11 @@ export function ErroDeCarga({ titulo, mensagem, onTentar, className }: {
 }
 
 /**
- * Primeiro uso (§3.3): não há nada ainda e nenhum recorte ativo. Diz o que é e
- * por onde começar; a ação primária (`cta`, ou `acao` quando ela já vem pronta
- * — um diálogo com o próprio gatilho) aparece para quem `podeCriar`, e quem não
- * pode lê a quem pedir: `pedirA="criar o primeiro workflow"` vira "Peça a um
- * editor do workspace para criar o primeiro workflow.".
+ * First use (§3.3): there is nothing yet and no active slice. Says what it is
+ * and where to start; the primary action (`cta`, or `acao` when it comes ready —
+ * a dialog with its own trigger) appears for whoever `podeCriar`, and whoever
+ * can't reads whom to ask: `pedirA="criar o primeiro workflow"` becomes "Peça a
+ * um editor do workspace para criar o primeiro workflow.".
  */
 export function VazioPrimeiroUso({
   icone, titulo, descricao, passos, cta, acao, podeCriar = true, pedirA,
@@ -134,7 +138,7 @@ export function VazioPrimeiroUso({
   icone: IconType
   titulo: ReactNode
   descricao: ReactNode
-  /** Passos numerados do "por onde começar". */
+  /** Numbered steps of the "where to start". */
   passos?: readonly { titulo: string; detalhe: string }[]
   cta?: { rotulo: string; icone?: IconType; onClick: () => void }
   acao?: ReactNode
@@ -174,10 +178,10 @@ export function VazioPrimeiroUso({
 }
 
 /**
- * A frase do sem-resultado: "Nenhum arquivo com «bacia» e este filtro" /
- * "…com «bacia»" / "…com este filtro". `sufixoFiltro` troca o "este filtro"
- * quando o recorte tem nome ("em GEOJSON"); `semRecorte` é o que dizer sem
- * termo nem filtro (por padrão, o próprio `nada`).
+ * The no-results sentence: "Nenhum arquivo com «bacia» e este filtro" /
+ * "…com «bacia»" / "…com este filtro". `sufixoFiltro` replaces "este filtro"
+ * when the slice has a name ("em GEOJSON"); `semRecorte` is what to say with
+ * neither term nor filter (by default, `nada` itself).
  */
 export function textoDeSemResultado({ nada, termo, comFiltro, sufixoFiltro, semRecorte }: {
   /** "Nenhum arquivo", "Nenhuma credencial"… */
@@ -195,8 +199,9 @@ export function textoDeSemResultado({ nada, termo, comFiltro, sufixoFiltro, semR
 }
 
 /**
- * Recorte ativo sem nenhuma linha (§3.3): o ícone `TbFilterOff` o separa do
- * vazio de fato, e a saída óbvia — limpar o recorte — vem no botão.
+ * Active slice with no rows at all (§3.3): the `TbFilterOff` icon sets it apart
+ * from a true empty state, and the obvious way out — clearing the slice — comes
+ * in the button.
  */
 export function SemResultado({ texto, dica, onLimpar }: {
   texto: string
@@ -216,10 +221,11 @@ export function SemResultado({ texto, dica, onLimpar }: {
 }
 
 /**
- * Falha parcial de uma seção (§3.4): a fonte daquele bloco caiu, mas o resto
- * continua na tela — uma linha âmbar discreta (`role="status"`, não alerta)
- * com o "Tentar de novo" inline. `rotuloDoBotao` existe para a Home, que fala
- * três idiomas; sem ele o botão é o "Tentar de novo" de sempre.
+ * Partial failure of a section (§3.4): the source for that block failed, but the
+ * rest stays on screen — a discreet amber line (`role="status"`, not alert) with
+ * the "Tentar de novo" (try again) inline. `rotuloDoBotao` exists for the Home,
+ * which speaks three languages; without it the button is the usual
+ * "Tentar de novo".
  */
 export function AvisoAmbar({ children, onTentar, rotuloDoBotao = "Tentar de novo" }: {
   children: ReactNode

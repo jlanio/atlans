@@ -1,6 +1,6 @@
 "use client"
 
-// Seção «Retenção de Artefatos» das Configurações do admin.
+// "Retenção de Artefatos" (artifact retention) section of the admin Settings.
 
 import { useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -8,7 +8,7 @@ import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
 import { createToast } from "@/utils/createToast"
 
-// ── Retenção de Artefatos ─────────────────────────────────────────────────────
+// ── Artifact retention ────────────────────────────────────────────────────────
 
 export function ArtifactRetentionSection({
   initialDays,

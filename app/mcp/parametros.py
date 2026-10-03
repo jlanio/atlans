@@ -1,33 +1,34 @@
 # app/mcp/parametros.py
 """
-Validação e coerção dos `inputs` contra o `params_schema` do workflow.
+Validation and coercion of `inputs` against the workflow's `params_schema`.
 
-Até aqui ninguém validava: a tela de execução apenas COAGIA no navegador
-(`Number("")` vira `0`, `Boolean("false")` vira `True`, `object` ia cru) e o
-servidor aceitava o que chegasse. Com um cliente do MCP no lugar da tela, esse
-silêncio fica caro: quem monta a chamada não vê o formulário, manda tudo como
-texto e descobre o erro no meio do run — depois de gastar executor, de escrever
-em banco e de produzir artefato errado. Daí a regra estar aqui, ANTES do
-despacho, e ser a mesma para todo mundo.
+Until now nobody validated: the run screen merely COERCED in the browser
+(`Number("")` becomes `0`, `Boolean("false")` becomes `True`, `object` went
+raw) and the server accepted whatever arrived. With an MCP client in place of
+the screen, that silence gets expensive: whoever builds the call does not see
+the form, sends everything as text and discovers the error mid-run — after
+spending an executor, writing to the database and producing a wrong artifact.
+Hence the rule lives here, BEFORE dispatch, and is the same for everyone.
 
-Três decisões que explicam o formato:
+Three decisions that explain the shape:
 
-- **Coerção só a partir de string.** O JSON já distingue `1` de `"1"`; se o
-  chamador mandou `1` onde se declarou `boolean`, isso é engano dele, não
-  formato frouxo. O que a coerção resolve é o caso legítimo do texto — a linha
-  de comando, o formulário, a variável de ambiente — tudo chega como string.
-- **String vazia nunca vira valor.** Era o pior defeito da tela: campo em
-  branco virava `0` e o fluxo rodava com um número que ninguém digitou.
-  Vazio é ausência, e ausência de obrigatório é erro.
-- **`params_schema` malformado não é erro.** Fluxo antigo (ou gerado fora da
-  tela) pode ter `params_schema` nulo, lista, ou valores que não descrevem
-  tipo. Recusar a execução por causa disso quebraria fluxos que funcionam hoje;
-  o certo é passar os inputs adiante e DIZER, num hint, que ninguém os
-  conferiu.
+- **Coercion only from strings.** JSON already distinguishes `1` from `"1"`; if
+  the caller sent `1` where `boolean` was declared, that is the caller's
+  mistake, not a loose format. What coercion solves is the legitimate text
+  case — the command line, the form, the environment variable — all of which
+  arrive as strings.
+- **An empty string never becomes a value.** That was the screen's worst
+  defect: a blank field became `0` and the workflow ran with a number nobody
+  typed. Empty is absence, and absence of a required field is an error.
+- **A malformed `params_schema` is not an error.** An old workflow (or one
+  generated outside the screen) may have a `params_schema` that is null, a
+  list, or values that do not describe a type. Refusing the run because of
+  that would break workflows that work today; the right thing is to pass the
+  inputs along and SAY, in a hint, that nobody checked them.
 
-Chave não declarada também passa intacta: o gatilho de webhook tem o seu
-próprio `payload_schema`, validado no despacho, e reclamar aqui de um campo que
-o outro contrato exige seria recusar o fluxo certo.
+An undeclared key also passes through untouched: the webhook trigger has its
+own `payload_schema`, validated at dispatch, and complaining here about a field
+that the other contract requires would be refusing the right workflow.
 """
 from __future__ import annotations
 
@@ -39,39 +40,40 @@ from typing import Any
 from app.core.utils.logger import scrub_text
 from app.mcp.erros import erro
 
-# Os tipos que a tela de parâmetros emite e que o executor sabe receber. Um
-# `type` fora desta lista é sinal de schema de outra procedência — e schema que
-# não reconhecemos vira "sem contrato", não erro.
+# The types that the parameters screen emits and that the executor knows how to
+# receive. A `type` outside this list signals a schema of other provenance — and
+# a schema we do not recognize becomes "no contract", not an error.
 TIPOS = ("string", "number", "boolean", "object")
 
-# Inteiro puro: é o que decide entre `int` e `float`. Sem isto, "3" viraria
-# `3.0` e um nó que indexa lista ou monta paginação receberia float.
+# Pure integer: this is what decides between `int` and `float`. Without it, "3"
+# would become `3.0` and a node that indexes a list or builds pagination would
+# receive a float.
 _INTEIRO = re.compile(r"^-?\d+$")
 
-# Grafias aceitas para booleano em texto. Inclui `nao` sem acento porque quem
-# escreve na linha de comando raramente acentua, e recusar por causa do til
-# seria um erro sem nenhum ganho.
+# Accepted spellings for a boolean in text. Includes `nao` without the accent
+# because people writing on the command line rarely use accents, and refusing
+# because of the tilde would be an error with no gain at all.
 _VERDADEIRO = frozenset({"true", "1", "yes", "sim"})
 _FALSO = frozenset({"false", "0", "no", "não", "nao"})
 
-# Teto de aninhamento de um `object`. Parâmetro de fluxo de verdade fica muito
-# abaixo — uma FeatureCollection de MultiPolygons dá 8 níveis. Até o Python 3.11 o
-# teto era implícito: o `json.loads` levantava `RecursionError` perto de 1000
-# níveis. A partir do 3.12 o decodificador conta no limite de recursão do C,
-# e 2000 níveis passam — o objeto seguia adiante e estourava a pilha em quem o
-# percorresse depois (validação, cópia, o executor), longe desta camada, que
-# existe para devolver `validation`. Explícito, vale igual em qualquer versão.
+# Nesting ceiling for an `object`. A real workflow parameter stays far below
+# it — a FeatureCollection of MultiPolygons reaches 8 levels. Up to Python 3.11
+# the ceiling was implicit: `json.loads` raised `RecursionError` near 1000
+# levels. From 3.12 on the decoder counts against the C recursion limit, and
+# 2000 levels pass — the object went on and blew the stack in whoever traversed
+# it later (validation, copying, the executor), far from this layer, which
+# exists to return `validation`. Explicit, it holds the same in any version.
 _PROFUNDIDADE_MAXIMA = 100
 
 HINT_SEM_CONTRATO = "params_schema ausente ou malformado: inputs não validados"
 
 
 def _schema_valido(params_schema: Any) -> bool:
-    """O `params_schema` descreve um contrato? (formato da tela de execução)
+    """Does the `params_schema` describe a contract? (run screen format)
 
-    Dict não vazio cujos valores são todos dicts com `type` conhecido. O dict
-    VAZIO conta como ausente de propósito: "nenhum parâmetro declarado" e
-    "schema que não sei ler" levam ao mesmo lugar — nada a conferir.
+    A non-empty dict whose values are all dicts with a known `type`. The EMPTY
+    dict counts as absent on purpose: "no parameter declared" and "a schema I
+    cannot read" lead to the same place — nothing to check.
     """
     if not isinstance(params_schema, dict) or not params_schema:
         return False
@@ -82,8 +84,9 @@ def _schema_valido(params_schema: Any) -> bool:
 
 
 def _para_numero(valor: Any) -> tuple[Any, str | None]:
-    # `bool` é subclasse de `int` em Python: sem esta linha, `True` passaria
-    # como número 1 e o fluxo receberia um booleano onde espera quantidade.
+    # `bool` is a subclass of `int` in Python: without this line, `True` would
+    # pass as the number 1 and the workflow would receive a boolean where it
+    # expects a quantity.
     if isinstance(valor, bool):
         return None, "esperado number; booleano não é número"
     if isinstance(valor, (int, float)):
@@ -96,12 +99,13 @@ def _para_numero(valor: Any) -> tuple[Any, str | None]:
     if not texto:
         return None, "esperado number; string vazia não é zero"
     if _INTEIRO.match(texto):
-        # O `try` não é supérfluo: desde o 3.10.7 o interpretador impõe um teto
-        # de 4300 dígitos (`sys.set_int_max_str_digits`) para converter texto em
-        # int, e acima dele `int()` levanta `ValueError`. Deixá-lo subir cru
-        # entregaria "erro inesperado" ao cliente — o decorador `ferramenta` só
-        # traduz `ToolError`, `AtlasBaseError` e `HTTPException` — num caso que
-        # é erro de entrada como qualquer outro e que ele corrige sozinho.
+        # The `try` is not superfluous: since 3.10.7 the interpreter imposes a
+        # ceiling of 4300 digits (`sys.set_int_max_str_digits`) for converting
+        # text to int, and above it `int()` raises `ValueError`. Letting it
+        # bubble up raw would hand the client an "unexpected error" — the
+        # `ferramenta` decorator only translates `ToolError`, `AtlasBaseError`
+        # and `HTTPException` — in a case that is an input error like any
+        # other and one the client fixes on its own.
         try:
             return int(texto), None
         except ValueError:
@@ -119,8 +123,8 @@ def _para_booleano(valor: Any) -> tuple[Any, str | None]:
     if isinstance(valor, bool):
         return valor, None
     if not isinstance(valor, str):
-        # Inclusive `1`/`0`: em JSON, número é número. Quem quer booleano
-        # escreve `true` ou manda a string "1".
+        # Including `1`/`0`: in JSON, a number is a number. Whoever wants a
+        # boolean writes `true` or sends the string "1".
         return None, "esperado boolean"
     texto = valor.strip().lower()
     if texto in _VERDADEIRO:
@@ -134,8 +138,9 @@ def _para_texto(valor: Any) -> tuple[Any, str | None]:
     if isinstance(valor, str):
         return valor, None
     if isinstance(valor, bool):
-        # "true"/"false", não "True"/"False": o valor veio de JSON e segue para
-        # uma expressão do fluxo, onde a grafia em minúsculas é a reconhecida.
+        # "true"/"false", not "True"/"False": the value came from JSON and goes
+        # on to a workflow expression, where the lowercase spelling is the
+        # recognized one.
         return ("true" if valor else "false"), None
     if isinstance(valor, (int, float)):
         return str(valor), None
@@ -143,13 +148,13 @@ def _para_texto(valor: Any) -> tuple[Any, str | None]:
 
 
 def _fundo_demais(valor: Any) -> bool:
-    """O `object` passa de `_PROFUNDIDADE_MAXIMA` níveis? (a raiz é o nível 1)
+    """Does the `object` exceed `_PROFUNDIDADE_MAXIMA` levels? (the root is level 1)
 
-    Iterativo de propósito — medir recursivamente estouraria a pilha no mesmo
-    caso que a medida existe para recusar — e um nível por volta, com os
-    contêineres do nível seguinte coletados numa compreensão: roda no event
-    loop, e um GeoJSON de 200 mil pontos passado como `object` custava centenas
-    de milissegundos no laço item a item.
+    Iterative on purpose — measuring recursively would blow the stack in the
+    very case the measurement exists to refuse — and one level per pass, with
+    the next level's containers collected in a comprehension: it runs on the
+    event loop, and a 200-thousand-point GeoJSON passed as `object` cost
+    hundreds of milliseconds in the item-by-item loop.
     """
     nivel = [valor]
     for _ in range(_PROFUNDIDADE_MAXIMA):
@@ -173,14 +178,15 @@ def _para_objeto(valor: Any) -> tuple[Any, str | None]:
         try:
             decodificado = json.loads(valor)
         except (ValueError, RecursionError):
-            # `RecursionError` entra junto de `ValueError` — e não é limpeza a
-            # fazer: o decodificador do CPython é recursivo e, com aninhamento
-            # fundo o bastante (`"[[[[..."`), estoura a pilha ANTES de decidir
-            # se o texto é JSON válido. Como ele herda de `RuntimeError`,
-            # escaparia do decorador `ferramenta` e viraria "erro inesperado"
-            # para o cliente, em vez do `validation` que esta camada existe
-            # para produzir. Do ponto de vista de quem chamou é a mesma falha
-            # das outras: o texto não é JSON que o servidor consiga ler.
+            # `RecursionError` goes in alongside `ValueError` — and it is not a
+            # cleanup to be done: the CPython decoder is recursive and, with
+            # deep enough nesting (`"[[[[..."`), it blows the stack BEFORE
+            # deciding whether the text is valid JSON. Since it inherits from
+            # `RuntimeError`, it would escape the `ferramenta` decorator and
+            # become an "unexpected error" for the client, instead of the
+            # `validation` this layer exists to produce. From the caller's
+            # point of view it is the same failure as the others: the text is
+            # not JSON the server can read.
             return None, "esperado object; o texto enviado não é JSON válido"
         if not isinstance(decodificado, (dict, list)):
             return None, "esperado object; o JSON enviado não é objeto nem lista"
@@ -198,16 +204,16 @@ _COERCOES = {
 
 
 def validar_inputs(params_schema: Any, inputs: dict | None) -> tuple[dict, list[str]]:
-    """Confere `inputs` contra `params_schema` e devolve `(inputs, hints)`.
+    """Checks `inputs` against `params_schema` and returns `(inputs, hints)`.
 
-    Os erros são AGREGADOS num único `ToolError` `validation` com
-    `errors=[{path, message}]`: quem chama corrige tudo de uma vez em vez de
-    descobrir um problema por tentativa. A mensagem nomeia o campo e o tipo
-    esperado e nunca ecoa o valor recebido — um parâmetro pode carregar senha,
-    e o erro é a rota mais fácil de um segredo para o log.
+    Errors are AGGREGATED into a single `validation` `ToolError` with
+    `errors=[{path, message}]`: the caller fixes everything at once instead of
+    discovering one problem per attempt. The message names the field and the
+    expected type and never echoes the value received — a parameter may carry
+    a password, and the error is a secret's easiest route into the log.
 
-    `hints` é aviso, não recusa: schema sem contrato e chave não declarada
-    entram aí para que quem chama saiba o que NÃO foi conferido.
+    `hints` is a warning, not a refusal: a schema without a contract and an
+    undeclared key go there so the caller knows what was NOT checked.
     """
     hints: list[str] = []
 
@@ -233,25 +239,27 @@ def validar_inputs(params_schema: Any, inputs: dict | None) -> tuple[dict, list[
     for nome, decl in params_schema.items():
         caminho = f"inputs.{nome}"
         coagir = _COERCOES[decl["type"]]
-        # `None` explícito conta como ausência: nenhum dos quatro tipos aceita
-        # nulo, então tratá-lo como valor só produziria um erro pior ("esperado
-        # string") no lugar do certo ("obrigatório").
+        # An explicit `None` counts as absence: none of the four types accepts
+        # null, so treating it as a value would only produce a worse error
+        # ("expected string") in place of the right one ("required").
         presente = nome in recebidos and recebidos[nome] is not None
 
         if not presente:
-            # `default: None` é a MESMA regra do input nulo, aplicada do outro
-            # lado do contrato: nulo é ausência de valor, não valor. Vale pelo
-            # mesmo motivo — nenhum dos quatro tipos aceita nulo, então coagi-lo
-            # só produziria erro. Só que aqui o erro seria PIOR que o do input:
-            # acusaria o `params_schema` do fluxo, que quem chama não escreveu e
-            # não conserta com input nenhum, deixando o workflow inexecutável
-            # pelo MCP. E `null` para campo opcional é o que um serializador
-            # JSON comum emite, inclusive nos fluxos criados por `create_workflow`.
+            # `default: None` is the SAME rule as the null input, applied on the
+            # other side of the contract: null is absence of a value, not a
+            # value. It holds for the same reason — none of the four types
+            # accepts null, so coercing it would only produce an error. Except
+            # that here the error would be WORSE than the input one: it would
+            # blame the workflow's `params_schema`, which the caller did not
+            # write and cannot fix with any input, leaving the workflow
+            # unrunnable through the MCP. And `null` for an optional field is
+            # what an ordinary JSON serializer emits, including in workflows
+            # created by `create_workflow`.
             padrao = decl.get("default")
             if padrao is not None:
-                # O default também é coagido: `"5"` escrito no schema precisa
-                # chegar ao executor como 5, senão o valor omitido se comporta
-                # diferente do valor digitado.
+                # The default is coerced too: a `"5"` written in the schema has to
+                # reach the executor as 5, otherwise the omitted value behaves
+                # differently from the typed value.
                 valor, problema = coagir(padrao)
                 if problema:
                     erros.append({"path": caminho, "message": f"default do params_schema inválido: {problema}"})

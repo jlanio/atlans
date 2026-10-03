@@ -12,8 +12,8 @@ logger = get_logger(__name__)
 @register_node
 class ClipNode(BaseNode):
     """
-    Recorta um GeoDataFrame (layerA = features) pelo contorno de outro (layerB = mask).
-    Reprojecta automaticamente a máscara para o CRS das features se necessário.
+    Clips a GeoDataFrame (layerA = features) by the outline of another (layerB = mask).
+    Automatically reprojects the mask to the features' CRS if needed.
     """
 
     @classmethod
@@ -38,8 +38,8 @@ class ClipNode(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
-        # Obtém as camadas via helper da classe base; exige CRS nas duas (a
-        # máscara é alinhada ao CRS das feições dentro da thread, em _clip).
+        # Gets the layers via the base class helper; requires a CRS on both (the
+        # mask is aligned to the features' CRS inside the thread, in _clip).
         gdf, mask_gdf = self.get_pair(
             inputs, crs="alinhar", nomes=("camada 'layerA'", "máscara 'layerB'"),
         )
@@ -53,7 +53,7 @@ class ClipNode(BaseNode):
             features: gpd.GeoDataFrame,
             mask: gpd.GeoDataFrame
         ) -> gpd.GeoDataFrame:
-            # Reprojeta máscara para o CRS das features se forem diferentes
+            # Reprojects the mask to the features' CRS if they differ
             if features.crs != mask.crs:
                 logger.info(f"Reprojetando máscara de {mask.crs} para {features.crs}.")
             mask = align_crs(features, mask)

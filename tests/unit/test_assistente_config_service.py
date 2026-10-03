@@ -1,17 +1,18 @@
 # tests/unit/test_assistente_config_service.py
-"""Qual modelo o assistente usa — env como piso, banco por cima.
+"""Which model the assistant uses — env as the floor, database on top.
 
-O que se prende aqui, em ordem de quanto custa errar:
+What is pinned here, in order of how costly it is to get wrong:
 
-1. **Nunca devolve vazio.** Redis fora, banco fora, linha corrompida: tudo cai
-   no padrão do ambiente. Ficar sem modelo significaria o assistente inteiro
-   fora do ar por causa de uma configuração.
-2. **A escolha do admin vence o env**, senão o botão não faz nada.
-3. **Salvar invalida o cache.** Sem isso a troca demora até cinco minutos para
-   valer, e o admin conclui que o botão está quebrado — e clica de novo.
-4. **Id inválido é recusado ao SALVAR**, não na próxima conversa de cada
-   usuário. Um `antropic/claude-opus-5` digitado errado não falha ao gravar;
-   falha em produção, para todo mundo, sem ninguém saber por quê.
+1. **Never returns empty.** Redis down, database down, corrupted row: everything
+   falls back to the environment default. Having no model would mean the whole
+   assistant down because of a setting.
+2. **The admin's choice beats the env**, otherwise the button does nothing.
+3. **Saving invalidates the cache.** Without that, the change takes up to five
+   minutes to take effect, and the admin concludes the button is broken — and
+   clicks again.
+4. **An invalid id is rejected on SAVE**, not on each user's next conversation.
+   A mistyped `antropic/claude-opus-5` does not fail when saving; it fails in
+   production, for everyone, with nobody knowing why.
 """
 from unittest.mock import patch
 
@@ -40,7 +41,7 @@ async def db():
     await engine.dispose()
 
 
-# ── A precedência ────────────────────────────────────────────────────────────
+# ── Precedence ───────────────────────────────────────────────────────────────
 
 async def test_sem_escolha_salva_vale_o_padrao_do_ambiente(db):
     assert await svc.modelo_em_uso(db=db) == ASSISTENTE_MODELO
@@ -55,7 +56,7 @@ async def test_a_escolha_do_admin_vence_o_ambiente(db):
     assert await svc.modelo_em_uso(db=db) == "outro/modelo"
     situacao = await svc.situacao(db=db)
     assert (situacao["origem"], situacao["definido_por"]) == ("banco", "jose")
-    # O padrão continua visível: é o que a tela oferece como «voltar ao padrão».
+    # The default stays visible: it is what the screen offers as "back to default".
     assert situacao["padrao_do_ambiente"] == ASSISTENTE_MODELO
 
 
@@ -70,34 +71,34 @@ async def test_voltar_ao_padrao_apaga_a_escolha(db):
 # ── O cache ──────────────────────────────────────────────────────────────────
 
 async def test_salvar_grava_o_valor_novo_no_cache(db):
-    """Sem isto a troca demora até cinco minutos para valer, e o admin conclui
-    que o botão não funcionou — e clica de novo."""
+    """Without this the change takes up to five minutes to take effect, and the admin
+    concludes the button didn't work — and clicks again."""
     redis = RedisFalso()
     await svc.modelo_em_uso(db=db, redis=redis)          # popula
     assert redis.dados[svc._CACHE] == ASSISTENTE_MODELO
 
     await svc.definir_modelo(db, "outro/modelo", por="jose", redis=redis)
 
-    # ESCREVE, não apaga — ver o teste da corrida logo abaixo.
+    # WRITES, does not delete — see the race test right below.
     assert redis.dados[svc._CACHE] == "outro/modelo"
     assert await svc.modelo_em_uso(db=db, redis=redis) == "outro/modelo"
 
 
 async def test_leitor_atrasado_nao_repinta_o_modelo_VELHO_por_cima(db):
-    """A corrida que a revisão adversária achou, encenada passo a passo.
+    """The race the adversarial review found, staged step by step.
 
-    Um leitor dá miss no cache e vai ao banco. ENQUANTO ele lê, o admin salva
-    outro modelo. Se o leitor terminasse com um SET cego, ele repintaria o
-    valor velho por cima do novo e o fixaria pelos cinco minutos do TTL: a
-    troca «não pegaria», e quem salvou concluiria que o botão está quebrado.
+    A reader misses the cache and goes to the database. WHILE it reads, the admin
+    saves another model. If the reader finished with a blind SET, it would paint
+    the old value over the new one and pin it for the five minutes of the TTL: the
+    change "wouldn't take", and whoever saved would conclude the button is broken.
     """
     redis = RedisFalso()
 
-    # O leitor já leu o banco (modelo velho) e só falta escrever no cache.
-    # Entre uma coisa e outra, a troca acontece:
+    # The reader has already read the database (old model) and only needs to write
+    # to the cache. In between, the change happens:
     await svc.definir_modelo(db, "novo/modelo", por="jose", redis=redis)
 
-    # Agora o leitor atrasado tenta gravar o que leu. `nx` o faz desistir.
+    # Now the late reader tries to write what it read. `nx` makes it give up.
     await redis.set(svc._CACHE, "velho/modelo", ex=svc._TTL_S, nx=True)
 
     assert redis.dados[svc._CACHE] == "novo/modelo"
@@ -114,12 +115,12 @@ async def test_redis_fora_do_ar_nao_deixa_ninguem_sem_modelo(db):
 
 
 async def test_falha_do_banco_nao_prende_o_padrao_no_cache(db):
-    """O padrão de um ERRO de banco não vai para o cache.
+    """The default from a database ERROR does not go into the cache.
 
-    Gravá-lo prenderia a instalação no modelo do ambiente por cinco minutos
-    DEPOIS de o banco voltar: a escolha do admin sumiria sem nada na tela
-    explicando. É a regra que outra cópia do esqueleto «SystemConfig + cache»
-    já seguia — e que esta não levou.
+    Writing it would lock the installation into the environment's model for five
+    minutes AFTER the database came back: the admin's choice would vanish with
+    nothing on the screen explaining it. It is the rule another copy of the
+    "SystemConfig + cache" skeleton already followed — and that this one didn't take.
     """
     await svc.definir_modelo(db, "outro/modelo", por="jose")
     redis = RedisFalso()
@@ -131,13 +132,13 @@ async def test_falha_do_banco_nao_prende_o_padrao_no_cache(db):
     assert await svc.modelo_em_uso(db=SessaoQuebrada(), redis=redis) == ASSISTENTE_MODELO
     assert svc._CACHE not in redis.dados
 
-    # Voltando o banco, a primeira leitura já vê a escolha do admin.
+    # Once the database is back, the first read already sees the admin's choice.
     assert await svc.modelo_em_uso(db=db, redis=redis) == "outro/modelo"
 
 
 async def test_banco_fora_do_ar_cai_no_padrao_em_vez_de_levantar():
-    """O assistente inteiro fora do ar por causa de uma configuração seria uma
-    troca ruim: o padrão do ambiente é sempre melhor que nada."""
+    """The whole assistant down because of a setting would be a bad trade: the
+    environment default is always better than nothing."""
     class Explode:
         def __call__(self): raise RuntimeError("banco fora do ar")
 
@@ -145,24 +146,24 @@ async def test_banco_fora_do_ar_cai_no_padrao_em_vez_de_levantar():
         assert await svc.modelo_em_uso() == ASSISTENTE_MODELO
 
 
-# ── A validação ──────────────────────────────────────────────────────────────
+# ── Validation ───────────────────────────────────────────────────────────────
 
-# Sem barra é válido: é o nome num servidor local (`llama3.1`, `qwen3:14b`).
+# Without a slash it is valid: it is the name on a local server (`llama3.1`, `qwen3:14b`).
 @pytest.mark.parametrize("ruim", [
     "", "   ", "fornecedor//modelo", "fornecedor/", "/modelo",
     "com espaço/no meio", "https://openrouter.ai/api/v1/x", "a/" + "x" * 200,
 ])
 async def test_id_invalido_e_recusado_ao_salvar(db, ruim):
-    """Recusar aqui é recusar uma vez; deixar passar é falhar na próxima
-    conversa de CADA usuário, sem a tela dizer por quê."""
+    """Rejecting here is rejecting once; letting it through is failing on the next
+    conversation of EVERY user, without the screen saying why."""
     with pytest.raises(ValueError):
         await svc.definir_modelo(db, ruim)
     assert await svc.modelo_em_uso(db=db) == ASSISTENTE_MODELO
 
 
 async def test_linha_corrompida_no_banco_nao_derruba_a_leitura(db):
-    """Alguém editando `system_config` à mão, uma migração malfeita: a leitura
-    ignora o que não tem forma de id e volta ao padrão."""
+    """Someone editing `system_config` by hand, a botched migration: the read
+    ignores what doesn't look like an id and falls back to the default."""
     from app.core.system_config import set_config
 
     await set_config(db, svc.CHAVE, {"modelo": "isto não é um id"})

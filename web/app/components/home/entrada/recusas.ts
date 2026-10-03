@@ -1,22 +1,23 @@
 // web/app/components/home/entrada/recusas.ts
 //
-// O que a entrada mostra quando o servidor recusa. O servidor só fala
-// português: em português a tela mostra a mensagem dele, a de sempre; em inglês
-// e espanhol, o texto do idioma, escolhido pelo status.
+// What the sign-in shows when the server rejects. The server only speaks
+// Portuguese: in Portuguese the screen shows its message, as always; in English
+// and Spanish, the language's text, chosen by status.
 //
-// Só a recusa que É do servidor passa por essa tradução por status — o corpo
-// que o `http_exception_handler` escreve (`error: "http_exception"`). O 429 do
-// limitador por IP (`{detail: "Too Many Requests"}`), o 502 do proxy /terra
-// (`{detail: "Serviço indisponível"}`), o 500 inesperado e a página de erro de
-// uma CDN têm outro corpo, e o mesmo status ali quer dizer outra coisa: um 429
-// sem o corpo do servidor não é conta bloqueada, e um 403 de uma CDN não é a
-// conta suspensa.
+// Only a rejection that IS from the server goes through this per-status
+// translation — the body `http_exception_handler` writes
+// (`error: "http_exception"`). The per-IP limiter's 429
+// (`{detail: "Too Many Requests"}`), the /terra proxy's 502
+// (`{detail: "Serviço indisponível"}`), an unexpected 500 and a CDN's error
+// page have another body, and the same status there means something else: a
+// 429 without the server body is not a locked account, and a 403 from a CDN is
+// not a suspended account.
 
 import type { AxiosError } from "axios"
 
 type Corpo = { error?: string; message?: string; detail?: string }
 
-/** A recusa veio do próprio servidor (e não do limitador, do proxy ou de uma CDN). */
+/** The rejection came from the server itself (and not from the limiter, the proxy or a CDN). */
 export function ehRecusaDoServidor(data: unknown): boolean {
   return !!data && typeof data === "object" && (data as Corpo).error === "http_exception"
 }
@@ -28,10 +29,10 @@ export interface TextosDaRecusaDoLink {
 }
 
 /**
- * A recusa de um link do e-mail (verificar, redefinir). Em português, a
- * mensagem do servidor como veio, ou "token inválido" quando não veio nenhuma
- * — o de sempre. Nos outros idiomas, pelo status: as recusas do token (400 e
- * 404) viram o "token inválido" do idioma.
+ * The rejection of an e-mail link (verify, reset). In Portuguese, the server
+ * message as it came, or "token inválido" when none came — as always. In the
+ * other languages, by status: the token rejections (400 and 404) become the
+ * language's "token inválido".
  */
 export function textoDaRecusaDoLink(erro: unknown, traduzir: boolean, t: TextosDaRecusaDoLink): string {
   const resposta = (erro as AxiosError<Corpo> | null)?.response

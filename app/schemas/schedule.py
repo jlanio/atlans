@@ -6,13 +6,14 @@ from app.core.constants import FUSO_PADRAO_DO_AGENDAMENTO
 
 
 class ScheduleNotice(BaseModel):
-    """Aviso sobre o que ACONTECEU (ou não) com o agendamento ao salvar.
+    """Warning about what HAPPENED (or not) to the schedule on save.
 
-    Espelha `WorkflowMoveWarning`: salvar o workflow nunca falha por causa do
-    agendamento (a exceção é best-effort e engolida pelo chamador), então o que
-    o usuário precisa saber — "o agendamento não foi aplicado porque o workflow
-    está inativo", "a expressão é inválida e o agendamento anterior foi mantido"
-    — volta aqui, pronto para virar um toast, em vez de morrer só no log.
+    Mirrors `WorkflowMoveWarning`: saving the workflow never fails because of
+    the schedule (the exception is best-effort and swallowed by the caller), so
+    what the user needs to know — "the schedule was not applied because the
+    workflow is inactive", "the expression is invalid and the previous schedule
+    was kept" — comes back here, ready to become a toast, instead of dying in
+    the log.
     """
     code: str = Field(..., description="Identificador estável do tipo de aviso.")
     severity: Literal["warning", "info"] = "warning"
@@ -29,9 +30,9 @@ class ScheduleBase(BaseModel):
         None,
         description="RFC 5545 RRULE for calendar scheduling, e.g. 'FREQ=MONTHLY;BYDAY=MO;BYSETPOS=1' (strategy='rrule')"
     )
-    # Era `America/Cuiaba` — mesmo offset do que o nó `ScheduleTrigger` manda,
-    # nome diferente. Dois nomes para a mesma intenção é como o terceiro
-    # valor (UTC, no agendador) passou despercebido tanto tempo.
+    # It used to be `America/Cuiaba` — same offset as what the `ScheduleTrigger`
+    # node sends, different name. Two names for the same intent is how the
+    # third value (UTC, in the scheduler) went unnoticed for so long.
     timezone: str = Field(
         FUSO_PADRAO_DO_AGENDAMENTO, description="Timezone for scheduling"
     )
@@ -59,8 +60,8 @@ class ScheduleRead(ScheduleBase):
 
 class ScheduleUpdate(BaseModel):
     """
-    Schema para atualização de um agendamento.
-    Todos os campos são opcionais — só inclua aqueles que quiser alterar.
+    Schema for updating a schedule.
+    All fields are optional — include only the ones you want to change.
     """
     strategy: Optional[Literal['cron', 'interval', 'rrule']] = Field(None, description="Strategy: 'cron', 'interval', ou 'rrule'")
     interval: Optional[int] = Field(None, description="Quantidade para intervalo (strategy='interval')")

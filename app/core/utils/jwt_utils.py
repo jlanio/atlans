@@ -1,20 +1,20 @@
 # app/core/utils/jwt_utils.py
 """
-Utilitários JWT — criação e validação de tokens de acesso e refresh — e o
-hash de senha.
+JWT utilities — creation and validation of access and refresh tokens — and
+password hashing.
 
-O hash de senha é o `bcrypt_sha256` que o passlib definiu, reproduzido aqui
-sobre o `bcrypt` direto (o passlib saiu: sem manutenção desde 2020, quebrava
-com o bcrypt 4.1+ e carregava uma licença composta no aviso de terceiros).
-O formato gravado no banco é o mesmo, então todo hash existente continua
-válido e um hash novo ainda é lido pela versão anterior do código:
+The password hash is the `bcrypt_sha256` that passlib defined, reproduced here
+on top of `bcrypt` directly (passlib is gone: unmaintained since 2020, it broke
+with bcrypt 4.1+ and carried a compound license into the third-party notice).
+The format stored in the database is the same, so every existing hash remains
+valid and a new hash is still read by the previous version of the code:
 
-    $bcrypt-sha256$v=2,t=2b,r=12$<salt de 22>$<digest de 31>
+    $bcrypt-sha256$v=2,t=2b,r=12$<22-char salt>$<31-char digest>
 
-A pré-chave é o HMAC-SHA256 da senha com o salt como chave, em base64 (44
-bytes): é o que tira o limite de 72 bytes do bcrypt e o que impede o truque
-do prefixo. Os hashes da versão 1 do esquema (SHA-256 puro, formato
-`$bcrypt-sha256$2b,12$…`) também verificam, caso exista algum.
+The pre-key is the HMAC-SHA256 of the password keyed with the salt, in base64
+(44 bytes): it is what removes bcrypt's 72-byte limit and what prevents the
+prefix trick. Hashes from version 1 of the scheme (plain SHA-256, format
+`$bcrypt-sha256$2b,12$…`) also verify, in case any exist.
 """
 import base64
 import hashlib
@@ -35,37 +35,37 @@ _logger = get_logger(__name__)
 _ALGORITHM = "HS256"
 _ACCESS_EXPIRE_MINUTES = int(30)
 _REFRESH_EXPIRE_DAYS = int(2)
-# Audience por contexto: impede que um token emitido para um proposito
-# seja usado em outro (ex: refresh_token apresentado como access_token a
-# um endpoint vulneravel). Cada decoder exige sua audience especifica.
+# Audience per context: prevents a token issued for one purpose from being
+# used for another (e.g., a refresh_token presented as an access_token to
+# a vulnerable endpoint). Each decoder requires its specific audience.
 AUDIENCE_ACCESS  = "atlas-studio:access"
 AUDIENCE_REFRESH = "atlas-studio:refresh"
 
-# ── Rotação de refresh token ──────────────────────────────────────────────────
-# Cada login abre uma "família" de refresh tokens. O Redis guarda qual jti é o
-# válido no momento da família; a cada refresh o jti rotaciona. Se um jti antigo
-# (já rotacionado) reaparece, é sinal de roubo → revogamos a família inteira.
+# ── Refresh token rotation ────────────────────────────────────────────────────
+# Each login opens a "family" of refresh tokens. Redis stores which jti is the
+# family's currently valid one; on each refresh the jti rotates. If an old jti
+# (already rotated) reappears, it is a sign of theft → we revoke the whole family.
 _REFRESH_FAMILY_PREFIX = "refresh_family:"
 _REFRESH_PREV_PREFIX   = "refresh_prev:"
 _REFRESH_FAMILY_TTL    = _REFRESH_EXPIRE_DAYS * 24 * 60 * 60
-# Janela de graça: tolera o jti imediatamente anterior por alguns segundos para
-# não derrubar a sessão quando o cliente dispara refreshes concorrentes
-# (ex.: o callback jwt do NextAuth em requisições paralelas).
+# Grace window: tolerates the immediately previous jti for a few seconds so the
+# session is not dropped when the client fires concurrent refreshes
+# (e.g., NextAuth's jwt callback on parallel requests).
 _REFRESH_GRACE_SECONDS = 30
 
-# ── Hash de senha (bcrypt_sha256, versão 2) ─────────────────────────────────
+# ── Password hash (bcrypt_sha256, version 2) ────────────────────────────────
 _ROUNDS = 12
 _HASH = re.compile(
     r"^\$bcrypt-sha256\$"
-    r"(?:v=(?P<versao>\d+),t=(?P<tipo>2[ab]),r=(?P<rounds>\d{1,2})"   # versão 2
-    r"|(?P<tipo1>2[ab]),(?P<rounds1>\d{1,2}))"                         # versão 1
+    r"(?:v=(?P<versao>\d+),t=(?P<tipo>2[ab]),r=(?P<rounds>\d{1,2})"   # version 2
+    r"|(?P<tipo1>2[ab]),(?P<rounds1>\d{1,2}))"                         # version 1
     r"\$(?P<salt>[./A-Za-z0-9]{22})\$(?P<digest>[./A-Za-z0-9]{31})$"
 )
 
 
 def _pre_chave(plain: str, salt: str, versao: int) -> bytes:
-    """A senha como o bcrypt a recebe: HMAC-SHA256 com o salt (v2) ou SHA-256
-    puro (v1), em base64 — 44 bytes, dentro do limite de 72 do bcrypt."""
+    """The password as bcrypt receives it: HMAC-SHA256 with the salt (v2) or plain
+    SHA-256 (v1), in base64 — 44 bytes, within bcrypt's 72-byte limit."""
     senha = plain.encode("utf-8")
     if versao >= 2:
         digest = hmac.new(salt.encode("ascii"), senha, hashlib.sha256).digest()
@@ -75,7 +75,7 @@ def _pre_chave(plain: str, salt: str, versao: int) -> bytes:
 
 
 def hash_password(plain: str) -> str:
-    """Um hash `bcrypt_sha256` v2 novo, com salt próprio."""
+    """A new `bcrypt_sha256` v2 hash, with its own salt."""
     config = bcrypt.gensalt(rounds=_ROUNDS, prefix=b"2b")          # b"$2b$12$<salt>"
     salt = config[-22:].decode("ascii")
     completo = bcrypt.hashpw(_pre_chave(plain, salt, 2), config).decode("ascii")
@@ -83,8 +83,8 @@ def hash_password(plain: str) -> str:
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """A senha confere com o hash? Um hash fora do formato (ou vazio) é só
-    falso — nunca uma exceção no login."""
+    """Does the password match the hash? A malformed (or empty) hash is just
+    false — never an exception at login."""
     partes = _HASH.match(hashed or "")
     if not partes or not isinstance(plain, str):
         return False
@@ -123,10 +123,10 @@ def create_refresh_token(data: dict) -> str:
 
 
 def decode_token(token: str, *, expected_audience: str) -> dict:
-    """Decodifica e valida o token, exigindo audience especifica.
+    """Decodes and validates the token, requiring a specific audience.
 
-    expected_audience: passe AUDIENCE_ACCESS ou AUDIENCE_REFRESH conforme o
-    uso. Tokens com audience diferente sao rejeitados.
+    expected_audience: pass AUDIENCE_ACCESS or AUDIENCE_REFRESH according to
+    the use. Tokens with a different audience are rejected.
     """
     return jwt.decode(
         token, APP_SECRET, algorithms=[_ALGORITHM], audience=expected_audience,
@@ -140,17 +140,17 @@ import hashlib as _hashlib
 
 
 def _token_blacklist_key(token: str) -> str:
-    """Chave Redis para blacklist — hash do token para não armazenar o JWT inteiro."""
+    """Redis key for the blacklist — a hash of the token so the whole JWT is not stored."""
     return f"token_blacklist:{_hashlib.sha256(token.encode()).hexdigest()}"
 
 
 async def blacklist_token(token: str) -> None:
-    """Adiciona token à blacklist com TTL baseado na expiração do token."""
+    """Adds the token to the blacklist with a TTL based on the token's expiration."""
     from app.core.redis import get_redis_pool
 
     try:
-        # Blacklist e agnostica a audience — aceita qualquer token valido
-        # para calcular TTL pelo claim exp.
+        # The blacklist is audience-agnostic — accepts any valid token
+        # to compute the TTL from the exp claim.
         claims = jwt.decode(
             token, APP_SECRET, algorithms=[_ALGORITHM],
             audience=[AUDIENCE_ACCESS, AUDIENCE_REFRESH],
@@ -166,16 +166,16 @@ async def blacklist_token(token: str) -> None:
 
 
 async def is_token_blacklisted(token: str) -> bool:
-    """Verifica se token está na blacklist.
+    """Checks whether the token is on the blacklist.
 
-    Fail-CLOSED: se o Redis estiver indisponível (rede, timeout, erro), levanta
-    HTTP 503 em vez de retornar `False`. O comportamento anterior aceitava
-    qualquer token quando o backing store estava down — tokens revogados via
-    logout permaneciam válidos até a expiração natural, anulando o logout.
+    Fail-CLOSED: if Redis is unavailable (network, timeout, error), raises
+    HTTP 503 instead of returning `False`. The previous behavior accepted
+    any token when the backing store was down — tokens revoked via logout
+    remained valid until their natural expiration, defeating the logout.
 
-    Fail-closed escolhe disponibilidade ↓ vs segurança ↑ — preferimos recusar
-    acessos legítimos por alguns minutos (até Redis voltar) do que aceitar
-    tokens potencialmente comprometidos.
+    Fail-closed trades availability ↓ for security ↑ — we prefer refusing
+    legitimate access for a few minutes (until Redis comes back) over
+    accepting potentially compromised tokens.
     """
     from app.core.redis import get_redis_pool
 
@@ -194,14 +194,14 @@ async def is_token_blacklisted(token: str) -> bool:
         ) from exc
 
 
-# ── Rotação de refresh token (Redis) ───────────────────────────────────────────
+# ── Refresh token rotation (Redis) ─────────────────────────────────────────────
 
-# Script Lua para rotação atômica (compare-and-swap) — evita corrida TOCTOU entre
-# requisições de refresh concorrentes que poderiam gerar jtis divergentes.
-#   KEYS[1] = chave da família   KEYS[2] = chave do jti anterior (grace)
-#   ARGV[1] = jti recebido       ARGV[2] = novo jti candidato
-#   ARGV[3] = TTL da família      ARGV[4] = TTL da janela de graça
-# Retorna: "NOFAMILY" | "REUSE" | <jti a embutir no novo refresh>
+# Lua script for atomic rotation (compare-and-swap) — avoids a TOCTOU race between
+# concurrent refresh requests that could produce divergent jtis.
+#   KEYS[1] = family key         KEYS[2] = previous jti key (grace)
+#   ARGV[1] = received jti       ARGV[2] = new candidate jti
+#   ARGV[3] = family TTL          ARGV[4] = grace window TTL
+# Returns: "NOFAMILY" | "REUSE" | <jti to embed in the new refresh>
 _ROTATE_LUA = """
 local current = redis.call('GET', KEYS[1])
 if not current then
@@ -227,7 +227,7 @@ def new_refresh_family() -> tuple[str, str]:
 
 
 async def register_refresh_family(family: str, jti: str) -> None:
-    """Registra o jti inicial de uma família de refresh tokens (no login)."""
+    """Registers the initial jti of a refresh token family (at login)."""
     from app.core.redis import get_redis_pool
 
     r = get_redis_pool()
@@ -235,12 +235,12 @@ async def register_refresh_family(family: str, jti: str) -> None:
 
 
 async def rotate_refresh_family(family: str, jti: str) -> tuple[str, str | None]:
-    """Valida e rotaciona o refresh token da família.
+    """Validates and rotates the family's refresh token.
 
-    Retorna (status, jti_para_novo_token):
-      - ("ok", novo_jti)   → rotação válida; embuta novo_jti no refresh emitido
-      - ("invalid", None)  → família inexistente/expirada
-      - ("reuse", None)    → jti já rotacionado reapareceu (roubo) → família revogada
+    Returns (status, jti_para_novo_token):
+      - ("ok", novo_jti)   → valid rotation; embed novo_jti in the issued refresh
+      - ("invalid", None)  → family nonexistent/expired
+      - ("reuse", None)    → an already-rotated jti reappeared (theft) → family revoked
     """
     from app.core.redis import get_redis_pool
 
@@ -261,33 +261,34 @@ async def rotate_refresh_family(family: str, jti: str) -> tuple[str, str | None]
 
 
 async def revoke_refresh_family(family: str) -> None:
-    """Revoga a sessão inteira (no logout) removendo a família e seu grace."""
+    """Revokes the whole session (at logout) by removing the family and its grace."""
     from app.core.redis import get_redis_pool
 
     r = get_redis_pool()
     await r.delete(f"{_REFRESH_FAMILY_PREFIX}{family}", f"{_REFRESH_PREV_PREFIX}{family}")
 
 
-# ── Rate limit de refresh por FAMÍLIA (não por IP) ─────────────────────────────
-# O /auth/refresh não pode ser limitado por IP: o Next.js renova server→server,
-# então todos os usuários chegam com o MESMO IP (o do pod web) e dividiriam um
-# balde único de plataforma — estourar esse balde devolvia 429, que o front
-# tratava como "refresh expirado" e deslogava todo mundo. O token de refresh é
-# assinado e já protegido por rotação + detecção de reuso, então a dimensão certa
-# de limite é a SESSÃO (família), não o IP: cada família tem seu próprio balde.
+# ── Refresh rate limit per FAMILY (not per IP) ─────────────────────────────────
+# /auth/refresh cannot be limited per IP: Next.js renews server→server, so all
+# users arrive with the SAME IP (the web pod's) and would share a single
+# platform bucket — overflowing that bucket returned 429, which the frontend
+# treated as "refresh expired" and logged everyone out. The refresh token is
+# signed and already protected by rotation + reuse detection, so the right
+# dimension for the limit is the SESSION (family), not the IP: each family has
+# its own bucket.
 _REFRESH_RATE_PREFIX = "refresh_rate:"
-# Generoso de propósito: uma sessão saudável renova ~1×/30min; o teto só existe
-# para conter um cliente em loop (ex.: uma aba re-tentando após falha transitória).
+# Generous on purpose: a healthy session renews ~1×/30min; the ceiling only exists
+# to contain a client in a loop (e.g., a tab retrying after a transient failure).
 _REFRESH_RATE_LIMIT  = 30
 _REFRESH_RATE_WINDOW = 60
 
 
 async def refresh_rate_exceeded(family: str) -> bool:
-    """True se esta família já passou do teto de refreshes na janela.
+    """True if this family has already exceeded the refresh ceiling in the window.
 
-    Contador Redis de janela fixa (`contar_na_janela`: o prazo nasce na
-    primeira contagem e não anda). Keyed por família — imune ao problema do IP
-    único do hop interno.
+    Fixed-window Redis counter (`contar_na_janela`: the deadline starts at the
+    first count and does not move). Keyed by family — immune to the single-IP
+    problem of the internal hop.
     """
     from app.core.redis import contar_na_janela
 

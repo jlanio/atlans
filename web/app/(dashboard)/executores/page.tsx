@@ -31,7 +31,7 @@ import {
   AvisoDeMetricas,
 } from "@/app/components/executores/estados"
 
-// ── Filtro por estado ao vivo ────────────────────────────────────────────────
+// ── Filter by live state ─────────────────────────────────────────────────────
 
 type StatusFilter = "all" | "online" | "offline"
 
@@ -42,9 +42,10 @@ const OPCOES_DE_STATUS: { valor: StatusFilter; rotulo: string }[] = [
 ]
 
 /**
- * Subtítulo com os contadores ao vivo (contrato §1): "10 executores · 6 online
- * · 2 dedicados". O zero some — "0 dedicados" não ajuda —, e o plural correto
- * de "executor" é "executores" (o default `+s` daria "executors").
+ * Subtitle with the live counters (contract §1): "10 executores · 6 online
+ * · 2 dedicados". Zero disappears — "0 dedicados" does not help — and the
+ * correct plural of "executor" is "executores" (the default `+s` would give
+ * "executors").
  */
 function textoDoSubtitulo({ total, online, dedicados }: { total: number; online: number; dedicados: number }): string {
   if (total === 0) return "Nenhum executor ainda"
@@ -61,15 +62,15 @@ export default function AgentsPage() {
   const quota = session?.user?.agent_quota ?? 0
   const canCreate = isAdmin || quota > 0
 
-  // Dentro do app desktop, marca na lista qual executor é ESTA máquina. No
-  // navegador comum é `null` (ver useExecutorLocal / lib/desktop).
+  // Inside the desktop app, marks in the list which executor is THIS machine. In
+  // a regular browser it is `null` (see useExecutorLocal / lib/desktop).
   const executorLocal = useExecutorLocal()
   const idExecutorLocal = executorLocal?.vinculado ? executorLocal.executorId : null
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all")
   const [tipoFiltro, setTipoFiltro] = useState<FiltroDeTipo>("todos")
-  // Ver o <Tooltip> do cabeçalho: no telefone não há hover nem foco de teclado,
-  // e sem controlar a abertura a dica não tinha como ser lida ali.
+  // See the header's <Tooltip>: on a phone there is no hover nor keyboard focus,
+  // and without controlling the open state the hint had no way to be read there.
   const [dicaAberta, setDicaAberta] = useState(false)
 
   const { data, firstLoad, loading, refreshing, error, refetch, recarregarEmFundo } = useFetchData(
@@ -81,13 +82,13 @@ export default function AgentsPage() {
     "Erro ao carregar métricas."
   )
 
-  // `useMemo` em tudo o que é derivado: sem eles, cada tick do auto-refresh
-  // reconstruía o mapa de métricas e as varreduras da lista, e as props dos
-  // cards trocavam de identidade à toa.
+  // `useMemo` on everything derived: without them, every auto-refresh tick
+  // rebuilt the metrics map and the list scans, and the cards' props changed
+  // identity for nothing.
   //
-  // Reconciliação por conteúdo (ver reconciliar-executores.ts): sem ela, o
-  // React.memo do ExecutorRow nunca acertava, porque cada tick de 15s traz
-  // objetos novos do JSON mesmo para executores que não mudaram em nada.
+  // Content-based reconciliation (see reconciliar-executores.ts): without it,
+  // ExecutorRow's React.memo never hit, because every 15s tick brings new
+  // objects from the JSON even for executors that did not change at all.
   const anterioresRef = useRef<IExecutor[]>([])
   const executores: IExecutor[] = useMemo(() => {
     anterioresRef.current = reconciliarExecutores(anterioresRef.current, data ?? [])
@@ -97,7 +98,7 @@ export default function AgentsPage() {
   const metricsMap = useMemo(() => {
     const mapa: Record<string, IExecutorMetrics> = {}
     for (const m of metricsData?.executores ?? []) {
-      // A linha "Sem executor" (falhas de despacho) não tem host: não é de ninguém.
+      // The "Sem executor" row (dispatch failures) has no host: it belongs to nobody.
       if (!m.agent_host) continue
       const id = m.agent_host.startsWith("executor:") ? m.agent_host.slice("executor:".length) : m.agent_host
       mapa[id] = m
@@ -105,11 +106,12 @@ export default function AgentsPage() {
     return mapa
   }, [metricsData])
 
-  // Auto-refresh a cada 15s para manter carga em tempo real — só com a aba em
-  // foco, e com atualização imediata ao retomar o foco (mesmo gate de
-  // workspaces/page.tsx). Aba oculta não tem quem leia o resultado. É recarga
-  // de fundo: com a 1ª carga em erro, o cartão fica na tela durante a
-  // tentativa, em vez de sair e voltar (e ser anunciado de novo) a cada tique.
+  // Auto-refresh every 15s to keep the load real-time — only with the tab
+  // focused, and with an immediate update on regaining focus (same gate as
+  // workspaces/page.tsx). A hidden tab has nobody to read the result. It is a
+  // background reload: with the 1st load in error, the card stays on screen
+  // during the attempt, instead of leaving and coming back (and being announced
+  // again) on every tick.
   useEffect(() => {
     const id = setInterval(() => {
       if (document.visibilityState === "visible") recarregarEmFundo()
@@ -124,19 +126,19 @@ export default function AgentsPage() {
     }
   }, [recarregarEmFundo])
 
-  // Admin: getAgents() retorna todos; não-admin: getMyAgents() já retorna apenas acessíveis
+  // Admin: getAgents() returns all; non-admin: getMyAgents() already returns only the accessible ones
   const visibleAgents = executores
 
-  // Executores criados pelo próprio usuário (usado para calcular cota restante)
+  // Executors created by the user themself (used to compute the remaining quota)
   const ownedCount = useMemo(
     () => (currentUserId ? visibleAgents.filter(a => a.created_by === currentUserId).length : 0),
     [visibleAgents, currentUserId],
   )
 
-  // Contadores ao vivo do subtítulo. "Online" conta só executores ATIVOS que
-  // estão online — casa com o LED verde que o usuário vê no trilho (um online
-  // de status revogado/inativo não é capacidade real). "Dedicados" conta os
-  // dedicados vigentes (status ativo), não os já revogados/inativos.
+  // Live counters for the subtitle. "Online" counts only ACTIVE executors that
+  // are online — it matches the green LED the user sees in the rail (an online
+  // one with revoked/inactive status is not real capacity). "Dedicados" counts
+  // the current dedicated ones (active status), not those already revoked/inactive.
   const online = useMemo(() => visibleAgents.filter(a => a.status === "active" && a.online).length, [visibleAgents])
   const dedicados = useMemo(() => visibleAgents.filter(a => a.executor_type === "dedicated" && a.status === "active").length, [visibleAgents])
 
@@ -151,16 +153,16 @@ export default function AgentsPage() {
     [filteredAgents, tipoFiltro],
   )
 
-  // Em "Todos" a lista mistura tipos, então ganha cabeçalhos de grupo e a
-  // coluna de tipo. Com um tipo escolhido os dois viram redundância.
+  // In "Todos" (all) the list mixes types, so it gets group headers and the
+  // type column. With a type chosen both become redundant.
   const agrupado = tipoFiltro === "todos"
   const grupos = useMemo<{ tipo: IExecutor["executor_type"]; itens: IExecutor[] }[]>(() => {
     if (!agrupado) return [{ tipo: tipoFiltro as IExecutor["executor_type"], itens: agentesVisiveis }]
-    // Enumerar `["default","dedicated"]` fixo escondia qualquer outro
-    // `executor_type` que a API viesse a mandar: ele entrava na contagem e
-    // passava pelo guard de lista vazia, mas nenhum grupo o renderizava — o
-    // trilho ficava com cabeçalho e sem linha. Agrupar pelos tipos que
-    // EXISTEM na resposta cobre isso, e `estiloDoTipo` já tem o neutro.
+    // Enumerating a fixed `["default","dedicated"]` hid any other
+    // `executor_type` the API might send: it went into the count and
+    // passed the empty-list guard, but no group rendered it — the rail
+    // ended up with a header and no row. Grouping by the types that
+    // EXIST in the response covers that, and `estiloDoTipo` already has the neutral one.
     const ordem = ["default", "dedicated"]
     const presentes = [...new Set(agentesVisiveis.map(a => a.executor_type))]
       .sort((x, y) => {
@@ -175,33 +177,33 @@ export default function AgentsPage() {
     setTipoFiltro("todos")
   }
 
-  // Métricas são uma fonte SECUNDÁRIA: se caírem, o trilho continua completo,
-  // só sem os números de histórico — vira aviso âmbar, não erro de tela.
+  // Metrics are a SECONDARY source: if they go down, the rail stays complete,
+  // just without the history numbers — it becomes an amber notice, not a screen error.
   const metricasFalharam = metricsData === null && metricsError != null
 
   return (
     <PageRoot>
-      {/* ── Cabeçalho (contrato §1) ─────────────────────────────────────────── */}
-      {/* `flex-wrap`: sem ele o título e a fila de ações disputam a mesma linha
-          num telefone, e o `shrink-0` das ações espremia "Executores" até virar
-          reticências. */}
+      {/* ── Header (contract §1) ─────────────────────────────────────────────── */}
+      {/* `flex-wrap`: without it the title and the action row fight for the same line
+          on a phone, and the actions' `shrink-0` squeezed "Executores" down to
+          an ellipsis. */}
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-semibold text-foreground">Executores</h1>
             <TooltipProvider delayDuration={100}>
-              {/* Controlado, e o clique abre: o Radix abre tooltip por hover e
-                  por foco de teclado, e o telefone não tem nem um nem outro —
-                  a instrução de como subir o executor era inalcançável ali.
-                  Fecha no toque fora, como qualquer camada do Radix. */}
+              {/* Controlled, and a click opens it: Radix opens a tooltip on hover and
+                  on keyboard focus, and the phone has neither —
+                  the instructions for bringing up the executor were unreachable
+                  there. Closes on an outside tap, like any Radix layer. */}
               <Tooltip open={dicaAberta} onOpenChange={setDicaAberta}>
                 <TooltipTrigger asChild>
                   <button
                     type="button"
                     aria-label="Como executar um executor"
                     onClick={() => setDicaAberta(true)}
-                    // `p-1 -m-1`: alvo de toque maior sem mexer no alinhamento
-                    // do ícone com o título.
+                    // `p-1 -m-1`: a larger touch target without touching the icon's
+                    // alignment with the title.
                     className="mt-0.5 -m-1 rounded-sm p-1 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
                   >
                     <TbInfoCircle size={17} aria-hidden="true" />
@@ -210,8 +212,8 @@ export default function AgentsPage() {
                 <TooltipContent
                   side="right"
                   collisionPadding={16}
-                  // `max-w-sm` fixo (384px) é mais largo que a tela de 360px, e
-                  // o conteúdo vazava por baixo da borda.
+                  // A fixed `max-w-sm` (384px) is wider than the 360px screen, and
+                  // the content leaked under the edge.
                   className="max-w-[min(24rem,calc(100vw-2rem))] space-y-2 border border-border bg-popover p-3 text-popover-foreground shadow-md"
                 >
                   <p className="text-xs font-semibold">Executar um executor</p>
@@ -228,8 +230,8 @@ export default function AgentsPage() {
               </Tooltip>
             </TooltipProvider>
           </div>
-          {/* Enquanto não há o que contar (1ª carga), o subtítulo vira esqueleto
-              — nunca escreve "— online". */}
+          {/* While there is nothing to count (1st load), the subtitle becomes a skeleton
+              — it never writes "— online". */}
           {data !== null ? (
             <p className="text-sm font-medium text-muted-foreground">
               {textoDoSubtitulo({ total: visibleAgents.length, online, dedicados })}
@@ -248,9 +250,9 @@ export default function AgentsPage() {
             aria-label="Atualizar a lista de executores"
             className="gap-1.5 max-md:h-10"
           >
-            {/* `loading` cobre a 1ª carga E as recargas (inclusive o tick de
-                15s) — é o único sinal de que a lista está sendo recarregada,
-                já que as linhas não esmaecem mais. */}
+            {/* `loading` covers the 1st load AND reloads (including the 15s
+                tick) — it is the only sign the list is being reloaded,
+                since the rows no longer fade. */}
             <TbRefresh size={14} className={loading ? "motion-safe:animate-spin" : undefined} aria-hidden="true" />
             Atualizar
           </Button>
@@ -266,7 +268,7 @@ export default function AgentsPage() {
         </div>
       </div>
 
-      {/* Aviso de pool compartilhado — orienta o usuário final sobre os tipos */}
+      {/* Shared-pool notice — guides the end user about the types */}
       {!isAdmin && visibleAgents.length > 0 && (
         <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
           <TbInfoCircle size={15} className="mt-0.5 shrink-0" aria-hidden="true" />
@@ -278,8 +280,8 @@ export default function AgentsPage() {
         </div>
       )}
 
-      {/* Filtros — dois grupos de toggle padrão (contrato §1). Só aparecem quando
-          há lista; num vazio de primeiro uso não há o que filtrar. */}
+      {/* Filters — two standard toggle groups (contract §1). They only appear when
+          there is a list; in a first-use empty state there is nothing to filter. */}
       {data !== null && visibleAgents.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
           <GrupoDeToggle
@@ -297,9 +299,9 @@ export default function AgentsPage() {
         </div>
       )}
 
-      {/* ── Estados (contrato §3): carregando → erro (só sem carga aceita) →
-             primeiro uso → conteúdo; dentro do conteúdo, sem-resultado e o
-             aviso de métricas. ─────────────────────────────────────────────── */}
+      {/* ── States (contract §3): loading → error (only with no accepted load) →
+             first use → content; within the content, no-result and the
+             metrics notice. ───────────────────────────────────────────────── */}
       {firstLoad ? (
         <SkeletonDeExecutores />
       ) : data === null ? (
@@ -324,9 +326,9 @@ export default function AgentsPage() {
           {agentesVisiveis.length === 0 ? (
             <SemResultado onLimpar={limparFiltros} />
           ) : (
-            // Trilho — variante deliberada (tabela densa). Uma <section> com a
-            // moldura de cartão e um h2 (sr-only, pois o cabeçalho de colunas já
-            // rotula visualmente); `aria-busy` na recarga.
+            // Rail — deliberate variant (dense table). A <section> with the card
+            // frame and an h2 (sr-only, since the column header already labels
+            // it visually); `aria-busy` during a reload.
             <section
               aria-labelledby="executores-trilho-titulo"
               aria-busy={refreshing}

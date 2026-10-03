@@ -1,7 +1,7 @@
 /**
- * /login e /register viraram redirecionamentos: a entrada é o modal da Home.
- * O `redirect` do Next LANÇA (é assim que ele interrompe o render) — o mock
- * imita isso e captura o destino.
+ * /login and /register became redirects: sign-in is the Home's modal.
+ * Next's `redirect` THROWS (that is how it interrupts the render) — the mock
+ * imitates that and captures the destination.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 

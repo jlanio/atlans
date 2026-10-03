@@ -1,23 +1,23 @@
 # app/services/artifact_service.py
 """
-Listagem de artefatos de um workspace, sem FastAPI no meio.
+Listing of a workspace's artifacts, with no FastAPI in between.
 
-A consulta nasceu inteira dentro de `GET /artifacts` e ficou lá porque só havia
-um chamador. Agora há dois: a tela e o servidor MCP, que não passa por request
-nenhuma. Copiar a consulta para o segundo transporte duplicaria sete filtros, a
-regra de escape da busca, o desempate da ordenação e a decisão de quando pagar
-o `outerjoin` — e a primeira vez que um deles mudasse, os dois passariam a
-responder coisas diferentes para a mesma pergunta.
+The query was born whole inside `GET /artifacts` and stayed there because there
+was only one caller. Now there are two: the screen and the MCP server, which goes
+through no request at all. Copying the query into the second transport would
+duplicate seven filters, the search escaping rule, the sort tie-breaker and the
+decision about when to pay for the `outerjoin` — and the first time one of them
+changed, the two would start giving different answers to the same question.
 
-A fronteira é a mesma que `app/core/authorization/workflow_access.py` estabelece
-para as guardas: a regra vira função de `(db, ids, filtros)`, e cada transporte
-encaixa a própria porta. Quem chama já resolveu QUEM pergunta; aqui se resolve
-O QUE responder.
+The boundary is the same one `app/core/authorization/workflow_access.py`
+establishes for the guards: the rule becomes a function of `(db, ids, filtros)`,
+and each transport plugs in its own port. The caller has already resolved WHO is
+asking; here we resolve WHAT to answer.
 
-O que **não** mora aqui, de propósito: assinar URL de download. A listagem
-devolve `content_location` e `s3_key` e deixa cada transporte decidir — a REST
-dá o link por outra rota, e o MCP recusa link para conteúdo que está no
-executor, com `available=false`, em vez de erro.
+What does **not** live here, on purpose: signing download URLs. The listing
+returns `content_location` and `s3_key` and lets each transport decide — REST
+hands out the link through another route, and MCP refuses a link for content
+that sits on the executor, with `available=false`, instead of an error.
 """
 from __future__ import annotations
 
@@ -32,9 +32,9 @@ from app.models.artifact import Artifact
 from app.models.models import Workflow
 from app.models.portal_layer import PortalLayer
 
-# Teto duro da página, espelhando o `le=200` que a rota declara no `Query`.
-# Aqui ele é grampeado em vez de validado: o MCP não tem Pydantic na borda, e
-# um `limit` grande vindo de uma tool não pode virar varredura de tabela.
+# Hard page ceiling, mirroring the `le=200` the route declares in `Query`.
+# Here it is clamped instead of validated: MCP has no Pydantic at the edge, and
+# a large `limit` coming from a tool must not turn into a table scan.
 LIMITE_MAXIMO = 200
 
 
@@ -49,16 +49,16 @@ def _filtros(
     kind: Optional[str],
     include_pinned: bool,
 ) -> list:
-    """As condições do WHERE, na ordem em que a rota as montava."""
-    # Um workspace específico ainda tem de estar entre os do usuário — o
-    # parâmetro estreita o escopo, nunca o amplia.
+    """The WHERE conditions, in the order the route used to build them."""
+    # A specific workspace still has to be among the user's — the
+    # parameter narrows the scope, never widens it.
     if workspace_id:
         verify_workspace_access(workspace_id, workspace_ids)
         filtros = [Artifact.workspace_id == workspace_id]
     else:
         filtros = [Artifact.workspace_id.in_(workspace_ids)]
 
-    # Exclui artefatos de pin-cache por padrao (sao internos do sistema)
+    # Excludes pin-cache artifacts by default (they are internal to the system)
     if not include_pinned:
         filtros.append(Artifact.is_pinned != True)  # noqa: E712
 
@@ -68,22 +68,23 @@ def _filtros(
         filtros.append(Artifact.run_id == run_id)
     if fmt:
         filtros.append(Artifact.format == fmt)
-    # As abas da tela. O critério é o mesmo que o cliente aplicava sobre a lista
-    # inteira (`is_published || is_portal_active`, e o segundo implica o
-    # primeiro) — agora no SQL, porque filtrar no cliente exigia a lista inteira.
+    # The screen's tabs. The criterion is the same one the client applied to the
+    # whole list (`is_published || is_portal_active`, and the second implies the
+    # first) — now in SQL, because filtering on the client required the whole list.
     if kind == "publication":
         filtros.append(Artifact.is_published == True)  # noqa: E712
     elif kind == "execution":
         filtros.append(Artifact.is_published == False)  # noqa: E712
 
     if search:
-        # `%` e `_` do usuario sao literais, nao curingas (ver `contem`).
-        # `Workflow.name` faz parte da busca porque a coluna 'Workflow' e a mais
-        # visivel da tabela: quando a busca era no cliente ela casava com os tres
-        # campos, e ao empurra-la para o SQL o nome do fluxo ficou de fora —
-        # digitar 'Cadastro Ambiental' devolvia "Nenhum artefato encontrado" com
-        # as linhas daquele fluxo visiveis um segundo antes. E nao ha degradacao
-        # parcial possivel: a pagina nao guarda mais a colecao inteira.
+        # The user's `%` and `_` are literals, not wildcards (see `contem`).
+        # `Workflow.name` is part of the search because the 'Workflow' column is
+        # the most visible one in the table: when the search ran on the client it
+        # matched all three fields, and when it was pushed down to SQL the workflow
+        # name was left out — typing 'Cadastro Ambiental' returned "Nenhum
+        # artefato encontrado" (no artifact found) with that workflow's rows
+        # visible a second earlier. And no partial degradation is possible: the
+        # page no longer keeps the whole collection.
         filtros.append(or_(
             contem(Artifact.filename, search),
             contem(Artifact.output_key, search),
@@ -100,12 +101,12 @@ def _item(
     *,
     incluir_chave: bool,
 ) -> dict:
-    """Uma linha da resposta, com os `getattr` defensivos que a rota já tinha.
+    """One row of the response, with the defensive `getattr`s the route already had.
 
-    `incluir_chave` existe para que a extração não mude o que a tela recebe. A
-    `s3_key` é o que permite decidir se há objeto a assinar — o MCP precisa
-    dela, a interface não, e acrescentá-la à resposta da REST seria alargar um
-    contrato por efeito colateral de um refactor.
+    `incluir_chave` exists so that the extraction does not change what the screen
+    receives. The `s3_key` is what lets us decide whether there is an object to
+    sign — MCP needs it, the interface does not, and adding it to the REST
+    response would widen a contract as a side effect of a refactor.
     """
     return {
         "id_hash":        artefato.id_hash,
@@ -124,10 +125,10 @@ def _item(
         "is_portal_active":   getattr(artefato, "is_published", False)
         and artefato.run_id in portal_run_ids,
         "executor_id":           getattr(artefato, "executor_id", None),
-        # Sem isto a UI nao consegue distinguir um artefato local: nem para
-        # o badge, nem para explicar que o download nao existe, nem para
-        # mostrar que uma remocao ficou pendente do executor voltar.
-        # `expires_at` no passado + local = removendo.
+        # Without this the UI cannot tell a local artifact apart: not for
+        # the badge, not to explain that the download does not exist, not to
+        # show that a removal is pending until the executor comes back.
+        # `expires_at` in the past + local = being removed.
         "content_location":   getattr(artefato, "content_location", "minio"),
         "is_pinned":          getattr(artefato, "is_pinned", False),
         "created_at":         artefato.created_at.isoformat() if artefato.created_at else None,
@@ -151,15 +152,15 @@ async def listar_artefatos(
     offset: int = 0,
     incluir_chave: bool = False,
 ) -> dict[str, Any]:
-    """Página de artefatos dos workspaces recebidos, com `total` coerente.
+    """Page of artifacts from the given workspaces, with a consistent `total`.
 
-    `workspace_ids` é a lista que quem chama já apurou — a rota pela dependency,
-    o MCP pelo escopo do token. Esta função não a descobre sozinha, e é por isso
-    que ela não tem como vazar entre contas: o que não estiver na lista não entra
-    no WHERE.
+    `workspace_ids` is the list the caller has already worked out — the route via
+    the dependency, MCP via the token's scope. This function does not discover it
+    on its own, and that is why it has no way to leak across accounts: whatever is
+    not in the list does not enter the WHERE.
 
-    `include_pinned` entra `False` por padrão porque artefato de pin-cache é
-    estado interno do motor, não saída que alguém pediu.
+    `include_pinned` defaults to `False` because a pin-cache artifact is internal
+    engine state, not output someone asked for.
     """
     limite = max(1, min(int(limit), LIMITE_MAXIMO))
     salto = max(0, int(offset))
@@ -175,9 +176,9 @@ async def listar_artefatos(
         include_pinned=include_pinned,
     )
 
-    # O join so entra quando ha busca — a contagem sem `search` nao precisa dele.
-    # `Workflow.id_hash` e unico, entao o outerjoin nao multiplica linhas e a
-    # contagem continua batendo com a pagina.
+    # The join only comes in when there is a search — the count without `search`
+    # does not need it. `Workflow.id_hash` is unique, so the outerjoin does not
+    # multiply rows and the count keeps matching the page.
     count_query = select(func.count(Artifact.id))
     if search:
         count_query = count_query.outerjoin(Workflow, Workflow.id_hash == Artifact.workflow_hash)
@@ -194,10 +195,10 @@ async def listar_artefatos(
 
     rows = (await db.execute(query)).all()
 
-    # run_ids ativos no portal, apenas para marcar qual versao esta publicada.
-    # PERF: escopado aos run_ids desta pagina de resultados. Antes varria TODA a
-    # tabela portal_layers (todos os workspaces) a cada request so pra montar
-    # este set.
+    # run_ids active on the portal, only to mark which version is published.
+    # PERF: scoped to the run_ids of this results page. Before, it scanned the
+    # WHOLE portal_layers table (all workspaces) on every request just to build
+    # this set.
     run_ids = {a.run_id for a, _ in rows if a.run_id}
     portal_run_ids: set[str] = set()
     if run_ids:

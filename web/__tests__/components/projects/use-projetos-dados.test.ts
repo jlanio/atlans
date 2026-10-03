@@ -2,8 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import type { IWorkflow, IWorkflowGroup } from "@/service/types"
 
-// Só o serviço, o workspace e o toast são dublados: o hook é testado de
-// verdade (paralelismo, falha parcial, sequência, poll das métricas).
+// Only the service, the workspace and the toast are doubled: the hook is tested
+// for real (parallelism, partial failure, sequencing, metrics poll).
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
     getWorkflows: vi.fn(),
@@ -12,8 +12,8 @@ vi.mock("@/service/GisFlowService", () => ({
   },
 }))
 
-// Workspace mutável: cada teste decide qual é o atual e se o context ainda
-// está resolvendo; `rerender` faz o hook enxergar a troca.
+// Mutable workspace: each test decides which one is current and whether the context is still
+// resolving; `rerender` makes the hook see the switch.
 const ws = vi.hoisted(() => ({ current: { id_hash: "ws1" } as { id_hash: string } | null, loading: false }))
 vi.mock("@/context/WorkspaceContext", () => ({
   useWorkspace: () => ({ current: ws.current, loading: ws.loading }),
@@ -72,7 +72,7 @@ describe("useProjetosDados", () => {
     expect(svc.getWorkflows).toHaveBeenCalledWith("ws1", { incluirDoAssistente: true })
     expect(svc.getWorkflowGroups).toHaveBeenCalledWith("ws1")
     expect(svc.getWorkflowMetricsList).toHaveBeenCalledWith(30, false, { workspace_id: "ws1" })
-    // Partem juntas: todas já foram chamadas quando a primeira responde.
+    // They start together: all have already been called when the first one responds.
     expect(svc.getWorkflows).toHaveBeenCalledTimes(1)
     expect(svc.getWorkflowGroups).toHaveBeenCalledTimes(1)
     expect(svc.getWorkflowMetricsList).toHaveBeenCalledTimes(1)
@@ -135,8 +135,8 @@ describe("useProjetosDados", () => {
     expect(result.current.erro).toBe("Sem permissão")
     expect(result.current.workflows).toEqual([])
     expect(result.current.atualizadoEm).toBeNull()
-    // Sem carga aceita, o cartão de erro toma a tela e já anuncia a falha
-    // (role="alert"): o toast faria o leitor de tela ler a mesma falha duas vezes.
+    // With no accepted load, the error card takes over the screen and already announces the failure
+    // (role="alert"): the toast would make the screen reader read the same failure twice.
     expect(toast.error).not.toHaveBeenCalled()
   })
 
@@ -163,8 +163,8 @@ describe("useProjetosDados", () => {
     await waitFor(() => expect(result.current.carregando).toBe(false))
     expect(result.current.atualizadoEm).toBeNull()
 
-    // O carimbo do tick tirava o cartão (`erro && atualizadoEm == null`), e a
-    // tela passava a dizer "primeiro uso" de uma estante que nem carregou.
+    // The tick's stamp removed the card (`erro && atualizadoEm == null`), and the
+    // screen started saying "first use" for a shelf that never even loaded.
     await act(async () => { await vi.advanceTimersByTimeAsync(1_050) })
     expect(result.current.atualizadoEm).toBeNull()
     expect(result.current.erro).toBe("boom")
@@ -185,7 +185,7 @@ describe("useProjetosDados", () => {
     await waitFor(() => expect(result.current.carregando).toBe(false))
     const carimboAnterior = result.current.atualizadoEm
 
-    // A recarga fica pendente para observar `atualizando` ligado com a lista ainda na tela.
+    // The reload stays pending to observe `atualizando` on with the list still on screen.
     let soltar: (v: unknown) => void = () => {}
     svc.getWorkflowMetricsList.mockImplementation(() => new Promise(r => { soltar = r }))
     act(() => result.current.recarregar({ force: true }))
@@ -198,13 +198,13 @@ describe("useProjetosDados", () => {
     await waitFor(() => expect(result.current.atualizando).toBe(false))
     expect(result.current.metricas?.get("a")?.total_runs).toBe(9)
     expect(result.current.atualizadoEm).toBeGreaterThanOrEqual(carimboAnterior!)
-    // Sem `force`, a chamada vai sem furar o cache.
+    // Without `force`, the call goes out without bypassing the cache.
     act(() => result.current.recarregar())
     await waitFor(() => expect(svc.getWorkflowMetricsList).toHaveBeenLastCalledWith(30, false, { workspace_id: "ws1" }))
   })
 
   it("resposta atrasada do workspace anterior é descartada (carimbo de sequência)", async () => {
-    // ws1 responde DEPOIS de ws2: a tela tem de ficar com ws2.
+    // ws1 responds AFTER ws2: the screen has to stay with ws2.
     let soltarWs1: (v: unknown) => void = () => {}
     svc.getWorkflows.mockImplementation((id: string) =>
       id === "ws1" ? new Promise(r => { soltarWs1 = r }) : Promise.resolve(ok([wf("z")])),
@@ -263,19 +263,19 @@ describe("useProjetosDados", () => {
     await waitFor(() => expect(result.current.metricas?.get("a")?.total_runs).toBe(5))
     expect(svc.getWorkflowMetricsList).toHaveBeenCalledTimes(2)
     expect(svc.getWorkflowMetricsList).toHaveBeenLastCalledWith(30, false, { workspace_id: "ws1" })
-    // A listagem não muda sozinha; e nada de skeleton ou botão girando.
+    // The listing does not change on its own; and no skeleton or spinning button.
     expect(svc.getWorkflows).toHaveBeenCalledTimes(1)
     expect(result.current.carregando).toBe(false)
     expect(result.current.atualizando).toBe(false)
 
-    // Tick que falha: fica o dado de antes, sem virar "indisponível".
+    // A tick that fails: the previous data stays, without becoming "indisponível".
     svc.getWorkflowMetricsList.mockResolvedValue(falhou())
     await act(async () => { await vi.advanceTimersByTimeAsync(1_050) })
     expect(svc.getWorkflowMetricsList).toHaveBeenCalledTimes(3)
     expect(result.current.metricas?.get("a")?.total_runs).toBe(5)
     expect(result.current.metricasIndisponiveis).toBe(false)
 
-    // Aba oculta: nenhum tick.
+    // Hidden tab: no tick.
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" })
     await act(async () => { await vi.advanceTimersByTimeAsync(2_100) })
     expect(svc.getWorkflowMetricsList).toHaveBeenCalledTimes(3)
@@ -295,7 +295,7 @@ describe("useProjetosDados", () => {
     expect(result.current.workflows.find(w => w.id_hash === "a")?.flag_ative).toBe(false)
     act(() => result.current.definirGrupos(prev => [...prev, grupo("g2")]))
     expect(result.current.grupos.map(g => g.id_hash)).toEqual(["g", "g2"])
-    // Nada disso vai à rede.
+    // None of this goes to the network.
     expect(svc.getWorkflows).toHaveBeenCalledTimes(1)
   })
 

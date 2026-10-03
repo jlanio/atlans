@@ -4,10 +4,10 @@ import { ORIGENS_DA_UI } from "@/app/components/observability/filtros"
 import { rotuloDaOrigem } from "@/lib/formatos"
 
 /**
- * Duas listas de origens de propósito: a URL (`ORIGENS`) e o seletor
- * (`ORIGENS_DA_UI`, na ordem em que as pessoas leem). Se uma ganhar um valor
- * e a outra não, o filtro mostra uma origem que a URL descarta ao recarregar
- * — ou aceita na URL algo que o seletor não consegue exibir.
+ * Two lists of origins on purpose: the URL's (`ORIGENS`) and the picker's
+ * (`ORIGENS_DA_UI`, in the order people read). If one gains a value and the
+ * other doesn't, the filter shows an origin that the URL discards on reload
+ * — or accepts in the URL something the picker can't display.
  */
 describe("origens de execução", () => {
   it("URL e seletor aceitam exatamente o mesmo conjunto", () => {

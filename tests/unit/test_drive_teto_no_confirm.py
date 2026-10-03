@@ -1,14 +1,14 @@
-"""O teto de tamanho do Drive vale sobre o objeto REAL, medido no confirm.
+"""The Drive size ceiling applies to the REAL object, measured at confirm.
 
-No upload por URL pre-assinada quem declara o tamanho e o cliente:
-`create_upload_url` valida o numero que veio no corpo e devolve uma URL de PUT
-direto para o MinIO, que nao conhece limite nenhum. Declarar 1 KB e enviar 5 GB
-passava pelas duas pontas — e o `confirm_upload` ainda MEDIA o objeto e gravava
-o tamanho verdadeiro em `size` sem nunca compara-lo a `max_size_mb`.
+In a pre-signed URL upload, the client is the one declaring the size:
+`create_upload_url` validates the number in the body and returns a direct PUT
+URL to MinIO, which knows no limit at all. Declaring 1 KB and sending 5 GB got
+through both ends — and `confirm_upload` even MEASURED the object and wrote the
+true size into `size` without ever comparing it to `max_size_mb`.
 
-Banco de verdade (SQLite) em vez de duble: a recusa remove a linha, e e isso
-que precisa ser observado — um mock de `db.delete` diria apenas que a chamada
-aconteceu.
+Real database (SQLite) instead of a double: the rejection removes the row, and
+that is what needs to be observed — a mock of `db.delete` would only say the
+call happened.
 """
 from unittest.mock import AsyncMock, patch
 
@@ -29,7 +29,7 @@ CHAVE = "drive/ws-1/abc_mapa.geojson"
 
 @pytest_asyncio.fixture
 async def banco():
-    """Teto de 1 MB e um upload pendente que DECLAROU 1 KB."""
+    """1 MB ceiling and a pending upload that DECLARED 1 KB."""
     eng = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
         poolclass=StaticPool,
@@ -44,8 +44,8 @@ async def banco():
                 AllowedFileExtension.__table__,
             ],
         )
-    # `expire_on_commit=False` como em `app.core.db` — sem isso o commit expira
-    # os atributos e a primeira leitura depois dele tenta IO fora do greenlet.
+    # `expire_on_commit=False` as in `app.core.db` — without it the commit expires
+    # the attributes and the first read after it attempts IO outside the greenlet.
     async with AsyncSession(eng, expire_on_commit=False) as db:
         db.add(PlatformFileSettings(id=1, max_size_mb=1))
         db.add(WorkspaceFile(
@@ -54,7 +54,7 @@ async def banco():
             s3_key=CHAVE,
             original_name="mapa.geojson",
             extension="geojson",
-            size=1024,          # o que o cliente disse ao pedir a URL
+            size=1024,          # what the client said when requesting the URL
             uploaded_by="u-1",
             status="pending",
         ))
@@ -98,17 +98,17 @@ async def test_objeto_acima_do_teto_e_recusado_e_apagado(banco, apagar, evento):
         with pytest.raises(FileTooLargeError):
             await DriveService(banco).confirm_upload("f-1")
 
-    # Os bytes nao podem ficar: uma recusa que os deixasse no storage seria
-    # apenas uma forma mais lenta de aceita-los.
+    # The bytes cannot stay: a rejection that left them in storage would be
+    # just a slower way of accepting them.
     apagar.assert_awaited_once_with(CHAVE)
     # E a linha some — confirmada, o Drive listaria um arquivo sem objeto.
     assert await _linha(banco) is None
-    # Ninguem e avisado de um arquivo que nao entrou.
+    # Nobody is notified about a file that did not get in.
     evento.assert_not_awaited()
 
 
 async def test_objeto_dentro_do_teto_confirma_normalmente(banco, apagar, evento):
-    """O par do teste acima: sem ele, uma guarda que recusa tudo passaria."""
+    """The counterpart of the test above: without it, a guard that rejects everything would pass."""
     with _head(512 * 1024):
         wf = await DriveService(banco).confirm_upload("f-1")
 
@@ -121,16 +121,17 @@ async def test_objeto_dentro_do_teto_confirma_normalmente(banco, apagar, evento)
 
 
 async def test_linha_ja_confirmada_e_recusada_sem_apagar_nada(banco, apagar):
-    """`confirm_upload` nao filtra por status, e qualquer editor alcanca a rota.
+    """`confirm_upload` does not filter by status, and any editor can reach the route.
 
-    Se a recusa apagasse aqui, re-confirmar arquivo ALHEIO ja aceito viraria um
-    botao de apagar — sem confirmacao e sem lixeira. E nem seria preciso enviar
-    byte nenhum: bastava o admin baixar `max_size_mb` para todo arquivo legitimo
-    maior que o teto novo ficar a um POST de ser destruido.
+    If the rejection deleted here, re-confirming SOMEONE ELSE'S already accepted
+    file would become a delete button — with no confirmation and no trash. And no
+    bytes would even need to be sent: it would be enough for the admin to lower
+    `max_size_mb` for every legitimate file larger than the new ceiling to be one
+    POST away from destruction.
 
-    Entao a confirmacao e recusada, mas objeto e registro ficam onde estao. Um
-    objeto acima do teto que o reconcile acusa como divergencia e melhor que um
-    caminho de exclusao sem guarda.
+    So the confirmation is rejected, but object and record stay where they are.
+    An object above the ceiling that reconcile flags as a discrepancy is better
+    than an unguarded deletion path.
     """
     alvo = await _linha(banco)
     alvo.status = "confirmed"
@@ -148,14 +149,14 @@ async def test_linha_ja_confirmada_e_recusada_sem_apagar_nada(banco, apagar):
 
 
 async def test_artefato_de_execucao_acima_do_teto_confirma_sem_recusar(banco, apagar, evento):
-    """Artefato de run nunca teve teto — aplica-lo seria perda de dado.
+    """A run artifact never had a ceiling — applying it would mean data loss.
 
-    `create_agent_upload_url(s3_key_override=...)` pula `validate_upload`
-    INTEIRA: extensao E tamanho. Nao ha tamanho DECLARADO para o teto reconferir,
-    entao a chave sob `artifacts/{ws}/` CONFIRMA normalmente mesmo acima do teto —
-    recusar derrubaria a execucao (o executor faz `raise_for_status` no confirm) e,
-    com `overwrite=True`, apagaria o arquivo bom que ja estava no Drive, sem
-    ninguem ter mexido em configuracao nenhuma.
+    `create_agent_upload_url(s3_key_override=...)` skips `validate_upload`
+    ENTIRELY: extension AND size. There is no DECLARED size for the ceiling to
+    re-check, so the key under `artifacts/{ws}/` CONFIRMS normally even above the
+    ceiling — rejecting would bring down the run (the executor does
+    `raise_for_status` on the confirm) and, with `overwrite=True`, would delete
+    the good file already in the Drive, without anyone having touched any setting.
     """
     alvo = await _linha(banco)
     alvo.s3_key = "artifacts/ws-1/task-abc/resultado.geojson"
@@ -172,10 +173,10 @@ async def test_artefato_de_execucao_acima_do_teto_confirma_sem_recusar(banco, ap
 
 
 async def test_chave_apontando_para_outro_workspace_nao_e_apagada(banco, apagar):
-    """`_validate_agent_s3_key` confere a chave contra TODOS os workspaces do
-    executor, nao contra o da linha — entao um `s3_key_override` pode apontar
-    para o objeto de outro workspace. A recusa nao pode virar o gatilho que
-    destroi bytes alheios.
+    """`_validate_agent_s3_key` checks the key against ALL of the executor's
+    workspaces, not against the row's — so an `s3_key_override` can point to
+    another workspace's object. The rejection cannot become the trigger that
+    destroys someone else's bytes.
     """
     alvo = await _linha(banco)
     alvo.s3_key = "drive/ws-VITIMA/abc_alvo.gpkg"
@@ -190,11 +191,11 @@ async def test_chave_apontando_para_outro_workspace_nao_e_apagada(banco, apagar)
 
 
 async def test_falha_ao_apagar_nao_transforma_recusa_em_aceite(banco, evento):
-    """MinIO fora do ar na hora de apagar nao pode fazer o arquivo entrar.
+    """MinIO being down at deletion time must not let the file in.
 
-    `storage.delete` e best-effort e NUNCA levanta: devolve False. Por isso o
-    duble aqui devolve False em vez de levantar — um teste com `side_effect`
-    exercitaria um caminho que a funcao real nao tem.
+    `storage.delete` is best-effort and NEVER raises: it returns False. That is
+    why the double here returns False instead of raising — a test with
+    `side_effect` would exercise a path the real function does not have.
     """
     with _head(9 * UM_MB), patch(
         "app.services.drive_service.s3.delete_async", new=AsyncMock(return_value=False),

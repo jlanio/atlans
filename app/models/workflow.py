@@ -11,20 +11,20 @@ class Workflow(Base):
     __tablename__ = 'workflows'
     __table_args__ = (
         Index('ix_workflow_workspace_active', 'workspace_id', 'flag_ative'),
-        # PARCIAL: o nome so e unico entre os workflows VIVOS. O delete e soft
-        # (soft_delete_by_hash mantem a linha e grava deleted_at), entao uma
-        # restricao total deixava o nome de tudo que se apagava ocupado para
-        # sempre — e de forma invisivel, ja que nenhuma listagem mostra
-        # soft-deletados. Duplicar, criar e renomear batiam nesse muro.
+        # PARTIAL: the name is only unique among LIVE workflows. Delete is soft
+        # (soft_delete_by_hash keeps the row and writes deleted_at), so a full
+        # constraint left the name of everything deleted taken forever — and
+        # invisibly, since no listing shows soft-deleted ones. Duplicating,
+        # creating and renaming hit that wall.
         #
-        # O nome do indice repete o da constraint anterior de proposito:
-        # workflow_service e workflow_move_service reconhecem a colisao por
+        # The index name repeats the previous constraint's on purpose:
+        # workflow_service and workflow_move_service recognize the collision by
         # `"uq_workflow_name_workspace" in str(exc.orig)`.
-        # `sqlite_where` junto do `postgresql_where`: os testes montam schema com
-        # `metadata.create_all` sobre SQLite, e um dialeto que ignora o predicado
-        # cria indice unico TOTAL — o oposto do que este indice significa. Sem os
-        # dois, um teste da semantica parcial passaria em produção e falharia na
-        # suite (ou pior, o contrario).
+        # `sqlite_where` alongside `postgresql_where`: the tests build the schema
+        # with `metadata.create_all` on SQLite, and a dialect that ignores the
+        # predicate creates a FULL unique index — the opposite of what this
+        # index means. Without both, a test of the partial semantics would pass
+        # in production and fail in the suite (or worse, the reverse).
         Index(
             'uq_workflow_name_workspace', 'name', 'workspace_id',
             unique=True,
@@ -41,9 +41,9 @@ class Workflow(Base):
     description = Column(Text, nullable=True)
     version = Column(String, nullable=True)
     priority = Column(Integer, default=0)
-    # NOT NULL desde 20260828_0001: enquanto a coluna aceitava NULL, os filtros
-    # de tenant carregavam um `OR workspace_id IS NULL` que tornava a linha
-    # visivel a QUALQUER usuario autenticado.
+    # NOT NULL since 20260828_0001: while the column accepted NULL, the tenant
+    # filters carried an `OR workspace_id IS NULL` that made the row visible
+    # to ANY authenticated user.
     workspace_id = Column(String(36), nullable=False, index=True)
     group_id = Column(String(36), ForeignKey('workflow_groups.id_hash', ondelete='SET NULL'), nullable=True, index=True)
     params_schema = Column(JSON, nullable=True)
@@ -53,11 +53,11 @@ class Workflow(Base):
     created_by_id = Column(String(36), nullable=True)
     updated_by_id = Column(String(36), nullable=True)
 
-    # Proveniencia do fluxo, nao privilegio: "usuario" (o padrao) ou "assistente"
-    # (criado pelo assistente da Home, escondido das listagens por padrao). Um
-    # dia absorve "importado"/"template"/"duplicado"; por isso VARCHAR e nao
-    # Boolean. NOT NULL com server_default: todo fluxo existente vira "usuario"
-    # sem backfill.
+    # The workflow's provenance, not a privilege: "usuario" (the default) or
+    # "assistente" (created by the Home assistant, hidden from listings by
+    # default). Some day it absorbs "importado"/"template"/"duplicado"; hence
+    # VARCHAR and not Boolean. NOT NULL with server_default: every existing
+    # workflow becomes "usuario" without a backfill.
     origem = Column(String(16), nullable=False, server_default=text("'usuario'"))
 
     definition = Column(JSON, nullable=False)

@@ -1,9 +1,9 @@
 /**
- * Editor estruturado das `rules` do Switch.
+ * Structured editor for the Switch's `rules`.
  *
- * O contrato: persiste a MESMA lista de dicts que o execute lê
- * (`{field, operator, value, output}`), então fluxos salvos pelo editor de
- * JSON abrem aqui e vice-versa.
+ * The contract: it persists the SAME list of dicts that execute reads
+ * (`{field, operator, value, output}`), so workflows saved by the JSON editor
+ * open here and vice versa.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent } from "@testing-library/react"
@@ -37,9 +37,9 @@ function montar(valor: unknown, sugestoes: string[] = []) {
 
 describe("lerRegras", () => {
   it("normaliza só o que o execute também normaliza — output ausente fica ausente", () => {
-    // No execute, regra sem `output` roteia para o FALLBACK
-    // (`rule.get("output", fallback)`) e encerra a avaliação. Inventar
-    // "output_1" aqui mudava o roteamento na primeira edição salva.
+    // In execute, a rule without `output` routes to the FALLBACK
+    // (`rule.get("output", fallback)`) and ends the evaluation. Making up
+    // "output_1" here changed the routing on the first saved edit.
     expect(lerRegras([{ field: "uf", value: "MT" }])).toEqual([
       { field: "uf", operator: "==", value: "MT", output: "" },
     ])
@@ -88,8 +88,8 @@ describe("SwitchRulesField", () => {
   })
 
   it("a MESMA coluna pode reger várias regras — a sugestão não some ao usar", () => {
-    // uf == MT → saída 1, uf == GO → saída 2: filtrar "uf" quebraria o caso
-    // de uso central do Switch.
+    // uf == MT → output 1, uf == GO → output 2: filtering out "uf" would break
+    // the Switch's central use case.
     montar([regra], ["uf", "pop"])
     expect(screen.getByRole("button", { name: "uf" })).toBeInTheDocument()
   })
@@ -115,14 +115,14 @@ describe("SwitchRulesField", () => {
   })
 
   it("editar OUTRA regra não carimba output na regra legada sem ele", () => {
-    // A regressão que importa: a definition legada [{uf==MT}] roteia para o
-    // fallback; regravá-la com output_1 mudaria silenciosamente o destino
-    // de registros que a edição nem tocou.
+    // The regression that matters: the legacy definition [{uf==MT}] routes to
+    // the fallback; rewriting it with output_1 would silently change the
+    // destination of records the edit didn't even touch.
     const setNodeField = montar([
       { field: "uf", operator: "==", value: "MS" },
       regra,
     ])
-    // Edita a SEGUNDA regra (a que tem output) — a legada não pode mudar.
+    // Edits the SECOND rule (the one with output) — the legacy one must not change.
     fireEvent.change(screen.getByDisplayValue("MT"), { target: { value: "GO" } })
     const gravado = setNodeField.mock.calls[0][1] as Record<string, string>[]
     expect(gravado[0]).toEqual({ field: "uf", operator: "==", value: "MS" })
@@ -131,8 +131,8 @@ describe("SwitchRulesField", () => {
   })
 
   it("operador fora do vocabulário aparece e sobrevive à edição", () => {
-    // Definition editada à mão: um Select mudo apagaria a escolha na
-    // primeira gravação.
+    // Hand-edited definition: a mute Select would erase the choice on the
+    // first save.
     const setNodeField = montar([
       { field: "uf", operator: "regex", value: "^M", output: "output_2" },
     ])

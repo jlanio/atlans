@@ -1,9 +1,9 @@
 /**
- * A validação de conexão acontece NO GESTO (A16), derivada do catálogo.
+ * Connection validation happens AT THE GESTURE (A16), derived from the catalog.
  *
- * Antes o canvas deixava ligar qualquer porta em qualquer porta e o erro só
- * chegava no /workflows/validate. A camada do gesto recusa apenas o que
- * CERTAMENTE quebraria — o validate segue como juiz final.
+ * Before, the canvas let you connect any port to any port and the error only
+ * arrived at /workflows/validate. The gesture layer refuses only what would
+ * CERTAINLY break — validate remains the final judge.
  */
 import { describe, it, expect } from "vitest"
 
@@ -76,8 +76,8 @@ describe("validarConexao", () => {
   })
 
   it("escalar numa entrada de camada é recusado no gesto", () => {
-    // feature_count (number) → Clip.layerA (geodataframe): o executor
-    // falharia com TypeError; agora a linha nem cola.
+    // feature_count (number) → Clip.layerA (geodataframe): the executor would
+    // fail with a TypeError; now the line doesn't even stick.
     expect(validarConexao(con("wfs", "clip", "feature_count", "layerA"), NODES, []))
       .toBe("tipo-incompativel")
   })
@@ -87,7 +87,7 @@ describe("validarConexao", () => {
   })
 
   it("handle anônimo de nó multi-campo emite any — não recusa", () => {
-    // WFS pelo handle anônimo espalha todos os campos; o validate decide.
+    // WFS through the anonymous handle spreads all fields; validate decides.
     expect(validarConexao(con("wfs", "clip", null, "layerA"), NODES, [])).toBeNull()
   })
 

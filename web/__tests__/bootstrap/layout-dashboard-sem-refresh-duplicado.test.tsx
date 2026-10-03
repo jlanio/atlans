@@ -1,12 +1,12 @@
 /**
- * O layout do dashboard não pode chamar `auth()` quando o middleware já entregou
- * a sessão.
+ * The dashboard layout must not call `auth()` when the middleware has already delivered
+ * the session.
  *
- * Cada `auth()` num Server Component com o access_token vencido custa um
- * POST /auth/refresh extra — inútil, porque o Set-Cookie do caminho RSC é
- * descartado pelo próprio next-auth — contra um rate limit de 20/min que é balde
- * único de toda a plataforma. Ao estourar, o 429 vira RefreshTokenExpired e
- * derruba todo mundo para /login.
+ * Each `auth()` in a Server Component with an expired access_token costs an
+ * extra POST /auth/refresh — useless, because the Set-Cookie of the RSC path is
+ * discarded by next-auth itself — against a 20/min rate limit that is a single bucket
+ * for the whole platform. When it overflows, the 429 becomes RefreshTokenExpired and
+ * kicks everyone out to /login.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 
@@ -21,10 +21,10 @@ vi.mock("next-auth", () => ({
 }))
 vi.mock("next-auth/providers/credentials", () => ({ default: () => ({}) }))
 vi.mock("next/headers", () => ({ headers: headersSpy, cookies: cookiesSpy }))
-// O layout importa o CSS global; o PostCSS do Tailwind não roda sob o vitest.
+// The layout imports the global CSS; Tailwind's PostCSS does not run under vitest.
 vi.mock("@/app/globals.css", () => ({}))
 
-// Filhos pesados: o teste olha só a decisão do layout, não a árvore renderizada.
+// Heavy children: the test only looks at the layout's decision, not the rendered tree.
 const { passthrough } = vi.hoisted(() => ({
   passthrough: ({ children }: { children?: unknown }) => children ?? null,
 }))
@@ -42,7 +42,7 @@ const sessaoDoMiddleware = {
   expires: "2026-01-01T00:00:00.000Z",
 }
 
-/** Pega a prop `session` entregue ao <Providers>, seja qual for a profundidade. */
+/** Grabs the `session` prop handed to <Providers>, at whatever depth. */
 function sessionDoElemento(el: unknown): unknown {
   const props = (el as { props?: Record<string, unknown> })?.props
   if (!props) return undefined
@@ -54,7 +54,7 @@ beforeEach(() => {
   authSpy.mockReset()
   headersSpy.mockReset()
   cookiesSpy.mockReset()
-  // O layout lê o cookie sidebar_state (defaultOpen); irrelevante para a sessão.
+  // The layout reads the sidebar_state cookie (defaultOpen); irrelevant to the session.
   cookiesSpy.mockResolvedValue({ get: () => undefined })
 })
 
@@ -71,8 +71,8 @@ describe("layout do dashboard", () => {
   })
 
   it("cai no auth() quando o middleware não rodou", async () => {
-    // Rede de segurança: rota fora do matcher / dev sem middleware. Aqui o
-    // refresh duplicado não existe porque o middleware nem chegou a refrescar.
+    // Safety net: a route outside the matcher / dev without middleware. Here the
+    // duplicate refresh does not exist because the middleware never got to refresh.
     const daRede = { user: { id_hash: "u_2", access_token: "TOKEN-DO-COOKIE" } }
     headersSpy.mockResolvedValue(new Headers())
     authSpy.mockResolvedValue(daRede)

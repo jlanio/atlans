@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
 
-// A trilha do editor afirma um fato sobre os dados: "este workflow está neste
-// workspace". Ela fica ao lado do botão de executar, e é a única indicação de
-// escopo na rota — o cabeçalho do dashboard não é renderizado em /workflow/*.
-// Se ela mostrar o workspace ATIVO em vez do workspace do WORKFLOW, a afirmação
-// pode ser falsa: /workflow/[id] busca por id, sem filtro de workspace, e o
-// ativo é reidratado do localStorage (pode ter mudado em outra aba).
+// The editor's breadcrumb states a fact about the data: "this workflow is in
+// this workspace". It sits next to the run button, and it's the only indication
+// of scope on the route — the dashboard header isn't rendered on /workflow/*.
+// If it shows the ACTIVE workspace instead of the WORKFLOW's workspace, the
+// statement can be false: /workflow/[id] fetches by id, with no workspace filter,
+// and the active one is rehydrated from localStorage (it may have changed in
+// another tab).
 
 let nomeDoWorkflow = "imóveis"
 vi.mock("@/app/stores/workflowSaveStore", () => ({
@@ -34,15 +35,15 @@ beforeEach(() => {
 
 describe("trilha do editor de workflow", () => {
   it("mostra o workspace do workflow aberto, não o workspace ativo", () => {
-    // Ativo é o B; o workflow pertence ao A. Dizer "Cadastro Urbano" aqui seria
-    // mentir sobre onde a execução vai acontecer.
+    // The active one is B; the workflow belongs to A. Saying "Cadastro Urbano"
+    // here would be lying about where the run will happen.
     render(<WorkflowLocation workspaceId="ws-a" />)
     expect(screen.getByText("Bacia do Paranapanema")).toBeTruthy()
     expect(screen.queryByText("Cadastro Urbano")).toBeNull()
   })
 
   it("não afirma workspace nenhum enquanto a lista não resolveu", () => {
-    // Lista vazia + id conhecido: o certo é ficar calado, não cair no ativo.
+    // Empty list + known id: the right thing is to stay silent, not fall back to the active one.
     lista = []
     render(<WorkflowLocation workspaceId="ws-a" />)
     expect(screen.queryByText("Cadastro Urbano")).toBeNull()
@@ -50,8 +51,8 @@ describe("trilha do editor de workflow", () => {
   })
 
   it("cai no workspace ativo quando ainda não há workflow (tela de criação)", () => {
-    // Em /workflow/create é o ativo que `useSaveWorkflow` manda como
-    // workspace_id ao criar — aí ele é a resposta certa.
+    // On /workflow/create it's the active one that `useSaveWorkflow` sends as
+    // workspace_id on creation — there it's the right answer.
     nomeDoWorkflow = ""
     render(<WorkflowLocation />)
     expect(screen.getByText("Cadastro Urbano")).toBeTruthy()
@@ -64,8 +65,8 @@ describe("trilha do editor de workflow", () => {
   })
 
   it("enquanto o workflow não chega, mostra esqueletos e não afirma nada", () => {
-    // Antes da busca responder, a trilha dizia "Sem nome" e o workspace ATIVO
-    // — duas afirmações que podiam ser falsas por alguns segundos.
+    // Before the fetch answered, the breadcrumb said "Sem nome" (untitled) and the
+    // ACTIVE workspace — two statements that could be false for a few seconds.
     nomeDoWorkflow = ""
     render(<WorkflowLocation carregando />)
     expect(screen.queryByText("Sem nome")).toBeNull()

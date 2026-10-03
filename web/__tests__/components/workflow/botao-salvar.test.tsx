@@ -1,7 +1,8 @@
 /**
- * O botão Salvar fica na coluna de baixo, longe do chip de estado. Ele ecoa o
- * estado com um ponto (âmbar = há o que salvar, vermelho = a última tentativa
- * falhou) e com o título, que é o que o hover e o leitor de tela dizem.
+ * The Save button sits in the bottom column, away from the state chip. It
+ * echoes the state with a dot (amber = there's something to save, red = the
+ * last attempt failed) and with the title, which is what the hover and the
+ * screen reader say.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, cleanup, fireEvent } from "@testing-library/react"

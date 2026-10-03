@@ -1,10 +1,10 @@
 /**
- * A recusa de um upload na tela /drive: o rótulo sai do CÓDIGO que o servidor
- * manda (`error` do corpo), nunca de um trecho da frase.
+ * The refusal of an upload on the /drive screen: the label comes from the CODE the server
+ * sends (`error` in the body), never from a piece of the sentence.
  *
- * A classificação antiga procurava "extensão"/"não permitida" no texto, e o
- * backend escreve "Extensao '.pdf' nao permitida." (sem acento): a recusa por
- * extensão aparecia como «Falha no envio», com o ícone de erro genérico.
+ * The old classification looked for "extensão"/"não permitida" in the text, and the
+ * backend writes "Extensao '.pdf' nao permitida." (without accents): the extension
+ * refusal showed up as "Falha no envio" (upload failed), with the generic error icon.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, cleanup } from "@testing-library/react"
@@ -36,7 +36,7 @@ async function enviar(nome: string) {
 
 describe("Drive — o rótulo da recusa", () => {
   it("a recusa por extensão cai na categoria de extensão", async () => {
-    // A resposta como o backend a manda: 422, o código e a frase sem acento.
+    // The response as the backend sends it: 422, the code and the sentence without accents.
     servico.uploadDriveFile.mockResolvedValue({
       status: 422, success: false,
       error: { name: "AxiosError", message: "Extensao '.pdf' nao permitida.", code: "extension_not_allowed" },
@@ -46,7 +46,7 @@ describe("Drive — o rótulo da recusa", () => {
 
     expect(await screen.findByText("Extensão não permitida")).toBeInTheDocument()
     expect(screen.queryByText("Falha no envio")).toBeNull()
-    // A frase do servidor continua sendo o detalhe que a pessoa lê.
+    // The server's sentence is still the detail the person reads.
     expect(screen.getByText("Extensao '.pdf' nao permitida.")).toBeInTheDocument()
   })
 

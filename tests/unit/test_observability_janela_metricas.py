@@ -1,19 +1,19 @@
 # tests/unit/test_observability_janela_metricas.py
-"""Invariantes da janela temporal das metricas de dashboard.
+"""Invariants of the time window of the dashboard metrics.
 
-Duas regressoes que a query unica de `get_metrics` introduziu e que nenhum teste
-cobria:
+Two regressions that the single query of `get_metrics` introduced and that no
+test covered:
 
-1. Os recortes de 7d/14d viraram `count(*) FILTER (...)` DENTRO da query, mas o
-   WHERE passou a ser a janela pedida (`?days=`). Com `days < 14` o predicado de
-   `prev_7d` (`>= now-14d AND < now-7d`) intersecta o WHERE (`>= now-7d`) num
-   conjunto VAZIO: `runs_prev_7d` zerava e a seta de tendencia do dashboard
-   sumia sem erro nenhum.
+1. The 7d/14d slices became `count(*) FILTER (...)` INSIDE the query, but the
+   WHERE became the requested window (`?days=`). With `days < 14` the predicate
+   of `prev_7d` (`>= now-14d AND < now-7d`) intersects the WHERE (`>= now-7d`) in
+   an EMPTY set: `runs_prev_7d` went to zero and the dashboard's trend arrow
+   disappeared without any error.
 
-2. As janelas viraram datetime NAIVE. `WorkflowRun.start_time` e timestamptz;
-   um bind naive e interpretado pelo codec do asyncpg no fuso LOCAL DO PROCESSO
-   (`TZ=America/Cuiaba` no docker-compose), deslocando o limiar em 4h — o card
-   "Execucoes (24h)" contava 20h.
+2. The windows became NAIVE datetimes. `WorkflowRun.start_time` is timestamptz;
+   a naive bind is interpreted by the asyncpg codec in the PROCESS'S LOCAL time
+   zone (`TZ=America/Cuiaba` in docker-compose), shifting the threshold by 4h —
+   the "Execucoes (24h)" card counted 20h.
 """
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -25,28 +25,28 @@ from app.services.observability_service import ObservabilityService
 
 
 def _user(role="admin"):
-    """Admin de proposito (as chamadas passam `como_admin=True`): `_run_filter`
-    devolve [] e o WHERE fica com uma condicao so, que e exatamente a janela
-    que estes testes inspecionam."""
+    """Admin on purpose (the calls pass `como_admin=True`): `_run_filter`
+    returns [] and the WHERE is left with a single condition, which is exactly
+    the window these tests inspect."""
     u = MagicMock()
     u.role = role
     return u
 
 
 class _LinhaVazia:
-    """Linha de agregacao "sem dados": qualquer coluna le como None. Serve as
-    consultas que estes testes NAO inspecionam (periodo anterior, percentis,
-    top de falhas, bloco `now`), que so precisam de um resultado vazio."""
+    """A "no data" aggregation row: any column reads as None. Serves the
+    queries these tests do NOT inspect (previous period, percentiles,
+    top failures, `now` block), which only need an empty result."""
 
     def __getattr__(self, _nome):
         return None
 
 
 def _db():
-    """Dublê de sessão. A 1a consulta é a contagem de workflows e a 2a é a
-    agregação principal sobre `workflow_runs` — é essa que os testes
-    inspecionam. Tudo o que vem depois (período anterior, percentis, top de
-    falhas, bloco `now`) recebe um resultado vazio genérico."""
+    """Session double. The 1st query is the workflow count and the 2nd is the
+    main aggregation over `workflow_runs` — that is the one the tests
+    inspect. Everything after that (previous period, percentiles, top
+    failures, `now` block) gets a generic empty result."""
     wf = MagicMock()
     wf.one.return_value = SimpleNamespace(total=0, ativos=0)
     runs = MagicMock()
@@ -73,17 +73,17 @@ def _query_dos_runs(db):
 
 
 def _limiar_do_where(stmt) -> datetime:
-    """O datetime do `WHERE start_time >= :param` — sem filtro de workspace, o
-    WHERE tem essa condicao e mais nenhuma."""
+    """The datetime of `WHERE start_time >= :param` — without a workspace filter,
+    the WHERE has that condition and no other."""
     return stmt.whereclause.right.value
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("days", [1, 7, 13])
 async def test_where_cobre_14_dias_quando_a_janela_pedida_e_menor(days):
-    """Cenario: `GET /observability/metrics?days=7` com centenas de execucoes na
-    semana anterior. Se o WHERE for de 7 dias, `prev_7d` nao tem como enxergar
-    nada e a comparacao semana-a-semana zera."""
+    """Scenario: `GET /observability/metrics?days=7` with hundreds of runs in
+    the previous week. If the WHERE spans 7 days, `prev_7d` cannot possibly see
+    anything and the week-over-week comparison goes to zero."""
     db = _db()
     antes = datetime.now(timezone.utc)
 
@@ -95,8 +95,8 @@ async def test_where_cobre_14_dias_quando_a_janela_pedida_e_menor(days):
 
 @pytest.mark.asyncio
 async def test_where_respeita_a_janela_pedida_quando_ela_e_maior_que_14_dias():
-    """O alargamento e um piso, nao um teto: `days=90` continua varrendo 90
-    dias, senao `total_runs` mentiria para baixo."""
+    """The widening is a floor, not a ceiling: `days=90` still scans 90
+    days, or `total_runs` would under-report."""
     db = _db()
     antes = datetime.now(timezone.utc)
 
@@ -108,9 +108,9 @@ async def test_where_respeita_a_janela_pedida_quando_ela_e_maior_que_14_dias():
 
 @pytest.mark.asyncio
 async def test_agregados_da_janela_ganham_filter_para_nao_herdar_os_14_dias():
-    """Com o WHERE alargado, `total`/`success`/`failed`/`running`/`avg` PRECISAM
-    do seu proprio FILTER: sem ele, `?days=7` devolveria os numeros de 14 dias
-    sob o rotulo de 7."""
+    """With the widened WHERE, `total`/`success`/`failed`/`running`/`avg` NEED
+    their own FILTER: without it, `?days=7` would return the 14-day numbers
+    under the 7-day label."""
     db = _db()
 
     await ObservabilityService.get_metrics(db, _user(), [], days=7, force=True, como_admin=True)
@@ -124,8 +124,8 @@ async def test_agregados_da_janela_ganham_filter_para_nao_herdar_os_14_dias():
 
 @pytest.mark.asyncio
 async def test_todas_as_janelas_sao_timezone_aware():
-    """Bind naive em coluna timestamptz e lido no fuso do processo: com
-    TZ=America/Cuiaba a janela de 24h vira 20h."""
+    """A naive bind on a timestamptz column is read in the process time zone: with
+    TZ=America/Cuiaba the 24h window becomes 20h."""
     db = _db()
 
     await ObservabilityService.get_metrics(db, _user(), [], days=90, force=True, como_admin=True)
@@ -152,7 +152,7 @@ async def test_janela_dos_executores_tambem_e_aware():
 
 @pytest.mark.asyncio
 async def test_resposta_informa_o_periodo_aplicado():
-    """Contrato com a tela: ela manda `days` e rotula o card com `period_days`."""
+    """Contract with the screen: it sends `days` and labels the card with `period_days`."""
     db = _db()
 
     metricas = await ObservabilityService.get_metrics(db, _user(), [], days=30, force=True, como_admin=True)

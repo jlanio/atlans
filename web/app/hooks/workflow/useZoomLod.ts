@@ -3,9 +3,9 @@ import { useOnViewportChange, useStoreApi } from "@xyflow/react"
 import { LodTier, useCanvasViewStore } from "@/app/stores/canvasViewStore"
 
 /**
- * Fronteiras com histerese: cada degrau só é abandonado ao cruzar um limiar
- * mais distante do que o que o fez entrar. Sem isso, ficar oscilando em cima
- * de um limiar faz o canvas piscar.
+ * Boundaries with hysteresis: each tier is only left when crossing a threshold
+ * farther away than the one that made it enter. Without this, hovering right on
+ * top of a threshold makes the canvas flicker.
  */
 const FAR_ENTER = 0.42
 const FAR_EXIT = 0.50
@@ -22,13 +22,13 @@ export function classifyZoom(zoom: number, current: LodTier): LodTier {
 }
 
 /**
- * Publica o degrau de detalhe conforme o zoom.
+ * Publishes the detail tier according to the zoom.
  *
- * Usa `useOnViewportChange` porque ele grava o callback na store do React Flow
- * e é chamado direto do handler de pan/zoom — sem re-render. `useViewport()`
- * re-renderizaria a cada frame, e `useStore(s => s.transform[2])` a cada frame
- * de zoom. A comparação com `tierRef` é o filtro que reduz uma sessão inteira
- * de zoom a meia dúzia de atualizações de estado.
+ * Uses `useOnViewportChange` because it stores the callback in the React Flow
+ * store and is called straight from the pan/zoom handler — no re-render.
+ * `useViewport()` would re-render on every frame, and `useStore(s => s.transform[2])`
+ * on every zoom frame. The comparison with `tierRef` is the filter that reduces a
+ * whole zoom session to half a dozen state updates.
  */
 export function useZoomLod() {
 
@@ -42,8 +42,8 @@ export function useZoomLod() {
     useCanvasViewStore.getState().setLod(next)
   }, [])
 
-  // `defaultViewport` não passa pelo d3-zoom, então a abertura do canvas num
-  // zoom salvo não emitiria nenhum evento — classifica uma vez na montagem.
+  // `defaultViewport` does not go through d3-zoom, so opening the canvas at a
+  // saved zoom would emit no event — classify once on mount.
   useEffect(() => { publish(store.getState().transform[2]) }, [publish, store])
 
   useOnViewportChange({ onChange: ({ zoom }) => publish(zoom) })

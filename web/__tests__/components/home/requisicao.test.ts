@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest"
 import { transformarRequisicao, ehTileDoAgente } from "@/app/components/home/mapa/requisicao"
 
 /**
- * O transformRequest do globo faz UMA coisa: manda o cookie de sessão nos tiles
- * do assistente (proxy same-origin). Todo o resto passa cru (undefined) — o
- * basemap da instalação inclusive, que não exige chave. (A CARTO, que exigia
- * `?key=` no CDN dela, saiu da Home; com ela saiu o ramo que anexava a chave.)
+ * The globe's transformRequest does ONE thing: it sends the session cookie on the assistant's
+ * tiles (same-origin proxy). Everything else passes raw (undefined) — the
+ * install's basemap included, which requires no key. (CARTO, which required
+ * `?key=` on its CDN, left the Home; with it went the branch that appended the key.)
  */
 describe("transformarRequisicao", () => {
   it("manda credentials same-origin nos tiles do assistente", () => {

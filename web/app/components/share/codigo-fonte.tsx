@@ -1,6 +1,6 @@
 "use client"
-// O link para o código-fonte desta instalação (CODIGO_FONTE_URL), lido pelo
-// layout raiz e consultado pela tela de entrada e pelo menu da conta. Ver
+// The link to this installation's source code (CODIGO_FONTE_URL), read by the
+// root layout and consulted by the sign-in screen and the account menu. See
 // lib/codigo-fonte.ts.
 
 import { createContext, useContext, type ReactNode } from "react"
@@ -11,7 +11,7 @@ export function CodigoFonteProvider({ url, children }: { url: string | null; chi
   return <CodigoFonteContexto.Provider value={url}>{children}</CodigoFonteContexto.Provider>
 }
 
-/** A URL do código-fonte desta instalação, ou null quando ela não a declara. */
+/** The URL of this installation's source code, or null when it doesn't declare one. */
 export function useCodigoFonte(): string | null {
   return useContext(CodigoFonteContexto)
 }

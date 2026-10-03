@@ -1,18 +1,18 @@
 # executor/main.py
 """
-Entry point do executor Atlas.
+Atlas executor entry point.
 
-Fluxo de inicialização:
-  1. Carrega configuração (env vars)
-  2. Fixa a chave de assinatura do servidor (enroll ou TOFU em disco)
-  3. Carrega a chave privada X25519 gerada no enrollment — nunca gera outra
-  4. Inicia ExecutorJobQueue com workers
-  5. Inicia ExecutorConnection (loop de reconnect automático)
-  6. Aguarda SIGTERM/SIGINT para shutdown gracioso
+Startup flow:
+  1. Loads configuration (env vars)
+  2. Pins the server's signing key (enroll or on-disk TOFU)
+  3. Loads the X25519 private key generated at enrollment — never generates another
+  4. Starts ExecutorJobQueue with workers
+  5. Starts ExecutorConnection (automatic reconnect loop)
+  6. Waits for SIGTERM/SIGINT for a graceful shutdown
 
-Uso:
+Usage:
   python -m executor.main
-  # ou
+  # or
   python executor/main.py
 """
 import asyncio
@@ -25,26 +25,27 @@ from concurrent.futures import ThreadPoolExecutor
 
 import httpx
 
-from executor import config as _cfg  # noqa: F401  (carrega o .env antes de tudo)
+from executor import config as _cfg  # noqa: F401  (loads .env before anything else)
 from executor.logging_setup import configure_logging
 
-# Roda no import, como sempre rodou: qualquer modulo importado abaixo ja loga
-# num root configurado. O conteudo mora em executor/logging_setup.py.
+# Runs at import, as it always has: any module imported below already logs
+# to a configured root. The contents live in executor/logging_setup.py.
 configure_logging()
 
 logger = logging.getLogger("executor")
 
 
 # ── Auto-restart ──────────────────────────────────────────────────────────────
-# Sob Docker (`restart: on-failure`), sair com codigo 1 basta — e permite pegar
-# uma imagem nova. Rodando direto no Python nao ha supervisor: sem re-exec, um
-# `config_changed` apenas encerraria o executor e ele nao voltaria.
+# Under Docker (`restart: on-failure`), exiting with code 1 is enough — and lets
+# a new image be picked up. Running directly on Python there is no supervisor:
+# without re-exec, a `config_changed` would just stop the executor and it would
+# not come back.
 #
 # EXECUTOR_AUTO_RESTART: auto (default) | always | never
 _AUTO_RESTART_MODE = os.getenv("EXECUTOR_AUTO_RESTART", "auto").strip().lower()
 
-# Guarda anti-loop: se a causa do restart persistir (ex: servidor reenviando
-# config_changed a cada conexao), re-executar sem limite viraria spin infinito.
+# Anti-loop guard: if the cause of the restart persists (e.g. the server resending
+# config_changed on every connection), re-executing without a limit would spin forever.
 _RESTART_COUNT_VAR  = "_EXECUTOR_RESTART_COUNT"
 _RESTART_SINCE_VAR  = "_EXECUTOR_RESTART_SINCE"
 _MAX_RESTARTS       = 5
@@ -52,7 +53,7 @@ _RESTART_WINDOW_SEC = 300
 
 
 def _in_container() -> bool:
-    """Detecta execucao em container (Docker/K8s), onde ja existe supervisor."""
+    """Detects running in a container (Docker/K8s), where a supervisor already exists."""
     if os.path.exists("/.dockerenv"):
         return True
     try:
@@ -64,11 +65,11 @@ def _in_container() -> bool:
 
 
 def _build_restart_argv() -> list[str]:
-    """Reconstroi a linha de comando original.
+    """Rebuilds the original command line.
 
-    `python -m executor` deixa sys.argv[0] apontando para __main__.py; re-executar
-    esse path direto quebraria os imports do pacote. O __spec__ do __main__ diz
-    se viemos de `-m` e qual era o modulo.
+    `python -m executor` leaves sys.argv[0] pointing to __main__.py; re-executing
+    that path directly would break the package imports. The __spec__ of __main__
+    says whether we came from `-m` and which module it was.
     """
     import __main__
     spec = getattr(__main__, "__spec__", None)
@@ -79,11 +80,11 @@ def _build_restart_argv() -> list[str]:
 
 
 def _restart_process() -> None:
-    """Substitui o processo atual por uma instancia nova (os.execv).
+    """Replaces the current process with a new instance (os.execv).
 
-    No-op quando ha supervisor externo (container) ou quando desabilitado —
-    nesses casos o caller segue para sys.exit(1). So retorna em caso de no-op
-    ou falha; em sucesso, o processo e substituido e nada apos isto executa.
+    No-op when there is an external supervisor (container) or when disabled —
+    in those cases the caller proceeds to sys.exit(1). Only returns on a no-op
+    or failure; on success, the process is replaced and nothing after this runs.
     """
     if _AUTO_RESTART_MODE == "never":
         logger.info("Auto-restart desabilitado (EXECUTOR_AUTO_RESTART=never) — encerrando.")
@@ -92,15 +93,16 @@ def _restart_process() -> None:
         logger.info("Em container — encerrando com codigo 1 para o supervisor reiniciar.")
         return
 
-    # Guarda incondicional: vale ate para EXECUTOR_AUTO_RESTART=always.
+    # Unconditional guard: applies even to EXECUTOR_AUTO_RESTART=always.
     #
-    # `os.execve` substitui o processo em POSIX, mas no Windows a implementacao
-    # do CPython CRIA um processo novo e encerra o atual. O supervisor veria o
-    # filho que ele conhece morrer, perderia o rastro do executor real — que
-    # segue vivo, com PID novo, segurando a conexao WebSocket sob o mesmo
-    # EXECUTOR_ID — e subiria um segundo. Duas conexoes do mesmo executor.
+    # `os.execve` replaces the process on POSIX, but on Windows CPython's
+    # implementation CREATES a new process and terminates the current one. The
+    # supervisor would see the child it knows die, lose track of the real
+    # executor — which stays alive, with a new PID, holding the WebSocket
+    # connection under the same EXECUTOR_ID — and start a second one. Two
+    # connections of the same executor.
     #
-    # Havendo supervisor, reiniciar e trabalho DELE: basta sair com codigo != 0.
+    # If there is a supervisor, restarting is ITS job: just exit with code != 0.
     from executor.supervisor import VAR_PID, pid_configurado
     if pid_configurado() is not None:
         logger.info(
@@ -109,7 +111,7 @@ def _restart_process() -> None:
         )
         return
 
-    # Janela deslizante de tentativas, propagada ao novo processo via env.
+    # Sliding window of attempts, propagated to the new process via env.
     agora = int(time.time())
     try:
         desde = int(os.getenv(_RESTART_SINCE_VAR, "") or agora)
@@ -131,8 +133,8 @@ def _restart_process() -> None:
     argv = _build_restart_argv()
     logger.info("Reiniciando executor no mesmo processo (tentativa %d)...", contagem + 1)
     try:
-        # O execve substitui o processo: sem fechar o painel antes, o processo
-        # NOVO herdaria um terminal em modo alternativo, sem cursor.
+        # execve replaces the process: without closing the dashboard first, the NEW
+        # process would inherit a terminal in alternate mode, with no cursor.
         from executor import dashboard
         dashboard.emergency_stop()
         sys.stdout.flush()
@@ -142,18 +144,18 @@ def _restart_process() -> None:
         logger.error("Falha ao reiniciar automaticamente (%s) — encerrando.", exc)
 
 
-# NOTE: register_public_key_if_needed foi removido. A chave publica X25519 e
-# enviada agora no enrollment (POST /executores/enroll) junto com o CSR Ed25519.
-# Re-enrollment exige novo OTP — nao ha auto-registro silencioso.
+# NOTE: register_public_key_if_needed was removed. The X25519 public key is now
+# sent at enrollment (POST /executores/enroll) along with the Ed25519 CSR.
+# Re-enrollment requires a new OTP — there is no silent auto-registration.
 
 
 def _observar_task(task: asyncio.Task) -> None:
-    """Loga em ERROR se a task de background morrer com excecao.
+    """Logs at ERROR if the background task dies with an exception.
 
-    Task criada e nunca observada morre em silencio: um FileNotFoundError trivial
-    matava a sincronizacao de uma pasta e nada aparecia nos logs — o
-    `gather(..., return_exceptions=True)` do shutdown ainda CONSUMIA a excecao,
-    entao nem o "Task exception was never retrieved" do asyncio surgia.
+    A task created and never observed dies silently: a trivial FileNotFoundError
+    killed the sync of a folder and nothing showed up in the logs — the
+    shutdown's `gather(..., return_exceptions=True)` also CONSUMED the
+    exception, so not even asyncio's "Task exception was never retrieved" showed up.
     """
     def _callback(t: asyncio.Task) -> None:
         if t.cancelled():
@@ -168,46 +170,46 @@ def _observar_task(task: asyncio.Task) -> None:
     task.add_done_callback(_callback)
 
 
-# Sentinela de "conte a fila inteira, sem discriminar run". Precisa ser um
-# objeto proprio porque `None` e um run_id legitimo: e o balde dos eventos que
-# nao pertencem a job nenhum (GeoSync).
+# Sentinel for "count the whole queue, without discriminating by run". It must be
+# its own object because `None` is a legitimate run_id: it is the bucket for
+# events that belong to no job (GeoSync).
 _QUALQUER_RUN = object()
 
 
 class _FilaContada(asyncio.Queue):
-    """asyncio.Queue que conta itens ENFILEIRADOS e ENVIADOS, por run.
+    """asyncio.Queue that counts ENQUEUED and SENT items, per run.
 
-    Existe para medir progresso REAL do consumidor. O `qsize` nao serve: numa
-    fila compartilhada por N jobs e pelo GeoSync ele sobe e desce por producao
-    alheia — com um produtor mais rapido que o sender o qsize NUNCA diminui,
-    ainda que o WebSocket esteja perfeitamente vivo. Foi assim que a barreira de
-    node_events passou a desistir em 3s acusando "sem conexao" e a despachar o
-    job_result antes dos eventos do proprio job.
+    It exists to measure the consumer's REAL progress. `qsize` does not work: in
+    a queue shared by N jobs and by GeoSync it goes up and down with other
+    parties' production — with a producer faster than the sender, qsize NEVER
+    decreases, even though the WebSocket is perfectly alive. That is how the
+    node_events barrier started giving up after 3s claiming "sem conexao" (no
+    connection) and dispatching the job_result before the job's own events.
 
-    DUAS decisoes que o nome "confirmados" ja escondeu uma vez:
+    TWO decisions that the name "confirmados" has already hidden once:
 
-      1. `confirmados` avanca em `confirmar_envio()`, chamado pelo sender APENAS
-         quando o `ws.send` retornou. Antes ele estava colado no `task_done()`,
-         que e incondicional (o item pode ter sido re-enfileirado ou descartado
-         por teto de tentativas): a barreira dava por "enviado" o que tinha
-         FALHADO e despachava o job_result — carregando o `__workflow_complete__`
-         — na frente dos eventos que ela existe para esperar.
+      1. `confirmados` advances in `confirmar_envio()`, called by the sender ONLY
+         when `ws.send` has returned. Before, it was glued to `task_done()`,
+         which is unconditional (the item may have been re-enqueued or dropped
+         by the attempt ceiling): the barrier took as "sent" what had
+         FAILED and dispatched the job_result — carrying `__workflow_complete__`
+         — ahead of the events it exists to wait for.
 
-      2. A contagem e POR run_id, nao so global. A fila e compartilhada: esperar
-         a marca d'agua global fazia um workflow curto esperar o backlog de um
-         workflow grande e do GeoSync antes de subir o proprio resultado.
+      2. The count is PER run_id, not only global. The queue is shared: waiting
+         for the global watermark made a short workflow wait for the backlog of
+         a large workflow and of GeoSync before sending its own result up.
 
-    O `sink` opcional espia cada item de passagem — e por ele que o painel
-    descobre em que no cada run esta e quanto o GeoSync ja transferiu. Espiar
-    aqui, e nao nos emissores, e um ponto de toque em vez de dois
-    (ExecutorEventPublisher e SyncEventEmitter ja convergem nesta fila) e pega
-    de graca qualquer emissor futuro. Nada e consumido: o
-    `_event_sender_loop` continua recebendo tudo.
+    The optional `sink` peeks at each item in passing — it is how the dashboard
+    finds out which node each run is on and how much GeoSync has transferred.
+    Peeking here, and not in the emitters, is one touch point instead of two
+    (ExecutorEventPublisher and SyncEventEmitter already converge on this queue)
+    and catches any future emitter for free. Nothing is consumed: the
+    `_event_sender_loop` keeps receiving everything.
 
-    O `coletor` guarda o ultimo lifecycle por no que NAO conseguiu ser enviado,
-    para o sender reenviar na reconexao (ver ColetorDeLifecycle). Mora na fila
-    porque ela e o unico objeto que produtor (ExecutorEventPublisher) e
-    consumidor (ExecutorConnection) ja compartilham.
+    The `coletor` keeps the last lifecycle per node that could NOT be sent,
+    for the sender to resend on reconnect (see ColetorDeLifecycle). It lives in
+    the queue because the queue is the only object that the producer
+    (ExecutorEventPublisher) and the consumer (ExecutorConnection) already share.
     """
 
     def __init__(self, maxsize: int = 0, sink=None):
@@ -232,33 +234,33 @@ class _FilaContada(asyncio.Queue):
             try:
                 self._sink.on_event(item)
             except Exception:
-                # Telemetria NUNCA derruba o publisher: esta excecao subiria
-                # pelo call_soon_threadsafe do event_publisher, que roda fora
-                # de qualquer try/except do caller.
+                # Telemetry NEVER brings down the publisher: this exception would go up
+                # through event_publisher's call_soon_threadsafe, which runs outside
+                # any try/except of the caller.
                 pass
         super()._put(item)
 
     def confirmar_envio(self, item) -> None:
-        """Marca que o item SAIU de fato pelo WebSocket. So o sender chama."""
+        """Marks that the item actually WENT OUT through the WebSocket. Only the sender calls it."""
         self._resolver(item)
 
     def resolver_sem_envio(self, item) -> None:
-        """Fecha a conta de um item que saiu da fila SEM ter sido enviado.
+        """Settles the account of an item that left the queue WITHOUT having been sent.
 
-        Sao dois casos, e os dois desbalanceavam a marca d'agua:
+        There are two cases, and both unbalanced the watermark:
 
-          - re-enfileiramento: o `_put` conta o item DE NOVO (`enfileirados +1`)
-            mas `confirmar_envio` so acontece no envio bem-sucedido. Cada
-            retentativa deixava um deficit permanente de 1 naquele run, e a
-            barreira de fim de job — que espera `confirmados >= alvo` — nunca
-            fechava: saia sempre pelo timeout de estagnacao, atrasando o
-            `job_result` (e o `__workflow_complete__`) em segundos;
-          - descarte definitivo (teto de tentativas, fila cheia no requeue): o
-            item foi contado na entrada e nunca sera enviado — sem contrapeso,
-            `alvo` fica inalcancavel para sempre.
+          - re-enqueueing: `_put` counts the item AGAIN (`enfileirados +1`)
+            but `confirmar_envio` only happens on a successful send. Each
+            retry left a permanent deficit of 1 on that run, and the
+            end-of-job barrier — which waits for `confirmados >= alvo` — never
+            closed: it always exited via the stagnation timeout, delaying the
+            `job_result` (and the `__workflow_complete__`) by seconds;
+          - permanent drop (attempt ceiling, queue full on requeue): the
+            item was counted on entry and will never be sent — without a
+            counterweight, `alvo` stays unreachable forever.
 
-        Nos dois casos a entrada ANTERIOR do item esta encerrada; se ele voltar
-        para a fila, ele volta como item novo e e contado de novo no `_put`.
+        In both cases the item's PREVIOUS entry is closed; if it comes back
+        to the queue, it comes back as a new item and is counted again in `_put`.
         """
         self._resolver(item)
 
@@ -268,17 +270,17 @@ class _FilaContada(asyncio.Queue):
         self.confirmados_por_run[run_id] = self.confirmados_por_run.get(run_id, 0) + 1
 
     def esquecer_run(self, run_id) -> None:
-        """Expurga os contadores de um run terminado.
+        """Purges the counters of a finished run.
 
-        Sem isto os dois dicts crescem para sempre num executor de vida longa —
-        uma entrada por run executado.
+        Without this both dicts grow forever on a long-lived executor —
+        one entry per run executed.
         """
         self.enfileirados_por_run.pop(run_id, None)
         self.confirmados_por_run.pop(run_id, None)
-        # O coletor guarda lifecycle por (run_id, no) para reenviar depois. Sem
-        # este expurgo, um reenvio horas mais tarde ressuscitava as entradas
-        # por-run que acabamos de apagar — e nada as removeria de novo,
-        # reabrindo o vazamento O(runs) pela porta dos fundos.
+        # The collector keeps lifecycle per (run_id, node) to resend later. Without
+        # this purge, a resend hours later revived the per-run entries we
+        # just deleted — and nothing would remove them again, reopening the
+        # O(runs) leak through the back door.
         coletor = getattr(self, "coletor", None)
         if coletor is not None:
             coletor.esquecer_run(run_id)
@@ -292,35 +294,35 @@ async def _aguardar_confirmacao(
     estagnado: float,
     run_id=_QUALQUER_RUN,
 ) -> bool:
-    """Espera o consumidor enviar tudo que JA estava na fila. True = enviou.
+    """Waits for the consumer to send everything that was ALREADY in the queue. True = sent.
 
-    Barreira por MARCA D'AGUA: fotografa `enfileirados` e espera `confirmados`
-    alcancar essa marca. Como a fila e FIFO com um unico consumidor, isso e
-    exatamente "todos os itens que existiam neste instante ja foram enviados" —
-    sem esperar pelo que outros produtores enfileirarem depois (era o defeito do
-    `join()` global, que fazia o job A esperar pelos eventos do job B) e sem
-    cortar cedo enquanto houver sender vivo progredindo.
+    WATERMARK barrier: snapshots `enfileirados` and waits for `confirmados` to
+    reach that mark. Since the queue is FIFO with a single consumer, this is
+    exactly "all the items that existed at this instant have been sent" —
+    without waiting for what other producers enqueue later (that was the defect
+    of the global `join()`, which made job A wait for job B's events) and
+    without cutting off early while there is a live sender making progress.
 
-    Com `run_id`, a marca d'agua e a DAQUELE run: o job so espera os proprios
-    eventos, e nao o backlog que outro job ou o GeoSync ja tinham enfileirado a
-    frente dele na mesma fila.
+    With `run_id`, the watermark is THAT run's: the job only waits for its own
+    events, not for the backlog that another job or GeoSync had already enqueued
+    ahead of it in the same queue.
 
-    Desiste em dois casos:
-      - `estagnado` segundos sem NENHUMA confirmacao na fila INTEIRA — nao ha
-        consumidor (WS caido, sender cancelado, executor em reconexao com
+    Gives up in two cases:
+      - `estagnado` seconds without ANY confirmation in the WHOLE queue — there
+        is no consumer (WS down, sender canceled, executor reconnecting with
         backoff);
-      - `timeout` total, teto do pior caso mesmo com um sender lento.
+      - total `timeout`, the worst-case ceiling even with a slow sender.
 
-    A assimetria entre alvo e detector e proposital: "quanto falta" e uma
-    propriedade DESTE run, mas "o sender esta vivo" e uma propriedade da FILA.
-    Medir estagnacao pelo contador por-run acusava sender morto com o WebSocket
-    perfeitamente vivo: a fila e FIFO unica e compartilhada, entao os eventos de
-    um job curto ficam fisicamente atras do backlog de um workflow grande e do
-    GeoSync. Enquanto o sender drenava esse backlog (facil passar de 3s num link
-    de upload de cliente), `confirmados_por_run` do job curto nao saia do lugar,
-    a barreira retornava False e o `job_result` — que carrega o
-    `__workflow_complete__` — era despachado na frente dos proprios node_events
-    do run, fechando o canvas com os nos girando.
+    The asymmetry between target and detector is intentional: "how much is left"
+    is a property of THIS run, but "the sender is alive" is a property of the
+    QUEUE. Measuring stagnation by the per-run counter accused the sender of
+    being dead with the WebSocket perfectly alive: the queue is a single shared
+    FIFO, so a short job's events sit physically behind the backlog of a large
+    workflow and of GeoSync. While the sender drained that backlog (easily over
+    3s on a client's upload link), the short job's `confirmados_por_run` did not
+    budge, the barrier returned False and the `job_result` — which carries
+    `__workflow_complete__` — was dispatched ahead of the run's own node_events,
+    closing the canvas with the nodes still spinning.
     """
     if run_id is _QUALQUER_RUN:
         enfileirados = lambda: fila.enfileirados          # noqa: E731
@@ -329,7 +331,7 @@ async def _aguardar_confirmacao(
         enfileirados = lambda: fila.enfileirados_por_run.get(run_id, 0)   # noqa: E731
         confirmados  = lambda: fila.confirmados_por_run.get(run_id, 0)    # noqa: E731
 
-    # Sempre GLOBAL: e a evidencia de que existe um consumidor drenando.
+    # Always GLOBAL: it is the evidence that there is a consumer draining.
     progresso_global = lambda: fila.confirmados                            # noqa: E731
 
     agora  = asyncio.get_running_loop().time
@@ -369,21 +371,21 @@ async def _drenar_eventos_pendentes(
     timeout: float = 30.0,
     estagnado: float = 3.0,
 ) -> None:
-    """Espera os node_events ja emitidos subirem antes de despachar o resultado.
+    """Waits for the already-emitted node_events to go up before dispatching the result.
 
-    O `__workflow_complete__` viaja junto do job_result; sem esta barreira ele
-    chegava antes dos node_events do proprio job e a UI fechava o run com o
-    grafo congelado/incompleto.
+    `__workflow_complete__` travels with the job_result; without this barrier it
+    arrived before the job's own node_events and the UI closed the run with the
+    graph frozen/incomplete.
 
-    A espera cobre exatamente os eventos DESTE run que existiam quando o job
-    terminou (ver `_aguardar_confirmacao`) — nao os de outros jobs, nem os do
-    GeoSync, que dividem a mesma fila.
+    The wait covers exactly the events of THIS run that existed when the job
+    finished (see `_aguardar_confirmacao`) — not those of other jobs, nor those
+    of GeoSync, which share the same queue.
     """
-    # ExecutorEventPublisher enfileira via `call_soon_threadsafe` (publica de
-    # dentro de asyncio.to_thread): os ultimos eventos do job ainda estao na fila
-    # de callbacks do loop, nao na _event_queue. Ceder o controle uma vez faz
-    # esses callbacks rodarem antes de fotografarmos a marca d'agua — sem isso a
-    # barreira sairia justamente sem os eventos finais que ela existe para cobrir.
+    # ExecutorEventPublisher enqueues via `call_soon_threadsafe` (it publishes from
+    # inside asyncio.to_thread): the job's last events are still in the loop's
+    # callback queue, not in _event_queue. Yielding control once makes those
+    # callbacks run before we snapshot the watermark — without it the barrier
+    # would exit precisely without the final events it exists to cover.
     await asyncio.sleep(0)
     await _aguardar_confirmacao(
         fila, rotulo="node_event", timeout=timeout, estagnado=estagnado, run_id=run_id,
@@ -395,14 +397,14 @@ async def _drive_event_fanout(
     managers: list,
     filas: list[asyncio.Queue],
 ) -> None:
-    """Roteia cada drive_event recebido do servidor para o SyncManager dono da pasta.
+    """Routes each drive_event received from the server to the SyncManager that owns the folder.
 
-    Contrato com executor/sync/manager.py: o manager expoe o metodo SINCRONO
-    `claims_event(msg) -> bool`, que responde True quando o evento pertence a
-    pasta dele. Se ninguem reivindicar, o evento vai para o PRIMEIRO manager (o
-    "primario") — e o caso do arquivo novo, que ainda nao esta em manifesto
-    nenhum. `getattr` porque o metodo pode nao existir ainda: ausencia conta
-    como "nao reivindica" em vez de quebrar o roteamento.
+    Contract with executor/sync/manager.py: the manager exposes the SYNCHRONOUS
+    method `claims_event(msg) -> bool`, which answers True when the event belongs
+    to its folder. If nobody claims it, the event goes to the FIRST manager (the
+    "primary") — that is the case of a new file, which is not in any manifest
+    yet. `getattr` because the method may not exist yet: its absence counts as
+    "does not claim" instead of breaking the routing.
     """
     while True:
         msg = await entrada.get()
@@ -434,11 +436,11 @@ async def _drive_event_fanout(
 
 
 def _causa_da_interrupcao(estado: str, limite_bytes: int | None) -> str:
-    """Texto do resultado de um job que o processo anterior não terminou.
+    """Result text for a job that the previous process did not finish.
 
-    O executor não sabe POR QUE morreu — o Docker zera o OOMKilled no restart —,
-    então diz o que sabe (reiniciou, e em que ponto do job) e a causa mais
-    provável, com o limite de memória do container para quem for investigar.
+    The executor does not know WHY it died — Docker resets OOMKilled on restart —,
+    so it says what it knows (it restarted, and at what point of the job) and the
+    most likely cause, with the container's memory limit for whoever investigates.
     """
     from executor import result_store
 
@@ -459,15 +461,15 @@ def _causa_da_interrupcao(estado: str, limite_bytes: int | None) -> str:
 
 
 def _fechar_orfaos_do_boot_anterior() -> int:
-    """Transforma em falha, com a causa provável, cada job que o processo
-    anterior aceitou e não terminou. Devolve quantos.
+    """Turns into a failure, with the probable cause, each job the previous
+    process accepted and did not finish. Returns how many.
 
-    Sem isto o servidor seguia com o run "Em andamento": o executor voltava em
-    segundos (restart: on-failure), reconectava dentro da carência do servidor
-    e ninguém mais sabia do job — foi o que aconteceu com um executor
-    morto pelo OOM do cgroup no meio de uma análise.
+    Without this the server kept the run "Em andamento" (in progress): the
+    executor came back in seconds (restart: on-failure), reconnected within the
+    server's grace period and nobody knew about the job anymore — that is what
+    happened with an executor killed by the cgroup OOM in the middle of an analysis.
 
-    Best-effort: falha aqui é logada e o boot segue.
+    Best-effort: a failure here is logged and the boot continues.
     """
     from executor import result_store
 
@@ -502,22 +504,24 @@ def _fechar_orfaos_do_boot_anterior() -> int:
     return len(orfaos)
 
 async def main():
-    # Configuracao e enrollment sao pre-requisitos, nao algo que o executor
-    # resolva sozinho ao subir. Aqui havia um wizard interativo que rodava
-    # quando faltava EXECUTOR_ID; ele foi removido junto com executor/setup.py.
+    # Configuration and enrollment are prerequisites, not something the executor
+    # resolves on its own when starting. There used to be an interactive wizard
+    # here that ran when EXECUTOR_ID was missing; it was removed along with
+    # executor/setup.py.
     #
-    # Motivo: `input()` nao existe em nenhum dos ambientes em que o executor
-    # roda de verdade — container sem -it, servico, e o app desktop, que da
-    # spawn com os pipes capturados. O wizard so funcionava no terminal do
-    # desenvolvedor, e nos demais estourava EOFError no lugar da mensagem util.
+    # Reason: `input()` does not exist in any of the environments where the
+    # executor actually runs — a container without -it, a service, and the
+    # desktop app, which spawns it with the pipes captured. The wizard only
+    # worked in the developer's terminal, and elsewhere it blew up with EOFError
+    # instead of the useful message.
     #
-    # Os caminhos que restam funcionam em todos eles:
+    # The remaining paths work in all of them:
     #   python -m executor enroll --executor-id=<ID> --otp=<OTP> --server=<URL>
-    #   o formulario de vinculo do app desktop
+    #   the desktop app's link form
     #
-    # A checagem de fato acontece em `config.assert_configured()` /
-    # `assert_enrolled()`, mais abaixo — DEPOIS de o canal com o supervisor
-    # subir, para que a falha vire evento em vez de codigo de saida.
+    # The actual check happens in `config.assert_configured()` /
+    # `assert_enrolled()`, further below — AFTER the channel with the supervisor
+    # comes up, so that the failure becomes an event instead of an exit code.
     from executor import config
 
     from executor.job_executor import execute_job, init_private_key
@@ -526,16 +530,17 @@ async def main():
     from executor import dashboard, result_store
     from executor.stats import ExecutorStats, NullStats
 
-    # ── Painel: decide cedo, liga tarde ───────────────────────────────────────
-    # A decisao vem ja, para que as filas e a conexao nascam com o coletor certo.
-    # O `Live` so assume a tela no passo 7 — o boot inteiro (banner, chave do
-    # servidor, replay do outbox, erros de GeoSync) precisa sair no console
-    # normal, que e onde o operador espera ver o que deu errado ao subir.
+    # ── Dashboard: decide early, turn on late ─────────────────────────────────
+    # The decision comes right away, so the queues and the connection are born
+    # with the right collector. The `Live` only takes over the screen in step 7 —
+    # the whole boot (banner, server key, outbox replay, GeoSync errors) must go
+    # out on the normal console, which is where the operator expects to see what
+    # went wrong at startup.
     #
-    # Excecao a "liga tarde": no modo JSON o canal sobe JA, logo abaixo. O
-    # consumidor e um programa, nao a tela — e um erro na fase 0 (chave do
-    # servidor, cert) precisa chegar a ele como um evento `state`, e nao como
-    # "o processo saiu com codigo 1".
+    # Exception to "turn on late": in JSON mode the channel comes up RIGHT AWAY,
+    # just below. The consumer is a program, not the screen — and an error in
+    # phase 0 (server key, cert) must reach it as a `state` event, not as
+    # "the process exited with code 1".
     _dash_modo, _dash_motivo = dashboard.should_enable_from_process()
     _dash_on = _dash_modo != dashboard.MODO_OFF
     stats = (
@@ -557,7 +562,7 @@ async def main():
     if config.SYNC_DIRS.strip():
         logger.info("  GeoSync:   %s", config.SYNC_DIRS)
     if not _dash_on:
-        # Um painel que nao aparece sem explicacao vira ticket de suporte.
+        # A dashboard that fails to appear without explanation becomes a support ticket.
         logger.info("  Painel:    desligado (%s)", _dash_motivo)
     logger.info("")
 
@@ -567,16 +572,16 @@ async def main():
         d.strip() for d in config.SYNC_DIRS.split(",") if d.strip()
     )
 
-    # ── Canal com o supervisor (modo JSON) ────────────────────────────────────
-    # Sobe ANTES da fase 0. O `shutdown_event` nasce aqui, e nao na fase 5, por
-    # causa disso: o comando `shutdown` precisa funcionar durante o boot inteiro
-    # — um app desktop que pede para parar enquanto o executor resolve a chave
-    # do servidor nao pode ficar sem resposta ate a fase 5.
+    # ── Channel with the supervisor (JSON mode) ───────────────────────────────
+    # Comes up BEFORE phase 0. The `shutdown_event` is born here, not in phase 5,
+    # because of that: the `shutdown` command must work during the whole boot
+    # — a desktop app that asks to stop while the executor resolves the server
+    # key cannot go unanswered until phase 5.
     shutdown_event = asyncio.Event()
 
-    # A conexao so existe na fase 4. Ate la, `reconnect` e um no-op honesto: nao
-    # ha backoff para interromper. O holder evita ter de religar o handler
-    # depois, o que seria mais uma ordem sutil a manter correta.
+    # The connection only exists in phase 4. Until then, `reconnect` is an honest
+    # no-op: there is no backoff to interrupt. The holder avoids having to rewire
+    # the handler later, which would be one more subtle ordering to keep correct.
     _conn_holder: dict = {}
 
     def _reconectar_agora() -> bool:
@@ -588,7 +593,7 @@ async def main():
         _dash = await dashboard.start(
             stats,
             modo=dashboard.MODO_JSON,
-            # Ligadas na fase 3 por `vincular_fontes`: a fila ainda nao existe.
+            # Wired in phase 3 by `vincular_fontes`: the queue does not exist yet.
             capacity_source=None,
             result_queue=None,
             intervalo=config.DASHBOARD_INTERVAL,
@@ -597,48 +602,48 @@ async def main():
         )
 
     def _fase(nome: str, passo: str | None = None, detalhe: str | None = None) -> None:
-        """Reporta a fase do boot ao supervisor. No-op sem canal.
+        """Reports the boot phase to the supervisor. No-op without a channel.
 
-        Sem isto, uma falha na fase 0 chega ao app desktop apenas como "o
-        processo saiu com 1" — e a diferenca entre "cert expirado" e "sem rede"
-        vira suporte por telefone.
+        Without this, a failure in phase 0 reaches the desktop app only as "the
+        process exited with 1" — and the difference between "cert expired" and
+        "no network" turns into phone support.
         """
         if _dash is not None and hasattr(_dash, "emitir"):
             _dash.emitir("state", {"phase": nome, "step": passo, "detail": detalhe})
 
     async def _falhar_boot(passo: str, exc: BaseException) -> None:
-        """Reporta a falha e encerra com 1.
+        """Reports the failure and exits with 1.
 
-        Sem isto, uma falha de boot chega ao supervisor so como codigo de saida.
-        A diferenca entre "cert expirado" e "sem rede" e a diferenca entre a UI
-        oferecer 'refazer enrollment' e oferecer 'tentar de novo' — e o passo
-        exato so existe aqui.
+        Without this, a boot failure reaches the supervisor only as an exit code.
+        The difference between "cert expired" and "no network" is the difference
+        between the UI offering 'redo enrollment' and offering 'try again' — and
+        the exact step only exists here.
         """
         _fase("failed", passo, detalhe=str(exc))
         if _dash is not None and _dash_modo == dashboard.MODO_JSON:
-            await _dash.stop()          # drena o buffer antes de o processo sumir
+            await _dash.stop()          # drains the buffer before the process goes away
         raise SystemExit(1)
 
-    # ── Watchdog do supervisor (anti-orfao) ───────────────────────────────────
+    # ── Supervisor watchdog (anti-orphan) ─────────────────────────────────────
     from executor import supervisor as _supervisor
     _watchdog_task = _supervisor.criar_task(shutdown_event.set)
 
-    # ── Configuracao e enrollment ─────────────────────────────────────────────
-    # Estas checagens rodam DEPOIS de o canal subir, e nao antes.
+    # ── Configuration and enrollment ──────────────────────────────────────────
+    # These checks run AFTER the channel comes up, not before.
     #
-    # Ficavam la em cima, logo apos o import de config, e o efeito era ruim para
-    # um supervisor: o processo saia com 1 sem emitir evento nenhum, entao o app
-    # nao tinha como distinguir "falta enrollment" de "o executor caiu" — e
-    # tratava como queda, religando em backoff para sempre uma condicao que so o
-    # usuario resolve.
+    # They used to be up top, right after the config import, and the effect was
+    # bad for a supervisor: the process exited with 1 without emitting any event,
+    # so the app had no way to tell "enrollment missing" from "the executor
+    # crashed" — and treated it as a crash, restarting with backoff forever a
+    # condition only the user can resolve.
     #
-    # Os dois passos sao separados porque a acao do usuario e diferente:
-    # `config` pede configurar o EXECUTOR_ID, `enrollment` pede refazer o enroll.
+    # The two steps are separate because the user's action is different:
+    # `config` asks to configure EXECUTOR_ID, `enrollment` asks to redo the enroll.
     _fase("booting", "config")
     try:
         config.assert_configured()
     except SystemExit as exc:
-        logger.error("%s", exc)     # a mensagem so aparecia por ser SystemExit
+        logger.error("%s", exc)     # the message only showed up because it was a SystemExit
         await _falhar_boot("config", exc)
     try:
         config.assert_enrolled()
@@ -648,12 +653,12 @@ async def main():
 
     _fase("booting", "server_key")
 
-    # ── 0. Chave de assinatura do servidor (fixada localmente) ───────────────
-    # Antes isto era um GET a cada boot, sem pinning e com follow_redirects=True:
-    # quem vencesse o canal em qualquer reinicio entregava a propria chave e
-    # passava a assinar jobs arbitrarios. Agora a chave vem do enroll (sem janela
-    # nenhuma) ou de um TOFU unico que fica fixado em disco.
-    # Ver executor/server_key.py para a ordem de precedencia completa.
+    # ── 0. Server signing key (pinned locally) ───────────────────────────────
+    # This used to be a GET on every boot, without pinning and with
+    # follow_redirects=True: whoever won the channel on any restart delivered
+    # their own key and could then sign arbitrary jobs. Now the key comes from
+    # the enroll (no window at all) or from a one-time TOFU that stays pinned on disk.
+    # See executor/server_key.py for the full order of precedence.
     from executor.server_key import ServerKeyError, resolve_server_signing_key
     try:
         config.SERVER_SIGNING_PUBLIC_KEY = await resolve_server_signing_key(
@@ -667,30 +672,30 @@ async def main():
         )
         await _falhar_boot("server_key", exc)
 
-    # ── 1. Inicializa chave privada X25519 (envelope decryption) ──────────────
-    # init_private_key() carrega a chave via `crypto.load_private_key` (SOMENTE
-    # leitura) e a guarda no global do job_executor. A chave foi gerada uma unica
-    # vez no enrollment e salva em config.EXECUTOR_PRIVATE_KEY_PATH — se sumiu,
-    # gerar outra faria o executor subir "online" com uma publica que nao casa
-    # com a registrada no servidor e derrubar 100% dos jobs. Ver
-    # crypto.PrivateKeyMissingError.
+    # ── 1. Initializes the X25519 private key (envelope decryption) ───────────
+    # init_private_key() loads the key via `crypto.load_private_key` (READ-only)
+    # and keeps it in job_executor's global. The key was generated a single time
+    # at enrollment and saved to config.EXECUTOR_PRIVATE_KEY_PATH — if it is gone,
+    # generating another would make the executor come up "online" with a public
+    # key that does not match the one registered on the server and fail 100% of
+    # jobs. See crypto.PrivateKeyMissingError.
     from executor.crypto import PrivateKeyMissingError
     try:
         init_private_key()
     except PrivateKeyMissingError as exc:
-        # Mesmo tratamento do ServerKeyError acima: a excecao existe justamente
-        # para dar instrucao clara ao operador (refazer o enroll) — enterra-la
-        # num traceback cru anularia o proposito dela.
+        # Same handling as ServerKeyError above: the exception exists precisely to
+        # give the operator a clear instruction (redo the enroll) — burying it in
+        # a raw traceback would defeat its purpose.
         logger.error("%s", exc)
         await _falhar_boot("private_key", exc)
 
-    # ── 2. Pool de threads proprio ────────────────────────────────────────────
-    # Todo `asyncio.to_thread` do flow engine cai no executor DEFAULT do loop,
-    # dimensionado em min(32, cpu_count + 4). Dois problemas: (a) N jobs
-    # concorrentes disputam o mesmo pool sem nenhuma relacao com MAX_CONCURRENT;
-    # (b) em Docker, cpu_count() reporta os cores do HOST, nao a quota do
-    # container — o pool fica gigante e as threads so brigam por CPU.
-    # Dimensionar a partir de MAX_CONCURRENT da a cada job uma folga previsivel.
+    # ── 2. Own thread pool ────────────────────────────────────────────────────
+    # Every `asyncio.to_thread` of the flow engine falls into the loop's DEFAULT
+    # executor, sized at min(32, cpu_count + 4). Two problems: (a) N concurrent
+    # jobs compete for the same pool with no relation to MAX_CONCURRENT;
+    # (b) in Docker, cpu_count() reports the HOST's cores, not the container's
+    # quota — the pool gets huge and the threads just fight over CPU.
+    # Sizing from MAX_CONCURRENT gives each job predictable headroom.
     loop = asyncio.get_running_loop()
     _thread_pool = ThreadPoolExecutor(
         max_workers=max(8, config.MAX_CONCURRENT * 4),
@@ -698,35 +703,36 @@ async def main():
     )
     loop.set_default_executor(_thread_pool)
 
-    # ── 3. Cria filas de comunicação ──────────────────────────────────────────
-    # Fila de resultados (executor → servidor). Precisa de LIMITE: sem WS vivo
-    # ninguem drena, e cada resultado retido segura memoria ate o proximo envio.
-    # Dimensionada pelo pior caso legitimo — tudo que pode estar em voo (fila +
-    # jobs rodando) mais folga para o replay do outbox no boot.
+    # ── 3. Creates communication queues ───────────────────────────────────────
+    # Results queue (executor → server). It needs a LIMIT: without a live WS
+    # nobody drains it, and each retained result holds memory until the next send.
+    # Sized for the worst legitimate case — everything that can be in flight
+    # (queue + running jobs) plus headroom for the outbox replay at boot.
     _result_queue = _FilaContada(
         maxsize=config.MAX_QUEUE_SIZE + config.MAX_CONCURRENT + 32
     )
-    # Fila de eventos de nós (ExecutorEventPublisher → connection → servidor).
-    # O `sink` do painel espia de passagem; com o painel off e um NullStats.
+    # Node events queue (ExecutorEventPublisher → connection → server).
+    # The dashboard's `sink` peeks in passing; with the dashboard off it is a NullStats.
     _event_queue = _FilaContada(maxsize=500, sink=stats if _dash_on else None)
-    # Fila de eventos Drive push (servidor → executor via WebSocket). É a fila de
-    # ENTRADA: o fan-out abaixo distribui para a fila própria de cada SyncManager.
+    # Drive push events queue (server → executor via WebSocket). It is the INPUT
+    # queue: the fan-out below distributes to each SyncManager's own queue.
     _drive_event_queue: asyncio.Queue = asyncio.Queue(maxsize=100)
 
     def _enqueue_result(result: dict) -> None:
-        """Enfileira um resultado para o sender sem NUNCA bloquear.
+        """Enqueues a result for the sender without EVER blocking.
 
-        `await put()` numa fila cheia prenderia o worker do job indefinidamente
-        quando o WS esta caido (ninguem drena). Se estourar, o resultado ja esta
-        persistido no result_store (outbox) — mas logamos em ERROR porque o envio
-        imediato foi perdido: descartar em silencio deixaria o run "running" no
-        servidor sem nenhuma pista.
+        `await put()` on a full queue would hold the job's worker indefinitely
+        when the WS is down (nobody drains). If it overflows, the result is
+        already persisted in the result_store (outbox) — but we log at ERROR
+        because the immediate send was lost: dropping silently would leave the
+        run "running" on the server without any clue.
 
-        Cuidado com a promessa do log: o replay do outbox REENVIA, mas o servidor
-        RECUSA (`_is_run_terminal` em executor_ws_router) tudo que chegar depois
-        de `_fail_orphan_runs_if_gone` ter fechado o run como orfao — e a fila so
-        enche quando o WS ja esta fora ha bastante tempo, exatamente o cenario em
-        que os runs ja foram fechados. Nao prometa recuperacao aqui.
+        Careful with the log's promise: the outbox replay RESENDS, but the server
+        REJECTS (`_is_run_terminal` in executor_ws_router) everything that arrives
+        after `_fail_orphan_runs_if_gone` has closed the run as orphaned — and the
+        queue only fills when the WS has been down for quite a while, exactly the
+        scenario in which the runs have already been closed. Do not promise
+        recovery here.
         """
         try:
             _result_queue.put_nowait(result)
@@ -740,46 +746,46 @@ async def main():
 
     async def on_execute(message: dict):
         """Executa o job e envia resultado ao servidor via WebSocket."""
-        # Ponto UNICO por onde todo job passa — e por isso o lugar natural de
-        # medir. A duracao daqui e ponta-a-ponta (inclui a barreira de eventos).
+        # The SINGLE point every job goes through — and therefore the natural place
+        # to measure. The duration here is end-to-end (includes the events barrier).
         job_id = message.get("envelope", {}).get("job_id", "?")
         _t0 = time.monotonic()
-        # run_id == job_id no despacho do servidor (ver job_executor.execute_job).
-        # Informar isso ja aqui e o que permite casar os node events com o job
-        # certo: sem ele, com MAX_CONCURRENT jobs simultaneos todos comecariam
-        # sem run_id e o primeiro evento a chegar seria atribuido a qualquer um.
+        # run_id == job_id in the server's dispatch (see job_executor.execute_job).
+        # Reporting it already here is what lets the node events be matched to the
+        # right job: without it, with MAX_CONCURRENT simultaneous jobs they would all
+        # start without a run_id and the first event to arrive would be assigned to any of them.
         stats.on_job_started(job_id, run_id=job_id)
-        # Diário: o job saiu da fila e começou. Se o processo morrer daqui até o
-        # `result_store.put`, o próximo boot o reporta como interrompido no meio.
+        # Journal: the job left the queue and started. If the process dies from here
+        # until `result_store.put`, the next boot reports it as interrupted midway.
         result_store.marcar_executando(job_id)
         result = None
         status = "error"
         try:
             result = await execute_job(message, event_queue=_event_queue)
             status = result.get("status", "error")
-            # A barreira e POR RUN: com a fila compartilhada, esperar a marca
-            # d'agua global fazia este job esperar tambem o backlog de um
-            # workflow grande e do GeoSync — ate 30s de "quase pronto" no painel.
+            # The barrier is PER RUN: with the shared queue, waiting for the global
+            # watermark made this job also wait for the backlog of a large
+            # workflow and of GeoSync — up to 30s of "almost done" on the dashboard.
             await _drenar_eventos_pendentes(_event_queue, result.get("run_id") or job_id)
-            # 'output' carrega os final_outputs INTEIROS (GeoDataFrames, centenas de
-            # MB). O servidor nunca usa esse campo — o sender ja o descartava na hora
-            # de serializar — mas ate la ele mantinha vivo todo o grafo de objetos
-            # dentro da fila e do outbox. Fora aqui, na origem.
+            # 'output' carries the ENTIRE final_outputs (GeoDataFrames, hundreds of
+            # MB). The server never uses this field — the sender already dropped it
+            # at serialization time — but until then it kept the whole object graph
+            # alive inside the queue and the outbox. Removed here, at the source.
             result.pop("output", None)
-            # Persiste o resultado ANTES de enfileirar — garante que reinício do
-            # processo não perde o envio. mark_sent() é chamado pelo sender loop
-            # após o servidor confirmar.
+            # Persists the result BEFORE enqueueing — guarantees that a process restart
+            # does not lose the send. mark_sent() is called by the sender loop
+            # after the server confirms.
             result_store.put(result)
             _enqueue_result(result)
         except asyncio.CancelledError:
-            # Cancelamento do job (job_queue.cancel) ou do worker (shutdown).
-            # Sem este ramo o `finally` contaria a interrupcao como erro.
+            # Cancellation of the job (job_queue.cancel) or of the worker (shutdown).
+            # Without this branch the `finally` would count the interruption as an error.
             status = "cancelled"
             raise
         finally:
-            # Contadores por run sao O(runs) e nada os apaga sozinho: sem este
-            # expurgo, um executor de vida longa acumula uma entrada por job
-            # executado nos dois dicts.
+            # Per-run counters are O(runs) and nothing deletes them on its own: without
+            # this purge, a long-lived executor accumulates one entry per job
+            # executed in both dicts.
             _event_queue.esquecer_run((result or {}).get("run_id") or job_id)
             stats.on_job_finished(
                 job_id, status, time.monotonic() - _t0,
@@ -787,23 +793,24 @@ async def main():
                 metrics=((result or {}).get("stats") or {}).get("__metrics__"),
             )
 
-    # Espaco maximo que o replay do outbox pode ocupar na _result_queue. O resto
-    # fica reservado para os resultados dos jobs que estao rodando AGORA — eles
-    # usam put_nowait e seriam DESCARTADOS se o backlog historico enchesse a fila.
+    # Maximum space the outbox replay may take up in _result_queue. The rest
+    # stays reserved for the results of the jobs running NOW — they use
+    # put_nowait and would be DROPPED if the historical backlog filled the queue.
     _RESERVA_OUTBOX = 8
 
     async def _replay_outbox() -> None:
-        """Reenvia, em ritmo do sender, os resultados que ficaram do boot anterior.
+        """Resends, at the sender's pace, the results left over from the previous boot.
 
-        Antes isto era um for síncrono com put_nowait ANTES de a conexao existir:
-        com a fila limitada (86 slots no default) e `load_pending()` sem LIMIT, um
-        outbox com 300 linhas perdia 214 delas em ERROR — e como o outbox so e
-        lido no boot, so drenava a 86 por reinicio. Aqui o replay vira task de
-        background que espera espaco: nada e descartado e nada compete com os
-        jobs vivos.
+        This used to be a synchronous for loop with put_nowait BEFORE the
+        connection existed: with the bounded queue (86 slots by default) and
+        `load_pending()` without a LIMIT, an outbox with 300 rows lost 214 of
+        them at ERROR — and since the outbox is only read at boot, it only
+        drained 86 per restart. Here the replay becomes a background task that
+        waits for space: nothing is dropped and nothing competes with the live
+        jobs.
 
-        Best-effort: qualquer falha e engolida com log — replay nunca pode
-        impedir o executor de operar.
+        Best-effort: any failure is swallowed with a log — replay can never
+        keep the executor from operating.
         """
         try:
             pending = await asyncio.to_thread(result_store.load_pending)
@@ -815,26 +822,27 @@ async def main():
 
         logger.info("Restaurando %d resultado(s) pendente(s) de execucoes anteriores.", len(pending))
         for r in pending:
-            # Sem await entre a checagem e o put: put_nowait nao tem como falhar.
+            # No await between the check and the put: put_nowait cannot fail.
             while _result_queue.qsize() >= _RESERVA_OUTBOX:
                 await asyncio.sleep(0.2)
             _result_queue.put_nowait(r)
 
     async def on_cancelled(message: dict):
-        """Reporta ao servidor que o job foi cancelado.
+        """Reports to the server that the job was canceled.
 
-        Sem isto o run ficaria "running" para sempre: a task interrompida nunca
-        chega a produzir resultado, e o servidor só sabe que algo mudou quando
-        recebe um job_result.
+        Without this the run would stay "running" forever: the interrupted task
+        never gets to produce a result, and the server only knows something
+        changed when it receives a job_result.
         """
         envelope = message.get("envelope", {})
         job_id = envelope.get("job_id", "?")
-        # `cancel_reason` vem da job_queue quando o cancelamento NAO partiu do
-        # usuario (ex: job que ainda estava na fila quando o executor encerrou).
-        # Sem ele o operador via "cancelada pelo usuario" para algo que ninguem
-        # cancelou. Sem 'output': o servidor nao usa e so ocuparia memoria/outbox.
+        # `cancel_reason` comes from job_queue when the cancellation did NOT come from
+        # the user (e.g. a job that was still in the queue when the executor shut
+        # down). Without it the operator saw "cancelada pelo usuario" (canceled by
+        # the user) for something nobody canceled. No 'output': the server does
+        # not use it and it would only take up memory/outbox.
         motivo = message.get("cancel_reason") or "Execução cancelada pelo usuário."
-        # O servidor despacha com run_id == job_id (ver job_executor.execute_job).
+        # The server dispatches with run_id == job_id (see job_executor.execute_job).
         result = {
             "job_id": job_id,
             "run_id": job_id,
@@ -843,10 +851,10 @@ async def main():
         }
         result_store.put(result)
         _enqueue_result(result)
-        # Cobre o job cancelado ANTES de comecar (drenado da fila no shutdown):
-        # esse nunca passa pelo on_execute, entao nao seria contado em lugar
-        # nenhum. Se ja estava rodando, o `finally` do on_execute contou — e o
-        # on_job_cancelled do coletor ignora o id que ja saiu.
+        # Covers the job canceled BEFORE starting (drained from the queue on shutdown):
+        # that one never goes through on_execute, so it would not be counted
+        # anywhere. If it was already running, on_execute's `finally` counted it —
+        # and the collector's on_job_cancelled ignores the id that has already left.
         stats.on_job_cancelled(job_id, motivo)
 
     job_queue = ExecutorJobQueue(
@@ -857,32 +865,32 @@ async def main():
     )
     await job_queue.start()
 
-    # ── 4. Conecta ao servidor ────────────────────────────────────────────────
-    # `thread_pool`: a conexao precisa dele para reportar capacidade honesta —
-    # queued/running contam JOBS e nao enxergam threads presas por um no que o
-    # timeout nao consegue cancelar. Ver ExecutorConnection._pool_saturado.
+    # ── 4. Connects to the server ─────────────────────────────────────────────
+    # `thread_pool`: the connection needs it to report honest capacity —
+    # queued/running count JOBS and do not see threads stuck on a node that the
+    # timeout cannot cancel. See ExecutorConnection._pool_saturado.
     conn = ExecutorConnection(job_queue, _result_queue, event_queue=_event_queue,
                            drive_event_queue=_drive_event_queue, stats=stats,
                            thread_pool=_thread_pool)
 
-    # A fila avisa a conexao no instante em que entra em drenagem, para o
-    # capacity saturado sair na hora em vez de esperar o tick de 10s do
-    # _capacity_loop (ver ExecutorJobQueue.shutdown e conn.push_capacity).
-    # Ligado aqui porque a fila e construida ANTES da conexao — ela e argumento
-    # do construtor dela.
+    # The queue notifies the connection the instant it starts draining, so the
+    # saturated capacity goes out right away instead of waiting for the
+    # _capacity_loop's 10s tick (see ExecutorJobQueue.shutdown and
+    # conn.push_capacity). Wired here because the queue is built BEFORE the
+    # connection — it is an argument of the connection's constructor.
     job_queue.set_on_draining(conn.push_capacity)
 
-    # Agora o canal com o supervisor tem de onde ler capacidade, e o comando
-    # `reconnect` passa a ter efeito.
+    # Now the channel with the supervisor has somewhere to read capacity from, and
+    # the `reconnect` command starts having an effect.
     _conn_holder["conn"] = conn
     if _dash is not None and hasattr(_dash, "vincular_fontes"):
         _dash.vincular_fontes(capacity_source=job_queue.get_capacity,
                               result_queue=_result_queue)
     _fase("booting", "connection")
 
-    # ── 5. Shutdown gracioso ──────────────────────────────────────────────────
-    # O `shutdown_event` foi criado la em cima, antes da fase 0, para que o
-    # comando `shutdown` do supervisor funcione durante o boot inteiro.
+    # ── 5. Graceful shutdown ──────────────────────────────────────────────────
+    # The `shutdown_event` was created up above, before phase 0, so that the
+    # supervisor's `shutdown` command works during the whole boot.
 
     def _on_signal():
         logger.info("Sinal de shutdown recebido — encerrando...")
@@ -892,25 +900,25 @@ async def main():
         try:
             loop.add_signal_handler(sig, _on_signal)
         except NotImplementedError:
-            # Windows não suporta add_signal_handler em asyncio
+            # Windows does not support add_signal_handler in asyncio
             pass
 
-    # ── 6. GeoSync — sincronizacao de pastas locais ────────────────────────────
+    # ── 6. GeoSync — local folder synchronization ──────────────────────────────
     sync_tasks = []
-    # Declarada fora de TODOS os `if` abaixo: `_sincronizar_agora` (mais adiante) fecha
-    # sobre ela e e chamada pelo botao "Sincronizar agora" da UI. Com
-    # EXECUTOR_SYNC_DIRS vazio o nome nunca era ligado, e a closure levantava
-    # NameError no caso mais comum de todos — executor sem GeoSync configurado —
-    # em vez de devolver o 0 que a UI usa para dizer "nao ha pasta configurada".
+    # Declared outside ALL the `if`s below: `_sincronizar_agora` (further on) closes
+    # over it and is called by the UI's "Sincronizar agora" (Sync now) button. With
+    # EXECUTOR_SYNC_DIRS empty the name was never bound, and the closure raised
+    # NameError in the most common case of all — an executor without GeoSync
+    # configured — instead of returning the 0 the UI uses to say "no folder configured".
     _sync_managers: list = []
     if config.SYNC_DIRS.strip():
         from executor.sync.manager import SyncManager
 
-        # Resolver workspace_id: .env > API (auto-detecção com validação)
+        # Resolve workspace_id: .env > API (auto-detection with validation)
         _sync_ws_id = config.WORKSPACE_ID
         _workspaces: list = []
 
-        # Sempre consulta a API para obter workspaces acessiveis (mTLS confere identidade).
+        # Always queries the API to get the accessible workspaces (mTLS verifies identity).
         try:
             from executor.utils import ws_to_http, mtls_httpx_kwargs
             base_url = ws_to_http(config.SERVER_URL)
@@ -923,7 +931,7 @@ async def main():
             logger.warning("GeoSync: falha ao consultar status do executor: %s", _exc)
 
         if _sync_ws_id:
-            # EXECUTOR_WORKSPACE_ID definido — valida que está na lista de workspaces acessíveis
+            # EXECUTOR_WORKSPACE_ID set — validates that it is in the list of accessible workspaces
             _accessible_ids = [w["id_hash"] for w in _workspaces]
             if _accessible_ids and _sync_ws_id not in _accessible_ids:
                 logger.error(
@@ -935,7 +943,7 @@ async def main():
             else:
                 logger.info("GeoSync: workspace_id definido via .env: %s", _sync_ws_id)
         else:
-            # Auto-detecção: só se a API retornar exatamente 1 workspace
+            # Auto-detection: only if the API returns exactly 1 workspace
             if len(_workspaces) == 1:
                 _sync_ws_id = _workspaces[0]["id_hash"]
                 logger.info(
@@ -956,10 +964,10 @@ async def main():
                 )
 
         if _sync_ws_id:
-            # Uma fila POR SyncManager. Antes todos recebiam a MESMA fila, e
-            # `Queue.get()` acorda apenas UM waiter: com N pastas, cada
-            # drive_event ia parar em 1 manager sorteado e os outros N-1 nunca o
-            # viam. O fan-out abaixo e quem decide o destino.
+            # One queue PER SyncManager. Before, they all received the SAME queue, and
+            # `Queue.get()` wakes only ONE waiter: with N folders, each
+            # drive_event ended up at 1 randomly picked manager and the other N-1
+            # never saw it. The fan-out below is what decides the destination.
             _sync_queues: list[asyncio.Queue] = []
 
             for sync_dir in config.SYNC_DIRS.split(","):
@@ -998,49 +1006,51 @@ async def main():
         name="cert-renewal",
     )
 
-    # ── 7. Loop principal ─────────────────────────────────────────────────────
-    # Órfãos do processo anterior viram resultado ANTES da conexão: entram no
-    # outbox, saem pelo replay logo abaixo e já aparecem no primeiro inventário
-    # como "resultado pendente" — o servidor não os fecha como perdidos.
+    # ── 7. Main loop ──────────────────────────────────────────────────────────
+    # Orphans from the previous process become results BEFORE the connection: they
+    # go into the outbox, go out through the replay just below and already show up
+    # in the first inventory as "pending result" — the server does not close them
+    # as lost.
     _fechar_orfaos_do_boot_anterior()
 
     conn_task = asyncio.create_task(conn.run(), name="executor-connection")
 
-    # Replay do outbox SO depois de a conexao existir: ele se paga em ritmo do
-    # _result_sender_loop e nao tem nada a fazer antes de haver sender.
+    # Outbox replay ONLY after the connection exists: it pays out at the pace of
+    # _result_sender_loop and has nothing to do before there is a sender.
     replay_task = asyncio.create_task(_replay_outbox(), name="outbox-replay")
     _observar_task(replay_task)
 
-    # Painel: assume a tela agora, com o boot inteiro ja no scrollback. Daqui
-    # para a frente o log passo-a-passo vai para o arquivo — `start()` devolve
-    # None (e o console segue como estava) se o arquivo nao abrir.
+    # Dashboard: takes over the screen now, with the whole boot already in the
+    # scrollback. From here on the step-by-step log goes to the file — `start()`
+    # returns None (and the console stays as it was) if the file does not open.
     def _sincronizar_agora() -> int:
-        """Acorda o ciclo de cada pasta do GeoSync. Devolve quantas responderam.
+        """Wakes up the cycle of each GeoSync folder. Returns how many responded.
 
-        Zero significa "nao ha GeoSync ativo" — pasta nao configurada, workspace
-        ambiguo, ou o modo desligado. `json_runtime` transforma esse numero no
-        `detalhe` do ack de `sync_now` ("N pasta(s) acordada(s)" ou "nenhuma
+        Zero means "no active GeoSync" — folder not configured, ambiguous
+        workspace, or the mode turned off. `json_runtime` turns that number into
+        the `detalhe` of the `sync_now` ack ("N pasta(s) acordada(s)" or "nenhuma
         pasta do GeoSync configurada").
 
-        RESSALVA: o app desktop ainda NAO mostra esse detalhe. `window.atlas.
-        comando()` resolve para o retorno de `Supervisor.enviar()`, que diz
-        apenas se a escrita no stdin funcionou (desktop/src/main/index.ts), e o
-        renderer imprime "Varredura solicitada." em qualquer caso
-        (GeoSync.tsx). Levar o ack de volta ao renderer e trabalho na camada de
-        IPC, nao aqui — mas o numero ja sai correto deste lado.
+        CAVEAT: the desktop app does NOT show that detail yet. `window.atlas.
+        comando()` resolves to the return of `Supervisor.enviar()`, which only
+        says whether the write to stdin worked (desktop/src/main/index.ts), and
+        the renderer prints "Varredura solicitada." (scan requested) in any case
+        (GeoSync.tsx). Bringing the ack back to the renderer is work in the IPC
+        layer, not here — but the number already comes out correct on this side.
 
-        Precisa ser definida ANTES do `dashboard.start` abaixo: ela e passada
-        como argumento numa chamada que executa na hora, e defini-la depois
-        tornava o nome uma local nao-ligada — `UnboundLocalError` no boot do
-        modo RICH, que e o default de quem roda o executor num terminal.
+        It must be defined BEFORE the `dashboard.start` below: it is passed
+        as an argument in a call that runs immediately, and defining it later
+        made the name an unbound local — `UnboundLocalError` at boot in
+        RICH mode, which is the default for anyone running the executor in a terminal.
         """
         return sum(1 for sm in _sync_managers if sm.sincronizar_agora())
 
-    # O runtime JSON sobe antes da fase 0 e recebe o handler aqui, pela mesma
-    # porta que ja usa para capacidade e fila. Sem isto, `sync_now` — o comando
-    # que o app desktop dispara no botao "Sincronizar agora" — respondia sempre
-    # "sem handler de sincronizacao": o handler so era entregue ao painel rich,
-    # que o desktop nao usa.
+    # The JSON runtime comes up before phase 0 and receives the handler here,
+    # through the same door it already uses for capacity and queue. Without this,
+    # `sync_now` — the command the desktop app fires from the "Sincronizar agora"
+    # button — always answered "sem handler de sincronizacao" (no sync handler):
+    # the handler was only delivered to the rich dashboard, which the desktop does
+    # not use.
     if _dash is not None and hasattr(_dash, "vincular_fontes"):
         _dash.vincular_fontes(ao_sincronizar=_sincronizar_agora)
 
@@ -1051,33 +1061,33 @@ async def main():
             capacity_source=job_queue.get_capacity,
             result_queue=_result_queue,
             intervalo=config.DASHBOARD_INTERVAL,
-            # A tecla 'q' entra pelo mesmo caminho de um SIGTERM: shutdown
-            # ordenado, sem atalho. No Windows isso vale ainda mais, porque la
-            # `add_signal_handler` nao registra nada e o Ctrl+C pode matar o
-            # processo antes de qualquer `finally` rodar.
+            # The 'q' key goes through the same path as a SIGTERM: an orderly
+            # shutdown, no shortcut. On Windows this matters even more, because
+            # there `add_signal_handler` registers nothing and Ctrl+C can kill
+            # the process before any `finally` runs.
             ao_sair=shutdown_event.set,
-            # Tecla 'r': corta o backoff de reconexao. Quem aperta sabe de algo
-            # que o processo nao sabe — a rede voltou, o servidor subiu.
+            # 'r' key: cuts the reconnect backoff short. Whoever presses it knows
+            # something the process does not — the network is back, the server is up.
             ao_reconectar=conn.reconectar_agora,
-            # "Sincronizar agora" da UI: acorda o ciclo do GeoSync sem esperar
-            # o intervalo. Quem pede sabe de algo que o executor ainda nao viu.
+            # The UI's "Sincronizar agora" (Sync now): wakes the GeoSync cycle without
+            # waiting for the interval. Whoever asks knows something the executor has not seen yet.
             ao_sincronizar=_sincronizar_agora,
         )
 
     _fase("running")
 
-    # Aguarda o QUE VIER PRIMEIRO: sinal do SO ou a conexao encerrar sozinha.
+    # Waits for WHICHEVER COMES FIRST: an OS signal or the connection closing on its own.
     #
-    # Observar apenas o shutdown_event deixava o processo pendurado para sempre
-    # sempre que o servidor encerrava a conexao (control revoked/shutdown/
-    # config_changed, ou deny terminal 401/403/404): conn.run() retornava, o
-    # conn_task terminava e ninguem percebia — executor vivo, desconectado e
-    # sem reiniciar. Como restart_requested so e lido depois deste await, o
-    # `sys.exit(1)` que dispara o restart do Docker nunca era alcancado.
+    # Watching only shutdown_event left the process hanging forever
+    # whenever the server closed the connection (control revoked/shutdown/
+    # config_changed, or terminal deny 401/403/404): conn.run() returned, the
+    # conn_task finished and nobody noticed — executor alive, disconnected and
+    # not restarting. Since restart_requested is only read after this await, the
+    # `sys.exit(1)` that triggers Docker's restart was never reached.
     #
-    # `revoked`/`shutdown` nao emitiam sinal algum (pendurava em qualquer SO) e
-    # `config_changed` so emitia SIGTERM em POSIX (pendurava no Windows, onde
-    # add_signal_handler nem chega a registrar o handler).
+    # `revoked`/`shutdown` emitted no signal at all (hung on any OS) and
+    # `config_changed` only emitted SIGTERM on POSIX (hung on Windows, where
+    # add_signal_handler does not even get to register the handler).
     stop_task = asyncio.create_task(shutdown_event.wait(), name="shutdown-signal")
     try:
         await asyncio.wait({stop_task, conn_task}, return_when=asyncio.FIRST_COMPLETED)
@@ -1087,57 +1097,58 @@ async def main():
         stop_task.cancel()
         if _watchdog_task is not None:
             _watchdog_task.cancel()
-        # O painel RICH sai ANTES do bloco 8, nao depois: o encerramento e
-        # justamente quando o operador precisa ler o texto — "aguardando jobs
-        # em andamento", resultados que ficaram para tras, traceback fatal. Com
-        # o `Live` ainda no ar, a tela limparia e nada disso apareceria.
+        # The RICH dashboard exits BEFORE block 8, not after: shutdown is
+        # precisely when the operator needs to read the text — "aguardando jobs
+        # em andamento" (waiting for running jobs), results left behind, fatal
+        # traceback. With the `Live` still up, the screen would clear and none of
+        # that would show.
         #
-        # O canal JSON faz o OPOSTO: fica de pe ate o fim do bloco 8. E durante
-        # a drenagem que o supervisor mais precisa dele — e o que permite a UI
-        # mostrar "3 jobs terminando" com numero real em vez de um spinner cego,
-        # e distinguir encerramento ordenado de crash pelo `state: stopped`.
+        # The JSON channel does the OPPOSITE: it stays up until the end of block 8.
+        # It is during draining that the supervisor needs it most — it is what lets
+        # the UI show "3 jobs finishing" with a real number instead of a blind
+        # spinner, and tell an orderly shutdown from a crash via `state: stopped`.
         if _dash is not None and _dash_modo == dashboard.MODO_RICH:
             await _dash.stop()
         _fase("draining")
 
-    # ── 8. Shutdown ORDENADO ──────────────────────────────────────────────────
-    # A ordem aqui e critica e estava invertida: o `conn_task.cancel()` vinha
-    # ANTES do `job_queue.shutdown()`. Sem conexao nao existe _result_sender_loop,
-    # entao nenhum resultado de job em andamento chegava ao servidor: ele marcava
-    # os runs como orfaos (_fail_orphan_runs) e o replay do outbox no proximo boot
-    # era recusado por idempotencia (_is_run_terminal). Acontecia em TODO deploy
-    # com job em execucao.
+    # ── 8. ORDERLY shutdown ───────────────────────────────────────────────────
+    # The order here is critical and was inverted: `conn_task.cancel()` came
+    # BEFORE `job_queue.shutdown()`. Without a connection there is no
+    # _result_sender_loop, so no result of a running job reached the server: it
+    # marked the runs as orphaned (_fail_orphan_runs) and the outbox replay on the
+    # next boot was rejected by idempotency (_is_run_terminal). It happened on EVERY
+    # deploy with a job running.
     #
-    # Correto: 1) terminar os jobs, 2) drenar os resultados pelo WS ainda vivo,
-    # 3) so entao derrubar conexao, renewal e sync.
-    # `job_queue.shutdown()` marca a fila como drenando LOGO na primeira linha, e
-    # `get_capacity()` passa a anunciar saturacao a partir dai — e o que tira este
-    # executor do topo do ranking least-loaded do servidor enquanto ele morre.
+    # Correct: 1) finish the jobs, 2) drain the results through the still-live WS,
+    # 3) only then tear down the connection, renewal and sync.
+    # `job_queue.shutdown()` marks the queue as draining RIGHT on its first line,
+    # and `get_capacity()` announces saturation from then on — that is what takes
+    # this executor off the top of the server's least-loaded ranking while it dies.
     logger.info("Shutdown: aguardando jobs em andamento...")
     await job_queue.shutdown(timeout=120)
 
-    # O replay do outbox para AQUI: a partir de agora a _result_queue tem alvo
-    # fixo (o que os jobs acabaram de produzir) e injetar backlog historico so
-    # atrasaria a drenagem que ainda tem chance de ser aceita pelo servidor.
+    # The outbox replay stops HERE: from now on _result_queue has a fixed target
+    # (what the jobs just produced) and injecting historical backlog would only
+    # delay the draining that still has a chance of being accepted by the server.
     replay_task.cancel()
 
     if conn_task.done():
-        # Conexao encerrada em definitivo (revoked/shutdown/config_changed ou deny
-        # terminal): conn.run() retornou e nao havera reconexao — nao existe
-        # sender e esperar seria puro atraso.
+        # Connection closed for good (revoked/shutdown/config_changed or terminal
+        # deny): conn.run() returned and there will be no reconnect — there is no
+        # sender and waiting would be pure delay.
         if not _result_queue.empty():
             logger.warning(
                 "Conexao ja encerrada — %d resultado(s) ficam para o replay do outbox.",
                 _result_queue.qsize(),
             )
     else:
-        # `conn_task` vivo NAO significa sessao WS viva: durante o backoff de
-        # reconexao o conn.run() esta apenas dormindo, sem _result_sender_loop
-        # algum, e o `wait_for(join(), 30)` anterior pagava os 30s inteiros com
-        # ninguem do outro lado — 150s de shutdown no pior caso, acima de
-        # qualquer grace period default. Em vez de adivinhar pelo estado da task,
-        # MEDIMOS: `_aguardar_confirmacao` desiste em 5s se nenhum resultado for
-        # confirmado, e so continua esperando enquanto o sender progride.
+        # A live `conn_task` does NOT mean a live WS session: during the reconnect
+        # backoff conn.run() is just sleeping, with no _result_sender_loop at
+        # all, and the previous `wait_for(join(), 30)` paid the full 30s with
+        # nobody on the other side — 150s of shutdown in the worst case, above
+        # any default grace period. Instead of guessing from the task state,
+        # we MEASURE: `_aguardar_confirmacao` gives up after 5s if no result is
+        # confirmed, and only keeps waiting while the sender makes progress.
         await _aguardar_confirmacao(
             _result_queue, rotulo="resultado", timeout=30, estagnado=5,
         )
@@ -1146,42 +1157,42 @@ async def main():
     renewal_task.cancel()
     for t in sync_tasks:
         t.cancel()
-    # renewal_task estava sendo cancelada mas NAO aguardada aqui — o loop podia
-    # ser destruido com a task ainda pendente ("Task was destroyed but it is
-    # pending!") e o `finally` do renewal nunca rodava.
+    # renewal_task was being canceled but NOT awaited here — the loop could
+    # be destroyed with the task still pending ("Task was destroyed but it is
+    # pending!") and the renewal's `finally` never ran.
     await asyncio.gather(
         conn_task, renewal_task, replay_task, *sync_tasks, return_exceptions=True,
     )
 
-    # Fecha pools asyncpg explicitamente antes do event loop encerrar
-    # (evita RuntimeError: There is no current event loop no pool.release())
+    # Closes asyncpg pools explicitly before the event loop shuts down
+    # (avoids RuntimeError: There is no current event loop in pool.release())
     try:
         from flow.utils.get_asyncpg_pool import close_all_pools
         await close_all_pools()
     except Exception as exc:
         logger.warning("Falha ao fechar pools asyncpg no shutdown: %s", exc)
 
-    # Encerra o pool de threads proprio: cancel_futures descarta o que nunca
-    # comecou; o join das threads vivas fica com o shutdown_default_executor()
-    # que o asyncio.run() executa ao fechar o loop.
+    # Shuts down our own thread pool: cancel_futures drops what never
+    # started; joining the live threads is left to the shutdown_default_executor()
+    # that asyncio.run() executes when closing the loop.
     _thread_pool.shutdown(wait=False, cancel_futures=True)
-    # Mesmo tratamento para o pool do plano de controle (validacao/cripto), que
-    # e separado justamente para nao compartilhar destino com os nos.
+    # Same handling for the control plane pool (validation/crypto), which
+    # is separate precisely so it does not share a fate with the nodes.
     from executor.job_executor import _CONTROL_POOL
     _CONTROL_POOL.shutdown(wait=False, cancel_futures=True)
 
     logger.info("Executor encerrado.")
 
-    # Ultimo evento do canal, e so entao ele fecha (drenando o buffer). Um
-    # supervisor que ve `stopped` sabe que foi encerramento ordenado; a ausencia
-    # dele significa crash, e as duas coisas pedem tratamento diferente — religar
-    # com backoff num caso, respeitar a decisao do usuario no outro.
+    # The channel's last event, and only then does it close (draining the buffer).
+    # A supervisor that sees `stopped` knows it was an orderly shutdown; its
+    # absence means a crash, and the two call for different handling — restart
+    # with backoff in one case, respect the user's decision in the other.
     #
-    # Deny autoritativo (close 4401/4403/4404, ou control `revoked`) e um
-    # TERCEIRO caso, e nao pode sair como `stopped`: o executor foi removido ou
-    # revogado no servidor, e so um enrollment novo o traz de volta. Reportado
-    # como `failed` para que o supervisor pare em vez de religar contra um
-    # servidor que ja disse nao — era um loop de reinicio a cada 2s.
+    # An authoritative deny (close 4401/4403/4404, or control `revoked`) is a
+    # THIRD case, and cannot go out as `stopped`: the executor was removed or
+    # revoked on the server, and only a new enrollment brings it back. Reported
+    # as `failed` so the supervisor stops instead of restarting against a
+    # server that has already said no — it was a restart loop every 2s.
     if conn.terminal_deny:
         _fase("failed", "revoked", detalhe=conn.terminal_deny)
     else:
@@ -1195,9 +1206,9 @@ async def main():
         sys.exit(1)  # Docker restart: on-failure → reinicia o container
 
     if conn.terminal_deny:
-        # Codigo != 0 tambem para o supervisor do Docker: `restart: on-failure`
-        # reinicia, mas o operador ve o motivo no log em vez de um exit 0
-        # silencioso que sugere encerramento normal.
+        # Code != 0 for Docker's supervisor too: `restart: on-failure`
+        # restarts, but the operator sees the reason in the log instead of a silent
+        # exit 0 that suggests a normal shutdown.
         sys.exit(1)
 
 
@@ -1207,9 +1218,9 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         pass
     finally:
-        # Rede de seguranca do painel. O caminho normal ja o fechou no bloco 7,
-        # mas uma excecao antes disso (ou o Ctrl+C do Windows, onde nao ha
-        # signal handler registrado) deixaria o terminal no buffer alternativo
-        # e sem cursor. emergency_stop e idempotente.
+        # Dashboard safety net. The normal path has already closed it in block 7,
+        # but an exception before that (or Windows' Ctrl+C, where there is no
+        # signal handler registered) would leave the terminal in the alternate
+        # buffer and with no cursor. emergency_stop is idempotent.
         from executor import dashboard
         dashboard.emergency_stop()

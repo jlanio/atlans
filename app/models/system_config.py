@@ -4,7 +4,7 @@ from app.models.base import Base
 
 
 class SystemConfig(Base):
-    """Configurações globais do sistema armazenadas no banco de dados."""
+    """Global system settings stored in the database."""
     __tablename__ = "system_config"
 
     key = Column(String, primary_key=True, nullable=False)

@@ -9,17 +9,17 @@ logger = get_logger(__name__)
 @register_node
 class Sort(BaseNode):
     """
-    Ordena os registros de um GeoDataFrame por um ou mais campos.
+    Sorts the records of a GeoDataFrame by one or more fields.
 
-    Parâmetros:
-      - sort_by (list): lista de objetos no formato:
+    Args:
+      - sort_by (list): list of objects in the format:
             [
               {"field": "nome_coluna", "direction": "asc"},
               {"field": "area",        "direction": "desc"}
             ]
-        direction: "asc" (crescente, padrão) ou "desc" (decrescente).
+        direction: "asc" (ascending, default) or "desc" (descending).
 
-    Exemplo:
+    Example:
         sort_by = [{"field": "area", "direction": "desc"}, {"field": "nome", "direction": "asc"}]
     """
 
@@ -40,8 +40,8 @@ class Sort(BaseNode):
                         'Lista de campos para ordenação. '
                         'Ex: [{"field": "area", "direction": "desc"}, {"field": "nome", "direction": "asc"}]'
                     ),
-                    # O editor dedicado (sort-by-field) oferece os nomes vistos
-                    # na última execução no campo de cada critério.
+                    # The dedicated editor (sort-by-field) offers the names seen
+                    # in the last run in each criterion's field.
                     "suggest_columns": "*",
                 }
             ],
@@ -61,7 +61,7 @@ class Sort(BaseNode):
             logger.warning("Sort: parâmetro 'sort_by' vazio ou inválido — retornando sem ordenar.")
             return {"output": gdf}
 
-        # Separa colunas e direções
+        # Separates columns and directions
         columns = []
         ascending_flags = []
 

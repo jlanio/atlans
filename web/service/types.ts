@@ -1,9 +1,9 @@
 // service/types.ts
 //
-// A casa ÚNICA dos tipos do web que espelham a API. O diretório
-// `web/interface/` foi absorvido aqui na F2 da simplificação
-// (docs/specs/simplification.md, A7): duas casas para o mesmo tipo de
-// coisa era convite para a terceira.
+// The SINGLE home for the web's types that mirror the API. The
+// `web/interface/` directory was absorbed here in F2 of the simplification
+// (docs/specs/simplification.md, A7): two homes for the same kind of thing
+// was an invitation for a third.
 import type { ActionsType, ControlsType, TriggersType } from "@/consts/WorkflowIcons"
 
 export interface IWorkflowVersion {
@@ -14,10 +14,10 @@ export interface IWorkflowVersion {
   change_note: string | null
 }
 
-// "mcp" = disparado por um agente via servidor MCP (token pessoal de acesso).
+// "mcp" = triggered by an agent via the MCP server (personal access token).
 export type TriggerSource = "manual" | "retry" | "webhook" | "schedule" | "mcp"
 
-/** Categoria do erro que fechou o run: taxonomia do flow + categorias do servidor. */
+/** Category of the error that closed the run: the flow taxonomy + server categories. */
 export type ErrorCategory =
   | "user" | "validation" | "timeout" | "resource" | "transient" | "internal"
   | "no_executor" | "executor_lost" | "isolation" | "dispatch"
@@ -27,14 +27,14 @@ export interface ITopFailingWorkflow {
   workflow_name: string | null
   failure_count: number
   total_runs: number
-  /** Falhas ÷ total do workflow na janela. */
+  /** Failures ÷ total for the workflow in the window. */
   failure_rate: number
   last_error: string | null
   last_error_category: ErrorCategory | string | null
   last_failed_at: string | null
 }
 
-/** Execução em andamento há mais tempo que o esperado para o workflow. */
+/** A run in progress for longer than expected for the workflow. */
 export interface IStuckRun {
   run_id: string
   workflow_hash: string
@@ -46,7 +46,7 @@ export interface IStuckRun {
   typical_seconds: number | null
 }
 
-/** O instante da consulta, sem janela (docs/specs/metrics-history.md §3.1). */
+/** The moment of the query, with no window (docs/specs/metrics-history.md §3.1). */
 export interface INowBlock {
   running: number
   pending: number
@@ -54,7 +54,7 @@ export interface INowBlock {
   stuck: IStuckRun[]
   executors: { online: number; total: number }
   queued_on_executors: number | null
-  /** Só admin; null para os demais. */
+  /** Admin only; null for everyone else. */
   overdue_acks: number | null
 }
 
@@ -64,7 +64,7 @@ export interface IObservabilityMetrics {
   active_workflows: number
   total_runs: number
   failed_runs: number
-  /** Concluídas ÷ (concluídas + falhas) na janela; 0 sem denominador. */
+  /** Completed ÷ (completed + failures) in the window; 0 without a denominator. */
   success_rate: number
   avg_duration_seconds: number
   runs_last_24h: number
@@ -73,17 +73,17 @@ export interface IObservabilityMetrics {
   success_rate_prev_7d: number | null
   by_status: { success: number; failed: number; running: number; other: number; cancelled?: number; pending?: number }
   top_failing_workflows: ITopFailingWorkflow[]
-  // ── novos (redesenho do Histórico) ──
+  // ── new (History redesign) ──
   success_runs?: number
   cancelled_runs?: number
   running_runs?: number
   pending_runs?: number
-  /** Janela anterior de mesmo tamanho. */
+  /** Previous window of the same size. */
   prev_period?: {
     total_runs: number; success_runs: number; failed_runs: number; success_rate: number
     p50_seconds: number | null
   }
-  /** Só concluídas com duração > 0; null sem dados. */
+  /** Only completed ones with duration > 0; null without data. */
   duration?: { p50_seconds: number | null; p95_seconds: number | null }
   now?: INowBlock
 }
@@ -110,8 +110,8 @@ export interface IWorkflowMetrics {
   max_duration_seconds: number | null
   last_runs: IRunSummary[]
   node_stats_summary: INodeStatSummary[]
-  // Populados somente quando o requester e admin (backend retorna
-  // via _resolve_workflow_meta no observability_service.py).
+  // Populated only when the requester is an admin (the backend returns them
+  // via _resolve_workflow_meta in observability_service.py).
   workflow_active?: boolean
   owner_username?: string | null
   workspace_id?: string | null
@@ -128,14 +128,14 @@ export interface IRunSummary {
   error_message: string | null
   retry_count: number
   agent_host: string | null
-  /** Nível da política em que rodou; nulo em runs anteriores à coluna. */
+  /** Policy tier it ran on; null for runs predating the column. */
   dispatch_tier?: DispatchTier | null
-  // Para qualquer usuário no escopo (o filtro por workspace já garante o acesso).
+  // For any user in scope (the workspace filter already guarantees access).
   workflow_name?: string
   workspace_id?: string | null
   workspace_name?: string | null
   executor_id?: string | null
-  /** Nome amigável do executor; null sem host. */
+  /** Friendly name of the executor; null without a host. */
   executor_name?: string | null
   trigger_source?: TriggerSource | null
   triggered_by?: string | null
@@ -143,17 +143,17 @@ export interface IRunSummary {
   error_category?: ErrorCategory | string | null
   schedule_id?: number | null
   /**
-   * Origem do FLUXO ("usuario" | "assistente"), não do disparo — este é
-   * `trigger_source`. `null` quando o fluxo foi apagado de vez.
+   * Origin of the WORKFLOW ("usuario" | "assistente"), not of the trigger — that
+   * one is `trigger_source`. `null` when the workflow was permanently deleted.
    */
   workflow_origem?: string | null
-  // Populados somente quando o requester é admin.
+  // Populated only when the requester is an admin.
   workflow_active?: boolean
   owner_username?: string | null
 }
 
 export interface IExecutorMetrics {
-  /** null na linha das execuções sem executor (falhas de despacho). */
+  /** null on the row for runs without an executor (dispatch failures). */
   agent_host: string | null
   display_name: string
   total_runs: number
@@ -162,20 +162,20 @@ export interface IExecutorMetrics {
   success_rate: number
   avg_duration_seconds: number | null
   last_run_at: string | null
-  // ── novos (redesenho do Histórico) ──
+  // ── new (History redesign) ──
   executor_id?: string | null
   executor_type?: "default" | "dedicated" | null
   is_default?: boolean
   status?: string | null
   online?: boolean
-  /** null quando o executor não publica capacidade. */
+  /** null when the executor does not publish capacity. */
   capacity?: { running: number; queued: number; max_concurrent: number; max_queue: number } | null
   p50_seconds?: number | null
-  /** Linha "Sem executor": runs que falharam antes de chegar a um executor. */
+  /** "Sem executor" (no executor) row: runs that failed before reaching an executor. */
   unassigned?: boolean
 }
 
-/** Uma linha da visão "Por workflow" (`GET /observability/metrics/workflows`). */
+/** A row of the "By workflow" view (`GET /observability/metrics/workflows`). */
 export interface IWorkflowMetricsRow {
   workflow_hash: string
   workflow_name: string
@@ -192,7 +192,7 @@ export interface IWorkflowMetricsRow {
   last_status: string | null
   last_error: string | null
   last_error_category: ErrorCategory | string | null
-  /** Quem criou o fluxo: "usuario" | "assistente" (o selo da lista). */
+  /** Who created the workflow: "usuario" | "assistente" (the list's badge). */
   origem?: string | null
 }
 
@@ -217,9 +217,9 @@ export interface IRunDetail {
   triggered_by_username?: string | null
   error_category?: ErrorCategory | string | null
   schedule_id?: number | null
-  /** p50 do workflow nos últimos 90 dias; null sem dados. */
+  /** The workflow's p50 over the last 90 days; null without data. */
   typical_seconds?: number | null
-  // Populados somente quando o requester é admin.
+  // Populated only when the requester is an admin.
   workflow_active?: boolean
   owner_username?: string | null
   node_stats: Record<string, {
@@ -232,18 +232,18 @@ export interface IRunDetail {
     error: string | null
     started_at: string | null
     output_keys: string[]
-    /** Colunas por porta de saída, quando o executor as publicou (>= 2.4.0 e
-     *  sem o corte de 8KB do stat). Re-hidrata a sugestão de nome de coluna
-     *  ao abrir o workflow — sem esta chave o tipo escondia um dado que o
-     *  backend sempre devolveu. */
+    /** Columns per output port, when the executor published them (>= 2.4.0 and
+     *  without the stat's 8KB cut). Rehydrates the column-name suggestion
+     *  when opening the workflow — without this key the type hid data the
+     *  backend always returned. */
     output_columns?: Record<string, string[]> | null
-    /** O executor marcou o stat como truncado (corte de 8KB) — as listas de
-     *  colunas podem estar reduzidas às primeiras 50. */
+    /** The executor marked the stat as truncated (8KB cut) — the column lists
+     *  may be reduced to the first 50. */
     __truncated__?: boolean
   }>
 }
 
-/** Um evento cru do canal de execução, como persistido no histórico do Redis. */
+/** A raw event from the run channel, as persisted in the Redis history. */
 export interface IRunEvent {
   run_id?: string
   node?: string
@@ -259,7 +259,7 @@ export interface IRunEvent {
 export interface IRunEventsResponse {
   run_id: string
   events: IRunEvent[]
-  /** true quando o histórico já expirou no Redis (TTL de 1h) ou está vazio. */
+  /** true when the history has already expired in Redis (1h TTL) or is empty. */
   expired: boolean
 }
 
@@ -292,15 +292,15 @@ export interface IArtifactItem {
   is_pinned:        boolean
   executor_id:         string | null
   /**
-   * Onde o CONTEÚDO mora.
+   * Where the CONTENT lives.
    *
-   * `minio` é o caso de sempre. `executor` significa que os bytes nunca saíram
-   * da máquina — nó de saída com localidade "Manter apenas no executor", ou a
-   * política daquela máquina. Não há download.
+   * `minio` is the usual case. `executor` means the bytes never left the
+   * machine — an output node with the "Manter apenas no executor" (keep on the
+   * executor only) locality, or that machine's policy. There is no download.
    *
-   * A API já devolvia o campo; era o tipo que não o declarava, e a tela
-   * adivinhava por `executor_id && !size_bytes` — heurística que erra
-   * justamente nos artefatos locais, porque eles TÊM tamanho.
+   * The API already returned the field; it was the type that did not declare
+   * it, and the screen guessed via `executor_id && !size_bytes` — a heuristic
+   * that fails precisely on local artifacts, because they DO have a size.
    */
   content_location?: "minio" | "executor"
   created_at:       string | null
@@ -308,18 +308,18 @@ export interface IArtifactItem {
 }
 
 /**
- * Filtros de `GET /artifacts/`.
+ * Filters for `GET /artifacts/`.
  *
- * `limit`/`offset` existem porque a tela baixava a tabela inteira de artefatos
- * do usuario e paginava no cliente — num workspace com historico isso trava a
- * aba por segundos. `search` e `workspace_id` sao os mesmos filtros que a tela
- * fazia em memoria, empurrados para o SQL.
+ * `limit`/`offset` exist because the screen downloaded the user's whole
+ * artifact table and paginated on the client — in a workspace with history
+ * that freezes the tab for seconds. `search` and `workspace_id` are the same
+ * filters the screen applied in memory, pushed down to SQL.
  */
 export interface IArtifactListParams {
   workflow_id?:    string
   run_id?:         string
   fmt?:            string
-  /** Recorte execucao x publicacao — o que a tela chamava de abas. */
+  /** Run x publication slice — what the screen called tabs. */
   kind?:           "execution" | "publication"
   search?:         string
   workspace_id?:   string
@@ -330,7 +330,7 @@ export interface IArtifactListParams {
 
 export interface IArtifactListResponse {
   items:  IArtifactItem[]
-  /** Total do filtro inteiro, nao da pagina — alimenta o "ver mais". */
+  /** Total for the whole filter, not the page — feeds "see more". */
   total:  number
   limit?:  number
   offset?: number
@@ -348,28 +348,28 @@ export interface IDriveFile {
   original_name: string
   extension:     string
   mime_type:     string | null
-  /** Nulavel de verdade: o confirm do upload pode gravar os metadados sem
-   *  tamanho (e o HEAD nem sempre responde), como `WorkspaceFileOut` declara.
-   *  Sem o `| null` aqui o proximo consumidor formatava um `undefined` sem
-   *  nenhum aviso do compilador. */
+  /** Truly nullable: the upload confirm can store the metadata without a
+   *  size (and the HEAD does not always respond), as `WorkspaceFileOut` declares.
+   *  Without the `| null` here the next consumer formatted an `undefined` with
+   *  no warning from the compiler. */
   size:          number | null
   uploaded_by:   string | null
   created_at:    string
   updated_at:    string | null
   /**
-   * Ultima escrita de CONTEUDO. Um arquivo sobrescrito mantem o created_at
-   * original. Distinta de `updated_at`, que qualquer update da linha dispara
-   * (renomear, por exemplo) e que NAO dispara quando a sobrescrita nao muda
-   * nenhum campo — exibi-lo nao explicava a ordem que o usuario via.
+   * Last CONTENT write. An overwritten file keeps the original created_at.
+   * Distinct from `updated_at`, which any update of the row triggers
+   * (renaming, for example) and which is NOT triggered when the overwrite does
+   * not change any field — showing it did not explain the order the user saw.
    */
   content_written_at: string | null
   /**
-   * Onde o CONTEUDO mora.
+   * Where the CONTENT lives.
    *
-   * `minio` e o caso de sempre. `executor` significa que o arquivo foi
-   * catalogado pelo GeoSync em modo catalogo (LGPD): a plataforma conhece o
-   * nome, o tipo e os metadados espaciais, mas os bytes nunca sairam da maquina
-   * do executor — e por isso nao ha download.
+   * `minio` is the usual case. `executor` means the file was cataloged by
+   * GeoSync in catalog mode (LGPD): the platform knows the name, the type and
+   * the spatial metadata, but the bytes never left the executor's machine —
+   * and that is why there is no download.
    */
   content_location?:    "minio" | "executor"
   content_executor_id?: string | null
@@ -382,18 +382,19 @@ export interface IDriveFileList {
   total: number
 }
 
-/** O `error` do corpo quando o Drive recusa um upload pelo arquivo em si — as
- *  subclasses de `FileValidationError` e o `FileTooLargeError` de
- *  `app/core/exceptions.py`. Chega em `IResponse.error.code`. A recusa se
- *  classifica por ele (e pelo status), nunca pela frase, que pode mudar. */
+/** The body's `error` when the Drive rejects an upload because of the file
+ *  itself — the subclasses of `FileValidationError` and the `FileTooLargeError`
+ *  in `app/core/exceptions.py`. Arrives in `IResponse.error.code`. The
+ *  rejection is classified by it (and by the status), never by the phrase,
+ *  which may change. */
 export type UploadErrorCode =
   | "extension_not_allowed"
   | "dangerous_inner_extension"
   | "empty_file"
   | "file_too_large"
 
-/** `page`/`page_size` sempre viajaram no backend e nenhum consumidor os enviava:
- *  arquivos alem do 50o ficavam inalcancaveis pela UI. */
+/** `page`/`page_size` always existed in the backend and no consumer sent them:
+ *  files past the 50th were unreachable from the UI. */
 export interface IDriveListParams {
   workspace_id: string
   search?:      string
@@ -462,9 +463,9 @@ export interface IExecutorEnrollmentOtpResponse {
   otp:        string
   expires_at: string
   executor_id:   string
-  /** Host dos executores (AGENTS_URL); vazio quando o servidor não o conhece. */
+  /** Executors' host (AGENTS_URL); empty when the server does not know it. */
   server_url: string
-  /** O site desta instalação (FRONTEND_URL), de onde o install.sh é baixado. */
+  /** This installation's site (FRONTEND_URL), where install.sh is downloaded from. */
   public_url: string
 }
 
@@ -477,7 +478,7 @@ export interface IExecutorUserAssignment {
   assigned_by: string | null
 }
 
-// ── Admin: Gestão de Usuários ────────────────────────────────────────────────
+// ── Admin: User Management ───────────────────────────────────────────────────
 
 export interface IAdminUser {
   id_hash:       string
@@ -521,10 +522,10 @@ export interface IAdminBulkActionResponse {
 // ── Workspaces ───────────────────────────────────────────────────────────────
 
 /**
- * Workspace como o backend devolve em GET /workspaces/ (WorkspaceOut).
+ * Workspace as the backend returns it in GET /workspaces/ (WorkspaceOut).
  *
- * Re-exportado como `Workspace` por WorkspaceContext, que e o dono do estado
- * do workspace ativo — os componentes seguem importando de la.
+ * Re-exported as `Workspace` by WorkspaceContext, which owns the active
+ * workspace's state — components keep importing from there.
  */
 export interface IWorkspace {
   id_hash:     string
@@ -539,22 +540,22 @@ export interface IWorkspace {
 export type DispatchTier = "primary" | "fallback" | "pool"
 export type PolicyTerminal = "fail" | "pool"
 export type IsolationFloor = "none" | "no_pool"
-/** pool = sem nível 1 · isolated = nível 1 + terminal fail · dedicated_pool = nível 1 + terminal pool */
+/** pool = no tier 1 · isolated = tier 1 + terminal fail · dedicated_pool = tier 1 + terminal pool */
 export type PolicyMode = "pool" | "isolated" | "dedicated_pool"
 
-/** Membro de um nível da política de execução ( GET /workspaces/{id}/executors ). */
+/** Member of an execution policy tier ( GET /workspaces/{id}/executors ). */
 export interface IPolicyMember {
   id_hash:       string
   name:          string
   executor_type: "default" | "dedicated"
   status:        string
   tier:          1 | 2
-  /** null = presença desconhecida (Redis fora / reconectando) */
+  /** null = unknown presence (Redis down / reconnecting) */
   online:        boolean | null
   capacity:      { queued?: number; running?: number; max_concurrent?: number; max_queue?: number } | null
 }
 
-/** Uma linha da tela de admin "Piso de isolamento" (GET /admin/workspaces/policies). */
+/** A row of the "Piso de isolamento" (isolation floor) admin screen (GET /admin/workspaces/policies). */
 export interface IWorkspacePolicyAdmin {
   id_hash:            string
   name:               string
@@ -575,9 +576,9 @@ export interface IPoolHealth {
 }
 
 /**
- * Política de execução do workspace (docs/specs/executor-isolation-routing.md).
- * `policy_routing_enabled=false` significa que o servidor ainda roteia pelo
- * caminho legado — a tela mostra a política como prévia.
+ * The workspace's execution policy (docs/specs/executor-isolation-routing.md).
+ * `policy_routing_enabled=false` means the server still routes through the
+ * legacy path — the screen shows the policy as a preview.
  */
 export interface IWorkspacePolicy {
   workspace_id:           string
@@ -595,11 +596,11 @@ export interface IWorkspacePolicy {
 }
 
 /**
- * Linha da lista de membros ( GET /workspaces/{id}/members ).
+ * Row of the member list ( GET /workspaces/{id}/members ).
  *
- * O dono vem SEMPRE primeiro, com `role: "owner"` — uma linha sintetica, montada
- * na leitura, porque ele nao tem registro em `workspace_members`. Nao e um role
- * atribuivel: o backend recusa PUT/DELETE sobre ela.
+ * The owner ALWAYS comes first, with `role: "owner"` — a synthetic row, built
+ * at read time, because the owner has no record in `workspace_members`. It is
+ * not an assignable role: the backend rejects PUT/DELETE on it.
  */
 export interface IWorkspaceMember {
   user_id:   string
@@ -610,7 +611,7 @@ export interface IWorkspaceMember {
   joined_at: string
 }
 
-/** Resultado de GET /workspaces/users/search — usuarios ja cadastrados. */
+/** Result of GET /workspaces/users/search — already registered users. */
 export interface IUserSearchResult {
   id_hash:  string
   username: string
@@ -618,9 +619,10 @@ export interface IUserSearchResult {
 }
 
 /**
- * Um workflow do workspace que envia webhook, e se a allowlist atual o deixa
- * passar. `allowed` vem do backend usando a MESMA funcao que o consumer aplica
- * ao disparar — e o que a tela pode prometer sem mentir.
+ * A workflow of the workspace that sends a webhook, and whether the current
+ * allowlist lets it through. `allowed` comes from the backend using the SAME
+ * function the consumer applies when firing — it is what the screen can
+ * promise without lying.
  */
 export interface IWorkspaceNotificationTarget {
   id_hash:          string
@@ -633,9 +635,9 @@ export interface IWorkspaceNotificationTarget {
 /**
  * GET/PUT /workspaces/{id}/notifications.
  *
- * `allowlist` vazia significa "sem politica adicional" — todo webhook que passe
- * na verificacao de SSRF e aceito. Preenchida, tudo que estiver fora dela e
- * bloqueado em silencio depois da execucao.
+ * An empty `allowlist` means "no additional policy" — every webhook that passes
+ * the SSRF check is accepted. When filled in, everything outside it is
+ * silently blocked after the run.
  */
 export interface IWorkspaceNotifications {
   allowlist: string[]
@@ -643,11 +645,11 @@ export interface IWorkspaceNotifications {
 }
 
 /**
- * Um impacto da movimentacao de um workflow entre workspaces.
+ * An impact of moving a workflow between workspaces.
  *
- * O move nunca falha por dependencia quebrada: o que deixa de funcionar no
- * destino chega aqui. `message` ja vem em pt-BR, pronto para exibir; `details`
- * carrega os ids envolvidos.
+ * The move never fails on a broken dependency: what stops working in the
+ * destination arrives here. `message` already comes in pt-BR, ready to
+ * display; `details` carries the ids involved.
  */
 export interface IWorkflowMoveWarning {
   code:     string
@@ -657,8 +659,8 @@ export interface IWorkflowMoveWarning {
 }
 
 /**
- * Resposta de POST /workflows/{id}/move — e de /move/preview, onde descreve o
- * que ACONTECERIA (`dry_run: true`) sem ter gravado nada.
+ * Response of POST /workflows/{id}/move — and of /move/preview, where it
+ * describes what WOULD HAPPEN (`dry_run: true`) without having written anything.
  */
 export interface IWorkflowMoveResult {
   id:                string
@@ -671,8 +673,8 @@ export interface IWorkflowMoveResult {
 }
 
 /**
- * Linha da lixeira ( GET /admin/workspaces/trash ). Admin-only: lista o que
- * qualquer usuario da plataforma deletou, por isso traz os dados do dono.
+ * Trash row ( GET /admin/workspaces/trash ). Admin-only: lists what any user
+ * of the platform deleted, which is why it carries the owner's data.
  */
 export interface IWorkspaceTrash {
   id_hash:         string
@@ -682,7 +684,7 @@ export interface IWorkspaceTrash {
   owner_username:  string | null
   owner_email:     string | null
   deleted_at:      string
-  /** Quantos workflows voltam se este workspace for restaurado. */
+  /** How many workflows come back if this workspace is restored. */
   workflows:       number
 }
 
@@ -707,21 +709,21 @@ export interface IStorageWorkspaceUsage extends IStorageUsage {
   workspace_name:  string
   owner_username:  string
   /**
-   * active  — workspace vivo
-   * trashed — na lixeira (soft delete): so o admin acessa, via /admin/settings
-   * purged  — linha removida do banco: dados orfaos, ninguem mais alcanca
+   * active  — live workspace
+   * trashed — in the trash (soft delete): only the admin has access, via /admin/settings
+   * purged  — row removed from the database: orphaned data, nobody can reach it anymore
    */
   workspace_state?: "active" | "trashed" | "purged"
-  /** true para trashed e purged. Mantido para a marcacao visual da tabela. */
+  /** true for trashed and purged. Kept for the table's visual marking. */
   workspace_deleted?: boolean
 }
 
 /**
- * Contrato (API publica) de um workflow para uso como sub-fluxo.
+ * Contract (public API) of a workflow for use as a sub-workflow.
  *
- * Servidor extrai de SubWorkflowInput (inputs) e SubWorkflowOutput (outputs)
- * — chaves vem das edges conectadas a esses nodes. `has_input_node` /
- * `has_output_node` indicam se o contrato esta declarado.
+ * The server extracts it from SubWorkflowInput (inputs) and SubWorkflowOutput
+ * (outputs) — keys come from the edges connected to those nodes.
+ * `has_input_node` / `has_output_node` indicate whether the contract is declared.
  */
 export interface IWorkflowContractPort {
   name:        string
@@ -738,10 +740,10 @@ export interface IWorkflowContract {
 }
 
 /**
- * Entry da lista admin de nodes ( GET /admin/nodes ).
+ * Entry of the admin node list ( GET /admin/nodes ).
  *
- * Reflete o NODE_REGISTRY mesclado com SystemConfig.disabled_nodes — quando
- * `enabled=false`, `reason`/`disabled_at`/`disabled_by` vem populados.
+ * Reflects NODE_REGISTRY merged with SystemConfig.disabled_nodes — when
+ * `enabled=false`, `reason`/`disabled_at`/`disabled_by` come populated.
  */
 export interface INodeAdminEntry {
   name:           string
@@ -754,18 +756,18 @@ export interface INodeAdminEntry {
 }
 
 /**
- * Indicadores de saude do tracking de storage. Servidor expoe via
- * /admin/storage para dar visibilidade ao drift silencioso (pending
- * abandonado, artefato sem tamanho, orfaos).
+ * Health indicators for storage tracking. The server exposes them via
+ * /admin/storage to give visibility into silent drift (abandoned pending,
+ * artifact without size, orphans).
  *
- * Campo opcional para compat com deploys mistos durante rollout — UI
- * nao renderiza a secao se vier undefined.
+ * Optional field for compatibility with mixed deploys during rollout — the UI
+ * does not render the section if it comes undefined.
  */
 export interface ITrackingHealth {
   pending_drive_files:          number
   pending_drive_bytes:          number
   null_size_artifacts:          number
-  /** Subconjunto de null_size: antigos demais para o retry — nao se resolvem. */
+  /** Subset of null_size: too old for the retry — they will not resolve. */
   unrecoverable_size_artifacts: number
   /** Artefatos cujo workspace foi deletado: inacessiveis e ocupando disco. */
   orphaned_workspace_artifacts: number
@@ -779,15 +781,15 @@ export interface IStoragePurgeResult {
   drive_bytes:       number
   scope:             "all" | "artifacts" | "drive"
   skipped_s3_errors: number
-  /** Artefatos que vivem no disco de um executor OFFLINE: a ordem de remoção
-   *  não foi entregue, então a linha fica e a próxima passada tenta de novo. */
+  /** Artifacts living on the disk of an OFFLINE executor: the removal order
+   *  was not delivered, so the row stays and the next pass tries again. */
   pending_executor?:    number
-  /** Artefatos locais sem executor_id/local_path — sem para quem mandar a
-   *  ordem; a linha fica para não perder o rastro do arquivo. */
+  /** Local artifacts without executor_id/local_path — nobody to send the
+   *  order to; the row stays so the file's trail is not lost. */
   skipped_sem_rastro?:  number
-  /** Arquivos de Drive catalogados no executor: preservados por política (são
-   *  do próprio usuário, na pasta que ele sincroniza, e não ocupam
-   *  armazenamento da plataforma). */
+  /** Drive files cataloged on the executor: preserved by policy (they belong
+   *  to the user, in the folder they sync, and take up no platform
+   *  storage). */
   skipped_catalogados?: number
 }
 
@@ -797,7 +799,7 @@ export interface IStorageUsageAdmin {
   by_workspace:     IStorageWorkspaceUsage[]
 }
 
-/** Instalador do app desktop para Windows, publicado em GitHub Releases. */
+/** Desktop app installer for Windows, published on GitHub Releases. */
 export interface IDesktopInstaller {
   versao: string
   url: string
@@ -806,12 +808,12 @@ export interface IDesktopInstaller {
   nome: string
 }
 
-// ── Tokens de acesso (API) ───────────────────────────────────────────────────
+// ── Access tokens (API) ──────────────────────────────────────────────────────
 //
-// Contrato de `/auth/tokens`: um token dá a um agente ou integração o que a
-// conta do dono já pode fazer — nunca mais que isso. O segredo só viaja na
-// resposta do POST (`ApiTokenCreated.token`), uma única vez; a listagem traz
-// apenas o `token_prefix`.
+// Contract of `/auth/tokens`: a token gives an agent or integration what the
+// owner's account can already do — never more than that. The secret only
+// travels in the POST response (`ApiTokenCreated.token`), a single time; the
+// listing brings only the `token_prefix`.
 
 export type ApiTokenScope =
   | "workflows:read"
@@ -829,10 +831,10 @@ export type ApiTokenExpiresInDays = 30 | 90 | 180 | 365
 export interface ApiToken {
   id: string
   name: string
-  /** Primeiros caracteres do segredo, para reconhecer o token na lista. */
+  /** First characters of the secret, to recognize the token in the list. */
   token_prefix: string
   scopes: ApiTokenScope[]
-  /** `null` = todos os workspaces do dono, inclusive os que ele entrar depois. */
+  /** `null` = all of the owner's workspaces, including those they join later. */
   workspace_ids: string[] | null
   expires_at: string
   last_used_at: string | null
@@ -848,7 +850,7 @@ export interface ApiTokenCreate {
   expires_in_days: ApiTokenExpiresInDays
 }
 
-/** Resposta do POST: o token mais o segredo em claro, mostrado UMA vez. */
+/** POST response: the token plus the plaintext secret, shown ONCE. */
 export interface ApiTokenCreated extends ApiToken {
   token: string
 }
@@ -856,38 +858,38 @@ export interface ApiTokenCreated extends ApiToken {
 // ── Assistente ─────────────────────────────────────────────────────────────────
 
 export interface IAssistenteCota {
-  /** Tokens consumidos na janela atual. */
+  /** Tokens consumed in the current window. */
   gasto: number
   teto: number
-  /** Quanto falta para a janela reabrir; nulo se ela ainda não começou. */
+  /** How long until the window reopens; null if it has not started yet. */
   reabre_em_segundos: number | null
 }
 
 /**
- * O que o painel consulta antes de aparecer na tela. `ativo: false` é um
- * estado, não um erro: a instalação simplesmente não configurou a chave, e o
- * `motivo` diz o que falta.
+ * What the panel queries before appearing on screen. `ativo: false` is a
+ * state, not an error: the installation simply has not configured the key, and
+ * `motivo` says what is missing.
  */
 export interface IAssistenteEstado {
   ativo: boolean
   motivo?: string | null
   cota?: IAssistenteCota | null
-  /** O plano que dá o teto desta pessoa, numa instalação com planos (uma
-   *  extensão); `null` sem eles. */
+  /** The plan that sets this person's ceiling, on an installation with plans (an
+   *  extension); `null` without them. */
   plano?: string | null
-  /** A instalação tem o que vender (uma extensão de planos, com provedor de
-   *  pagamento). Sem isto, a oferta da cota cheia viraria um beco. */
+  /** The installation has something to sell (a plans extension, with a payment
+   *  provider). Without this, the full-quota offer would be a dead end. */
   assinaturas_ativas?: boolean
 }
 
-// ── Meu (recortes por pessoa) ────────────────────────────────────────────────
+// ── Mine (per-person slices) ─────────────────────────────────────────────────
 
 /**
- * Um agendamento na lista da pessoa (GET /me/schedules): um por linha, entre
- * todos os workspaces dela. `next_run_at` nulo é "pausado" quando `active` é
- * false, ou "recém-criado" (≤30 s) quando true. "Pausado" tem duas causas — o
- * `active` do agendamento ou o `flag_ative` do workflow desligado —, por isso os
- * dois campos vêm juntos.
+ * A schedule in the person's list (GET /me/schedules): one per row, across all
+ * of their workspaces. A null `next_run_at` is "paused" when `active` is
+ * false, or "just created" (≤30 s) when true. "Paused" has two causes — the
+ * schedule's `active` or the workflow's `flag_ative` turned off —, which is why
+ * the two fields come together.
  */
 export interface IAgendamentoMeu {
   job_id: string
@@ -899,8 +901,8 @@ export interface IAgendamentoMeu {
   unit?: string | null
   rrule_expression?: string | null
   timezone?: string | null
-  // Sempre presentes na resposta (Pydantic serializa o Optional como null), e é o
-  // que `resumirAgendamento` (de gatilho.ts) espera — nulável, não opcional.
+  // Always present in the response (Pydantic serializes Optional as null), and it
+  // is what `resumirAgendamento` (from gatilho.ts) expects — nullable, not optional.
   next_run_at: string | null
   last_run_at: string | null
   retry_count: number
@@ -908,23 +910,23 @@ export interface IAgendamentoMeu {
   workflow_name: string
   flag_ative: boolean
   workspace_id?: string | null
-  /** Proveniência do fluxo (usuario|assistente), para o selo "assistente". */
+  /** Provenance of the workflow (usuario|assistente), for the "assistente" badge. */
   origem?: string
 }
 
 /**
- * A página + o TOTAL de `GET /me/schedules` — o MESMO envelope de
- * `IConversaLista`. A rota tem teto (200 por página); sem o total ela truncava
- * em silêncio e quem via 200 linhas concluía que eram todas.
+ * The page + the TOTAL of `GET /me/schedules` — the SAME envelope as
+ * `IConversaLista`. The route has a ceiling (200 per page); without the total it
+ * truncated silently and whoever saw 200 rows concluded that was all of them.
  */
 export interface IAgendamentosMeus {
   itens: IAgendamentoMeu[]
   total: number
 }
 
-// ── Assistente da Home (conversas) ───────────────────────────────────────────
+// ── Home assistant (conversations) ───────────────────────────────────────────
 
-/** Uma linha da lista de conversas (GET /assistente/conversas). */
+/** A row of the conversation list (GET /assistente/conversas). */
 export interface IConversaResumo {
   id: string
   titulo?: string | null
@@ -939,13 +941,13 @@ export interface IConversaLista {
   total: number
 }
 
-/** Um quadro do replay — o MESMO vocabulário do SSE (`tool_result` nunca sai). */
+/** A replay frame — the SAME vocabulary as the SSE (`tool_result` never comes out). */
 export interface IQuadroDoReplay {
   tipo: string
   dados: Record<string, unknown>
 }
 
-/** O replay de uma conversa (GET /assistente/conversas/{id}), para o painel reaplicar. */
+/** The replay of a conversation (GET /assistente/conversas/{id}), for the panel to reapply. */
 export interface IConversaDetalhe {
   id: string
   titulo?: string | null
@@ -954,11 +956,11 @@ export interface IConversaDetalhe {
 }
 
 /**
- * Uma camada do globo (GET /assistente/camadas/{artifact_id}). `tipo` decide como a
- * web carrega: `geojson` (fetch da `download_url` pré-assinada → FeatureCollection
- * em memória), `mvt` (tiles em `/terra/assistente/tiles/…`, o par vem em `mvt`), ou
- * `indisponivel` (sem prévia; `hint` diz por quê). `bbox` só enquadra com segurança
- * quando `crs` é EPSG:4326.
+ * A globe layer (GET /assistente/camadas/{artifact_id}). `tipo` decides how the
+ * web loads it: `geojson` (fetch of the presigned `download_url` → in-memory
+ * FeatureCollection), `mvt` (tiles at `/terra/assistente/tiles/…`, the pair comes
+ * in `mvt`), or `indisponivel` (no preview; `hint` says why). `bbox` only frames
+ * safely when `crs` is EPSG:4326.
  */
 export interface ICamadaDoGlobo {
   artifact_id: string
@@ -975,7 +977,7 @@ export interface ICamadaDoGlobo {
   geometry_type?: string | null
   features?: number | null
   size_bytes?: number | null
-  /** O arquivo de origem pode ser baixado — ver `baixavel` em `schemas/assistente.py`. */
+  /** The source file can be downloaded — see `baixavel` in `schemas/assistente.py`. */
   baixavel?: boolean
   hint?: string | null
   workflow_id?: string | null
@@ -984,16 +986,16 @@ export interface ICamadaDoGlobo {
 }
 
 
-// ── Modelo do assistente ─────────────────────────────────────────────────────
+// ── Assistant model ──────────────────────────────────────────────────────────
 //
-// O painel do admin: o modelo em uso e o catálogo do provedor. Uma extensão
-// (`web/extensoes`) pode somar campos a ele.
+// The admin panel: the model in use and the provider's catalog. An extension
+// (`web/extensoes`) can add fields to it.
 
 export interface IModeloDoCatalogo {
   id: string
   nome: string
-  /** `null`, e NUNCA 0: um modelo sem preço conhecido não pode aparecer como
-   *  gratuito numa tabela de custo — é a leitura que faria escolher errado. */
+  /** `null`, and NEVER 0: a model without a known price cannot appear as free
+   *  in a cost table — that reading is what would lead to the wrong choice. */
   entrada_por_milhao: number | null
   saida_por_milhao: number | null
   contexto: number | null
@@ -1001,9 +1003,9 @@ export interface IModeloDoCatalogo {
 
 export interface ISituacaoDoModelo {
   modelo: string
-  /** `ambiente` = ninguém escolheu ainda, vale `ASSISTENTE_MODELO`. Os dois
-   *  estados pedem botões diferentes: um oferece definir, o outro oferece
-   *  voltar ao padrão. */
+  /** `ambiente` = nobody has chosen yet, `ASSISTENTE_MODELO` applies. The two
+   *  states call for different buttons: one offers to set it, the other offers
+   *  to go back to the default. */
   origem: "banco" | "ambiente"
   definido_por: string | null
   definido_em: string | null
@@ -1013,12 +1015,12 @@ export interface ISituacaoDoModelo {
 export interface IPainelDoModelo {
   atual: ISituacaoDoModelo
   catalogo: IModeloDoCatalogo[]
-  /** Por que o catálogo veio vazio. Provedor fora do ar não pode derrubar a
-   *  tela — mas a tela precisa dizer o que houve. */
+  /** Why the catalog came back empty. A provider being down must not take down
+   *  the screen — but the screen needs to say what happened. */
   catalogo_indisponivel: string | null
 }
 
-// ── Envelope de resposta do service ──────────────────────────────────────────
+// ── Service response envelope ────────────────────────────────────────────────
 
 export interface IResponse<T> {
   success: boolean
@@ -1026,48 +1028,48 @@ export interface IResponse<T> {
   error?: {
     message?: string
     name: "AxiosError" | (string & {})
-    /** Código de domínio da API (`error` no corpo), quando houver. */
+    /** The API's domain code (`error` in the body), when there is one. */
     code?: string
-    /** 409 da política de execução: workspaces cujo nível principal esvaziaria. */
+    /** Execution policy 409: workspaces whose main tier would be emptied. */
     workspaces?: { workspace_id: string; workspace_name: string }[]
   },
   status: number
 }
 
-// ── Nós — catálogo (GET /nodes) e runtime do canvas ──────────────────────────
+// ── Nodes — catalog (GET /nodes) and canvas runtime ──────────────────────────
 
 export interface INodePortAPI {
   name: string
-  /** Tipo de dado que a porta aceita/emite (contrato TIPOS_DE_CAMPO). */
+  /** Data type the port accepts/emits (TIPOS_DE_CAMPO contract). */
   type?: string
   description?: string
 }
 
 /**
- * Campos compartilhados entre todas as representações de um nó.
+ * Fields shared across all representations of a node.
  *
- * O projeto tem 3 "shapes" de nó que variam conforme o contexto:
- * - `INodesAPI` — catálogo vindo do backend (GET /nodes) com schema dos campos
- * - `INodes` — runtime no canvas (ReactFlow) com valores + schema resolvido
- * - `INodesDefinition` — formato de persistência (definition.nodes no DB)
+ * The project has 3 node "shapes" that vary by context:
+ * - `INodesAPI` — catalog coming from the backend (GET /nodes) with the field schema
+ * - `INodes` — runtime on the canvas (ReactFlow) with values + resolved schema
+ * - `INodesDefinition` — persistence format (definition.nodes in the DB)
  *
- * Esta interface agrupa o que é comum aos 3 para evitar drift de tipagem.
+ * This interface groups what is common to the 3 to avoid typing drift.
  */
 export interface INodeBase {
-  /** Rótulo customizado — preenchido quando o usuário renomeia o nó no canvas */
+  /** Custom label — filled in when the user renames the node on the canvas */
   alias?: string
-  /** Categoria do nó (e.g. "trigger", "action", "control", "datasource") */
+  /** Node category (e.g. "trigger", "action", "control", "datasource") */
   type: string
 }
 
 /**
- * Nó no catálogo do backend (resposta de GET /nodes).
+ * Node in the backend catalog (response of GET /nodes).
  *
- * Define o **schema** do nó: quais propriedades aceita, tipos, descrições.
- * É usado pelo canvas para construir o drawer de nós e validar inputs.
+ * Defines the node's **schema**: which properties it accepts, types, descriptions.
+ * Used by the canvas to build the node drawer and validate inputs.
  *
- * - `properties`: array de *schemas* de campo (não valores).
- * - Não tem `id` nem `position` (é um template, não uma instância).
+ * - `properties`: array of field *schemas* (not values).
+ * - Has no `id` or `position` (it is a template, not an instance).
  */
 export interface INodesAPI<T = ActionsType | TriggersType | ControlsType | unknown>
   extends INodeBase, Record<string, unknown> {
@@ -1075,52 +1077,52 @@ export interface INodesAPI<T = ActionsType | TriggersType | ControlsType | unkno
   description: string
   alias: string
   properties: INodesPropertyAPI[]
-  /** Se true, este nó exige uma credencial para executar */
+  /** If true, this node requires a credential to execute */
   requires_credential?: boolean
   /**
-   * Campos de saída do nó — a fonte única e tipada do contrato (A13). Cada
-   * campo é uma chave que uma aresta pode transportar (`from_key`); os que
-   * têm `port: true` ganham ponto de conexão próprio no canvas (2+ deles ⇒
-   * handles nomeados). Quem deriva os handles é `portasDeSaida`
+   * The node's output fields — the single, typed source of the contract (A13).
+   * Each field is a key an edge can carry (`from_key`); those with
+   * `port: true` get their own connection point on the canvas (2+ of them ⇒
+   * named handles). The handles are derived by `portasDeSaida`
    * (utils/node-ports).
    */
   outputs?: INodeOutputField[]
-  /** Portas de entrada nomeadas (apenas nós binários, ex: [{name:"layerA"},{name:"layerB"}]) */
+  /** Named input ports (binary nodes only, e.g. [{name:"layerA"},{name:"layerB"}]) */
   inputs?: INodePortAPI[]
   /**
-   * As entradas são declaradas pelo USUÁRIO, na propriedade `ports`, e não
-   * fixas no catálogo. Quem monta os pontos de conexão é `portasDeEntrada`
-   * (workflow/index.tsx), lendo `properties.ports` em vez de `inputs`.
+   * The inputs are declared by the USER, in the `ports` property, not fixed in
+   * the catalog. The connection points are built by `portasDeEntrada`
+   * (workflow/index.tsx), reading `properties.ports` instead of `inputs`.
    */
   dynamic_inputs?: boolean
   /**
-   * As saídas são declaradas pelo USUÁRIO, na propriedade `output_vars`, e não
-   * fixas no catálogo. Quem as monta é `saidasDoNo` (utils/node-ports).
+   * The outputs are declared by the USER, in the `output_vars` property, not
+   * fixed in the catalog. They are built by `saidasDoNo` (utils/node-ports).
    */
   dynamic_output?: boolean
   /**
-   * As saídas vêm da propriedade `ports` — cada porta é um ponto de conexão de
-   * saída próprio (ex.: o SubWorkflowInput expõe as chaves de entrada do
-   * sub-fluxo). Simétrico ao `dynamic_inputs`, no lado da saída; quem monta é
+   * The outputs come from the `ports` property — each port is its own output
+   * connection point (e.g. SubWorkflowInput exposes the sub-workflow's input
+   * keys). Symmetric to `dynamic_inputs`, on the output side; built by
    * `portasDeSaida` (utils/node-ports).
    */
   outputs_from_ports?: boolean
   /**
-   * Nó de RAMO (Conditional, JinjaBranch, ChangeDetector): os pontos de saída
-   * são `true`/`false` — roteiam a execução — e não os campos de `outputs`.
+   * BRANCH node (Conditional, JinjaBranch, ChangeDetector): the output points
+   * are `true`/`false` — they route the execution — and not the `outputs` fields.
    */
   branches?: boolean
 }
 
 /**
- * Nó no runtime do canvas (dentro de `Node<INodes>` do ReactFlow).
+ * Node in the canvas runtime (inside ReactFlow's `Node<INodes>`).
  *
- * Combina **valores** preenchidos pelo usuário com **schema** resolvido do
- * catálogo — usado pelos componentes do canvas para renderizar e editar.
+ * Combines **values** filled in by the user with the **schema** resolved from
+ * the catalog — used by the canvas components to render and edit.
  *
- * - `properties`: Record de valores (preenchidos pelo usuário).
- * - `fields`: array de schemas resolvidos do INodesAPI (para o form).
- * - `id` e `position` vivem no Node wrapper do ReactFlow, não aqui.
+ * - `properties`: Record of values (filled in by the user).
+ * - `fields`: array of schemas resolved from INodesAPI (for the form).
+ * - `id` and `position` live in ReactFlow's Node wrapper, not here.
  */
 export interface INodes<T = ActionsType | TriggersType | ControlsType | (string & {})>
   extends INodeBase, Record<string, unknown> {
@@ -1129,14 +1131,14 @@ export interface INodes<T = ActionsType | TriggersType | ControlsType | (string 
   alias: string
   properties: Record<string, string>
   fields: INodesPropertyAPI[]
-  /** Se true, este nó exige uma credencial para executar */
+  /** If true, this node requires a credential to execute */
   requires_credential?: boolean
-  /** Pontos de conexão de SAÍDA desta instância (derivados do catálogo). */
+  /** OUTPUT connection points of this instance (derived from the catalog). */
   outputs?: INodePortAPI[]
   inputs?: INodePortAPI[]
-  /** Campos de saída do catálogo (`INodesAPI.outputs`) — o que uma aresta pode carregar. */
+  /** Output fields from the catalog (`INodesAPI.outputs`) — what an edge can carry. */
   saidas?: INodeOutputField[]
-  /** O nó roteia por ramos true/false (ver INodesAPI.branches). */
+  /** The node routes through true/false branches (see INodesAPI.branches). */
   branches?: boolean
 }
 
@@ -1144,7 +1146,7 @@ export interface INodeOutputField {
   name: string
   type?: string
   description?: string
-  /** O campo tem ponto de conexão próprio no canvas. */
+  /** The field has its own connection point on the canvas. */
   port?: boolean
 }
 
@@ -1154,8 +1156,8 @@ export interface ISelectOption {
 }
 
 /**
- * Regra de visibilidade condicional de um campo: só é exibido quando o valor
- * atual de `field` está em `in`. Um array de regras é combinado com AND.
+ * Conditional visibility rule for a field: it is shown only when the current
+ * value of `field` is in `in`. An array of rules is combined with AND.
  */
 export interface IVisibleWhen {
   field: string
@@ -1164,37 +1166,37 @@ export interface IVisibleWhen {
 
 export interface INodesPropertyAPI {
   name: string
-  /** Label exibido na UI. Quando ausente, usa name. */
+  /** Label shown in the UI. When missing, uses name. */
   label?: string
   type: "string" | "object" | "number" | "integer" | "boolean" | "code" | "credential" | "drive" | "artifact" | "sql" | "select" | "ports" | "chips" | "keyvalue"
-  /** Campo que espera NOME DE COLUNA. O valor é a porta de entrada de onde o
-   *  dado vem, ou "*" para todas — o editor sugere os nomes vistos na última
-   *  execução daquele lado. */
+  /** Field that expects a COLUMN NAME. The value is the input port the data
+   *  comes from, or "*" for all — the editor suggests the names seen in the
+   *  last run on that side. */
   suggest_columns?: string | null
   default: unknown,
   description: string | null
-  /** Tipos de credencial compatíveis — apenas quando type == "credential" */
+  /** Compatible credential types — only when type == "credential" */
   credential_types?: string[]
-  /** Extensões de arquivo permitidas — apenas quando type == "drive" */
+  /** Allowed file extensions — only when type == "drive" */
   drive_extensions?: string[]
-  /** Opções para type == "select" */
+  /** Options for type == "select" */
   options?: ISelectOption[]
-  /** Visibilidade condicional (declarativa). Regra única ou lista (AND). */
+  /** Conditional visibility (declarative). A single rule or a list (AND). */
   visibleWhen?: IVisibleWhen | IVisibleWhen[]
-  /** O execute() recusa vazio — o rótulo ganha asterisco (sinalização, não bloqueio). */
+  /** execute() rejects empty — the label gets an asterisk (a signal, not a block). */
   required?: boolean
-  /** Exemplo do formato esperado, exibido no input vazio. */
+  /** Example of the expected format, shown in the empty input. */
   placeholder?: string
 }
 
-// ── Workflows — persistência, agendamento e grupos ───────────────────────────
+// ── Workflows — persistence, scheduling and groups ───────────────────────────
 
 /**
- * Nó no formato de persistência (gravado em `workflow.definition.nodes` no DB).
+ * Node in the persistence format (stored in `workflow.definition.nodes` in the DB).
  *
- * Representa o **estado serializável** mínimo de um nó — o que precisa ser
- * restaurado ao reabrir o workflow. Schema (fields, outputs, saidas)
- * vem do catálogo `INodesAPI` no load time, não é persistido aqui.
+ * Represents the minimal **serializable state** of a node — what needs to be
+ * restored when reopening the workflow. The schema (fields, outputs, saidas)
+ * comes from the `INodesAPI` catalog at load time; it is not persisted here.
  */
 export interface INodesDefinition extends INodeBase {
   id: string
@@ -1210,27 +1212,27 @@ export interface IEdgeDefinition {
   source: string
   target: string
   /**
-   * Ramo de roteamento de um nó condicional. SOMENTE para handles "true"/"false"
-   * — antes qualquer handle nomeado caía aqui como `condition: false`, o que
-   * destruía o id da porta e fazia a aresta sumir do canvas ao reabrir.
+   * Routing branch of a conditional node. ONLY for "true"/"false" handles —
+   * before, any named handle fell in here as `condition: false`, which
+   * destroyed the port id and made the edge vanish from the canvas on reopening.
    */
   condition?: boolean
   /**
-   * Id do Handle de saída do React Flow (ex: "output", "metadata", "true").
-   * Não é redundante com `from_key`: coincidem quando o handle é uma porta de
-   * dado, mas divergem em nó condicional (handle "true", from_key "output") e
-   * em nó de saída única com picker (handle null, from_key "crs").
+   * Id of the React Flow output Handle (e.g. "output", "metadata", "true").
+   * It is not redundant with `from_key`: they match when the handle is a data
+   * port, but differ on a conditional node (handle "true", from_key "output")
+   * and on a single-output node with a picker (handle null, from_key "crs").
    */
   source_handle?: string
-  /** Chave do output do nó pai a ser extraída (ex: "file_a", "output") */
+  /** Key of the parent node's output to extract (e.g. "file_a", "output") */
   from_key?: string
-  /** Chave com que o valor chega no inputs do nó filho (ex: "layerA", "layerB") */
+  /** Key under which the value arrives in the child node's inputs (e.g. "layerA", "layerB") */
   to_key?: string
 }
 
-/** Uma definition parcial como as propostas do assistente carregam:
- *  só nós e arestas, sem viewport. É o pedaço de `IWorkflow["definition"]`
- *  que trafega entre o motor e as duas superfícies. */
+/** A partial definition like the ones the assistant's proposals carry:
+ *  only nodes and edges, no viewport. It is the piece of `IWorkflow["definition"]`
+ *  that travels between the engine and the two surfaces. */
 export interface CanvasDefinition {
   nodes?: INodesDefinition[]
   edges?: IEdgeDefinition[]
@@ -1245,9 +1247,9 @@ export interface IPinNodeMeta {
 }
 
 /**
- * Resumo do agendamento que a listagem traz (spec docs/specs/projects.md §2.1).
- * `next_run_at` nulo com `active` = true é "recém-criado, o agendador ainda
- * calcula" (≤30 s); com `active` = false é "pausado".
+ * Summary of the schedule that the listing brings (spec docs/specs/projects.md §2.1).
+ * A null `next_run_at` with `active` = true is "just created, the scheduler is
+ * still computing" (≤30 s); with `active` = false it is "paused".
  */
 export interface IWorkflowSchedule {
   active: boolean
@@ -1262,8 +1264,8 @@ export interface IWorkflowSchedule {
 }
 
 /**
- * Aviso sobre o agendamento gerado por um save (workflow inativo, expressão
- * inválida). Espelha `ScheduleNotice` do backend; o editor o mostra como toast.
+ * Notice about the schedule produced by a save (inactive workflow, invalid
+ * expression). Mirrors the backend's `ScheduleNotice`; the editor shows it as a toast.
  */
 export interface IScheduleNotice {
   code: "workflow_inactive" | "invalid_schedule" | (string & {})
@@ -1287,7 +1289,7 @@ export interface IWorkflow {
   },
   created_by_id: string,
   updated_by_id: string,
-  // Campos adicionados na última versão do backend
+  // Fields added in the latest backend version
   workspace_id?: string
   group_id?: string | null
   params_schema?: Record<string, IParamSchema>
@@ -1295,18 +1297,18 @@ export interface IWorkflow {
   portal_access?: "disabled" | "public" | "private"
   portal_shared_with?: string[] | null
   has_publish_map?: boolean
-  /** Declara contrato de sub-fluxo (nó Saída do Sub-Workflow): existe para ser
-   *  chamado por outro workflow, e em geral não tem gatilho próprio. */
+  /** Declares a sub-workflow contract (Sub-Workflow Output node): it exists to be
+   *  called by another workflow, and generally has no trigger of its own. */
   is_subworkflow?: boolean
-  /** Gatilhos presentes na definição (spec projetos §2.1). Nenhum = "só manual". */
+  /** Triggers present in the definition (projects spec §2.1). None = "manual only". */
   has_webhook_trigger?: boolean
   has_schedule_trigger?: boolean
   has_file_trigger?: boolean
   has_geofence_trigger?: boolean
-  /** Proveniência do fluxo: "usuario" (padrão) ou "assistente" (criado pelo
-   *  assistente da Home, escondido das listagens por padrão). */
+  /** Provenance of the workflow: "usuario" (default) or "assistente" (created by
+   *  the Home assistant, hidden from listings by default). */
   origem?: "usuario" | "assistente" | (string & {})
-  /** Agendamento do workflow, quando há um nó ScheduleTrigger aplicado. */
+  /** The workflow's schedule, when a ScheduleTrigger node is applied. */
   schedule?: IWorkflowSchedule | null
   created_by_username?: string | null
   updated_by_username?: string | null
@@ -1315,7 +1317,7 @@ export interface IWorkflow {
   created_at?: string
   updated_at?: string
   deleted_at?: string | null
-  /** Avisos do agendamento deste save (vazio no caso normal). */
+  /** Schedule notices from this save (empty in the normal case). */
   schedule_notices?: IScheduleNotice[]
 }
 
@@ -1325,11 +1327,11 @@ export interface IWorkflowGroup {
   name: string
   description?: string | null
   workspace_id?: string | null
-  /** Ordem escolhida a mão na tela de Projetos. */
+  /** Order chosen by hand on the Projects screen. */
   position?: number
-  /** Todos os workflows não excluídos do grupo (inativos inclusive). */
+  /** All non-deleted workflows in the group (inactive ones included). */
   workflow_count: number
-  /** Só os ativos. */
+  /** Only the active ones. */
   active_count?: number
   created_at: string
   updated_at: string
@@ -1350,9 +1352,9 @@ export interface ICredentials {
   type: string
   description?: string | null
   tags?: string[] | null
-  /** id_hash do criador — a UI usa para distinguir "minha" de "compartilhada comigo". */
+  /** The creator's id_hash — the UI uses it to tell "mine" from "shared with me". */
   owner_id?: string | null
-  /** Se preenchido, a credencial é compartilhada com os membros deste workspace. */
+  /** If filled in, the credential is shared with the members of this workspace. */
   workspace_id?: string | null
   created_at: string
   updated_at: string
@@ -1383,10 +1385,10 @@ export interface ICredentialTypeSchema {
   fields: ICredentialFieldSchema[]
 }
 
-// ── Saúde do sistema ─────────────────────────────────────────────────────────
+// ── System health ────────────────────────────────────────────────────────────
 
-/** GET /admin/health: só a whitelist de webhook, que é o que a tela de
- *  Configurações lê. */
+/** GET /admin/health: only the webhook whitelist, which is what the Settings
+ *  screen reads. */
 export interface ISystemHealth {
   webhook_whitelist: string[]
 }

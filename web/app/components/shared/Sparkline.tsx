@@ -9,27 +9,27 @@ interface SparklineProps {
 }
 
 /**
- * SVG escrito à mão de propósito. Hoje o consumidor é `observability/indicadores`
- * (reusado por Histórico e Dashboard); a razão original de existir era manter os
- * indicadores sem recharts, cuja lib de ~250 KB entraria no first-load dessas
- * rotas por um mero gráfico de 7 pontos. São 7 pontos e uma polilinha: nada aqui
- * justificava um ResponsiveContainer com ResizeObserver por card.
+ * Hand-written SVG on purpose. Today the consumer is `observability/indicadores`
+ * (reused by History and Dashboard); the original reason for it to exist was to keep
+ * the indicators free of recharts, whose ~250 KB lib would enter those routes'
+ * first-load for a mere 7-point chart. It's 7 points and a polyline: nothing here
+ * justified a ResponsiveContainer with a ResizeObserver per card.
  *
- * Sem animação de entrada também por decisão: o poll de ACKs de 10 s
- * re-renderizava a página e os 5 sparklines reanimavam sozinhos, "piscando" sem
- * que nenhum dado tivesse mudado.
+ * No entrance animation, also by decision: the 10 s ACK poll re-rendered the page
+ * and the 5 sparklines re-animated on their own, "blinking" without any data
+ * having changed.
  */
 function SparklineImpl({ data, color = "var(--chart-1)", height = 28 }: SparklineProps) {
-  // `useId()` devolve delimitadores (`:`/`«»`) que quebram o `url(#id)` do
-  // atributo fill — daí o saneamento em vez do id cru.
+  // `useId()` returns delimiters (`:`/`«»`) that break the fill attribute's
+  // `url(#id)` — hence the sanitizing instead of the raw id.
   const gradientId = `spark-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`
 
   const geometry = useMemo(() => {
     if (data.length < 2) return null
-    // O viewBox usa largura fixa de 100 e `preserveAspectRatio="none"`: o SVG
-    // estica para a largura do card sem precisar medir o DOM.
+    // The viewBox uses a fixed width of 100 and `preserveAspectRatio="none"`: the SVG
+    // stretches to the card width without having to measure the DOM.
     const W = 100
-    const TOP = 2 // respiro para o traço não ser cortado no pico
+    const TOP = 2 // headroom so the stroke isn't clipped at the peak
     const min = Math.min(...data)
     const max = Math.max(...data)
     const span = max - min
@@ -37,15 +37,15 @@ function SparklineImpl({ data, color = "var(--chart-1)", height = 28 }: Sparklin
 
     const points = data.map((v, i) => {
       const x = i * stepX
-      // Série constante (inclusive toda zerada) vira uma reta no meio: sem isto
-      // a divisão por zero levaria o traço para fora do viewBox.
+      // A constant series (including all zeros) becomes a line in the middle: without
+      // this the division by zero would send the stroke outside the viewBox.
       const ratio = span === 0 ? 0.5 : (v - min) / span
       const y = TOP + (1 - ratio) * (height - TOP)
       return `${x.toFixed(2)},${y.toFixed(2)}`
     })
 
     const line = `M${points.join("L")}`
-    // A área fecha no rodapé para receber o gradiente 0.3 → 0.
+    // The area closes at the bottom to receive the 0.3 → 0 gradient.
     const area = `${line}L${W},${height}L0,${height}Z`
     return { line, area }
   }, [data, height])

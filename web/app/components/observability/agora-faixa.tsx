@@ -10,17 +10,18 @@ import { formatarDuracao, formatarInteiro } from "@/lib/formatos"
 interface Props {
   now: INowBlock | null | undefined
   carregando: boolean
-  /** "Ver em andamento →": aplica `status=running` na tabela. */
+  /** "Ver em andamento →" (see in progress): applies `status=running` to the table. */
   onVerEmAndamento: () => void
-  /** Clique em "N presa(s)": abre a mais antiga no painel. */
+  /** Click on "N presa(s)" (N stuck): opens the oldest one in the panel. */
   onAbrirPresa: (runId: string) => void
 }
 
 /**
- * Faixa "Agora" (spec §4.3): o instante, não a janela. Uma linha, não cards —
- * ela muda a cada 30 s e não pode fazer os números do período piscarem.
- * Some o que é zero, exceto "em andamento": zero em andamento é uma
- * informação ("nada rodando"); zero presas é o normal e não merece espaço.
+ * "Agora" (Now) strip (spec §4.3): the instant, not the window. One line, not
+ * cards — it changes every 30 s and must not make the period numbers flicker.
+ * Whatever is zero is hidden, except "em andamento" (in progress): zero in
+ * progress is information ("nothing running"); zero stuck is normal and does
+ * not deserve space.
  */
 export function AgoraFaixa({ now, carregando, onVerEmAndamento, onAbrirPresa }: Props) {
   return (
@@ -50,10 +51,10 @@ export function AgoraFaixa({ now, carregando, onVerEmAndamento, onAbrirPresa }: 
 }
 
 /**
- * A linha de itens do instante ("3 em andamento · 1 presa há X · Executores N
- * de M online"), sem o envelope da faixa nem o "Ver em andamento". Export
- * nomeado para o Dashboard reusar a MESMA linha dentro da faixa de Saúde
- * (docs/specs/dashboard.md §3.4), sem duplicar a lógica de "some o que é zero".
+ * The line of instant items ("3 em andamento · 1 presa há X · Executores N
+ * de M online"), without the strip's envelope or the "Ver em andamento". Named
+ * export so the Dashboard reuses the SAME line inside the Health strip
+ * (docs/specs/dashboard.md §3.4), without duplicating the "hide what is zero" logic.
  */
 export function ItensAgora({ now, onAbrirPresa }: { now: INowBlock; onAbrirPresa: (runId: string) => void }) {
   const presas = now.stuck_count ?? 0

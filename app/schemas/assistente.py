@@ -1,11 +1,11 @@
 # app/schemas/assistente.py
-"""Schemas do assistente da Home (superficie `home`): a camada do globo e a API
-de conversas persistidas (`/assistente`).
+"""Schemas for the Home assistant (`home` surface): the globe layer and the API
+for persisted conversations (`/assistente`).
 
-O que o cliente MANDA leva `extra="forbid"` — o transcrito nunca vem do
-navegador (um `tool_result` e a palavra do servidor), e um campo desconhecido
-aceito em silencio e o primeiro passo para alguem tentar forjar um. O que ele
-RECEBE fora do stream (lista, detalhe/replay) sao os modelos de resposta."""
+What the client SENDS carries `extra="forbid"` — the transcript never comes
+from the browser (a `tool_result` is the server's word), and an unknown field
+silently accepted is the first step for someone to try forging one. What it
+RECEIVES outside the stream (list, detail/replay) are the response models."""
 from datetime import datetime
 from typing import Any, List, Literal, Optional
 
@@ -13,20 +13,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class CamadaDoGlobo(BaseModel):
-    """O que a Home precisa para por uma saida de execucao no globo.
+    """What Home needs to put a run output on the globe.
 
-    `tipo` decide como a web a carrega:
-    - `geojson`: `download_url` (URL pre-assinada, curta) → a web faz fetch e
-      guarda a FeatureCollection em memoria (nunca `addSource({data: url})`,
-      que a URL expira).
-    - `mvt`: a camada foi publicada (PublishMap) → tiles vetoriais em
-      `/assistente/tiles/{workflow_id}/{layer_key}/...`; `mvt` traz o par.
-    - `indisponivel`: sem previa (executor-local, sem storage, CRS != 4326,
-      ou formato que a v1 nao converte). `hint` diz por que, em pt-BR.
+    `tipo` decides how the web app loads it:
+    - `geojson`: `download_url` (pre-signed, short-lived URL) → the web app
+      fetches it and keeps the FeatureCollection in memory (never
+      `addSource({data: url})`, since the URL expires).
+    - `mvt`: the layer was published (PublishMap) → vector tiles at
+      `/assistente/tiles/{workflow_id}/{layer_key}/...`; `mvt` carries the pair.
+    - `indisponivel`: no preview (executor-local, no storage, CRS != 4326, or
+      a format v1 does not convert). `hint` says why, in pt-BR.
 
-    `bbox`/`crs`/`geometry_type` vem de `node_run_metrics` (ja calculados na
-    execucao) ou do `PortalLayer`; `bbox` so e confiavel para enquadrar quando
-    `crs` e 4326.
+    `bbox`/`crs`/`geometry_type` come from `node_run_metrics` (already
+    computed during execution) or from the `PortalLayer`; `bbox` is only
+    reliable for framing when `crs` is 4326.
     """
     artifact_id: str
     nome: str
@@ -43,40 +43,40 @@ class CamadaDoGlobo(BaseModel):
     geometry_type: Optional[str] = None
     features: Optional[int] = None
     size_bytes: Optional[int] = None
-    # O arquivo de origem pode ser BAIXADO por `GET /artifacts/{id}/download`.
-    # Nao e o mesmo que `available`, que diz se ha PREVIA no globo: uma camada
-    # publicada (MVT) aparece no globo com o conteudo no PostGIS e pode nao ter
-    # arquivo no storage, e o download recusaria (409/404). Quem consome mostra
-    # a acao so quando isto e verdadeiro — botao vivo que falha e pior que
-    # botao ausente.
+    # The source file can be DOWNLOADED via `GET /artifacts/{id}/download`.
+    # It is not the same as `available`, which says whether there is a PREVIEW
+    # on the globe: a published layer (MVT) shows up on the globe with its
+    # content in PostGIS and may have no file in storage, and the download
+    # would refuse (409/404). Consumers show the action only when this is
+    # true — a live button that fails is worse than no button.
     baixavel: bool = False
     hint: Optional[str] = None
     workflow_id: Optional[str] = None
     run_id: Optional[str] = None
-    # Retencao do artefato (dias), nao o prazo do link. Null = nao expira.
+    # The artifact's retention (days), not the link's lifetime. Null = does not expire.
     expires_at: Optional[datetime] = None
 
 
-# ── A API de conversas ───────────────────────────────────────────────────────
+# ── The conversations API ────────────────────────────────────────────────────
 
 
 class Localizacao(BaseModel):
-    """A posicao atual de quem esta na Home, quando a pessoa resolve compartilha-la.
+    """The current position of whoever is on Home, when the person decides to share it.
 
-    Chega opcional no turno (`MensagemDaHome.localizacao`): o navegador so a manda
-    depois de a pessoa liberar o GPS. Serve de ponto de referencia para pedidos
-    relativos ("perto de mim", "num raio de N km"); ausente/nula quando ela nao
-    compartilhou. `extra="forbid"` como no resto do que o cliente MANDA — um campo
-    desconhecido aqui dentro e o mesmo vetor que o do envelope de fora.
+    It arrives optionally with the turn (`MensagemDaHome.localizacao`): the
+    browser only sends it after the person allows GPS. It serves as a reference
+    point for relative requests ("near me", "within N km"); absent/null when
+    they did not share it. `extra="forbid"` as in the rest of what the client
+    SENDS — an unknown field in here is the same vector as in the outer envelope.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    # `allow_inf_nan=False` nos tres: o parser de JSON do FastAPI aceita os
-    # literais Infinity/NaN (e 1e999 parseia para inf), e "inf >= 0" passa num
-    # `ge` puro — o prompt ganharia um "precisao ~inf m". O teto de 1000 km em
-    # `precisao_m` corta o resto do lixo numerico (precisao pior que isso nao
-    # e localizacao, e ruido).
+    # `allow_inf_nan=False` on all three: FastAPI's JSON parser accepts the
+    # Infinity/NaN literals (and 1e999 parses to inf), and "inf >= 0" passes a
+    # plain `ge` — the prompt would get a "precisao ~inf m". The 1000 km ceiling
+    # on `precisao_m` cuts off the rest of the numeric garbage (accuracy worse
+    # than that is not a location, it is noise).
     lat: float = Field(..., ge=-90, le=90, allow_inf_nan=False, description="Latitude em graus decimais (WGS84).")
     lon: float = Field(..., ge=-180, le=180, allow_inf_nan=False, description="Longitude em graus decimais (WGS84).")
     precisao_m: Optional[float] = Field(
@@ -84,18 +84,19 @@ class Localizacao(BaseModel):
     )
 
 
-# O idioma da TELA de quem conversa (a Home traduzida). O assistente responde
-# nele; "pt-BR" (ou ausente) mantém o idioma padrão da instalação.
+# The language of the chatting person's SCREEN (the translated Home). The
+# assistant answers in it; "pt-BR" (or absent) keeps the installation's default
+# language.
 IdiomaDaTela = Literal["pt-BR", "en", "es"]
 
 
 class MensagemDaHome(BaseModel):
-    """Uma mensagem de quem esta usando o assistente da Home.
+    """A message from whoever is using the Home assistant.
 
-    `extra="forbid"` como no assistente: o transcrito NAO vem do cliente. E a rota
-    ainda recusa (422) a mensagem que comeca com `[Acao` — so o servidor escreve
-    esse prefixo, nas mensagens sinteticas de confirmacao; aqui o schema so
-    garante o formato.
+    `extra="forbid"` as in the assistant: the transcript does NOT come from the
+    client. And the route also refuses (422) a message starting with `[Acao` —
+    only the server writes that prefix, in the synthetic confirmation
+    messages; here the schema only ensures the format.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -129,17 +130,19 @@ class RenomearConversa(BaseModel):
 
 
 class DecisaoDeConfirmacao(BaseModel):
-    """O clique no cartao de confirmacao: o token que o servidor emitiu e a decisao.
+    """The click on the confirmation card: the token the server issued and the decision.
 
-    NAO leva argumentos — o que roda sao os args ARMAZENADOS no Redis pelo portao
-    da Home. `extra="forbid"` fecha a porta para o cliente tentar mandar argumentos
-    por aqui, que seria justamente burlar a confirmacao verificada no servidor.
+    It carries NO arguments — what runs are the args STORED in Redis by Home's
+    gate. `extra="forbid"` shuts the door on the client trying to send
+    arguments through here, which would be precisely bypassing the
+    confirmation verified on the server.
 
-    `localizacao` NAO e argumento da acao: e o mesmo contexto opcional do turno
-    (MensagemDaHome.localizacao), reenviado porque a confirmacao RETOMA o laco do
-    modelo e o servidor nao guarda a coordenada (ela vive so no prompt do stream).
-    Sem o reenvio, um fluxo "perto de mim" que pede confirmacao retomava sem
-    saber onde a pessoa esta.
+    `localizacao` is NOT an argument of the action: it is the same optional
+    context as the turn (MensagemDaHome.localizacao), resent because the
+    confirmation RESUMES the model's loop and the server does not keep the
+    coordinate (it lives only in the stream's prompt). Without resending it, a
+    "near me" workflow that asks for confirmation resumed without knowing where
+    the person is.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -157,7 +160,7 @@ class DecisaoDeConfirmacao(BaseModel):
 
 
 class ConversaResumo(BaseModel):
-    """Uma linha da lista de conversas da pessoa."""
+    """One row of the person's conversation list."""
 
     id: str
     titulo: Optional[str] = None
@@ -173,8 +176,8 @@ class ConversaLista(BaseModel):
 
 
 class QuadroDoReplay(BaseModel):
-    """Um quadro do replay — o MESMO vocabulario do SSE, para o painel reaplicar
-    pelo mesmo caminho de um quadro ao vivo. `tool_result` nunca sai aqui."""
+    """A replay frame — the SAME vocabulary as the SSE, so the panel reapplies it
+    through the same path as a live frame. `tool_result` never goes out here."""
 
     tipo: str
     dados: dict[str, Any] = Field(default_factory=dict)
@@ -187,13 +190,13 @@ class ConversaDetalhe(BaseModel):
     quadros: List[QuadroDoReplay]
 
 
-# ── Superfície do editor (o painel do canvas) ────────────────────────────────
+# ── Editor surface (the canvas panel) ────────────────────────────────────────
 class MensagemDoEditor(BaseModel):
-    """Uma mensagem de quem está usando.
+    """A message from whoever is using it.
 
-    `extra="forbid"` de propósito: o transcrito NÃO vem do cliente (ver
-    `app/services/assistente_service.py`), e um campo desconhecido aceito em
-    silêncio é o primeiro passo para alguém tentar mandar um junto.
+    `extra="forbid"` on purpose: the transcript does NOT come from the client
+    (see `app/services/assistente_service.py`), and an unknown field silently
+    accepted is the first step for someone to try sending one along.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -223,25 +226,27 @@ class CotaDoAssistente(BaseModel):
 
 
 class EstadoDoAssistente(BaseModel):
-    """O que o painel precisa saber antes de aparecer na tela."""
+    """What the panel needs to know before appearing on screen."""
 
     ativo: bool = Field(..., description="Falso quando a instalação não configurou a chave")
     motivo: Optional[str] = Field(
         default=None, description="Por que está desligado, quando está"
     )
     cota: Optional[CotaDoAssistente] = None
-    # O plano de quem pergunta, quando uma extensão de planos está instalada
-    # ("free" | "pro" | "max", na dos planos pagos). Opcional porque o payload
-    # existia antes dos planos: um cliente antigo (ou uma instalação sem a
-    # extensão) continua lendo `cota.teto`, que já traz o teto correto. Serve
-    # para a tela dizer QUAL plano dá aquele teto, não para calcular nada.
+    # The plan of whoever asks, when a plans extension is installed ("free" |
+    # "pro" | "max", in the paid-plans one). Optional because the payload
+    # existed before plans: an old client (or an installation without the
+    # extension) keeps reading `cota.teto`, which already carries the correct
+    # ceiling. It is for the screen to say WHICH plan gives that ceiling, not
+    # to compute anything.
     plano: Optional[str] = Field(
         default=None, description="O plano que define o teto desta pessoa"
     )
-    # Sem isto, a oferta que aparece quando a cota estoura vira um beco: numa
-    # instalação sem provedor de pagamento, «Ver planos» levaria a pessoa a uma
-    # tela que só diz «não disponível nesta instalação». Oferecer o que não se
-    # pode vender é pior que não oferecer.
+    # Without this, the offer that shows up when the quota runs out becomes a
+    # dead end: on an installation without a payment provider, "Ver planos"
+    # (see plans) would take the person to a screen that only says "não
+    # disponível nesta instalação" (not available on this installation).
+    # Offering what cannot be sold is worse than not offering.
     assinaturas_ativas: bool = Field(
         default=False, description="Há provedor de pagamento configurado nesta instalação"
     )

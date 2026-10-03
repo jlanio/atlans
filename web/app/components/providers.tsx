@@ -10,42 +10,41 @@ import { NotificationsProvider } from "@/context/NotificationsContext";
 import CommandPalette from "@/app/components/command-palette";
 
 /**
- * Sincroniza o access_token da sessão Auth.js com o interceptor Axios.
- * - Chama setAuthToken no corpo do render (síncrono) para evitar race condition
- *   com effects de componentes filhos que já fazem chamadas à API.
- * - Usa useEffect apenas para detectar RefreshTokenExpired e forçar logout.
+ * Syncs the Auth.js session's access_token with the Axios interceptor.
+ * - Calls setAuthToken in the render body (synchronous) to avoid a race
+ *   condition with child component effects that already make API calls.
+ * - Uses useEffect only to detect RefreshTokenExpired and force logout.
  *
- * Exportado para teste: a garantia de "no servidor não escreve" é o tipo de
- * invariante que só some silenciosamente.
+ * Exported for tests: the "does not write on the server" guarantee is the kind
+ * of invariant that only ever disappears silently.
  */
 export function SessionSync() {
   const { data: session } = useSession();
 
-  // SEG: a escrita é EXCLUSIVA do cliente.
+  // SEC: the write is client-ONLY.
   //
-  // `setAuthToken` grava numa variável de MÓDULO (`let _token` em
-  // GisFlowService), que no browser é por-aba mas no Node é por-PROCESSO,
-  // compartilhada por todas as requisições em voo. Desde que o SessionProvider
-  // passou a receber a sessão resolvida no servidor, este corpo de render passa
-  // a rodar no SSR já COM o access_token real: o render do usuário A gravava o
-  // token de A e o de B, concorrente, sobrescrevia com o de B — qualquer leitura
-  // pelo interceptor do axios rodando no servidor pegaria a credencial do outro
-  // usuário.
+  // `setAuthToken` writes to a MODULE variable (`let _token` in
+  // GisFlowService), which in the browser is per tab but in Node is per
+  // PROCESS, shared by all in-flight requests. Since the SessionProvider started
+  // receiving the session resolved on the server, this render body runs during
+  // SSR already WITH the real access_token: user A's render wrote A's token and
+  // B's, concurrent, overwrote it with B's — any read by the axios interceptor
+  // running on the server would pick up the other user's credential.
   //
-  // O guard não custa o ganho de latência: no servidor o axios tem baseURL
-  // relativo ("/terra") e não faz requisição nenhuma, e na hidratação esta linha
-  // roda no primeiro render do cliente — antes, portanto, dos effects dos filhos
-  // que disparam as chamadas à API.
+  // The guard does not cost the latency gain: on the server axios has a relative
+  // baseURL ("/terra") and makes no request at all, and on hydration this line
+  // runs in the client's first render — therefore before the children's effects
+  // that fire the API calls.
   if (typeof window !== "undefined") {
     setAuthToken(session?.user?.access_token ?? null);
   }
 
   useEffect(() => {
     if (session?.error === "RefreshTokenExpired") {
-      // Limpa caches locais antes do signOut — evita que o próximo login
-      // (mesma aba) parta com estado herdado deste usuário.
+      // Clears local caches before signOut — keeps the next login (same tab)
+      // from starting with state inherited from this user.
       clearCachedHasAgents();
-      // Quem estava logado quer voltar a entrar: a Home com o modal aberto.
+      // Whoever was logged in wants to sign back in: the Home with the modal open.
       signOut({ callbackUrl: destinoDaEntrada("entrar") });
     }
   }, [session?.error]);
@@ -54,13 +53,14 @@ export function SessionSync() {
 }
 
 /**
- * `session` vem resolvida do servidor — na prática, do MIDDLEWARE, repassada ao
- * layout do dashboard por cabeçalho (ver SESSION_HEADER em auth.ts).
- * Sem ela o next-auth dispara um GET /api/auth/session na montagem e `status`
- * fica "loading" até a resposta — e como todo fetch da aplicação usa
- * `status === "authenticated"` como gatilho, a tela inteira esperava esse
- * round-trip antes de pedir o primeiro dado. Com a sessão inicial o status já
- * nasce "authenticated" e os fetches saem no mesmo tick da hidratação.
+ * `session` comes resolved from the server — in practice, from the MIDDLEWARE,
+ * passed to the dashboard layout via header (see SESSION_HEADER in auth.ts).
+ * Without it next-auth fires a GET /api/auth/session on mount and `status`
+ * stays "loading" until the response — and since every fetch in the app uses
+ * `status === "authenticated"` as its trigger, the whole screen waited for that
+ * round-trip before requesting the first piece of data. With the initial session
+ * the status is born "authenticated" and the fetches go out in the same tick as
+ * hydration.
  */
 export default function Providers({
   session,

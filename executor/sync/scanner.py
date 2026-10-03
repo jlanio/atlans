@@ -12,7 +12,7 @@ from executor.sync.paths import TRASH_DIR_NAME
 
 logger = logging.getLogger("executor.sync")
 
-# Extensoes de componentes de Shapefile
+# Shapefile component extensions
 _SHP_EXTENSIONS = {".shp", ".dbf", ".shx", ".prj", ".cpg", ".sbn", ".sbx", ".fbn", ".fbx", ".ain", ".aih", ".ixs", ".mxs", ".atx", ".qpj"}
 _SHP_REQUIRED = {".shp", ".dbf", ".shx"}
 
@@ -23,7 +23,7 @@ _SINGLE_FILE_EXTENSIONS = {
     ".zip", ".gml", ".fgb", ".parquet",
 }
 
-# Tudo que o sync reconhece
+# Everything the sync recognizes
 SUPPORTED_EXTENSIONS = _SINGLE_FILE_EXTENSIONS | _SHP_EXTENSIONS
 
 # Arquivos/pastas ignorados
@@ -31,7 +31,7 @@ _IGNORE_NAMES = {".atlans-sync.json", ".DS_Store", "Thumbs.db", "__pycache__", "
 
 
 class Dataset:
-    """Representa um dataset espacial (pode ser 1 arquivo ou bundle Shapefile)."""
+    """Represents a spatial dataset (may be 1 file or a Shapefile bundle)."""
 
     def __init__(self, name: str, dataset_type: str):
         self.name = name
@@ -48,7 +48,7 @@ class Dataset:
 
     @property
     def primary_path(self) -> Path | None:
-        """Retorna o path do arquivo principal (ex: .shp para Shapefile, .geojson para GeoJSON)."""
+        """Returns the path of the main file (e.g. .shp for Shapefile, .geojson for GeoJSON)."""
         if self.type == "shapefile":
             for f in self.files.values():
                 if f.path.suffix.lower() == ".shp":
@@ -62,7 +62,7 @@ class Dataset:
 
 
 class FileInfo:
-    """Informacoes de um arquivo individual."""
+    """Information about an individual file."""
 
     def __init__(self, path: Path):
         st = path.stat()  # um stat so: o segundo era I/O puro em vao
@@ -71,8 +71,8 @@ class FileInfo:
         self.extension = path.suffix.lower()
         self.size = st.st_size
         self.mtime = st.st_mtime
-        # Quando este stat foi tirado. E o que torna o par (size, mtime) uma
-        # TESTEMUNHA confiavel de "nao mudou" — ver `_testemunho_confiavel`.
+        # When this stat was taken. It is what makes the (size, mtime) pair a
+        # reliable WITNESS of "unchanged" — see `_testemunho_confiavel`.
         self.stat_at = time.time()
         self._md5: str | None = None
 
@@ -83,11 +83,12 @@ class FileInfo:
         return self._md5
 
     def semear_md5(self, valor: str) -> None:
-        """Adota o MD5 que o manifesto ja guardava para este arquivo.
+        """Adopts the MD5 the manifest already held for this file.
 
-        So e chamado quando (size, mtime) batem com o manifesto — isto e, quando
-        o diff ja concluiu que o arquivo nao mudou. Sem isso, `_dataset_md5()`
-        la na frente releria do disco o que acabamos de decidir nao reler.
+        Only called when (size, mtime) match the manifest — that is, when the
+        diff has already concluded the file didn't change. Without this,
+        `_dataset_md5()` further on would reread from disk what we just
+        decided not to reread.
         """
         self._md5 = valor
 
@@ -108,20 +109,20 @@ class DatasetScanner:
         self._ignore = ignore_filter
 
     def scan(self) -> dict[str, Dataset]:
-        """Retorna dict nome → Dataset com todos os datasets encontrados."""
+        """Returns a name → Dataset dict with all the datasets found."""
         datasets: dict[str, Dataset] = {}
         shp_groups: dict[str, list[FileInfo]] = {}  # stem → arquivos
 
         for file_path in self.sync_dir.iterdir():
-            # Symlinks NUNCA entram no sync. O upload nao tem `safe_join` como o
-            # download tem, entao um link plantado na pasta (ex:
-            # 'pontos.csv' → /opt/atlans/executor/certs/client.key) publicaria um
-            # arquivo de fora no Drive do workspace — o validador nem abre .csv/
-            # .xlsx e o bundle de shapefile e zipado sem checagem de conteudo.
-            # Isto fecha o ESCAPE DE CAMINHO, nao a proveniencia do conteudo: um
-            # hardlink continua invisivel aqui (is_symlink() e False) e nenhuma
-            # checagem de caminho o pegaria — quem consegue linkar ja consegue
-            # copiar os mesmos bytes para dentro da pasta.
+            # Symlinks NEVER enter the sync. The upload has no `safe_join` like the
+            # download does, so a link planted in the folder (e.g.
+            # 'pontos.csv' → /opt/atlans/executor/certs/client.key) would publish
+            # an outside file to the workspace Drive — the validator doesn't even
+            # open .csv/.xlsx and the shapefile bundle is zipped without any
+            # content check. This closes PATH ESCAPE, not content provenance: a
+            # hardlink is still invisible here (is_symlink() is False) and no
+            # path check would catch it — whoever can link can already copy the
+            # same bytes into the folder.
             if file_path.is_symlink():
                 logger.warning("Symlink '%s' ignorado pelo sync (aponta para fora do controle da pasta).",
                                file_path.name)
@@ -137,9 +138,9 @@ class DatasetScanner:
             if ext not in SUPPORTED_EXTENSIONS:
                 continue
 
-            # O QGIS (e afins) cria e remove temporarios o tempo todo: o arquivo
-            # pode sumir entre o iterdir() e o stat() do FileInfo. Isso e normal,
-            # nao um erro de sync — pula em vez de derrubar o scan inteiro.
+            # QGIS (and the like) creates and removes temp files all the time: the file
+            # may vanish between iterdir() and the FileInfo's stat(). That is
+            # normal, not a sync error — skip instead of killing the whole scan.
             try:
                 info = FileInfo(file_path)
             except OSError as exc:
@@ -147,11 +148,11 @@ class DatasetScanner:
                 continue
 
             if ext in _SHP_EXTENSIONS:
-                # Agrupa por stem (nome sem extensao)
+                # Groups by stem (name without extension)
                 stem = file_path.stem.lower()
                 shp_groups.setdefault(stem, []).append(info)
             elif ext in _SINGLE_FILE_EXTENSIONS:
-                # Dataset de arquivo unico
+                # Single-file dataset
                 ds_name = file_path.stem.lower()
                 ds_type = ext.lstrip(".")
                 if ds_type in ("tiff", "tif"):
@@ -162,7 +163,7 @@ class DatasetScanner:
                 ds.add_file(info)
                 datasets[ds_name] = ds
 
-        # Processa grupos de Shapefile
+        # Processes Shapefile groups
         for stem, files in shp_groups.items():
             ds = Dataset(stem, "shapefile")
             extensions_found = set()
@@ -183,18 +184,18 @@ class DatasetScanner:
     def diff(self, current: dict[str, Dataset], manifest_datasets: dict,
              force_hash: bool = False) -> tuple[list, list, list]:
         """
-        Compara estado atual com manifesto.
-        Retorna (novos, modificados, removidos) como listas de nomes de datasets.
+        Compares the current state with the manifest.
+        Returns (new, modified, removed) as lists of dataset names.
 
-        Para os datasets presentes dos DOIS lados, o veredito sai de (size,
-        mtime) — que o manifesto ja guardava e o `scan()` acabou de ler no
-        `stat()`. Antes o diff pedia o MD5 de tudo a cada ciclo (30s por
-        padrao): numa pasta de campo com rasters, o disco ficava em 100% de
-        leitura permanentemente sem NENHUM arquivo ter mudado.
+        For datasets present on BOTH sides, the verdict comes from (size,
+        mtime) — which the manifest already held and `scan()` just read in
+        `stat()`. Before, the diff asked for the MD5 of everything every cycle
+        (30s by default): in a field folder with rasters, the disk stayed at
+        100% read permanently without ANY file having changed.
 
-        `force_hash=True` ignora o atalho e rehasheia tudo — e a rede de
-        seguranca contra a reescrita que preserva o mtime (copia com `-p`),
-        usada no boot e de hora em hora pelo ciclo.
+        `force_hash=True` ignores the shortcut and rehashes everything — it is
+        the safety net against a rewrite that preserves mtime (copy with
+        `-p`), used at boot and hourly by the cycle.
         """
         new_datasets = []
         modified_datasets = []
@@ -207,7 +208,7 @@ class DatasetScanner:
         for name in current_names - manifest_names:
             ds = current[name]
             if ds.type == "shapefile" and not ds.is_complete:
-                continue  # Nao sincroniza shapefile incompleto
+                continue  # Doesn't sync an incomplete shapefile
             new_datasets.append(name)
 
         # Removidos
@@ -223,9 +224,9 @@ class DatasetScanner:
             if not force_hash and _metadados_inalterados(ds, manifest_files):
                 continue  # atalho barato: nem abriu o arquivo
 
-            # Aqui o hash e obrigatorio: (size, mtime) divergiram e e ele que
-            # separa uma edicao de verdade de um `touch` — sem esta confirmacao
-            # abrir o arquivo no QGIS ja bastaria para re-enviar tudo.
+            # Here the hash is mandatory: (size, mtime) diverged and it is what
+            # separates a real edit from a `touch` — without this confirmation,
+            # opening the file in QGIS would be enough to re-send everything.
             current_hashes = _hashes_atuais(ds)
             if current_hashes is None:
                 continue
@@ -239,31 +240,32 @@ class DatasetScanner:
         return new_datasets, modified_datasets, removed_datasets
 
 
-# Pior granularidade de mtime que aparece em campo: FAT32/exFAT de pendrive e
-# HD externo gravam o horario de modificacao em passos de 2 segundos.
+# Worst mtime granularity seen in the field: FAT32/exFAT on USB sticks and
+# external HDDs record the modification time in 2-second steps.
 _GRANULARIDADE_MTIME_S = 2.0
 
 
 def _testemunho_confiavel(gravado: dict) -> bool:
-    """O par (size, mtime) gravado consegue TESTEMUNHAR que o arquivo nao mudou?
+    """Can the recorded (size, mtime) pair WITNESS that the file didn't change?
 
-    So consegue se, no instante em que foi coletado, o mtime do arquivo ja
-    estivesse "fechado". Num FS de mtime grosseiro (FAT32/exFAT: 2s), uma
-    gravacao feita logo APOS o nosso stat cai no MESMO balde de mtime — e como o
-    registro DBF tem largura fixa, editar um atributo de shapefile no QGIS
-    reescreve so o .dbf sem mudar o tamanho. Resultado: size e mtime identicos
-    para todos os componentes, o atalho conclui "inalterado" e o arquivo do
-    usuario NUNCA sobe (a varredura completa horaria era a unica rede).
+    It can only if, at the moment it was collected, the file's mtime was
+    already "closed". On a coarse-mtime FS (FAT32/exFAT: 2s), a write made
+    right AFTER our stat falls into the SAME mtime bucket — and since the DBF
+    record has a fixed width, editing a shapefile attribute in QGIS rewrites
+    only the .dbf without changing its size. Result: identical size and mtime
+    for every component, the shortcut concludes "unchanged" and the user's
+    file NEVER gets uploaded (the hourly full scan was the only net).
 
-    Duas saidas:
-      * mtime com parte fracionaria → o FS tem resolucao sub-segundo e a janela
-        de colisao e de milissegundos; nao existe na pratica;
-      * senao, exige-se que o stat tenha sido tirado ao menos uma granularidade
-        DEPOIS do mtime — dai qualquer gravacao posterior a ele cai
-        obrigatoriamente num balde diferente e o atalho volta a ser seguro.
+    Two ways out:
+      * mtime with a fractional part → the FS has sub-second resolution and
+        the collision window is milliseconds; it doesn't exist in practice;
+      * otherwise, the stat is required to have been taken at least one
+        granularity AFTER the mtime — then any later write necessarily falls
+        into a different bucket and the shortcut is safe again.
 
-    Entrada sem `stat_at` (manifesto gravado antes deste campo) nao tem como
-    provar nada: rehasheia uma vez e o `_renovar_testemunho` a reancora.
+    An entry without `stat_at` (manifest written before this field) has no
+    way to prove anything: it rehashes once and `_renovar_testemunho`
+    re-anchors it.
     """
     mtime = gravado["mtime"]
     if mtime % 1:
@@ -275,11 +277,11 @@ def _testemunho_confiavel(gravado: dict) -> bool:
 
 
 def _metadados_inalterados(ds: Dataset, manifest_files: dict) -> bool:
-    """(size, mtime) de TODOS os arquivos batem com o manifesto?
+    """Do the (size, mtime) of ALL files match the manifest?
 
-    Tudo-ou-nada de proposito: semear o MD5 de parte dos arquivos e hashear o
-    resto produziria um hash combinado meio velho, que acabaria gravado no
-    manifesto como se fosse o estado atual do disco.
+    All-or-nothing on purpose: seeding the MD5 of some files and hashing the
+    rest would produce a half-stale combined hash, which would end up written
+    to the manifest as if it were the current state of the disk.
     """
     if set(ds.files) != set(manifest_files):
         return False
@@ -289,8 +291,8 @@ def _metadados_inalterados(ds: Dataset, manifest_files: dict) -> bool:
         if not isinstance(gravado, dict):
             return False
         md5_gravado = gravado.get("md5")
-        # Manifesto antigo (ou entrada gravada sem stat) nao tem com o que
-        # comparar — cai no hash.
+        # An old manifest (or an entry written without stat) has nothing to
+        # compare with — falls back to the hash.
         if not md5_gravado or gravado.get("size") is None or gravado.get("mtime") is None:
             return False
         if finfo.size != gravado["size"] or finfo.mtime != gravado["mtime"]:
@@ -304,15 +306,15 @@ def _metadados_inalterados(ds: Dataset, manifest_files: dict) -> bool:
 
 
 def _renovar_testemunho(ds: Dataset, manifest_files: dict) -> None:
-    """Reancora (size, mtime, stat_at) depois de o HASH confirmar que o conteudo
-    e o mesmo.
+    """Re-anchors (size, mtime, stat_at) after the HASH confirms the content
+    is the same.
 
-    Sem isto, um `touch` — ou uma entrada gravada por versao antiga, sem
-    `stat_at`, ou colhida cedo demais num pendrive — condenava o dataset a ser
-    rehasheado a cada ciclo: nada muda, nada e enviado e, portanto, ninguem
-    regrava a entrada do manifesto. Aqui a mutacao e no dict vivo do manifesto;
-    o flush do fim do ciclo a persiste. Se ela se perder, o unico custo e mais
-    um hash no ciclo seguinte.
+    Without this, a `touch` — or an entry written by an old version, without
+    `stat_at`, or collected too early on a USB stick — doomed the dataset to
+    be rehashed every cycle: nothing changes, nothing is sent and, therefore,
+    nobody rewrites the manifest entry. Here the mutation is on the
+    manifest's live dict; the end-of-cycle flush persists it. If it is lost,
+    the only cost is one more hash on the next cycle.
     """
     for fname, finfo in ds.files.items():
         gravado = manifest_files.get(fname)
@@ -323,11 +325,11 @@ def _renovar_testemunho(ds: Dataset, manifest_files: dict) -> None:
 
 
 def entrada_de_manifesto(path: Path, md5: str) -> dict:
-    """Entrada de 'files' para um arquivo que NOS acabamos de gravar (download).
+    """'files' entry for a file that WE just wrote (download).
 
-    Passa pelo `FileInfo` para que o formato do testemunho (size/mtime/stat_at)
-    tenha um lugar so: montado a mao em cada ponto de download, bastava esquecer
-    o `stat_at` para o dataset ser rehasheado todo ciclo.
+    Goes through `FileInfo` so the witness format (size/mtime/stat_at) has a
+    single home: built by hand at each download point, forgetting `stat_at`
+    was enough to get the dataset rehashed every cycle.
     """
     info = FileInfo(path)
     info.semear_md5(md5)
@@ -335,15 +337,16 @@ def entrada_de_manifesto(path: Path, md5: str) -> dict:
 
 
 def _hashes_atuais(ds: Dataset) -> dict[str, str] | None:
-    """MD5 de todos os arquivos do dataset, ou None se algum nao pode ser lido.
+    """MD5 of all the dataset's files, or None if any could not be read.
 
-    O `scan()` ja trata o temporario que some entre o `iterdir` e o `stat`; aqui
-    a janela e bem maior, porque o hash ABRE todos os arquivos — e na varredura
-    completa horaria isso e a pasta inteira. Um unico arquivo que suma (QGIS/
-    ArcGIS criam e removem temporarios o tempo todo) ou que esteja travado
-    derrubava o ciclo com OSError, e com ele a deteccao de mudanca da pasta
-    toda. Sem conseguir ler, nao ha veredito seguro a dar: o dataset fica para o
-    proximo ciclo, quando o scan ja vera a pasta como ela ficou.
+    `scan()` already handles the temp file that vanishes between `iterdir` and
+    `stat`; here the window is much larger, because the hash OPENS every file
+    — and in the hourly full scan that is the whole folder. A single file
+    that vanished (QGIS/ArcGIS create and remove temp files all the time) or
+    that was locked killed the cycle with OSError, and with it change
+    detection for the whole folder. Without being able to read, there is no
+    safe verdict to give: the dataset is left for the next cycle, when the
+    scan will see the folder as it ended up.
     """
     try:
         return ds.file_hashes()
@@ -353,13 +356,13 @@ def _hashes_atuais(ds: Dataset) -> dict[str, str] | None:
         return None
 
 
-# Chunk de leitura do MD5. 8 KB pagava uma chamada de leitura a cada 8 KB de
-# raster; o uploader ja lia em 1 MB.
+# MD5 read chunk. 8 KB paid for one read call every 8 KB of raster; the
+# uploader already read in 1 MB.
 _CHUNK = 1024 * 1024
 
 
 def _compute_md5(path: Path) -> str:
-    """Calcula MD5 de um arquivo."""
+    """Computes a file's MD5."""
     h = hashlib.md5()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(_CHUNK), b""):

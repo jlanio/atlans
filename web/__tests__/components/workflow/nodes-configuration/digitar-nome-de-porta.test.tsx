@@ -1,19 +1,19 @@
 /**
- * Digitar o nome de uma porta nos nós de entrada/saída de sub-fluxo.
+ * Typing a port name in the sub-workflow input/output nodes.
  *
- * O `HELPER_MAP` do formulário era construído DENTRO do componente, e os dois
- * editores de porta eram funções inline — um tipo de elemento novo a cada
- * render. O React não reconcilia isso: desmonta e remonta a subárvore inteira.
- * O campo de texto era recriado do zero a cada tecla e perdia o foco, então só
- * dava para escrever uma letra por vez, clicando de volta no campo entre elas.
+ * The form's `HELPER_MAP` was built INSIDE the component, and the two port
+ * editors were inline functions — a new element type on every render. React
+ * doesn't reconcile that: it unmounts and remounts the whole subtree. The text
+ * field was recreated from scratch on every keystroke and lost focus, so you
+ * could only type one letter at a time, clicking back into the field in between.
  *
- * Os outros helpers do mapa são referências importadas, estáveis — por isso o
- * defeito aparecia só nestes dois.
+ * The map's other helpers are imported, stable references — that's why the
+ * defect only showed up in these two.
  *
- * O teste olha a IDENTIDADE do nó no DOM, que é a causa direta: sobrevivendo ao
- * re-render, ele mantém o foco e a tecla seguinte chega nele. Comparar só o
- * valor não bastaria — com o remount o valor até aparece, o que não aparece é o
- * cursor.
+ * The test looks at the IDENTITY of the DOM node, which is the direct cause:
+ * surviving the re-render, it keeps focus and the next keystroke reaches it.
+ * Comparing only the value wouldn't be enough — with the remount the value even
+ * shows up; what doesn't show up is the cursor.
  */
 import { describe, it, expect, vi } from "vitest"
 import { useState } from "react"
@@ -27,7 +27,7 @@ vi.mock("@monaco-editor/react", () => ({
   default: () => <div data-testid="monaco" />,
   Editor: () => <div data-testid="monaco" />,
   useMonaco: () => null,
-  // O editor aponta o loader para `/monaco/vs` no escopo do módulo.
+  // The editor points the loader at `/monaco/vs` at module scope.
   loader: { config: () => {} },
 }))
 
@@ -48,7 +48,7 @@ function noDe(name: string): INodeContext {
   } as unknown as INodeContext
 }
 
-/** Reproduz o ciclo real do modal: cada tecla grava e re-renderiza o formulário. */
+/** Reproduces the modal's real cycle: each keystroke writes and re-renders the form. */
 function Harness({ nodeName }: { nodeName: string }) {
   const [values, setValues] = useState<Record<string, string | number | boolean>>({
     ports: JSON.stringify(["porta"]),
@@ -77,15 +77,15 @@ describe.each(["SubWorkflowInput", "SubWorkflowOutput"])("%s", (nodeName) => {
 
     fireEvent.change(campo, { target: { value: "g" } })
 
-    // Mesmo nó do DOM = o React reconciliou em vez de remontar.
+    // Same DOM node = React reconciled instead of remounting.
     expect(screen.getByDisplayValue("g")).toBe(campo)
     expect(campo).toHaveFocus()
   })
 
   it("o espaço digitado permanece e é explicado, em vez de sumir", () => {
-    // O campo aplicava `trim` a cada tecla: a barra de espaço parecia não
-    // funcionar, sem nada dizendo por quê. Guardar o que foi digitado é o que
-    // permite a validação explicar — e sugerir o underscore.
+    // The field applied `trim` on every keystroke: the space bar seemed not to
+    // work, with nothing saying why. Keeping what was typed is what lets the
+    // validation explain — and suggest the underscore.
     render(<Harness nodeName={nodeName} />)
 
     const campo = screen.getByDisplayValue("porta") as HTMLInputElement

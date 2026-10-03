@@ -44,7 +44,7 @@ export default function NodeOperationHelper({ name, alias, description, type, in
   return (
     <div className="flex flex-col gap-5 px-4 py-4">
 
-      {/* Cabeçalho de tipo */}
+      {/* Type header */}
       <div className="flex items-center gap-1.5">
         {TypeIcon && <TypeIcon size={12} className="text-muted-foreground" />}
         <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
@@ -52,7 +52,7 @@ export default function NodeOperationHelper({ name, alias, description, type, in
         </p>
       </div>
 
-      {/* Diagrama de operação */}
+      {/* Operation diagram */}
       <div className="flex items-center justify-center gap-2">
 
         {/* Inputs */}
@@ -62,7 +62,7 @@ export default function NodeOperationHelper({ name, alias, description, type, in
           </div>
         )}
 
-        {/* Seta de entrada */}
+        {/* Input arrow */}
         {inputs.length > 0 && (
           <div className="flex flex-col gap-2">
             {Array.from({ length: maxPorts }).map((_, i) => (
@@ -71,7 +71,7 @@ export default function NodeOperationHelper({ name, alias, description, type, in
           </div>
         )}
 
-        {/* Ícone central */}
+        {/* Central icon */}
         <div className="flex flex-col items-center gap-1 border rounded-md px-4 py-3 bg-muted/40 min-w-[4rem]">
           <Icon className="text-2xl text-foreground/80" />
           <p className="text-[10px] text-muted-foreground text-center leading-tight max-w-[5rem] truncate">
@@ -79,7 +79,7 @@ export default function NodeOperationHelper({ name, alias, description, type, in
           </p>
         </div>
 
-        {/* Seta de saída */}
+        {/* Output arrow */}
         {outputs.length > 0 && (
           <div className="flex flex-col gap-2">
             {Array.from({ length: maxPorts }).map((_, i) => (
@@ -97,7 +97,7 @@ export default function NodeOperationHelper({ name, alias, description, type, in
 
       </div>
 
-      {/* Descrição */}
+      {/* Description */}
       {description && (
         <div className="flex flex-col gap-1.5">
           <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
@@ -109,7 +109,7 @@ export default function NodeOperationHelper({ name, alias, description, type, in
         </div>
       )}
 
-      {/* Nota de ausência de configuração */}
+      {/* Note that no configuration is needed */}
       <div className="flex items-center gap-2 bg-muted/50 rounded-md px-3 py-2">
         <div className="w-1 h-4 rounded-full bg-border flex-shrink-0" />
         <p className="text-[11px] text-muted-foreground leading-snug">

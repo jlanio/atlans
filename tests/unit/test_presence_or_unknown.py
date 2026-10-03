@@ -1,9 +1,9 @@
 # tests/unit/test_presence_or_unknown.py
 """
-Presença em tri-estado para o dispatch (spec §5.1): blip de Redis e
-reconexão em curso viram "não sei" (candidato é TENTADO), não "offline".
-Antes, `is_online` fail-closed marcava o grupo (ou o pool) inteiro offline
-por um soluço no instante do disparo.
+Tri-state presence for dispatch (spec §5.1): a Redis blip and a reconnection in
+progress become "don't know" (the candidate is TRIED), not "offline".
+Before, a fail-closed `is_online` marked the whole group (or pool) offline
+because of a hiccup at the moment of the trigger.
 """
 from __future__ import annotations
 

@@ -78,14 +78,14 @@ describe("descrição do cron", () => {
   })
 
   it.each([
-    "5 4 * 2 *",          // mês específico
-    "0 6 * * 1,3",        // lista de dias
-    "0 6 1 * 1",          // dia do mês E dia da semana
-    "*/10 8-18 * * *",    // faixa de horas
+    "5 4 * 2 *",          // specific month
+    "0 6 * * 1,3",        // list of days
+    "0 6 1 * 1",          // day of month AND day of week
+    "*/10 8-18 * * *",    // range of hours
     "0 6 * *",            // 4 campos
-    "60 6 * * *",         // minuto fora da faixa
-    "0 25 * * *",         // hora fora da faixa
-    "0 6 32 * *",         // dia fora da faixa
+    "60 6 * * *",         // minute out of range
+    "0 25 * * *",         // hour out of range
+    "0 6 32 * *",         // day out of range
     "0 */0 * * *",        // passo zero
   ])("não reconhecido devolve o cron cru: %s", (expr) => {
     expect(descricao(expr)).toBe(expr)
@@ -139,8 +139,8 @@ describe("resumirAgendamento", () => {
   })
 
   it("next_run_at no passado é 'calculando', não 'próxima há 3 h'", () => {
-    // O agendador ainda não avançou a marca; mostrar um horário já vencido
-    // como "próxima" engana. Vira "calculando" (o tick do agendador corrige).
+    // The scheduler has not advanced the mark yet; showing an already past time
+    // as "next" is misleading. It becomes "calculando" (the scheduler's tick fixes it).
     const r = resumirAgendamento(schedule({ next_run_at: iso(-3) }), true, agora)
     expect(r?.estado).toBe("calculando")
     expect(r?.proxima).toBeNull()

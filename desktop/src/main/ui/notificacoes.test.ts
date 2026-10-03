@@ -1,11 +1,12 @@
 // desktop/src/main/ui/notificacoes.test.ts
 //
-// O que transforma notificação em spam é a repetição, e este callback roda uma
-// vez por SEGUNDO enquanto o executor trabalha. Um executor parado por erro
-// geraria 3600 toasts por hora se ninguém guardasse a condição anterior.
+// What turns notifications into spam is repetition, and this callback runs
+// once per SECOND while the executor is working. An executor stopped by an
+// error would generate 3600 toasts per hour if nobody kept the previous
+// condition.
 //
-// Por isso os testes são sobre a decisão, não sobre o texto: quando notificar,
-// quando calar, e quando voltar a falar.
+// That is why the tests are about the decision, not the text: when to notify,
+// when to stay quiet, and when to speak up again.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EstadoApp } from '../state/store.js'
 
@@ -53,8 +54,8 @@ describe('avaliarNotificacao', () => {
   })
 
   it('passos de falha diferentes sao condicoes diferentes', () => {
-    // Um erro de certificado depois de um de configuracao e outro problema, e
-    // merece ser dito. Chave igual calaria o segundo.
+    // A certificate error after a configuration one is a different problem, and
+    // deserves to be reported. An identical key would silence the second.
     const a = avaliarNotificacao(estado({ supervisor: 'failed', passoFase: 'config' }))
     const b = avaliarNotificacao(estado({ supervisor: 'failed', passoFase: 'private_key' }))
     expect(a?.chave).not.toBe(b?.chave)
@@ -70,7 +71,7 @@ describe('avaliarNotificacao', () => {
   })
 
   it('disco de executor PARADO nao notifica', () => {
-    // Um problema que ainda nao existe: nada esta gravando.
+    // A problem that does not exist yet: nothing is recording.
     expect(avaliarNotificacao(estado({ supervisor: 'stopped', livre: 0.2 }))).toBeNull()
   })
 
@@ -87,8 +88,9 @@ describe('avaliarNotificacao', () => {
   })
 
   it('NAO notifica execucao concluida', () => {
-    // Regra do modulo: numa maquina com dezenas por dia isso vira ruido, e a
-    // pessoa desliga as notificacoes do app inteiro — inclusive as que importam.
+    // Module rule: on a machine with dozens a day this becomes noise, and the
+    // person turns off notifications for the whole app — including the ones
+    // that matter.
     const a = avaliarNotificacao(estado({
       livre: 500,
       jobs: [{ job_id: 'j', status: 'ok' }] as never,
@@ -98,35 +100,35 @@ describe('avaliarNotificacao', () => {
 })
 
 describe('notificarSeMudou', () => {
-  // `Notification.isSupported()` e false no mock, entao nada e exibido — o que
-  // esta sob teste e a MEMORIA da condicao, que roda antes disso.
+  // `Notification.isSupported()` is false in the mock, so nothing is shown —
+  // what is under test is the condition's MEMORY, which runs before that.
   it('a mesma condicao repetida nao vira nova notificacao', () => {
     const clique = vi.fn()
     const falho = estado({ supervisor: 'failed', passoFase: 'config' })
 
     notificarSeMudou(falho, clique)
-    // 3600 ticks de um executor parado por uma hora.
+    // 3600 ticks of an executor stopped for an hour.
     for (let i = 0; i < 100; i++) notificarSeMudou(falho, clique)
 
-    // Sem exceção e sem acumular — a garantia observavel aqui e que a chave
-    // memorizada nao muda.
+    // No exception and no accumulation — the observable guarantee here is that
+    // the memorized key does not change.
     expect(avaliarNotificacao(falho)?.chave).toBe('failed:config')
   })
 
   it('voltar ao normal REARMA a condicao', () => {
-    // Um executor que falha, e reiniciado e falha de novo precisa avisar as
-    // duas vezes. Sem o rearme, a segunda seria muda.
+    // An executor that fails, is restarted and fails again needs to warn both
+    // times. Without re-arming, the second would be silent.
     const clique = vi.fn()
     const falho = estado({ supervisor: 'failed', passoFase: 'config' })
 
     notificarSeMudou(falho, clique)
-    notificarSeMudou(estado({ livre: 500 }), clique)   // voltou ao normal
+    notificarSeMudou(estado({ livre: 500 }), clique)   // back to normal
     expect(() => notificarSeMudou(falho, clique)).not.toThrow()
   })
 
   it('nao lanca quando o Windows recusa notificacoes', () => {
-    // Politica de grupo pode desligar toasts. Isso nao pode derrubar o loop de
-    // estado do app, que roda no mesmo callback.
+    // Group policy can turn toasts off. That must not take down the app's state
+    // loop, which runs in the same callback.
     expect(() => notificarSeMudou(
       estado({ supervisor: 'failed' }), () => {},
     )).not.toThrow()

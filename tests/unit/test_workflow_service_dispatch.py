@@ -1,9 +1,9 @@
 """
-Regressão: WorkflowService.start_analysis precisa incluir disabled_nodes e
-subworkflow_definitions no envelope do job. Antes do fix, esse caminho
-(usado pelo POST /workflows/.../execute, webhook e schedule cron) enviava
-envelope vazio para o executor, e SubWorkflows falhavam com 'nao foi pre-
-resolvido pelo servidor'.
+Regression: WorkflowService.start_analysis needs to include disabled_nodes and
+subworkflow_definitions in the job envelope. Before the fix, this path (used by
+POST /workflows/.../execute, webhook and the cron schedule) sent an empty
+envelope to the executor, and SubWorkflows failed with 'nao foi pre-
+resolvido pelo servidor' (was not pre-resolved by the server).
 """
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from app.services.workflow_service import WorkflowService, DispatchResult
 
 
 def _make_workflow_with_subworkflow(child_hash: str = "child-1") -> MagicMock:
-    """Workflow A simples com um SubWorkflow apontando para child_hash."""
+    """Simple workflow A with a SubWorkflow pointing to child_hash."""
     wf = MagicMock()
     wf.id_hash = "parent-A"
     wf.workspace_id = "ws-test"
@@ -58,14 +58,14 @@ def _make_child_workflow(hash_: str = "child-1") -> MagicMock:
 
 @pytest.mark.asyncio
 async def test_start_analysis_includes_subworkflow_definitions_in_dispatch():
-    """O fix critico: start_analysis precisa coletar a definition do filho
-    e passar ao _dispatch_job."""
+    """The critical fix: start_analysis needs to collect the child's definition
+    and pass it to _dispatch_job."""
     parent = _make_workflow_with_subworkflow("child-1")
     child = _make_child_workflow("child-1")
 
     captured_dispatch_kwargs: dict = {}
 
-    # Mock do db.execute: precisa ser AsyncMock, retornando objeto com
+    # Mock of db.execute: it needs to be an AsyncMock, returning an object with
     # .scalars().all() = [child]
     scalars_mock = MagicMock()
     scalars_mock.all = MagicMock(return_value=[child])
@@ -75,19 +75,19 @@ async def test_start_analysis_includes_subworkflow_definitions_in_dispatch():
     db = MagicMock()
     db.execute = AsyncMock(return_value=result_mock)
 
-    # WorkflowService recebe `db` e cria WorkflowCRUD internamente.
-    # Mockamos service.crud apos a instanciacao para apontar para nosso db.
+    # WorkflowService receives `db` and creates WorkflowCRUD internally.
+    # We mock service.crud after instantiation to point to our db.
     service = WorkflowService(db)
     service.crud = MagicMock(db=db)
 
-    # Mock dos wrappers que delegam para workflow_execution_service
+    # Mock of the wrappers that delegate to workflow_execution_service
     service._load_workflow = AsyncMock(return_value=(parent, parent.definition))
     service._resolve_candidates = AsyncMock(return_value=[MagicMock()])
 
-    # Mock do _dispatch_job para capturar os kwargs
+    # Mock of _dispatch_job to capture the kwargs
     service._dispatch_job = AsyncMock(side_effect=lambda *a, **kw: captured_dispatch_kwargs.update(kw) or DispatchResult(id="task-123"))
 
-    # Mock disabled_names para retornar set vazio (sem nodes desabilitados)
+    # Mock disabled_names to return an empty set (no disabled nodes)
     with patch("app.services.disabled_nodes_service.disabled_names",
                new=AsyncMock(return_value=set())):
         with patch(
@@ -107,7 +107,7 @@ async def test_start_analysis_includes_subworkflow_definitions_in_dispatch():
     assert "disabled_nodes" in captured_dispatch_kwargs, \
         "_dispatch_job nao recebeu disabled_nodes"
 
-    # A definition do filho deve ter sido coletada e passada
+    # The child's definition must have been collected and passed
     subdefs = captured_dispatch_kwargs["subworkflow_definitions"]
     assert "child-1" in subdefs, (
         f"subworkflow_definitions deveria conter 'child-1'. Recebido: {list(subdefs.keys())}"
@@ -116,8 +116,8 @@ async def test_start_analysis_includes_subworkflow_definitions_in_dispatch():
 
 @pytest.mark.asyncio
 async def test_start_analysis_with_no_subworkflows_passes_empty_dict():
-    """Workflow sem SubWorkflow: subworkflow_definitions deve ser dict vazio
-    (nao None) para nao quebrar contrato com executor."""
+    """Workflow without a SubWorkflow: subworkflow_definitions should be an empty
+    dict (not None) so as not to break the contract with the executor."""
     wf = MagicMock()
     wf.id_hash = "simple-wf"
     wf.workspace_id = "ws-test"
@@ -138,8 +138,8 @@ async def test_start_analysis_with_no_subworkflows_passes_empty_dict():
     result_mock.scalars = MagicMock(return_value=scalars_mock)
     db.execute = AsyncMock(return_value=result_mock)
 
-    # WorkflowService recebe `db` e cria WorkflowCRUD internamente.
-    # Mockamos service.crud apos a instanciacao para apontar para nosso db.
+    # WorkflowService receives `db` and creates WorkflowCRUD internally.
+    # We mock service.crud after instantiation to point to our db.
     service = WorkflowService(db)
     service.crud = MagicMock(db=db)
 

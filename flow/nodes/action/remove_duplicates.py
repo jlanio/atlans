@@ -10,18 +10,18 @@ logger = get_logger(__name__)
 @register_node
 class RemoveDuplicates(BaseNode):
     """
-    Remove registros duplicados de um GeoDataFrame com base em campos-chave.
+    Removes duplicate records from a GeoDataFrame based on key fields.
 
-    Se nenhum campo for especificado, considera todas as colunas (exceto geometry)
-    para determinar unicidade.
+    If no field is specified, considers all columns (except geometry)
+    to determine uniqueness.
 
-    Parâmetros:
-      - fields (list): lista de nomes de campos que definem unicidade.
-            Ex: ["id_municipio"] ou ["nome", "estado"]
-            Se vazio, usa todas as colunas não-geométricas.
-      - keep (string): qual registro manter em caso de duplicata:
-            "first" (padrão) — mantém a primeira ocorrência
-            "last"           — mantém a última ocorrência
+    Args:
+      - fields (list): list of field names that define uniqueness.
+            E.g.: ["id_municipio"] or ["nome", "estado"]
+            If empty, uses all non-geometry columns.
+      - keep (string): which record to keep in case of a duplicate:
+            "first" (default) — keeps the first occurrence
+            "last"            — keeps the last occurrence
     """
 
     @classmethod
@@ -36,7 +36,7 @@ class RemoveDuplicates(BaseNode):
                     "name": "fields",
                     "label": "Campos-chave",
                     "type": "chips",
-                    # Nó de entrada única: '*' e a porta dariam no mesmo.
+                    # Single-input node: '*' and the port would amount to the same thing.
                     "suggest_columns": "*",
                     "default": [],
                     "description": (
@@ -70,17 +70,17 @@ class RemoveDuplicates(BaseNode):
 
         gdf = self.get_first_gdf(inputs)
 
-        # Campo de fichas: aceita lista, JSON-string (o que a tela grava) e o
-        # texto com vírgulas das definitions antigas.
+        # Chips field: accepts a list, a JSON string (what the screen writes) and the
+        # comma-separated text of old definitions.
         fields: List[str] = colunas_pedidas(self.parameters.get("fields", []))
 
-        # keep já validado contra as options pelo self.validate().
+        # keep already validated against the options by self.validate().
         keep = self.parameters.get("keep", "first")
 
-        # Determina colunas de subset
+        # Determines subset columns
         geo_col = gdf.geometry.name
         if fields:
-            # Filtra apenas colunas que existem no GDF
+            # Filters only columns that exist in the GDF
             subset = [f for f in fields if f in gdf.columns]
             if not subset:
                 logger.warning(
@@ -90,13 +90,13 @@ class RemoveDuplicates(BaseNode):
                 )
                 subset = None
         else:
-            subset = None  # pandas usa todas as colunas
+            subset = None  # pandas uses all columns
 
         original_count = len(gdf)
 
-        # Executa drop_duplicates em thread (operação blocking)
-        # Nao usa ignore_index para preservar indices originais e poder
-        # identificar registros removidos por comparacao de indice.
+        # Runs drop_duplicates in a thread (blocking operation)
+        # Doesn't use ignore_index, to preserve the original indexes and be able
+        # to identify removed records by index comparison.
         if subset:
             deduped = await asyncio.to_thread(
                 lambda: gdf.drop_duplicates(subset=subset, keep=keep)

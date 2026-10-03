@@ -8,7 +8,7 @@ const ObjectField = ({ field, values, setNodeField }: ObjectFieldProps) => {
 
   return (
     <div>
-      {/* `htmlFor={null}`: o JsonEditor e de terceiros e nao expoe id. */}
+      {/* `htmlFor={null}`: JsonEditor is third-party and doesn't expose an id. */}
       <FieldLabel field={field} htmlFor={null} />
       <JsonEditor
         data={

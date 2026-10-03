@@ -16,23 +16,25 @@ interface MonacoCodeEditorProps {
   onEditorReady?(insertFn: (text: string) => void): void
   minHeight?: number
   label?: string
-  /** Linguagem do editor (default: "python") */
+  /** Editor language (default: "python") */
   language?: string
 }
 
 /**
- * O Monaco vem da própria origem (`public/monaco/vs`, copiado do pacote
- * instalado por `scripts/copiar-monaco.mjs` no build e no dev), não do CDN.
+ * Monaco comes from our own origin (`public/monaco/vs`, copied from the
+ * installed package by `scripts/copiar-monaco.mjs` on build and dev), not from
+ * the CDN.
  *
- * O padrão do @monaco-editor/loader é o jsdelivr, e a CSP bloqueante
- * (next.config.ts) só aceita script da origem: o loader AMD seria recusado e o
- * editor ficaria no skeleton para sempre. Os workers saem da mesma pasta — o
- * Monaco os sobe por um `blob:` que faz `importScripts` desta URL, coberto por
- * `worker-src blob:` e `script-src 'self'`. De quebra, o editor deixa de
- * depender de egress liberado e roda a versão que está no package-lock.
+ * The @monaco-editor/loader default is jsdelivr, and the blocking CSP
+ * (next.config.ts) only accepts scripts from the origin: the AMD loader would be
+ * refused and the editor would stay on the skeleton forever. The workers come
+ * from the same folder — Monaco starts them through a `blob:` that does
+ * `importScripts` of this URL, covered by `worker-src blob:` and
+ * `script-src 'self'`. As a bonus, the editor no longer depends on allowed
+ * egress and runs the version that is in package-lock.
  *
- * Aqui, no escopo do módulo: vale antes do primeiro `<Editor>` montar, que é
- * quando o loader resolve os caminhos.
+ * Here, at module scope: it applies before the first `<Editor>` mounts, which
+ * is when the loader resolves the paths.
  */
 loader.config({ paths: { vs: "/monaco/vs" } })
 
@@ -56,15 +58,15 @@ const BASE_OPTIONS: Monaco.editor.IStandaloneEditorConstructionOptions = {
 }
 
 /**
- * Tema Monokai embutido, portado do monaco-themes (MIT, © Brijesh Bittu; a
- * licença está em LICENSE.monaco-themes.txt, nesta pasta).
+ * Embedded Monokai theme, ported from monaco-themes (MIT, © Brijesh Bittu; the
+ * license is in LICENSE.monaco-themes.txt, in this folder).
  *
- * Antes era um `fetch` em escopo de módulo para cdn.jsdelivr.net que disparava
- * no instante em que o chunk era avaliado e guardava o resultado num global.
- * Isso deixava o editor dependente de egress liberado — em rede corporativa ele
- * ficava no skeleton e depois caía calado em vs-dark — e ainda apontava para
- * uma versão do pacote diferente da instalada. São 3 KB: embutir custa menos
- * que qualquer forma de buscá-lo.
+ * It used to be a module-scope `fetch` to cdn.jsdelivr.net that fired the
+ * instant the chunk was evaluated and stored the result in a global. That made
+ * the editor depend on allowed egress — on a corporate network it stayed on the
+ * skeleton and then silently fell back to vs-dark — and it also pointed to a
+ * different package version than the installed one. It is 3 KB: embedding costs
+ * less than any way of fetching it.
  */
 const MONOKAI: Monaco.editor.IStandaloneThemeData = {
   base: "vs-dark",
@@ -142,7 +144,7 @@ function exposeInsert(
 // ─── Editor inline ─────────────────────────────────────────────────────────
 
 function InlineEditor({ value, onChange, onEditorReady, minHeight = 180, language = "python", onExpand }: MonacoCodeEditorProps & { onExpand(): void }) {
-  // Altura em px gerenciada como estado — Monaco precisa de valor explícito
+  // Height in px managed as state — Monaco needs an explicit value
   const [height, setHeight] = useState(minHeight)
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null)
 
@@ -188,7 +190,7 @@ function InlineEditor({ value, onChange, onEditorReady, minHeight = 180, languag
       onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
       onDrop={handleDrop}
     >
-      {/* Botão expandir — aparece ao hover */}
+      {/* Expand button — appears on hover */}
       <button
         type="button"
         title="Expandir editor"
@@ -263,7 +265,7 @@ function FullscreenEditor({ value, onChange, label, language = "python", open, o
         onKeyDown={(e) => e.stopPropagation()}
         onKeyUp={(e) => e.stopPropagation()}
       >
-        {/* Barra de título estilo Monokai */}
+        {/* Monokai-style title bar */}
         <div className="flex items-center justify-between px-4 py-2 border-b bg-[#272822] shrink-0">
           <DialogTitle className="text-sm font-mono text-white/80">
             {label ?? "Código"}

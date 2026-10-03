@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest"
 import { aplicarQuadro, turnoVazio } from "@/app/components/home/assistente/quadros"
 
-/** Os quatro quadros só do assistente da Home, aditivos ao decodificador do editor. */
+/** The four frames specific to the Home assistant, additive to the editor's decoder. */
 describe("aplicarQuadro — quadros da Home", () => {
   it("fluxo vira um bloco fluxo", () => {
     const t = aplicarQuadro(turnoVazio("t"), { evento: "fluxo", dados: { workflow_id: "w1", nome: "Focos" } })

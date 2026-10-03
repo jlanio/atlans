@@ -1,14 +1,14 @@
 # tests/unit/test_schedule_hook_preserva_disparo.py
-"""Salvar um workflow não pode custar o próximo disparo do agendamento.
+"""Saving a workflow must not cost the schedule's next trigger.
 
-O hook apagava TODOS os schedules e recriava a cada save. O schedule novo nasce
-com next_run_at nulo, recalculado para a proxima ocorrencia FUTURA — entao
-salvar o workflow depois do horario do cron pulava o disparo daquele dia.
+The hook deleted ALL schedules and recreated them on every save. The new schedule
+is born with a null next_run_at, recomputed to the next FUTURE occurrence — so
+saving the workflow after the cron time skipped that day's trigger.
 
-Pior: `create_schedule` recusa workflow desativado e a excecao e engolida pelo
-chamador (workflow_service). O delete ja tinha acontecido, entao salvar um
-workflow inativo apagava o agendamento em definitivo, com "salvo com sucesso"
-na tela.
+Worse: `create_schedule` refuses a deactivated workflow and the exception is
+swallowed by the caller (workflow_service). The delete had already happened, so
+saving an inactive workflow deleted the schedule for good, with "salvo com sucesso"
+(saved successfully) on the screen.
 """
 from unittest.mock import AsyncMock, MagicMock
 
@@ -21,7 +21,7 @@ def _definition(**props) -> dict:
     base = {
         "strategy": "cron",
         "cron_expression": "0 13 * * *",
-        "interval": 60,          # o nó envia os defaults de TODAS as estratégias
+        "interval": 60,          # the node sends the defaults of ALL strategies
         "unit": "minutes",
         "timezone": "America/Cuiaba",
         "active": True,
@@ -39,7 +39,7 @@ def _schedule_existente(**kwargs) -> MagicMock:
         "job_id": "job-existente",
         "strategy": "cron",
         "cron_expression": "0 13 * * *",
-        "interval": None,        # zerado por create_schedule para strategy=cron
+        "interval": None,        # zeroed by create_schedule for strategy=cron
         "unit": None,
         "rrule_expression": None,
         "timezone": "America/Cuiaba",
@@ -59,7 +59,7 @@ def workflow():
 
 @pytest.fixture
 def crud(monkeypatch):
-    """Intercepta o ScheduleService inteiro — só o CRUD interessa aqui."""
+    """Intercepts the whole ScheduleService — only the CRUD matters here."""
     fake = MagicMock()
     fake.schedule_crud = MagicMock(
         get_by_workflow_hash=AsyncMock(return_value=[]),
@@ -73,7 +73,7 @@ def crud(monkeypatch):
 
 
 async def test_config_inalterada_nao_recria_o_schedule(workflow, crud):
-    """É o que preservava o next_run_at: sem delete, sem create."""
+    """This is what preserved next_run_at: no delete, no create."""
     crud.schedule_crud.get_by_workflow_hash.return_value = [_schedule_existente()]
 
     await apply_schedule_if_needed(workflow, _definition(), MagicMock())
@@ -112,9 +112,9 @@ async def test_timezone_alterado_substitui_o_schedule(workflow, crud):
 
 
 async def test_workflow_desativado_nao_perde_o_agendamento(workflow, crud):
-    """Regressao: create_schedule recusa workflow inativo e a excecao e engolida.
+    """Regression: create_schedule refuses an inactive workflow and the exception is swallowed.
 
-    Apagar antes de tentar deixava o workflow sem agendamento nenhum.
+    Deleting before trying left the workflow with no schedule at all.
     """
     workflow.flag_ative = False
     crud.schedule_crud.get_by_workflow_hash.return_value = [_schedule_existente()]
@@ -123,20 +123,20 @@ async def test_workflow_desativado_nao_perde_o_agendamento(workflow, crud):
 
     crud.schedule_crud.delete.assert_not_awaited()
     crud.create_schedule.assert_not_awaited()
-    # Fix #3: o short-circuit vira aviso para o front (não some só no log).
+    # Fix #3: the short-circuit becomes a warning to the front end (does not vanish into the log).
     assert [a.code for a in avisos] == ["workflow_inactive"]
 
 
 async def test_config_invalida_preserva_o_agendamento_e_avisa(workflow, crud):
-    """Fix #1: uma expressão inválida não pode apagar o schedule válido anterior.
+    """Fix #1: an invalid expression must not delete the previous valid schedule.
 
-    Antes a validação só rodava DENTRO de create_schedule — depois do delete.
-    Agora valida antes: sem delete, sem create, e um aviso volta para a UI.
+    Before, validation only ran INSIDE create_schedule — after the delete.
+    Now it validates first: no delete, no create, and a warning goes back to the UI.
     """
     crud.schedule_crud.get_by_workflow_hash.return_value = [_schedule_existente()]
 
-    # cron com 4 campos (inválido) — muda a config, então cairia no caminho de
-    # substituição se a guarda não existisse.
+    # cron with 4 fields (invalid) — it changes the config, so it would fall into the
+    # replacement path if the guard did not exist.
     avisos = await apply_schedule_if_needed(workflow, _definition(cron_expression="0 7 * *"), MagicMock())
 
     crud.schedule_crud.delete.assert_not_awaited()
@@ -145,8 +145,8 @@ async def test_config_invalida_preserva_o_agendamento_e_avisa(workflow, crud):
 
 
 async def test_cron_equivalente_nao_recria_o_schedule(workflow, crud):
-    """Fix #2: "00 13 * * *" == "0 13 * * *" — croniter trata igual, então
-    recriar (e zerar next_run_at, pulando o dia) seria à toa."""
+    """Fix #2: "00 13 * * *" == "0 13 * * *" — croniter treats them the same, so
+    recreating (and zeroing next_run_at, skipping the day) would be pointless."""
     crud.schedule_crud.get_by_workflow_hash.return_value = [_schedule_existente(cron_expression="0 13 * * *")]
 
     await apply_schedule_if_needed(workflow, _definition(cron_expression="00 13 * * *"), MagicMock())
@@ -156,7 +156,7 @@ async def test_cron_equivalente_nao_recria_o_schedule(workflow, crud):
 
 
 async def test_cron_dias_reordenados_nao_recria_o_schedule(workflow, crud):
-    """Fix #2: "... 4,2" e "... 2,4" são o mesmo conjunto de dias."""
+    """Fix #2: "... 4,2" and "... 2,4" are the same set of days."""
     crud.schedule_crud.get_by_workflow_hash.return_value = [_schedule_existente(cron_expression="0 13 * * 2,4")]
 
     await apply_schedule_if_needed(workflow, _definition(cron_expression="0 13 * * 4,2"), MagicMock())
@@ -166,7 +166,7 @@ async def test_cron_dias_reordenados_nao_recria_o_schedule(workflow, crud):
 
 
 async def test_caso_normal_nao_gera_aviso(workflow, crud):
-    """Substituição legítima (workflow ativo, cron válido) não avisa nada."""
+    """A legitimate replacement (active workflow, valid cron) warns about nothing."""
     crud.schedule_crud.get_by_workflow_hash.return_value = [_schedule_existente()]
 
     avisos = await apply_schedule_if_needed(workflow, _definition(cron_expression="0 7 * * *"), MagicMock())
@@ -176,7 +176,7 @@ async def test_caso_normal_nao_gera_aviso(workflow, crud):
 
 
 async def test_sem_schedule_trigger_remove_tudo(workflow, crud):
-    """Tirar o nó do canvas não pode deixar o scheduler zumbi disparando."""
+    """Removing the node from the canvas must not leave the scheduler firing as a zombie."""
     await apply_schedule_if_needed(workflow, {"nodes": [{"id": "n1", "name": "Outro"}]}, MagicMock())
 
     crud.delete_all_schedules_for_workflow.assert_awaited_once_with("wf-1")
@@ -194,8 +194,8 @@ async def test_primeiro_agendamento_e_criado(workflow, crud):
 
 
 async def test_sem_timezone_usa_o_fuso_padrao_do_produto(workflow, crud):
-    """Sem `timezone` no no, o default e o FUSO_PADRAO_DO_AGENDAMENTO unificado,
-    nao o literal 'America/Cuiaba' que divergia da constante (o ultimo caso)."""
+    """Without `timezone` on the node, the default is the unified FUSO_PADRAO_DO_AGENDAMENTO,
+    not the literal 'America/Cuiaba' that diverged from the constant (the last case)."""
     from app.core.constants import FUSO_PADRAO_DO_AGENDAMENTO
 
     crud.schedule_crud.get_by_workflow_hash.return_value = []

@@ -1,10 +1,10 @@
 # app/api/routers/me_router.py
-"""Rotas do escopo "Meu": recortes por PESSOA, entre todos os workspaces dela.
+"""Routes of the "Mine" scope: slices per PERSON, across all of their workspaces.
 
-Prefixo próprio `/me` de propósito. `GET /workflows/schedules` seria sombreado
-por `GET /workflows/{id_hash}` (o `schedules` cairia como um `id_hash`), e as
-rotas de schedule de hoje são aninhadas em `/workflows/{id}/schedules` — por
-fluxo, não por pessoa. A listagem transversal do dono não tem casa entre elas.
+Own `/me` prefix on purpose. `GET /workflows/schedules` would be shadowed
+by `GET /workflows/{id_hash}` (`schedules` would land as an `id_hash`), and
+today's schedule routes are nested under `/workflows/{id}/schedules` — per
+workflow, not per person. The owner's cross-cutting listing has no home among them.
 """
 from typing import List
 
@@ -22,18 +22,18 @@ from app.services.schedule_service import listar_agendamentos_de
 
 router = APIRouter(prefix="/me", tags=["me"])
 
-# O mesmo teto do acervo da Home (`useAcervo`): o painel do sidebar não
-# virtualiza, e uma instalação grande devolveria centenas de linhas por resposta.
+# The same ceiling as the Home collection (`useAcervo`): the sidebar panel does not
+# virtualize, and a large installation would return hundreds of rows per response.
 LIMITE_PADRAO = 200
 LIMITE_MAXIMO = 500
 
 
 class AgendamentosMeus(BaseModel):
-    """Página + TOTAL, o mesmo envelope de `ConversaLista` (`GET /assistente/conversas`).
+    """Page + TOTAL, the same envelope as `ConversaLista` (`GET /assistente/conversas`).
 
-    O teto sozinho truncava em silêncio: a web recebia 200 linhas e não tinha como
-    saber que havia mais. Com o total ela desenha o rodapé "Ver mais" — e o padrão
-    de resposta das listas da Home (Chats, Acervo) passa a ser um só.
+    The ceiling alone truncated silently: the web received 200 rows and had no way
+    to know there were more. With the total it draws the "Ver mais" (See more)
+    footer — and the response pattern of the Home lists (Chats, Collection) becomes one.
     """
 
     itens: List[AgendamentoMeu]
@@ -53,14 +53,14 @@ async def meus_agendamentos(
     db: AsyncSession = Depends(get_db),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
-    """Todos os agendamentos dos workspaces do usuário, ativos e pausados,
-    ordenados por próxima execução. A escrita (pausar/ativar) continua na rota
-    por fluxo `PUT /workflows/{id}/schedules/{job_id}`.
+    """All schedules of the user's workspaces, active and paused,
+    ordered by next run. Writing (pause/activate) stays on the per-workflow
+    route `PUT /workflows/{id}/schedules/{job_id}`.
 
-    Paginada e com limiter porque era a única listagem nova sem teto: Chats corta
-    em 50, Acervo em 200, e esta devolvia a tabela inteira dos workspaces. O
-    `total` vem junto da página para que o teto deixe de ser um truncamento
-    invisível — ver `AgendamentosMeus`."""
+    Paginated and with a limiter because it was the only new listing without a ceiling:
+    Chats cuts at 50, Collection at 200, and this one returned the workspaces' entire
+    table. The `total` comes along with the page so the ceiling stops being an
+    invisible truncation — see `AgendamentosMeus`."""
     itens = await listar_agendamentos_de(
         db,
         workspace_ids,
@@ -71,12 +71,12 @@ async def meus_agendamentos(
 
 
 async def _contar_agendamentos(db: AsyncSession, workspace_ids: List[str]) -> int:
-    """Quantos agendamentos a página recorta — o MESMO filtro de
-    `listar_agendamentos_de` (JOIN com Workflow, não apagado, workspace do ator).
+    """How many schedules the page slices — the SAME filter as
+    `listar_agendamentos_de` (JOIN with Workflow, not deleted, the actor's workspace).
 
-    A contagem mora aqui, e não no serviço, porque é o envelope da ROTA que a
-    pede; o filtro é curto o bastante para ser repetido sem risco de divergir
-    silenciosamente — qualquer mudança no recorte quebra o teste de paginação.
+    The count lives here, and not in the service, because it is the ROUTE's
+    envelope that asks for it; the filter is short enough to be repeated without
+    risk of silently diverging — any change to the slice breaks the pagination test.
     """
     if not workspace_ids:
         return 0

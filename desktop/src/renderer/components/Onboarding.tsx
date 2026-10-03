@@ -1,11 +1,11 @@
 // desktop/src/renderer/components/Onboarding.tsx
 //
-// Vincular este computador a um executor, sem terminal.
+// Linking this computer to an executor, without a terminal.
 //
-// Substitui o wizard `python -m executor setup`, que depende de `input()` e por
-// isso nao roda sob o app. Antes desta tela, quem instalasse o app e nao
-// tivesse enrollment via apenas a mensagem de erro do executor mandando rodar
-// um comando — em um terminal que o instalador nao pressupoe que exista.
+// Replaces the `python -m executor setup` wizard, which depends on `input()` and
+// therefore does not run under the app. Before this screen, anyone who installed
+// the app without an enrollment saw only the executor's error message telling
+// them to run a command — in a terminal the installer does not assume exists.
 import { useEffect, useState } from 'react'
 import { TbCircleCheck, TbDeviceDesktop, TbKey, TbLoader2 } from 'react-icons/tb'
 import type { EstadoConfiguracao } from '../../main/state/config.js'
@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { SERVIDOR } from '../../shared/servidor.js'
 import { cn } from '../lib/utils.js'
 
-/** Traduz o `codigo` do Python para algo que diga o que FAZER. */
+/** Translates the Python `codigo` into something that says what to DO. */
 const REMEDIO: Record<string, string> = {
   otp_ausente: 'O OTP não chegou ao processo de enrollment. Tente novamente.',
   executor_id_ausente: 'Informe o ID do executor, copiado do painel web.',
@@ -39,16 +39,16 @@ function Campo({
   mono?: boolean
   tipo?: string
   desabilitado?: boolean
-  /** Marca o campo apontado pela falha do enrollment. */
+  /** Marks the field pointed to by the enrollment failure. */
   invalido?: boolean
 }) {
   return (
     <label className="flex flex-col gap-1.5">
       <span className="text-sm font-medium">{rotulo}</span>
-      {/* `ui/input.tsx` em vez de um `<input>` remontado à mão: era a terceira
-          cópia das mesmas classes no app, e cada uma divergia num detalhe
-          (aqui, um `shadow-xs` que o primitivo não tem e nenhum tratamento de
-          `aria-invalid`). */}
+      {/* `ui/input.tsx` instead of an `<input>` rebuilt by hand: it was the
+          third copy of the same classes in the app, and each one diverged in
+          a detail (here, a `shadow-xs` the primitive does not have and no
+          handling of `aria-invalid`). */}
       <Input
         type={tipo}
         value={valor}
@@ -75,18 +75,18 @@ export function Onboarding({
   const [otp, setOtp] = useState('')
   const [enviando, setEnviando] = useState(false)
   const [resultado, setResultado] = useState<ResultadoEnroll | null>(null)
-  // Pedido vindo de `atlans://enroll?…`. Fica em espera até o usuário confirmar:
-  // qualquer página web pode disparar um deep link, então vincular sozinho
-  // entregaria esta máquina a quem escreveu a página.
+  // Request coming from `atlans://enroll?…`. It stays pending until the user
+  // confirms: any web page can fire a deep link, so linking on its own would
+  // hand this machine over to whoever wrote the page.
   const [pedidoLink, setPedidoLink] = useState<PedidoDeepLink | null>(null)
 
-  // O ID vem do painel web e nao muda; se ja estava no `.env` (enrollment
-  // parcial, certificado apagado), o campo nasce preenchido.
+  // The ID comes from the web dashboard and does not change; if it was already in
+  // `.env` (partial enrollment, deleted certificate), the field starts filled in.
   useEffect(() => {
     if (config.executorId) setExecutorId(config.executorId)
   }, [config.executorId])
 
-  // Deep link: o que chegou antes de montar (invoke) e o que chega depois (push).
+  // Deep link: what arrived before mounting (invoke) and what arrives after (push).
   useEffect(() => {
     void window.atlas.deepLinkPendente().then((p) => { if (p) setPedidoLink(p) })
     return window.atlas.aoReceberDeepLink(setPedidoLink)
@@ -103,7 +103,7 @@ export function Onboarding({
       const r = await window.atlas.enrolar({ executorId: executorId.trim(), otp: otp.trim() })
       setResultado(r)
       if (r.ok) {
-        setOtp('')      // uso único: manter na tela só arrisca reenvio
+        setOtp('')      // single use: keeping it on screen only risks a resubmission
         aoConcluir()
       }
     } finally {
@@ -125,8 +125,8 @@ export function Onboarding({
       <div className="flex w-full max-w-2xl flex-col gap-6 px-8 py-12">
         <header className="flex flex-col gap-1.5">
           <h1 className="flex items-center gap-2.5 text-2xl font-semibold">
-            {/* Um glifo no título dá à tela uma marca antes de qualquer texto
-                ser lido — é a primeira coisa que alguém vê ao instalar. */}
+            {/* A glyph in the title gives the screen a mark before any text is
+                read — it is the first thing someone sees after installing. */}
             <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <TbDeviceDesktop size={20} />
             </span>
@@ -199,9 +199,10 @@ export function Onboarding({
             desabilitado={enviando}
             mono
           />
-          {/* O servidor não é campo: é fixo neste app (ver shared/servidor.ts).
-              Continua VISÍVEL porque quem vincula a máquina tem o direito de
-              saber a quem ela vai obedecer — só não é editável. */}
+          {/* The server is not a field: it is fixed in this app (see
+              shared/servidor.ts). It stays VISIBLE because whoever links the
+              machine has the right to know whom it will obey — it is just not
+              editable. */}
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-medium">Servidor</span>
             <div className="flex h-9 items-center rounded-md border border-input bg-muted/40 px-3 font-mono text-xs text-muted-foreground select-text">
@@ -223,10 +224,11 @@ export function Onboarding({
           </div>
         </form>
 
-        {/* A mensagem crua do Python acompanha o remédio: quando o genérico não
-            basta, é ela que o suporte precisa ler. O `Alerta` traz o ícone e o
-            `role="alert"` — este é o retorno de uma ação que a pessoa acabou de
-            disparar, e ele nascia mudo para leitor de tela. */}
+        {/* The raw Python message accompanies the remedy: when the generic one
+            is not enough, it is what support needs to read. `Alerta` brings
+            the icon and `role="alert"` — this is the result of an action the
+            person just triggered, and it used to be born mute to screen
+            readers. */}
         {resultado && !resultado.ok && (
           <Alerta
             tom="erro"

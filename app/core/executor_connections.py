@@ -1,27 +1,27 @@
 # app/core/agent_connections.py
 """
-Registro global de conexões WebSocket ativas de executores.
+Global registry of active executor WebSocket connections.
 
-ExecutorConnectionRegistry mantém dois planos de estado:
-  - Em memória (por worker): mapa executor_id → ExecutorConnection com o WebSocket real.
-    Usado exclusivamente para envio de jobs e leitura de capacity/connected_at.
-  - Redis (compartilhado): chave executor:presence:{id} com TTL de 120s.
-    Usado para determinar se o executor está online — funciona corretamente com
-    múltiplos workers uvicorn (--workers N), pois é um estado global.
-    Ao lado dela vive executor:conn_owner:{id}, com o token da conexão que detém
-    a POSSE global do executor. Duas conexões com o mesmo executor_id em workers
-    diferentes fariam o job ser executado duas vezes (o relay é PUBLISH, ou
-    seja, broadcast); e o unregister de uma delas apagava a presença da outra.
-    Com o owner: quem conecta por último assume, o perdedor fecha o seu socket
-    e a remoção de presença é por CAS.
+ExecutorConnectionRegistry keeps two planes of state:
+  - In memory (per worker): an executor_id → ExecutorConnection map with the real WebSocket.
+    Used exclusively for sending jobs and reading capacity/connected_at.
+  - Redis (shared): key executor:presence:{id} with a 120s TTL.
+    Used to determine whether the executor is online — works correctly with
+    multiple uvicorn workers (--workers N), since it is global state.
+    Next to it lives executor:conn_owner:{id}, with the token of the connection that holds
+    global OWNERSHIP of the executor. Two connections with the same executor_id on different
+    workers would make the job run twice (the relay is PUBLISH, that
+    is, broadcast); and the unregister of one of them deleted the other's presence.
+    With the owner: whoever connects last takes over, the loser closes its socket
+    and presence removal is by CAS.
 
 Relay via Redis pub/sub:
-  Quando o HTTP request que despacha um job cai em um worker diferente do que
-  tem o WebSocket, o job é publicado no canal 'executor:job_relay:{executor_id}'.
-  O worker que tem o WS subscreve esse canal e encaminha o job ao executor.
+  When the HTTP request that dispatches a job lands on a different worker from the one
+  holding the WebSocket, the job is published on the 'executor:job_relay:{executor_id}' channel.
+  The worker holding the WS subscribes to that channel and forwards the job to the executor.
 
-Renovação de TTL: ocorre a cada heartbeat/capacity recebido (~30s).
-O TTL de 120s serve de segurança para workers que criem sem chamar unregister().
+TTL renewal: happens on every heartbeat/capacity received (~30s).
+The 120s TTL is a safety net for workers that crash without calling unregister().
 """
 import asyncio
 import collections
@@ -47,84 +47,84 @@ from app.core.config import REDIS_URL
 
 logger = get_logger(__name__)
 
-# TTL da chave de presença no Redis (segundos).
-# Deve ser > HEARTBEAT_TIMEOUT do servidor (90s) para evitar falsos negativos.
+# TTL of the presence key in Redis (seconds).
+# Must be > the server's HEARTBEAT_TIMEOUT (90s) to avoid false negatives.
 _PRESENCE_TTL = 120
 
-# Canal pub/sub para relay de jobs entre workers
+# Pub/sub channel for relaying jobs between workers
 _RELAY_CHANNEL_PREFIX = "executor:job_relay:"
 
-# Cache local (TTL curto) para respostas de is_online — evita round-trip Redis
-# em endpoints que listam todos os executores (GET /executores, list_agents).
+# Local cache (short TTL) for is_online answers — avoids a Redis round-trip
+# on endpoints that list every executor (GET /executores, list_agents).
 _PRESENCE_CACHE_TTL = 5.0  # segundos
 
-# Intervalo mínimo entre dois EVAL de renovação de presença da MESMA conexão.
-# O executor manda capacity a cada 10s e heartbeat a cada 30s: sem throttle eram
-# ~14 EVAL/min/executor (com 200 executores, ~47 EVAL/s de puro "ainda estou
-# vivo") para manter uma chave cujo TTL é de 120s. Renovando a cada TTL/4 a
-# margem continua enorme e a carga de fundo cai ~8x. A detecção de takeover por
-# este caminho passa a demorar até 30s, mas ela é só a rede de segurança — o
-# marker `__internal__.takeover` publicado no relay fecha o duplicado na hora.
+# Minimum interval between two presence-renewal EVALs of the SAME connection.
+# The executor sends capacity every 10s and a heartbeat every 30s: without a throttle that was
+# ~14 EVAL/min/executor (with 200 executors, ~47 EVAL/s of pure "I'm still
+# alive") to maintain a key whose TTL is 120s. Renewing every TTL/4 the
+# margin is still huge and the background load drops ~8x. Takeover detection through
+# this path now takes up to 30s, but it is only the safety net — the
+# `__internal__.takeover` marker published on the relay closes the duplicate right away.
 #
-# TTL/4 (e não TTL/3) de propósito: com TTL/3 havia UMA renovação de folga, então
-# uma única renovação perdida já encostava no vencimento da chave. Com TTL/4
-# sobram três tentativas antes de a presença sumir — e presença ausente com o WS
-# vivo faz o `orphan_runs_watchdog` matar runs que estão executando.
+# TTL/4 (and not TTL/3) on purpose: with TTL/3 there was ONE spare renewal, so
+# a single lost renewal already brushed against the key's expiry. With TTL/4
+# three attempts remain before the presence vanishes — and absent presence with a live WS
+# makes `orphan_runs_watchdog` kill runs that are executing.
 _PRESENCE_RENEW_INTERVAL = _PRESENCE_TTL / 4
 
-# Espera antes de RETENTAR uma renovação que não pôde ser feita (Redis fora).
-# Sem isto, uma falha de Redis avançava o relógio do throttle como se a chave
-# tivesse sido renovada e a próxima tentativa só viria um intervalo inteiro
-# depois — um blip de ~45s bastava para a chave expirar com o executor vivo.
+# Wait before RETRYING a renewal that could not be done (Redis down).
+# Without this, a Redis failure advanced the throttle clock as if the key
+# had been renewed and the next attempt would only come a whole interval
+# later — a ~45s blip was enough for the key to expire with the executor alive.
 _PRESENCE_RENEW_RETRY_INTERVAL = 5.0
 
 
 def _relay_secret() -> bytes:
-    """Segredo HMAC para autenticar mensagens do relay entre workers.
+    """HMAC secret for authenticating relay messages between workers.
 
-    Reusa APP_SECRET (já obrigatório via config) — compartilhado por todos os
-    workers uvicorn mas NÃO pelo Redis. Mesmo se o Redis for comprometido ou
-    um container hostil conseguir publicar no canal, as mensagens sem HMAC
-    válido são descartadas pelo listener.
+    Reuses APP_SECRET (already mandatory via config) — shared by all the
+    uvicorn workers but NOT by Redis. Even if Redis is compromised or
+    a hostile container manages to publish on the channel, messages without a valid
+    HMAC are discarded by the listener.
     """
     from app.core.config import APP_SECRET
     return APP_SECRET.encode() if isinstance(APP_SECRET, str) else APP_SECRET
 
 
-# ── Envelope assinado do relay ────────────────────────────────────────────────
-# O HMAC cobria SÓ o payload cru — sem canal, destinatário, nonce ou timestamp.
-# Consequência: um envelope capturado valia PARA SEMPRE e em QUALQUER canal.
-# Bastava gravar um `control/revoked` legítimo e republicá-lo no canal de cada
-# executor para derrubar a frota inteira. Agora o material assinado inclui o
-# propósito (audience), o executor de destino, um nonce e o timestamp; o
-# consumidor recusa envelope fora da janela de frescor ou com nonce já visto.
+# ── Signed relay envelope ─────────────────────────────────────────────────────
+# The HMAC covered ONLY the raw payload — no channel, recipient, nonce or timestamp.
+# Consequence: a captured envelope was valid FOREVER and on ANY channel.
+# It was enough to record a legitimate `control/revoked` and republish it on each
+# executor's channel to bring down the whole fleet. Now the signed material includes the
+# purpose (audience), the target executor, a nonce and the timestamp; the
+# consumer refuses an envelope outside the freshness window or with a nonce already seen.
 _AUDIENCE_RELAY = "relay"
 _AUDIENCE_DRIVE = "drive_events"
 
-# Curinga de destinatário. Só o fan-out de drive events usa: `emit_drive_event`
-# assina UM envelope e publica para os N executores do workspace. O relay
-# SEMPRE carrega o executor_id concreto — é essa amarra que impede reaproveitar
-# o control message de um executor no canal de outro.
+# Recipient wildcard. Only the drive events fan-out uses it: `emit_drive_event`
+# signs ONE envelope and publishes it to the workspace's N executors. The relay
+# ALWAYS carries the concrete executor_id — that binding is what prevents reusing
+# one executor's control message on another's channel.
 _ANY_EXECUTOR = "*"
 
-# Janela de frescor do envelope. Produtor e consumidor são processos do mesmo
-# host/stack, então relógio de parede é comparável entre eles.
+# Envelope freshness window. Producer and consumer are processes on the same
+# host/stack, so wall-clock time is comparable between them.
 _RELAY_FRESHNESS_WINDOW = 60.0
 _RELAY_NONCE_TTL = 2 * _RELAY_FRESHNESS_WINDOW
 _RELAY_NONCE_MAX = 20_000
 
-# "nonce|destinatário" já consumidos → deadline monotonic. Cache EM PROCESSO de
-# propósito: o adversário do modelo de ameaça é justamente quem fala com o
-# Redis, então um seen-set lá seria apagável por ele. Cada worker só precisa
-# deduplicar o que ELE recebe.
+# "nonce|recipient" already consumed → monotonic deadline. IN-PROCESS cache on
+# purpose: the adversary in the threat model is precisely whoever talks to
+# Redis, so a seen-set there could be erased by them. Each worker only needs to
+# deduplicate what IT receives.
 #
-# O TTL é FIXO, então a ordem de inserção do dict é a ordem de vencimento — é o
-# que permite purgar por prefixo em O(expirados) lá embaixo.
+# The TTL is FIXED, so the dict's insertion order is the expiry order — that is
+# what allows purging by prefix in O(expired) further below.
 _seen_relay_nonces: dict[str, float] = {}
 
-# Contador de nonces AINDA VÁLIDOS descartados por saturação do cache. Enquanto
-# durar a saturação o anti-replay do relay está desligado de fato para essas
-# entradas; o log é agregado para não virar um ERROR por envelope recebido.
+# Counter of STILL-VALID nonces discarded due to cache saturation. While
+# the saturation lasts, the relay's anti-replay is effectively off for those
+# entries; the log is aggregated so it doesn't become one ERROR per envelope received.
 _relay_nonce_evictions: dict[str, float] = {"total": 0.0, "since_log": 0.0, "last_log": 0.0}
 _RELAY_NONCE_EVICTION_LOG_EVERY = 10.0  # segundos
 
@@ -132,10 +132,10 @@ _RELAY_NONCE_EVICTION_LOG_EVERY = 10.0  # segundos
 def _relay_signing_material(
     *, payload: str, audience: str, executor_id: str, nonce: str, ts: str,
 ) -> bytes:
-    """Serializa os campos assinados com prefixo de comprimento.
+    """Serializes the signed fields with a length prefix.
 
-    O prefixo elimina ambiguidade de concatenação: sem ele, deslocar caracteres
-    entre `audience` e `executor_id` produziria o mesmo material assinado.
+    The prefix removes concatenation ambiguity: without it, shifting characters
+    between `audience` and `executor_id` would produce the same signed material.
     """
     parts = (payload, audience, executor_id, nonce, ts)
     return b"".join(f"{len(p)}:{p}".encode() for p in parts)
@@ -166,53 +166,53 @@ def _seal_envelope(payload: str, *, audience: str, executor_id: str) -> str:
 
 
 def build_signed_envelope(payload: str) -> str:
-    """Envelope assinado para o canal de DRIVE EVENTS (fan-out).
+    """Signed envelope for the DRIVE EVENTS channel (fan-out).
 
-    `emit_drive_event` assina uma vez e publica para todos os executores do
-    workspace, então este envelope não pode se amarrar a um executor concreto —
-    mas continua amarrado ao propósito 'drive_events', ao nonce e ao timestamp.
-    Consequência aceita: dentro da janela de frescor um envelope de drive pode
-    ser reapresentado a OUTRO executor. O listener de drive só aceita
-    {"type":"drive_event"}, então o estrago se limita a uma notificação de
-    arquivo fora de ordem — nada de control/job.
+    `emit_drive_event` signs once and publishes to all of the workspace's
+    executors, so this envelope cannot be bound to a concrete executor —
+    but it is still bound to the 'drive_events' purpose, the nonce and the timestamp.
+    Accepted consequence: within the freshness window a drive envelope may
+    be replayed to ANOTHER executor. The drive listener only accepts
+    {"type":"drive_event"}, so the damage is limited to an out-of-order file
+    notification — nothing on control/job.
     """
     return _seal_envelope(payload, audience=_AUDIENCE_DRIVE, executor_id=_ANY_EXECUTOR)
 
 
 def build_relay_envelope(payload: str, *, executor_id: str) -> str:
-    """Envelope assinado para o relay de job/control de UM executor.
+    """Signed envelope for the job/control relay of ONE executor.
 
-    Todo canal pub/sub que termina em `ws.send_text()` para o executor DEVE usar
-    um envelope assinado — o listener valida antes de encaminhar. Quem não tiver
-    APP_SECRET (container hostil, Redis comprometido) não consegue injetar
-    mensagens no WebSocket do executor.
+    Every pub/sub channel that ends in `ws.send_text()` to the executor MUST use
+    a signed envelope — the listener validates before forwarding. Anyone without
+    APP_SECRET (hostile container, compromised Redis) cannot inject
+    messages into the executor's WebSocket.
     """
     return _seal_envelope(payload, audience=_AUDIENCE_RELAY, executor_id=executor_id)
 
 
 def _nonce_already_seen(nonce: str, executor_id: str) -> bool:
-    """Registra o nonce para este destinatário; True se já tinha sido consumido."""
+    """Records the nonce for this recipient; True if it had already been consumed."""
     now = time.monotonic()
     key = f"{nonce}|{executor_id}"
     deadline = _seen_relay_nonces.get(key)
     if deadline is not None and deadline > now:
         return True
-    # PERF: TTL fixo ⇒ ordem de inserção == ordem de vencimento, logo os
-    # expirados são sempre um PREFIXO. Purgar pelo início até achar o primeiro
-    # vivo custa O(expirados). A versão anterior varria as 20k entradas e ainda
-    # fazia `sorted()` sobre elas — no caminho quente de TODO envelope recebido.
+    # PERF: fixed TTL ⇒ insertion order == expiry order, so the
+    # expired entries are always a PREFIX. Purging from the start until the first
+    # live one costs O(expired). The previous version scanned all 20k entries and also
+    # ran `sorted()` over them — on the hot path of EVERY envelope received.
     while _seen_relay_nonces:
         oldest_key, oldest_deadline = next(iter(_seen_relay_nonces.items()))
         if oldest_deadline > now:
             break
         _seen_relay_nonces.pop(oldest_key, None)
 
-    # SEG: se o teto for atingido só com entradas AINDA VÁLIDAS, evictar reabre
-    # a janela de replay do envelope correspondente. Descartar em SILÊNCIO — como
-    # era feito antes — deixava o operador sem saber que o anti-replay do relay
-    # estava desligado de fato. O cache irmão do executor
-    # (executor/job_validator.py) grita nessa mesma situação; aqui o grito é
-    # agregado porque, saturado, isso acontece a cada envelope.
+    # SEC: if the ceiling is reached with only STILL-VALID entries, evicting reopens
+    # the replay window of the corresponding envelope. Discarding SILENTLY — as
+    # was done before — left the operator unaware that the relay's anti-replay
+    # was effectively off. The executor's sibling cache
+    # (executor/job_validator.py) shouts in this same situation; here the shout is
+    # aggregated because, when saturated, it happens on every envelope.
     if len(_seen_relay_nonces) >= _RELAY_NONCE_MAX:
         evicted_key, evicted_deadline = next(iter(_seen_relay_nonces.items()))
         _seen_relay_nonces.pop(evicted_key, None)
@@ -239,11 +239,11 @@ def _nonce_already_seen(nonce: str, executor_id: str) -> bool:
 def open_signed_envelope(
     raw: str, *, channel_label: str, executor_id: str, audience: str,
 ) -> str | None:
-    """Valida o envelope assinado e devolve o payload, ou None se inválido.
+    """Validates the signed envelope and returns the payload, or None if invalid.
 
-    Além do HMAC, exige: propósito igual ao esperado, destinatário igual ao
-    executor deste canal (ou curinga, só em drive events), timestamp dentro de
-    `_RELAY_FRESHNESS_WINDOW` e nonce inédito.
+    Besides the HMAC, it requires: purpose equal to the expected one, recipient equal to
+    this channel's executor (or the wildcard, only in drive events), timestamp within
+    `_RELAY_FRESHNESS_WINDOW` and a never-seen nonce.
     """
     try:
         envelope = json.loads(raw)
@@ -262,8 +262,8 @@ def open_signed_envelope(
         )
         return None
 
-    # HMAC primeiro: aud/target/nonce/ts fazem parte do material assinado, logo
-    # qualquer adulteração deles é detectada aqui antes de serem usados.
+    # HMAC first: aud/target/nonce/ts are part of the signed material, so
+    # any tampering with them is detected here before they are used.
     expected = _relay_mac(
         payload=payload, audience=aud, executor_id=target, nonce=nonce, ts=ts,
     )
@@ -321,13 +321,13 @@ def _presence_key(executor_id: str) -> str:
 
 
 def _conn_owner_key(executor_id: str) -> str:
-    """Chave do DONO GLOBAL da conexão WebSocket de um executor.
+    """Key of the GLOBAL OWNER of an executor's WebSocket connection.
 
-    O de-dup de `register()` é por processo, mas o deploy roda `--workers 4`:
-    nada impedia dois workers de terem, cada um, um WS vivo para o mesmo
-    executor_id. Como o relay usa PUBLISH (broadcast), o job era entregue duas
-    vezes → INSERT e e-mail duplicados. Esta chave carrega o token da conexão
-    que detém a posse; quem conecta por último assume e o perdedor fecha o seu
+    The de-dup in `register()` is per process, but the deployment runs `--workers 4`:
+    nothing prevented two workers from each having a live WS for the same
+    executor_id. Since the relay uses PUBLISH (broadcast), the job was delivered twice
+    → duplicated INSERTs and emails. This key carries the token of the connection
+    that holds ownership; whoever connects last takes over and the loser closes its
     socket.
     """
     return f"executor:conn_owner:{executor_id}"
@@ -341,8 +341,8 @@ def _drive_channel(executor_id: str) -> str:
     return f"executor:{executor_id}:drive_events"
 
 
-# Renova presence + owner APENAS se o token ainda for o dono (ou se a posse
-# expirou e ninguém assumiu). Retorna 1 se renovou, 0 se outro worker assumiu.
+# Renews presence + owner ONLY if the token is still the owner (or if ownership
+# expired and nobody took over). Returns 1 if renewed, 0 if another worker took over.
 _LUA_RENEW_PRESENCE = """
 local owner = redis.call('GET', KEYS[2])
 if owner and owner ~= ARGV[1] then
@@ -353,10 +353,10 @@ redis.call('SET', KEYS[1], '1', 'EX', tonumber(ARGV[2]))
 return 1
 """
 
-# Libera presence + owner por CAS. O DELETE incondicional anterior era um bug de
-# disponibilidade grave: o worker cuja conexão MORREU apagava a presença global
-# de uma sessão que já pertencia a outro worker → "503 Nenhum executor
-# disponível" com o executor online e ocioso.
+# Releases presence + owner by CAS. The previous unconditional DELETE was a serious
+# availability bug: the worker whose connection DIED deleted the global presence
+# of a session that already belonged to another worker → "503 Nenhum executor
+# disponível" (no executor available) with the executor online and idle.
 _LUA_RELEASE_PRESENCE = """
 local owner = redis.call('GET', KEYS[2])
 if owner and owner ~= ARGV[1] then
@@ -368,32 +368,32 @@ return 1
 """
 
 
-# ── Prazo de envio pelo WebSocket do executor ────────────────────────────────
-# Sem prazo, `send_text` para uma conexão parada (executor congelado, rede
-# meio-aberta) esperava o drain até o ping timeout da API (`--ws-ping-timeout
-# 600`): o despacho — e com ele o agendador daquele worker, que processa um
-# agendamento por vez — ficava até ~10 min preso num único envio, com o run em
-# "Na fila". O prazo cresce com o tamanho do frame para não cortar um envelope
-# grande numa rede lenta: 30 s + 1 s a cada 512 KB (16 MB, o teto do frame,
-# dá ~62 s).
+# ── Send deadline on the executor's WebSocket ────────────────────────────────
+# Without a deadline, `send_text` to a stalled connection (frozen executor, half-open
+# network) waited on the drain until the API's ping timeout (`--ws-ping-timeout
+# 600`): the dispatch — and with it that worker's scheduler, which processes one
+# schedule at a time — was stuck for up to ~10 min on a single send, with the run in
+# "Na fila" (queued). The deadline grows with the frame size so as not to cut off a large
+# envelope on a slow network: 30 s + 1 s per 512 KB (16 MB, the frame ceiling,
+# gives ~62 s).
 #
-# Estourar o prazo NÃO é recusa nem conexão morta. O frame inteiro já está no
-# buffer do transporte (o websockets o escreve antes do drain; o prazo só
-# cancela a espera) e continua saindo em segundo plano. Por isso:
-#   - não se derruba a conexão: um executor vivo com link lento perdia a
-#     presença, o watchdog fechava todos os runs dele como órfãos e, na volta,
-#     o inventário mandava cancelar os jobs que ainda rodavam;
-#   - o job conta como entregue sem confirmação (ACK pendente), sem failover —
-#     mandá-lo a outro executor faria os dois rodarem o mesmo job. Se ele não
-#     chegar, o inventário e a varredura dos 'pending' fecham o run;
-#   - enquanto a escrita estiver atrasada (além do próprio prazo), a conexão
-#     fica fora do despacho — no worker que a segura e, por uma marca no Redis,
-#     nos que a alcançam pelo relay. Uma conexão morta de verdade cai pelo
-#     timeout do heartbeat e pela presença.
+# Exceeding the deadline is NOT a refusal nor a dead connection. The whole frame is already in the
+# transport buffer (websockets writes it before the drain; the deadline only
+# cancels the wait) and keeps going out in the background. Therefore:
+#   - the connection is not dropped: a live executor with a slow link used to lose its
+#     presence, the watchdog closed all of its runs as orphans and, on return,
+#     the inventory ordered the jobs still running to be canceled;
+#   - the job counts as delivered without confirmation (ACK pending), with no failover —
+#     sending it to another executor would make both run the same job. If it does not
+#     arrive, the inventory and the 'pending' sweep close the run;
+#   - while the write is late (beyond its own deadline), the connection
+#     is left out of dispatch — on the worker that holds it and, via a mark in Redis,
+#     on those that reach it through the relay. A truly dead connection drops out through
+#     the heartbeat timeout and presence.
 _PRAZO_DE_ENVIO_BASE_S = 30.0
 _PRAZO_DE_ENVIO_BYTES_POR_S = 512 * 1024
-# A marca de parada no Redis vence sozinha se ninguém a renovar (worker morto
-# no meio de uma escrita atrasada); o escritor a renova enquanto o atraso durar.
+# The stall mark in Redis expires on its own if nobody renews it (worker died
+# in the middle of a late write); the writer renews it while the delay lasts.
 _TTL_DA_PARADA_S = 60
 _RENOVA_PARADA_S = 30.0
 
@@ -407,9 +407,9 @@ def _chave_de_parada(executor_id: str) -> str:
 
 
 async def _redis_parada(executor_id: str) -> bool:
-    """O worker que segura o socket deste executor tem uma escrita atrasada
-    (ver `_Saida._sinalizar_atraso`). Redis fora: False — a marca é otimização,
-    não trava de segurança."""
+    """The worker holding this executor's socket has a late write
+    (see `_Saida._sinalizar_atraso`). Redis down: False — the mark is an optimization,
+    not a safety lock."""
     try:
         rc = await _get_redis()
         return bool(await rc.exists(_chave_de_parada(executor_id)))
@@ -417,32 +417,32 @@ async def _redis_parada(executor_id: str) -> bool:
         return False
 
 
-# ── Saída do WebSocket do executor: uma fila, um escritor ────────────────────
-# O `--ws websockets` do uvicorn (fixado no compose) escreve o frame INTEIRO no
-# transporte e só então espera o drain — e o drain não aceita dois esperando:
-# com o socket em backpressure (um envelope de MBs num link lento), um segundo
-# escritor levantava AssertionError com o frame dele JÁ no buffer, e quem
-# chamava tratava como falha (failover: o job rodava em dois executores; ou
-# unregister: presença apagada de um executor vivo).
+# ── Executor WebSocket output: one queue, one writer ─────────────────────────
+# uvicorn's `--ws websockets` (pinned in compose) writes the WHOLE frame to the
+# transport and only then waits for the drain — and the drain does not accept two waiters:
+# with the socket under backpressure (a multi-MB envelope on a slow link), a second
+# writer raised AssertionError with its frame ALREADY in the buffer, and the
+# caller treated it as a failure (failover: the job ran on two executors; or
+# unregister: presence deleted for a live executor).
 #
-# Por isso cada socket tem uma `_Saida`: uma fila e UMA tarefa que escreve, em
-# ordem, sem prazo nenhum sobre o drain. Quem manda espera o próprio desfecho
-# com um prazo que conta o que está na frente (o envio em curso e a fila):
-#   ENVIADO   saiu inteiro;
-#   ESCOANDO  a escrita começou (o frame está no buffer) e passou do prazo —
-#             segue saindo; para quem mandou, entregue sem confirmação;
-#   OCUPADO   o prazo acabou ainda na fila: quem mandou desiste e NADA é escrito;
-#   FECHANDO  o socket está sendo fechado: nada é escrito.
-# Erro do socket (conexão morta) sobe para quem espera. Quem espera nunca
-# recebe o CancelledError do escritor: o desfecho é um Future próprio.
+# That is why each socket has a `_Saida`: a queue and ONE task that writes, in
+# order, with no deadline at all on the drain. The sender waits for its own outcome
+# with a deadline that counts what is ahead of it (the send in progress and the queue):
+#   ENVIADO   went out whole;
+#   ESCOANDO  the write started (the frame is in the buffer) and passed the deadline —
+#             it keeps going out; for the sender, delivered without confirmation;
+#   OCUPADO   the deadline ran out while still in the queue: the sender gives up and NOTHING is written;
+#   FECHANDO  the socket is being closed: nothing is written.
+# A socket error (dead connection) propagates to the waiter. The waiter never
+# receives the writer's CancelledError: the outcome is a Future of its own.
 ENVIADO = "enviado"
 ESCOANDO = "escoando"
 OCUPADO = "ocupado"
 FECHANDO = "fechando"
 
-# ws → _Saida. Sai daqui no fim do handler da conexão (ver `encerrar_saida`).
+# ws → _Saida. Removed from here at the end of the connection handler (see `encerrar_saida`).
 _saidas: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
-# Referências fortes a tarefas soltas (asyncio só guarda weakrefs).
+# Strong references to loose tasks (asyncio only keeps weakrefs).
 _tarefas_soltas: set = set()
 
 
@@ -479,11 +479,11 @@ class _Envio:
     prazo: float
     feito: "asyncio.Future"
     estado: str = "na_fila"   # na_fila → escrevendo → fim | desistiu
-    inicio: float = 0.0       # monotonic, quando a escrita começou
+    inicio: float = 0.0       # monotonic, when the write started
 
 
 class _Saida:
-    """Fila de saída de UM WebSocket de executor, com um único escritor."""
+    """Output queue of ONE executor WebSocket, with a single writer."""
 
     def __init__(self, ws, executor_id: str | None = None):
         self.ws = ws
@@ -491,13 +491,13 @@ class _Saida:
         self.fila: "collections.deque[_Envio]" = collections.deque()
         self.atual: _Envio | None = None
         self.fechando = False
-        # Fechada porque outra sessão assumiu o executor (takeover, posse
-        # perdida): o que chegar agora é entregue por ela — ver
-        # `_conexao_para_envio` e `_encaminhar`.
+        # Closed because another session took over the executor (takeover, ownership
+        # lost): whatever arrives now is delivered by it — see
+        # `_conexao_para_envio` and `_encaminhar`.
         self.substituida = False
-        # Fechada pelo AVISO de takeover que este listener recebeu: o que
-        # estava na fila foi publicado antes de a sessão nova subscrever (ver
-        # `register`), então só existia aqui — ver `_fechar_nao_entregue`.
+        # Closed by the takeover NOTICE this listener received: whatever
+        # was in the queue was published before the new session subscribed (see
+        # `register`), so it only existed here — see `_fechar_nao_entregue`.
         self.avisada = False
         self.erro: BaseException | None = None
         self._tem_item = asyncio.Event()
@@ -505,16 +505,16 @@ class _Saida:
         self._marcou_parada = False
         self.escritor = asyncio.create_task(self._escrever(), name="saida-executor")
 
-    # ── quem manda ────────────────────────────────────────────────────────────
+    # ── the sender ────────────────────────────────────────────────────────────
     def enfileirar(self, texto: str) -> "_Envio | str":
-        """Põe na fila e devolve o envio — ou FECHANDO. Síncrono de propósito:
-        quem enfileira em sequência (o listener do relay) preserva a ordem."""
+        """Enqueues and returns the send — or FECHANDO. Synchronous on purpose:
+        whoever enqueues in sequence (the relay listener) preserves the order."""
         if self.fechando:
             return FECHANDO
         if self.erro is not None:
             raise self.erro
         feito = asyncio.get_running_loop().create_future()
-        # Um erro entregue a quem já desistiu não vira "exception never retrieved".
+        # An error delivered to someone who already gave up does not become "exception never retrieved".
         feito.add_done_callback(lambda f: f.cancelled() or f.exception())
         envio = _Envio(texto=texto, prazo=_prazo_de_envio(len(texto)), feito=feito)
         self.fila.append(envio)
@@ -522,10 +522,10 @@ class _Saida:
         return envio
 
     def _espera(self, envio: _Envio) -> float:
-        """O prazo próprio mais o que está na frente: o que falta do prazo do
-        envio em curso e os BYTES da fila antes dele, no piso de projeto
-        (512 KB/s). A base de 30 s entra uma vez só: somada por mensagem, uma
-        fila de 40 eventos pequenos prendia quem manda por 20 minutos."""
+        """Its own deadline plus what is ahead: what remains of the deadline of the
+        send in progress and the queue's BYTES before it, at the design floor
+        (512 KB/s). The 30 s base is counted only once: added per message, a
+        queue of 40 small events held the sender for 20 minutes."""
         espera = envio.prazo
         atual = self.atual
         if atual is not None:
@@ -540,16 +540,16 @@ class _Saida:
     async def aguardar(self, envio: _Envio) -> str:
         await asyncio.wait({envio.feito}, timeout=self._espera(envio))
         if envio.feito.done():
-            return envio.feito.result()   # ENVIADO, ESCOANDO, FECHANDO — ou o erro do socket
+            return envio.feito.result()   # ENVIADO, ESCOANDO, FECHANDO — or the socket error
         if envio.estado == "na_fila":
-            envio.estado = "desistiu"     # o escritor pula: nada é escrito
+            envio.estado = "desistiu"     # the writer skips it: nothing is written
             return OCUPADO
-        return ESCOANDO                   # a escrita começou: o frame está no buffer
+        return ESCOANDO                   # the write started: the frame is in the buffer
 
     async def enviar(self, texto: str) -> str:
         if self.atrasada() and not self.fechando:
-            # O link está abaixo do piso: na fila, a mensagem esperaria atrás do
-            # frame atrasado o prazo inteiro e sairia OCUPADO do mesmo jeito.
+            # The link is below the floor: in the queue, the message would wait behind the
+            # late frame for the whole deadline and come out OCUPADO anyway.
             return OCUPADO
         envio = self.enfileirar(texto)
         if isinstance(envio, str):
@@ -557,15 +557,15 @@ class _Saida:
         return await self.aguardar(envio)
 
     def atrasada(self) -> bool:
-        """A escrita em curso passou do próprio prazo (link abaixo do piso)."""
+        """The write in progress passed its own deadline (link below the floor)."""
         atual = self.atual
         return atual is not None and time.monotonic() - atual.inicio > atual.prazo
 
     def encerrar(self, *, substituida: bool = False, avisada: bool = False) -> None:
-        """Nenhum envio novo; a ESPERA do escritor é cancelada — o que ele já pôs
-        no buffer segue saindo antes do frame de close. A fila é resolvida aqui
-        mesmo: um escritor cancelado antes do primeiro passo nunca chega ao
-        próprio `except`, e quem esperava ficaria o prazo inteiro por um OCUPADO."""
+        """No new sends; the writer's WAIT is canceled — what it already put
+        in the buffer keeps going out before the close frame. The queue is resolved right
+        here: a writer canceled before its first step never reaches its
+        own `except`, and whoever was waiting would wait the whole deadline for an OCUPADO."""
         self.fechando = True
         self.substituida = self.substituida or substituida or avisada
         self.avisada = self.avisada or avisada
@@ -582,7 +582,7 @@ class _Saida:
                     self._tem_item.clear()
                     await self._tem_item.wait()
                 envio = self.fila.popleft()
-                if envio.estado != "na_fila":     # quem mandou desistiu
+                if envio.estado != "na_fila":     # the sender gave up
                     envio = None
                     continue
                 envio.estado = "escrevendo"
@@ -599,13 +599,13 @@ class _Saida:
                     envio.feito.set_result(ENVIADO)
                 envio = None
         except asyncio.CancelledError:
-            # Fechamento: o que estava sendo escrito já está no buffer.
+            # Closing: what was being written is already in the buffer.
             if envio is not None and envio.estado == "escrevendo" and not envio.feito.done():
                 envio.feito.set_result(ESCOANDO)
             self._resolver_fila(FECHANDO)
             raise
         except Exception as exc:
-            # Socket morto: quem esperava recebe o erro, e os próximos também.
+            # Dead socket: whoever was waiting gets the error, and so do the next ones.
             self.erro = exc
             if envio is not None and not envio.feito.done():
                 envio.feito.set_exception(exc)
@@ -621,11 +621,11 @@ class _Saida:
             else:
                 envio.feito.set_result(desfecho)
 
-    # ── a marca de parada ─────────────────────────────────────────────────────
-    # Liga quando a escrita em curso passa do próprio prazo e desliga quando ela
-    # termina: os outros workers param de relayar SÓ enquanto o link está de
-    # fato abaixo do piso — nem um minuto fixo depois de uma transferência
-    # grande e saudável.
+    # ── the stall mark ────────────────────────────────────────────────────────
+    # Turns on when the write in progress passes its own deadline and turns off when it
+    # finishes: the other workers stop relaying ONLY while the link is
+    # actually below the floor — not a fixed minute after a large,
+    # healthy transfer.
     def _armar_alarme(self, envio: _Envio) -> None:
         if self.executor_id:
             self._alarme = asyncio.get_running_loop().call_later(envio.prazo, self._sinalizar_atraso)
@@ -645,7 +645,7 @@ class _Saida:
 
 
 def _ws_aberto(ws) -> bool:
-    """O app ainda não pediu o close e o executor não se desconectou."""
+    """The app has not requested the close yet and the executor has not disconnected."""
     return (
         getattr(ws, "application_state", None) != WebSocketState.DISCONNECTED
         and getattr(ws, "client_state", None) != WebSocketState.DISCONNECTED
@@ -662,14 +662,14 @@ def _saida_de(ws, executor_id: str | None = None) -> _Saida:
 
 
 async def enviar_ao_executor(ws, texto: str, executor_id: str | None = None) -> str:
-    """Envia `texto` pela saída do socket — ver `_Saida`."""
+    """Sends `texto` through the socket's output — see `_Saida`."""
     return await _saida_de(ws, executor_id).enviar(texto)
 
 
 def enfileirar_ao_executor(ws, texto: str, executor_id: str | None = None) -> bool:
-    """Põe `texto` na saída do socket e segue, sem esperar a vez (para o loop de
-    recebimento, que não pode ficar preso atrás de um frame lento). Com o envio
-    em curso atrasado, descarta e devolve False: só engrossaria a fila."""
+    """Puts `texto` on the socket's output and moves on, without waiting its turn (for the
+    receive loop, which must not get stuck behind a slow frame). With the send
+    in progress running late, it discards and returns False: it would only swell the queue."""
     saida = _saida_de(ws, executor_id)
     if saida.atrasada():
         return False
@@ -677,16 +677,16 @@ def enfileirar_ao_executor(ws, texto: str, executor_id: str | None = None) -> bo
 
 
 def encerrar_envios(ws) -> None:
-    """O handler da conexão está terminando: nada mais sai por este socket. A
-    saída fica no mapa — quem mandar recebe FECHANDO e o relay dá o job por não
-    entregue, em vez de bater no socket morto — até `encerrar_saida`, no fim do
-    mesmo handler."""
+    """The connection handler is finishing: nothing else goes out through this socket. The
+    output stays in the map — whoever sends gets FECHANDO and the relay treats the job as not
+    delivered, instead of hitting the dead socket — until `encerrar_saida`, at the end of the
+    same handler."""
     _saida_de(ws).encerrar()
 
 
 def encerrar_saida(ws) -> None:
-    """Fim da vida do socket (o handler da conexão terminou): a saída dele sai
-    do mapa. Ela segura o ws, então o WeakKeyDictionary sozinho não a soltaria."""
+    """End of the socket's life (the connection handler finished): its output leaves
+    the map. It holds the ws, so the WeakKeyDictionary alone would not release it."""
     saida = _saidas.pop(ws, None)
     if saida is not None:
         saida.encerrar()
@@ -701,20 +701,20 @@ async def _fechar_depois_do_escritor(ws, saida: "_Saida | None", code: int, reas
 async def fechar_ws_do_executor(
     ws, code: int = 1000, reason: str = "", *, substituida: bool = False, avisada: bool = False,
 ) -> None:
-    """Fecha o WebSocket de um executor. Todo close de socket de executor passa
-    por aqui.
+    """Closes an executor's WebSocket. Every executor socket close goes
+    through here.
 
-    Com uma escrita escoando, o drain dela fica pendente — e com ele pendente o
-    close do websockets legacy levantava AssertionError na hora, sem nunca chegar
-    ao close_timeout → abort: o socket de um executor congelado ficava vivo com
-    até 16 MB no buffer. Por isso a saída é encerrada primeiro (a espera do
-    escritor é cancelada; o que ele já escreveu segue antes do frame de close).
-    O close roda numa tarefa própria: um `wait_for` de quem chamou não o
-    abandona no meio (ele chega ao abort mesmo que quem pediu desista de esperar).
+    With a write draining, its drain stays pending — and with it pending, the
+    legacy websockets close raised AssertionError immediately, never reaching
+    close_timeout → abort: the socket of a frozen executor stayed alive with
+    up to 16 MB in the buffer. That is why the output is shut down first (the writer's
+    wait is canceled; what it already wrote goes out before the close frame).
+    The close runs in its own task: a caller's `wait_for` does not
+    abandon it midway (it reaches the abort even if the requester gives up waiting).
 
-    `substituida`: outra sessão assumiu o executor — o que vier para ele segue
-    pelo relay até a sessão nova (ver `_conexao_para_envio`). `avisada`: foi o
-    aviso de takeover que chegou (ver `_Saida.avisada`).
+    `substituida`: another session took over the executor — whatever comes for it goes
+    through the relay to the new session (see `_conexao_para_envio`). `avisada`: it was the
+    takeover notice that arrived (see `_Saida.avisada`).
     """
     saida = _marcar_fechando(ws, substituida=substituida, avisada=avisada)
     fechamento = _em_segundo_plano(_fechar_depois_do_escritor(ws, saida, code, reason), "fecha-ws")
@@ -722,11 +722,11 @@ async def fechar_ws_do_executor(
 
 
 def _marcar_fechando(ws, *, substituida: bool, avisada: bool = False) -> "_Saida | None":
-    """Encerra a saída do socket — criando-a, se nada saiu ainda por ele: quem
-    mandar durante o close recebe FECHANDO. Sem ela, o relay criava uma saída
-    nova, o escritor batia no socket fechado e o job relayado se perdia calado
-    (o erro do socket não fecha o run). Quem a tira do mapa é o fim do handler
-    (`encerrar_saida`); num socket já fechado não se cria nada."""
+    """Shuts down the socket's output — creating it, if nothing has gone out through it yet: whoever
+    sends during the close gets FECHANDO. Without it, the relay created a new
+    output, the writer hit the closed socket and the relayed job was silently lost
+    (the socket error does not close the run). What removes it from the map is the end of the handler
+    (`encerrar_saida`); on an already-closed socket nothing is created."""
     saida = _saidas.get(ws)
     if saida is None and _ws_aberto(ws):
         saida = _saida_de(ws)
@@ -735,11 +735,11 @@ def _marcar_fechando(ws, *, substituida: bool, avisada: bool = False) -> "_Saida
     return saida
 
 
-# ── Tracking de ACKs pendentes (compartilhado entre workers via Redis) ────────
-# Cada job em voo vira: executor:pending_ack:{job_id} -> "{executor_id}|{sent_at_unix}"
-# com TTL automático. O índice executor:pending_acks:set lista IDs vivos para o
-# monitor poder enumerar sem SCAN. O lock garante que só um worker emite o
-# warning por ciclo em deploys multi-worker.
+# ── Tracking of pending ACKs (shared between workers via Redis) ───────────────
+# Each in-flight job becomes: executor:pending_ack:{job_id} -> "{executor_id}|{sent_at_unix}"
+# with an automatic TTL. The executor:pending_acks:set index lists live IDs so the
+# monitor can enumerate without SCAN. The lock ensures only one worker emits the
+# warning per cycle in multi-worker deployments.
 _PENDING_ACK_TTL_SECONDS = 600
 _PENDING_ACKS_INDEX_KEY = "executor:pending_acks:set"
 _ACK_MONITOR_LOCK_KEY = "executor:ack_monitor:lock"
@@ -749,15 +749,15 @@ def _pending_ack_key(job_id: str) -> str:
     return f"executor:pending_ack:{job_id}"
 
 
-# Compara-e-apaga o pending_ack em UM round-trip. Antes eram dois (GET para
-# conferir o dono, depois pipeline GETDEL+SREM), com uma janela entre eles em que
-# outra sessão podia trocar o valor.
+# Compare-and-delete of the pending_ack in ONE round-trip. Before it was two (GET to
+# check the owner, then a GETDEL+SREM pipeline), with a window between them in which
+# another session could swap the value.
 #
-# SEG: ARGV[1] é o executor que ENVIOU o ACK; só apagamos se o job tiver sido
-# despachado para ele. ARGV[1] vazio é o modo curinga (caller sem vínculo a
-# provar) — executor_id nunca é string vazia, então não há como um ACK forjar
-# esse modo. Retornos: nil (job desconhecido), {0, dono} (impostor),
-# {1, valor} (limpo).
+# SEC: ARGV[1] is the executor that SENT the ACK; we only delete if the job was
+# dispatched to it. An empty ARGV[1] is the wildcard mode (a caller with no binding to
+# prove) — executor_id is never an empty string, so there is no way for an ACK to forge
+# that mode. Returns: nil (unknown job), {0, owner} (impostor),
+# {1, value} (clean).
 _LUA_CLEAR_PENDING_ACK = """
 local raw = redis.call('GET', KEYS[1])
 if not raw then
@@ -774,18 +774,18 @@ return {1, raw}
 """
 
 
-# ── Pool Redis singleton ──────────────────────────────────────────────────────
-# Reutiliza a mesma conexão em todas as operações do registry. Criar+fechar
-# uma conexão a cada setex/exists/delete (como antes) é custoso: heartbeat
-# (30s) + capacity (10s) × N executores viram pressão desnecessária em connect.
+# ── Singleton Redis pool ──────────────────────────────────────────────────────
+# Reuses the same connection across all registry operations. Creating+closing
+# a connection on every setex/exists/delete (as before) is costly: heartbeat
+# (30s) + capacity (10s) × N executors turn into needless connect pressure.
 _redis_singleton: _aioredis.Redis | None = None
 _redis_lock = asyncio.Lock()
 
 
 async def _get_redis() -> _aioredis.Redis:
-    """Retorna o cliente Redis singleton do registry.
+    """Returns the registry's singleton Redis client.
 
-    Inicialização lazy, thread-safe via Lock. NÃO chamar aclose() no retorno.
+    Lazy initialization, thread-safe via Lock. Do NOT call aclose() on the return value.
     """
     global _redis_singleton
     if _redis_singleton is not None:
@@ -797,10 +797,10 @@ async def _get_redis() -> _aioredis.Redis:
 
 
 async def _reset_redis_singleton() -> None:
-    """Invalida o singleton — próximo _get_redis() recria o client.
+    """Invalidates the singleton — the next _get_redis() recreates the client.
 
-    Chamado quando uma operação falha com ConnectionError ou erro de protocolo,
-    evitando que o singleton fique preso em estado ruim após um blip do Redis.
+    Called when an operation fails with ConnectionError or a protocol error,
+    preventing the singleton from getting stuck in a bad state after a Redis blip.
     """
     global _redis_singleton
     if _redis_singleton is None:
@@ -811,17 +811,17 @@ async def _reset_redis_singleton() -> None:
     try:
         await asyncio.wait_for(old.aclose(), timeout=1.0)
     except Exception:
-        pass  # aclose em conn já ruim pode falhar; tudo bem
+        pass  # aclose on an already-bad conn may fail; that's fine
 
 
 async def _redis_claim_presence(executor_id: str, owner_token: str) -> str | None:
-    """Assume a posse global da conexão e marca presença. Devolve o token do
-    dono anterior (None se não havia dono, ou em falha de Redis).
+    """Takes global ownership of the connection and marks presence. Returns the token of the
+    previous owner (None if there was no owner, or on a Redis failure).
 
-    Quem conecta por último vence: o executor só abre um WS novo depois de o
-    antigo ter caído do ponto de vista DELE, então a sessão mais recente é a
-    boa. O aviso ao worker perdedor sai sempre, com ou sem dono anterior (ver
-    `register`): a posse de uma sessão que ainda está fechando pode ter vencido.
+    Whoever connects last wins: the executor only opens a new WS after the
+    old one has dropped from ITS point of view, so the most recent session is the
+    good one. The notice to the losing worker always goes out, with or without a previous owner (see
+    `register`): the ownership of a session that is still closing may have expired.
     """
     try:
         rc = await _get_redis()
@@ -839,18 +839,18 @@ async def _redis_claim_presence(executor_id: str, owner_token: str) -> str | Non
 
 
 async def _redis_renew_presence(executor_id: str, owner_token: str) -> bool | None:
-    """Renova presence + owner em TRI-ESTADO.
+    """Renews presence + owner as a TRI-STATE.
 
-    True  = renovei, a chave está gravada com TTL cheio.
-    False = OUTRO worker é o dono — este WS é o duplicado e deve cair.
-    None  = não consegui perguntar (Redis fora).
+    True  = renewed, the key is written with a full TTL.
+    False = ANOTHER worker is the owner — this WS is the duplicate and must drop.
+    None  = couldn't ask (Redis down).
 
-    O `None` existe porque "renovei" e "não consegui tentar" tinham o mesmo
-    retorno: quem chama marcava a renovação como FEITA e só voltava a tentar um
-    intervalo inteiro depois, enquanto a chave real seguia envelhecendo até
-    expirar com o executor vivo — e presença ausente faz o watchdog de órfãos
-    matar runs em execução. Continua fail-open no que importa (o WS não cai por
-    blip de Redis): quem trata o None só reagenda a tentativa.
+    The `None` exists because "renewed" and "couldn't try" had the same
+    return value: the caller marked the renewal as DONE and only tried again a whole
+    interval later, while the real key kept aging until it
+    expired with the executor alive — and absent presence makes the orphan watchdog
+    kill running runs. It remains fail-open where it matters (the WS does not drop over a
+    Redis blip): whoever handles the None just reschedules the attempt.
     """
     try:
         rc = await _get_redis()
@@ -867,8 +867,8 @@ async def _redis_renew_presence(executor_id: str, owner_token: str) -> bool | No
 
 
 async def _redis_release_presence(executor_id: str, owner_token: str) -> bool | None:
-    """Remove presença + posse por CAS — só se `owner_token` ainda for o dono.
-    Devolve se liberou; False quando a posse já é de outra sessão; None em erro."""
+    """Removes presence + ownership by CAS — only if `owner_token` is still the owner.
+    Returns whether it released; False when ownership already belongs to another session; None on error."""
     try:
         rc = await _get_redis()
         released = await rc.eval(
@@ -889,15 +889,15 @@ async def _redis_release_presence(executor_id: str, owner_token: str) -> bool | 
 
 
 async def _redis_presence_or_unknown(executor_id: str) -> bool | None:
-    """Presença no Redis em TRI-ESTADO: True (online), False (offline), None (não sei).
+    """Presence in Redis as a TRI-STATE: True (online), False (offline), None (don't know).
 
-    O `None` existe porque "a consulta falhou" e "o executor sumiu" são fatos
-    diferentes com custos opostos. Quem decide DISPATCH pode colapsar os dois em
-    offline sem prejuízo (não despachar é o lado seguro) — é o que
-    `_redis_check_presence` faz. Já quem decide DESTRUIR estado (falhar runs
-    órfãos) não pode: um blip do pool no instante exato da checagem mataria runs
-    de 40 minutos que estão vivos e progredindo em outro worker. Esse caller
-    trata None como "reavalio depois".
+    The `None` exists because "the query failed" and "the executor vanished" are different
+    facts with opposite costs. Whoever decides DISPATCH can collapse both into
+    offline at no cost (not dispatching is the safe side) — that is what
+    `_redis_check_presence` does. But whoever decides to DESTROY state (failing orphan
+    runs) cannot: a pool blip at the exact moment of the check would kill 40-minute
+    runs that are alive and progressing on another worker. That caller
+    treats None as "I'll reassess later".
     """
     try:
         rc = await _get_redis()
@@ -910,26 +910,26 @@ async def _redis_presence_or_unknown(executor_id: str) -> bool | None:
 
 
 async def _redis_check_presence(executor_id: str) -> bool:
-    """Presença como booleano, FAIL-CLOSED: "não sei" vira offline.
+    """Presence as a boolean, FAIL-CLOSED: "don't know" becomes offline.
 
-    Use apenas onde negar é o lado seguro (dispatch, relay, is_online). Para
-    decisões destrutivas use `_redis_presence_or_unknown` e trate o None.
+    Use only where denying is the safe side (dispatch, relay, is_online). For
+    destructive decisions use `_redis_presence_or_unknown` and handle the None.
     """
     return (await _redis_presence_or_unknown(executor_id)) is True
 
 
-# Carência de DISPATCH após uma desconexão limpa (spec §5.1). A presença é
-# apagada na hora no `finally` do handler; sem carência, um executor que está
-# reconectando (blip de rede, restart) sumia da lista de candidatos e o job ia
-# para o próximo — ou falhava, sob terminal `fail`. Dentro desta janela a
-# presença ausente vira "não sei" e o candidato é TENTADO: o `send_job` real
-# decide (falha rápido se ele não voltou). Mesma ordem de grandeza do grace de
-# órfãos do WS router.
+# DISPATCH grace period after a clean disconnect (spec §5.1). Presence is
+# deleted immediately in the handler's `finally`; without a grace period, an executor that is
+# reconnecting (network blip, restart) vanished from the candidate list and the job went
+# to the next one — or failed, under the `fail` terminal. Within this window
+# absent presence becomes "don't know" and the candidate is TRIED: the real `send_job`
+# decides (it fails fast if the executor has not come back). Same order of magnitude as the WS router's
+# orphan grace.
 _DISPATCH_GRACE_SECONDS = 20.0
 
-# Capacidade no Redis (`executor:capacity:{id}`), para o caminho RELAY do
-# `send_job` recusar um executor cheio como o caminho direto faz. Regravada só
-# quando muda ou a cada intervalo — o capacity chega a cada ~10s por executor.
+# Capacity in Redis (`executor:capacity:{id}`), so that `send_job`'s RELAY path
+# refuses a full executor as the direct path does. Rewritten only
+# when it changes or every interval — capacity arrives every ~10s per executor.
 _CAPACITY_STORE_INTERVAL = 30.0
 
 
@@ -956,9 +956,9 @@ async def _redis_store_capacity(executor_id: str, capacity: dict) -> None:
 
 
 async def _redis_delete_capacity(executor_id: str) -> None:
-    """Apaga a capacidade publicada quando o WS cai: sem isto, um executor
-    saturado que reconecta em OUTRO worker fica "cheio" para o relay por até
-    um TTL — e num workspace isolado de executor único isso é um run falhado."""
+    """Deletes the published capacity when the WS drops: without this, a saturated
+    executor that reconnects on ANOTHER worker stays "full" for the relay for up to
+    one TTL — and in an isolated single-executor workspace that is a failed run."""
     try:
         rc = await _get_redis()
         await rc.delete(_capacity_key(executor_id))
@@ -968,7 +968,7 @@ async def _redis_delete_capacity(executor_id: str) -> None:
 
 
 def _capacidade_de(raw) -> dict | None:
-    """O valor de `executor:capacity:{id}` como dict; None se ausente ou ilegível."""
+    """The value of `executor:capacity:{id}` as a dict; None if absent or unreadable."""
     if not raw:
         return None
     try:
@@ -981,7 +981,7 @@ def _capacidade_de(raw) -> dict | None:
 
 
 async def _redis_read_capacity(executor_id: str) -> dict | None:
-    """Capacidade publicada pelo worker que tem o WS; None = desconhecida."""
+    """Capacity published by the worker that holds the WS; None = unknown."""
     try:
         rc = await _get_redis()
         return _capacidade_de(await rc.get(_capacity_key(executor_id)))
@@ -992,7 +992,7 @@ async def _redis_read_capacity(executor_id: str) -> dict | None:
 
 
 async def _redis_read_capacities(executor_ids: list[str]) -> dict[str, dict | None]:
-    """`_redis_read_capacity` de vários executores numa ida só (MGET)."""
+    """`_redis_read_capacity` of several executors in a single trip (MGET)."""
     try:
         rc = await _get_redis()
         valores = await rc.mget(*[_capacity_key(i) for i in executor_ids])
@@ -1003,7 +1003,7 @@ async def _redis_read_capacities(executor_ids: list[str]) -> dict[str, dict | No
     return {i: _capacidade_de(v) for i, v in zip(executor_ids, valores)}
 
 
-# Capacidade padrão reportada antes do primeiro heartbeat de capacidade do executor
+# Default capacity reported before the executor's first capacity heartbeat
 _DEFAULT_CAPACITY = {
     "queued": 0,
     "running": 0,
@@ -1022,44 +1022,44 @@ class ExecutorConnection:
     executor_ip:    Optional[str] = None
     capacity:    dict = field(default_factory=lambda: dict(_DEFAULT_CAPACITY))
     system_info: Optional[dict] = None
-    # Define quando o executor enviou o handshake — mensagens anteriores são
-    # rejeitadas. Ver SEG/R3 no WS router.
+    # Set when the executor sent the handshake — earlier messages are
+    # rejected. See SEG/R3 in the WS router.
     handshake_received: bool = False
-    # Token único desta conexão. É ele que aparece em `executor:conn_owner:{id}`
-    # enquanto esta sessão for a dona — ver `_conn_owner_key`.
+    # Unique token of this connection. It is what appears in `executor:conn_owner:{id}`
+    # while this session is the owner — see `_conn_owner_key`.
     owner_token: str = field(default_factory=lambda: uuid.uuid4().hex)
-    # Tetos vindos do registro do Executor no banco (max_concurrent_jobs /
-    # max_queue_size). A `capacity` é AUTO-DECLARADA pelo executor: sem clamp,
-    # anunciar max_queue=10**9 atraía todos os jobs do pool para ele.
+    # Ceilings from the Executor's record in the database (max_concurrent_jobs /
+    # max_queue_size). The `capacity` is SELF-DECLARED by the executor: without a clamp,
+    # announcing max_queue=10**9 attracted every job in the pool to it.
     max_concurrent_limit: int = _DEFAULT_CAPACITY["max_concurrent"]
     max_queue_limit:      int = _DEFAULT_CAPACITY["max_queue"]
-    # Memo de autorização run_id → (autorizado, deadline monotonic). Evita um
-    # SELECT no Postgres por node_event (o vínculo run→host é imutável depois do
-    # dispatch). Vive NA CONEXÃO: nunca cruza executores e some no unregister.
+    # Authorization memo run_id → (authorized, monotonic deadline). Avoids one
+    # Postgres SELECT per node_event (the run→host binding is immutable after the
+    # dispatch). Lives IN THE CONNECTION: never crosses executors and vanishes on unregister.
     run_auth_cache: dict[str, tuple[bool, float]] = field(default_factory=dict)
-    # Instante (monotonic) da última renovação de presença no Redis. O register
-    # já grava a chave com TTL cheio, então a conexão nasce "renovada" — ver
+    # Instant (monotonic) of the last presence renewal in Redis. register
+    # already writes the key with a full TTL, so the connection is born "renewed" — see
     # `_PRESENCE_RENEW_INTERVAL`.
     last_presence_renew: float = field(default_factory=time.monotonic)
-    # Circuit breaker curto de autorização: enquanto valer, o veredito é negado
-    # SEM tocar no banco. Ver `_run_belongs_to_agent` no WS router.
+    # Short authorization circuit breaker: while it holds, the verdict is denied
+    # WITHOUT touching the database. See `_run_belongs_to_agent` in the WS router.
     db_auth_cooldown_until: float = 0.0
 
-    # Throttle da publicação de capacidade no Redis (ver _CAPACITY_STORE_INTERVAL).
+    # Throttle of capacity publication to Redis (see _CAPACITY_STORE_INTERVAL).
     last_capacity_store: float = 0.0
     last_capacity_stored: tuple | None = None
-    # Instante (monotonic) da última reconciliação pelo inventário do executor.
-    # Zero de propósito: a primeira, logo depois da conexão, nunca espera. Ver
-    # `_reconciliar_inventario` no WS router.
+    # Instant (monotonic) of the last reconciliation from the executor's inventory.
+    # Zero on purpose: the first one, right after connecting, never waits. See
+    # `_reconciliar_inventario` in the WS router.
     ultima_reconciliacao: float = 0.0
 
     def is_full(self) -> bool:
-        """Retorna True se a fila local do executor está cheia (back-pressure)."""
+        """Returns True if the executor's local queue is full (back-pressure)."""
         return _capacity_is_full(self.capacity)
 
 
 async def _redis_outra_sessao(executor_id: str, owner_token: str | None) -> bool | None:
-    """Outra sessão detém a posse deste executor? None: não deu para saber."""
+    """Does another session hold ownership of this executor? None: couldn't tell."""
     try:
         dono = await (await _get_redis()).get(_conn_owner_key(executor_id))
     except Exception as exc:
@@ -1071,16 +1071,16 @@ async def _redis_outra_sessao(executor_id: str, owner_token: str | None) -> bool
 async def _fechar_nao_entregue(
     executor_id: str, job_id: str, motivo: str, dono: str | None, *, so_aqui: bool = False,
 ) -> None:
-    """Quem publicou no relay já deu o job por entregue (o run vai a 'running'):
-    sem isto ele ficava "Em andamento" até o ACK pendente vencer (10 min).
+    """Whoever published on the relay already treated the job as delivered (the run goes to 'running'):
+    without this it stayed "Em andamento" (in progress) until the pending ACK expired (10 min).
 
-    Só fecha se nenhuma outra sessão pode tê-lo recebido. `so_aqui`: ele estava
-    na fila quando chegou o aviso de takeover — publicado antes de a sessão nova
-    subscrever. Fora isso, a posse no Redis decide: ainda desta sessão (ou de
-    ninguém) quer dizer que nenhuma sessão nova subscreveu antes deste instante,
-    logo nenhuma o recebeu. Com a posse de outra (um executor que reconectou sem
-    o aviso chegar aqui) ela pode tê-lo entregue, e fechar o run faria o
-    inventário mandar parar o job em execução: fica para a reconciliação.
+    Only closes it if no other session could have received it. `so_aqui`: it was
+    in the queue when the takeover notice arrived — published before the new session
+    subscribed. Otherwise, the ownership in Redis decides: still this session's (or
+    nobody's) means no new session subscribed before this instant,
+    so none received it. With ownership held by another (an executor that reconnected without
+    the notice reaching here) it may have delivered it, and closing the run would make the
+    inventory order the running job to stop: it is left to reconciliation.
     """
     if not so_aqui:
         outra = await _redis_outra_sessao(executor_id, dono)
@@ -1102,14 +1102,14 @@ async def _acompanhar_encaminhamento(
     executor_id: str, saida: _Saida, envio: _Envio, canal: str, tipo: str | None,
     job_id: str | None, dono: str | None,
 ) -> None:
-    """Espera o desfecho de uma mensagem que o listener enfileirou — sem prender
-    o listener, que atende TODAS as mensagens do executor (inclusive o marker de
-    close) e não pode deixá-las envelhecer atrás de um frame grande."""
+    """Waits for the outcome of a message the listener enqueued — without holding up
+    the listener, which handles ALL of the executor's messages (including the close
+    marker) and must not let them age behind a large frame."""
     try:
         resultado = await saida.aguardar(envio)
     except Exception as exc:
-        # Socket morto: nada saiu por ele (um frame cortado no meio não chega a
-        # ser lido pelo executor).
+        # Dead socket: nothing went out through it (a frame cut off midway is never
+        # read by the executor).
         logger.debug("%s: mensagem ao executor '%s' não saiu: %s", canal, executor_id, exc)
         if job_id:
             await _fechar_nao_entregue(executor_id, job_id, "erro do socket", dono)
@@ -1122,8 +1122,8 @@ async def _acompanhar_encaminhamento(
         return
     logger.warning("%s: mensagem '%s' ao executor '%s' não saiu (%s).", canal, tipo or "?", executor_id, resultado)
     if job_id:
-        # FECHANDO aqui é de uma mensagem que já estava na fila quando o socket
-        # começou a fechar.
+        # FECHANDO here belongs to a message that was already in the queue when the socket
+        # started closing.
         await _fechar_nao_entregue(
             executor_id, job_id, resultado, dono, so_aqui=resultado == FECHANDO and saida.avisada,
         )
@@ -1136,8 +1136,8 @@ def _encaminhar(
     try:
         envio = saida.enfileirar(payload)
     except Exception:
-        # Socket morto: o erro sobe (o listener encerra), mas quem publicou
-        # contou com este listener.
+        # Dead socket: the error propagates (the listener ends), but whoever published
+        # counted on this listener.
         if job_id:
             _em_segundo_plano(
                 _fechar_nao_entregue(executor_id, job_id, "erro do socket", dono), f"nao-entregue-{job_id[:8]}",
@@ -1150,15 +1150,15 @@ def _encaminhar(
         )
         return
     if saida.substituida:
-        # Chegou depois do takeover: o listener da sessão nova também a recebe.
-        # Janela rara: publicada entre o aviso e a inscrição dele (uma ida e
-        # volta ao Redis, mais se a inscrição falhar), ninguém a entrega — a
-        # reconciliação fecha o run quando o ACK pendente vence.
+        # Arrived after the takeover: the new session's listener also receives it.
+        # Rare window: published between the notice and its subscription (one round
+        # trip to Redis, more if the subscription fails), nobody delivers it — the
+        # reconciliation closes the run when the pending ACK expires.
         logger.debug("%s: socket do executor '%s' substituído — '%s' fica com a sessão nova.",
                      canal, executor_id, tipo or "?")
         return
-    # O executor está indo embora (heartbeat, erro de protocolo, disconnect):
-    # este listener pode ser o único destinatário, e quem publicou contou com ele.
+    # The executor is going away (heartbeat, protocol error, disconnect):
+    # this listener may be the only recipient, and whoever published counted on it.
     if not job_id:
         logger.debug("%s: socket do executor '%s' fechando — '%s' descartado.", canal, executor_id, tipo or "?")
         return
@@ -1169,14 +1169,14 @@ def _encaminhar(
 async def _handle_relay_message(
     executor_id: str, ws: "WebSocket", owner_token: str, raw: str,
 ) -> bool:
-    """Trata uma mensagem do canal de relay. Devolve False para encerrar o listener.
+    """Handles a message from the relay channel. Returns False to end the listener.
 
-    Extraída do laço para que relay e drive events possam dividir UM único
-    pubsub — ver `_executor_pubsub_listener`.
+    Extracted from the loop so that relay and drive events can share ONE single
+    pubsub — see `_executor_pubsub_listener`.
     """
-    # ── Verifica HMAC do envelope ─────────────────────────────────────────────
-    # Qualquer publisher que não tenha APP_SECRET (ex: container externo
-    # acessando Redis) produz mensagens sem assinatura válida e é descartado aqui.
+    # ── Verifies the envelope's HMAC ──────────────────────────────────────────
+    # Any publisher without APP_SECRET (e.g. an external container
+    # accessing Redis) produces messages without a valid signature and is discarded here.
     payload = open_signed_envelope(
         raw, channel_label="Relay",
         executor_id=executor_id, audience=_AUDIENCE_RELAY,
@@ -1184,38 +1184,38 @@ async def _handle_relay_message(
     if payload is None:
         return True
 
-    # Parse do payload uma vez — usado pra detectar marker interno de close
-    # (nao encaminha). Backpressure fica com o CLIENTE
-    # (executor/connection.py:_handle_job), que ja emite `job_result` com erro
-    # "fila cheia" para que o server marque o run como failed. Filtrar aqui era
-    # duplicata e causava run "running" para sempre.
+    # Parse the payload once — used to detect the internal close marker
+    # (not forwarded). Backpressure is the CLIENT's job
+    # (executor/connection.py:_handle_job), which already emits `job_result` with the error
+    # "fila cheia" (queue full) so that the server marks the run as failed. Filtering here was
+    # a duplicate and left runs "running" forever.
     try:
         parsed_payload = json.loads(payload)
     except json.JSONDecodeError:
         parsed_payload = None
 
-    # ── Marker interno de close (disconnect_executor) ─────────────────────────
-    # Payload publicado por `disconnect_executor` para forcar fechamento remoto
-    # do WS. Nao encaminhado ao cliente — so causa close local, cleanup e
-    # finaliza o listener.
+    # ── Internal close marker (disconnect_executor) ───────────────────────────
+    # Payload published by `disconnect_executor` to force a remote close
+    # of the WS. Not forwarded to the client — it only causes a local close, cleanup and
+    # ends the listener.
     if isinstance(parsed_payload, dict):
         internal = parsed_payload.get("__internal__")
 
-        # ── Marker de takeover (outra sessão assumiu a posse) ──
-        # Só chega aqui via envelope assinado com APP_SECRET e amarrado a ESTE
-        # executor, então não é forjável de fora.
+        # ── Takeover marker (another session took ownership) ──
+        # Only arrives here via an envelope signed with APP_SECRET and bound to THIS
+        # executor, so it cannot be forged from outside.
         if isinstance(internal, dict) and "takeover" in internal:
             new_owner = (internal.get("takeover") or {}).get("owner")
             if new_owner == owner_token:
-                return True  # eco do meu próprio register
+                return True  # echo of my own register
             logger.warning(
                 "Executor '%s': outra sessão assumiu a conexão — "
                 "fechando este WS duplicado (evita execução dupla de job).",
                 executor_id,
             )
             try:
-                # 4409 (conflito) NÃO é terminal no cliente: se este socket ainda
-                # estiver vivo do lado dele, reconectar é o comportamento correto.
+                # 4409 (conflict) is NOT terminal on the client: if this socket is still
+                # alive on its side, reconnecting is the correct behavior.
                 await fechar_ws_do_executor(
                     ws, code=4409, reason="Conexao assumida por outra sessao.", avisada=True,
                 )
@@ -1242,9 +1242,9 @@ async def _handle_relay_message(
                     "Relay: falha ao fechar WS do executor '%s' via marker: %s",
                     executor_id, exc,
                 )
-            # Cleanup imediato — sem esperar 90s do heartbeat timeout. Remove
-            # presence + entrada local + cancela o listener. O handler do WS caira
-            # no finally logo em seguida e sera no-op via expected_ws guard.
+            # Immediate cleanup — without waiting the 90s heartbeat timeout. Removes
+            # presence + local entry + cancels the listener. The WS handler will fall
+            # into its finally right after and will be a no-op via the expected_ws guard.
             try:
                 await executor_registry.unregister(executor_id, expected_ws=ws)
             except Exception as exc:
@@ -1258,10 +1258,10 @@ async def _handle_relay_message(
             )
             return False
 
-    # Encaminha payload ao cliente. Se for job e a fila do cliente estiver cheia,
-    # ele responde com `job_result` error "back-pressure" e o server marca o run
-    # failed via `_handle_job_result` (executor_ws_router.py). Enfileira e segue:
-    # o desfecho é acompanhado fora do listener (ver `_acompanhar_encaminhamento`).
+    # Forwards the payload to the client. If it is a job and the client's queue is full,
+    # it replies with a `job_result` error "back-pressure" and the server marks the run
+    # failed via `_handle_job_result` (executor_ws_router.py). Enqueues and moves on:
+    # the outcome is tracked outside the listener (see `_acompanhar_encaminhamento`).
     tipo = parsed_payload.get("type") if isinstance(parsed_payload, dict) else None
     job_id = ((parsed_payload or {}).get("envelope") or {}).get("job_id") if tipo == "job" else None
     try:
@@ -1275,20 +1275,20 @@ async def _handle_relay_message(
 
 
 async def _handle_drive_message(executor_id: str, ws: "WebSocket", raw: str) -> bool:
-    """Trata uma mensagem do canal de drive events. False encerra o listener."""
-    # SEG: mesma verificação HMAC do relay de jobs. Antes este canal repassava o
-    # payload cru do Redis direto ao WS — quem conseguisse publicar nele injetava
-    # qualquer mensagem no executor, inclusive
-    # {"type":"control","action":"shutdown"} (DoS) e
-    # {"type":"control","action":"config_changed"} (SIGTERM em loop), além de
-    # drive_events forjados.
+    """Handles a message from the drive events channel. False ends the listener."""
+    # SEC: same HMAC check as the job relay. Before, this channel passed the
+    # raw Redis payload straight to the WS — anyone able to publish on it could inject
+    # any message into the executor, including
+    # {"type":"control","action":"shutdown"} (DoS) and
+    # {"type":"control","action":"config_changed"} (SIGTERM in a loop), besides
+    # forged drive_events.
     payload = open_signed_envelope(
         raw, channel_label="Drive event",
         executor_id=executor_id, audience=_AUDIENCE_DRIVE,
     )
     if payload is None:
         return True
-    # Só drive_event trafega neste canal — control/job têm rota própria.
+    # Only drive_event travels on this channel — control/job have their own route.
     try:
         parsed = json.loads(payload)
     except json.JSONDecodeError:
@@ -1301,12 +1301,12 @@ async def _handle_drive_message(executor_id: str, ws: "WebSocket", raw: str) -> 
         return True
     saida = _saidas.get(ws)
     if saida is not None and saida.atrasada():
-        # Link abaixo do piso: o evento só engrossaria a fila atrás do frame
-        # atrasado. Drive event é melhor-esforço — o GeoSync ressincroniza.
+        # Link below the floor: the event would only swell the queue behind the late
+        # frame. A drive event is best-effort — GeoSync resynchronizes.
         logger.debug("Drive event ao executor '%s' descartado: envio anterior atrasado.", executor_id)
         return True
     try:
-        # O mesmo listener do relay de jobs: enfileira e segue.
+        # Same listener as the job relay: enqueues and moves on.
         _encaminhar(executor_id, ws, payload, "Drive event", "drive_event", None, None)
     except Exception as exc:
         logger.warning("Drive event: falha ao encaminhar ao executor '%s': %s", executor_id, exc)
@@ -1316,51 +1316,51 @@ async def _handle_drive_message(executor_id: str, ws: "WebSocket", raw: str) -> 
 
 async def _executor_pubsub_listener(executor_id: str, ws: "WebSocket", owner_token: str) -> None:
     """
-    Subscreve os canais 'executor:job_relay:{id}' e 'executor:{id}:drive_events'
-    num ÚNICO pubsub e encaminha cada mensagem ao WebSocket do executor. Roda
-    como task enquanto o executor está conectado.
+    Subscribes to the 'executor:job_relay:{id}' and 'executor:{id}:drive_events' channels
+    on a SINGLE pubsub and forwards each message to the executor's WebSocket. Runs
+    as a task while the executor is connected.
 
-    Permite que workers uvicorn que não têm o WS em memória enviem jobs via Redis pub/sub.
+    Lets uvicorn workers that don't hold the WS in memory send jobs via Redis pub/sub.
 
-    PERF: eram DUAS conexões Redis dedicadas por executor conectado por worker
-    (uma por listener), cada uma com pool próprio — numa frota de 200 executores
-    e 4 workers isso somava ~1600 sockets só de pubsub, e uma reconexão em
-    rajada (deploy, blip de rede) subia todos ao mesmo tempo, pressionando o
-    `maxclients` justamente quando o dispatch mais precisa do Redis. Um pubsub
-    subscreve os dois canais e o despacho é por `message["channel"]`, cada um com
-    a validação de envelope do SEU propósito (audience RELAY vs DRIVE) — a amarra
-    anti-replay cross-canal continua exatamente onde estava.
+    PERF: there used to be TWO dedicated Redis connections per connected executor per worker
+    (one per listener), each with its own pool — in a fleet of 200 executors
+    and 4 workers that added up to ~1600 sockets just for pubsub, and a burst
+    reconnection (deploy, network blip) brought them all up at once, pressuring
+    `maxclients` precisely when dispatch needs Redis the most. One pubsub
+    subscribes to both channels and dispatch is by `message["channel"]`, each with
+    the envelope validation of ITS purpose (audience RELAY vs DRIVE) — the cross-channel
+    anti-replay binding stays exactly where it was.
 
-    ROBUSTEZ:
-      - Valida backpressure antes de encaminhar (o publisher em outro worker não
-        conhece o capacity local).
-      - Auto-restart com backoff exponencial se a conexão Redis cair (timeout/
-        connection refused). Sem isso, um único erro transiente deixa o executor
-        inalcançável via relay até que ele reconecte — o que causou o cenário
-        "online no Redis mas sem relay listener ativo" em produção.
-      - Backoff só zera após ficar saudável por _HEALTHY_THRESHOLD segundos —
-        evita churn de TCP em loop apertado quando o problema é persistente
-        (ex.: socket_timeout misconfig fazendo o read estourar a cada 5s).
-      - TimeoutError de leitura no pubsub é demovido para DEBUG (causa
-        rotineira); a cada _NOISY_WARN_EVERY reconexões loga 1 WARNING
-        agregado pra operação. Outros erros continuam WARNING imediato.
-      - Contador de restarts por executor (increment_listener_restart) alimenta
-        o WARNING agregado acima.
-      - Saída limpa em CancelledError (registry cancelou) via try/finally
-        (CancelledError herda de BaseException, não cai no except Exception).
+    ROBUSTNESS:
+      - Validates backpressure before forwarding (the publisher on another worker does not
+        know the local capacity).
+      - Auto-restart with exponential backoff if the Redis connection drops (timeout/
+        connection refused). Without it, a single transient error leaves the executor
+        unreachable via relay until it reconnects — which caused the
+        "online in Redis but no active relay listener" scenario in production.
+      - Backoff only resets after staying healthy for _HEALTHY_THRESHOLD seconds —
+        avoids TCP churn in a tight loop when the problem is persistent
+        (e.g. a socket_timeout misconfig making the read blow up every 5s).
+      - A read TimeoutError on the pubsub is demoted to DEBUG (a routine
+        cause); every _NOISY_WARN_EVERY reconnections it logs 1 aggregated
+        WARNING for operations. Other errors remain an immediate WARNING.
+      - Per-executor restart counter (increment_listener_restart) feeds
+        the aggregated WARNING above.
+      - Clean exit on CancelledError (the registry canceled) via try/finally
+        (CancelledError inherits from BaseException, it does not fall into except Exception).
 
-    `owner_token` identifica ESTA sessão. O canal também transporta o marker
-    interno `__internal__.takeover`, publicado por quem assume a posse global da
-    conexão: um listener que receba um takeover com token diferente do seu sabe
-    que virou duplicata e fecha o próprio WS na hora (sem esperar o heartbeat).
+    `owner_token` identifies THIS session. The channel also carries the internal
+    `__internal__.takeover` marker, published by whoever takes global ownership of the
+    connection: a listener that receives a takeover with a token different from its own knows
+    it has become a duplicate and closes its own WS right away (without waiting for the heartbeat).
     """
     relay_ch = _relay_channel(executor_id)
     drive_ch = _drive_channel(executor_id)
     channels = (relay_ch, drive_ch)
     backoff = 1.0
     _MAX_BACKOFF = 30.0
-    _HEALTHY_THRESHOLD = 60.0    # segundos saudável antes de zerar o backoff
-    _NOISY_WARN_EVERY = 50       # logs agregados a cada N reconexões consecutivas
+    _HEALTHY_THRESHOLD = 60.0    # seconds of health before the backoff is reset
+    _NOISY_WARN_EVERY = 50       # aggregated logs every N consecutive reconnections
     iteration = 0
 
     while True:
@@ -1370,13 +1370,13 @@ async def _executor_pubsub_listener(executor_id: str, ws: "WebSocket", owner_tok
         ws_closed = False
         subscribed_at: float | None = None
         try:
-            # PubSub usa conexão dedicada (não o singleton) — listen() é bloqueante
-            # e acomodamos uma conexão por listener ativo.
-            # Override explícito: produção mostrou socket_timeout efetivo de ~5s
-            # vindo de algum lugar opaco (provavelmente REDIS_URL com query).
-            # socket_timeout=None garante que pubsub.listen() bloqueia idle.
-            # socket_keepalive=True + health_check_interval=30 cobrem detecção
-            # de conexão morta no nível do SO e do protocolo redis.
+            # PubSub uses a dedicated connection (not the singleton) — listen() blocks
+            # and we accommodate one connection per active listener.
+            # Explicit override: production showed an effective socket_timeout of ~5s
+            # coming from somewhere opaque (probably REDIS_URL with a query).
+            # socket_timeout=None ensures pubsub.listen() blocks while idle.
+            # socket_keepalive=True + health_check_interval=30 cover detection
+            # of dead connections at the OS level and the redis protocol level.
             rc = _aioredis.from_url(
                 REDIS_URL,
                 decode_responses=True,
@@ -1406,9 +1406,9 @@ async def _executor_pubsub_listener(executor_id: str, ws: "WebSocket", owner_tok
             async for message in pubsub.listen():
                 if message["type"] != "message":
                     continue
-                # O canal decide a validação: um envelope de drive apresentado no
-                # canal de relay (ou vice-versa) continua sendo recusado pelo
-                # `audience` do envelope.
+                # The channel decides the validation: a drive envelope presented on the
+                # relay channel (or vice versa) is still rejected by the
+                # envelope's `audience`.
                 if message["channel"] == relay_ch:
                     alive = await _handle_relay_message(
                         executor_id, ws, owner_token, message["data"],
@@ -1419,8 +1419,8 @@ async def _executor_pubsub_listener(executor_id: str, ws: "WebSocket", owner_tok
                     ws_closed = True
                     break
         except _RedisTimeoutError as exc:
-            # Causa rotineira (read pubsub estourando socket_timeout). Mantém
-            # como DEBUG por padrão; o WARNING agregado já avisa a operação.
+            # Routine cause (pubsub read hitting socket_timeout). Kept at DEBUG
+            # by default; the aggregated WARNING already alerts operations.
             logger.debug(
                 "Pubsub listener: timeout no read (executor '%s'): %s", executor_id, exc,
             )
@@ -1430,25 +1430,25 @@ async def _executor_pubsub_listener(executor_id: str, ws: "WebSocket", owner_tok
                 executor_id, exc, backoff,
             )
         finally:
-            # CancelledError herda de BaseException e cai aqui também.
-            # _cleanup_pubsub é best-effort e idempotente.
+            # CancelledError inherits from BaseException and lands here too.
+            # _cleanup_pubsub is best-effort and idempotent.
             await _cleanup_pubsub(pubsub, rc, channels, "pubsub", executor_id)
 
-        # Não reinicia se o WS já caiu — quem cuidar do unregister cancelará.
+        # Do not restart if the WS is already down — whoever handles unregister will cancel.
         if ws_closed or ws.client_state == WebSocketState.DISCONNECTED:
             break
 
-        # Reset do backoff só se ficou saudável tempo suficiente.
-        # Em loop apertado (timeout recorrente), backoff cresce até MAX_BACKOFF.
+        # Reset the backoff only if it stayed healthy long enough.
+        # In a tight loop (recurring timeout), backoff grows up to MAX_BACKOFF.
         elapsed = (time.monotonic() - subscribed_at) if subscribed_at else 0.0
         if elapsed >= _HEALTHY_THRESHOLD:
             backoff = 1.0
         else:
             backoff = min(backoff * 2, _MAX_BACKOFF)
 
-        # Dispersa a espera (50–100%) — ver flow/utils/backoff.py. Todos os
-        # listeners de uma API que perdeu o Redis reiniciam juntos; sem jitter
-        # eles voltam a bater nele no mesmo instante.
+        # Spread out the wait (50–100%) — see flow/utils/backoff.py. All the
+        # listeners of an API that lost Redis restart together; without jitter
+        # they hit it again at the same instant.
         await asyncio.sleep(com_jitter(backoff))
 
     logger.debug("Pubsub listener encerrado para executor '%s'.", executor_id)
@@ -1457,7 +1457,7 @@ async def _executor_pubsub_listener(executor_id: str, ws: "WebSocket", owner_tok
 async def _cleanup_pubsub(
     pubsub, rc: "_aioredis.Redis | None", channels, label: str, executor_id: str,
 ) -> None:
-    """Fecha pubsub/conexão Redis de um listener — best-effort, não levanta."""
+    """Close a listener's Redis pubsub/connection — best-effort, never raises."""
     if isinstance(channels, str):
         channels = (channels,)
     if pubsub is not None:
@@ -1477,37 +1477,37 @@ async def _cleanup_pubsub(
 
 class ExecutorConnectionRegistry:
     """
-    Mantém um mapa executor_id → ExecutorConnection para conexões WebSocket ativas.
+    Keeps an executor_id → ExecutorConnection map for active WebSocket connections.
 
-    Thread-safety: asyncio é single-threaded por worker; usamos asyncio.Lock
-    em update_capacity para garantir atomicidade lógica quando múltiplos
-    await points ocorrem em sequência.
+    Thread-safety: asyncio is single-threaded per worker; we use asyncio.Lock
+    in update_capacity to guarantee logical atomicity when multiple
+    await points occur in sequence.
     """
 
     def __init__(self):
         self._connections: dict[str, ExecutorConnection] = {}
-        # UMA task de pubsub por executor: relay e drive events dividem o mesmo
-        # cliente Redis (ver `_executor_pubsub_listener`).
+        # ONE pubsub task per executor: relay and drive events share the same
+        # Redis client (see `_executor_pubsub_listener`).
         self._listener_tasks: dict[str, asyncio.Task] = {}
-        # Cache local de presença (executor_id → (online, timestamp)) com TTL curto.
+        # Local presence cache (executor_id → (online, timestamp)) with a short TTL.
         self._presence_cache: dict[str, tuple[bool, float]] = {}
-        # executor_id → monotonic da última desconexão limpa (carência de dispatch).
+        # executor_id → monotonic time of the last clean disconnect (dispatch grace period).
         self._recent_disconnects: dict[str, float] = {}
-        # Contadores de restart do listener (executor_id → {"pubsub": N}): a cada
-        # _NOISY_WARN_EVERY reconexões o listener loga um WARNING agregado.
-        # Resetam no unregister.
+        # Listener restart counters (executor_id → {"pubsub": N}): every
+        # _NOISY_WARN_EVERY reconnections the listener logs an aggregated WARNING.
+        # Reset on unregister.
         self._listener_restarts: dict[str, dict[str, int]] = {}
-        # Lock por operação de registro para evitar register+unregister concorrente.
+        # Lock per registration operation to avoid concurrent register+unregister.
         self._register_lock = asyncio.Lock()
         self._capacity_lock = asyncio.Lock()
 
     def increment_listener_restart(self, executor_id: str, label: str) -> int:
-        """Incrementa atomicamente o contador de restarts de um listener e devolve o novo valor."""
+        """Atomically increment a listener's restart counter and return the new value."""
         counters = self._listener_restarts.setdefault(executor_id, {})
         counters[label] = counters.get(label, 0) + 1
         return counters[label]
 
-    # ── Gerenciamento de conexões ─────────────────────────────────────────────
+    # ── Connection management ─────────────────────────────────────────────────
 
     async def register(
         self,
@@ -1518,14 +1518,15 @@ class ExecutorConnectionRegistry:
         max_concurrent_limit: int | None = None,
         max_queue_limit: int | None = None,
     ):
-        """Registra a conexão e assume a POSSE GLOBAL dela.
+        """Register the connection and take GLOBAL OWNERSHIP of it.
 
-        `max_concurrent_limit`/`max_queue_limit` vêm do registro do Executor no
-        banco (lido pelo router durante a validação mTLS, sem query extra) e
-        servem de teto para a capacidade auto-declarada — ver S3 no WS router.
+        `max_concurrent_limit`/`max_queue_limit` come from the Executor's record
+        in the database (read by the router during mTLS validation, with no extra
+        query) and act as a ceiling for the self-declared capacity — see S3 in the
+        WS router.
         """
-        # Idempotência: se já existe conexão para este executor_id, derruba a antiga
-        # antes de registrar a nova (evita dois workers disputando o mesmo slot).
+        # Idempotence: if a connection already exists for this executor_id, drop the old one
+        # before registering the new one (avoids two workers fighting over the same slot).
         async with self._register_lock:
             if executor_id in self._connections:
                 logger.warning("Executor '%s' já registrado — substituindo conexão anterior.", executor_id)
@@ -1542,8 +1543,8 @@ class ExecutorConnectionRegistry:
                 conn.max_concurrent_limit = max_concurrent_limit
             if max_queue_limit is not None:
                 conn.max_queue_limit = max_queue_limit
-            # Até o primeiro `capacity`, assume o executor vazio com os limites
-            # do banco — o dispatch não deve enxergar mais folga do que existe.
+            # Until the first `capacity`, assume the executor is empty with the
+            # database limits — dispatch must not see more headroom than exists.
             conn.capacity = {
                 "queued":         0,
                 "running":        0,
@@ -1553,33 +1554,34 @@ class ExecutorConnectionRegistry:
             self._connections[executor_id] = conn
 
             await _redis_claim_presence(executor_id, conn.owner_token)
-            # Socket novo, nada escoando: uma marca de parada da sessão anterior
-            # recusaria o relay para um executor saudável por até 60 s.
+            # New socket, nothing draining: a stop mark from the previous session
+            # would refuse the relay to a healthy executor for up to 60 s.
             try:
                 await (await _get_redis()).delete(_chave_de_parada(executor_id))
             except Exception as exc:
                 logger.debug("Marca de parada de '%s' não limpa no registro: %s", executor_id, exc)
-            # Publica a capacidade inicial (vazia): o relay de outros workers
-            # não pode herdar um "cheio" antigo até o primeiro heartbeat.
+            # Publish the initial (empty) capacity: the relay of other workers
+            # must not inherit an old "full" until the first heartbeat.
             await _redis_store_capacity(executor_id, conn.capacity)
             conn.last_capacity_store = time.monotonic()
-            # Invalida cache local — executor está online agora.
+            # Invalidate the local cache — the executor is online now.
             self._presence_cache[executor_id] = (True, time.monotonic())
 
-            # Avisa pelo relay qualquer sessão anterior (possivelmente em OUTRO
-            # worker uvicorn, com o WS ainda vivo) para fechar na hora — sem
-            # isso, as duas receberiam o mesmo job pelo PUBLISH e o workflow
-            # rodaria duas vezes. Mesmo sem dono anterior no Redis: a posse de
-            # uma sessão que ainda está fechando (heartbeat estourado) vence no
-            # meio do close, e o listener dela precisa saber que foi substituído.
+            # Notify any previous session through the relay (possibly on ANOTHER
+            # uvicorn worker, with the WS still alive) to close immediately —
+            # without this, both would receive the same job via PUBLISH and the
+            # workflow would run twice. Even with no previous owner in Redis: the
+            # ownership of a session that is still closing (heartbeat timed out)
+            # expires mid-close, and its listener needs to know it was replaced.
             #
-            # O aviso sai ANTES de o listener desta sessão existir: o que foi
-            # publicado antes dele fica só com a sessão antiga, que ao fechar o
-            # dá por não entregue (ver `_Saida.avisada`) — nunca com as duas.
+            # The notice goes out BEFORE this session's listener exists: whatever
+            # was published before it stays only with the old session, which on
+            # closing treats it as undelivered (see `_Saida.avisada`) — never
+            # with both.
             await self._announce_takeover(executor_id, conn.owner_token)
 
-            # Um único listener cobre relay (jobs despachados por outros
-            # workers) E drive events — os dois canais chegam pelo mesmo pubsub.
+            # A single listener covers relay (jobs dispatched by other
+            # workers) AND drive events — both channels arrive on the same pubsub.
             task = asyncio.create_task(
                 _executor_pubsub_listener(executor_id, ws, conn.owner_token),
                 name=f"pubsub-{executor_id[:8]}",
@@ -1591,18 +1593,18 @@ class ExecutorConnectionRegistry:
     async def _unregister_locked(
         self, executor_id: str, expected_ws: "WebSocket | None" = None,
     ) -> None:
-        """Implementação interna — assume que o caller já tem self._register_lock.
+        """Internal implementation — assumes the caller already holds self._register_lock.
 
-        Se `expected_ws` for passado, a remocao so acontece quando o WS
-        atualmente registrado eh identicamente esse (`is`). Evita o race
-        classico: handler A cai no finally e chama unregister DEPOIS que
-        o executor ja reconectou e handler B registrou WS_B — sem essa
-        checagem, A removia o WS_B legitimo e o executor entrava em
-        flapping.
+        If `expected_ws` is passed, removal only happens when the currently
+        registered WS is identically that one (`is`). Avoids the classic
+        race: handler A falls into finally and calls unregister AFTER the
+        executor has already reconnected and handler B registered WS_B —
+        without this check, A removed the legitimate WS_B and the executor
+        started flapping.
         """
         current = self._connections.get(executor_id)
         if expected_ws is not None and current is not None and current.websocket is not expected_ws:
-            # WS atual pertence a outra sessao (reconexao recente). Nao mexer.
+            # The current WS belongs to another session (recent reconnection). Leave it alone.
             logger.debug(
                 "unregister ignorado para '%s': WS atual pertence a sessao diferente.",
                 executor_id,
@@ -1610,19 +1612,21 @@ class ExecutorConnectionRegistry:
             return
 
         conn = self._connections.pop(executor_id, None)
-        # Liberação por CAS: só apaga presence/owner se ESTA sessão ainda for a
-        # dona. Sem conexão local não há token, logo não há o que provar — e o
-        # DELETE incondicional que existia aqui invalidava a sessão viva de
-        # outro worker uvicorn ("503 Nenhum executor disponível" com o executor
-        # online). O TTL de 120s cobre o caso do worker que morre sem unregister.
+        # Release via CAS: only deletes presence/owner if THIS session is still
+        # the owner. Without a local connection there is no token, so nothing
+        # to prove — and the unconditional DELETE that used to be here
+        # invalidated another uvicorn worker's live session ("503 Nenhum
+        # executor disponível" (no executor available) with the executor
+        # online). The 120s TTL covers the case of a worker dying without
+        # unregister.
         if conn is not None:
-            # A capacidade só sai com a posse: depois de um takeover a chave já é
-            # da sessão nova, e apagá-la zerava a capacidade que ela publicou.
+            # Capacity only goes away with ownership: after a takeover the key already
+            # belongs to the new session, and deleting it zeroed the capacity it published.
             if await _redis_release_presence(executor_id, conn.owner_token) is not False:
                 await _redis_delete_capacity(executor_id)
             self._recent_disconnects[executor_id] = time.monotonic()
         self._presence_cache[executor_id] = (False, time.monotonic())
-        # Reseta o contador de restarts — a próxima register é um ciclo novo.
+        # Reset the restart counter — the next register is a new cycle.
         self._listener_restarts.pop(executor_id, None)
 
         task = self._listener_tasks.pop(executor_id, None)
@@ -1630,8 +1634,8 @@ class ExecutorConnectionRegistry:
             task.cancel()
 
         if conn:
-            # Timeout defensivo — ws.close() normalmente retorna rápido (só envia
-            # frame), mas queremos garantia absoluta de não travar o register lock.
+            # Defensive timeout — ws.close() normally returns quickly (it only sends
+            # a frame), but we want an absolute guarantee of not stalling the register lock.
             try:
                 await asyncio.wait_for(fechar_ws_do_executor(conn.websocket), timeout=2.0)
             except Exception:
@@ -1639,34 +1643,34 @@ class ExecutorConnectionRegistry:
             logger.info("Executor '%s' desconectado.", executor_id)
 
     async def _announce_takeover(self, executor_id: str, owner_token: str) -> None:
-        """Publica no relay o marker que manda a sessão antiga se fechar."""
+        """Publish on the relay the marker that tells the old session to close itself."""
         try:
             payload = json.dumps({"__internal__": {"takeover": {"owner": owner_token}}})
             envelope = build_relay_envelope(payload, executor_id=executor_id)
             rc = await _get_redis()
             await rc.publish(_relay_channel(executor_id), envelope)
         except Exception as exc:
-            # Não é fatal: o perdedor também descobre na próxima renovação de
-            # presença (`_redis_renew_presence` devolve False) — só demora mais.
+            # Not fatal: the loser also finds out on the next presence renewal
+            # (`_redis_renew_presence` returns False) — it just takes longer.
             logger.warning(
                 "Falha ao anunciar takeover da conexão do executor '%s': %s",
                 executor_id, exc,
             )
 
     async def _renew_presence_or_drop(self, conn: ExecutorConnection) -> None:
-        """Renova a presença; se a posse global mudou, fecha este WS duplicado.
+        """Renew presence; if global ownership changed, close this duplicate WS.
 
-        THROTTLE: a chave vale 120s e as mensagens que chamam aqui chegam a cada
-        10s — renovar em todas era um EVAL Lua por mensagem, dentro do loop de
-        recepção, atrasando o node_event/job_result que viesse logo atrás. Só
-        renovamos a cada `_PRESENCE_RENEW_INTERVAL`; nos demais casos a conexão
-        local é prova suficiente de que o executor está vivo para o cache.
+        THROTTLE: the key lasts 120s and the messages that call this arrive every
+        10s — renewing on all of them was one Lua EVAL per message, inside the
+        receive loop, delaying the node_event/job_result that came right behind.
+        We only renew every `_PRESENCE_RENEW_INTERVAL`; otherwise the local
+        connection is sufficient proof that the executor is alive for the cache.
 
-        O carimbo do throttle só avança quando a renovação REALMENTE aconteceu.
-        Avançá-lo antes da tentativa (com `_redis_renew_presence` devolvendo
-        "sucesso" em erro de Redis) transformava um blip em "renovei" por um
-        intervalo inteiro: a chave expirava com o WebSocket vivo e o
-        `orphan_runs_watchdog` marcava como failed runs que estavam progredindo.
+        The throttle timestamp only advances when the renewal ACTUALLY happened.
+        Advancing it before the attempt (with `_redis_renew_presence` returning
+        "success" on a Redis error) turned a blip into "renewed" for a whole
+        interval: the key expired with the WebSocket alive and
+        `orphan_runs_watchdog` marked runs that were making progress as failed.
         """
         now = time.monotonic()
         if (now - conn.last_presence_renew) < _PRESENCE_RENEW_INTERVAL:
@@ -1674,9 +1678,9 @@ class ExecutorConnectionRegistry:
             return
         resultado = await _redis_renew_presence(conn.executor_id, conn.owner_token)
         if resultado is None:
-            # Não deu para falar com o Redis: NÃO carimba renovação. Reagenda a
-            # próxima tentativa para daqui a pouco em vez de um intervalo cheio,
-            # para que a recuperação do Redis regrave a chave antes do TTL.
+            # Could not talk to Redis: do NOT stamp the renewal. Reschedule the
+            # next attempt for shortly after instead of a full interval, so
+            # that Redis recovery rewrites the key before the TTL.
             conn.last_presence_renew = (
                 now - _PRESENCE_RENEW_INTERVAL + _PRESENCE_RENEW_RETRY_INTERVAL
             )
@@ -1690,36 +1694,37 @@ class ExecutorConnectionRegistry:
             "encerrando este WS duplicado.",
             conn.executor_id,
         )
-        # Já na hora, antes de esperar a trava do unregister: o que for mandado
-        # a este executor daqui em diante segue pelo relay até a sessão nova.
-        # (O que já estava na fila é dado por não entregue ao fechar; sem o
-        # aviso de takeover, a sessão nova pode tê-lo recebido também — caso
-        # raro: exige o aviso perdido e a fila cheia neste instante.)
+        # Right away, before waiting for the unregister lock: whatever is sent
+        # to this executor from now on goes through the relay to the new session.
+        # (What was already in the queue is treated as undelivered on close;
+        # without the takeover notice, the new session may have received it
+        # too — a rare case: it requires the lost notice and a full queue at
+        # this very instant.)
         _marcar_fechando(conn.websocket, substituida=True)
         await self.unregister(conn.executor_id, expected_ws=conn.websocket)
 
     async def unregister(
         self, executor_id: str, expected_ws: "WebSocket | None" = None,
     ):
-        """Remove o executor do registry. Se `expected_ws` for passado,
-        so remove quando o WS registrado for identicamente esse — protege
-        contra race quando um handler finaliza depois de o executor ja
-        ter reconectado noutra sessao."""
+        """Remove the executor from the registry. If `expected_ws` is passed,
+        only removes when the registered WS is identically that one — protects
+        against a race when a handler finishes after the executor has already
+        reconnected in another session."""
         async with self._register_lock:
             await self._unregister_locked(executor_id, expected_ws=expected_ws)
 
     def _conexao_para_envio(self, executor_id: str) -> "ExecutorConnection | str | None":
-        """A conexão local, se ela ainda serve para enviar; None para ir pelo
-        relay (o executor não está neste worker); FECHANDO se ele está indo
-        embora — quem manda devolve False e o dispatch tenta o próximo.
+        """The local connection, if it is still usable for sending; None to go
+        through the relay (the executor is not on this worker); FECHANDO if it
+        is going away — the sender returns False and dispatch tries the next one.
 
-        Uma conexão sendo fechada não serve. Se ela foi SUBSTITUÍDA (outra
-        sessão assumiu o executor), quem manda cai no relay e o listener da
-        sessão nova entrega. Nos outros fechamentos (heartbeat, erro de
-        protocolo, disconnect, revogação) não há sessão nova: o único ouvinte
-        do relay seria o listener deste mesmo socket, que descartaria a
-        mensagem depois de o publish contar um destinatário — o job ia a
-        'running' sem nunca sair."""
+        A connection being closed is not usable. If it was REPLACED (another
+        session took over the executor), the sender falls back to the relay and
+        the new session's listener delivers. In the other closures (heartbeat,
+        protocol error, disconnect, revocation) there is no new session: the only
+        relay listener would be this same socket's listener, which would discard
+        the message after the publish counted one recipient — the job would go
+        to 'running' without ever leaving."""
         conn = self._connections.get(executor_id)
         if conn is None:
             return None
@@ -1729,15 +1734,15 @@ class ExecutorConnectionRegistry:
         return None if saida.substituida else FECHANDO
 
     async def presence_or_unknown(self, executor_id: str) -> bool | None:
-        """Presença em TRI-ESTADO para o DISPATCH (spec §5.1).
+        """TRI-STATE presence for DISPATCH (spec §5.1).
 
-        True  = há prova de vida (WS neste worker, cache positivo ou chave viva).
-        None  = não sei: Redis fora, ou desconexão limpa há menos de
-                `_DISPATCH_GRACE_SECONDS` (pode estar reconectando). Quem monta
-                candidatos TENTA o executor — o `send_job` real decide.
-        False = presença ausente e fora da carência: excluído.
+        True  = there is proof of life (WS on this worker, positive cache or live key).
+        None  = unknown: Redis down, or a clean disconnect less than
+                `_DISPATCH_GRACE_SECONDS` ago (may be reconnecting). Whoever builds
+                candidates TRIES the executor — the actual `send_job` decides.
+        False = presence absent and outside the grace period: excluded.
 
-        `is_online` continua fail-closed para quem precisa de um booleano.
+        `is_online` remains fail-closed for those who need a boolean.
         """
         if executor_id in self._connections:
             return True
@@ -1759,16 +1764,16 @@ class ExecutorConnectionRegistry:
         return False
 
     async def read_capacity(self, executor_id: str) -> dict | None:
-        """Capacidade conhecida: a local (WS neste worker) ou a publicada no Redis."""
+        """Known capacity: the local one (WS on this worker) or the one published in Redis."""
         conn = self._connections.get(executor_id)
         if conn is not None:
             return dict(conn.capacity)
         return await _redis_read_capacity(executor_id)
 
     async def read_capacities(self, executor_ids: list[str]) -> dict[str, dict | None]:
-        """`read_capacity` de vários executores: os locais da memória, os demais
-        numa ida só ao Redis. O despacho lê todos os candidatos de um nível a
-        cada job — um GET por candidato abria uma conexão Redis por executor."""
+        """`read_capacity` for several executors: local ones from memory, the rest
+        in a single round trip to Redis. Dispatch reads every candidate of a tier
+        for each job — one GET per candidate opened one Redis connection per executor."""
         capacidades: dict[str, dict | None] = {}
         remotos: list[str] = []
         for eid in executor_ids:
@@ -1784,21 +1789,21 @@ class ExecutorConnectionRegistry:
     async def read_presence_and_capacities(
         self, executor_ids: list[str],
     ) -> tuple[dict[str, bool], dict[str, dict | None]]:
-        """Presença e capacidade publicada de vários executores numa ida só ao
-        Redis (um MGET das duas chaves de cada um): o mesmo retrato em qualquer
-        worker. É a leitura das telas, e por isso:
+        """Presence and published capacity of several executors in a single round
+        trip to Redis (one MGET of each one's two keys): the same snapshot on any
+        worker. It is what the screens read, and therefore:
 
-        - sem o cache positivo do `is_online`, que num worker ainda dava
-          "online" até `_PRESENCE_CACHE_TTL` depois da queda;
-        - com a cópia publicada da capacidade mesmo para o WebSocket deste
-          worker. Ela só é regravada quando a carga muda ou a cada
-          `_CAPACITY_STORE_INTERVAL`, então disco e RAM livres nela podem ter
-          até esse tempo — mas são os mesmos em todos os workers;
-        - offline não tem capacidade: a cópia pode sobreviver à presença por
-          até um TTL (a remoção no unregister falhou, ou as chaves vencem em
-          momentos diferentes).
+        - without the positive cache of `is_online`, which on one worker still
+          reported "online" until `_PRESENCE_CACHE_TTL` after going down;
+        - with the published copy of the capacity even for this worker's
+          WebSocket. It is only rewritten when the load changes or every
+          `_CAPACITY_STORE_INTERVAL`, so the free disk and RAM in it may be
+          up to that old — but they are the same on every worker;
+        - offline has no capacity: the copy may outlive presence by up to
+          one TTL (removal on unregister failed, or the keys expire at
+          different moments).
 
-        Redis fora: todos offline, como no `is_online`."""
+        Redis down: all offline, as in `is_online`."""
         if not executor_ids:
             return {}, {}
         chaves = [chave for eid in executor_ids for chave in (_presence_key(eid), _capacity_key(eid))]
@@ -1820,13 +1825,13 @@ class ExecutorConnectionRegistry:
         return online, capacidades
 
     async def is_online(self, executor_id: str) -> bool:
-        """Verifica presença no Redis com cache POSITIVO de curta duração.
+        """Check presence in Redis with a short-lived POSITIVE cache.
 
-        Negative caching foi removido: um blip momentâneo do Redis ou uma
-        reconexão em progresso não deve prender o executor como "offline" por
-        5s no cache — isso causava "Nenhum executor disponível" logo após uma
-        reconexão normal. Apenas respostas positivas são cacheadas; qualquer
-        miss vai sempre ao Redis.
+        Negative caching was removed: a momentary Redis blip or a reconnection
+        in progress must not pin the executor as "offline" for 5s in the
+        cache — that caused "Nenhum executor disponível" (no executor
+        available) right after a normal reconnection. Only positive answers
+        are cached; any miss always goes to Redis.
         """
         cached = self._presence_cache.get(executor_id)
         now = time.monotonic()
@@ -1836,38 +1841,38 @@ class ExecutorConnectionRegistry:
         if online:
             self._presence_cache[executor_id] = (True, now)
         else:
-            # Não cacheia False: força re-check no próximo is_online.
+            # Do not cache False: forces a re-check on the next is_online.
             self._presence_cache.pop(executor_id, None)
         return online
 
     def get(self, executor_id: str) -> ExecutorConnection | None:
         return self._connections.get(executor_id)
 
-    # ── Atualização de metadados ──────────────────────────────────────────────
+    # ── Metadata updates ──────────────────────────────────────────────────────
 
     async def update_capacity(self, executor_id: str, capacity: dict):
-        # Lock evita que duas capacity updates concorrentes alternem leitores
-        # (is_full) para um estado intermediário. O rebind do dict é atômico
-        # pelo GIL, mas o pareamento com last_seen_at se beneficia do lock.
+        # The lock prevents two concurrent capacity updates from flipping readers
+        # (is_full) to an intermediate state. Rebinding the dict is atomic
+        # thanks to the GIL, but pairing it with last_seen_at benefits from the lock.
         async with self._capacity_lock:
             conn = self._connections.get(executor_id)
             if conn:
-                conn.capacity = dict(capacity)  # cópia defensiva
+                conn.capacity = dict(capacity)  # defensive copy
                 conn.last_seen_at = datetime.now(timezone.utc)
-        # Renova o TTL de presença no Redis a cada mensagem de capacidade.
-        # Sem conexão local não há como provar a posse — quem renovaria seria um
-        # worker que não tem o WS, ressuscitando presença de sessão morta.
+        # Renew the presence TTL in Redis on every capacity message.
+        # Without a local connection there is no way to prove ownership — the one
+        # renewing would be a worker without the WS, resurrecting a dead session's presence.
         if conn:
             await self._renew_presence_or_drop(conn)
-            # A renovação pode ter descoberto que outra sessão é a dona e
-            # derrubado esta: publicar agora sobrescreveria a capacidade da
-            # sessão nova — no despacho e na tela — até ela regravar (30 s).
+            # The renewal may have found that another session is the owner and
+            # dropped this one: publishing now would overwrite the new session's
+            # capacity — in dispatch and on screen — until it rewrites it (30 s).
             if self._connections.get(executor_id) is not conn:
                 return
             await self._store_capacity(conn)
 
     async def _store_capacity(self, conn: ExecutorConnection) -> None:
-        """Publica a capacidade para o relay; só quando muda ou por intervalo."""
+        """Publish the capacity for the relay; only when it changes or on an interval."""
         c = conn.capacity
         assinatura = (c.get("queued", 0), c.get("running", 0),
                       c.get("max_concurrent", 4), c.get("max_queue", 50))
@@ -1883,19 +1888,19 @@ class ExecutorConnectionRegistry:
         if not conn:
             return
         conn.last_seen_at = datetime.now(timezone.utc)
-        # Renova o TTL de presença no Redis a cada heartbeat
+        # Renew the presence TTL in Redis on every heartbeat
         await self._renew_presence_or_drop(conn)
 
-    # ── Envio de jobs ─────────────────────────────────────────────────────────
+    # ── Job sending ───────────────────────────────────────────────────────────
 
-    # Janela (segundos) após a qual um job enviado sem ACK é considerado perdido.
+    # Window (seconds) after which a job sent without an ACK is considered lost.
     JOB_ACK_WARN_SECONDS = 15.0
 
     async def record_pending_ack(self, job_id: str, executor_id: str) -> None:
-        """Registra um job em voo aguardando ACK do executor (compartilhado via Redis).
+        """Register an in-flight job awaiting the executor's ACK (shared via Redis).
 
-        Chave principal carrega o executor_id e o timestamp de envio; o set de
-        índice permite enumerar IDs vivos sem SCAN no banco inteiro.
+        The main key carries the executor_id and the send timestamp; the index
+        set allows enumerating live IDs without a SCAN of the whole database.
         """
         if not job_id or job_id == "?":
             return
@@ -1913,18 +1918,18 @@ class ExecutorConnectionRegistry:
     async def clear_pending_ack(
         self, job_id: str, *, expected_executor_id: str | None = None,
     ) -> str | None:
-        """Remove o job da lista de pendentes — chamado ao receber ACK.
+        """Remove the job from the pending list — called upon receiving the ACK.
 
-        Retorna o executor_id que tinha sido registrado, ou None se o ACK
-        chegou para um job_id desconhecido (TTL expirou, limpeza de outro
-        worker, ou vindo de outra instalação).
+        Returns the executor_id that had been registered, or None if the ACK
+        arrived for an unknown job_id (TTL expired, cleanup by another
+        worker, or coming from another installation).
 
-        SEG: com `expected_executor_id`, o ACK só é aceito se o job tiver sido
-        despachado para aquele executor. Sem esse vínculo, um executor podia
-        confirmar jobs de outro (job_id é global), apagando a evidência de job
-        perdido usada por overdue_acks(). A conferência de dono e a remoção são
-        UM script Lua: além de cortar um round-trip do caminho quente de cada
-        ACK, fecham a janela que existia entre o GET e o GETDEL.
+        SEC: with `expected_executor_id`, the ACK is only accepted if the job was
+        dispatched to that executor. Without this binding, an executor could
+        confirm another's jobs (job_id is global), erasing the lost-job evidence
+        used by overdue_acks(). The owner check and the removal are ONE Lua
+        script: besides cutting a round trip from the hot path of every ACK,
+        they close the window that existed between the GET and the GETDEL.
         """
         if not job_id:
             return None
@@ -1951,11 +1956,11 @@ class ExecutorConnectionRegistry:
             return None
 
     async def overdue_acks(self) -> list[tuple[str, str, float]]:
-        """Retorna tuplas (job_id, executor_id, elapsed) para jobs sem ACK há mais
-        que JOB_ACK_WARN_SECONDS. Background task pode consumir para alertas.
+        """Return (job_id, executor_id, elapsed) tuples for jobs without an ACK for more
+        than JOB_ACK_WARN_SECONDS. A background task can consume them for alerts.
 
-        Faz cleanup oportunista do índice: IDs cujo TTL expirou são removidos
-        do set para não acumular fantasmas.
+        Performs opportunistic cleanup of the index: IDs whose TTL expired are
+        removed from the set so ghosts do not pile up.
         """
         try:
             rc = await _get_redis()
@@ -1988,7 +1993,7 @@ class ExecutorConnectionRegistry:
             return []
 
     async def list_pending_acks(self) -> list[dict]:
-        """Lista todos os pending_acks com elapsed (para endpoint admin)."""
+        """List all pending_acks with elapsed (for the admin endpoint)."""
         try:
             rc = await _get_redis()
             ids = await rc.smembers(_PENDING_ACKS_INDEX_KEY)
@@ -2015,13 +2020,13 @@ class ExecutorConnectionRegistry:
 
     async def send_job(self, executor_id: str, job_message: dict) -> bool:
         """
-        Envia um job ao executor via WebSocket.
+        Send a job to the executor via WebSocket.
 
-        Se o WebSocket estiver neste worker: envia diretamente.
-        Se estiver em outro worker: publica no canal Redis de relay.
+        If the WebSocket is on this worker: sends directly.
+        If it is on another worker: publishes on the Redis relay channel.
 
-        Retorna True se o envio/relay foi bem-sucedido.
-        Retorna False se o executor não está online ou a fila está cheia.
+        Returns True if the send/relay succeeded.
+        Returns False if the executor is not online or the queue is full.
         """
         wire_message = {"type": "job", **job_message}
         wire_text    = json.dumps(wire_message)
@@ -2034,12 +2039,12 @@ class ExecutorConnectionRegistry:
             )
             return False
 
-        # ── Caminho direto: WS está neste worker ─────────────────────────────
+        # ── Direct path: WS is on this worker ────────────────────────────────
         if conn is not None:
             saida = _saida_de(conn.websocket, executor_id)
             if saida.atrasada():
-                # O link está abaixo do piso: o próximo candidato recebe este job
-                # em vez de ele entrar na fila atrás do frame atrasado.
+                # The link is below the floor: the next candidate gets this job
+                # instead of it queuing behind the delayed frame.
                 logger.warning(
                     "Executor '%s' com envio anterior atrasado — tentando o próximo candidato.",
                     executor_id,
@@ -2057,20 +2062,20 @@ class ExecutorConnectionRegistry:
                 resultado = await saida.enviar(wire_text)
             except Exception as exc:
                 logger.error("Erro ao enviar job ao executor '%s': %s", executor_id, exc)
-                # `expected_ws`: o executor pode já ter reconectado NESTE worker
-                # enquanto o envio falhava — derrubar a conexão nova só geraria
-                # outra reconexão.
+                # `expected_ws`: the executor may have already reconnected on THIS worker
+                # while the send was failing — dropping the new connection would only
+                # cause another reconnection.
                 await self.unregister(executor_id, expected_ws=conn.websocket)
                 return False
             if resultado in (OCUPADO, FECHANDO):
-                # Nada foi escrito: o próximo candidato recebe o job.
+                # Nothing was written: the next candidate gets the job.
                 logger.warning(
                     "Job '%s' não saiu para o executor '%s' (%s) — vai ao próximo candidato.",
                     job_id, executor_id, resultado,
                 )
                 return False
             if resultado == ESCOANDO:
-                # Entregue sem confirmação — ver `_PRAZO_DE_ENVIO_BASE_S`.
+                # Delivered without confirmation — see `_PRAZO_DE_ENVIO_BASE_S`.
                 logger.warning(
                     "Job '%s': envio ao executor '%s' passou do prazo — link lento. O frame "
                     "segue saindo; o ACK, o inventário ou a varredura confirmam ou fecham o run.",
@@ -2081,16 +2086,16 @@ class ExecutorConnectionRegistry:
             await self.record_pending_ack(job_id, executor_id)
             return True
 
-        # ── Caminho relay: WS está em outro worker uvicorn ───────────────────
-        # Verifica presença no Redis antes de tentar o relay
+        # ── Relay path: WS is on another uvicorn worker ──────────────────────
+        # Check presence in Redis before attempting the relay
         if not await _redis_check_presence(executor_id):
             logger.debug("Executor '%s' offline — job não enviado.", executor_id)
             return False
 
-        # A MESMA regra do caminho direto: cheio ⇒ recusa ⇒ o dispatch tenta o
-        # próximo candidato. Antes o relay publicava sem olhar capacidade, o
-        # executor rejeitava por fila cheia e o run FALHAVA — o mesmo estado
-        # produzia desfechos opostos conforme o worker que atendia a request.
+        # The SAME rule as the direct path: full ⇒ refuse ⇒ dispatch tries the
+        # next candidate. Previously the relay published without checking capacity,
+        # the executor rejected it for a full queue and the run FAILED — the same
+        # state produced opposite outcomes depending on which worker served the request.
         capacidade = await _redis_read_capacity(executor_id)
         if _capacity_is_full(capacidade):
             logger.warning(
@@ -2100,8 +2105,8 @@ class ExecutorConnectionRegistry:
             )
             return False
         if await _redis_parada(executor_id):
-            # O worker que segura o socket está preso atrás de um frame parado:
-            # o job publicado agora esperaria a vez e seria descartado por idade.
+            # The worker holding the socket is stuck behind a stalled frame:
+            # a job published now would wait its turn and be discarded for age.
             logger.warning(
                 "Executor '%s' com envio parado noutro worker — job '%s' vai ao próximo candidato.",
                 executor_id, job_id,
@@ -2109,22 +2114,22 @@ class ExecutorConnectionRegistry:
             return False
 
         try:
-            # Envelope assinado — listener valida HMAC antes de encaminhar ao WS.
-            # Protege contra publisher não-autorizado no canal Redis.
+            # Signed envelope — the listener validates the HMAC before forwarding to the WS.
+            # Protects against an unauthorized publisher on the Redis channel.
             envelope = build_relay_envelope(wire_text, executor_id=executor_id)
             rc = await _get_redis()
             recipients = await rc.publish(_relay_channel(executor_id), envelope)
             if recipients == 0:
-                # Executor aparece no Redis mas nenhum worker subscreveu o canal ainda
-                # (race condition na inicialização — improvável mas possível)
+                # Executor appears in Redis but no worker has subscribed to the channel yet
+                # (race condition at startup — unlikely but possible)
                 logger.warning(
                     "Executor '%s' online no Redis mas sem relay listener ativo — job não enviado.",
                     executor_id,
                 )
                 return False
             logger.info("Job '%s' encaminhado via relay Redis ao executor '%s'.", job_id, executor_id)
-            # Tracking compartilhado via Redis: registrar aqui é seguro mesmo
-            # com WS em outro worker — o ACK será limpo lá.
+            # Tracking shared via Redis: registering here is safe even
+            # with the WS on another worker — the ACK will be cleared there.
             await self.record_pending_ack(job_id, executor_id)
             return True
         except Exception as exc:
@@ -2132,30 +2137,30 @@ class ExecutorConnectionRegistry:
             return False
 
     async def send_json(self, executor_id: str, data: dict) -> bool:
-        """Envia um payload JSON arbitrário ao executor (ex: cancel, control).
+        """Send an arbitrary JSON payload to the executor (e.g. cancel, control).
 
-        Multi-worker uvicorn: se o WS estiver em outro worker, publica no
-        canal Redis 'executor:job_relay:{id}' (mesmo canal do send_job) —
-        o listener que tem o WS entrega. Sem esse relay, control messages
-        (ex: 'action:revoked') morriam silenciosamente quando o admin caia
-        num worker sem o WS, deixando o executor conectado indefinidamente
-        apesar de o DB estar 'revoked'.
+        Multi-worker uvicorn: if the WS is on another worker, publishes on the
+        Redis channel 'executor:job_relay:{id}' (same channel as send_job) —
+        the listener holding the WS delivers. Without this relay, control messages
+        (e.g. 'action:revoked') died silently when the admin landed on a
+        worker without the WS, leaving the executor connected indefinitely
+        even though the DB said 'revoked'.
 
-        SEG (S7): `control` e `cancel` são assinados AQUI, no ponto único de
-        saída, em vez de em cada router que os emite — são 6 call sites hoje e
-        um esquecido seria um comando descartado pelo executor. O HMAC do relay
-        protege apenas o salto Redis→worker; a assinatura Ed25519 protege o
-        comando fim-a-fim até o executor e o amarra a um destinatário, a um
-        prazo curto e a um nonce.
+        SEC (S7): `control` and `cancel` are signed HERE, at the single exit
+        point, instead of in each router that emits them — there are 6 call sites
+        today and a forgotten one would be a command discarded by the executor.
+        The relay HMAC only protects the Redis→worker hop; the Ed25519 signature
+        protects the command end to end up to the executor and binds it to one
+        recipient, a short deadline and a nonce.
         """
         from app.core.control_crypto import sign_if_needed
 
         try:
             data = sign_if_needed(data, executor_id)
         except RuntimeError as exc:
-            # Sem chave de assinatura o executor descartaria a mensagem de
-            # qualquer forma. Falhar aqui deixa o motivo no log do servidor em
-            # vez de virar "comando sumiu" do lado do executor.
+            # Without a signing key the executor would discard the message
+            # anyway. Failing here leaves the reason in the server log
+            # instead of becoming "command vanished" on the executor side.
             logger.error(
                 "Não foi possível assinar '%s' para o executor '%s': %s",
                 data.get("type"), executor_id, exc,
@@ -2183,17 +2188,17 @@ class ExecutorConnectionRegistry:
                 "Mensagem '%s' ao executor '%s': %s.", data.get("type"), executor_id,
                 "link lento; o frame segue saindo" if resultado == ESCOANDO else f"não saiu ({resultado})",
             )
-            # ESCOANDO: para quem chama — um cancel, por exemplo — a mensagem foi
-            # entregue. OCUPADO (inclusive de cara, com um envio anterior
-            # atrasado) e FECHANDO: nada saiu.
+            # ESCOANDO: for the caller — a cancel, for example — the message was
+            # delivered. OCUPADO (including right away, with an earlier send
+            # delayed) and FECHANDO: nothing went out.
             return resultado == ESCOANDO
 
         # Caminho relay: WS em outro worker uvicorn.
         if not await _redis_check_presence(executor_id):
             return False
         if await _redis_parada(executor_id):
-            # Publicada agora, esperaria a vez atrás do frame parado e seria
-            # descartada por idade — quem chama (cancel_run) precisa saber.
+            # Published now, it would wait its turn behind the stalled frame and be
+            # discarded for age — the caller (cancel_run) needs to know.
             return False
         try:
             payload = json.dumps(data)
@@ -2214,16 +2219,16 @@ class ExecutorConnectionRegistry:
     async def disconnect_executor(
         self, executor_id: str, *, code: int = 1000, reason: str = "",
     ) -> bool:
-        """Forca o fechamento do WebSocket do executor.
+        """Force the executor's WebSocket to close.
 
-        Se o WS estiver neste worker: fecha direto + unregister local.
-        Se estiver em outro worker: publica marker '__internal__.close' no
-        relay Redis; o listener detecta o marker (nao encaminha ao cliente)
-        e fecha o WS local.
+        If the WS is on this worker: closes directly + local unregister.
+        If it is on another worker: publishes the '__internal__.close' marker on
+        the Redis relay; the listener detects the marker (does not forward it to
+        the client) and closes the local WS.
 
-        Diferente do send_json com control message (que confia no cliente
-        para sair sozinho), este metodo garante o kick mesmo se o cliente
-        estiver com bug ou versao antiga que ignora control.
+        Unlike send_json with a control message (which trusts the client
+        to leave on its own), this method guarantees the kick even if the client
+        is buggy or an old version that ignores control.
         """
         conn = self._connections.get(executor_id)
 
@@ -2240,8 +2245,8 @@ class ExecutorConnectionRegistry:
         if not await _redis_check_presence(executor_id):
             return False
         try:
-            # Marker '__internal__' e removido pelo listener antes de
-            # qualquer send_text — cliente jamais ve esse payload.
+            # The '__internal__' marker is removed by the listener before
+            # any send_text — the client never sees this payload.
             payload = json.dumps({
                 "__internal__": {"close": {"code": code, "reason": reason}},
             })
@@ -2260,42 +2265,43 @@ class ExecutorConnectionRegistry:
             return False
 
 
-# Instância singleton — importada pelos routers e services
+# Singleton instance — imported by routers and services
 executor_registry = ExecutorConnectionRegistry()
 
 
 def ip_do_websocket(ws) -> Optional[str]:
-    """IP real do executor na ponta deste WebSocket.
+    """Real IP of the executor at the end of this WebSocket.
 
-    Atras do Traefik, `ws.client.host` e o IP do proxy para TODOS os
-    executores — `RunMetrics.executor_ip` registrava o mesmo endereco para a
-    frota inteira. `get_client_ip` so confia no X-Forwarded-For quando o peer e
-    um proxy listado em TRUSTED_PROXIES.
+    Behind Traefik, `ws.client.host` is the proxy's IP for ALL
+    executors — `RunMetrics.executor_ip` recorded the same address for the
+    whole fleet. `get_client_ip` only trusts X-Forwarded-For when the peer is
+    a proxy listed in TRUSTED_PROXIES.
 
-    Sem peer, None: preserva o NULL da coluna — "unknown" seria pior que
-    ausente porque parece um valor.
+    No peer, None: preserves the column's NULL — "unknown" would be worse than
+    absent because it looks like a value.
     """
     from app.core.trusted_proxy import get_client_ip
     return get_client_ip(ws.client.host, ws.headers.get("x-forwarded-for")) if ws.client else None
 
 
-# ── Monitor de ACKs atrasados ─────────────────────────────────────────────────
-# Loga warnings periódicos para operador. Lançado no lifespan do app
-# (app/main.py). Em deploys multi-worker, todos os workers entram aqui mas
-# apenas o que adquirir o lock distribuído por ciclo emite o log — evita
-# multiplicar warnings em N workers. TTL automático no Redis cuida do GC.
+# ── Overdue ACK monitor ───────────────────────────────────────────────────────
+# Logs periodic warnings for the operator. Launched in the app lifespan
+# (app/main.py). In multi-worker deploys, every worker enters here but
+# only the one that acquires the distributed lock for the cycle emits the log —
+# avoids multiplying warnings across N workers. The automatic TTL in Redis
+# takes care of GC.
 
-_ACK_MONITOR_INTERVAL = 30.0    # segundos entre varreduras
+_ACK_MONITOR_INTERVAL = 30.0    # seconds between sweeps
 
 
 async def overdue_acks_monitor() -> None:
-    """Varre periodicamente jobs sem ACK e alerta no log. Cancele no shutdown."""
+    """Periodically sweep jobs without an ACK and alert in the log. Cancel on shutdown."""
     worker_token = f"{os.getpid()}-{id(executor_registry)}"
     try:
         while True:
             await asyncio.sleep(_ACK_MONITOR_INTERVAL)
-            # Lock distribuído: só um worker loga por ciclo. TTL pouco menor
-            # que o intervalo evita janelas em que ninguém pega o lock.
+            # Distributed lock: only one worker logs per cycle. A TTL slightly shorter
+            # than the interval avoids windows in which nobody takes the lock.
             try:
                 rc = await _get_redis()
                 got_lock = await rc.set(

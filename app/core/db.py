@@ -26,23 +26,23 @@ logger = get_logger(__name__)
 
 def _parse_url(url: str) -> tuple[str, dict]:
     """
-    Extrai ssl/sslmode da DATABASE_URL e retorna (url_limpa, connect_args) para asyncpg.
+    Extracts ssl/sslmode from DATABASE_URL and returns (url_limpa, connect_args) for asyncpg.
 
-    - Sem parâmetro SSL → desabilita SSL explicitamente (asyncpg tenta SSL por padrão,
-      o que pode causar timeout em servidores que aceitam mas não completam o handshake).
+    - No SSL parameter → disables SSL explicitly (asyncpg tries SSL by default,
+      which can cause a timeout on servers that accept but never complete the handshake).
     - ssl=disable / ssl=false → ssl=False
-    - ssl=require / sslmode=require → SSLContext com ou sem CA cert.
+    - ssl=require / sslmode=require → SSLContext with or without a CA cert.
     """
     match = re.search(r'[?&](ssl|sslmode)=([^&]+)', url)
 
     if not match:
-        # asyncpg tenta SSL por padrão — desabilita explicitamente quando não solicitado
+        # asyncpg tries SSL by default — disable it explicitly when not requested
         return url, {"ssl": False}
 
     full_param = match.group(0)
     ssl_value  = match.group(2).lower()
 
-    # Remove o parâmetro da URL e normaliza separadores
+    # Removes the parameter from the URL and normalizes separators
     clean = url.replace(full_param, "")
     clean = re.sub(r'\?&', '?', clean)
     clean = re.sub(r'[?&]$', '', clean)
@@ -51,13 +51,13 @@ def _parse_url(url: str) -> tuple[str, dict]:
     if ssl_value in _SSL_OFF:
         return clean, {"ssl": False}
 
-    # Auditoria (SEG-25): honrar verify-ca / verify-full em vez de aceitar
-    # QUALQUER certificado. Antes, todo valor "ligado" caía num contexto com
-    # check_hostname=False e CERT_NONE — um MITM com certificado autoassinado
-    # era aceito mesmo com o operador pedindo verify-full. Agora:
-    #   require/prefer/true/1 → cifra sem verificar cadeia (semântica do libpq)
-    #   verify-ca             → verifica a cadeia (CA de DATABASE_CA_CERT)
-    #   verify-full           → verifica cadeia + hostname
+    # Audit (SEG-25): honor verify-ca / verify-full instead of accepting
+    # ANY certificate. Before, every "on" value fell into a context with
+    # check_hostname=False and CERT_NONE — a MITM with a self-signed certificate
+    # was accepted even when the operator asked for verify-full. Now:
+    #   require/prefer/true/1 → encrypts without verifying the chain (libpq semantics)
+    #   verify-ca             → verifies the chain (CA from DATABASE_CA_CERT)
+    #   verify-full           → verifies chain + hostname
     import os as _os
     _ssl_ctx = ssl.create_default_context()
     ca_cert = _os.getenv("DATABASE_CA_CERT", "").strip()
@@ -74,7 +74,7 @@ def _parse_url(url: str) -> tuple[str, dict]:
         _ssl_ctx.check_hostname = False
         _ssl_ctx.verify_mode = ssl.CERT_REQUIRED
     else:
-        # require / prefer / true / 1: só cifra (não verifica a cadeia).
+        # require / prefer / true / 1: encrypt only (does not verify the chain).
         _ssl_ctx.check_hostname = False
         _ssl_ctx.verify_mode = ssl.CERT_NONE
 
@@ -83,14 +83,14 @@ def _parse_url(url: str) -> tuple[str, dict]:
 
 def _prazos(statement_timeout_s: int, command_timeout_s: int) -> dict:
     """
-    connect_args do asyncpg com os prazos de cada comando (ver config.py).
+    asyncpg connect_args with the per-command deadlines (see config.py).
 
-    - `statement_timeout` vai como parâmetro de sessão na abertura da conexão:
-      vale para todo comando dela, e o Postgres cancela com `QueryCanceledError`
-      e deixa a conexão pronta para o próximo.
-    - `command_timeout` é o prazo do lado do asyncpg, para quando o Postgres
-      nem responde.
-    0 (ou negativo) desliga o prazo correspondente.
+    - `statement_timeout` goes as a session parameter when the connection is opened:
+      it applies to every command on it, and Postgres cancels with `QueryCanceledError`
+      and leaves the connection ready for the next one.
+    - `command_timeout` is the deadline on the asyncpg side, for when Postgres
+      doesn't even respond.
+    0 (or negative) disables the corresponding deadline.
     """
     args: dict = {}
     if statement_timeout_s > 0:
@@ -111,31 +111,31 @@ _connect_args = {**_connect_args, **_prazos(DB_STATEMENT_TIMEOUT, DB_COMMAND_TIM
 
 # --- Async Engine & Session ---
 #
-# A CONEXÃO É DIRETA COM O POSTGRES. Não há pooler no caminho.
+# THE CONNECTION GOES DIRECTLY TO POSTGRES. There is no pooler in the path.
 #
-# Existia na raiz do repositório um `pgbouncer.ini` que não estava ligado a
-# nada: nenhum serviço no docker-compose.yml nem no docker-compose.executor.yml,
-# nenhuma referência à porta 6432 em lugar nenhum. Pior que inútil, ele mentia —
-# prometia `pool_mode = transaction` (que não estava em vigor) e documentava um
-# dimensionamento de "4 workers × 30 pool each" que não é o do código. Quem
-# investigasse "too many clients already" ia conferir o pooler e concluir que
-# estava tudo certo. O arquivo foi removido; esta nota é o que sobrou dele.
+# There used to be a `pgbouncer.ini` at the repository root that was wired to
+# nothing: no service in docker-compose.yml nor in docker-compose.executor.yml,
+# no reference to port 6432 anywhere. Worse than useless, it lied —
+# it promised `pool_mode = transaction` (which was not in effect) and documented a
+# sizing of "4 workers × 30 pool each" that is not the code's. Anyone
+# investigating "too many clients already" would check the pooler and conclude that
+# everything was fine. The file was removed; this note is what is left of it.
 #
-# O teto real de conexões é `n_workers × (POOL_SIZE + MAX_OVERFLOW)` — hoje
-# 4 × (8 + 5) = 52 (ver o comentário do pool em app/core/config.py e o
-# `--workers` do api-prod no docker-compose.yml). Isso tem de caber no
-# `max_connections` do servidor com folga para migrations e psql.
+# The real connection ceiling is `n_workers × (POOL_SIZE + MAX_OVERFLOW)` — today
+# 4 × (8 + 5) = 52 (see the pool comment in app/core/config.py and the
+# api-prod `--workers` in docker-compose.yml). That has to fit within the
+# server's `max_connections` with headroom for migrations and psql.
 #
-# Se um dia o pgbouncer for de fato introduzido em `pool_mode = transaction`,
-# `connect_args` PRECISA levar junto `statement_cache_size=0` e
-# `prepared_statement_cache_size=0`: asyncpg com prepared statements sob
-# transaction pooling produz "prepared statement already exists" intermitente,
-# que só aparece sob concorrência. E o `statement_timeout` de `_prazos` vai como
-# parâmetro de início de sessão, que o pgbouncer recusa: ou ele entra em
-# `ignore_startup_parameters`, ou o prazo muda para `ALTER ROLE ... SET`.
+# If pgbouncer is ever actually introduced in `pool_mode = transaction`,
+# `connect_args` MUST also carry `statement_cache_size=0` and
+# `prepared_statement_cache_size=0`: asyncpg with prepared statements under
+# transaction pooling produces intermittent "prepared statement already exists",
+# which only shows up under concurrency. And the `statement_timeout` from `_prazos` goes as a
+# session startup parameter, which pgbouncer refuses: either it goes into
+# `ignore_startup_parameters`, or the deadline moves to `ALTER ROLE ... SET`.
 #
-# Permite importação sem DATABASE_URL (testes unitários, CI sem banco).
-# O engine será None — qualquer uso real falhará com erro claro.
+# Allows importing without DATABASE_URL (unit tests, CI without a database).
+# The engine will be None — any real use will fail with a clear error.
 if _async_url:
     async_engine = create_async_engine(
         _async_url,
@@ -152,16 +152,16 @@ if _async_url:
 
     @event.listens_for(async_engine.sync_engine, "invalidate")
     def _abortar_conexao_presa(dbapi_conn, _registro, exc):
-        """Conexão invalidada por prazo estourado ou tarefa cancelada: derruba o
-        socket já.
+        """Connection invalidated by an exceeded deadline or a cancelled task: drops the
+        socket right away.
 
-        Nos dois casos o SQLAlchemy descarta a conexão e o asyncpg a fecha com
-        cortesia — espera a confirmação do cancelamento da consulta, SEM
-        prazo. Com a rede muda (NAT que esqueceu o fluxo, peer congelado) essa
-        espera não acaba: o `command_timeout` nunca chegava a quem chamou, e um
-        `asyncio.wait_for` em volta da escrita (o fim de sessão do WS de
-        executores, 5 s) ficava preso — medido com um proxy que congela. O
-        backend órfão morre no `statement_timeout`.
+        In both cases SQLAlchemy discards the connection and asyncpg closes it
+        politely — it waits for confirmation of the query cancellation, WITHOUT a
+        deadline. With a silent network (a NAT that forgot the flow, a frozen peer) that
+        wait never ends: the `command_timeout` never reached the caller, and an
+        `asyncio.wait_for` around the write (the executors WS session teardown,
+        5 s) got stuck — measured with a freezing proxy. The
+        orphaned backend dies at `statement_timeout`.
         """
         if isinstance(exc, (asyncio.TimeoutError, TimeoutError, asyncio.CancelledError)):
             try:
@@ -185,7 +185,7 @@ else:
 @asynccontextmanager
 async def get_session_async() -> AsyncSession:
     """
-    Fornece uma AsyncSession do SQLAlchemy para uso com FastAPI ou código async.
+    Provides a SQLAlchemy AsyncSession for use with FastAPI or async code.
     """
     async with AsyncSessionLocal() as session:
         try:
@@ -193,20 +193,20 @@ async def get_session_async() -> AsyncSession:
         finally:
             await session.rollback()
 
-# --- Sync Engine & Session: REMOVIDOS ---
+# --- Sync Engine & Session: REMOVED ---
 #
-# Havia aqui um `sync_engine` + `SyncSessionLocal` + `get_session_sync()` que
-# NENHUM código usava — zero referências em app/, flow/, executor/, alembic/ e
-# tests/. O Alembic não dependia deles: `alembic/env.py` monta a própria URL
-# psycopg2 em `_get_sync_url()` e usa `engine_from_config`.
+# There used to be a `sync_engine` + `SyncSessionLocal` + `get_session_sync()` here that
+# NO code used — zero references in app/, flow/, executor/, alembic/ and
+# tests/. Alembic did not depend on them: `alembic/env.py` builds its own psycopg2
+# URL in `_get_sync_url()` and uses `engine_from_config`.
 #
-# Não era só código morto, era armadilha. O engine síncrono era configurado com
-# os MESMOS POOL_SIZE/MAX_OVERFLOW do assíncrono, então o teto real de conexões
-# do processo era `2 × (POOL_SIZE + MAX_OVERFLOW)`, não `1 ×`. Pools do
-# SQLAlchemy são lazy e o pool morto nunca abria conexão, então na prática nunca
-# custou nada — mas o primeiro uso de `SyncSessionLocal` dobraria o teto
-# silenciosamente, justo o número que precisa ficar abaixo do `max_connections`
-# do servidor (ver o comentário do pool em app/core/config.py).
+# It was not just dead code, it was a trap. The sync engine was configured with
+# the SAME POOL_SIZE/MAX_OVERFLOW as the async one, so the process's real connection
+# ceiling was `2 × (POOL_SIZE + MAX_OVERFLOW)`, not `1 ×`. SQLAlchemy
+# pools are lazy and the dead pool never opened a connection, so in practice it never
+# cost anything — but the first use of `SyncSessionLocal` would silently double the
+# ceiling, precisely the number that must stay below the server's
+# `max_connections` (see the pool comment in app/core/config.py).
 #
-# Se algum dia for preciso código síncrono, criar um engine com pool próprio e
-# explícito (provavelmente NullPool), não reaproveitar as constantes do async.
+# If sync code is ever needed, create an engine with its own explicit
+# pool (probably NullPool), do not reuse the async constants.

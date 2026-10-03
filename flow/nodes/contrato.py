@@ -1,34 +1,34 @@
 # flow/nodes/contrato.py
-"""O contrato do description() de um nó — vocabulários fechados e validação.
+"""The contract of a node's description() — closed vocabularies and validation.
 
-O campo `type` acumulava três papéis com vocabulários misturados e nenhum
-deles validado: a CATEGORIA do nó, o TIPO DE CAMPO de saída e o TIPO DE
-PROPRIEDADE (widget do formulário). Um typo em qualquer um passava mudo pela
-importação e virava defeito visual longe da causa — nó sem ícone, campo sem
-editor, porta sem tipo.
+The `type` field accumulated three roles with mixed vocabularies and none of
+them validated: the node's CATEGORY, the output FIELD TYPE and the PROPERTY
+TYPE (form widget). A typo in any of them passed silently through import and
+became a visual defect far from the cause — a node without an icon, a field
+without an editor, a port without a type.
 
-Aqui os três vocabulários viram conjuntos fechados, e `validar_description`
-roda na importação (via `register_node`): nó malformado morre no CI com a
-frase apontando o campo, não na tela.
+Here the three vocabularies become closed sets, and `validar_description`
+runs at import (via `register_node`): a malformed node dies in CI with the
+sentence pointing to the field, not on the screen.
 """
 from typing import Any
 
-# Categoria do nó — decide a paleta, o ícone e o agrupamento no editor.
+# Node category — decides the palette, the icon and the grouping in the editor.
 CATEGORIAS = frozenset({"trigger", "action", "spatial", "datasource", "output", "control"})
 
-# Tipo do DADO que sai por um campo de `outputs` (não é widget de UI).
+# Type of the DATA that leaves through an `outputs` field (not a UI widget).
 TIPOS_DE_CAMPO = frozenset({"geodataframe", "string", "number", "boolean", "object", "list", "any"})
 
-# Tipo de uma propriedade — o WIDGET do formulário do editor. `integer` não é
-# sinônimo de `number`: o form arredonda e usa step=1 (numeric-field.tsx).
+# Type of a property — the editor form's WIDGET. `integer` is not a
+# synonym of `number`: the form rounds and uses step=1 (numeric-field.tsx).
 TIPOS_DE_PROPRIEDADE = frozenset({
     "string", "number", "integer", "boolean", "object", "select", "chips",
     "credential", "keyvalue", "code", "ports", "drive", "artifact", "sql",
 })
 
-# Todas as chaves que um description() pode ter. Chave fora do conjunto é
-# quase sempre typo (`output` por `outputs`) — e um typo aqui não quebra nada
-# na hora: o campo só deixa de existir para o editor e para o validate.
+# Every key a description() may have. A key outside the set is almost
+# always a typo (`output` for `outputs`) — and a typo here breaks nothing
+# right away: the field simply stops existing for the editor and for validate.
 CHAVES_DO_DESCRIPTION = frozenset({
     "name", "alias", "description", "type", "properties", "outputs", "inputs",
     "dynamic_inputs", "dynamic_output", "outputs_from_ports", "branches",
@@ -42,23 +42,23 @@ CHAVES_DE_PROPRIEDADE = frozenset({
 })
 
 
-# Nomes que já existiram no catálogo e para onde foram. A renomeação de 27/07
-# (commit ff11c196, "app em dev, sem shim") não migrou os fluxos salvos: um
-# fluxo com `DriveTrigger` falhava todo dia na partida com "Node 'DriveTrigger'
-# não encontrado". Quem lê isto: o `python -m app.cli migrar-nos` (que reescreve
-# as definições salvas) e as mensagens de nó desconhecido do lint e da factory,
-# que passam a dizer para onde o nó foi em vez de só que ele não existe.
-# Renomear um nó daqui em diante = uma entrada nova aqui, no mesmo commit.
+# Names that once existed in the catalog and where they went. The 07/27 rename
+# (commit ff11c196, "app em dev, sem shim") did not migrate saved workflows: a
+# workflow with `DriveTrigger` failed every day at startup with "Node 'DriveTrigger'
+# não encontrado". Who reads this: `python -m app.cli migrar-nos` (which rewrites
+# the saved definitions) and the unknown-node messages from the lint and the factory,
+# which now say where the node went instead of just that it doesn't exist.
+# Renaming a node from now on = a new entry here, in the same commit.
 NOMES_ANTIGOS: dict[str, str] = {
     "DriveTrigger": "DataInput",
     "ArtifactOutput": "DataOutput",
 }
 
 
-# Nós que saíram do catálogo sem substituto, e por quê. O executor constrói
-# todos os nós antes do run — inclusive os de um ramo que não vai rodar —, então
-# um fluxo salvo com um deles para de rodar inteiro: a mensagem tem de dizer que
-# o nó saiu, e não sugerir erro de digitação.
+# Nodes that left the catalog with no replacement, and why. The executor builds
+# all nodes before the run — including those of a branch that won't run —, so
+# a saved workflow with one of them stops running entirely: the message has to
+# say the node was removed, and not suggest a typo.
 NOS_REMOVIDOS: dict[str, str] = {
     "Cluster": (
         "dependia do scikit-learn, que nenhuma instalação do executor traz, e "
@@ -68,8 +68,8 @@ NOS_REMOVIDOS: dict[str, str] = {
 
 
 def dica_de_no_desconhecido(nome: str) -> str:
-    """Complemento da mensagem de nó desconhecido (renomeado ou removido);
-    vazio se o nome nunca existiu."""
+    """Addendum to the unknown-node message (renamed or removed);
+    empty if the name never existed."""
     novo = NOMES_ANTIGOS.get(nome)
     if novo:
         return (
@@ -87,10 +87,10 @@ def _erro(nome: str, msg: str) -> ValueError:
 
 
 def validar_description(desc: Any) -> None:
-    """Valida um description() completo. Levanta ValueError com a causa exata.
+    """Validates a complete description(). Raises ValueError with the exact cause.
 
-    Roda na importação do módulo do nó (register_node), então o custo é pago
-    uma vez por processo — e um nó malformado nunca chega ao registry.
+    Runs at import of the node's module (register_node), so the cost is paid
+    once per process — and a malformed node never reaches the registry.
     """
     if not isinstance(desc, dict):
         raise ValueError(f"description() deve devolver dict, não {type(desc).__name__}.")

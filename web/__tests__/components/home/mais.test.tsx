@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 /**
- * O "+" do compositor (a opção B') e o chip de localização.
+ * The composer's "+" (option B') and the location chip.
  *
- * "Anexar arquivo" cai no MESMO caminho do arrasta-e-solta (useAnexos.receber),
- * agora com um lar descobrível; "Usar minha localização" aciona o controle do
- * globo. O chip é o espelho dos de anexo: à vista, com o ×, lendo a store.
+ * "Anexar arquivo" (attach file) goes down the SAME path as drag-and-drop (useAnexos.receber),
+ * now with a discoverable home; "Usar minha localização" (use my location) triggers the globe's
+ * control. The chip mirrors the attachment ones: in view, with the ×, reading the store.
  */
 import { BotaoMais, ChipDeLocalizacao } from "@/app/components/home/assistente/mais"
 import { useHomeStore } from "@/app/stores/homeStore"
@@ -23,13 +23,13 @@ describe("BotaoMais — o \"+\" do compositor", () => {
     fireEvent.change(input, { target: { files: [arquivo] } })
     expect(aoAnexar).toHaveBeenCalledTimes(1)
     expect(aoAnexar.mock.calls[0][0][0].name).toBe("municipios.shp")
-    // Zera para que reescolher o MESMO arquivo dispare o change de novo.
+    // Resets so that re-choosing the SAME file fires the change again.
     expect(input.value).toBe("")
   })
 
   it("o item «Anexar arquivo» do menu abre o seletor (o click do input)", () => {
-    // O caminho menu → seletor, e não só o change do input: sem isto o item
-    // podia apontar para o nada e a suíte seguia verde.
+    // The menu → picker path, and not just the input's change: without this the item
+    // could point to nothing and the suite would stay green.
     const click = vi.spyOn(HTMLInputElement.prototype, "click")
     render(<BotaoMais aoAnexar={vi.fn()} aoLocalizar={vi.fn()} />)
     fireEvent.keyDown(screen.getByRole("button", { name: /anexar/i }), { key: "Enter" })
@@ -48,8 +48,8 @@ describe("BotaoMais — o \"+\" do compositor", () => {
 
 describe("ChipDeLocalizacao", () => {
   it("sem compartilhar ligado, não renderiza — mesmo com posição na store", () => {
-    // O botão nativo do globo grava a posição (última conhecida), mas só o
-    // gesto do "+" a põe na conversa.
+    // The globe's native button records the position (last known), but only the
+    // "+" gesture puts it into the conversation.
     useHomeStore.setState({ localizacao: { lat: 1, lon: 2, precisao_m: 5 } })
     render(<ChipDeLocalizacao />)
     expect(screen.queryByTestId("chip-de-localizacao")).toBeNull()
@@ -67,11 +67,11 @@ describe("ChipDeLocalizacao", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /Tirar a localização/i }))
     expect(useHomeStore.getState().compartilharLocalizacao).toBe(false)
-    // A última posição fica (religar volta na hora) — o chip é que some.
+    // The last position stays (turning it back on returns instantly) — it is the chip that goes away.
     expect(useHomeStore.getState().localizacao).toEqual({ lat: -23.5505, lon: -46.6333, precisao_m: 18 })
     expect(screen.queryByTestId("chip-de-localizacao")).toBeNull()
 
-    // O tick seguinte do modo seguir NÃO ressuscita o chip.
+    // The next tick of follow mode does NOT bring the chip back.
     useHomeStore.getState().definirLocalizacao({ lat: -23.56, lon: -46.64, precisao_m: 9 })
     expect(screen.queryByTestId("chip-de-localizacao")).toBeNull()
   })

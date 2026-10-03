@@ -11,12 +11,12 @@ import { DeleteWorkspaceDialog } from "../dialog-content/delete-workspace"
 import { SheetSection } from "./section-shell"
 
 /**
- * Ações irreversíveis do workspace.
+ * The workspace's irreversible actions.
  *
- * Excluir e sair são MUTUAMENTE EXCLUSIVAS, não uma desabilitada ao lado da
- * outra: o dono não pode sair (não tem registro em `workspace_members`, e o
- * backend responde 400), e quem não é dono não pode excluir. Mostrar o botão
- * proibido em cinza só ensinaria que existe algo fora de alcance.
+ * Delete and leave are MUTUALLY EXCLUSIVE, not one disabled next to the
+ * other: the owner cannot leave (they have no row in `workspace_members`, and
+ * the backend answers 400), and a non-owner cannot delete. Showing the
+ * forbidden button grayed out would only teach that something is out of reach.
  */
 export function DangerSection({
   workspace, onClosePanel,
@@ -31,9 +31,9 @@ export function DangerSection({
   const isOwner = workspace.my_role === "owner"
 
   async function handleLeave() {
-    // O painel fecha ANTES de aguardar: o workspace alvo é derivado da lista, e
-    // o reload que vem junto com a saída o remove de lá — com o painel aberto,
-    // o corpo renderizaria com o alvo já nulo.
+    // The panel closes BEFORE awaiting: the target workspace is derived from the
+    // list, and the reload that comes with leaving removes it from there — with
+    // the panel open, the body would render with the target already null.
     onClosePanel()
     try {
       await leaveWorkspace(workspace.id_hash)

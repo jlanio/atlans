@@ -1,8 +1,8 @@
 /**
- * O editor de código carrega o Monaco da própria origem (`public/monaco/vs`,
- * copiado no build por scripts/copiar-monaco.mjs). Sem o `loader.config`, o
- * @monaco-editor/loader vai ao jsdelivr — que a CSP bloqueante recusa, e o
- * editor fica no skeleton para sempre.
+ * The code editor loads Monaco from its own origin (`public/monaco/vs`, copied
+ * at build time by scripts/copiar-monaco.mjs). Without `loader.config`,
+ * @monaco-editor/loader goes to jsdelivr — which the blocking CSP refuses, and
+ * the editor stays on the skeleton forever.
  */
 import { describe, it, expect, vi } from "vitest"
 

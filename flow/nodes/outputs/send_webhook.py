@@ -14,9 +14,9 @@ logger = get_logger(__name__)
 @register_node
 class SendWebhookNode(BaseNode):
     """
-    Envia uma requisição HTTP (webhook) com dados do workflow como payload JSON.
-    Se um GeoDataFrame for encontrado nos inputs, é serializado como GeoJSON e
-    incluído no payload. Inclui proteção SSRF.
+    Sends an HTTP request (webhook) with workflow data as the JSON payload.
+    If a GeoDataFrame is found in the inputs, it is serialized as GeoJSON and
+    included in the payload. Includes SSRF protection.
     """
 
     @classmethod
@@ -126,15 +126,15 @@ class SendWebhookNode(BaseNode):
             else:
                 logger.warning("Nenhum GeoDataFrame ou DataFrame encontrado nos inputs. Enviando payload vazio.")
 
-        # Garante Content-Type para JSON
+        # Ensures a JSON Content-Type
         if 'Content-Type' not in headers and 'content-type' not in headers:
             headers = {**headers, 'Content-Type': 'application/json'}
 
         logger.info(f"Enviando webhook {method} para: {url}")
 
-        # SEG (SSRF): safe_httpx_request valida a URL E fixa o IP resolvido.
-        # Antes chamavamos validate_url_ssrf e descartavamos o resultado, e o
-        # httpx re-resolvia o DNS (TOCTOU / DNS-rebinding para metadata/interno).
+        # SEG (SSRF): safe_httpx_request validates the URL AND pins the resolved IP.
+        # We used to call validate_url_ssrf and discard the result, and
+        # httpx re-resolved DNS (TOCTOU / DNS rebinding to metadata/internal).
         try:
             response = await safe_httpx_request(
                 method=method,

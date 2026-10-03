@@ -3,7 +3,7 @@ import { render } from "@testing-library/react"
 
 import MarcaAnimada from "@/app/components/home/assistente/marca-animada"
 
-/** A marca de três nós do item pendente: a forma e a API; a animação é CSS (`globals.css`). */
+/** The three-node mark of the pending item: the shape and the API; the animation is CSS (`globals.css`). */
 describe("MarcaAnimada", () => {
   it("é um SVG decorativo com três nós, três trilhos e três traços, no tamanho pedido", () => {
     const { container } = render(<MarcaAnimada size={20} className="x" />)

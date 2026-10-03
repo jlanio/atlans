@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 @register_node
 class ReadGeoParquetNode(BaseNode):
     """
-    Le um arquivo GeoParquet do Drive do Workspace e retorna um GeoDataFrame.
+    Reads a GeoParquet file from the Workspace Drive and returns a GeoDataFrame.
     """
 
     @classmethod

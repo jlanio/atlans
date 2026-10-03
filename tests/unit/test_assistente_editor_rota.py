@@ -1,18 +1,18 @@
 # tests/unit/test_assistente_rota.py
 """
-A rota do assistente — o que atravessa o SSE e o que o cliente não manda.
+The assistant route — what crosses the SSE and what the client does not send.
 
-Divisão de trabalho com `test_assistente_service.py`: lá se mede o LAÇO (portão,
-escopo, cota, transcrito retomável); aqui se mede a ROTA (enquadramento SSE,
-trava, persistência, caminhos de erro, e o que o corpo aceita). Por isso
-`conversar` entra dublado na maior parte dos testes: repetir o laço aqui mediria
-duas vezes a mesma coisa e esconderia um defeito de enquadramento atrás dele.
+Division of labor with `test_assistente_service.py`: there the LOOP is measured
+(gate, scope, quota, resumable transcript); here the ROUTE is measured (SSE
+framing, lock, persistence, error paths, and what the body accepts). That is why
+`conversar` is doubled in most tests: repeating the loop here would measure the
+same thing twice and hide a framing defect behind it.
 
-O que estes testes **não** medem: que os quadros chegam ESPAÇADOS. A fixture
-`client` usa `ASGITransport`, que bufferiza o corpo inteiro — medido, com o
-controle sem middleware nenhum acusando o mesmo. O comportamento incremental foi
-conferido à parte, com uvicorn num socket de verdade; o que sobra aqui, e é o
-que importa para o painel, é o conteúdo e a ORDEM dos quadros.
+What these tests do **not** measure: that the frames arrive SPACED OUT. The
+`client` fixture uses `ASGITransport`, which buffers the whole body — measured,
+with the control with no middleware at all showing the same. The incremental
+behavior was checked separately, with uvicorn on a real socket; what remains here,
+and what matters for the panel, is the content and the ORDER of the frames.
 """
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ ROTA = "/assistente/editor/conversa"
 
 
 def _eventos(*pares):
-    """Um `conversar` dublado que cede os quadros que o teste roteirizou."""
+    """A doubled `conversar` that yields the frames the test scripted."""
 
     async def falso(**kw):
         for tipo, dados in pares:
@@ -56,9 +56,9 @@ def _quadros(texto: str) -> list[tuple[str, dict]]:
 
 @contextmanager
 def _sem_banco():
-    """Sobrepõe `get_db`: a suíte não tem banco, e o FastAPI resolve a dependência
-    ANTES de o handler rodar — sem isto todo teste deste arquivo morre no 500 da
-    sessão em vez de medir o que veio medir."""
+    """Overrides `get_db`: the suite has no database, and FastAPI resolves the
+    dependency BEFORE the handler runs — without this every test in this file dies
+    on the session's 500 instead of measuring what it came to measure."""
     from app.api.dependencies import get_db
     from app.main import app
 
@@ -73,12 +73,12 @@ def _sem_banco():
 
 
 def _ligado(redis, conversar=None, *, ativo=True):
-    """Liga o assistente, injeta um Redis de mentira e (opcional) dubla o laço.
+    """Turns the assistant on, injects a fake Redis and (optionally) doubles the loop.
 
-    `listar_workspace_ids` entra dublada porque a suíte não tem banco: a rota a
-    chama ANTES de devolver o `StreamingResponse`, justamente porque a sessão do
-    request morre quando o handler sai de cena. Qual workspace ela devolve não é
-    o que este arquivo mede — isso é `test_workflow_access.py`.
+    `listar_workspace_ids` is doubled because the suite has no database: the route
+    calls it BEFORE returning the `StreamingResponse`, precisely because the
+    request's session dies when the handler leaves the scene. Which workspace it
+    returns is not what this file measures — that is `test_workflow_access.py`.
     """
     pilha = ExitStack()
     pilha.enter_context(_sem_banco())
@@ -100,23 +100,23 @@ def _ligado(redis, conversar=None, *, ativo=True):
 
 
 async def test_sem_chave_a_conversa_responde_503_e_diz_o_que_falta(client):
-    """503 e não 404: quem instalou sem a chave precisa saber que o recurso existe.
+    """503 and not 404: whoever installed without the key needs to know the feature exists.
 
-    Com a sessão autenticada pela fixture — aceitar 401 aqui faria o teste
-    passar pelo motivo errado no dia em que a rota deixasse de existir.
+    With the session authenticated by the fixture — accepting 401 here would make
+    the test pass for the wrong reason the day the route ceased to exist.
     """
     redis = RedisFalso()
     with _ligado(redis, ativo=False):
         r = await client.post(ROTA, json={"mensagem": "oi"})
 
     assert r.status_code == 503
-    # `message`, e não `detail`: a app tem forma de erro própria
-    # (`app/core/utils/error_handlers.py`), e o painel lê essa.
+    # `message`, not `detail`: the app has its own error shape
+    # (`app/core/utils/error_handlers.py`), and the panel reads that one.
     assert "OPENROUTER_API_KEY" in r.json()["message"]
 
 
 async def test_o_estado_diz_desligado_sem_precisar_de_erro(client):
-    """O painel consulta antes de aparecer: um 503 aqui o obrigaria a tratar erro."""
+    """The panel checks before showing up: a 503 here would force it to handle an error."""
     with _ligado(RedisFalso(), ativo=False):
         r = await client.get("/assistente/editor/estado")
 
@@ -131,12 +131,12 @@ async def test_o_estado_diz_desligado_sem_precisar_de_erro(client):
 
 
 async def test_o_cliente_nao_pode_mandar_o_transcrito(client):
-    """A defesa que importa mais neste arquivo.
+    """The defense that matters most in this file.
 
-    Um `tool_result` é a palavra do SERVIDOR sobre o que aconteceu. Se o corpo
-    aceitasse um transcrito, o cliente diria ao modelo o que quisesse — "a
-    validação passou", "o usuário é administrador". `extra="forbid"` é o que
-    torna a tentativa um 422 em vez de um campo ignorado em silêncio.
+    A `tool_result` is the SERVER's word about what happened. If the body
+    accepted a transcript, the client would tell the model whatever it wanted —
+    "validation passed", "the user is an administrator". `extra="forbid"` is what
+    turns the attempt into a 422 instead of a silently ignored field.
     """
     redis = RedisFalso()
     with _ligado(redis, _eventos(("fim", {"transcrito": [], "ok": True}))):
@@ -159,7 +159,7 @@ async def test_mensagem_vazia_e_recusada(client):
     assert r.status_code == 422
 
 
-# ── O enquadramento do SSE ────────────────────────────────────────────────────
+# ── SSE framing ───────────────────────────────────────────────────────────────
 
 
 async def test_os_quadros_saem_nomeados_e_na_ordem(client):
@@ -194,10 +194,10 @@ async def test_os_quadros_saem_nomeados_e_na_ordem(client):
 
 
 async def test_o_gzip_nao_comprime_o_stream(client):
-    """`text/event-stream` comprimido chegaria em blocos, e o painel veria pausas.
+    """Compressed `text/event-stream` would arrive in chunks, and the panel would see pauses.
 
-    O Starlette 1.6 já exclui esse tipo por dentro; o teste é o guarda de que uma
-    troca de versão não desfaça isso em silêncio.
+    Starlette 1.6 already excludes this type internally; the test is the guard
+    against a version bump silently undoing that.
     """
     redis = RedisFalso()
     with _ligado(redis, _eventos(("texto", {"texto": "x" * 4000}), ("fim", {"ok": True}))):
@@ -213,7 +213,7 @@ async def test_o_gzip_nao_comprime_o_stream(client):
 
 
 async def test_a_conversa_e_guardada_no_servidor_e_retomada_na_proxima_mensagem(client):
-    """Chave por (usuário, fluxo): reabrir o editor retoma a conversa daquele fluxo."""
+    """Keyed by (user, workflow): reopening the editor resumes that workflow's conversation."""
     redis = RedisFalso()
     laco = _eventos(("fim", {"transcrito": [{"role": "user", "content": "primeira"}], "ok": True}))
 
@@ -226,7 +226,7 @@ async def test_a_conversa_e_guardada_no_servidor_e_retomada_na_proxima_mensagem(
     assert guardado == [{"role": "user", "content": "primeira"}]
     assert redis.ttls[chaves[0]] == cs.TTL_DA_CONVERSA_S
 
-    # A segunda mensagem recebe o histórico de volta, e não uma conversa nova.
+    # The second message gets the history back, not a new conversation.
     vistos = {}
 
     async def espiando(**kw):
@@ -251,7 +251,7 @@ async def test_fluxos_diferentes_tem_conversas_diferentes(client):
     with _ligado(redis, laco):
         await client.post(ROTA, json={"mensagem": "a", "workflow_id": "wf-2"})
     with _ligado(redis, laco):
-        await client.post(ROTA, json={"mensagem": "a"})  # a tela de criar
+        await client.post(ROTA, json={"mensagem": "a"})  # the create screen
 
     assert sorted(k for k in redis.dados if k.startswith("assistente:conversa:")) == [
         "assistente:conversa:usr-test-001:novo",
@@ -261,10 +261,10 @@ async def test_fluxos_diferentes_tem_conversas_diferentes(client):
 
 
 async def test_o_stream_que_morre_no_meio_ainda_salva_o_que_tinha(client):
-    """Fechar a aba não pode apagar a conversa.
+    """Closing the tab must not delete the conversation.
 
-    O `finally` do gerador é o que garante isso. Aqui a morte é simulada por uma
-    exceção no meio do laço, que é o mesmo caminho de código.
+    The generator's `finally` is what guarantees that. Here the death is simulated
+    by an exception in the middle of the loop, which is the same code path.
     """
     redis = RedisFalso()
 
@@ -278,7 +278,7 @@ async def test_o_stream_que_morre_no_meio_ainda_salva_o_que_tinha(client):
     quadros = _quadros(r.text)
     assert quadros[-2][0] == "erro"
     assert quadros[-2][1]["code"] == "erro_interno"
-    # Nunca o texto da exceção: ele carrega caminho de arquivo e estado interno.
+    # Never the exception text: it carries file paths and internal state.
     assert "cabo arrancado" not in r.text
     assert quadros[-1][0] == "fim" and quadros[-1][1]["ok"] is False
 
@@ -303,8 +303,8 @@ async def test_esquecer_apaga_so_a_conversa_daquele_fluxo(client):
 
 
 async def test_duas_abas_no_mesmo_fluxo_a_segunda_e_recusada(client):
-    """Sem a trava as duas salvariam por cima uma da outra e o histórico viraria
-    uma mistura das duas conversas."""
+    """Without the lock the two would save over each other and the history would
+    become a mix of the two conversations."""
     redis = RedisFalso()
     redis.dados["assistente:trava:usr-test-001:wf-1"] = "1"
 
@@ -318,7 +318,7 @@ async def test_duas_abas_no_mesmo_fluxo_a_segunda_e_recusada(client):
 
 
 async def test_a_trava_e_solta_quando_a_conversa_termina(client):
-    """Senão a segunda mensagem da MESMA aba seria recusada."""
+    """Otherwise the second message from the SAME tab would be rejected."""
     redis = RedisFalso()
     with _ligado(redis, _eventos(("fim", {"transcrito": [], "ok": True}))):
         await client.post(ROTA, json={"mensagem": "oi", "workflow_id": "wf-1"})
@@ -355,14 +355,14 @@ async def test_o_estado_traz_o_gasto_e_quando_a_janela_reabre(client, registro_d
     assert corpo["cota"]["gasto"] == 250_000
     assert corpo["cota"]["teto"] == 1_500_000
     assert corpo["cota"]["reabre_em_segundos"] == 3600
-    # Sem extensão de planos, ninguém tem plano: o teto é o da instalação.
+    # Without a plans extension, nobody has a plan: the ceiling is the installation's.
     assert corpo["plano"] is None
 
 
 async def test_o_estado_traz_o_teto_do_PLANO_de_quem_pergunta(client, registro_de_teste):
-    """A tela tem de dizer QUAL plano da aquele teto — e o teto tem de ser o do
-    plano, senao o donut mostraria a folga errada para quem paga. Quem responde
-    é o registro das extensões; uma extensão de planos testa o dela na própria pasta."""
+    """The screen has to say WHICH plan gives that ceiling — and the ceiling has to be
+    the plan's, otherwise the donut would show the wrong headroom to whoever pays. The
+    extension registry answers; a plans extension tests its own in its own folder."""
     redis = RedisFalso()
     redis.dados["assistente:tokens:usr-test-001"] = 250_000
 
@@ -381,10 +381,11 @@ async def test_o_estado_traz_o_teto_do_PLANO_de_quem_pergunta(client, registro_d
 
 @pytest.mark.parametrize("ligado", [True, False])
 async def test_o_estado_diz_se_HA_o_que_vender_nesta_instalacao(client, registro_de_teste, ligado):
-    """Sem isto, a oferta que aparece quando a cota estoura vira um beco: numa
-    instalação sem provedor de pagamento, «Ver planos» levaria a uma tela que
-    só diz «não disponível aqui». Oferecer o que não se pode vender é pior que
-    não oferecer — e a tela só sabe disso se o servidor contar."""
+    """Without this, the offer that appears when the quota runs out becomes a dead end:
+    on an installation without a payment provider, "Ver planos" (see plans) would
+    lead to a screen that only says "não disponível aqui" (not available here).
+    Offering what cannot be sold is worse than not offering — and the screen only
+    knows that if the server tells it."""
     registro_de_teste.assinaturas_ativas = lambda: ligado
     with _ligado(RedisFalso()):
         r = await client.get("/assistente/editor/estado")
@@ -393,14 +394,14 @@ async def test_o_estado_diz_se_HA_o_que_vender_nesta_instalacao(client, registro
 
 
 async def test_a_recusa_de_cota_chega_como_quadro_de_erro(client):
-    """A resposta já começou quando a recusa acontece — e o painel tem UM caminho
-    de erro só."""
+    """The response has already started when the refusal happens — and the panel has
+    ONLY ONE error path."""
     redis = RedisFalso()
     from app.mcp.erros import erro
 
     async def recusa(**kw):
         raise erro("rate_limited", "Você atingiu a cota diária do assistente.", "espere")
-        yield  # pragma: no cover - torna a função um gerador
+        yield  # pragma: no cover - makes the function a generator
 
     with _ligado(redis, recusa):
         r = await client.post(ROTA, json={"mensagem": "oi"})

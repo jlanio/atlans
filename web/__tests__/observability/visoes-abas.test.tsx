@@ -37,7 +37,7 @@ describe("VisoesAbas", () => {
     fireEvent.keyDown(workflows, { key: "ArrowLeft" })
     expect(onVisao).toHaveBeenCalledWith("execucoes")
     fireEvent.keyDown(executores, { key: "ArrowRight" })
-    // Circular: da última volta para a primeira.
+    // Circular: from the last it wraps to the first.
     expect(onVisao).toHaveBeenLastCalledWith("execucoes")
     fireEvent.keyDown(execucoes, { key: "End" })
     expect(onVisao).toHaveBeenLastCalledWith("executores")

@@ -1,13 +1,13 @@
 // web/app/components/home/i18n/index.ts
 //
-// Os textos da Home em três idiomas. Cada seção mora num arquivo (casca,
-// assistente, entrada, listas) com o português como MOLDE: `en` e `es` são
-// tipados como `typeof pt`, então uma chave esquecida ou sobrando é erro de
-// compilação, não texto faltando em produção. Texto que depende de número
-// (plural, "3 anexos") é função na própria seção.
+// The Home's texts in three languages. Each section lives in a file (casca,
+// assistente, entrada, listas) with Portuguese as the TEMPLATE: `en` and `es`
+// are typed as `typeof pt`, so a forgotten or extra key is a compile error, not
+// missing text in production. Text that depends on a number (plural,
+// "3 anexos") is a function in the section itself.
 //
-// Sem provider de idioma (testes de componente, o portal /share) vale o
-// português — ver IdiomaContext.
+// Without a language provider (component tests, the /share portal) Portuguese
+// applies — see IdiomaContext.
 
 import type { Idioma } from "@/lib/idioma"
 import { TEXTOS_DA_CASCA } from "./da-casca"
@@ -15,7 +15,7 @@ import * as assistente from "./secoes/assistente"
 import * as entrada from "./secoes/entrada"
 import { useIdiomaDaTela } from "./tela"
 
-// A casca (comum, casca, listas) vem montada de ./da-casca — ver lá por quê.
+// The shell (comum, casca, listas) comes assembled from ./da-casca — see there for why.
 const TEXTOS = {
   "pt-BR": { ...TEXTOS_DA_CASCA["pt-BR"], assistente: assistente.pt, entrada: entrada.pt },
   en: { ...TEXTOS_DA_CASCA.en, assistente: assistente.en, entrada: entrada.en },
@@ -24,12 +24,12 @@ const TEXTOS = {
 
 export type Textos = (typeof TEXTOS)["pt-BR"]
 
-/** Fora do React (uma função pura que recebe o idioma). */
+/** Outside React (a pure function that receives the language). */
 export function textosDe(idioma: Idioma): Textos {
   return TEXTOS[idioma]
 }
 
-/** Os textos do idioma da tela. Objeto estável por idioma — serve de dependência. */
+/** The texts in the screen's language. A stable object per language — usable as a dependency. */
 export function useTextos(): Textos {
   return TEXTOS[useIdiomaDaTela()]
 }

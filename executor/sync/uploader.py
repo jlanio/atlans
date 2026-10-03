@@ -1,7 +1,7 @@
 # executor/sync/uploader.py
 """
-DriveUploader — envia datasets para o Drive do Workspace via pre-signed URLs (MinIO).
-Fluxo: pede URL → PUT direto no MinIO → confirma na API.
+DriveUploader — sends datasets to the Workspace Drive via pre-signed URLs (MinIO).
+Flow: request URL → direct PUT to MinIO → confirm with the API.
 """
 import hashlib
 import logging
@@ -17,21 +17,21 @@ from executor.sync.scanner import Dataset
 
 logger = logging.getLogger("executor.sync")
 
-# Tamanho de chunk do streaming/hash. Grande o bastante para nao pagar overhead
-# de troca de contexto por 8 KB, pequeno o bastante para nao segurar memoria.
+# Chunk size for streaming/hashing. Large enough not to pay context-switch
+# overhead per 8 KB, small enough not to hold on to memory.
 _CHUNK = 1024 * 1024
 
 
 @dataclass
 class UploadResult:
     """
-    Resultado de um upload confirmado.
+    Result of a confirmed upload.
 
-    `remote_name` e `remote_md5` descrevem o OBJETO que foi de fato enviado — que
-    para um shapefile nao e nenhum dos arquivos locais, e sim o `<dataset>.zip`.
-    Sem esses dois campos no manifesto, o proximo `_remote_to_local` via o zip
-    como arquivo novo, baixava-o para a pasta do usuario e colidia na mesma
-    chave do dataset, destruindo 'files'/'local_md5' a cada reinicio.
+    `remote_name` and `remote_md5` describe the OBJECT that was actually sent — which
+    for a shapefile is none of the local files, but the `<dataset>.zip`.
+    Without these two fields in the manifest, the next `_remote_to_local` saw the zip
+    as a new file, downloaded it into the user's folder and collided on the same
+    dataset key, destroying 'files'/'local_md5' on every restart.
     """
     id_hash: str
     remote_name: str
@@ -49,16 +49,16 @@ class DriveUploader:
         self._http = ClienteHTTP(self._httpx_kwargs)
 
     async def aclose(self):
-        """Fecha o cliente HTTP compartilhado (chamado no shutdown do manager)."""
+        """Closes the shared HTTP client (called on manager shutdown)."""
         await self._http.aclose()
 
     def _headers(self) -> dict:
-        """Sem headers de auth — identidade vem do cert mTLS no handshake TLS."""
+        """No auth headers — identity comes from the mTLS cert in the TLS handshake."""
         return {}
 
     @staticmethod
     def remote_name_for(dataset: Dataset) -> str:
-        """Nome do objeto que sera criado no Drive para este dataset."""
+        """Name of the object that will be created in the Drive for this dataset."""
         if dataset.type == "shapefile":
             return f"{dataset.name}.zip"
         primary = dataset.primary_path
@@ -66,11 +66,12 @@ class DriveUploader:
 
     def _contained(self, path: Path, context: str) -> bool:
         """
-        Revalida a contencao imediatamente antes de abrir o arquivo.
+        Revalidates containment right before opening the file.
 
-        O scanner ja pula symlinks, mas entre o scan e o upload a arvore pode ter
-        mudado. O download e contido por `safe_join` desde sempre; o upload nao
-        tinha contencao nenhuma — essa assimetria era o vetor de vazamento.
+        The scanner already skips symlinks, but between the scan and the upload the
+        tree may have changed. The download has been contained by `safe_join` from
+        the start; the upload had no containment at all — that asymmetry was the
+        leak vector.
         """
         if is_inside(self.sync_dir, path):
             return True
@@ -80,9 +81,9 @@ class DriveUploader:
 
     async def upload(self, dataset: Dataset, spatial_metadata: dict | None = None) -> UploadResult | None:
         """
-        Faz upload de um dataset via pre-signed URL.
-        Shapefile: zipa antes, envia como .zip.
-        Retorna UploadResult ou None em caso de falha.
+        Uploads a dataset via a pre-signed URL.
+        Shapefile: zipped first, sent as .zip.
+        Returns UploadResult, or None on failure.
         """
         if dataset.type == "shapefile":
             return await self._upload_shapefile(dataset, spatial_metadata)
@@ -96,25 +97,26 @@ class DriveUploader:
         return await self._upload_file(primary, primary.name, spatial_metadata)
 
     async def register(self, dataset: Dataset, spatial_metadata: dict | None = None) -> UploadResult | None:
-        """Registra o dataset no Drive SEM enviar os bytes (modo catalogo).
+        """Registers the dataset in the Drive WITHOUT sending the bytes (catalog mode).
 
-        Para dado pessoal (LGPD): o servidor passa a conhecer o arquivo — nome,
-        tipo, tamanho, CRS, bbox, contagem de feicoes — e a saber que ele esta
-        NESTE executor, mas o conteudo nunca sai da maquina.
+        For personal data (LGPD): the server gets to know the file — name,
+        type, size, CRS, bbox, feature count — and that it is on THIS
+        executor, but the content never leaves the machine.
 
-        Devolve o mesmo `UploadResult` do `upload()` para que o manager trate os
-        dois caminhos igual. `remote_md5` vai vazio de proposito: nao ha objeto
-        remoto para comparar, e inventar um hash faria o diff do proximo ciclo
-        concluir que o arquivo mudou.
+        Returns the same `UploadResult` as `upload()` so the manager treats both
+        paths the same way. `remote_md5` is left empty on purpose: there is no
+        remote object to compare against, and making up a hash would make the next
+        cycle's diff conclude that the file changed.
         """
         primary = dataset.primary_path
         if not primary:
             logger.warning("Dataset '%s' sem arquivo principal — registro ignorado.", dataset.name)
             return None
 
-        # Para shapefile o nome remoto e o do bundle ('<dataset>.zip'), o mesmo
-        # que o upload usaria: o Drive mostra um item so, e trocar a convencao
-        # aqui faria o mesmo dataset aparecer com dois nomes conforme o modo.
+        # For a shapefile the remote name is the bundle's ('<dataset>.zip'), the same
+        # one the upload would use: the Drive shows a single item, and changing the
+        # convention here would make the same dataset show up under two names
+        # depending on the mode.
         remote_name = self.remote_name_for(dataset)
 
         corpo = {
@@ -122,8 +124,8 @@ class DriveUploader:
             "workspace_id": self.workspace_id,
             "size": dataset.total_size,
             "spatial_metadata": spatial_metadata or {},
-            # Nome do dataset no manifesto local. E por ele que o executor
-            # reencontra o arquivo na leitura — nao ha caminho trafegando.
+            # Dataset name in the local manifest. It is how the executor finds the
+            # file again on read — no path travels over the wire.
             "dataset_name": dataset.name,
         }
 
@@ -150,21 +152,21 @@ class DriveUploader:
         return UploadResult(id_hash=id_hash, remote_name=remote_name, remote_md5="")
 
     async def delete(self, remote_id_hash: str) -> bool:
-        """Remove um arquivo do Drive. Devolve se o registro NAO esta mais la.
+        """Removes a file from the Drive. Returns whether the record is NO LONGER there.
 
-        A rota e `/drive/executor-file/{id}` — um endpoint mTLS de executor, e
-        NAO o `DELETE /drive/{id}` do usuario. Os dois motivos sao o mesmo
-        motivo de todos os outros metodos deste uploader usarem o prefixo
-        `executor-`: o `/drive/{id}` cru exige JWT (que o executor nao tem) e, no
-        host dos executores, o Traefik so roteia `/drive/executor-*` para a
-        API. Apontar a delecao para `/drive/{id}` fazia o pedido morrer no
-        Traefik com 404 — o arquivo NUNCA saia do Drive.
+        The route is `/drive/executor-file/{id}` — an executor mTLS endpoint, and
+        NOT the user's `DELETE /drive/{id}`. The two reasons are the same reason
+        every other method of this uploader uses the `executor-` prefix: the bare
+        `/drive/{id}` requires a JWT (which the executor does not have) and, on the
+        executors host, Traefik only routes `/drive/executor-*` to the API.
+        Pointing the deletion at `/drive/{id}` made the request die at Traefik
+        with a 404 — the file NEVER left the Drive.
 
-        **404 conta como sucesso.** O objetivo e "este registro nao deve
-        existir", e um 404 do endpoint correto significa que ele ja nao existe
-        (apagado pelo Drive web, ou por uma tentativa anterior). Tratar 404 como
-        falha criava um retry que nunca converge. E a mesma politica do
-        `allow_missing=True` que o servidor usa no `delete_strict`.
+        **404 counts as success.** The goal is "this record must not exist", and
+        a 404 from the correct endpoint means it no longer exists (deleted from the
+        web Drive, or by an earlier attempt). Treating 404 as a failure created a
+        retry that never converges. It is the same policy as the
+        `allow_missing=True` the server uses in `delete_strict`.
         """
         url = f"{self.base_url}/drive/executor-file/{remote_id_hash}"
         try:
@@ -194,15 +196,15 @@ class DriveUploader:
             return None
 
         file_size = file_path.stat().st_size
-        # MD5 do conteudo REAL enviado, calculado fora do event loop. E esse valor
-        # que o servidor devolve como `content_md5` no executor-list, entao e ele
-        # que precisa ir para o manifesto — nao o hash combinado do dataset local.
+        # MD5 of the ACTUAL content sent, computed off the event loop. That value is
+        # what the server returns as `content_md5` in executor-list, so it is what
+        # has to go into the manifest — not the combined hash of the local dataset.
         content_md5 = await em_thread(_file_md5, file_path)
 
         try:
-            # As tres etapas usam o MESMO cliente: cada `AsyncClient` novo
-            # refazia o handshake mTLS inteiro, entao um arquivo de 3 KB pagava
-            # ~6 RTTs so de TLS — o mesmo custo de um raster de 2 GB.
+            # All three steps use the SAME client: each new `AsyncClient`
+            # redid the whole mTLS handshake, so a 3 KB file paid
+            # ~6 RTTs of TLS alone — the same cost as a 2 GB raster.
             cliente = self._http()
 
             # 1. Pede pre-signed PUT URL
@@ -219,11 +221,11 @@ class DriveUploader:
             upload_url = data["upload_url"]
             id_hash = data["id_hash"]
 
-            # 2. PUT direto no MinIO (sem headers de auth — URL pre-assinada).
-            #    Streaming: ler o arquivo inteiro com f.read() estourava a memoria
-            #    em raster/gpkg grandes E bloqueava o event loop. Com
-            #    Content-Length explicito o httpx nao cai em Transfer-Encoding:
-            #    chunked, que o MinIO recusa em URL pre-assinada.
+            # 2. Direct PUT to MinIO (no auth headers — pre-signed URL).
+            #    Streaming: reading the whole file with f.read() blew the memory
+            #    on large rasters/gpkgs AND blocked the event loop. With an
+            #    explicit Content-Length httpx does not fall back to
+            #    Transfer-Encoding: chunked, which MinIO rejects on a pre-signed URL.
             put_resp = await cliente.put(
                 upload_url,
                 content=_aiter_file(file_path),
@@ -233,11 +235,11 @@ class DriveUploader:
                 logger.warning("PUT MinIO falhou: HTTP %d", put_resp.status_code)
                 return None
 
-            # 3. Confirma upload na API
-            # CRS, bbox e contagem de feicoes so podem ser calculados por quem
-            # tem o arquivo. Iam junto no modo `register` e eram descartados
-            # aqui, entao todo dataset sincronizado pelo modo padrao aparecia no
-            # Drive sem dado espacial nenhum.
+            # 3. Confirm the upload with the API
+            # CRS, bbox and feature count can only be computed by whoever
+            # has the file. They were sent in `register` mode and discarded
+            # here, so every dataset synced in the default mode showed up in the
+            # Drive with no spatial data at all.
             confirm_resp = await cliente.post(
                 f"{self.base_url}/drive/executor-confirm-upload/{id_hash}",
                 json={"spatial_metadata": spatial_metadata or {}},
@@ -260,9 +262,9 @@ class DriveUploader:
         """Empacota Shapefile em zip e faz upload."""
         zip_name = self.remote_name_for(dataset)
 
-        # Revalida CADA componente antes de abrir: o bundle e zipado sem passar
-        # pelo validador (que so olha o .shp), entao um '.dbf' que virou symlink
-        # para fora entraria no pacote sem nenhuma checagem.
+        # Revalidate EACH component before opening: the bundle is zipped without going
+        # through the validator (which only looks at the .shp), so a '.dbf' that
+        # became a symlink pointing outside would get into the package unchecked.
         members: list[tuple[Path, str]] = []
         for finfo in dataset.files.values():
             if not self._contained(finfo.path, "componente de shapefile"):
@@ -273,9 +275,9 @@ class DriveUploader:
             tmp_path = Path(tmp.name)
 
         try:
-            # ZIP_DEFLATED de um bundle grande e CPU+I/O puro: rodar na corrotina
-            # segurava o heartbeat de 30s (unico keepalive do executor) e o
-            # servidor fechava a conexao com 4408, matando o run em andamento.
+            # ZIP_DEFLATED of a large bundle is pure CPU+I/O: running it in the coroutine
+            # held up the 30s heartbeat (the executor's only keepalive) and the
+            # server closed the connection with 4408, killing the run in progress.
             await em_thread(_write_zip, tmp_path, members)
 
             logger.info("Shapefile '%s' empacotado (%d arquivos, %d bytes).",
@@ -287,14 +289,14 @@ class DriveUploader:
 
 
 def _write_zip(zip_path: Path, members: list[tuple[Path, str]]):
-    """Compacta os membros no zip. Sincrono por natureza — chamar via to_thread."""
+    """Compresses the members into the zip. Synchronous by nature — call via to_thread."""
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for source, arcname in members:
             zf.write(source, arcname)
 
 
 def _file_md5(path: Path) -> str:
-    """MD5 do conteudo. Sincrono por natureza — chamar via to_thread."""
+    """MD5 of the content. Synchronous by nature — call via to_thread."""
     h = hashlib.md5()
     with open(path, "rb") as f:
         for chunk in iter(lambda: f.read(_CHUNK), b""):
@@ -303,11 +305,11 @@ def _file_md5(path: Path) -> str:
 
 
 async def _aiter_file(path: Path):
-    """Gera o corpo do PUT em pedacos, lendo o disco fora do event loop.
+    """Yields the PUT body in chunks, reading the disk off the event loop.
 
-    Pool de I/O, nao o pesado: no mesmo pool de 2 threads, um `_write_zip` de
-    bundle de GB parava TODOS os PUTs em voo pelo tempo da compactacao — e o
-    MinIO fecha conexao ociosa.
+    I/O pool, not the heavy one: in the same 2-thread pool, a `_write_zip` of a
+    GB-sized bundle stalled ALL in-flight PUTs for the duration of the compression —
+    and MinIO closes idle connections.
     """
     with open(path, "rb") as f:
         while True:

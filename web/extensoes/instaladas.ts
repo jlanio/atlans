@@ -1,7 +1,7 @@
 // web/extensoes/instaladas.ts
 //
-// As extensões desta instalação: nenhuma. Para somar uma, ponha a pasta dela
-// em web/extensoes/ e o objeto que ela exporta nesta lista (ver `tipos.ts`).
+// This installation's extensions: none. To add one, put its folder in
+// web/extensoes/ and the object it exports in this list (see `tipos.ts`).
 
 import type { ExtensaoDoWeb } from "./tipos"
 

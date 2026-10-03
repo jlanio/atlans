@@ -18,16 +18,17 @@ interface Props {
   values: Record<string, string | number | boolean> | undefined
   setNodeField: (field: string, value: string | number | boolean) => void
   hasUnsaved: boolean
-  /** Colunas conhecidas dos nós anteriores — cada seção oferece as que ainda
-   *  fazem sentido nela. Este helper substitui o renderizador de campos, onde
-   *  a sugestão nasce; sem receber a lista, o "redefinir campos" era o único
-   *  nó de coluna do fluxo que nunca via uma dica. */
+  /** Known columns of the upstream nodes — each section offers the ones that
+   *  still make sense in it. This helper replaces the field renderer, where the
+   *  suggestion originates; without receiving the list, "redefinir campos"
+   *  (redefine fields) was the only column node in the workflow that never saw
+   *  a hint. */
   sugestoesDeColunas: string[]
   sugestoesDesatualizadas: boolean
   sugestoesParciais: boolean
 }
 
-// ── Helpers de serialização ──────────────────────────────────────────────────
+// ── Serialization helpers ────────────────────────────────────────────────────
 
 function parseObj(raw: unknown): Record<string, string> {
   if (!raw) return {}
@@ -77,13 +78,13 @@ export default function SetFieldsHelper({
   )
   const renameEntries = objToRenameEntries(parseObj(values?.renameFields))
 
-  // Cada seção só oferece o que ainda não usou — oferecer o que já está lá é
-  // ruído (a mesma regra do campo de fichas).
+  // Each section only offers what it hasn't used yet — offering what is already
+  // there is noise (the same rule as the chips field).
   const sugerirParaDefinir  = sugestoesDeColunas.filter(s => !setEntries.some(e => e.field === s))
   const sugerirParaRemover  = sugestoesDeColunas.filter(s => !removeFields.includes(s))
   const sugerirParaRenomear = sugestoesDeColunas.filter(s => !renameEntries.some(e => e.from === s))
 
-  // ── Mutações ───────────────────────────────────────────────────────────────
+  // ── Mutations ──────────────────────────────────────────────────────────────
 
   function updateSetEntries(next: SetEntry[]) {
     setNodeField("setFields", setEntriesToObj(next) as unknown as string)
@@ -120,10 +121,10 @@ export default function SetFieldsHelper({
     updateRemoveFields(removeFields.filter(f => f !== field))
   }
 
-  // Clique numa sugestão: preenche a primeira linha cujo campo está vazio, se
-  // houver, ou abre uma linha nova — o valor (ou o "Para") continua com a
-  // pessoa. Substituir um campo já preenchido nunca: a dica não pode custar o
-  // que já foi digitado.
+  // Click on a suggestion: fills the first row whose field is empty, if any, or
+  // opens a new row — the value (or the "Para" (To)) stays with the person.
+  // Never replace an already filled field: the hint must not cost what has
+  // already been typed.
   function escolherParaDefinir(nome: string) {
     const vazia = setEntries.findIndex(e => e.field.trim() === "")
     if (vazia >= 0) updateSetEntry(vazia, "field", nome)
@@ -178,7 +179,7 @@ export default function SetFieldsHelper({
           </p>
         ) : (
           <div className="flex flex-col gap-1.5">
-            {/* Cabeçalho */}
+            {/* Header */}
             <div className="grid grid-cols-[1fr_1fr_auto] gap-1.5 px-1">
               <span className="text-[10px] font-medium text-muted-foreground">Campo</span>
               <span className="text-[10px] font-medium text-muted-foreground">Valor / Expressão</span>

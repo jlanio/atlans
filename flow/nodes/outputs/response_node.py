@@ -1,26 +1,26 @@
 # flow/nodes/outputs/response_node.py
 """
-ResponseNode — retorna dados como resposta HTTP quando o workflow é acionado por webhook.
+ResponseNode — returns data as the HTTP response when the workflow is triggered by a webhook.
 
-Quando o executor encontra este nó em final_outputs, insere a chave __response__
-nos stats do job. O servidor usa essa chave para responder sincronamente à requisição
-HTTP original que disparou o workflow.
+When the executor finds this node in final_outputs, it inserts the __response__ key
+into the job stats. The server uses that key to respond synchronously to the original
+HTTP request that triggered the workflow.
 
-Propriedades:
-  statusCode  — código HTTP de retorno (padrão: 200)
-  contentType — Content-Type da resposta (padrão: application/json)
-  headers     — headers adicionais (objeto chave→valor)
-  customBody  — corpo literal/templated da resposta. Vazio = usa bodyField/inputs.
-                Aceita expressões Jinja interpoladas pelo executor antes de chegar
-                aqui (ex: "Olá {{ inputs.nome }}" ou "$NodePai.field").
-  bodyField   — fallback quando customBody está vazio: nome do campo do input
-                a usar como body; vazio = primeiro input.
+Properties:
+  statusCode  — HTTP status code returned (default: 200)
+  contentType — Content-Type of the response (default: application/json)
+  headers     — additional headers (key→value object)
+  customBody  — literal/templated response body. Empty = uses bodyField/inputs.
+                Accepts Jinja expressions interpolated by the executor before reaching
+                this point (e.g. "Olá {{ inputs.nome }}" or "$NodePai.field").
+  bodyField   — fallback when customBody is empty: name of the input field
+                to use as the body; empty = first input.
 
-Ordem de prioridade do body: customBody > bodyField > primeiro input.
+Body priority order: customBody > bodyField > first input.
 
-Body grande (> WEBHOOK_RESPONSE_INLINE_LIMIT, default 1MB): sobe para o MinIO e
-retorna __response__.body_ref em vez de body inline, evitando HoL blocking no
-WebSocket executor→servidor.
+Large body (> WEBHOOK_RESPONSE_INLINE_LIMIT, default 1MB): uploaded to MinIO and
+returns __response__.body_ref instead of an inline body, avoiding HoL blocking on
+the executor→server WebSocket.
 """
 import asyncio
 import json
@@ -139,13 +139,13 @@ class ResponseNode(BaseNode):
         task_id      = self._task_id
         workspace_id = self._workspace_id
 
-        # Resolução do body conforme bodyMode:
-        #   empty   → sem body
-        #   literal → customBody (texto/Jinja já interpolado pelo executor)
-        #   field   → bodyField nos inputs (com fallback para o primeiro input)
-        # Compat retroativa: workflows antigos sem bodyMode caem em "field" e
-        # se houver customBody preenchido, ele ainda prevalece (mesmo
-        # comportamento que existia antes do bodyMode).
+        # Body resolution according to bodyMode:
+        #   empty   → no body
+        #   literal → customBody (text/Jinja already interpolated by the executor)
+        #   field   → bodyField in the inputs (falling back to the first input)
+        # Backward compat: old workflows without bodyMode fall into "field" and,
+        # if customBody is filled in, it still takes precedence (same
+        # behavior as before bodyMode existed).
         if mode == "empty":
             body = ""
         elif mode == "literal":
@@ -168,11 +168,11 @@ class ResponseNode(BaseNode):
             else:
                 body = {}
 
-        # Conversão GeoDataFrame, json.dumps e upload ao MinIO são todos
-        # bloqueantes (CPU + I/O síncrono). Se rodarem direto no event loop,
-        # o callback 'started' agendado via call_soon_threadsafe fica preso
-        # até o fim e a UI nunca pinta o ring azul durante a execução. Roda
-        # tudo numa thread para que o await yielde imediatamente.
+        # GeoDataFrame conversion, json.dumps and the MinIO upload are all
+        # blocking (CPU + synchronous I/O). If they run directly on the event loop,
+        # the 'started' callback scheduled via call_soon_threadsafe is stuck
+        # until the end and the UI never paints the blue ring during the execution.
+        # Run everything in a thread so the await yields immediately.
         return await asyncio.to_thread(
             _build_response, body, status_code, content_type, headers, task_id, workspace_id,
         )
@@ -186,30 +186,30 @@ def _build_response(
     task_id: str | None,
     workspace_id: str | None = None,
 ) -> dict:
-    """Converte, serializa e (se grande) faz upload do body ao MinIO.
+    """Converts, serializes and (if large) uploads the body to MinIO.
 
-    Roda síncrona porque é chamada dentro de asyncio.to_thread — mantém o
-    event loop livre para processar outros callbacks (como o evento 'started'
-    agendado pelo executor antes de execute()).
+    Runs synchronously because it is called inside asyncio.to_thread — keeps the
+    event loop free to process other callbacks (such as the 'started' event
+    scheduled by the executor before execute()).
     """
-    # GeoDataFrame não é serializável em JSON — converte para dict.
-    # Checa GeoDataFrame antes de DataFrame, ja que GeoDataFrame eh subclasse.
+    # GeoDataFrame is not JSON-serializable — convert it to a dict.
+    # Check GeoDataFrame before DataFrame, since GeoDataFrame is a subclass.
     import geopandas as gpd
     import pandas as pd
 
     if isinstance(body, gpd.GeoDataFrame):
         body = body.__geo_interface__
 
-    # DataFrame puro vira lista de records — sem essa conversão, json.dumps
-    # cai no fallback default=str e devolve a repr "<DataFrame NxM>".
+    # A plain DataFrame becomes a list of records — without this conversion, json.dumps
+    # falls into the default=str fallback and returns the repr "<DataFrame NxM>".
     if isinstance(body, pd.DataFrame):
         body = body.to_dict(orient="records")
 
-    # Serializa o body para medir tamanho. String/bytes vão direto (preserva
-    # texto literal sem aspas extras de JSON — útil para customBody +
-    # Content-Type text/plain ou text/html). Dict/list serializa via json.dumps.
-    # Acima do limite, sobe para o MinIO e substitui o body inline por uma
-    # referência S3.
+    # Serializes the body to measure its size. String/bytes go straight through
+    # (keeps literal text without extra JSON quotes — useful for customBody +
+    # Content-Type text/plain or text/html). Dict/list is serialized via json.dumps.
+    # Above the limit, it is uploaded to MinIO and the inline body is replaced by
+    # an S3 reference.
     if isinstance(body, bytes):
         body_bytes = body
     elif isinstance(body, str):
@@ -241,16 +241,16 @@ def _build_response(
 def _upload_to_minio(
     content: bytes, content_type: str, task_id: str | None, workspace_id: str | None = None,
 ) -> dict:
-    """Sobe o body da resposta para o MinIO e retorna a referência S3.
+    """Uploads the response body to MinIO and returns the S3 reference.
 
-    Mesmo padrão de flow/executor/pin.py:upload_pin_to_minio — pre-signed URL
-    obtida em /drive/executor-presign-upload.
+    Same pattern as flow/executor/pin.py:upload_pin_to_minio — pre-signed URL
+    obtained from /drive/executor-presign-upload.
 
-    A key segue o esquema `{prefix}/{workspace_id}/...` que o servidor exige em
-    `_validate_agent_s3_key`: sem o `workspace_id` como segundo segmento, o
-    presign-upload (escopo do executor), o readback (escopo do workflow) e o
-    registro do artefato (escopo do run) rejeitavam a key com 403 — o body_ref
-    acima de WEBHOOK_RESPONSE_INLINE_LIMIT nunca chegava ao cliente.
+    The key follows the `{prefix}/{workspace_id}/...` scheme the server requires in
+    `_validate_agent_s3_key`: without the `workspace_id` as the second segment, the
+    presign-upload (executor scope), the readback (workflow scope) and the
+    artifact registration (run scope) rejected the key with 403 — the body_ref
+    above WEBHOOK_RESPONSE_INLINE_LIMIT never reached the client.
     """
     import httpx
     from flow.utils.executor_http import get_agent_http_config
@@ -283,8 +283,8 @@ def _upload_to_minio(
         )
         put_resp.raise_for_status()
 
-    # Best-effort: retenta qualquer falha (rede/storage/5xx) — body de webhook
-    # nao pode ser perdido por um blip transitorio.
+    # Best-effort: retries any failure (network/storage/5xx) — a webhook body
+    # must not be lost to a transient blip.
     retry_sync(_do_upload, retryable_exc=(Exception,), label=f"webhook-response upload {s3_key}")
 
     logger.info("Webhook response enviado ao MinIO: %s (%d bytes)", s3_key, size)

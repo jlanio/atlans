@@ -1,33 +1,35 @@
 # app/mcp/tools/gatilhos.py
 """
-Gatilhos: quando um fluxo dispara sozinho.
+Triggers: when a workflow fires on its own.
 
-É o domínio que faz um fluxo virar rotina. Sem ele, um agente consegue construir
-e executar um workflow, mas não consegue responder à pergunta seguinte — "e
-agora, como isto roda todo dia às sete?" — nem descobrir por que a rotina que
-existe não está rodando.
+This is the domain that turns a workflow into a routine. Without it, an agent
+can build and run a workflow, but cannot answer the next question — "and now,
+how does this run every day at seven?" — nor find out why the routine that
+exists is not running.
 
-`triggers:manage` é o escopo que a tela de tokens oferece desde a Fase 0 e que
-até aqui **não gatilhava nada**: era um chip no cartão do token sem nenhuma tool
-por trás. Este módulo é o que torna aquela promessa verdadeira.
+`triggers:manage` is the scope the tokens screen has offered since Phase 0 and
+that until now **triggered nothing**: it was a chip on the token card with no
+tool behind it. This module is what makes that promise true.
 
-Quatro decisões moldam o módulo:
+Four decisions shape the module:
 
-- **Agendar é executar.** Um schedule de um minuto dispara o fluxo com as
-  credenciais do dono, indefinidamente. Por isso as três tools de escrita pedem
-  `operator`, o mesmo papel de `run_workflow` — e é a mesma régua que a rota
-  REST aplica (`workflow_com_papel(ROLE_OPERATOR)` no `schedules_router`).
-- **`list_schedules` lista fluxo inativo.** "Por que este fluxo parou de
-  rodar?" é exatamente a pergunta que se faz sobre um fluxo inativo, então ler
-  não passa pelo guardião de execução que as escritas usam
-  (`ScheduleService._exigir_workflow_ativo`). A consulta é direta no
-  `ScheduleCRUD`: a tool já tem o workflow em mãos pelo `carregar_workflow`.
-- **`delete_schedule` exige `confirm`.** Apagar um agendamento não tem desfazer
-  e o sintoma é silencioso: nada falha, a rotina só deixa de acontecer. O
-  parâmetro obriga o agente a ter lido o que vai apagar.
-- **Nada do cliente entra num schema por atacado.** `ScheduleBase` carrega
-  `workspace_id` e não tinha `extra="forbid"`; as tools montam o objeto campo a
-  campo, com lista branca.
+- **Scheduling is executing.** A one-minute schedule fires the workflow with
+  the owner's credentials, indefinitely. That is why the three write tools
+  require `operator`, the same role as `run_workflow` — and it is the same
+  yardstick the REST route applies (`workflow_com_papel(ROLE_OPERATOR)` in
+  `schedules_router`).
+- **`list_schedules` lists inactive workflows.** "Why did this workflow stop
+  running?" is exactly the question asked about an inactive workflow, so
+  reading does not go through the execution guard that writes use
+  (`ScheduleService._exigir_workflow_ativo`). The query goes directly to
+  `ScheduleCRUD`: the tool already has the workflow in hand from
+  `carregar_workflow`.
+- **`delete_schedule` requires `confirm`.** Deleting a schedule cannot be
+  undone and the symptom is silent: nothing fails, the routine just stops
+  happening. The parameter forces the agent to have read what it is deleting.
+- **Nothing from the client goes into a schema wholesale.** `ScheduleBase`
+  carries `workspace_id` and did not have `extra="forbid"`; the tools build
+  the object field by field, with an allowlist.
 """
 from __future__ import annotations
 
@@ -60,21 +62,21 @@ UNIDADES = ("seconds", "minutes", "hours", "days")
 
 
 def _resumo(sch) -> dict:
-    """O que identifica e descreve um agendamento.
+    """What identifies and describes a schedule.
 
-    Nada aqui é texto livre de pessoa: estratégia e unidade são enums, o fuso é
-    um nome de zona, e as expressões são a configuração que o próprio chamador
-    mandou. Por isso o item sai no topo e não em `untrusted_data`.
+    Nothing here is free human text: strategy and unit are enums, the timezone
+    is a zone name, and the expressions are the configuration the caller itself
+    sent. That is why the item goes out at the top and not in `untrusted_data`.
     """
     return {
         "job_id": sch.job_id,
         "strategy": sch.strategy,
         "active": bool(sch.active),
         "timezone": sch.timezone,
-        # Só o campo da estratégia em uso: o nó `ScheduleTrigger` envia os
-        # defaults de TODAS elas, e o service zera os que não pertencem — mas
-        # uma linha antiga pode ter os três preenchidos, e devolver os três
-        # faria o agente concluir que há três regras concorrendo.
+        # Only the field of the strategy in use: the `ScheduleTrigger` node sends
+        # the defaults of ALL of them, and the service clears the ones that do
+        # not belong — but an old row may have all three filled in, and
+        # returning all three would make the agent conclude three rules compete.
         **({"cron_expression": sch.cron_expression} if sch.strategy == "cron" else {}),
         **({"interval": sch.interval, "unit": sch.unit}
            if sch.strategy == "interval" else {}),
@@ -100,19 +102,20 @@ def _erro_de_config(exc: Exception):
 
 @ferramenta
 async def list_schedules(ctx: Context, workflow_id: str) -> dict:
-    """Os agendamentos deste workflow — quando ele dispara sozinho.
+    """This workflow's schedules — when it fires on its own.
 
-    Responde as duas perguntas que um fluxo agendado gera: "quando roda?"
-    (`next_run_at`) e "por que não rodou?". Para a segunda, olhe nesta ordem:
+    Answers the two questions a scheduled workflow raises: "when does it run?"
+    (`next_run_at`) and "why didn't it run?". For the second, look in this
+    order:
 
-    1. `workflow_active: false` no topo — o agendador **ignora** agendamento de
-       fluxo inativo, por mais correto que ele esteja. É a causa mais comum, e
-       nada no agendamento em si a denuncia.
-    2. `active: false` no item — o agendamento existe e está desligado.
-    3. `next_run_at` no passado — o agendador não passou por ele ainda.
+    1. `workflow_active: false` at the top — the scheduler **ignores** schedules
+       of an inactive workflow, however correct they are. It is the most common
+       cause, and nothing in the schedule itself gives it away.
+    2. `active: false` on the item — the schedule exists and is turned off.
+    3. `next_run_at` in the past — the scheduler has not gone over it yet.
 
-    `timezone` é o fuso em que a expressão é lida: `"0 9 * * *"` em
-    `America/Sao_Paulo` dispara às 9h de lá, não às 9h UTC.
+    `timezone` is the timezone the expression is read in: `"0 9 * * *"` in
+    `America/Sao_Paulo` fires at 9 AM there, not at 9 AM UTC.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -122,8 +125,9 @@ async def list_schedules(ctx: Context, workflow_id: str) -> dict:
         exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
         id_do_fluxo, ativo = wf.id_hash, bool(wf.flag_ative)
 
-        # Direto no CRUD, sem o guardião de execução das escritas: o workflow
-        # já veio do `carregar_workflow` acima, e fluxo inativo é listável.
+        # Directly on the CRUD, without the writes' execution guard: the workflow
+        # already came from `carregar_workflow` above, and an inactive workflow
+        # is listable.
         itens = [_resumo(s) for s in await ScheduleCRUD(db).get_by_workflow_hash(id_do_fluxo)]
 
     return envelope({
@@ -153,27 +157,28 @@ async def create_schedule(
     timezone: Optional[str] = None,
     active: bool = True,
 ) -> dict:
-    """Cria um agendamento: faz o workflow disparar sozinho, sem ninguém pedir.
+    """Creates a schedule: makes the workflow fire on its own, without anyone asking.
 
-    Três estratégias, e cada uma usa campos diferentes:
+    Three strategies, and each uses different fields:
 
-    - `cron` — `cron_expression` com **5 campos** (`min hora dia mês
-      dia-da-semana`). `"0 9 * * 1-5"` é 9h nos dias úteis.
+    - `cron` — `cron_expression` with **5 fields** (`min hour day month
+      day-of-week`). `"0 9 * * 1-5"` is 9 AM on weekdays.
     - `interval` — `interval` + `unit` (`seconds`/`minutes`/`hours`/`days`).
-    - `rrule` — `rrule_expression` RFC 5545, para calendário
-      (`"FREQ=MONTHLY;BYDAY=MO;BYSETPOS=1"` = primeira segunda do mês).
+    - `rrule` — RFC 5545 `rrule_expression`, for calendars
+      (`"FREQ=MONTHLY;BYDAY=MO;BYSETPOS=1"` = first Monday of the month).
 
-    `timezone` é o fuso em que a expressão é lida; omitido, usa o padrão do
-    produto. Um cron sem fuso explícito não é UTC.
+    `timezone` is the timezone the expression is read in; if omitted, the
+    product default is used. A cron without an explicit timezone is not UTC.
 
-    Peça confirmação antes de chamar. Um agendamento dispara o fluxo com as
-    credenciais do dono, repetidamente e sem ninguém olhando — um `interval` de
-    1 `minutes` num fluxo caro é uma conta que corre sozinha.
+    Ask for confirmation before calling. A schedule fires the workflow with
+    the owner's credentials, repeatedly and with no one watching — an
+    `interval` of 1 `minutes` on an expensive workflow is a bill that runs up
+    on its own.
 
-    **O workflow precisa estar ativo.** Agendar um fluxo inativo é recusado, e
-    não por capricho: o agendador ignora agendamento de fluxo inativo, então a
-    linha gravada seria uma promessa que nunca se cumpre. Ative primeiro com
-    `set_workflow_active(active=true)`.
+    **The workflow must be active.** Scheduling an inactive workflow is
+    refused, and not on a whim: the scheduler ignores schedules of inactive
+    workflows, so the saved row would be a promise never kept. Activate it
+    first with `set_workflow_active(active=true)`.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "triggers:manage")
@@ -189,10 +194,10 @@ async def create_schedule(
         exigir_papel(papel, ROLE_OPERATOR, _MENSAGEM_PAPEL_ESCRITA)
         id_do_fluxo = wf.id_hash
 
-        # A recusa também é do núcleo (`_exigir_workflow_ativo` levanta
-        # `WorkflowInactiveError`). Antecipar aqui dá o código e a saída antes
-        # de montar e validar a configuração inteira — e a mensagem daqui
-        # explica o PORQUÊ, que a do núcleo não tem espaço para dizer.
+        # The refusal also belongs to the core (`_exigir_workflow_ativo` raises
+        # `WorkflowInactiveError`). Anticipating it here gives the code and the
+        # way out before building and validating the whole configuration — and
+        # the message here explains the WHY, which the core's has no room to say.
         if not wf.flag_ative:
             raise erro(
                 "workflow_inactive",
@@ -201,9 +206,9 @@ async def create_schedule(
                 "ative com set_workflow_active(workflow_id, active=true) e agende depois",
             )
 
-        # Lista branca, campo a campo. `ScheduleBase` não tem `extra="forbid"` e
-        # carrega `workspace_id` — jogar um dict do cliente aqui deixaria ele
-        # escolher o tenant do agendamento.
+        # Allowlist, field by field. `ScheduleBase` has no `extra="forbid"` and
+        # carries `workspace_id` — passing a client dict here would let it pick
+        # the schedule's tenant.
         campos: dict[str, Any] = {"strategy": strategy, "active": bool(active)}
         for nome, valor in (
             ("cron_expression", cron_expression), ("interval", interval),
@@ -216,16 +221,16 @@ async def create_schedule(
 
         try:
             config = ScheduleCreate(**campos)
-            # A mesma validação que a rota usa, chamada ANTES de gravar.
+            # The same validation the route uses, called BEFORE saving.
             validate_schedule_create(config)
         except AtlasBaseError as exc:
             raise _erro_de_config(exc)
         except ValueError as exc:
-            # Pydantic e `InvalidScheduleError` caem aqui.
+            # Pydantic and `InvalidScheduleError` land here.
             raise _erro_de_config(exc)
 
         criado = await ScheduleService(db).create_schedule(id_do_fluxo, config)
-        # `create_schedule` não commita; a sessão do MCP faz rollback no finally.
+        # `create_schedule` does not commit; the MCP session rolls back in the finally.
         await db.commit()
         item = _resumo(criado)
 
@@ -245,18 +250,18 @@ async def update_schedule(
     timezone: Optional[str] = None,
     active: Optional[bool] = None,
 ) -> dict:
-    """Altera um agendamento existente. Só os campos enviados mudam.
+    """Changes an existing schedule. Only the fields sent change.
 
-    Para **pausar sem perder a configuração**, mande `active=false` — é o que se
-    quer quase sempre, e não apaga nada. `delete_schedule` é para quando a
-    rotina deixou de existir.
+    To **pause without losing the configuration**, send `active=false` — it is
+    what one wants almost always, and it deletes nothing. `delete_schedule` is
+    for when the routine no longer exists.
 
-    Trocar de estratégia exige mandar os campos da nova: virar `cron` sem
-    `cron_expression` é recusado.
+    Switching strategy requires sending the new one's fields: switching to
+    `cron` without `cron_expression` is refused.
 
-    O `job_id` vem de `list_schedules`. Um `job_id` que não pertence a este
-    workflow responde `not_found`, e não `forbidden`: dizer "existe, mas não é
-    seu" já entregaria que ele existe.
+    The `job_id` comes from `list_schedules`. A `job_id` that does not belong
+    to this workflow answers `not_found`, not `forbidden`: saying "it exists,
+    but is not yours" would already give away that it exists.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "triggers:manage")
@@ -297,8 +302,8 @@ async def update_schedule(
                 job_id, mudancas, owner_workflow_hash=id_do_fluxo,
             )
         except AtlasBaseError as exc:
-            # `ScheduleNotFoundError` cobre tanto "não existe" quanto "é de
-            # outro workflow" — de propósito, para não virar oráculo.
+            # `ScheduleNotFoundError` covers both "does not exist" and "belongs to
+            # another workflow" — on purpose, so it does not become an oracle.
             raise erro(
                 "not_found", str(exc),
                 "use list_schedules(workflow_id) para ver os job_id deste fluxo",
@@ -313,15 +318,16 @@ async def update_schedule(
 async def delete_schedule(
     ctx: Context, workflow_id: str, job_id: str, confirm: bool = False
 ) -> dict:
-    """Apaga um agendamento de vez. Exige `confirm=true`.
+    """Deletes a schedule for good. Requires `confirm=true`.
 
-    **Antes de apagar, considere `update_schedule(active=false)`**: pausar
-    preserva a expressão, o fuso e o histórico, e é reversível com uma chamada.
-    Apagar não tem desfazer, e o sintoma é silencioso — nada falha, a rotina só
-    deixa de acontecer, e pode levar semanas até alguém reparar.
+    **Before deleting, consider `update_schedule(active=false)`**: pausing
+    keeps the expression, the timezone and the history, and is reversible with
+    one call. Deleting cannot be undone, and the symptom is silent — nothing
+    fails, the routine just stops happening, and it may take weeks for anyone
+    to notice.
 
-    Sem `confirm=true` nada é apagado: a resposta descreve o que seria removido,
-    para você mostrar a quem pediu antes de repetir a chamada.
+    Without `confirm=true` nothing is deleted: the response describes what
+    would be removed, for you to show whoever asked before repeating the call.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "triggers:manage")
@@ -333,8 +339,8 @@ async def delete_schedule(
 
         crud = ScheduleCRUD(db)
         alvo = await crud.get(job_id)
-        # A mesma regra do service: posse confirmada pelo workflow do path, e
-        # `not_found` para os dois casos.
+        # The same rule as the service: ownership confirmed through the path's
+        # workflow, and `not_found` for both cases.
         if alvo is None or alvo.workflow_hash != id_do_fluxo:
             raise erro(
                 "not_found", f"Agendamento {job_id} não encontrado neste workflow.",
@@ -364,7 +370,7 @@ async def delete_schedule(
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="list_schedules",
         title="Agendamentos do fluxo",

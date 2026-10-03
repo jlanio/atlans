@@ -1,28 +1,29 @@
 # executor/logging_setup.py
 """
-Configuracao de logging do executor.
+Executor logging configuration.
 
-Extraido de main.py, que carregava 130 linhas de setup de logging antes da
-primeira linha de logica. Aqui mora tudo: formatter colorido do console,
-handlers rotativos de arquivo e a comutacao para o modo painel.
+Extracted from main.py, which carried 130 lines of logging setup before the
+first line of logic. Everything lives here: the console's colored formatter,
+the rotating file handlers and the switch to dashboard mode.
 
-Dois modos:
+Two modes:
 
-  CONSOLE (padrao)  — identico ao comportamento historico: um StreamHandler
-                      colorido SEM filtro no root, mais os arquivos opcionais
-                      de LOG_FILE_AGENT / LOG_FILE_WORKFLOW (filtrados).
+  CONSOLE (default) — identical to the historical behavior: an UNFILTERED
+                      colored StreamHandler on the root, plus the optional
+                      LOG_FILE_AGENT / LOG_FILE_WORKFLOW files (filtered).
 
-  PAINEL            — o console sai do root e um handler rotativo CATCH-ALL
-                      entra no lugar. O terminal fica livre para o dashboard
-                      e nada se perde: o arquivo passa a ser o espelho fiel
-                      do que ia para a tela.
+  PAINEL            — the console leaves the root and a CATCH-ALL rotating
+                      handler takes its place. The terminal is free for the
+                      dashboard and nothing is lost: the file becomes the
+                      faithful mirror of what used to go to the screen.
 
-A distincao entre "filtrado" e "catch-all" importa e nao e detalhe: o console
-nunca teve filtro, entao ele levava ao terminal `websockets`, `asyncio`,
-`boto3` e qualquer biblioteca de terceiro. Os handlers de arquivo existentes
-sao filtrados por prefixo (`executor`/`httpx` e `flow`/`node`/`app`) e juntos
-NAO cobrem esses loggers. Trocar o console por eles perderia registros — o
-oposto do objetivo, que e mover o log passo-a-passo para disco, nao apaga-lo.
+The distinction between "filtered" and "catch-all" matters and is not a detail:
+the console never had a filter, so it brought `websockets`, `asyncio`, `boto3`
+and any third-party library to the terminal. The existing file handlers are
+filtered by prefix (`executor`/`httpx` and `flow`/`node`/`app`) and together
+do NOT cover those loggers. Swapping the console for them would lose records —
+the opposite of the goal, which is to move the step-by-step log to disk, not
+erase it.
 """
 from __future__ import annotations
 
@@ -32,17 +33,17 @@ import os
 import pathlib
 import sys
 
-_LOG_FORMAT = "%(asctime)s  %(levelname)-5s  %(name)s  %(message)s"  # usado nos arquivos
+_LOG_FORMAT = "%(asctime)s  %(levelname)-5s  %(name)s  %(message)s"  # used in the files
 
 _MAX_BYTES = 10 * 1024 * 1024
 _BACKUP_COUNT = 5
 
-# As variaveis sao lidas do ambiente, e nao de `executor.config`, para este
-# modulo nao ter dependencia nenhuma dentro do pacote — mas a leitura acontece
-# em `configure_logging()`, NUNCA no import. Quem popula o ambiente com o
-# conteudo do `.env` e o `load_dotenv()` de config.py; ler no import tornaria o
-# resultado dependente da ordem em que os modulos sao importados, e um
-# `LOG_LEVEL=DEBUG` no .env seria silenciosamente ignorado.
+# The variables are read from the environment, not from `executor.config`, so
+# this module has no dependency at all inside the package — but the reading
+# happens in `configure_logging()`, NEVER at import. What populates the
+# environment with the contents of `.env` is config.py's `load_dotenv()`;
+# reading at import would make the result depend on the order in which modules
+# are imported, and a `LOG_LEVEL=DEBUG` in .env would be silently ignored.
 _log_color = "auto"
 
 
@@ -51,7 +52,7 @@ def _nivel() -> int:
 
 
 class LoggingSetupError(RuntimeError):
-    """Falha ao preparar o log em arquivo — o painel NAO deve ligar."""
+    """Failure preparing the file log — the dashboard must NOT turn on."""
 
 
 def _rotating(path: str) -> logging.handlers.RotatingFileHandler:
@@ -62,7 +63,7 @@ def _rotating(path: str) -> logging.handlers.RotatingFileHandler:
 
 
 class _PrefixFilter(logging.Filter):
-    """Aceita apenas registros cujo logger começa com um dos prefixos fornecidos."""
+    """Accepts only records whose logger starts with one of the given prefixes."""
     def __init__(self, *prefixes: str):
         super().__init__()
         self._prefixes = prefixes
@@ -71,7 +72,7 @@ class _PrefixFilter(logging.Filter):
         return any(record.name == p or record.name.startswith(p + ".") for p in self._prefixes)
 
 
-# ── Formatter colorido para console ──────────────────────────────────────────
+# ── Colored formatter for the console ────────────────────────────────────────
 
 _R   = "\033[0m"   # reset
 _B   = "\033[1m"   # bold
@@ -91,8 +92,8 @@ LEVEL_LABEL = {
     logging.ERROR:    "ERROR",
     logging.CRITICAL: "CRIT ",
 }
-# Aliases de 6 chars por subsistema. Publico porque o rodape do painel os
-# reusa como coluna de origem — a mesma taxonomia nos dois lugares.
+# 6-char aliases per subsystem. Public because the dashboard footer reuses
+# them as the source column — the same taxonomy in both places.
 LOGGER_ALIAS: dict[str, str] = {
     "executor":                 "AGENT ",
     "executor.connection":      "CONN  ",
@@ -112,7 +113,7 @@ LOGGER_ALIAS: dict[str, str] = {
 
 
 def alias_for(name: str) -> str:
-    """Alias de 6 chars do subsistema. Cai no prefixo do nome se desconhecido."""
+    """The subsystem's 6-char alias. Falls back to the name's prefix if unknown."""
     if name in LOGGER_ALIAS:
         return LOGGER_ALIAS[name]
     for key, val in LOGGER_ALIAS.items():
@@ -129,7 +130,7 @@ class _ColoredFormatter(logging.Formatter):
             self._color = True
         elif modo == "never":
             self._color = False
-        else:  # auto — só colorido se o stderr for um TTY real
+        else:  # auto — colored only if stderr is a real TTY
             self._color = sys.stderr.isatty()
 
     def _alias(self, name: str) -> str:
@@ -140,10 +141,10 @@ class _ColoredFormatter(logging.Formatter):
         level = LEVEL_LABEL.get(record.levelno, record.levelname[:5])
         alias = self._alias(record.name)
         msg   = record.getMessage()
-        # O contrato do `logging.Formatter`: `exc_text` pronto vale antes de
-        # formatar `exc_info`. A redação de segredos (flow/utils/segredos_vivos)
-        # entrega o traceback redigido em `exc_text` e anula `exc_info`; só
-        # olhar `exc_info` fazia o console perder o traceback inteiro.
+        # The `logging.Formatter` contract: a ready `exc_text` takes precedence over
+        # formatting `exc_info`. Secret redaction (flow/utils/segredos_vivos)
+        # delivers the redacted traceback in `exc_text` and nulls `exc_info`; only
+        # looking at `exc_info` made the console lose the whole traceback.
         if record.exc_info and not record.exc_text:
             record.exc_text = self.formatException(record.exc_info)
         if record.exc_text:
@@ -162,33 +163,34 @@ class _ColoredFormatter(logging.Formatter):
         return f"{ts}  {level}  {alias}  {msg}"
 
 
-# ── Estado do modulo ─────────────────────────────────────────────────────────
+# ── Module state ─────────────────────────────────────────────────────────────
 
 _configurado = False
 _console: logging.Handler | None = None
 _detached_console: logging.Handler | None = None
 _catch_all: logging.Handler | None = None
-# Handler filtrado de LOG_FILE_AGENT, guardado para poder ser removido quando o
-# catch-all assumir o MESMO arquivo (senao cada linha sairia duplicada).
+# Filtered LOG_FILE_AGENT handler, kept so it can be removed when the
+# catch-all takes over the SAME file (otherwise every line would come out twice).
 _agent_file: logging.Handler | None = None
 _agent_file_path: str | None = None
 
 
 def configure_logging() -> None:
-    """Instala o root logger, o console e os arquivos opcionais. Idempotente.
+    """Installs the root logger, the console and the optional files. Idempotent.
 
-    Le as variaveis AQUI, e nao no import: o `.env` do executor so entra no
-    ambiente quando `executor.config` roda o `load_dotenv()`.
+    Reads the variables HERE, not at import: the executor's `.env` only enters
+    the environment when `executor.config` runs `load_dotenv()`.
     """
     global _configurado, _console, _agent_file, _agent_file_path, _log_color
     if _configurado:
         return
     _configurado = True
 
-    # Redação de segredos por padrão (DSN com senha, Bearer, Basic, PAT...) em
-    # TODO registro do processo, antes de qualquer handler — o console, os
-    # arquivos e o painel. O executor decifra DSN e monta cabeçalho de
-    # autenticação, e logava tudo isso sem máscara; a lista é a mesma da API.
+    # Secret redaction by default (DSN with password, Bearer, Basic, PAT...) on
+    # EVERY record of the process, before any handler — the console, the
+    # files and the dashboard. The executor decrypts DSNs and builds
+    # authentication headers, and logged all of that unmasked; the list is the
+    # same as the API's.
     from flow.utils.redacao_log import instalar_no_processo
     instalar_no_processo()
 
@@ -198,12 +200,12 @@ def configure_logging() -> None:
     root = logging.getLogger()
     root.setLevel(_nivel())
 
-    # Console: todos os logs, sem filtro, com formatter colorido.
+    # Console: all logs, unfiltered, with the colored formatter.
     _console = logging.StreamHandler()
     _console.setFormatter(_ColoredFormatter(_log_color))
     root.addHandler(_console)
 
-    # Arquivo do executor: loggers executor.* e httpx (sem cores)
+    # Executor file: executor.* and httpx loggers (no colors)
     agente = os.getenv("LOG_FILE_AGENT") or ""
     if agente:
         _agent_file = _rotating(agente)
@@ -212,7 +214,7 @@ def configure_logging() -> None:
         _agent_file_path = agente
         root.addHandler(_agent_file)
 
-    # Arquivo do workflow: loggers flow.*, node.* e app.* (sem cores)
+    # Workflow file: flow.*, node.* and app.* loggers (no colors)
     workflow = os.getenv("LOG_FILE_WORKFLOW") or ""
     if workflow:
         h = _rotating(workflow)
@@ -224,8 +226,8 @@ def configure_logging() -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
 
-    # Avisos de validacao acumulados durante o import de config.py, que roda
-    # antes deste ponto. Emitidos agora que existe para onde manda-los.
+    # Validation warnings accumulated during the import of config.py, which runs
+    # before this point. Emitted now that there is somewhere to send them.
     try:
         from executor.config import flush_startup_warnings
         flush_startup_warnings()
@@ -234,11 +236,12 @@ def configure_logging() -> None:
 
 
 def resolve_agent_log_path() -> str:
-    """Caminho do arquivo de log do agente no modo painel.
+    """Path of the agent log file in dashboard mode.
 
-    LOG_FILE_AGENT tem precedencia — quem ja configurou continua mandando no
-    destino. Sem ele, o default deriva de EXECUTOR_LOG_DIR / ARTIFACTS_DIR,
-    seguindo a mesma convencao de ~/AtlansExecutor usada pelos artefatos.
+    LOG_FILE_AGENT takes precedence — whoever already configured it keeps
+    control of the destination. Without it, the default derives from
+    EXECUTOR_LOG_DIR / ARTIFACTS_DIR, following the same ~/AtlansExecutor
+    convention used by the artifacts.
     """
     explicito = os.getenv("LOG_FILE_AGENT") or ""
     if explicito:
@@ -249,15 +252,15 @@ def resolve_agent_log_path() -> str:
 
 
 def ensure_file_mirror() -> str:
-    """Garante o handler rotativo CATCH-ALL — o espelho do console em disco.
+    """Ensures the CATCH-ALL rotating handler — the console's mirror on disk.
 
-    Idempotente: chamado na primeira vez que o painel liga e nunca desfeito. O
-    arquivo continua recebendo tudo mesmo depois de o console voltar, seja pelo
-    atalho de teclado ou pelo shutdown.
+    Idempotent: called the first time the dashboard turns on and never undone.
+    The file keeps receiving everything even after the console comes back,
+    whether via the keyboard shortcut or via shutdown.
 
-    Retorna o caminho efetivo. Levanta LoggingSetupError se nao conseguir
-    abri-lo — quem chama DEVE abortar o painel nesse caso: ligar o dashboard
-    sem o arquivo trocaria o log passo-a-passo por nada.
+    Returns the effective path. Raises LoggingSetupError if it cannot open
+    it — the caller MUST abort the dashboard in that case: turning on the
+    dashboard without the file would swap the step-by-step log for nothing.
     """
     global _catch_all, _agent_file
 
@@ -267,10 +270,10 @@ def ensure_file_mirror() -> str:
 
     root = logging.getLogger()
 
-    # O handler filtrado de LOG_FILE_AGENT aponta para este mesmo arquivo? Sai
-    # ANTES de o catch-all abrir: senao toda linha de `executor.*` sairia
-    # duplicada, e dois RotatingFileHandler com o mesmo arquivo aberto brigam
-    # na hora de rotacionar (no Windows, o rename de um arquivo aberto falha).
+    # Does the filtered LOG_FILE_AGENT handler point to this same file? It goes
+    # away BEFORE the catch-all opens: otherwise every `executor.*` line would
+    # come out twice, and two RotatingFileHandlers with the same file open fight
+    # when rotating (on Windows, renaming an open file fails).
     if _agent_file is not None and _agent_file_path == path:
         root.removeHandler(_agent_file)
         _agent_file.close()
@@ -282,15 +285,15 @@ def ensure_file_mirror() -> str:
         raise LoggingSetupError(f"Nao foi possivel abrir o log em '{path}': {exc}") from exc
 
     catch_all.setFormatter(logging.Formatter(_LOG_FORMAT))
-    # Sem filtro, de proposito: este handler substitui o console, que tambem
-    # nao tinha filtro. E o espelho do que ia para a tela.
+    # Unfiltered, on purpose: this handler replaces the console, which also
+    # had no filter. It is the mirror of what used to go to the screen.
     root.addHandler(catch_all)
     _catch_all = catch_all
     return path
 
 
 def detach_console() -> None:
-    """Tira o console do root — a tela fica livre para o painel. Idempotente."""
+    """Takes the console off the root — the screen is free for the dashboard. Idempotent."""
     global _detached_console
     if _console is None or _detached_console is not None:
         return
@@ -299,11 +302,11 @@ def detach_console() -> None:
 
 
 def switch_to_dashboard_mode() -> str:
-    """Liga o modo painel: garante o espelho em arquivo e libera a tela.
+    """Turns on dashboard mode: ensures the file mirror and frees the screen.
 
-    Reversivel: `restore_console_mode()` traz o log de volta ao terminal sem
-    fechar o arquivo, e uma nova chamada aqui devolve a tela ao painel. E o que
-    sustenta a alternancia por teclado.
+    Reversible: `restore_console_mode()` brings the log back to the terminal
+    without closing the file, and a new call here hands the screen back to the
+    dashboard. That is what supports the keyboard toggle.
     """
     path = ensure_file_mirror()
     detach_console()
@@ -311,11 +314,11 @@ def switch_to_dashboard_mode() -> str:
 
 
 def restore_console_mode() -> None:
-    """Reanexa o console. Idempotente — pode ser chamada de varios caminhos de
-    saida (shutdown normal, atexit, KeyboardInterrupt) sem duplicar handlers.
+    """Reattaches the console. Idempotent — can be called from several exit
+    paths (normal shutdown, atexit, KeyboardInterrupt) without duplicating handlers.
 
-    Os handlers de arquivo continuam onde estao: depois do painel fechar, o
-    log segue sendo gravado ate o processo morrer.
+    The file handlers stay where they are: after the dashboard closes, the
+    log keeps being written until the process dies.
     """
     global _detached_console
     if _detached_console is None:
@@ -326,8 +329,8 @@ def restore_console_mode() -> None:
     _detached_console = None
 
 
-# ── Nivel de log em runtime ──────────────────────────────────────────────────
-# Guarda o nivel configurado no boot para o toggle saber ao que voltar.
+# ── Runtime log level ────────────────────────────────────────────────────────
+# Keeps the level configured at boot so the toggle knows what to go back to.
 _nivel_base: int | None = None
 
 
@@ -336,12 +339,12 @@ def em_debug() -> bool:
 
 
 def alternar_debug() -> bool:
-    """Liga/desliga DEBUG sem reiniciar o executor. Retorna o estado novo.
+    """Turns DEBUG on/off without restarting the executor. Returns the new state.
 
-    Diagnosticar um erro exigia parar o processo, editar LOG_LEVEL no .env e
-    subir de novo — perdendo exatamente o estado que se queria investigar. Como
-    nenhum handler tem nivel proprio (so o LogTailHandler, fixo em WARNING),
-    mexer no root basta para o arquivo passar a receber DEBUG na hora.
+    Diagnosing an error required stopping the process, editing LOG_LEVEL in .env
+    and starting again — losing exactly the state one wanted to investigate.
+    Since no handler has its own level (only LogTailHandler, fixed at WARNING),
+    changing the root is enough for the file to start receiving DEBUG right away.
     """
     global _nivel_base
     root = logging.getLogger()
@@ -355,8 +358,8 @@ def alternar_debug() -> bool:
         return False
 
     root.setLevel(logging.DEBUG)
-    # httpx/httpcore em DEBUG despejam cada frame HTTP e afogam o resto — o que
-    # o operador quer ver e o `executor.*` e o `flow.*`. Ficam em INFO.
+    # httpx/httpcore at DEBUG dump every HTTP frame and drown the rest — what the
+    # operator wants to see is `executor.*` and `flow.*`. They stay at INFO.
     logging.getLogger("httpx").setLevel(logging.INFO)
     logging.getLogger("httpcore").setLevel(logging.INFO)
     return True

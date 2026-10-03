@@ -1,18 +1,18 @@
 """
-Escopo de execucao, contrato simetrico e isolamento de pool em sub-workflows.
+Execution scope, symmetric contract and pool isolation in sub-workflows.
 
-Tres regressoes cobertas aqui:
+Three regressions covered here:
 
-1. O filho era instanciado como `WorkflowExecutor(definition)` puro — sem
-   task_id, workspace_id, publisher nem debug. Todo node que chama
+1. The child was instantiated as a bare `WorkflowExecutor(definition)` — no
+   task_id, workspace_id, publisher or debug. Every node that calls
    `require_scope()` (DataOutput, PublishMap, SaveToS3, SaveToShapefile,
-   SaveToGeoparquet, SendEmail) falhava com "workspace_id nao injetado".
+   SaveToGeoparquet, SendEmail) failed with "workspace_id nao injetado".
 
-2. `ports` filtrava so na saida. Na entrada o contrato valia no save e era
-   ignorado em runtime, entao o filho recebia o namespace inteiro do pai.
+2. `ports` filtered only on output. On input the contract was enforced on save
+   and ignored at runtime, so the child received the parent's entire namespace.
 
-3. O cache de pools asyncpg era chaveado so pela connection string, apoiado na
-   premissa de "um event loop por processo" — que sub-workflows quebravam.
+3. The asyncpg pool cache was keyed only by the connection string, relying on
+   the premise of "one event loop per process" — which sub-workflows broke.
 """
 from unittest.mock import MagicMock, patch
 
@@ -52,11 +52,11 @@ def _node_with_scope(**scope):
     return node
 
 
-# ── 1. Propagacao de escopo ──────────────────────────────────────────────────
+# ── 1. Scope propagation ─────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_filho_herda_task_id_e_workspace_id():
-    """Sem isto, qualquer node de saida dentro do sub-fluxo quebra."""
+    """Without this, any output node inside the sub-workflow breaks."""
     node = _node_with_scope(task_id="run-abc", workspace_id="ws-1")
 
     with patch("flow.executor.WorkflowExecutor") as cls:
@@ -74,7 +74,7 @@ async def test_filho_herda_task_id_e_workspace_id():
 
 @pytest.mark.asyncio
 async def test_workflow_hash_do_filho_e_do_filho_nao_do_pai():
-    """Artefatos e metricas do sub-fluxo pertencem a ele, nao ao chamador."""
+    """The sub-workflow's artifacts and metrics belong to it, not to the caller."""
     node = _node_with_scope(workflow_hash="PARENT")
 
     with patch("flow.executor.WorkflowExecutor") as cls:
@@ -103,11 +103,11 @@ async def test_sem_publisher_no_pai_nao_cria_wrapper():
     assert cls.call_args.kwargs["publisher"] is None
 
 
-# ── 2. Namespacing de eventos ────────────────────────────────────────────────
+# ── 2. Event namespacing ─────────────────────────────────────────────────────
 
 def test_evento_do_filho_recebe_prefixo_do_node_pai():
-    """node_ids do filho nao existem no canvas do pai — sem prefixo o frontend
-    recebe eventos de nos desconhecidos."""
+    """The child's node_ids do not exist on the parent's canvas — without a prefix
+    the frontend receives events from unknown nodes."""
     parent = MagicMock()
     pub = _SubWorkflowEventPublisher(parent, "sub-1")
 
@@ -119,7 +119,7 @@ def test_evento_do_filho_recebe_prefixo_do_node_pai():
 
 
 def test_workflow_complete_do_filho_nao_e_repassado():
-    """Encerraria o run do pai no frontend."""
+    """It would end the parent's run in the frontend."""
     parent = MagicMock()
     pub = _SubWorkflowEventPublisher(parent, "sub-1")
 
@@ -133,10 +133,10 @@ def test_falha_ao_publicar_nao_derruba_execucao():
     parent.publish_event.side_effect = Exception("redis down")
     pub = _SubWorkflowEventPublisher(parent, "sub-1")
 
-    pub.publish_event(run_id="r1", node="n1", status="started")  # não levanta
+    pub.publish_event(run_id="r1", node="n1", status="started")  # does not raise
 
 
-# ── 3. Contrato simetrico (ports na entrada) ─────────────────────────────────
+# ── 3. Symmetric contract (ports on input) ───────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_input_filtra_chaves_fora_do_contrato():
@@ -190,7 +190,7 @@ async def test_metadados_internos_nunca_atravessam():
     assert out["__subworkflow_output__"] == {"ok": 1}
 
 
-# ── 4. Pool asyncpg por event loop ───────────────────────────────────────────
+# ── 4. asyncpg pool per event loop ───────────────────────────────────────────
 
 async def _async_cache_key(dsn):
     from flow.utils.get_asyncpg_pool import _cache_key
@@ -198,11 +198,12 @@ async def _async_cache_key(dsn):
 
 
 def test_mesmo_dsn_em_loops_distintos_gera_chaves_distintas():
-    """Pool e atrelado ao loop que o criou; reusar em outro quebra com
-    'attached to a different loop'.
+    """A pool is bound to the loop that created it; reusing it in another one breaks
+    with 'attached to a different loop'.
 
-    Sincrono de proposito: nao da para rodar um segundo loop de dentro de um
-    loop ativo, e o cenario real do bug era justamente dois loops separados.
+    Synchronous on purpose: you cannot run a second loop from inside an
+    active loop, and the real-world scenario of the bug was precisely two
+    separate loops.
     """
     import asyncio
 

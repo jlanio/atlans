@@ -34,7 +34,7 @@ interface Props extends EntradaDoResumo {
   salvandoExecutor: boolean
   podeGerenciar: boolean
   onTrocarExecutor: (valor: string) => void
-  /** Abre o painel de configuração já na seção pedida. */
+  /** Opens the settings panel directly on the requested section. */
   onConfigurar: (secao: SectionId) => void
 }
 
@@ -43,19 +43,19 @@ const TITULO_PREVIA = "Prévia: passa a valer quando o roteamento por política 
 const TITULO_PISO = "Isolamento obrigatório: definido pelo administrador da plataforma"
 
 /**
- * Painel do workspace ativo.
+ * Panel of the active workspace.
  *
- * O produto trabalha em UM workspace por vez — o cabeçalho e o editor já vivem
- * em função dele — e esta tela passou a dizer o mesmo: o ativo ganha a cor de
- * identidade, o executor com o status por extenso e os atalhos para onde o
- * trabalho de fato acontece. A troca de executor fica aqui, e só aqui: é o
- * ajuste mais frequente da tela, e o ajuste dos outros workspaces passa pelo
- * painel de configuração.
+ * The product works in ONE workspace at a time — the header and the editor
+ * already revolve around it — and this screen now says the same: the active one
+ * gets the identity color, the executor with its status spelled out, and the
+ * shortcuts to where the work actually happens. Switching the executor lives
+ * here, and only here: it is the screen's most frequent adjustment, and the
+ * adjustment for the other workspaces goes through the settings panel.
  *
- * O seletor rápido é a ação mais destrutiva da tela: voltar ao pool apaga a
- * política inteira e muda para onde os DADOS vão. Por isso ele pede
- * confirmação quando há um dedicado na mesa — a mesma cerimônia que o editor
- * exige para o "último recurso".
+ * The quick picker is the most destructive action on the screen: going back to
+ * the pool erases the whole policy and changes where the DATA goes. That is why
+ * it asks for confirmation when there is a dedicated executor in play — the
+ * same ceremony the editor requires for the "último recurso" (last resort).
  */
 export function WorkspaceHero({
   workspace, salvandoExecutor, podeGerenciar, onTrocarExecutor, onConfigurar, ...entrada
@@ -69,15 +69,15 @@ export function WorkspaceHero({
   const papel = workspace.my_role === "owner" ? "Proprietário" : roleLabel(workspace.my_role)
   const [confirmarPool, setConfirmarPool] = useState(false)
 
-  // Só dedicados ativos: um executor do pool não é alvo — o item "Pool
-  // compartilhado" já é o pool. O atual, se for do pool (dado antigo),
-  // continua visível para o gatilho não renderizar vazio.
+  // Only active dedicated executors: a pool executor is not a target — the
+  // "Pool compartilhado" item already is the pool. The current one, if it is
+  // from the pool (old data), stays visible so the trigger does not render empty.
   const disponiveis = entrada.executores.filter(
     e => e.status === "active" && (!e.is_default || e.id_hash === entrada.alvo),
   )
 
-  // Há um dedicado na mesa? Então "pool" apaga a política e muda o destino
-  // dos dados: confirmação antes.
+  // Is there a dedicated executor in play? Then "pool" erases the policy and
+  // changes where the data goes: confirmation first.
   const dedicadoAtual = resumo.estado === "ok" || resumo.estado === "inativo"
     ? (resumo.executor.executor_type === "dedicated" ? resumo.executor.name : null)
     : null
@@ -101,8 +101,8 @@ export function WorkspaceHero({
       aria-labelledby="workspace-ativo-nome"
       className="relative overflow-hidden rounded-xl border bg-card shadow-xs motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:duration-300"
     >
-      {/* A cor de identidade entra só como friso — não como fundo chapado (que
-          engoliria o texto nos dois temas) nem como brilho difuso. */}
+      {/* The identity color comes in only as a stripe — not as a flat background (which
+          would swallow the text in both themes) nor as a diffuse glow. */}
       <span aria-hidden="true" className={cn("absolute inset-y-0 left-0 w-1.5", identity.bg)} />
 
       <div className="relative grid gap-5 p-5 pl-6 sm:p-6 sm:pl-7 lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-8">
@@ -158,12 +158,12 @@ export function WorkspaceHero({
           {resumo.estado === "carregando" ? (
             <Skeleton className="h-9 w-full rounded-md" />
           ) : resumo.estado === "indefinido" ? (
-            // "Não consegui ler" NÃO é "pool da plataforma": afirmar pool aqui
-            // seria mentir sobre para onde as execuções vão.
+            // "Couldn't read" is NOT "platform pool": claiming pool here
+            // would be lying about where the runs go.
             <p className="text-sm text-muted-foreground">{resumo.mensagem}</p>
           ) : resumo.estado === "grupo" ? (
-            // Grupo ou reserva EM VIGOR: não é um alvo só, e o seletor rápido
-            // não o representa. O ajuste passa pelo editor (link abaixo).
+            // Group or fallback IN EFFECT: it is not a single target, and the quick
+            // picker does not represent it. Adjusting goes through the editor (link below).
             <div className="flex min-w-0 items-center gap-2 rounded-md border bg-background/60 px-3 py-2 text-sm">
               <span className="min-w-0 flex-1 truncate font-medium">{rotularExecutor(resumo)}</span>
             </div>
@@ -172,8 +172,8 @@ export function WorkspaceHero({
               <Select
                 value={entrada.alvo ?? POOL}
                 onValueChange={escolher}
-                // Uma segunda escolha durante a gravação era descartada em
-                // silêncio; travar o gatilho diz por quê.
+                // A second choice during the write was silently discarded;
+                // locking the trigger says why.
                 disabled={salvandoExecutor}
               >
                 <SelectTrigger
@@ -190,9 +190,9 @@ export function WorkspaceHero({
                       <ExecutorTypeBadge type="default" size="sm" />
                     </span>
                   </SelectItem>
-                  {/* O alvo que sumiu vira um item desabilitado: sem ele o
-                      gatilho renderizaria VAZIO e o aviso abaixo não teria
-                      referente na tela. */}
+                  {/* The target that disappeared becomes a disabled item: without it the
+                      trigger would render EMPTY and the warning below would have
+                      no referent on screen. */}
                   {resumo.estado === "sumido" && (
                     <SelectItem value={resumo.alvo} disabled>
                       <span className="flex min-w-0 items-center gap-1.5">
@@ -227,8 +227,8 @@ export function WorkspaceHero({
                   ))}
                 </SelectContent>
               </Select>
-              {/* Slot fixo: inserir/remover o spinner encolhia o Select no
-                  meio da interação. */}
+              {/* Fixed slot: inserting/removing the spinner shrank the Select in the
+                  middle of the interaction. */}
               <span className="flex size-4 shrink-0 items-center justify-center">
                 {salvandoExecutor && <TbLoader2 size={15} className="animate-spin text-muted-foreground" />}
               </span>
@@ -261,9 +261,9 @@ export function WorkspaceHero({
             </p>
           )}
 
-          {/* Uma linha só para a política: o modo que vale (ou a prévia),
-              a saúde do conjunto e UM controle para o editor — onde grupo,
-              reserva e último recurso são definidos. */}
+          {/* A single line for the policy: the mode in effect (or the preview),
+              the set's health and ONE control for the editor — where group,
+              fallback and last resort are defined. */}
           {politica && resumo.estado !== "carregando" && resumo.estado !== "indefinido" && (
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
               <span>Política:</span>
@@ -296,8 +296,8 @@ export function WorkspaceHero({
         </div>
       </div>
 
-      {/* Voltar ao pool com um dedicado na mesa: apaga a política e muda para
-          onde os dados vão. */}
+      {/* Going back to the pool with a dedicated executor in play: erases the
+          policy and changes where the data goes. */}
       <Dialog open={confirmarPool} onOpenChange={setConfirmarPool}>
         <DialogContent className="max-w-md">
           <DialogHeader>

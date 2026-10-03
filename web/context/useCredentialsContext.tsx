@@ -15,8 +15,8 @@ export const useCredentialsContext = () => {
 
 export const CredentialsContextProvider = ({ children }: PropsWithChildren) => {
   const [data, setData] = useState<ICredentialsContext>({ credentials: [], setCredentialsContext: () => {} });
-  // useMemo: sem ele o `value` é um objeto novo a cada render do provider, e
-  // todo consumidor de useCredentialsContext re-renderiza mesmo sem mudança.
+  // useMemo: without it `value` is a new object on every provider render, and
+  // every useCredentialsContext consumer re-renders even without a change.
   const value: ICredentialsContext = useMemo(
     () => ({ ...data, setCredentialsContext: setData }),
     [data],

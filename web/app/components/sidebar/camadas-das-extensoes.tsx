@@ -1,9 +1,9 @@
 "use client"
 
-// As camadas das extensões (`web/extensoes`): modais e efeitos globais que uma
-// extensão pendura na casca. Componente de cliente à parte porque o
-// `SidebarRoot` é renderizado no servidor, e o registro das extensões é coisa
-// do cliente. Uma camada que quebra sai sozinha: a casca e as outras ficam.
+// The extensions' layers (`web/extensoes`): modals and global effects that an
+// extension hangs on the shell. A separate client component because
+// `SidebarRoot` is rendered on the server, and the extension registry is a
+// client concern. A layer that breaks drops out alone: the shell and the others stay.
 
 import { EXTENSOES, LimiteDaExtensao } from "@/extensoes"
 

@@ -59,31 +59,31 @@ function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
-  /** O nome do `X` para leitor de tela — a Home traduzida passa o do idioma dela. */
+  /** The screen-reader name of the `X` — the translated Home passes its language's. */
   closeLabel?: string
   /**
-   * Classes do véu por trás do diálogo. Sem a prop, o `bg-black/50` de sempre;
-   * o modal de entrada da Home passa um véu mais leve, para o globo continuar
-   * à vista por trás.
+   * Classes of the scrim behind the dialog. Without the prop, the usual
+   * `bg-black/50`; the Home's sign-in modal passes a lighter scrim, so the globe
+   * stays visible behind it.
    */
   overlayClassName?: string
   /**
-   * Desabilita SÓ o `X`, sem esconder. Para o caso "operação em voo", prefira
-   * `bloqueado`, que trava as três saídas de uma vez.
+   * Disables ONLY the `X`, without hiding it. For the "operation in flight" case,
+   * prefer `bloqueado`, which locks all three exits at once.
    *
-   * `false` por padrão — nenhum diálogo existente muda de comportamento.
+   * `false` by default — no existing dialog changes behavior.
    */
   closeDisabled?: boolean
   /**
-   * Operação em voo: trava as TRÊS saídas do diálogo — Esc, clique fora e o `X`
-   * (desabilitado, não escondido). Fechar no meio de um envio deixa a pessoa
-   * sem saber se ele aconteceu. Antes, cada diálogo copiava o trio
-   * `onEscapeKeyDown` + `onInteractOutside` + `closeDisabled`, e quem esquecia
-   * uma das três deixava uma saída aberta. O Cancelar é do diálogo: quem
-   * passa `bloqueado` desabilita o seu junto.
+   * Operation in flight: locks the dialog's THREE exits — Esc, click outside and
+   * the `X` (disabled, not hidden). Closing in the middle of a submit leaves the
+   * person not knowing whether it happened. Before, each dialog copied the trio
+   * `onEscapeKeyDown` + `onInteractOutside` + `closeDisabled`, and whoever forgot
+   * one of the three left an exit open. Cancel belongs to the dialog: whoever
+   * passes `bloqueado` disables theirs along with it.
    *
-   * Os `onEscapeKeyDown`/`onInteractOutside` de quem chama continuam rodando.
-   * `false` por padrão — nenhum diálogo existente muda de comportamento.
+   * The caller's `onEscapeKeyDown`/`onInteractOutside` keep running.
+   * `false` by default — no existing dialog changes behavior.
    */
   bloqueado?: boolean
 }) {
@@ -96,14 +96,14 @@ function DialogContent({
         onInteractOutside={e => { onInteractOutside?.(e); if (bloqueado) e.preventDefault() }}
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 sm:max-w-lg",
-          // Teto de altura + rolagem própria. Sem isto o conteúdo alto (um
-          // formulário de credencial postgresql tem 5 campos + descrições +
-          // resultado do teste + footer) vazava para fora da viewport SEM
-          // scroll: o Radix trava o scroll do body e o content não rolava, então
-          // título e botões ficavam inalcançáveis em tela baixa.
+          // Height ceiling + its own scrolling. Without this tall content (a
+          // postgresql credential form has 5 fields + descriptions +
+          // test result + footer) spilled out of the viewport WITHOUT
+          // scroll: Radix locks the body scroll and the content didn't scroll, so
+          // title and buttons became unreachable on a short screen.
           //
-          // 100dvh (não vh) por causa da barra de endereço móvel, que muda a
-          // altura visível durante o scroll.
+          // 100dvh (not vh) because of the mobile address bar, which changes the
+          // visible height while scrolling.
           "max-h-[calc(100dvh-2rem)] overflow-y-auto",
           className
         )}

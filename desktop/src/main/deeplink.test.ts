@@ -1,17 +1,18 @@
 // desktop/src/main/deeplink.test.ts
 //
-// `atlans://enroll?…` e disparavel por QUALQUER pagina web — basta um link. O
-// que separa a conveniencia do sequestro e a validacao aqui e o dialogo de
-// confirmacao no Onboarding.
+// `atlans://enroll?…` can be triggered by ANY web page — a link is enough. What
+// separates convenience from hijacking is the validation here and the
+// confirmation dialog in Onboarding.
 //
-// O servidor nao vem mais do link: e a constante SERVIDOR. Um `server=` que
-// aponte para outro host nao e ignorado, e sim motivo para RECUSAR o link
-// inteiro — quem o escreveu declarou a intencao de desviar o vinculo.
+// The server no longer comes from the link: it is the SERVIDOR constant. A
+// `server=` pointing to another host is not ignored, but rather a reason to
+// REFUSE the whole link — whoever wrote it declared the intent to divert the
+// binding.
 import { describe, expect, it, vi } from 'vitest'
 
-// O deeplink.ts importa `app` do electron; as funções testadas aqui não o usam.
-// Sem o mock, o import carrega o pacote de verdade, que exige o binário baixado
-// pelo postinstall — e o desktop/.npmrc desliga os scripts de instalação.
+// deeplink.ts imports `app` from electron; the functions tested here don't use it.
+// Without the mock, the import loads the real package, which requires the binary
+// downloaded by postinstall — and desktop/.npmrc turns off install scripts.
 vi.mock('electron', () => ({ app: {} }))
 
 import { ehDeepLink, interpretar, urlDosArgumentos } from './deeplink.js'
@@ -41,15 +42,15 @@ describe('interpretar', () => {
   // ── Host ────────────────────────────────────────────────────────────────────
 
   it('RECUSA servidor diferente do do app', () => {
-    // O caso central: uma pagina qualquer mandando o app se vincular ao
-    // servidor dela.
+    // The central case: some random page telling the app to bind to its
+    // server.
     expect(interpretar('atlans://enroll?executor_id=a&otp=b&server=https://atacante.com')).toBeNull()
   })
 
   it('RECUSA subdominio', () => {
-    // A comparacao e por host exato: um `*.atlans.example.org` deixaria um subdominio
-    // comprometido, ou um bucket mal configurado, servirem de servidor de
-    // enrollment.
+    // The comparison is by exact host: a `*.atlans.example.org` would let a
+    // compromised subdomain, or a misconfigured bucket, serve as an enrollment
+    // server.
     expect(interpretar('atlans://enroll?executor_id=a&otp=b&server=https://evil.atlans.example.org')).toBeNull()
   })
 
@@ -65,7 +66,7 @@ describe('interpretar', () => {
   // ── Esquema ─────────────────────────────────────────────────────────────
 
   it('RECUSA http:// mesmo no host certo', () => {
-    // Host certo com esquema errado nao e engano de digitacao: e link forjado.
+    // Right host with the wrong scheme is not a typo: it is a forged link.
     expect(interpretar('atlans://enroll?executor_id=a&otp=b&server=http://agents.atlans.example.org')).toBeNull()
   })
 
@@ -98,18 +99,19 @@ describe('interpretar', () => {
 })
 
 describe('ehDeepLink', () => {
-  // A janela web usa isto para separar um `atlans://` clicado ali dentro (a
-  // encaminhar ao main) de um link comum (vai ao navegador). Só o ESQUEMA: a
-  // recusa de conteúdo é do `interpretar`.
+  // The web window uses this to tell an `atlans://` clicked inside it (to be
+  // forwarded to main) from an ordinary link (goes to the browser). Only the
+  // SCHEME: refusing on content is `interpretar`'s job.
   it('reconhece o esquema do app', () => {
     expect(ehDeepLink(OK)).toBe(true)
     expect(ehDeepLink('atlans://enroll?executor_id=a&otp=b')).toBe(true)
   })
 
   it('reconhece o esquema mesmo em link malformado — quem recusa é o interpretar', () => {
-    // O ponto do conserto: sem params, `ehDeepLink` ainda diz "é deep link", a
-    // janela encaminha, e o `interpretar` faz a recusa silenciosa. Se retornasse
-    // `false` aqui, o clique cairia no descarte e nada aconteceria — o bug.
+    // The point of the fix: without params, `ehDeepLink` still says "it is a deep
+    // link", the window forwards it, and `interpretar` does the silent refusal.
+    // If it returned `false` here, the click would fall into the discard path
+    // and nothing would happen — the bug.
     expect(ehDeepLink('atlans://enroll?executor_id=&otp=')).toBe(true)
     expect(ehDeepLink('atlans://executar?x=1')).toBe(true)
     expect(interpretar('atlans://enroll?executor_id=&otp=')).toBeNull()
@@ -131,7 +133,7 @@ describe('ehDeepLink', () => {
 
 describe('urlDosArgumentos', () => {
   it('acha a URL no meio do argv', () => {
-    // No Windows o deep link chega assim, junto dos argumentos do Electron.
+    // On Windows the deep link arrives like this, along with Electron's arguments.
     const argv = ['C:\\app\\Atlans Executor.exe', '--flag', OK, '--outro']
     expect(urlDosArgumentos(argv)).toBe(OK)
   })

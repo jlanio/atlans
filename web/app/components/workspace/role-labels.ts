@@ -1,13 +1,14 @@
 /**
- * Rótulos dos papéis dentro de um workspace.
+ * Labels for the roles within a workspace.
  *
- * Há duas listas de propósito. `ROLE_LABELS` cobre os cinco papéis EXIBÍVEIS —
- * incluindo "owner", que o backend devolve na linha sintética do dono. Sem ele,
- * o `<Badge>` daquela linha renderizaria vazio.
+ * There are two lists on purpose. `ROLE_LABELS` covers the five DISPLAYABLE
+ * roles — including "owner", which the backend returns on the owner's synthetic
+ * row. Without it, that row's `<Badge>` would render empty.
  *
- * `ROLE_OPTIONS` são os quatro ATRIBUÍVEIS, e é o que os selects podem oferecer:
- * "owner" não é um papel que se concede — sai de `Workspace.owner_id`, e o
- * backend recusa qualquer PUT que tente atribuí-lo (`_VALID_ROLES`).
+ * `ROLE_OPTIONS` are the four ASSIGNABLE ones, and are what the selects can
+ * offer: "owner" is not a role that is granted — it comes from
+ * `Workspace.owner_id`, and the backend rejects any PUT that tries to assign
+ * it (`_VALID_ROLES`).
  */
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -26,10 +27,10 @@ export const ROLE_COLORS: Record<string, "default" | "secondary" | "outline" | "
   viewer:   "secondary",
 }
 
-/** Papéis que um admin pode conceder, do menor para o maior. */
+/** Roles an admin can grant, from lowest to highest. */
 export const ROLE_OPTIONS = ["viewer", "editor", "operator", "admin"] as const
 
-/** O que cada papel permite — o select oferecia quatro opções sem explicar nenhuma. */
+/** What each role allows — the select offered four options without explaining any. */
 export const ROLE_DESCRIPTIONS: Record<string, string> = {
   owner:    "Criou o workspace. Edita as configurações gerais e pode excluí-lo.",
   admin:    "Gerencia membros, executor e notificações do workspace.",

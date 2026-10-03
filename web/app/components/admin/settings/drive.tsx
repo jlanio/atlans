@@ -1,6 +1,6 @@
 "use client"
 
-// Seção «Drive — Upload de Arquivos» das Configurações do admin.
+// "Drive — Upload de Arquivos" (file upload) section of the admin Settings.
 
 import { useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -12,9 +12,9 @@ import { TbPackage, TbPlus, TbTrash } from "react-icons/tb"
 import { createToast } from "@/utils/createToast"
 import { AvisoDeSecao, CartaoDeErro, SkeletonDeFormulario, VazioEmCirculo } from "./estados"
 
-// ── Drive: Configurações globais de upload ────────────────────────────────────
+// ── Drive: global upload settings ────────────────────────────────────────────
 
-// `token` deixou de ser prop: o interceptor do GisFlowService anexa o JWT.
+// `token` is no longer a prop: the GisFlowService interceptor attaches the JWT.
 export function DriveSettingsSection() {
   const [maxMb,    setMaxMb]    = useState("")
   const [savingMb, setSavingMb] = useState(false)
@@ -64,8 +64,8 @@ export function DriveSettingsSection() {
     setAddingExt(true)
     const res = await GisFlowService.addAdminDriveExtension(ext)
     if (res.error) {
-      // O `detail` do backend explica POR QUE a extensão foi recusada
-      // (duplicada, formato inválido); `resolveAxiosError` já o coloca aqui.
+      // The backend's `detail` explains WHY the extension was refused
+      // (duplicated, invalid format); `resolveAxiosError` already puts it here.
       createToast.error(res.error.message ?? "Erro ao adicionar.")
     } else {
       createToast.success(`Extensão .${ext} adicionada.`)
@@ -85,9 +85,9 @@ export function DriveSettingsSection() {
     }
   }
 
-  // 1ª carga: skeleton do corpo. Erro só toma a seção quando NADA carregou —
-  // uma das duas leituras basta para mostrar o formulário. Antes o `error` era
-  // ignorado e a seção ficava em branco.
+  // 1st load: body skeleton. The error only takes over the section when NOTHING
+  // loaded — either of the two reads is enough to show the form. Before, the
+  // `error` was ignored and the section stayed blank.
   if (settingsFirst || extFirst) return <SkeletonDeFormulario rotulo="Carregando as configurações do Drive" />
   if (settingsError && !settings && extError && !extensions) {
     return <CartaoDeErro mensagem={settingsError} onTentar={() => { refetchSettings(); refetchExt() }} />
@@ -95,7 +95,7 @@ export function DriveSettingsSection() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Tamanho máximo */}
+      {/* Maximum size */}
       <div className="flex flex-col gap-2">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Tamanho máximo de arquivo
@@ -124,7 +124,7 @@ export function DriveSettingsSection() {
         </div>
       </div>
 
-      {/* Extensões permitidas */}
+      {/* Allowed extensions */}
       <div className="flex flex-col gap-3">
         <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
           Extensões permitidas

@@ -2,25 +2,25 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Dedo não tem hover. Tudo o que só aparece sob `hover:` — a seta que diz que a
-   linha leva a algum lugar, a barra de ferramentas de um card — simplesmente não
-   existe num telefone, e a affordance some junto.
+/* A finger has no hover. Everything that only shows up under `hover:` — the arrow
+   saying the row leads somewhere, a card's toolbar — simply does not exist on a
+   phone, and the affordance goes with it.
 
-   A variante é do PONTEIRO e não da largura: um tablet de 1280px com toque
-   precisa da mesma regra, e um notebook estreito não precisa de nenhuma. Já
-   havia um `@media (pointer: coarse)` aqui embaixo (o de fonte mínima nos
-   inputs); isto dá o mesmo teste às utilitárias. */
+   The variant is about the POINTER, not the width: a 1280px touch tablet needs
+   the same rule, and a narrow laptop needs none. There was already a
+   `@media (pointer: coarse)` further down (the minimum font size on inputs);
+   this gives the utilities the same test. */
 @custom-variant coarse (@media (pointer: coarse));
 
-/* ── Entrada (login e cadastro) ─────────────────────────────────────────────
-   Superfície escura fixa, e não os tokens de tema: os painéis do modal de
-   entrada da Home (`components/home/entrada/`) vêm ANTES de existir qualquer
-   preferência de usuário, e o modal é escuro em qualquer caso.
+/* ── Sign-in (login and sign-up) ────────────────────────────────────────────
+   A fixed dark surface, not the theme tokens: the panels of the Home sign-in
+   modal (`components/home/entrada/`) come BEFORE any user preference exists,
+   and the modal is dark in every case.
 
-   Ficam aqui, e não em `style` inline: as mesmas cores se repetiam como
-   `rgba(...)` cru em cada tela da entrada, então acertar um contraste era
-   acertar em cada uma — e o `style` inline ainda sobrescrevia a borda do
-   `Input`, engolindo junto o anel de foco do design system.
+   They live here, not in inline `style`: the same colors were repeated as raw
+   `rgba(...)` on every sign-in screen, so fixing a contrast meant fixing it on
+   each one — and the inline `style` also overrode the `Input` border,
+   swallowing the design system's focus ring along with it.
    ───────────────────────────────────────────────────────────────────────── */
 .auth-input {
   background: rgba(255, 255, 255, 0.05);
@@ -31,8 +31,8 @@
 }
 .auth-input::placeholder { color: rgba(255, 255, 255, 0.25); }
 .auth-input:hover:not(:disabled) { border-color: rgba(255, 255, 255, 0.18); }
-/* O anel usa a laranja da marca em vez do `--ring` do tema: sobre a superfície
-   escura o anel padrão praticamente não aparece. */
+/* The ring uses the brand orange instead of the theme's `--ring`: on the dark
+   surface the default ring is practically invisible. */
 .auth-input:focus-visible {
   outline: none;
   border-color: rgba(255, 138, 51, 0.75);
@@ -41,18 +41,18 @@
 }
 .auth-input:disabled { opacity: 0.55; }
 
-/* Rótulos e textos de apoio — dois níveis de hierarquia sobre o modal. */
+/* Labels and supporting text — two levels of hierarchy over the modal. */
 .auth-label { color: rgba(255, 255, 255, 0.62); }
 .auth-muted { color: rgba(255, 255, 255, 0.38); }
 
-/* ── Áreas seguras (notch / barra de gestos) ────────────────────────────────
-   Com `viewportFit: cover` (ver app/layout.tsx) a página ocupa a tela toda,
-   inclusive o que fica sob o notch e sob a barra de gestos do iOS. Quem é
-   `fixed`/`absolute` colado numa borda precisa recuar por conta própria —
-   senão o controle nasce debaixo do hardware.
+/* ── Safe areas (notch / gesture bar) ───────────────────────────────────────
+   With `viewportFit: cover` (see app/layout.tsx) the page takes the whole
+   screen, including what sits under the notch and the iOS gesture bar.
+   Anything `fixed`/`absolute` pinned to an edge must inset itself —
+   otherwise the control is born underneath the hardware.
 
-   `env()` devolve 0 em qualquer navegador sem recorte, então estas classes são
-   inertes no desktop e não precisam de media query. */
+   `env()` returns 0 in any browser without a cutout, so these classes are
+   inert on desktop and need no media query. */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
 .pl-safe { padding-left:   env(safe-area-inset-left, 0px); }
 .pr-safe { padding-right:  env(safe-area-inset-right, 0px); }
@@ -61,22 +61,22 @@
   padding-right: env(safe-area-inset-right, 0px);
 }
 
-/* Posicionamento dinâmico de handles/labels via CSS variable.
-   A classe é estática (scaneada pelo Tailwind/bundler) e o valor
-   vem de --port-top definido no style inline do elemento. */
+/* Dynamic positioning of handles/labels via a CSS variable.
+   The class is static (scanned by Tailwind/the bundler) and the value
+   comes from --port-top set in the element's inline style. */
 .port-top {
   top: var(--port-top, 50%) !important;
 }
 
-/* ── Portas do nó (handles) ──────────────────────────────────────────────────
-   Especificidade `.react-flow__handle.rf-handle` (0-2-0) de propósito: as
-   regras do próprio React Flow são 0-1-0 e a ordem de import das duas folhas
-   não é garantida. Resolver isso com `!important` em classe utilitária era o
-   que impedia o chamador de sobrescrever qualquer coisa — e por isso
-   `!border-input hover:!bg-accent` estava copiado em cinco pontos de chamada.
+/* ── Node ports (handles) ────────────────────────────────────────────────────
+   Specificity `.react-flow__handle.rf-handle` (0-2-0) on purpose: React Flow's
+   own rules are 0-1-0 and the import order of the two stylesheets is not
+   guaranteed. Solving that with `!important` on a utility class was what
+   kept the caller from overriding anything — and that is why
+   `!border-input hover:!bg-accent` was copied into five call sites.
 
-   A cor sai do mesmo vocabulário da aresta (`--exec-*`), mas só a parte que é
-   IDENTIDADE da porta — ver o comentário de `--rf-handle-tom` abaixo.
+   The color comes from the same vocabulary as the edge (`--exec-*`), but only
+   the part that is the port's IDENTITY — see the `--rf-handle-tom` comment below.
    ───────────────────────────────────────────────────────────────────────── */
 .react-flow__handle.rf-handle {
   width: 10px;
@@ -85,17 +85,17 @@
   min-height: 10px;
   border-radius: 9999px;
   box-sizing: border-box;
-  /* A porta NÃO acompanha o status da execução, de propósito.
-     A primeira versão herdava `--exec-color` do card e espelhava a precedência
-     de `tomDaAresta`. Mas `tomDaAresta` tem um terceiro fator que o card não
-     expõe — `perdedora` —, e sem ele a porta `false` de um Conditional
-     concluído ficava VERDE (o nó completou) enquanto a aresta que sai dela é
-     desenhada cinza e tracejada como ramo rejeitado. Duas cores contando
-     histórias opostas sobre a mesma ligação.
-     A divisão de trabalho resolve melhor: a porta diz o que ela É (o ramo, e se
-     está ligada), a aresta diz o que ACONTECEU. O estado do run já tem três
-     canais — o anel do card, a cor da aresta e o fluxo marchando —, e um quarto
-     num ponto de 10px não paga a contradição. */
+  /* The port does NOT follow the execution status, on purpose.
+     The first version inherited `--exec-color` from the card and mirrored the
+     precedence of `tomDaAresta`. But `tomDaAresta` has a third factor the card
+     does not expose — `perdedora` (losing) —, and without it the `false` port
+     of a completed Conditional turned GREEN (the node completed) while the edge
+     leaving it is drawn gray and dashed as a rejected branch. Two colors
+     telling opposite stories about the same connection.
+     The division of labor works better: the port says what it IS (the branch,
+     and whether it is connected), the edge says what HAPPENED. The run state
+     already has three channels — the card's ring, the edge color and the
+     marching flow —, and a fourth in a 10px dot is not worth the contradiction. */
   --rf-handle-tom: var(--rf-handle-ramo, var(--exec-idle));
   transition:
     background-color 140ms ease-out,
@@ -103,34 +103,34 @@
     box-shadow 140ms ease-out;
 }
 
-/* Saída: pino CHEIO. O anel na cor do card separa o pino da borda do nó sem
-   precisar de sombra projetada, que a esse tamanho vira borrão. */
+/* Output: FILLED pin. The ring in the card's color separates the pin from the
+   node's border without needing a drop shadow, which at this size turns to blur. */
 .react-flow__handle.rf-handle-saida {
   background-color: var(--rf-handle-tom);
   border: 2px solid var(--card);
   box-shadow: 0 0 0 1px var(--rf-handle-tom);
 }
 
-/* Entrada: soquete VAZADO. A direção passa a ser legível pelo preenchimento, e
-   não por formas diferentes — assim as duas alinham na mesma grade de 10px. */
+/* Input: HOLLOW socket. Direction becomes readable from the fill, not from
+   different shapes — so both align on the same 10px grid. */
 .react-flow__handle.rf-handle-entrada {
   background-color: var(--card);
   border: 2px solid var(--rf-handle-tom);
 }
 
-/* Porta livre — tracejada. Legível sem depender do stub "+", que o LOD esconde
-   no zoom afastado levando a informação junto. */
+/* Free port — dashed. Readable without relying on the "+" stub, which the LOD
+   hides when zoomed out, taking the information with it. */
 .react-flow__handle.rf-handle[data-livre="true"] {
   background-color: var(--card);
   border: 2px dashed color-mix(in oklch, var(--rf-handle-tom) 70%, transparent);
   box-shadow: none;
 }
 
-/* Halo no hover e enquanto se arrasta a conexão.
-   Só `box-shadow`: as propriedades `scale`/`translate` compõem DEPOIS do
-   `transform`, e o React Flow centra o handle na borda com
-   `transform: translate(±50%, -50%)` — escalar aqui multiplicaria também essa
-   translação e a porta sairia do lugar sob o cursor. */
+/* Halo on hover and while dragging a connection.
+   Only `box-shadow`: the `scale`/`translate` properties compose AFTER
+   `transform`, and React Flow centers the handle on the border with
+   `transform: translate(±50%, -50%)` — scaling here would also multiply that
+   translation and the port would move out from under the cursor. */
 .react-flow__handle.rf-handle:hover,
 .react-flow__handle.rf-handle.connectingfrom {
   box-shadow:
@@ -138,16 +138,16 @@
     0 0 0 5px color-mix(in oklch, var(--rf-handle-tom) 22%, transparent);
 }
 
-/* ── Fluxo da aresta ────────────────────────────────────────────────────────
-   `stroke-dashoffset` NEGATIVO empurra o padrão no sentido do path
-   (origem → destino) — é o que faz a aresta dizer para onde o dado vai, já que
-   o canvas não desenha setas.
+/* ── Edge flow ──────────────────────────────────────────────────────────────
+   A NEGATIVE `stroke-dashoffset` pushes the pattern along the path direction
+   (source → target) — it is what makes the edge say where the data goes, since
+   the canvas draws no arrows.
 
-   Uma aresta ativa usa DUAS camadas em paralaxe. Uma corrente só lê como um
-   tracejado que escorrega; duas de calibre e velocidade diferentes leem como
-   tráfego — miudezas passando depressa entre pacotes maiores e mais espaçados.
-   Cada dasharray tem um keyframe próprio porque o offset precisa fechar
-   exatamente um período, senão o laço salta.
+   An active edge uses TWO layers in parallax. A single stream reads as a dash
+   pattern sliding along; two of different gauge and speed read as traffic —
+   small bits rushing between larger, more widely spaced packets.
+   Each dasharray has its own keyframe because the offset must close exactly
+   one period, otherwise the loop jumps.
    ───────────────────────────────────────────────────────────────────────── */
 @keyframes edge-flow-fast { to { stroke-dashoffset: -11; } }
 @keyframes edge-flow-slow { to { stroke-dashoffset: -29; } }
@@ -157,31 +157,31 @@
 .edge-flow-slow,
 .edge-flow-hint { stroke-dashoffset: 0; }
 
-/* A poeira: traços curtos, velozes, discretos. Fica deliberadamente apagada —
-   ela dá textura por baixo dos pacotes, não disputa com eles. */
+/* The dust: short, fast, discreet dashes. Deliberately faint —
+   it adds texture beneath the packets, it does not compete with them. */
 .edge-flow-fast {
   animation: edge-flow-fast 0.42s linear infinite;
   stroke-opacity: 0.4;
 }
-/* Os pacotes: traços longos, espaçados, opacos. É a corrente que se lê. */
+/* The packets: long, spaced, opaque dashes. This is the stream you read. */
 .edge-flow-slow {
   animation: edge-flow-slow 1.5s linear infinite;
   stroke-opacity: 0.95;
 }
 
-/* Hover numa aresta PARADA não é "dado passando": é a direção sob demanda.
-   Antes as duas coisas compartilhavam a mesma animação, e passar o mouse
-   durante um run fazia uma aresta inerte parecer viva — o canal mais forte do
-   canvas disparado por um gesto de leitura. Continua nítida o bastante para
-   ler o sentido, mas com UMA camada e sem brilho, que é o que separa os dois
-   sentidos agora que a ativa ganhou densidade. */
+/* Hover on an IDLE edge is not "data flowing": it is direction on demand.
+   The two used to share the same animation, and hovering during a run made
+   an inert edge look alive — the canvas's strongest channel fired by a
+   reading gesture. It stays crisp enough to read the direction, but with ONE
+   layer and no glow, which is what tells the two meanings apart now that the
+   active one gained density. */
 .edge-flow-hint {
   animation: edge-flow-hint 1s linear infinite;
   stroke-opacity: 0.6;
 }
 
-/* O brilho respira junto: sozinho e fixo ele lia como uma linha grossa e
-   estática por baixo. Pulsando, a aresta inteira parece carregar. */
+/* The glow breathes along: alone and fixed it read as a thick, static line
+   underneath. Pulsing, the whole edge seems to be carrying load. */
 @keyframes edge-glow-pulse {
   0%, 100% { stroke-opacity: 0.10; }
   50%      { stroke-opacity: 0.24; }
@@ -191,50 +191,51 @@
   animation: edge-glow-pulse 1.6s ease-in-out infinite;
 }
 
-/* Cor e espessura atravessam os estados em vez de saltar. `stroke-dasharray`
-   fica de fora: transição de tracejado não tem interpolação útil. */
+/* Color and width transition across states instead of jumping. `stroke-dasharray`
+   is left out: a dash transition has no useful interpolation. */
 [data-role="edge-path"] {
   transition: stroke 260ms ease-out, stroke-opacity 260ms ease-out,
               stroke-width 140ms ease-out;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Estados de execução no canvas
+   Execution states on the canvas
 
-   As camadas vivem em PSEUDO-ELEMENTOS, e não no `box-shadow` do card. O
-   `ring-*` do Tailwind, o `shadow-sm` do card e qualquer keyframe de brilho
-   disputam a MESMA propriedade, e um keyframe de `box-shadow` substitui a
-   declaração inteira: enquanto o pulso rodava, ele apagava o anel de seleção
-   e a sombra do card. Separados, seleção (Tailwind, no card), anel de estado
-   (`::after`) e halo (`::before`) coexistem — um nó selecionado E em execução
-   agora mostra os dois anéis, o que antes era impossível.
+   The layers live in PSEUDO-ELEMENTS, not in the card's `box-shadow`.
+   Tailwind's `ring-*`, the card's `shadow-sm` and any glow keyframe compete
+   for the SAME property, and a `box-shadow` keyframe replaces the whole
+   declaration: while the pulse ran, it erased the selection ring and the
+   card's shadow. Kept apart, selection (Tailwind, on the card), state ring
+   (`::after`) and halo (`::before`) coexist — a node that is selected AND
+   running now shows both rings, which used to be impossible.
 
-   A divisão entre os dois pseudo não é arbitrária:
-     ::after  = anel nítido, via `outline`. É a única forma de ter anel
-                TRACEJADO, e é o tracejado que separa "não sabemos" de "deu
-                certo" por forma — a 0.42 de zoom dois âmbares viram a mesma
-                mancha, mas cheio × tracejado sobrevive.
-     ::before = halo difuso, `box-shadow` FIXO. Só ele se move, e move apenas
-                `opacity`/`transform`, que o compositor resolve. Animar blur ou
-                spread repintaria a sombra a cada quadro, em todo nó ativo.
+   The split between the two pseudos is not arbitrary:
+     ::after  = crisp ring, via `outline`. It is the only way to get a DASHED
+                ring, and the dash is what separates "we don't know" from
+                "it worked" by shape — at 0.42 zoom two ambers become the same
+                smudge, but solid × dashed survives.
+     ::before = diffuse halo, FIXED `box-shadow`. Only it moves, and it moves
+                only `opacity`/`transform`, which the compositor handles.
+                Animating blur or spread would repaint the shadow every frame,
+                on every active node.
 
-   Ganchos por ATRIBUTO, não por classe alternada em runtime: com
-   `onlyRenderVisibleElements`, um nó que entra na viewport durante o pan monta
-   do zero — mesmo motivo do realce de caminho em `utils/focus-css.ts`.
+   Hooks by ATTRIBUTE, not by a class toggled at runtime: with
+   `onlyRenderVisibleElements`, a node entering the viewport during a pan mounts
+   from scratch — same reason as the path highlight in `utils/focus-css.ts`.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .exec-card {
   --exec-color: var(--exec-idle);
-  /* Só cor e opacidade: o card não se desloca. Fica aqui, e não numa utility
-     do Tailwind, porque este arquivo é unlayered e venceria a utility. */
+  /* Only color and opacity: the card does not move. It lives here, not in a
+     Tailwind utility, because this file is unlayered and would beat the utility. */
   transition: opacity 320ms ease-out, filter 320ms ease-out;
 }
 
 .exec-card::before,
 .exec-card::after {
   content: "";
-  /* `absolute` é obrigatório: o card é `flex items-stretch`, e sem isto os
-     pseudo-elementos viram flex items e entram no layout. */
+  /* `absolute` is mandatory: the card is `flex items-stretch`, and without it
+     the pseudo-elements become flex items and enter the layout. */
   position: absolute;
   inset: 0;
   border-radius: inherit;
@@ -244,13 +245,13 @@
 
 .exec-card::after {
   outline: 0 solid transparent;
-  /* `offset: 0` e não 1px: um absoluto com `inset:0` se apoia no PADDING box,
-     então a borda de 1px do card fica FORA da caixa deste pseudo. Com qualquer
-     offset positivo, o anel começava depois dela e sobrava uma faixa cinza
-     entre a stripe colorida e o anel colorido — mais visível justamente à
-     esquerda, onde a stripe dá contraste. Em zero, o anel cobre a borda e
-     encosta na stripe. É o mesmo defeito que `ring-offset-*` causa, e o motivo
-     de ele estar proibido no card. */
+  /* `offset: 0` and not 1px: an absolute element with `inset:0` rests on the
+     PADDING box, so the card's 1px border sits OUTSIDE this pseudo's box. With
+     any positive offset, the ring started after it and a gray strip was left
+     between the colored stripe and the colored ring — most visible on the
+     left, precisely where the stripe gives contrast. At zero, the ring covers
+     the border and touches the stripe. It is the same defect `ring-offset-*`
+     causes, and the reason it is banned on the card. */
   outline-offset: 0;
   transition: outline-color 240ms ease-out, outline-width 240ms ease-out,
               opacity 240ms ease-out;
@@ -270,13 +271,13 @@
   outline-color: color-mix(in oklch, var(--exec-color) 88%, transparent);
   opacity: 1;
 }
-/* Amplitude baixa, período longo: 2.4s lê como atividade contínua, onde os
-   1.4s de antes liam como alarme. O anel não participa — antes o keyframe
-   bombeava a GEOMETRIA (`0 0 0 3px` → `4px`) e o card parecia engordar e
-   emagrecer; agora a borda fica parada e só a luz respira. */
+/* Low amplitude, long period: 2.4s reads as continuous activity, where the
+   previous 1.4s read as an alarm. The ring does not take part — the keyframe
+   used to pump the GEOMETRY (`0 0 0 3px` → `4px`) and the card seemed to swell
+   and shrink; now the border stays still and only the light breathes. */
 .exec-card[data-status="started"]::before {
   opacity: 1;
-  /* Só aqui: promover todo card a camada própria custaria uma por nó. */
+  /* Only here: promoting every card to its own layer would cost one per node. */
   will-change: opacity, transform;
   animation: exec-breathe 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
@@ -285,16 +286,17 @@
   50%      { opacity: 1;   transform: scale(1.015); }
 }
 
-/* ── Concluído ──────────────────────────────────────────────────────────── */
+/* ── Completed ──────────────────────────────────────────────────────────── */
 .exec-card[data-status="completed"] { --exec-color: var(--exec-success); }
 .exec-card[data-status="completed"]::after {
   outline-width: 2px;
   outline-color: var(--exec-color);
   opacity: 1;
 }
-/* A luz que respirava resolve para fora e some, deixando o anel — é o pouso do
-   estado anterior, não um corte para verde. Trocar `data-status` já troca o
-   `animation-name` e reinicia o keyframe, sem remontar nada no React. */
+/* The breathing light resolves outward and fades, leaving the ring — it is the
+   landing of the previous state, not a cut to green. Changing `data-status`
+   already changes `animation-name` and restarts the keyframe, without
+   remounting anything in React. */
 .exec-card[data-status="completed"]::before {
   animation: exec-settle 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
@@ -305,10 +307,10 @@
 }
 
 /* ── Falhou ─────────────────────────────────────────────────────────────── */
-/* SEM animação infinita. Um anel vermelho parado já é alto; o que precisa
-   chamar é a ENTRADA. O pulso de 0.9s cansava em qualquer run com mais de um
-   erro — três nós piscando fora de fase deixavam o canvas ilegível — e o
-   painel de problemas já é quem persegue o usuário. */
+/* NO infinite animation. A still red ring is already loud; what needs to call
+   attention is the ENTRANCE. The 0.9s pulse became tiring in any run with more
+   than one error — three nodes blinking out of phase made the canvas
+   unreadable — and the problems panel is already the one that chases the user. */
 .exec-card[data-status="failed"] { --exec-color: var(--exec-error); }
 .exec-card[data-status="failed"]::after {
   outline-width: 2px;
@@ -326,8 +328,8 @@
 }
 
 /* ── Resultado desconhecido ─────────────────────────────────────────────── */
-/* Tracejado: "não sabemos" difere de "deu certo" por FORMA, porque de longe o
-   matiz sozinho não sobrevive. */
+/* Dashed: "we don't know" differs from "it worked" by SHAPE, because from afar
+   hue alone does not survive. */
 .exec-card[data-status="unknown"] { --exec-color: var(--exec-unknown); }
 .exec-card[data-status="unknown"]::after {
   outline: 2px dashed var(--exec-color);
@@ -335,10 +337,10 @@
 }
 .exec-card[data-status="unknown"]::before { opacity: 0.55; }
 
-/* ── Ainda não executado, com o run de pé ───────────────────────────────── */
-/* Antes só a opacidade do card piscava, o que apagava o TÍTULO junto: o nó
-   ficava difícil de ler justamente enquanto se esperava por ele. Agora o card
-   fica estável e quem respira é um contorno tracejado neutro. */
+/* ── Not executed yet, with the run still going ─────────────────────────── */
+/* Previously only the card's opacity blinked, which dimmed the TITLE too: the
+   node was hard to read precisely while you were waiting for it. Now the card
+   stays steady and what breathes is a neutral dashed outline. */
 .exec-card[data-pending="true"] {
   --exec-color: var(--exec-idle);
   opacity: 0.8;
@@ -356,21 +358,21 @@
 }
 
 /* ── Ramo perdedor ──────────────────────────────────────────────────────── */
-/* Dessatura em vez de apagar: a opacidade profunda continua reservada ao
-   realce de caminho, senão os dois canais se multiplicam e um nó rejeitado
-   DENTRO do caminho em foco fica ilegível. A novidade é a transição — o ramo
-   recua quando o Conditional decide, em vez de saltar para cinza num quadro.
-   Vem depois dos estados de propósito: mesma especificidade, e um ramo
-   rejeitado não deve continuar respirando azul. */
+/* Desaturate instead of fading: deep opacity stays reserved for the path
+   highlight, otherwise the two channels multiply and a rejected node INSIDE
+   the focused path becomes unreadable. What is new is the transition — the
+   branch recedes when the Conditional decides, instead of jumping to gray in
+   one frame. It comes after the states on purpose: same specificity, and a
+   rejected branch must not keep breathing blue. */
 .exec-card[data-losing="true"] {
   opacity: 0.62;
   filter: saturate(0.08);
 }
 .exec-card[data-losing="true"]::before { animation: none; opacity: 0; }
 
-/* ── Nó recém-adicionado ────────────────────────────────────────────────── */
-/* Mesma linguagem dos demais. Saiu do `box-shadow` do card, onde apagava a
-   sombra base e o anel de seleção pelos 2.5s inteiros da animação. */
+/* ── Newly added node ───────────────────────────────────────────────────── */
+/* Same language as the others. Moved out of the card's `box-shadow`, where it
+   erased the base shadow and the selection ring for the animation's full 2.5s. */
 .exec-card[data-new="true"] { --exec-color: var(--exec-success); }
 .exec-card[data-new="true"]::before {
   animation: exec-arrive 2.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -382,12 +384,12 @@
   100% { opacity: 0;    transform: scale(1); }
 }
 
-/* Atividade do nó em execução — quatro barras oscilando fora de fase (ver
-   custom-nodes/exec-activity). Substituiu o spinner girando: rotação é o glifo
-   de "aguarde", e o que este badge precisa dizer é que há trabalho acontecendo.
-   `transform-box: fill-box` é o que faz `transform-origin: center` valer o
-   centro do próprio rect — sem ele a origem cai no do SVG e as barras
-   escorregam para o lado em vez de crescer no lugar. */
+/* Activity of a running node — four bars oscillating out of phase (see
+   custom-nodes/exec-activity). It replaced the spinning spinner: rotation is
+   the "please wait" glyph, and what this badge needs to say is that work is
+   happening. `transform-box: fill-box` is what makes `transform-origin: center`
+   mean the center of the rect itself — without it the origin falls on the
+   SVG's and the bars slide sideways instead of growing in place. */
 @keyframes exec-activity-wave {
   0%, 100% { transform: scaleY(0.28); }
   50%      { transform: scaleY(1); }
@@ -401,9 +403,9 @@
 .exec-activity rect:nth-child(3) { animation-delay: 0.28s; }
 .exec-activity rect:nth-child(4) { animation-delay: 0.42s; }
 
-/* Pulse de entrada para o ícone de cache_hit (TbBolt) — toca uma única vez
-   quando o ícone é montado (node virou completed com cache_hit). Chama atenção
-   para "veio do cache" sem ser ruidoso. */
+/* Entrance pulse for the cache_hit icon (TbBolt) — plays once when the icon
+   mounts (node became completed with cache_hit). Draws attention to
+   "came from the cache" without being noisy. */
 @keyframes cache-hit-pulse {
   0%   { transform: scale(0.5); opacity: 0; filter: drop-shadow(0 0 0 transparent); }
   35%  { transform: scale(1.35); opacity: 1; filter: drop-shadow(0 0 6px color-mix(in oklch, var(--exec-cache) 85%, transparent)); }
@@ -415,9 +417,9 @@
   transform-origin: center;
 }
 
-/* Pulse de entrada para o ícone de pin (TbPinFilled âmbar) — bounce leve
-   com pequena rotação ao ser pinado. Usa ease-out-back para o overshoot
-   clássico de "afixar". */
+/* Entrance pulse for the pin icon (amber TbPinFilled) — a light bounce
+   with a small rotation when pinned. Uses ease-out-back for the classic
+   "pin it" overshoot. */
 @keyframes pin-hit-pulse {
   0%   { transform: scale(0.2) rotate(-25deg); opacity: 0; }
   50%  { transform: scale(1.25) rotate(8deg);  opacity: 1; }
@@ -429,7 +431,7 @@
   transform-origin: center;
 }
 
-/* Pulse no botão + quando o canvas está vazio */
+/* Pulse on the + button when the canvas is empty */
 @keyframes add-node-pulse {
   0%, 100% { box-shadow: 0 0 0 0px rgb(255 106 0 / 0.5), 0 4px 12px rgb(255 106 0 / 0.3); }
   50%      { box-shadow: 0 0 0 8px rgb(255 106 0 / 0), 0 4px 12px rgb(255 106 0 / 0.15); }
@@ -438,7 +440,7 @@
   animation: add-node-pulse 2s ease-in-out infinite;
 }
 
-/* Shimmer contínuo para Skeleton — gradiente desliza da esquerda para direita */
+/* Continuous shimmer for Skeleton — the gradient slides from left to right */
 @keyframes skeleton-shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
@@ -448,11 +450,11 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Canvas em espera (carregando o workflow) — ver canvas-loading.tsx
+   Waiting canvas (loading the workflow) — see canvas-loading.tsx
 
-   Um mini fluxo de três nós: um pacote na cor da marca percorre as ligações e
-   cada nó acende ao ser alcançado. Cores pelos tokens do tema, para parecer um
-   pedaço do editor e não um spinner por cima dele.
+   A mini three-node workflow: a packet in the brand color travels the
+   connections and each node lights up when reached. Colors from the theme
+   tokens, so it looks like a piece of the editor and not a spinner on top of it.
    ───────────────────────────────────────────────────────────────────────── */
 .canvas-carregando .no {
   fill: var(--card);
@@ -476,27 +478,28 @@
   filter: drop-shadow(0 0 4px color-mix(in oklch, var(--primary) 70%, transparent));
 }
 
-/* Enquanto carrega, as colunas de botões vão para segundo plano: nada ali tem
-   em que agir. `data-canvas-chrome` marca esses contêineres. */
-/* `bottom` continua aqui: as colunas já transitavam `bottom` (Tailwind) para
-   acompanhar o dock do painel de execução, e uma regra `transition` só de
-   opacidade apagaria essa. */
+/* While loading, the button columns recede into the background: there is
+   nothing there to act on. `data-canvas-chrome` marks those containers. */
+/* `bottom` stays here: the columns already transitioned `bottom` (Tailwind) to
+   follow the execution panel dock, and an opacity-only `transition` rule
+   would erase that one. */
 [data-canvas-chrome] { transition-property: opacity, bottom; transition-duration: 0.3s, 0.15s; }
 .react-flow.rf-carregando [data-canvas-chrome] { opacity: 0.35; pointer-events: none; }
 
-/* O grafo chega em fade, não em corte. Só opacidade: o `transform` do viewport
-   é o pan/zoom do React Flow. */
+/* The graph arrives with a fade, not a cut. Only opacity: the viewport's
+   `transform` is React Flow's pan/zoom. */
 .react-flow.rf-revelando .react-flow__viewport { animation: canvas-revelar 0.32s ease-out both; }
 @keyframes canvas-revelar { from { opacity: 0; } to { opacity: 1; } }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Realce de caminho (focus mode)
+   Path highlight (focus mode)
 
-   `.rf-focus` fica no container `.react-flow`; a allow-list de quem está no
-   caminho é gerada em `utils/focus-css.ts` e injetada por `canvas-view-layer`,
-   definindo `--rf-focus-dim: 1` nos elementos realçados. Quem não está na
-   lista cai no fallback abaixo. Ganchos por atributo (e não classe) porque
-   `onlyRenderVisibleElements` remonta os nós ao dar pan.
+   `.rf-focus` sits on the `.react-flow` container; the allow-list of what is
+   on the path is generated in `utils/focus-css.ts` and injected by
+   `canvas-view-layer`, setting `--rf-focus-dim: 1` on the highlighted
+   elements. Anything not on the list falls to the fallback below. Hooks by
+   attribute (not class) because `onlyRenderVisibleElements` remounts the
+   nodes on pan.
    ───────────────────────────────────────────────────────────────────────── */
 .rf-focus .react-flow__node,
 .rf-focus .react-flow__edge,
@@ -504,13 +507,14 @@
   opacity: var(--rf-focus-dim, 0.12);
   transition: opacity 160ms ease-out;
 }
-/* O botão de excluir aresta fica de fora: ele já alterna a própria opacidade
-   por hover via Tailwind, e esta regra tem especificidade maior — sobrescrevê-la
-   deixaria o botão permanentemente visível enquanto o realce estivesse ativo. */
+/* The delete-edge button is left out: it already toggles its own opacity on
+   hover via Tailwind, and this rule has higher specificity — overriding it
+   would leave the button permanently visible while the highlight is active. */
 
-/* Âncora do realce — anel discreto para não se perder de vista qual nó
-   originou o caminho. Usa outline (e não box-shadow) para não competir com
-   os rings de seleção e de status do card. A cor vem da regra gerada. */
+/* Highlight anchor — a discreet ring so you don't lose track of which node
+   originated the path. Uses outline (not box-shadow) so as not to compete
+   with the card's selection and status rings. The color comes from the
+   generated rule. */
 .rf-focus .react-flow__node {
   outline: 2px solid transparent;
   outline-offset: 4px;
@@ -519,17 +523,17 @@
 }
 
 /* ─────────────────────────────────────────────────────────────────────────
-   Nível de detalhe por zoom (LOD)
+   Level of detail by zoom (LOD)
 
-   `.rf-lod-far` / `.rf-lod-mid` / `.rf-lod-near` também ficam no container.
-   Usa `display` (e não `opacity`) para não brigar com o realce acima.
+   `.rf-lod-far` / `.rf-lod-mid` / `.rf-lod-near` also sit on the container.
+   Uses `display` (not `opacity`) so as not to clash with the highlight above.
    ───────────────────────────────────────────────────────────────────────── */
 
-/* Longe: só tipo (stripe), identidade (título) e estado (ring). */
+/* Far: only type (stripe), identity (title) and state (ring). */
 .rf-lod-far [data-role="edge-label"],
 .rf-lod-far [data-role="edge-delete"],
 .rf-lod-far [data-role="edge-flow"],
-/* A essa distância o traço largo do brilho vira borrão sobre o traço fino. */
+/* At this distance the wide glow stroke becomes a blur over the thin stroke. */
 .rf-lod-far [data-role="edge-glow"],
 .rf-lod-far [data-role="node-type-label"],
 .rf-lod-far [data-role="node-badge"],
@@ -541,16 +545,17 @@
   display: none;
 }
 
-/* Handles somem junto com os stubs "+". `pointer-events: none` acompanha a
-   opacidade de propósito: um alvo invisível que ainda inicia uma conexão faz
-   o arraste do nó virar aresta acidental — a esse zoom o handle tem ~3px. */
+/* Handles disappear together with the "+" stubs. `pointer-events: none` follows
+   the opacity on purpose: an invisible target that still starts a connection
+   turns a node drag into an accidental edge — at this zoom the handle is ~3px. */
 .rf-lod-far .react-flow__handle {
   opacity: 0;
   pointer-events: none;
 }
 
-/* O React Flow escala o SVG por transform: a 0.4 de zoom uma linha de 1.5px
-   vira 0.6px na tela e some. Compensar em flow-space devolve a espessura. */
+/* React Flow scales the SVG with a transform: at 0.4 zoom a 1.5px line
+   becomes 0.6px on screen and vanishes. Compensating in flow-space restores
+   the width. */
 .rf-lod-far [data-role="edge-path"] {
   stroke-width: 2.5;
 }
@@ -558,10 +563,10 @@
   stroke-width: 2;
 }
 
-/* Com o subtítulo escondido, o título herda o espaço vertical do card. Só
-   aumentar a fonte pioraria: o card tem largura fixa e o título é truncado,
-   então mais pixels por caractere = mais reticências. Vale mais soltar a
-   quebra de linha (até duas) do que crescer a fonte. */
+/* With the subtitle hidden, the title inherits the card's vertical space. Just
+   enlarging the font would make it worse: the card has a fixed width and the
+   title is truncated, so more pixels per character = more ellipses. Letting
+   the line wrap (up to two) is worth more than growing the font. */
 .rf-lod-far [data-role="node-title"] {
   font-size: 0.9375rem;
   font-weight: 600;
@@ -574,30 +579,30 @@
   overflow: hidden;
 }
 
-/* Mesmo motivo pelo qual `edge-path` engorda aqui: a 0.42 de zoom um contorno
-   de 2px vira 0.8px e some. Ao contrário do brilho da aresta, o anel de estado
-   PERMANECE em `far` — de longe ele é a única pista de quem está rodando.
-   Depois do bloco de estados de propósito: mesma especificidade, vence a
-   ordem. */
+/* Same reason `edge-path` gets thicker here: at 0.42 zoom a 2px outline
+   becomes 0.8px and vanishes. Unlike the edge glow, the state ring REMAINS in
+   `far` — from afar it is the only clue to what is running.
+   After the states block on purpose: same specificity, order wins. */
 .rf-lod-far .exec-card::after { outline-width: 4px; }
 .rf-lod-mid .exec-card::after { outline-width: 3px; }
 
-/* `.home-portal` entra aqui junto com `.dark` porque as superfícies que a Home
-   abre em portal (menu, diálogo, tooltip) não têm o `.dark` de um ancestral —
-   elas vivem no <body>. Sem isto, um `dark:` dentro de um menu da Home ficaria
-   com a variante clara. Ver o bloco `.home, .home-portal` mais abaixo. */
+/* `.home-portal` comes in here along with `.dark` because the surfaces the
+   Home opens in a portal (menu, dialog, tooltip) do not get `.dark` from an
+   ancestor — they live in <body>. Without this, a `dark:` inside a Home menu
+   would get the light variant. See the `.home, .home-portal` block further down. */
 @custom-variant dark (&:where(.dark, .dark *, .home-portal, .home-portal *));
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  /* A Inter é a do layout (app/fonts/inter.ts, `--font-inter` na classe do <html>).
-     Antes estas duas apontavam para `--font-geist-*`, do template do Next,
-     que ninguém define: o `html` caía no fallback do preflight (a fonte do
-     sistema) e o `.font-mono` ficava inválido e herdava a proporcional — os
-     IDs, hashes e rótulos "mono" do app nunca foram monoespaçados, e a Inter
-     era baixada (preload) sem uso. O fallback dentro do var() segura a pilha
-     se a classe faltar: um var() indefinido invalidaria a declaração inteira. */
+  /* Inter is the layout's (app/fonts/inter.ts, `--font-inter` on the <html> class).
+     These two used to point at `--font-geist-*`, from the Next template,
+     which nobody defines: `html` fell to the preflight fallback (the system
+     font) and `.font-mono` was invalid and inherited the proportional font —
+     the app's IDs, hashes and "mono" labels were never monospaced, and Inter
+     was downloaded (preload) unused. The fallback inside var() holds the stack
+     if the class is missing: an undefined var() would invalidate the whole
+     declaration. */
   --font-sans: var(--font-inter, ui-sans-serif), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -633,8 +638,8 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  /* Estado de execução como utilitário: os badges do card usavam `text-blue-500`
-     e afins, que não trocam com o tema e divergiam da cor da própria aresta. */
+  /* Execution state as a utility: the card badges used `text-blue-500` and the
+     like, which do not switch with the theme and diverged from the edge's own color. */
   --color-exec-idle:    var(--exec-idle);
   --color-exec-running: var(--exec-running);
   --color-exec-success: var(--exec-success);
@@ -656,7 +661,7 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.02 65);
 
-  /* Terracota/laranja — cor primária do Claude */
+  /* Terracotta/orange — Claude's primary color */
   --primary: oklch(0.57 0.17 43);
   --primary-foreground: oklch(1 0 0);
 
@@ -690,29 +695,29 @@
   --sidebar-border: oklch(0.90 0.012 70);
   --sidebar-ring: oklch(0.57 0.17 43 / 40%);
 
-  /* ── Execução no canvas ──────────────────────────────────────────────────
-     Fonte única do estado de execução, consumida pelo card do nó E pela aresta
-     que sai dele — antes cada um trazia o próprio hex, e os dois discordavam
-     (`unknown` deixava o card âmbar e a aresta cinza).
+  /* ── Execution on the canvas ─────────────────────────────────────────────
+     Single source of the execution state, consumed by the node card AND by
+     the edge leaving it — previously each brought its own hex, and the two
+     disagreed (`unknown` made the card amber and the edge gray).
 
-     Croma contido de propósito: ao lado da terracota do produto, os tons puros
-     do Tailwind (blue-500, green-500) leem como alerta de sistema, não como
-     este produto. */
-  --exec-idle:    oklch(0.62 0.020 68);   /* cinza QUENTE — o slate-500 de antes era frio */
+     Restrained chroma on purpose: next to the product's terracotta, Tailwind's
+     pure tones (blue-500, green-500) read as a system alert, not as this
+     product. */
+  --exec-idle:    oklch(0.62 0.020 68);   /* WARM gray — the previous slate-500 was cold */
   --exec-running: oklch(0.58 0.160 254);
   --exec-success: oklch(0.62 0.145 152);
-  --exec-error:   oklch(0.575 0.205 27);  /* mesma família de --destructive */
+  --exec-error:   oklch(0.575 0.205 27);  /* same family as --destructive */
   --exec-unknown: oklch(0.70 0.140 72);
   --exec-cache:   oklch(0.74 0.150 88);
 
-  /* Ramos do Conditional apontam para os MESMOS tons: "ramo verdadeiro" e
-     "concluiu" partilham significado positivo, e duas escalas de verde no
-     mesmo canvas só somam ruído. */
+  /* Conditional branches point to the SAME tones: "true branch" and
+     "completed" share a positive meaning, and two green scales on the
+     same canvas only add noise. */
   --exec-true:  var(--exec-success);
   --exec-false: var(--exec-error);
 
-  /* Intensidade das camadas do halo. Sobre fundo claro o brilho satura cedo;
-     no escuro ele precisa de bem mais para sequer existir. */
+  /* Intensity of the halo layers. On a light background the glow saturates
+     early; on dark it needs much more to exist at all. */
   --exec-halo-near: 34%;
   --exec-halo-far:  14%;
 }
@@ -729,7 +734,7 @@
   --popover: oklch(0.168 0.008 55);
   --popover-foreground: oklch(0.93 0.004 70);
 
-  /* Laranja levemente mais claro no escuro para melhor contraste */
+  /* Slightly lighter orange on dark for better contrast */
   --primary: oklch(0.68 0.16 44);
   --primary-foreground: oklch(0.99 0 0);
 
@@ -754,7 +759,7 @@
   --chart-4: oklch(0.80 0.18 85);
   --chart-5: oklch(0.65 0.22 16);
 
-  /* Sidebar ligeiramente mais escura que o fundo */
+  /* Sidebar slightly darker than the background */
   --sidebar: oklch(0.148 0.008 55);
   --sidebar-foreground: oklch(0.90 0.004 70);
   --sidebar-primary: oklch(0.68 0.16 44);
@@ -764,9 +769,9 @@
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.68 0.16 44 / 50%);
 
-  /* Execução — mais claros que no tema claro, para contrastar com o fundo
-     escuro, e com halo bem mais forte: sobre `--background` escuro um brilho
-     a 14% simplesmente não aparece. */
+  /* Execution — lighter than in the light theme, to contrast with the dark
+     background, and with a much stronger halo: over a dark `--background` a
+     14% glow simply does not show. */
   --exec-idle:    oklch(0.56 0.015 62);
   --exec-running: oklch(0.70 0.145 250);
   --exec-success: oklch(0.74 0.150 152);
@@ -781,42 +786,43 @@
   --exec-halo-far:  26%;
 }
 
-/* ── Home (o globo) — paleta quase preta, SEMPRE escura ──────────────────────
-   A Home (`/`) é o globo em tela cheia com a conversa flutuante; a casca ao lado
-   segue a mesma escala. Não é um tema global: é um bloco de tokens que a raiz da
-   HomeView e do HomeSidebar vestem com `className="home dark"`, sobrescrevendo
-   só os NEUTROS que a casca usa. A terracota (`--primary`, `--ring`,
-   `--sidebar-primary`) e os demais tokens vêm do `.dark` que acompanha na mesma
-   classe — por isso a Home é escura independente do tema que a pessoa escolheu
-   para o app.
+/* ── Home (the globe) — near-black palette, ALWAYS dark ──────────────────────
+   The Home (`/`) is the full-screen globe with the floating conversation; the
+   shell beside it follows the same scale. It is not a global theme: it is a
+   block of tokens that the root of HomeView and HomeSidebar put on with
+   `className="home dark"`, overriding only the NEUTRALS the shell uses. The
+   terracotta (`--primary`, `--ring`, `--sidebar-primary`) and the other
+   tokens come from the `.dark` that comes along in the same class — that is
+   why the Home is dark regardless of the theme the person chose for the app.
 
-   Escala (decisão 15, mockup v2): #050505 fundo · #0f0f0f painéis · #171717
-   superfícies · #202020 elevado · #606060 bordas · #ececec texto (#ffffff na
-   barra lateral). (Borda e texto da barra subiram de #262626/#ececec por
-   contraste — a justificativa está em cada token, mais abaixo.)
+   Scale (decision 15, mockup v2): #050505 background · #0f0f0f panels ·
+   #171717 surfaces · #202020 elevated · #606060 borders · #ececec text
+   (#ffffff in the sidebar). (The sidebar's border and text went up from
+   #262626/#ececec for contrast — the rationale is on each token, below.)
 
-   `.home` vem DEPOIS de `.dark` no arquivo de propósito: com as duas classes no
-   mesmo elemento a especificidade empata (0-1-0) e a ordem de origem decide —
-   os neutros do `.home` ganham, o resto fica com o `.dark`.
+   `.home` comes AFTER `.dark` in the file on purpose: with both classes on the
+   same element the specificity ties (0-1-0) and source order decides —
+   `.home`'s neutrals win, the rest stays with `.dark`.
 
-   ── `.home-portal`: a paleta da Home FORA da árvore da Home ─────────────────
-   Todo Radix (DropdownMenu, Dialog, Tooltip, Sheet, Popover) renderiza o
-   conteúdo em portal no <body> — ou seja, FORA do elemento que declara
-   `className="home dark"`. Com o app em tema claro, esses painéis saíam brancos
-   sobre a Home quase preta. Em vez de repetir `home dark` em cada `*Content`,
-   a classe única `.home-portal` traz os DOIS blocos de uma vez (ela está no
-   seletor do `.dark` acima, no deste bloco e no `@custom-variant dark`):
+   ── `.home-portal`: the Home palette OUTSIDE the Home tree ──────────────────
+   Every Radix component (DropdownMenu, Dialog, Tooltip, Sheet, Popover)
+   renders its content in a portal on <body> — that is, OUTSIDE the element
+   that declares `className="home dark"`. With the app in the light theme,
+   those panels came out white over the near-black Home. Instead of repeating
+   `home dark` on every `*Content`, the single `.home-portal` class brings BOTH
+   blocks at once (it is in the `.dark` selector above, in this block's and in
+   `@custom-variant dark`):
 
        <DropdownMenuContent className="home-portal"> … </DropdownMenuContent>
 
-   É o que toda superfície portada pela Home deve usar — menus e diálogos das
-   listas do grupo Meu, tooltips e cartões do assistente. Custom properties
-   valem no elemento que as declara, então `bg-popover`/`border-border` no
-   mesmo nó já resolvem pela escala quase preta.
+   It is what every surface portaled by the Home must use — menus and dialogs
+   of the Mine group lists, tooltips and assistant cards. Custom properties
+   apply on the element that declares them, so `bg-popover`/`border-border` on
+   the same node already resolve through the near-black scale.
 
-   `color-scheme: dark` acompanha para que barra de rolagem e controles nativos
-   dentro da Home (e dos portais dela) não apareçam claros quando o tema do app
-   é claro. */
+   `color-scheme: dark` comes along so that the scrollbar and native controls
+   inside the Home (and its portals) do not appear light when the app theme
+   is light. */
 .home,
 .home-portal {
   color-scheme: dark;
@@ -839,62 +845,66 @@
   --accent: #202020;
   --accent-foreground: #ececec;
 
-  /* Borda dos painéis flutuantes. #262626 dava 1,27:1 sobre o painel — sobre o
-     basemap escuro do globo a borda simplesmente não existia, e a mesma cor
-     contorna os campos (`--input`), onde 3:1 é exigência (WCAG 1.4.11, limite
-     de componente). #606060 é o menor cinza que passa em 3:1 sobre #050505
-     (3,24) e sobre #0f0f0f (3,05); a escala continua quase preta porque só a
-     LINHA sobe de tom. */
+  /* Border of the floating panels. #262626 gave 1.27:1 over the panel — over
+     the globe's dark basemap the border simply did not exist, and the same
+     color outlines the fields (`--input`), where 3:1 is required (WCAG 1.4.11,
+     component threshold). #606060 is the darkest gray that passes 3:1
+     over #050505 (3.24) and over #0f0f0f (3.05); the scale stays near-black
+     because only the LINE goes up in tone. */
   --border: #606060;
   --input: #606060;
 
-  /* Foco. Sem estes dois a Home herdava o `--ring` do `.dark`, que já vem com
-     50% de alfa embutido; como Button usa `ring-ring/50` e o `*` do @layer base
-     usa `outline-ring/50`, o alfa multiplicava (25% ⇒ 1,38:1) e o anel sumia
-     sobre #050505. Aqui os DOIS tokens são OPACOS e são a MESMA terracota do
-     produto — a Home não tem um laranja só dela.
+  /* Focus. Without these two the Home inherited `--ring` from `.dark`, which
+     already comes with 50% alpha built in; since Button uses `ring-ring/50`
+     and the `*` in @layer base uses `outline-ring/50`, the alpha multiplied
+     (25% ⇒ 1.38:1) and the ring vanished over #050505. Here BOTH tokens are
+     OPAQUE and are the SAME product terracotta — the Home has no orange of
+     its own.
 
-     `--ring` é usado das duas formas, e não "sempre a 50%": cheio em
-     `focus-visible:border-ring` (Button, Input, Select, Textarea) e em
-     `border-ring`, e diluído em `ring-ring/50` (o anel de 3px que as listas do
-     grupo Meu usam sozinho) e em `outline-ring/50`. Opaca, esta terracota rende
-     6,5:1 sobre #0a0a0a e 5,3:1 sobre o #202020 elevado; diluída a 50% cairia
-     para ~2,4:1, abaixo do 3:1 que WCAG 1.4.11 pede do indicador de foco — por
-     isso a regra logo abaixo do bloco devolve o alfa cheio ao anel DENTRO da
-     Home, em vez de clarear o matiz até a cor aguentar a diluição. */
+     `--ring` is used both ways, not "always at 50%": full in
+     `focus-visible:border-ring` (Button, Input, Select, Textarea) and in
+     `border-ring`, and diluted in `ring-ring/50` (the 3px ring the Mine group
+     lists use alone) and in `outline-ring/50`. Opaque, this terracotta gives
+     6.5:1 over #0a0a0a and 5.3:1 over the elevated #202020; diluted at 50% it
+     would drop to ~2.4:1, below the 3:1 WCAG 1.4.11 asks of the focus
+     indicator — which is why the rule right below the block restores full
+     alpha to the ring INSIDE the Home, instead of lightening the hue until the
+     color withstands the dilution. */
   --ring: oklch(0.68 0.16 44);
   --sidebar-ring: oklch(0.68 0.16 44);
 
   --sidebar: #0a0a0a;
-  /* Branco puro, e não o #ececec da escala, por causa dos rótulos de apoio das
-     listas: eles usam `text-sidebar-foreground/45` em 11px, e com #ececec a
-     mistura dava 3,99:1 — abaixo do 4,5:1 que AA pede para texto pequeno. Com
-     #ffffff a MESMA mistura dá 4,50:1 sobre #0a0a0a. O texto cheio continua
-     lendo como a escala: quem não usa alfa muda de #ececec para #fff. */
+  /* Pure white, not the scale's #ececec, because of the lists' supporting
+     labels: they use `text-sidebar-foreground/45` at 11px, and with #ececec the
+     blend gave 3.99:1 — below the 4.5:1 AA asks for small text. With #ffffff
+     the SAME blend gives 4.50:1 over #0a0a0a. Full-strength text still reads
+     like the scale: whatever uses no alpha goes from #ececec to #fff. */
   --sidebar-foreground: #ffffff;
   --sidebar-accent: #171717;
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: #1f1f1f;
 }
 
-/* O anel de foco da Home é OPACO, e não meio transparente.
+/* The Home focus ring is OPAQUE, not semi-transparent.
 
-   As utilitárias do design system pedem o anel a 50% (`ring-ring/50`,
-   `outline-ring/50`) porque sobre as superfícies claras do app um anel cheio
-   fica gritado. Sobre a escala quase preta da Home (#050505 a #202020) o
-   cálculo se inverte: a 50% a terracota se mistura ao preto e cai para ~2,4:1,
-   abaixo do 3:1 de WCAG 1.4.11 — o anel existe, mas some para quem mais precisa
-   dele. As listas do grupo Meu são o caso extremo, porque usam `ring-ring/50`
-   SOZINHO (sem o `border-ring` cheio que Button e Input desenham junto).
+   The design system utilities ask for the ring at 50% (`ring-ring/50`,
+   `outline-ring/50`) because on the app's light surfaces a full ring is
+   shouty. On the Home's near-black scale (#050505 to #202020) the math is
+   reversed: at 50% the terracotta blends into the black and drops to ~2.4:1,
+   below the 3:1 of WCAG 1.4.11 — the ring exists, but vanishes for those who
+   need it most. The Mine group lists are the extreme case, because they use
+   `ring-ring/50` ALONE (without the full `border-ring` that Button and Input
+   draw alongside).
 
-   Devolver o alfa aqui, em vez de clarear `--ring` até a cor sobreviver à
-   diluição, mantém uma terracota só no produto e leva o foco a 6,5:1.
+   Restoring the alpha here, instead of lightening `--ring` until the color
+   survives the dilution, keeps a single terracotta in the product and takes
+   focus to 6.5:1.
 
-   Sem `@layer`, então ganha das utilitárias (que vivem em `@layer utilities`)
-   sem depender de especificidade. `aria-invalid` fica de fora: lá o anel é
-   vermelho de propósito, e pintá-lo de terracota apagaria o sinal de erro. O
-   `ring-sidebar-ring` da barra lateral também cai nesta regra, e sem efeito:
-   dentro da Home os dois tokens são a MESMA terracota. */
+   No `@layer`, so it beats the utilities (which live in `@layer utilities`)
+   without relying on specificity. `aria-invalid` is left out: there the ring
+   is red on purpose, and painting it terracotta would erase the error signal.
+   The sidebar's `ring-sidebar-ring` also falls under this rule, with no
+   effect: inside the Home the two tokens are the SAME terracotta. */
 .home:focus-visible,
 .home :focus-visible:not([aria-invalid="true"]),
 .home-portal:focus-visible,
@@ -903,13 +913,14 @@
   outline-color: var(--ring);
 }
 
-/* ── Home: o hero do primeiro acesso ─────────────────────────────────────────
-   A barra é o MESMO elemento nas duas variantes (`data-variante` em
-   `.home-barra`): o React troca o atributo no primeiro token da resposta e
-   estas transições levam posição, largura, altura e tamanho de texto do centro
-   ao rodapé em 900 ms, com a curva do previewer aprovado. Sem movimento, a
-   duração cai a zero e a troca é imediata. Tudo fora de @layer para ganhar das
-   utilitárias do Tailwind que cuidam do resto do visual. */
+/* ── Home: the first-visit hero ──────────────────────────────────────────────
+   The bar is the SAME element in both variants (`data-variante` on
+   `.home-barra`): React switches the attribute on the response's first token
+   and these transitions carry position, width, height and text size from the
+   center to the footer in 900 ms, with the curve from the approved previewer.
+   With reduced motion, the duration drops to zero and the switch is instant.
+   All outside @layer to beat the Tailwind utilities that handle the rest of
+   the look. */
 .home {
   --home-dur: 900ms;
   --home-curva: cubic-bezier(.22, .9, .3, 1);
@@ -918,7 +929,7 @@
   .home { --home-dur: 0ms; }
 }
 
-/* O véu: o globo fica à vista ao norte e se apaga rumo ao sul. */
+/* The veil: the globe stays visible to the north and fades toward the south. */
 .home-veu {
   position: absolute;
   inset: 0;
@@ -930,7 +941,7 @@
 }
 .home-veu[data-visivel="false"] { opacity: 0; }
 
-/* Título e frase, acima da barra centrada. */
+/* Title and tagline, above the centered bar. */
 .home-hero-texto {
   position: absolute;
   left: 50%;
@@ -943,42 +954,45 @@
   transition: opacity 420ms ease, transform 420ms ease;
 }
 
-/* ── O HALO: a chamada sobre a imagem de satélite ───────────────────────────
-   O texto fica em `50% - 118px`, ou seja entre ~38% e ~46% da altura — e o véu
-   acima só sai de 0 em 24% para .55 em 50%, então ali ele vale ~0,34. Medido
-   sobre um pixel de nuvem (#f0ece4), que é o pior caso real da imagem, o
-   contraste é 2,4:1 no título e 1,5:1 no apoio (WCAG pede 3:1 acima de 24px e
-   4,5:1 no resto). Sobre oceano à noite sobra contraste de sobra; o problema é
-   nuvem, neve e deserto passando por baixo.
+/* ── The HALO: the headline over the satellite imagery ───────────────────────
+   The text sits at `50% - 118px`, i.e. between ~38% and ~46% of the height —
+   and the veil above only goes from 0 at 24% to .55 at 50%, so there it is
+   ~0.34. Measured over a cloud pixel (#f0ece4), which is the image's real
+   worst case, contrast is 2.4:1 on the title and 1.5:1 on the supporting text
+   (WCAG asks for 3:1 above 24px and 4.5:1 elsewhere). Over ocean at night
+   there is contrast to spare; the problem is cloud, snow and desert passing
+   underneath.
 
-   O que está aqui é um HALO, por decisão do dono entre as alternativas
-   medidas. Ele NÃO muda essas razões — contorno altera a borda da letra, não o
-   fundo —, mas é o que a vista usa para separar glifo de imagem, e resolve na
-   prática o que a sombra borrada de antes não resolvia. Quem precisar do número
-   (um audit de acessibilidade, por exemplo) tem de mexer no FUNDO: uma elipse
-   escura ancorada neste bloco leva o título a ~14:1 sem tocar no enquadramento
-   do globo — foi a opção B do previewer.
+   What is here is a HALO, by the owner's decision among the measured
+   alternatives. It does NOT change those ratios — an outline alters the
+   letter's edge, not the background —, but it is what the eye uses to separate
+   glyph from image, and in practice it solves what the previous blurred shadow
+   did not. Whoever needs the number (an accessibility audit, for example) has
+   to change the BACKGROUND: a dark ellipse anchored to this block takes the
+   title to ~14:1 without touching the globe's framing — it was option B in
+   the previewer.
 
-   Aumentar o brilho do texto não ajuda: sobre nuvem, mais claro é PIOR. Por
-   isso a cor não muda aqui, só o contorno.
+   Raising the text brightness does not help: over cloud, lighter is WORSE.
+   That is why the color does not change here, only the outline.
 
-   Duas camadas, e cada uma faz uma coisa:
+   Two layers, and each does one thing:
 
-   1. `text-shadow` empilhado e CURTO (2px e 10px), não um borrão de 24px. O
-      borrão espalhava o preto por uma área grande com pouca densidade em cada
-      ponto — de longe virava sujeira cinza em volta da frase, e de perto não
-      dava borda nenhuma. Funciona em todo navegador, e é o piso.
-   2. O CONTORNO de verdade (`-webkit-text-stroke` + `paint-order`), que dá a
-      aresta que a sombra não dá. Ele vai atrás de `@supports` porque sem
-      `paint-order` o traço é pintado POR CIMA do preenchimento, centrado na
-      curva do glifo: a letra afina e some — pior do que não ter halo. Com o
-      guarda, quem não suporta fica só com a camada 1.
+   1. Stacked, SHORT `text-shadow` (2px and 10px), not a 24px blur. The blur
+      spread the black over a large area with little density at each point —
+      from afar it became gray grime around the sentence, and up close it gave
+      no edge at all. It works in every browser, and it is the floor.
+   2. The real OUTLINE (`-webkit-text-stroke` + `paint-order`), which gives the
+      edge the shadow does not. It sits behind `@supports` because without
+      `paint-order` the stroke is painted ON TOP of the fill, centered on the
+      glyph's curve: the letter thins out and vanishes — worse than no halo.
+      With the guard, browsers without support get only layer 1.
 
-   `-webkit-text-stroke` é herdado, então o "Mais respostas." em terracota
-   dentro do <h2> recebe o mesmo contorno sem precisar de regra própria — e
-   precisa MAIS dele que o resto: `--primary` (#e7723b) tem quase a mesma
-   luminância da nuvem velada (#9e9c96), 1,11:1, o pior par desta tela. Sobre
-   oceano ela rende 6,19:1, melhor que o cinza que havia ali. */
+   `-webkit-text-stroke` is inherited, so the terracotta "Mais respostas."
+   (more answers) inside the <h2> gets the same outline without a rule of its
+   own — and it needs it MORE than the rest: `--primary` (#e7723b) has almost
+   the same luminance as the veiled cloud (#9e9c96), 1.11:1, the worst pair on
+   this screen. Over ocean it gives 6.19:1, better than the gray that was
+   there. */
 .home-hero-texto h2,
 .home-hero-texto p {
   text-shadow: 0 1px 2px rgba(0, 0, 0, .95), 0 0 10px rgba(0, 0, 0, .75);
@@ -998,8 +1012,8 @@
   transform: translate(-50%, calc(-50% - 140px));
 }
 
-/* A barra: do centro (hero) ao rodapé (a barra de hoje). `top` em porcentagem
-   e `transform` em translate são interpoláveis nos dois estados. */
+/* The bar: from the center (hero) to the footer (today's bar). `top` as a
+   percentage and `transform` as translate are interpolable in both states. */
 .home-barra {
   position: absolute;
   left: 50%;
@@ -1022,10 +1036,11 @@
   box-shadow: 0 0 0 1px oklch(0.68 0.16 44 / .22), 0 10px 40px rgba(0, 0, 0, .6);
   transition: height var(--home-dur) var(--home-curva), box-shadow 300ms ease;
 }
-/* Em repouso o halo do hero é PRETO — decisão do dono (2026-09-19): o brilho
-   terracota ao redor da caixa lia como vermelho e não agradou. O anel fino
-   terracota volta SÓ no foco, porque ele é o indicador de foco da caixa (o
-   input tem outline-none) e é o mesmo `--ring` de todo controle focado. */
+/* At rest the hero halo is BLACK — the owner's decision (2026-09-19): the
+   terracotta glow around the box read as red and was not liked. The thin
+   terracotta ring comes back ONLY on focus, because it is the box's focus
+   indicator (the input has outline-none) and it is the same `--ring` as every
+   focused control. */
 .home-barra[data-variante="hero"] .home-barra-caixa {
   height: 56px;
   box-shadow: 0 0 0 1px rgba(0, 0, 0, .55), 0 18px 60px rgba(0, 0, 0, .65), 0 0 70px rgba(0, 0, 0, .5);
@@ -1062,7 +1077,7 @@
   height: 36px;
 }
 @media (max-width: 767px) {
-  /* Alvo de 40 px no telefone (§5 do padrão de telas), nas duas variantes. */
+  /* 40 px target on the phone (§5 of the screen patterns), in both variants. */
   .home-barra-btn,
   .home-barra[data-variante="hero"] .home-barra-btn {
     width: 40px;
@@ -1070,7 +1085,7 @@
   }
 }
 
-/* A sugestão digitada: cursor laranja piscando; sem movimento, cursor parado. */
+/* The typed suggestion: a blinking orange cursor; with reduced motion, a still cursor. */
 .home-caret {
   display: inline-block;
   width: 2px;
@@ -1085,12 +1100,13 @@
   .home-caret { animation: none; }
 }
 
-/* O texto "Trabalhando…": um brilho que varre a palavra enquanto o modelo trabalha.
-   As cores vêm dos tokens (`--muted-foreground` → `--foreground`), então o
-   mesmo span funciona na Home (sempre escura) e no assistente do editor, nos dois
-   temas. `color: transparent` + `background-clip: text` é a técnica; por isso o
-   gradiente NÃO usa currentColor (com o texto transparente, currentColor seria
-   transparente também). Sem movimento: texto parado na cor de sempre. */
+/* The "Trabalhando…" (working) text: a shimmer that sweeps the word while the model works.
+   The colors come from the tokens (`--muted-foreground` → `--foreground`), so
+   the same span works on the Home (always dark) and in the editor assistant, in
+   both themes. `color: transparent` + `background-clip: text` is the technique;
+   that is why the gradient does NOT use currentColor (with transparent text,
+   currentColor would be transparent too). Reduced motion: still text in the
+   usual color. */
 .texto-pensando {
   background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--muted-foreground) 35%, var(--foreground) 50%, var(--muted-foreground) 65%, var(--muted-foreground) 100%);
   background-size: 220% 100%;
@@ -1111,10 +1127,10 @@
   }
 }
 
-/* As reticências do PENSANDO…, digitadas e apagadas em ciclo (a escolha do
-   dono no previewer do indicador de pensamento). O conteúdo vive no ::after
-   para o DOM não mudar a cada passo; o "…" de verdade fica num sr-only ao
-   lado. Sem movimento: os três pontos, parados. */
+/* The ellipsis of PENSANDO… (thinking), typed and erased in a cycle (the
+   owner's choice in the thinking-indicator previewer). The content lives in
+   ::after so the DOM does not change at every step; the real "…" sits in an
+   sr-only beside it. Reduced motion: the three dots, still. */
 .tic-pensando::after {
   content: "";
   animation: tic-pensando 1.8s steps(4, end) infinite;
@@ -1132,12 +1148,13 @@
   }
 }
 
-/* A marca animada do item pendente (`assistente/marca-animada.tsx`): três nós e
-   três arestas; o traço percorre n1 → n2 → n3 → n1 (um terço do ciclo de 2,4 s
-   cada) e acende o nó ao chegar; o conjunto respira. As arestas medem ~14
-   unidades: o dash de 4,5 com o offset indo de 4,5 a −15,5 (20 unidades) entra
-   e sai inteiro. Sem movimento: a marca inteira, parada — arestas sólidas, nós
-   acesos —, um quadro que informa, como o `.exec-activity`. */
+/* The pending item's animated mark (`assistente/marca-animada.tsx`): three
+   nodes and three edges; the stroke travels n1 → n2 → n3 → n1 (one third of
+   the 2.4 s cycle each) and lights the node on arrival; the whole thing
+   breathes. The edges measure ~14 units: the 4.5 dash with the offset going
+   from 4.5 to −15.5 (20 units) enters and exits whole. Reduced motion: the
+   whole mark, still — solid edges, lit nodes —, a frame that informs, like
+   `.exec-activity`. */
 .home-marca-anim { overflow: visible; }
 .home-marca-anim .respira {
   transform-origin: 12px 13px;
@@ -1212,13 +1229,14 @@
   .home-marca-anim .no { opacity: 1; }
 }
 
-/* ── Home: as animações das interações ──────────────────────────────────────
-   Poucas e curtas, todas no token `--home-dur` (que `prefers-reduced-motion`
-   zera) — menos o flash, de duração fixa, desligado à parte. */
+/* ── Home: the interaction animations ───────────────────────────────────────
+   Few and short, all on the `--home-dur` token (which `prefers-reduced-motion`
+   zeroes) — except the flash, with a fixed duration, turned off separately. */
 
-/* O envio: um anel terracota pisca na caixa. É um `::after` só de OPACIDADE — um
-   `box-shadow` não interpola entre listas de tamanhos diferentes, e a caixa tem
-   uma sombra por variante. O botão afunda pela classe (`active:scale-90`). */
+/* Sending: a terracotta ring flashes on the box. It is an OPACITY-only
+   `::after` — a `box-shadow` does not interpolate between lists of different
+   lengths, and the box has one shadow per variant. The button sinks via the
+   class (`active:scale-90`). */
 .home-barra-caixa { position: relative; }
 .home-barra-caixa::after {
   content: "";
@@ -1238,52 +1256,57 @@
   .home-barra-caixa[data-flash="true"]::after { animation: none; }
 }
 
-/* O realce do arraste de arquivos: a caixa é o ALVO VISUAL (a janela inteira é
-   quem aceita — ver `useArrasteDeArquivos`). Um anel terracota fixo, sem
-   animação, separado do `::after` do flash para os dois não brigarem pelo
-   mesmo pseudo — o flash é um pulso de 600 ms, este fica enquanto o arquivo
-   está no ar. O `.home` embrulha `--primary` na terracota da Home. */
+/* The file-drag highlight: the box is the VISUAL TARGET (the whole window is
+   what accepts — see `useArrasteDeArquivos`). A fixed terracotta ring, no
+   animation, separate from the flash's `::after` so the two don't fight over
+   the same pseudo — the flash is a 600 ms pulse, this one stays while the file
+   is in the air. `.home` wraps `--primary` in the Home terracotta. */
 .home-barra-caixa[data-arraste="true"] {
   box-shadow: 0 0 0 2px var(--primary), 0 10px 40px rgba(0, 0, 0, .6), 0 0 34px oklch(0.68 0.16 44 / .35);
   background-color: color-mix(in oklab, var(--background) 88%, var(--primary));
 }
 
-/* A gaveta (painel): o composer é o alvo, e ali não há caixa arredondada — o
-   realce é uma linha terracota na área de escrever. Escopado em `.home`: um
-   `form[data-arraste]` sem escopo valeria para qualquer form futuro do app. */
+/* The drawer (panel): the composer is the target, and there is no rounded box
+   there — the highlight is a terracotta line on the writing area. Scoped to
+   `.home`: an unscoped `form[data-arraste]` would apply to any future form in
+   the app. */
 .home [data-arraste="true"] { transition: box-shadow 160ms ease, border-color 160ms ease; }
 .home form[data-arraste="true"] { border-top-color: var(--primary); box-shadow: inset 0 2px 0 -1px var(--primary); }
 
-/* O cartão de camada pipoca ao chegar (a curva com sobressalto do previewer). */
+/* The layer card pops on arrival (the overshoot curve from the previewer). */
 .home-pop { animation: home-pop calc(var(--home-dur) * .36) cubic-bezier(.2, 1.2, .3, 1) both; }
 @keyframes home-pop {
   from { opacity: 0; transform: scale(.9); }
 }
 
-/* ── A vitrine do catálogo: as fitas de siglas da barra anônima ──────────────
-   Três faixas de pílulas deslizando sob as duas linhas de número, no grupo que
-   a Home mostra a quem ainda não entrou. Em 256px nenhuma lista estática cabe
-   com dezesseis órgãos e dez países; a fita cabe.
+/* ── The catalog showcase: the acronym tickers of the anonymous sidebar ──────
+   Three strips of pills sliding under the two lines of numbers, in the group
+   the Home shows to those who have not signed in yet. At 256px no static list
+   fits sixteen agencies and ten countries; the ticker fits.
 
-   O trilho leva o conteúdo DUPLICADO (o React renderiza a lista duas vezes, a
-   segunda `aria-hidden`) e anda até `-50%`: no fim do ciclo a segunda cópia
-   está exatamente onde a primeira começou, e o salto de volta a 0 não se vê.
-   É por isso que a duplicação é obrigatória — sem ela a emenda pisca.
+   The track carries the content DUPLICATED (React renders the list twice, the
+   second `aria-hidden`) and moves to `-50%`: at the end of the cycle the
+   second copy is exactly where the first one started, and the jump back to 0
+   is invisible. That is why the duplication is mandatory — without it the
+   seam flickers.
 
-   `width: max-content` para o trilho medir a soma das pílulas, não os 240px do
-   pai; `flex-shrink: 0` nelas para não serem espremidas nessa medida.
+   `width: max-content` so the track measures the sum of the pills, not the
+   parent's 240px; `flex-shrink: 0` on them so they are not squeezed in that
+   measurement.
 
-   A máscara apaga as pontas: sem ela as pílulas aparecem e somem cortadas na
-   borda, que é o que faz uma fita parecer defeito em vez de movimento.
+   The mask fades the ends: without it the pills appear and vanish clipped at
+   the edge, which is what makes a ticker look like a defect instead of motion.
 
-   As durações são DIFERENTES e sem relação inteira entre si (26s, 26s, 34s) —
-   com a mesma duração as três faixas reencontram o alinhamento a cada volta e
-   a coluna inteira pulsa junto, que chama mais atenção que o globo atrás.
+   The durations are DIFFERENT and have no integer ratio between them (26s,
+   26s, 34s) — with the same duration the three strips realign on every lap
+   and the whole column pulses together, which draws more attention than the
+   globe behind it.
 
-   Fixas, e não em `--home-dur`: aquele token é o compasso da transição do hero
-   (900ms) e zerá-lo aqui não é o que `prefers-reduced-motion` precisa — quem
-   pediu menos movimento quer a fita PARADA, com os nomes legíveis, não
-   instantânea. O bloco lá embaixo desliga a animação e o trilho fica em 0. */
+   Fixed, not on `--home-dur`: that token is the tempo of the hero transition
+   (900ms) and zeroing it here is not what `prefers-reduced-motion` needs —
+   whoever asked for less motion wants the ticker STOPPED, with readable names,
+   not instantaneous. The block further down turns the animation off and the
+   track stays at 0. */
 .home-fita {
   overflow: hidden;
   -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
@@ -1305,11 +1328,12 @@
   .home-fita-trilho { animation: none; }
 }
 
-/* A conversa expande para a lateral: a faixa desliza para a direita e apaga, a
-   barra apaga, o painel entra da direita. A HomeView segura a faixa e a barra
-   montadas por `SAIDA_MS` (`useSaida`) para a saída acontecer; sem movimento o
-   prazo é zero e nada disto tem duração. O `translateX(-50%)` da faixa é o
-   centro — tem de continuar no quadro final. */
+/* The conversation expands to the side: the strip slides right and fades, the
+   bar fades, the panel enters from the right. HomeView keeps the strip and
+   the bar mounted for `SAIDA_MS` (`useSaida`) so the exit can happen; with
+   reduced motion the delay is zero and none of this has a duration. The
+   strip's `translateX(-50%)` is the centering — it has to stay in the final
+   frame. */
 .home-pilha[data-saindo="true"] {
   animation: home-pilha-sai calc(var(--home-dur) * .33) var(--home-curva) both;
   pointer-events: none;
@@ -1329,7 +1353,7 @@
   from { opacity: 0; transform: translateX(24px); }
 }
 
-/* A linha de meta sob a caixa: a dica de digitação e o donut da cota. */
+/* The meta line under the box: the typing hint and the quota donut. */
 .home-barra-meta {
   position: absolute;
   right: 0;
@@ -1337,12 +1361,12 @@
   margin-top: 5px;
 }
 
-/* Chips (ou o status "Trabalhando…") logo abaixo da barra, sem deslocar o
-   centro. O margin-top salta a LINHA DE META (.home-barra-meta: a dica e o
-   donut da cota, ~21px sob a caixa): com 12px, um chip comprido alcançava o
-   canto direito e cobria o donut (bug visual apontado pelo dono em
-   2026-09-19). Os chips só existem no hero, então o afastamento não mexe no
-   rodapé. */
+/* Chips (or the "Trabalhando…" status) right below the bar, without shifting
+   the center. The margin-top skips the META LINE (.home-barra-meta: the hint
+   and the quota donut, ~21px below the box): with 12px, a long chip reached
+   the right corner and covered the donut (visual bug pointed out by the owner
+   on 2026-09-19). Chips only exist in the hero, so the spacing does not
+   affect the footer. */
 .home-chips {
   position: absolute;
   left: 50%;
@@ -1352,21 +1376,23 @@
   transform: translateX(-50%);
 }
 
-/* A faixa da conversa ao centro: colada à barra do rodapé, a legenda do globo.
-   Fixa: nada rola nem desliza — a pergunta cabe numa linha e a resposta corta
-   em 4 (`compacta` na Conversa); o teto abaixo é só segurança (cartões). A
-   faixa e cada item novo entram com um fade curto, na mesma curva e no mesmo
-   token de duração do hero, que `prefers-reduced-motion` zera. Não há saída:
-   o React desmonta, e o texto só troca. */
+/* The conversation strip at the center: attached to the footer bar, the
+   globe's caption. Fixed: nothing scrolls or slides — the question fits on
+   one line and the answer cuts off at 4 (`compacta` in Conversa); the ceiling
+   below is just a safeguard (cards). The strip and each new item enter with a
+   short fade, on the same curve and duration token as the hero, which
+   `prefers-reduced-motion` zeroes. There is no exit: React unmounts, and the
+   text just swaps. */
 .home-pilha {
   position: absolute;
   left: 50%;
-  /* A faixa é ancorada acima da caixa (44px). `--folga-extras` é a altura, MEDIDA
-     na barra, dos chips de anexo/convite/aviso de recusados que crescem acima da
-     caixa — sem ela a barra (z-30) pintaria por cima do "Expandir" daqui (z-25),
-     o mesmo bug do pill de cota. Zero quando não há anexo. */
+  /* The strip is anchored above the box (44px). `--folga-extras` is the
+     height, MEASURED on the bar, of the attachment/invitation/rejected-notice
+     chips that grow above the box — without it the bar (z-30) would paint
+     over this "Expandir" (expand) (z-25), the same bug as the quota pill.
+     Zero when there is no attachment. */
   bottom: calc(24px + 44px + 4px + var(--folga-extras, 0px));
-  --folga-do-aviso-de-cota: 32px; /* o pill âmbar (~26px) + a margem dele */
+  --folga-do-aviso-de-cota: 32px; /* the amber pill (~26px) + its margin */
   z-index: 25;
   width: min(560px, calc(100% - 2rem));
   transform: translateX(-50%);
@@ -1378,14 +1404,15 @@
   box-shadow: 0 -12px 32px rgba(0, 0, 0, .35);
   animation: home-pilha-entra calc(var(--home-dur) * .35) var(--home-curva) both;
 }
-/* Cota estourada: a barra cresce para cima com o pill âmbar (ela tem z-index
-   maior) e cobria o rodapé da faixa — o "Expandir" sumia sob o aviso (bug
-   apontado pelo dono em 2026-09-19). A faixa sobe a altura do pill. */
+/* Quota exceeded: the bar grows upward with the amber pill (it has a higher
+   z-index) and covered the strip's footer — "Expandir" vanished under the
+   notice (bug pointed out by the owner on 2026-09-19). The strip moves up by
+   the pill's height. */
 .home-pilha[data-aviso-de-cota="true"] {
   bottom: calc(24px + 44px + 4px + var(--folga-extras, 0px) + var(--folga-do-aviso-de-cota));
 }
 @media (max-width: 767px) {
-  /* No telefone o texto do pill quebra em duas linhas. */
+  /* On the phone the pill's text wraps onto two lines. */
   .home-pilha[data-aviso-de-cota="true"] {
     --folga-do-aviso-de-cota: 52px;
   }
@@ -1422,72 +1449,74 @@
   * {
     @apply border-border outline-ring/50;
   }
-  /* A calha da barra de rolagem fica reservada SEMPRE, inclusive nas rotas que
-     não rolam. Sem isto, sair de uma listagem (que rola) para o canvas do
-     workflow (que não rola) faz a barra sumir e devolver a largura dela ao
-     conteúdo: `PageRoot` centraliza dentro de `max-w-6xl`, então TUDO na tela
-     desliza meia-barra no instante da troca — a "mexida" que sobrou depois de
-     o scroll voltar do body para o viewport (ver `overflow-x` em `body`).
+  /* The scrollbar gutter is ALWAYS reserved, including on routes that do not
+     scroll. Without this, going from a listing (which scrolls) to the workflow
+     canvas (which does not) makes the bar disappear and give its width back
+     to the content: `PageRoot` centers inside `max-w-6xl`, so EVERYTHING on
+     screen shifts by half a bar at the moment of the switch — the "jiggle"
+     that was left after scrolling moved back from the body to the viewport
+     (see `overflow-x` on `body`).
 
-     Declarada nos dois elementos de propósito: a propagação para o viewport sai
-     do elemento que define o overflow do viewport, e aqui esse elemento é o
-     BODY (o `html` tem overflow `visible`). No `body` a regra não tem efeito
-     próprio — `clip` não cria container de rolagem —, só é propagada. Em
-     plataformas de barra sobreposta (macOS, telefone) a calha é zero e nada
-     muda. */
+     Declared on both elements on purpose: propagation to the viewport comes
+     from the element that defines the viewport's overflow, and here that
+     element is the BODY (`html` has overflow `visible`). On `body` the rule has
+     no effect of its own — `clip` does not create a scroll container —, it is
+     only propagated. On overlay-scrollbar platforms (macOS, phone) the gutter
+     is zero and nothing changes. */
   html,
   body {
     scrollbar-gutter: stable;
   }
   body {
     @apply bg-background text-foreground;
-    /* Fade suave entre temas light/dark — evita flash brusco no toggle. */
+    /* Smooth fade between light/dark themes — avoids a harsh flash on toggle. */
     transition: background-color 200ms ease-in-out, color 200ms ease-in-out;
-    /* Um único elemento vazando a viewport dá rolagem lateral na página
-       INTEIRA, e no telefone isso lê como layout quebrado. Conter aqui evita
-       caçar o culpado a cada tela nova; quem precisa rolar na horizontal
-       declara o próprio `overflow-x: auto`.
+    /* A single element overflowing the viewport gives sideways scrolling to
+       the WHOLE page, and on a phone that reads as a broken layout. Containing
+       it here avoids hunting down the culprit on every new screen; whatever
+       needs horizontal scrolling declares its own `overflow-x: auto`.
 
-       `clip` e NÃO `hidden`: quando um eixo do overflow deixa de ser
-       `visible`, o outro computa `visible` para `auto`. Com `hidden` aqui, o
-       `overflow-y` do body virava `auto` e o BODY passava a ser o container de
-       rolagem, em vez de propagar o scroll para o viewport como o `min-h-svh`
-       do SidebarProvider espera. A barra passava a ser desenhada dentro do
-       body, e a largura do conteúdo saltava ao ir de uma rota que rola (as
-       listagens) para uma que não rola (o canvas) — era a "tremida" ao abrir
-       um workflow. `clip` corta o transbordo sem criar container de rolagem e
-       sem mexer no outro eixo, que é o que se queria desde o começo. */
+       `clip` and NOT `hidden`: when one overflow axis stops being `visible`,
+       the other computes `visible` as `auto`. With `hidden` here, the body's
+       `overflow-y` became `auto` and the BODY became the scroll container,
+       instead of propagating scrolling to the viewport as the SidebarProvider's
+       `min-h-svh` expects. The bar was then drawn inside the body, and the
+       content width jumped when going from a route that scrolls (the listings)
+       to one that does not (the canvas) — that was the "shake" when opening a
+       workflow. `clip` cuts the overflow without creating a scroll container
+       and without touching the other axis, which is what was wanted from the
+       start. */
     overflow-x: clip;
   }
 
-  /* ── Arrasto da janela no app desktop ──────────────────────────────────────
-     Dentro do Electron, o preload da janela web marca o <html> com
-     data-atlans-desktop (ver desktop/src/preload/web.ts). A janela não tem
-     barra de título, então os headers do topo (o da sidebar e o AppHeader)
-     viram a região de arrasto da janela, e os controles dentro deles recebem
-     no-drag para continuarem clicáveis. No navegador comum o atributo não
-     existe e nada disto se aplica. */
+  /* ── Window dragging in the desktop app ────────────────────────────────────
+     Inside Electron, the web window's preload marks <html> with
+     data-atlans-desktop (see desktop/src/preload/web.ts). The window has no
+     title bar, so the top headers (the sidebar's and AppHeader) become the
+     window's drag region, and the controls inside them get no-drag so they
+     stay clickable. In a regular browser the attribute does not exist and
+     none of this applies. */
   :root[data-atlans-desktop] .app-region-drag { -webkit-app-region: drag; }
   :root[data-atlans-desktop] .app-region-no-drag { -webkit-app-region: no-drag; }
 
-  /* O flash cinza-azulado do toque no Android aparece sobre CADA elemento
-     interativo e não combina com nenhum estado do design system — que já tem
-     `active:` e `focus-visible:` próprios. */
+  /* Android's blue-gray tap flash appears over EVERY interactive element and
+     matches no design system state — which already has its own `active:` and
+     `focus-visible:`. */
   * {
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Campos com fonte menor que 16px fazem o Safari do iOS dar zoom sozinho ao
-     focar, e o usuário fica preso num viewport ampliado. Vale só para ponteiro
-     grosso: no desktop o `text-sm` dos inputs é proposital. */
+  /* Fields with a font smaller than 16px make iOS Safari zoom in on its own on
+     focus, and the user gets stuck in a magnified viewport. Applies only to a
+     coarse pointer: on desktop the inputs' `text-sm` is intentional. */
   @media (pointer: coarse) {
     input, select, textarea {
       font-size: max(16px, 1em);
     }
   }
 
-  /* View Transitions API — transição suave entre rotas (Next.js App Router).
-     O runtime ignora em navegadores sem suporte. */
+  /* View Transitions API — smooth transition between routes (Next.js App Router).
+     The runtime ignores it in browsers without support. */
   @supports (view-transition-name: auto) {
     ::view-transition-old(root),
     ::view-transition-new(root) {
@@ -1539,9 +1568,9 @@
   scrollbar-color: color-mix(in oklch, var(--muted-foreground) 25%, transparent) transparent;
 }
 
-/* Trilhas que rolam mas não devem anunciar a barra — tab-bars, faixas de chips.
-   A barra global tem 6px e assenta rente à borda inferior da trilha, onde lê
-   como um traço solto abaixo do conteúdo, não como controle. */
+/* Tracks that scroll but should not announce the bar — tab bars, chip strips.
+   The global bar is 6px and sits flush with the track's bottom edge, where it
+   reads as a stray line below the content, not as a control. */
 .no-scrollbar {
   scrollbar-width: none;
 }
@@ -1549,10 +1578,11 @@
   display: none;
 }
 
-/* ── Painel de execução ──────────────────────────────────────────────────────
-   Destaque do nó correspondente à linha sob o cursor no painel. Aplicado
-   imperativamente na classe do elemento (ver useCanvasHoverHighlight) em vez de
-   via setNodes: mexer no array de nós a cada hover re-renderizaria o grafo. */
+/* ── Execution panel ─────────────────────────────────────────────────────────
+   Highlight of the node matching the row under the cursor in the panel.
+   Applied imperatively to the element's class (see useCanvasHoverHighlight)
+   instead of via setNodes: touching the node array on every hover would
+   re-render the graph. */
 .react-flow__node.run-panel-hover {
   outline: 2px solid var(--primary);
   outline-offset: 4px;
@@ -1560,44 +1590,44 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Movimento reduzido
+   Reduced motion
 
-   Nenhuma animação do canvas é decorativa — todas codificam estado. Então
-   nenhuma simplesmente some: cada uma é congelada no quadro que carrega a
-   informação. `animation: none` cego apagaria a diferença entre "rodando" e
-   "ainda não rodou", que é justamente o que o usuário precisa ler.
+   No canvas animation is decorative — they all encode state. So none simply
+   disappears: each one is frozen on the frame that carries the information.
+   A blind `animation: none` would erase the difference between "running" and
+   "not run yet", which is precisely what the user needs to read.
 
-   Transições de cor e opacidade ficam: não deslocam nada na tela, e são o que
-   evita o jumpcut entre estados.
+   Color and opacity transitions stay: they do not move anything on screen,
+   and they are what prevents the jump cut between states.
    ═══════════════════════════════════════════════════════════════════════════ */
 @media (prefers-reduced-motion: reduce) {
 
-  /* `!important` porque `animation` também é declarada nas regras de estado,
-     todas unlayered e de mesma especificidade — sem ele este bloco teria de
-     ficar obrigatoriamente no fim do arquivo para sempre. */
+  /* `!important` because `animation` is also declared in the state rules, all
+     unlayered and of the same specificity — without it this block would have
+     to stay at the end of the file forever. */
   .exec-card::before,
   .exec-card::after {
     animation: none !important;
     transform: none !important;
   }
 
-  /* Congelados no pico de cada estado. */
+  /* Frozen at the peak of each state. */
   .exec-card[data-status="started"]::before   { opacity: 1; }
   .exec-card[data-status="failed"]::before    { opacity: 0.75; }
   .exec-card[data-status="unknown"]::before   { opacity: 0.55; }
   .exec-card[data-status="completed"]::before { opacity: 0; }
   .exec-card[data-pending="true"]::before     { opacity: 0.28; }
 
-  /* Sem o brilho de chegada, o nó novo é marcado por um anel — que o
-     `useEffect` de 2.5s remove junto com o atributo. */
+  /* Without the arrival glow, the new node is marked by a ring — which the
+     2.5s `useEffect` removes along with the attribute. */
   .exec-card[data-new="true"]::after {
     outline: 2px solid var(--exec-success);
     opacity: 1;
   }
 
-  /* A marcha da aresta vira TEXTURA: um tracejado parado ainda separa "ativa"
-     de "parada", e ganha espessura para compensar o movimento que não existe.
-     A camada miúda sai de cena — parada, ela só suja a linha. */
+  /* The edge's march becomes TEXTURE: a still dash pattern still separates
+     "active" from "idle", and gains width to make up for the missing motion.
+     The fine layer leaves the stage — still, it only muddies the line. */
   .edge-flow-fast { animation: none; stroke-opacity: 0; }
   .edge-flow-slow {
     animation: none;
@@ -1613,21 +1643,21 @@
   }
   .edge-glow-pulse { animation: none; stroke-opacity: 0.16; }
 
-  /* O anel e o halo já dizem "executando", então o glifo pode parar. Escopo em
-     `.react-flow__node` de propósito: o spinner do botão Executar é o feedback
-     de um clique e continua girando. */
+  /* The ring and the halo already say "running", so the glyph can stop. Scoped
+     to `.react-flow__node` on purpose: the Run button's spinner is click
+     feedback and keeps spinning. */
   .react-flow__node .animate-spin { animation: none; }
 
-  /* As barras param em alturas DESIGUAIS. Congelá-las em `scaleY(1)` daria um
-     bloco sólido, que não lê como atividade nenhuma — o perfil irregular é o
-     que sobrevive à ausência de movimento. */
+  /* The bars stop at UNEVEN heights. Freezing them at `scaleY(1)` would give a
+     solid block, which reads as no activity at all — the irregular profile is
+     what survives the absence of motion. */
   .exec-activity rect { animation: none; }
   .exec-activity rect:nth-child(1) { transform: scaleY(0.45); }
   .exec-activity rect:nth-child(2) { transform: scaleY(0.85); }
   .exec-activity rect:nth-child(3) { transform: scaleY(0.60); }
   .exec-activity rect:nth-child(4) { transform: scaleY(1); }
 
-  /* Toques de entrada: só não tocam. O ícone fica no lugar e opaco. */
+  /* Entrance cues: they simply don't play. The icon stays in place and opaque. */
   .cache-hit-pulse,
   .pin-hit-pulse {
     animation: none;
@@ -1646,32 +1676,32 @@
     background-position: 0 0;
   }
 
-  /* O fluxo de espera para: ficam os três nós e as ligações, sem o pacote — o
-     texto "Carregando workflow…" continua dizendo o que acontece. O grafo entra
-     sem fade. */
+  /* The waiting flow stops: the three nodes and the connections remain, without
+     the packet — the "Carregando workflow…" (loading workflow) text still says
+     what is happening. The graph enters without a fade. */
   .canvas-carregando .no { animation: none; }
   .canvas-carregando .pk { display: none; }
   .react-flow.rf-revelando .react-flow__viewport { animation: none; }
 }
 
-/* ── A entrada do que o assistente desenha ──────────────────────────────────────
-   O assistente monta o fluxo passo a passo, e sem transicao os nos simplesmente
-   PISCAM na tela: a pessoa ve o resultado, nao a montagem. A animacao e curta
-   de proposito — ela existe para o olho acompanhar de onde veio cada no, nao
-   para ser vista.
+/* ── The entrance of what the assistant draws ───────────────────────────────────
+   The assistant builds the workflow step by step, and without a transition the
+   nodes simply BLINK onto the screen: the person sees the result, not the
+   assembly. The animation is short on purpose — it exists so the eye can follow
+   where each node came from, not to be watched.
 
-   So o que chegou AGORA anima: `aplicar-proposta.ts` devolve os ids novos, e o
-   canvas poe a classe so neles. Animar o fluxo inteiro a cada no acrescentado
-   faria a tela piscar por completo doze vezes seguidas.
+   Only what arrived NOW animates: `aplicar-proposta.ts` returns the new ids,
+   and the canvas puts the class only on them. Animating the whole workflow on
+   every added node would make the entire screen blink twelve times in a row.
 
-   `prefers-reduced-motion` desliga as duas: quem pediu menos movimento
-   continua vendo o fluxo aparecer, sem o movimento. */
-/* O no ASSENTA, e nao estoura. A curva nao ultrapassa 1 de proposito: um
-   overshoot (o `cubic-bezier(.34,1.26,.64,1)` que estava aqui) faz o no crescer
-   alem do tamanho final e voltar, e doze desses em sequencia leem como sobressalto.
-   E a escala parte de 0.96 e nao de 0.88 — o salto de tamanho era metade do que
-   se sentia como brusco. Mais longa e mais mansa: o que se quer mostrar e o
-   fluxo sendo montado, nao cada peca chegando. */
+   `prefers-reduced-motion` turns both off: whoever asked for less motion
+   still sees the workflow appear, without the motion. */
+/* The node SETTLES, it does not burst. The curve does not exceed 1 on purpose:
+   an overshoot (the `cubic-bezier(.34,1.26,.64,1)` that was here) makes the
+   node grow past its final size and come back, and twelve of those in a row
+   read as a jolt. And the scale starts at 0.96, not 0.88 — the size jump was
+   half of what felt abrupt. Longer and gentler: what we want to show is the
+   workflow being assembled, not each piece arriving. */
 @keyframes assistente-no-entrando {
   from { opacity: 0; transform: scale(0.96); }
   to   { opacity: 1; transform: scale(1); }
@@ -1681,18 +1711,18 @@
   animation: assistente-no-entrando 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* A aresta APARECE, e nao se desenha — e a correcao de um defeito, nao gosto.
-   O que estava aqui era `stroke-dasharray: 1000` com o offset indo de 1000 a 0.
-   Para um caminho de comprimento L, o traco so cobre o caminho inteiro quando o
-   offset chega a 1000-L: numa aresta tipica de 150px isso e 85% do percurso, e
-   com `ease-out` (rapido no comeco) o desenho TERMINAVA em 26ms dos 500ms. Os
-   outros 473ms nao mudavam pixel nenhum. O efeito era um flash seguido de
-   imobilidade, que e exatamente o que se sentia como brusco.
+/* The edge APPEARS, it is not drawn — and this fixes a defect, not a taste.
+   What was here was `stroke-dasharray: 1000` with the offset going from 1000 to 0.
+   For a path of length L, the dash only covers the whole path once the offset
+   reaches 1000-L: on a typical 150px edge that is 85% of the way, and with
+   `ease-out` (fast at the start) the drawing FINISHED within 26ms of the 500ms.
+   The other 473ms changed no pixel at all. The effect was a flash followed by
+   stillness, which is exactly what felt abrupt.
 
-   O truque do dash so funciona quando o dasharray casa com o comprimento do
-   caminho, e CSS nao mede caminho. Uma abertura por opacidade independe do
-   comprimento e vale para qualquer aresta. O atraso de 0.12s faz a ligacao
-   chegar DEPOIS dos nos que ela liga — que e a leitura que o tracado buscava. */
+   The dash trick only works when the dasharray matches the path length, and
+   CSS does not measure paths. An opacity reveal does not depend on length and
+   works for any edge. The 0.12s delay makes the connection arrive AFTER the
+   nodes it connects — which is the reading the drawing was going for. */
 @keyframes assistente-aresta-entrando {
   from { opacity: 0; }
   to   { opacity: 1; }

@@ -1,15 +1,15 @@
 // web/app/components/home/assistente/quadros.ts
 //
-// Os quadros do assistente: decodificar o `text/event-stream` e transformar cada
-// quadro na conversa que o painel desenha.
+// The assistant's frames: decoding the `text/event-stream` and turning each
+// frame into the conversation the panel draws.
 //
-// Puras de propósito. O defeito clássico de quem lê stream é o quadro PARTIDO
-// AO MEIO entre dois `read()` — a rede não respeita fronteira de mensagem, e um
-// `JSON.parse` em cima de meio quadro derruba a conversa inteira. Isso precisa
-// de teste, e testar por dentro de um `fetch` de mentira dentro de um hook
-// dentro de um componente é a maneira mais cara de não olhar para o problema.
+// Pure on purpose. The classic bug of stream readers is the frame SPLIT IN
+// HALF between two `read()` calls — the network does not respect message
+// boundaries, and a `JSON.parse` on half a frame takes down the whole
+// conversation. That needs tests, and testing it through a fake `fetch` inside
+// a hook inside a component is the most expensive way of not looking at the problem.
 //
-// O contrato dos quadros está em `docs/assistente/editor.md` §"Os quadros do SSE".
+// The frame contract is in `docs/assistente/editor.md` §"The SSE frames".
 import type { CanvasDefinition } from "@/service/types"
 
 export interface QuadroSSE {
@@ -18,17 +18,17 @@ export interface QuadroSSE {
 }
 
 /**
- * Decodificador de quadros SSE, com memória do que sobrou do pedaço anterior.
+ * SSE frame decoder, remembering what was left over from the previous chunk.
  *
- * Devolve os quadros COMPLETOS de cada alimentada e guarda o resto — que pode
- * ser meia linha, meio quadro, ou dez quadros e meio.
+ * Returns the COMPLETE frames of each feed and keeps the rest — which may be
+ * half a line, half a frame, or ten and a half frames.
  */
 /**
- * O quadro `cota` — o acumulado da janela depois de cada resposta do modelo,
- * com o teto. Não é bloco de turno: os hooks o interceptam antes de
- * `aplicarQuadro` e atualizam o `estado.cota`, e é assim que o donut sobe
- * DURANTE o turno, sem consultar `/estado`. O servidor só o emite quando há
- * Redis para contar; um quadro malformado vale como nenhum.
+ * The `cota` frame — the window's running total after each model response,
+ * with the ceiling. It is not a turn block: the hooks intercept it before
+ * `aplicarQuadro` and update `estado.cota`, and that is how the donut rises
+ * DURING the turn, without querying `/estado`. The server only emits it when
+ * there is Redis to count; a malformed frame counts as none.
  */
 export function cotaDoQuadro(quadro: QuadroSSE): { gasto: number; teto: number } | null {
   if (quadro.evento !== "cota") return null
@@ -42,9 +42,9 @@ export function criarDecodificador() {
   let resto = ""
 
   return function alimentar(pedaco: string): QuadroSSE[] {
-    // Normaliza no acumulado, e não no pedaço: um `\r\n` cortado no meio (o
-    // `\r` num pedaço, o `\n` no seguinte) só vira fim de linha depois de
-    // juntar os dois.
+    // Normalize on the accumulated buffer, not on the chunk: a `\r\n` cut in the
+    // middle (the `\r` in one chunk, the `\n` in the next) only becomes a line
+    // ending after the two are joined.
     resto = (resto + pedaco).replace(/\r\n/g, "\n")
 
     const partes = resto.split("\n\n")
@@ -59,7 +59,7 @@ function decodificarUm(bruto: string): QuadroSSE | null {
   const dados: string[] = []
 
   for (const linha of bruto.split("\n")) {
-    if (!linha || linha.startsWith(":")) continue // linha vazia ou comentário (heartbeat)
+    if (!linha || linha.startsWith(":")) continue // empty line or comment (heartbeat)
 
     const corte = linha.indexOf(":")
     const campo = corte === -1 ? linha : linha.slice(0, corte)
@@ -74,9 +74,10 @@ function decodificarUm(bruto: string): QuadroSSE | null {
 
   try {
     const corpo: unknown = JSON.parse(dados.join("\n"))
-    // Quadro sem objeto no `data` não é quadro deste servidor. Descartar é
-    // melhor que inventar um evento para ele: o fim da conversa não depende do
-    // quadro `fim` chegar — quem encerra é o fechamento do stream.
+    // A frame without an object in `data` is not a frame from this server.
+    // Discarding is better than inventing an event for it: the end of the
+    // conversation does not depend on the `fim` frame arriving — what ends it is
+    // the stream closing.
     if (!corpo || typeof corpo !== "object" || Array.isArray(corpo)) return null
     return { evento, dados: corpo as Record<string, unknown> }
   } catch {
@@ -90,7 +91,7 @@ export interface ErroDoAssistente {
   code: string
   message: string
   hint?: string
-  /** No `loop_limit`: o teto de voltas da superfície (a frase traduzida o cita). */
+  /** On `loop_limit`: the surface's round ceiling (the translated sentence cites it). */
   teto?: number
 }
 
@@ -99,17 +100,17 @@ export interface PropostaDeFluxo {
   nos: number
   arestas: number
   /**
-   * `true` quando veio de `desenhar_no_canvas`: é para pôr na tela AGORA, sem
-   * botão. `false`/ausente quando veio de `validate_workflow`, que só traz o
-   * veredito do que já está desenhado.
+   * `true` when it came from `desenhar_no_canvas`: it is meant to go on screen
+   * NOW, without a button. `false`/absent when it came from `validate_workflow`,
+   * which only brings the verdict on what is already drawn.
    *
-   * A distinção existe porque o mesmo quadro serve a dois papéis desde que
-   * entregar deixou de ser efeito colateral de validar.
+   * The distinction exists because the same frame serves two roles ever since
+   * delivering stopped being a side effect of validating.
    */
   desenhar?: boolean
-  /** Uma linha do modelo sobre o que mudou neste desenho. */
+  /** One line from the model about what changed in this drawing. */
   nota?: string
-  /** `null` quando o relatório da validação não pôde ser lido. */
+  /** `null` when the validation report could not be read. */
   ok: boolean | null
   erros: number | null
   avisos: number | null
@@ -121,16 +122,16 @@ export interface Progresso {
   mensagem: string | null
 }
 
-// ── Quadros só do assistente da Home ─────────────────────────────────────────
-// O editor nunca os emite; são aditivos e o painel do editor os ignora.
+// ── Frames only from the Home assistant ──────────────────────────────────────
+// The editor never emits them; they are additive and the editor panel ignores them.
 
-/** Um fluxo que o assistente criou — o badge junto do chat abre `/workflow/{id}`. */
+/** A workflow the assistant created — the badge next to the chat opens `/workflow/{id}`. */
 export interface FluxoDoAssistente {
   workflow_id: string
   nome: string
 }
 
-/** Ponteiro para uma saída no globo; a verdade é `GET /assistente/camadas/{id}`. */
+/** Pointer to an output on the globe; the source of truth is `GET /assistente/camadas/{id}`. */
 export interface CamadaDoAssistente {
   artifact_id: string
   nome?: string
@@ -139,7 +140,7 @@ export interface CamadaDoAssistente {
   hint?: string
 }
 
-/** Uma ação que mexe no que já existia, esperando o clique de confirmação. */
+/** An action that touches what already existed, waiting for the confirmation click. */
 export interface ConfirmacaoDoAssistente {
   tool_use_id: string
   token: string
@@ -161,16 +162,16 @@ export type BlocoDoAssistente =
   | { tipo: "fluxo"; fluxo: FluxoDoAssistente }
   | { tipo: "camada"; camada: CamadaDoAssistente }
   | { tipo: "confirmacao"; confirmacao: ConfirmacaoDoAssistente }
-  // Respostas rápidas do assistente da Home: continuações curtas que a pessoa
-  // escolhe com um clique. Valem só para aquela vez — quem as desenha só o faz
-  // no último turno, fora do stream.
+  // Quick replies from the Home assistant: short continuations the person picks
+  // with a click. They hold only for that one time — whoever draws them only
+  // does so on the last turn, outside the stream.
   | { tipo: "respostas_rapidas"; opcoes: string[] }
   | { tipo: "erro"; erro: ErroDoAssistente }
 
 export interface TurnoDoAssistente {
   id: string
   papel: "user" | "assistant"
-  /** Só para `papel: "user"`. O turno do modelo é uma lista de blocos. */
+  /** Only for `papel: "user"`. The model turn is a list of blocks. */
   texto?: string
   blocos: BlocoDoAssistente[]
 }
@@ -182,16 +183,16 @@ export const turnoVazio = (id: string): TurnoDoAssistente => ({
 })
 
 /**
- * Aplica um quadro ao turno em andamento e devolve o turno novo.
+ * Applies a frame to the turn in progress and returns the new turn.
  *
- * Imutável: o painel re-renderiza por identidade, e mutar o turno no lugar
- * faria o React não ver mudança nenhuma num stream inteiro.
+ * Immutable: the panel re-renders by identity, and mutating the turn in place
+ * would make React see no change at all across a whole stream.
  *
- * Os blocos são uma LINHA DO TEMPO, e não campos separados, porque o modelo
- * alterna: pensa, escreve, chama três ferramentas, escreve de novo. Guardar o
- * texto todo num campo só perderia o que veio antes e o que veio depois de cada
- * chamada — que é justamente a explicação que impede alguém de aplicar um fluxo
- * sem entender.
+ * The blocks are a TIMELINE, not separate fields, because the model
+ * alternates: it thinks, writes, calls three tools, writes again. Keeping all
+ * the text in a single field would lose what came before and after each call —
+ * which is precisely the explanation that keeps someone from applying a workflow
+ * without understanding it.
  */
 export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): TurnoDoAssistente {
   const { evento, dados } = quadro
@@ -219,10 +220,10 @@ export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): Turn
       }
 
     case "progresso": {
-      // Com as ferramentas de uma volta rodando em paralelo, várias estão
-      // "correndo" ao mesmo tempo — o quadro traz o `id` da dona e é por ele
-      // que a barra acha o card certo. Sem `id` (backend antigo, replay de
-      // conversa gravada antes), vale o critério de sempre: a que está correndo.
+      // With a round's tools running in parallel, several are "running" at the
+      // same time — the frame carries the owner's `id` and that is how the bar
+      // finds the right card. Without an `id` (old backend, replay of a
+      // conversation recorded earlier), the usual criterion applies: the one running.
       const dono = dados.id == null ? null : String(dados.id)
       return {
         ...turno,
@@ -312,9 +313,9 @@ export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): Turn
       }
 
     case "respostas_rapidas": {
-      // Sem opção válida não há bloco: um grupo vazio de chips seria um buraco
-      // na resposta. A limpeza espelha a do servidor (sem pontas, sem repetida,
-      // três no máximo) — defesa em profundidade, não a regra.
+      // Without a valid option there is no block: an empty group of chips would be
+      // a hole in the answer. The cleanup mirrors the server's (trimmed, no
+      // duplicates, three at most) — defense in depth, not the rule.
       const opcoes = textos(dados.opcoes)
       if (!opcoes.length) return turno
       return { ...turno, blocos: [...turno.blocos, { tipo: "respostas_rapidas", opcoes }] }
@@ -340,22 +341,22 @@ export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): Turn
     case "fim":
       return {
         ...turno,
-        // O `fim` fecha as ferramentas que ficaram em aberto. O turno pode ter
-        // terminado no meio de uma (teto de voltas, aba fechada, modelo fora do
-        // ar), e um passo girando para sempre mentiria sobre o que aconteceu.
+        // The `fim` closes the tools left open. The turn may have ended in the
+        // middle of one (round ceiling, tab closed, model down), and a step
+        // spinning forever would lie about what happened.
         blocos: turno.blocos.map(b =>
           b.tipo === "ferramenta" && b.estado === "correndo" ? { ...b, estado: "erro" } : b,
         ),
       }
 
     default:
-      // Quadro de um servidor mais novo. Ignorar é o comportamento certo: o
-      // painel velho continua funcionando em vez de quebrar na atualização.
+      // A frame from a newer server. Ignoring it is the right behavior: the old
+      // panel keeps working instead of breaking on the upgrade.
       return turno
   }
 }
 
-/** Texto que chega em pedaços vira UM bloco, e não um bloco por delta. */
+/** Text that arrives in chunks becomes ONE block, not one block per delta. */
 function acumular(
   blocos: BlocoDoAssistente[],
   tipo: "texto" | "pensando",
@@ -370,7 +371,7 @@ function acumular(
   return [...blocos, { tipo, texto: novo }]
 }
 
-/** Aplica `mudar` à ÚLTIMA ferramenta que casa com `casa`. */
+/** Applies `mudar` to the LAST tool that matches `casa`. */
 function mapearFerramenta(
   blocos: BlocoDoAssistente[],
   casa: (b: Extract<BlocoDoAssistente, { tipo: "ferramenta" }>) => boolean,
@@ -392,7 +393,7 @@ const texto = (v: unknown): string => (typeof v === "string" ? v : "")
 const objeto = (v: unknown): Record<string, unknown> =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
 
-/** Uma lista de frases: só strings, sem pontas, sem vazias nem repetidas, `teto` no máximo. */
+/** A list of sentences: strings only, trimmed, no empty or repeated ones, `teto` at most. */
 const textos = (v: unknown, teto = 3): string[] => {
   if (!Array.isArray(v)) return []
   const lista: string[] = []
@@ -404,7 +405,7 @@ const textos = (v: unknown, teto = 3): string[] => {
   return lista
 }
 
-/** Extrai a confirmação do quadro: token e a ação (tool + args resumidos + alvo). */
+/** Extracts the confirmation from the frame: token and the action (tool + summarized args + target). */
 function confirmacaoDe(dados: Record<string, unknown>): ConfirmacaoDoAssistente {
   const acao = objeto(dados.acao)
   return {

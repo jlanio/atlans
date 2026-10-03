@@ -1,28 +1,28 @@
 import { create } from 'zustand'
 
-/** Degraus de detalhe. Quanto mais afastado o zoom, menos informação na tela. */
+/** Detail tiers. The further out the zoom, the less information on screen. */
 export type LodTier = 'far' | 'mid' | 'near'
 
-/** Origem do realce: `hover` é transitório, `pin` sobrevive ao mouse sair. */
+/** Highlight origin: `hover` is transient, `pin` survives the mouse leaving. */
 export type FocusOrigin = 'hover' | 'pin'
 
 const EMPTY: ReadonlySet<string> = new Set()
 
-/** Estado visual do canvas — realce de caminho e nível de detalhe por zoom.
+/** Visual state of the canvas — path highlight and zoom-based detail level.
  *
- * As duas coisas moram na mesma store porque são consumidas pelos mesmos dois
- * lugares: a camada que escreve o CSS (`canvas-view-layer.tsx`) e a toolbar.
+ * Both live in the same store because they are consumed by the same two
+ * places: the layer that writes the CSS (`canvas-view-layer.tsx`) and the toolbar.
  *
- * Note que os conjuntos chegam prontos: o cálculo do caminho vive em
- * `useCanvasFocus`, que tem acesso às arestas. A store só guarda o resultado.
+ * Note that the sets arrive ready-made: the path computation lives in
+ * `useCanvasFocus`, which has access to the edges. The store only keeps the result.
  */
 interface CanvasViewState {
-  /** Preferência do usuário — desliga o realce por hover por completo. */
+  /** User preference — turns off hover highlighting completely. */
   focusEnabled: boolean
-  /** Nó âncora do realce. `null` = nenhum realce ativo. */
+  /** Anchor node of the highlight. `null` = no active highlight. */
   focusNodeId: string | null
   focusOrigin: FocusOrigin | null
-  /** Ancestrais ∪ âncora ∪ descendentes. */
+  /** Ancestors ∪ anchor ∪ descendants. */
   focusNodeIds: ReadonlySet<string>
   focusEdgeIds: ReadonlySet<string>
   lod: LodTier
@@ -32,10 +32,10 @@ interface CanvasViewActions {
   setFocusEnabled(v: boolean): void
   toggleFocusEnabled(): void
   applyFocus(nodeId: string, origin: FocusOrigin, nodes: Set<string>, edges: Set<string>): void
-  /** `clearFocus('hover')` é ignorado enquanto houver um pin ativo. */
+  /** `clearFocus('hover')` is ignored while there is an active pin. */
   clearFocus(origin?: FocusOrigin): void
   setLod(lod: LodTier): void
-  /** Zera o estado por-workflow ao trocar de canvas. */
+  /** Resets the per-workflow state when switching canvas. */
   resetView(): void
 }
 
@@ -50,7 +50,7 @@ export const useCanvasViewStore = create<CanvasViewState & CanvasViewActions>((s
   setFocusEnabled: (focusEnabled) => set(
     focusEnabled
       ? { focusEnabled }
-      // Desligar precisa apagar o realce corrente, senão ele congela na tela.
+      // Turning off must clear the current highlight, otherwise it freezes on screen.
       : { focusEnabled, focusNodeId: null, focusOrigin: null, focusNodeIds: EMPTY, focusEdgeIds: EMPTY }
   ),
 
@@ -62,7 +62,7 @@ export const useCanvasViewStore = create<CanvasViewState & CanvasViewActions>((s
   },
 
   clearFocus: (origin) => {
-    // O pin é deliberado; passar o mouse por fora dele não deve apagá-lo.
+    // The pin is deliberate; moving the mouse outside it must not clear it.
     if (origin === 'hover' && get().focusOrigin === 'pin') return
     set({ focusNodeId: null, focusOrigin: null, focusNodeIds: EMPTY, focusEdgeIds: EMPTY })
   },

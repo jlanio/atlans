@@ -1,10 +1,10 @@
 /**
- * Reordenar grupos arrastando um sobre o outro.
+ * Reordering groups by dragging one over another.
  *
- * A armadilha é o índice: depois de remover o item da posição de origem, tudo
- * o que estava à frente andou uma casa para trás, e reutilizar o índice do alvo
- * calculado ANTES da remoção insere no lugar errado — o item cai uma posição
- * além, e a ordem gravada não é a que a pessoa viu ao soltar.
+ * The pitfall is the index: after removing the item from its source position, everything
+ * that was ahead moved back one slot, and reusing the target index
+ * computed BEFORE the removal inserts in the wrong place — the item lands one position
+ * further, and the saved order is not the one the person saw on dropping.
  */
 import { describe, it, expect } from "vitest"
 
@@ -47,8 +47,8 @@ describe("moverGrupo", () => {
 
 describe("quando não há o que mover", () => {
   it("soltar sobre si mesmo devolve a MESMA lista", () => {
-    // Identidade, não igualdade: é o que permite a quem chama pular a gravação
-    // no servidor sem comparar item a item.
+    // Identity, not equality: it is what lets the caller skip saving
+    // to the server without comparing item by item.
     expect(moverGrupo(LISTA, "b", "b")).toBe(LISTA)
   })
 

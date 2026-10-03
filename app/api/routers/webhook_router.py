@@ -22,27 +22,27 @@ logger = get_logger(__name__)
 router = APIRouter(
     prefix="/webhook",
     tags=["webhook"],
-    # Sem autenticação JWT global — o controle de acesso é por credencial no nó WebhookTrigger:
-    # sem credential_id → acesso livre; com credential_id → token validado em start_analysis.
+    # No global JWT authentication — access control is per credential on the WebhookTrigger node:
+    # no credential_id → open access; with credential_id → token validated in start_analysis.
 )
 
-# Segundos para aguardar resposta do ResponseNode antes de retornar 504.
-# Piso de 1 s porque o valor vai direto ao BRPOP, onde 0 significa "bloqueia
-# para sempre" — exatamente o que este timeout existe para evitar.
+# Seconds to wait for the ResponseNode's response before returning 504.
+# Floor of 1 s because the value goes straight to BRPOP, where 0 means "block
+# forever" — exactly what this timeout exists to avoid.
 _WEBHOOK_RESPONSE_TIMEOUT = max(1, int(os.getenv("WEBHOOK_RESPONSE_TIMEOUT", "60")))
 _MAX_WEBHOOK_BODY = 10 * 1024 * 1024  # 10 MB
 
-# ── Allowlist da resposta do ResponseNode ────────────────────────────────────
+# ── ResponseNode response allowlist ──────────────────────────────────────────
 #
-# `/webhook/execute/{id_hash}` nao tem JWT (por desenho — o controle e a
-# credencial do no WebhookTrigger), e o corpo/cabecalhos da resposta vem do
-# ResponseNode, ou seja, do autor do workflow. Os cabecalhos crus permitiam
-# sobrescrever o que o SecurityHeadersMiddleware acabara de aplicar.
+# `/webhook/execute/{id_hash}` has no JWT (by design — the control is the
+# WebhookTrigger node's credential), and the response body/headers come from the
+# ResponseNode, that is, from the workflow's author. The raw headers allowed
+# overwriting what SecurityHeadersMiddleware had just applied.
 #
-# A lista abaixo espelha o dropdown `contentType` do ResponseNode
-# (flow/nodes/outputs/response_node.py) MAIS os tipos que so o body_ref produz.
-# Nao pode ser mais restrita que o no: rebaixar um tipo que a UI oferece
-# quebraria workflows existentes em silencio, com um aviso so no log do servidor.
+# The list below mirrors the ResponseNode's `contentType` dropdown
+# (flow/nodes/outputs/response_node.py) PLUS the types only body_ref produces.
+# It cannot be stricter than the node: downgrading a type the UI offers
+# would silently break existing workflows, with a warning only in the server log.
 _CONTENT_TYPES_PERMITIDOS = {
     "application/json",
     "application/xml",
@@ -53,30 +53,30 @@ _CONTENT_TYPES_PERMITIDOS = {
     "text/html",
 }
 
-# Tipos que o navegador RENDERIZA como documento. `text/html` e opcao legitima
-# do no, mas o corpo pode ecoar a entrada da requisicao — XSS refletido na
-# ORIGEM DA API, cuja CSP padrao traz `script-src 'unsafe-inline'`.
+# Types the browser RENDERS as a document. `text/html` is a legitimate option
+# of the node, but the body may echo the request input — reflected XSS on the
+# API ORIGIN, whose default CSP carries `script-src 'unsafe-inline'`.
 #
-# A resposta nao e rebaixada (isso quebraria o recurso): ela e marcada em
-# `request.state`, e o SecurityHeadersMiddleware troca a CSP por uma com
-# `sandbox` — origem opaca, sem script e sem formulario. O HTML continua
-# renderizando; o script dentro dele nao roda.
+# The response is not downgraded (that would break the feature): it is flagged in
+# `request.state`, and SecurityHeadersMiddleware swaps the CSP for one with
+# `sandbox` — opaque origin, no script and no forms. The HTML keeps
+# rendering; the script inside it does not run.
 #
-# A marcacao tem de ir por `request.state` porque o middleware SOBRESCREVE
-# `Content-Security-Policy` em toda resposta: um header definido aqui seria
-# descartado.
-# Auditoria (SEG-08): não é só text/html. O navegador RENDERIZA documentos XML
-# e executa `<script>` inline num XML com namespace XHTML (e SVG é XML). Como
-# esses tipos estão na allowlist do nó e a resposta sai na ORIGEM da API (CSP
-# padrão com `unsafe-inline`), eles TAMBÉM precisam da CSP `sandbox`.
+# The flag has to go through `request.state` because the middleware OVERWRITES
+# `Content-Security-Policy` on every response: a header set here would be
+# discarded.
+# Audit (SEG-08): it is not just text/html. The browser RENDERS XML documents
+# and runs inline `<script>` in an XML with the XHTML namespace (and SVG is XML). Since
+# these types are in the node's allowlist and the response goes out on the API ORIGIN
+# (default CSP with `unsafe-inline`), they ALSO need the `sandbox` CSP.
 _CONTENT_TYPES_RENDERIZAVEIS = {
     "text/html", "application/xml", "text/xml", "application/xhtml+xml",
     "image/svg+xml",
 }
 
-# Cabecalhos que o workflow NAO pode definir: os de seguranca (que o middleware
-# aplica), os que fixam identidade no browser, e os que o proprio Starlette
-# calcula. Content-Type sai daqui por vir de `content_type`, ja validado.
+# Headers the workflow can NOT set: the security ones (which the middleware
+# applies), those that pin identity in the browser, and those Starlette itself
+# computes. Content-Type is left out because it comes from `content_type`, already validated.
 _HEADERS_BLOQUEADOS = frozenset({
     "content-security-policy", "content-security-policy-report-only",
     "x-frame-options", "x-content-type-options", "strict-transport-security",
@@ -87,14 +87,14 @@ _HEADERS_BLOQUEADOS = frozenset({
 
 
 def _sanear_resposta_do_node(resp: dict, request: Request) -> tuple[str, dict]:
-    """Devolve (content_type, headers) seguros a partir do que o ResponseNode pediu.
+    """Returns safe (content_type, headers) from what the ResponseNode asked for.
 
-    Tipo fora da allowlist vira `text/plain`: o conteudo continua chegando ao
-    caller — so deixa de ser interpretado como markup pelo navegador. Rebaixar
-    e melhor que recusar, porque o workflow ja rodou e o dado ja existe.
+    A type outside the allowlist becomes `text/plain`: the content still reaches the
+    caller — it just stops being interpreted as markup by the browser. Downgrading
+    is better than refusing, because the workflow has already run and the data already exists.
 
-    Tipo renderizavel que ESTA na allowlist (text/html) passa intacto, mas marca
-    `request.state.corpo_nao_confiavel` para o middleware endurecer a CSP.
+    A renderable type that IS in the allowlist (text/html) passes intact, but sets
+    `request.state.corpo_nao_confiavel` so the middleware hardens the CSP.
     """
     content_type = str(resp.get("content_type") or "application/json")
     base = content_type.split(";")[0].strip().lower()
@@ -109,9 +109,9 @@ def _sanear_resposta_do_node(resp: dict, request: Request) -> tuple[str, dict]:
     if base in _CONTENT_TYPES_RENDERIZAVEIS:
         request.state.corpo_nao_confiavel = True
 
-    # `headers` vem do JSON do executor e o no o expoe como campo livre do tipo
-    # `object` — nao ha garantia de ser dict. Sem esta guarda, uma string ou
-    # lista levantava AttributeError e virava 500 no handler generico.
+    # `headers` comes from the executor's JSON and the node exposes it as a free field of type
+    # `object` — there is no guarantee it is a dict. Without this guard, a string or
+    # list raised AttributeError and became a 500 in the generic handler.
     brutos = resp.get("headers")
     if not isinstance(brutos, dict):
         if brutos:
@@ -127,18 +127,18 @@ def _sanear_resposta_do_node(resp: dict, request: Request) -> tuple[str, dict]:
 
 
 def _webhook_rate_key(request: Request) -> str:
-    """Chave de rate-limit (IP, workflow_hash).
+    """Rate-limit key (IP, workflow_hash).
 
-    Antes era so o IP — botnet com 1000 IPs gerava 20000 req/min. Agora um
-    par (IP, workflow) e contado isoladamente: botnet ainda pode tentar mil
-    workflows distintos, mas atingir UM workflow especifico exige IP rotation
-    por cada janela.
+    Before it was only the IP — a botnet with 1000 IPs generated 20,000 req/min. Now an
+    (IP, workflow) pair is counted in isolation: a botnet can still try a thousand
+    distinct workflows, but hitting ONE specific workflow requires IP rotation
+    for each window.
 
-    O IP e o do cliente de verdade (`_client_key`, o X-Forwarded-For lido
-    atras do Traefik). O `get_remote_address` do slowapi devolvia o IP do
-    proxy para todo mundo: o balde era um so por workflow, dividido entre
-    todos os chamadores — com os contadores no Redis, quem soubesse a URL
-    esgotaria os 20/min do workflow para os demais.
+    The IP is the real client's (`_client_key`, the X-Forwarded-For read
+    behind Traefik). slowapi's `get_remote_address` returned the proxy's IP
+    for everyone: there was a single bucket per workflow, shared among
+    all callers — with the counters in Redis, anyone who knew the URL
+    would exhaust the workflow's 20/min for everyone else.
     """
     workflow_hash = request.path_params.get("id_hash") or "unknown"
     return f"{_client_key(request)}:{workflow_hash}"
@@ -153,15 +153,15 @@ async def webhook_trigger(
     service: WorkflowService = Depends(get_workflow_service),
 ):
     """
-    Dispara um workflow via Webhook.
+    Triggers a workflow via Webhook.
 
-    Comportamento:
-      - Workflow sem ResponseNode → retorna 202 com {"task_id": "..."} imediatamente.
-      - Workflow com ResponseNode → aguarda o executor executar e retorna a resposta
-        HTTP definida pelo nó (status_code, body, headers customizáveis).
-        Retorna 504 se o executor não responder dentro de WEBHOOK_RESPONSE_TIMEOUT segundos.
+    Behavior:
+      - Workflow without a ResponseNode → returns 202 with {"task_id": "..."} immediately.
+      - Workflow with a ResponseNode → waits for the executor to run it and returns the HTTP
+        response defined by the node (customizable status_code, body, headers).
+        Returns 504 if the executor does not respond within WEBHOOK_RESPONSE_TIMEOUT seconds.
     """
-    # 1) Valida tamanho e tenta ler body JSON; se não for JSON, body = {}
+    # 1) Validates size and tries to read a JSON body; if it is not JSON, body = {}
     content_length = request.headers.get("content-length")
     if content_length:
         try:
@@ -175,17 +175,17 @@ async def webhook_trigger(
         body = {}
 
     debug_mode = bool(body.pop("debug_mode", False))
-    # no_wait=True: retorna 202 imediatamente sem aguardar o ResponseNode.
-    # O canvas sempre envia no_wait=True para manter feedback visual em tempo real.
-    # Callers externos (curl, integrações) omitem o parâmetro e obtêm resposta síncrona.
+    # no_wait=True: returns 202 immediately without waiting for the ResponseNode.
+    # The canvas always sends no_wait=True to keep real-time visual feedback.
+    # External callers (curl, integrations) omit the parameter and get a synchronous response.
     no_wait   = bool(body.pop("no_wait", False))
     logger.info("[webhook] acionando workflow %s debug_mode=%s no_wait=%s", id_hash, debug_mode, no_wait)
 
-    # 1b) Valida que o workflow tem WebhookTrigger antes de despachar.
-    # Sem isso, workflows com outros tipos de trigger (ScheduleTrigger,
-    # FileTrigger, etc) seriam executados via HTTP arbitrário — comportamento
-    # indevido: o endpoint de webhook só deve disparar fluxos explicitamente
-    # configurados com esse gatilho.
+    # 1b) Validates that the workflow has a WebhookTrigger before dispatching.
+    # Without this, workflows with other trigger types (ScheduleTrigger,
+    # FileTrigger, etc) would be run via arbitrary HTTP — improper
+    # behavior: the webhook endpoint should only trigger workflows explicitly
+    # configured with that trigger.
     try:
         wf = await service.get_workflow_by_hash(id_hash)
     except WorkflowNotFoundError:
@@ -208,16 +208,16 @@ async def webhook_trigger(
             detail="Workflow não possui node WebhookTrigger — endpoint de webhook não é válido para este fluxo.",
         )
 
-    # 2) Dispara análise
+    # 2) Triggers the analysis
     try:
         async_result = await service.start_analysis(
             id_hash, inputs=body, request=request, debug_mode=debug_mode,
-            # O workflow acabou de ser carregado e descriptografado acima para
-            # a checagem do WebhookTrigger; sem repassá-lo, o dispatch refazia
-            # o SELECT e desserializava a `definition` inteira uma segunda vez.
+            # The workflow was just loaded and decrypted above for the
+            # WebhookTrigger check; without passing it along, the dispatch redid
+            # the SELECT and deserialized the entire `definition` a second time.
             workflow=wf,
-            # Sem `triggered_by`: o chamador é um sistema externo, não um
-            # usuário — inventar um dono aqui abriria credenciais privadas.
+            # No `triggered_by`: the caller is an external system, not a
+            # user — inventing an owner here would open up private credentials.
             trigger_source="webhook",
         )
     except WorkflowNotFoundError:
@@ -231,12 +231,12 @@ async def webhook_trigger(
             detail="Workflow está desativado e não pode ser executado.",
         )
     except NoExecutorAvailableError as exc:
-        # Chamador ANÔNIMO: corpo genérico, sem nomes de executores, contagens
-        # ou política (spec §6). O motivo detalhado fica no log e no histórico
-        # do dono. Stateless: nenhum run foi criado neste caminho, então um
-        # integrador martelando não amplifica escrita. `Retry-After` orienta o
-        # backoff; a chave de idempotência NÃO foi consumida (só é gravada após
-        # um dispatch bem-sucedido), então o reenvio tenta de verdade.
+        # ANONYMOUS caller: generic body, without executor names, counts
+        # or policy (spec §6). The detailed reason stays in the log and in the owner's
+        # history. Stateless: no run was created on this path, so an
+        # integrator hammering away does not amplify writes. `Retry-After` guides the
+        # backoff; the idempotency key was NOT consumed (it is only written after
+        # a successful dispatch), so the resend really tries again.
         logger.warning("[webhook] sem executor para %s (%s): %s", id_hash, exc.category, exc.detail)
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -246,26 +246,26 @@ async def webhook_trigger(
 
     task_id = async_result.id
 
-    # 3) Se não há ResponseNode ou o caller pediu resposta assíncrona, retorna 202 imediatamente
+    # 3) If there is no ResponseNode or the caller asked for an async response, return 202 immediately
     if no_wait or not getattr(async_result, "has_response_node", False):
         return JSONResponse({"task_id": task_id}, status_code=202)
 
-    # 4) Aguarda resposta síncrona via Redis BRPOP
+    # 4) Waits for a synchronous response via Redis BRPOP
     from app.core.redis import get_redis_pool
     rc = get_redis_pool()
     try:
         raw = await asyncio.wait_for(
-            # O timeout vai no PRÓPRIO comando. Sem ele o BRPOP era `timeout=0`
-            # — bloqueio indefinido no servidor Redis — e quem desistia era só o
-            # `wait_for` daqui: a conexão continuava presa até o Redis notar o
-            # socket fechado. Cada webhook síncrono em voo segurava assim uma
-            # conexão da pool COMPARTILHADA (idempotência, rate-limit de WS,
-            # blacklist de JWT, fila run_results), que não tem teto de tamanho:
-            # um pico de webhooks caminhava para o `maxclients` do Redis e
-            # derrubava todo o resto junto.
+            # The timeout goes in the command ITSELF. Without it BRPOP was `timeout=0`
+            # — indefinite blocking on the Redis server — and the only one giving up was
+            # the `wait_for` here: the connection stayed stuck until Redis noticed the
+            # closed socket. Each in-flight synchronous webhook thus held one
+            # connection of the SHARED pool (idempotency, WS rate limit,
+            # JWT blacklist, run_results queue), which has no size ceiling:
+            # a webhook spike marched toward Redis's `maxclients` and
+            # took everything else down with it.
             rc.brpop(f"webhook_response:{task_id}", timeout=_WEBHOOK_RESPONSE_TIMEOUT),
-            # Rede de segurança para um Redis que nem responde ao próprio
-            # timeout; a expiração normal agora volta como `raw is None`.
+            # Safety net for a Redis that does not even honor its own
+            # timeout; normal expiration now comes back as `raw is None`.
             timeout=_WEBHOOK_RESPONSE_TIMEOUT + 5,
         )
     except asyncio.TimeoutError:
@@ -284,7 +284,7 @@ async def webhook_trigger(
 
     payload = json.loads(raw[1])
 
-    # 5) Workflow falhou antes de atingir o ResponseNode
+    # 5) Workflow failed before reaching the ResponseNode
     if payload.get("job_status") != "ok":
         error_msg = payload.get("error") or "Workflow falhou."
         logger.error("[webhook] workflow falhou (task_id=%s): %s", task_id, error_msg)
@@ -293,13 +293,13 @@ async def webhook_trigger(
             status_code=500,
         )
 
-    # 6) Monta resposta HTTP a partir dos dados do ResponseNode
+    # 6) Builds the HTTP response from the ResponseNode's data
     resp = payload.get("response") or {}
     http_status  = resp.get("status_code", 200)
     _content_type, extra_headers = _sanear_resposta_do_node(resp, request)
 
-    # 6a) Body guardado no MinIO (body grande, evita HoL no WS executor→servidor):
-    # streama diretamente do MinIO para o caller e agenda remoção imediata.
+    # 6a) Body stored in MinIO (large body, avoids HoL on the executor→server WS):
+    # streams directly from MinIO to the caller and schedules immediate removal.
     body_ref = resp.get("body_ref")
     if body_ref and body_ref.get("s3_key"):
         s3_key = body_ref["s3_key"]
@@ -307,18 +307,18 @@ async def webhook_trigger(
             "[webhook] ResponseNode retornou body_ref=%s status=%d (task_id=%s)",
             s3_key, http_status, task_id,
         )
-        # A s3_key vem do executor (máquina sob controle do usuário) e aqui ela
-        # seria usada para LER e depois APAGAR um objeto do MinIO — que usa um
-        # bucket único para os prefixos de todos os workspaces. Sem o guard, um
-        # executor devolvia `s3_key = "drive/<workspace_alheio>/<arquivo>"` e o
-        # webhook servia o conteúdo de outro tenant ao caller, apagando o objeto
-        # em seguida. Mesmo guard já aplicado nos demais caminhos executor→servidor.
+        # The s3_key comes from the executor (a machine under the user's control) and here it
+        # would be used to READ and then DELETE an object from MinIO — which uses a
+        # single bucket for the prefixes of all workspaces. Without the guard, an
+        # executor returned `s3_key = "drive/<workspace_alheio>/<arquivo>"` and the
+        # webhook served another tenant's content to the caller, deleting the object
+        # afterwards. Same guard already applied on the other executor→server paths.
         from app.api.routers.executor_drive_router import _validate_agent_s3_key
-        # Auditoria (SEG-71): além do escopo por workspace, exige o prefixo
-        # `webhook-responses/` — o corpo do ResponseNode é sempre gravado ali
-        # (response_node.py). Sem isso, um `body_ref` apontando para
-        # `drive/{ws}/…` ou `artifacts/{ws}/…` do MESMO workspace faria o
-        # webhook servir e depois APAGAR esse objeto.
+        # Audit (SEG-71): besides the per-workspace scope, requires the
+        # `webhook-responses/` prefix — the ResponseNode body is always written there
+        # (response_node.py). Without it, a `body_ref` pointing to
+        # `drive/{ws}/…` or `artifacts/{ws}/…` of the SAME workspace would make the
+        # webhook serve and then DELETE that object.
         prefixo_ok = isinstance(s3_key, str) and s3_key.startswith(
             f"webhook-responses/{wf.workspace_id}/"
         )
@@ -337,9 +337,9 @@ async def webhook_trigger(
             )
 
         from app.core import storage as s3
-        # Baixa em memória (operação síncrona boto3 em threadpool). Para bodies
-        # muito grandes seria possível usar streaming chunked de get_object,
-        # mas requer plumbing extra de boto3.StreamingBody em async.
+        # Downloads into memory (synchronous boto3 operation in a threadpool). For very
+        # large bodies, chunked streaming of get_object would be possible,
+        # but it requires extra plumbing of boto3.StreamingBody in async.
         try:
             content_bytes = await asyncio.to_thread(s3.download, s3_key)
         except Exception as exc:
@@ -348,8 +348,8 @@ async def webhook_trigger(
                 {"error": "Falha ao recuperar resposta do storage.", "task_id": task_id},
                 status_code=502,
             )
-        # Apaga no MinIO em background; o Artifact registrado pelo executor_ws_router
-        # também é removido pelo cleanup global quando expires_at vence (rede de segurança).
+        # Deletes from MinIO in the background; the Artifact registered by executor_ws_router
+        # is also removed by the global cleanup when expires_at passes (safety net).
         background_tasks.add_task(_delete_webhook_response_artifact, s3_key)
         return Response(
             content=content_bytes,
@@ -372,9 +372,9 @@ async def webhook_trigger(
 
 
 async def _delete_webhook_response_artifact(s3_key: str) -> None:
-    """Remove objeto do MinIO e a linha Artifact correspondente após o caller receber o body.
+    """Removes the object from MinIO and the matching Artifact row after the caller receives the body.
 
-    Rodado em BackgroundTasks — se falhar, o cleanup global remove pelo expires_at.
+    Run in BackgroundTasks — if it fails, the global cleanup removes it via expires_at.
     """
     from sqlalchemy import delete as sa_delete
 

@@ -14,9 +14,9 @@ import { ROLE_COLORS, ROLE_DESCRIPTIONS, ROLE_LABELS, ROLE_OPTIONS, roleLabel } 
 interface Props {
   member: IWorkspaceMember
   canManage: boolean
-  /** id do usuário logado — a própria linha não oferece remover (isso é "Sair"). */
+  /** id of the logged-in user — their own row does not offer removal (that is "Sair", Leave). */
   currentUserId: string | null
-  /** id em mutação, ou null. Trava TODAS as linhas, não só a que está salvando. */
+  /** id being mutated, or null. Locks ALL rows, not just the one saving. */
   savingUserId: string | null
   onRoleChange: (userId: string, role: string) => void
   onRemove: (member: IWorkspaceMember) => void
@@ -28,13 +28,13 @@ export function MemberRow({
   const isOwner = member.role === "owner"
   const isSelf = currentUserId != null && member.user_id === currentUserId
   const isSaving = savingUserId === member.user_id
-  // Qualquer mutação em voo trava a linha inteira: com os selects livres, dois
-  // cliques rápidos disparavam PUTs concorrentes e o último a responder definia
-  // o papel — inclusive entre linhas diferentes.
+  // Any in-flight mutation locks the whole row: with the selects free, two
+  // quick clicks fired concurrent PUTs and the last to respond set the
+  // role — even across different rows.
   const locked = savingUserId !== null
 
-  // O dono não tem linha em `workspace_members`; o backend recusa PUT e DELETE
-  // sobre ele. Oferecer os controles aqui só produziria um 400.
+  // The owner has no row in `workspace_members`; the backend rejects PUT and
+  // DELETE on them. Offering the controls here would only produce a 400.
   const editable = canManage && !isOwner
   const removable = canManage && !isOwner && !isSelf
 

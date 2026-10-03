@@ -1,23 +1,23 @@
 # tests/unit/test_job_result_caracterizacao.py
-"""Caracterização do `_handle_job_result`: o que ele grava, publica e em que ordem.
+"""Characterization of `_handle_job_result`: what it writes, publishes and in what order.
 
-O handler recebe resultado de executores ANTIGOS e NOVOS em campo, então o
-formato e a ordem de cada efeito são contrato — com o consumer de `run_results`,
-com o webhook síncrono (BRPOP em `webhook_response:{run}`) e com o painel (o
-`__workflow_complete__`). Um Redis que anota cada comando na ordem em que chega
-prende:
+The handler receives results from OLD and NEW executors in the field, so the
+format and order of each effect are a contract — with the `run_results` consumer,
+with the synchronous webhook (BRPOP on `webhook_response:{run}`) and with the panel (the
+`__workflow_complete__`). A Redis that logs each command in the order it arrives
+pins down:
 
-- a ordem banco → Redis → webhook: leitura do run, chave efêmera do resultado,
-  fila `run_results`, `webhook_response`, Artifact do body no MinIO e, por
-  último, histórico + canal do `__workflow_complete__`;
-- o formato exato (chaves, ordem, valores) de cada payload nos desfechos ok,
-  falha com e sem taxonomia e cancelado — do executor antigo (sem `run_id`, sem
-  `error_category`) e do novo;
-- a validação e a truncagem de `stats`/`error` na entrada, e o erro explícito
-  ao webhook quando a truncagem levou até as chaves de controle;
-- a idempotência (job_result repetido de run terminal), a recusa por memo, o
-  rate limit e o fechamento do run como falho quando o resultado se perde;
-- que a falha de um destino não impede os seguintes.
+- the order database → Redis → webhook: run read, ephemeral result key,
+  `run_results` queue, `webhook_response`, body Artifact in MinIO and,
+  last, history + the `__workflow_complete__` channel;
+- the exact format (keys, order, values) of each payload in the outcomes ok,
+  failure with and without taxonomy, and cancelled — from the old executor (no `run_id`, no
+  `error_category`) and from the new one;
+- validation and truncation of `stats`/`error` on input, and the explicit error
+  to the webhook when truncation took even the control keys;
+- idempotency (repeated job_result for a terminal run), refusal by memo,
+  rate limiting and closing the run as failed when the result is lost;
+- that the failure of one destination does not prevent the following ones.
 """
 import asyncio
 import json
@@ -45,11 +45,11 @@ CANAL = f"workflow:{RUN}:events"
 WEBHOOK = f"webhook_response:{RUN}"
 
 
-# ── Dublês ────────────────────────────────────────────────────────────────────
+# ── Test doubles ──────────────────────────────────────────────────────────────
 
 
 class _Pipe:
-    """Pipeline que só chega ao diário no `execute` — tudo ou nada, como no Redis."""
+    """Pipeline that only reaches the log on `execute` — all or nothing, as in Redis."""
 
     def __init__(self, rc):
         self._rc = rc
@@ -82,7 +82,7 @@ class _Pipe:
 
 
 class _Redis:
-    """Anota, em ordem, cada comando que chega. `falhar(cmd)` decide quais levantam."""
+    """Logs, in order, each command that arrives. `falhar(cmd)` decides which ones raise."""
 
     def __init__(self, diario: list, falhar):
         self._diario = diario
@@ -110,10 +110,10 @@ class _Redis:
 
 @pytest.fixture
 def cenario(monkeypatch):
-    """Executor conectado a ESTE worker, run 'running' dele, Redis anotando tudo.
+    """Executor connected to THIS worker, its run 'running', Redis logging everything.
 
-    `linha` é o que `_query_run_snapshot` devolve (host, status, start_time);
-    `falhar` recebe cada comando do Redis e diz se ele levanta.
+    `linha` is what `_query_run_snapshot` returns (host, status, start_time);
+    `falhar` receives each Redis command and says whether it raises.
     """
     diario: list[tuple] = []
     estado = SimpleNamespace(
@@ -143,8 +143,8 @@ def cenario(monkeypatch):
     monkeypatch.setattr(
         "app.core.redis.get_redis_pool", lambda: _Redis(diario, lambda cmd: estado.falhar(cmd)),
     )
-    # O logger do app só propaga ao root quando o root já tinha handler no
-    # import; aqui a propagação é garantida para o caplog enxergar as mensagens.
+    # The app's logger only propagates to root when root already had a handler at
+    # import; here propagation is ensured so caplog can see the messages.
     monkeypatch.setattr(RES.logger, "propagate", True)
     return estado
 
@@ -173,10 +173,10 @@ def _run_result_esperado(
     obtido: dict, *, status, error_message=None, error_category=None, retryable=False,
     executor_ip=IP, stats_json="{}",
 ) -> str:
-    """O envelope da fila, byte a byte: cabeçalho do `json.dumps` + `stats` emendado.
+    """The queue envelope, byte by byte: `json.dumps` header + spliced `stats`.
 
-    `end_time` e `duration_seconds` dependem do relógio e vêm do obtido; o resto
-    é o que o contrato fixa.
+    `end_time` and `duration_seconds` depend on the clock and come from the actual value;
+    the rest is what the contract fixes.
     """
     head = json.dumps({
         "task_id":          RUN,
@@ -233,7 +233,7 @@ def _mensagens(caplog) -> list[str]:
 
 async def test_ok_do_executor_novo_grava_na_ordem_e_no_formato_de_sempre(cenario, caplog):
     stats = {"n1": {"status": "completed", "rows": 3}, "__metrics__": {"run": {"duration_ms": 10}}}
-    # Posse já provada por node_events: o memo não dispensa a leitura e sai no fim.
+    # Ownership already proven by node_events: the memo does not skip the read and exits at the end.
     cenario.conn.run_auth_cache[RUN] = (True, time.monotonic() + 60)
 
     with caplog.at_level("INFO"):
@@ -267,7 +267,7 @@ async def test_ok_do_executor_novo_grava_na_ordem_e_no_formato_de_sempre(cenario
 
 
 async def test_falha_do_executor_antigo_sem_run_id_nem_taxonomia(cenario, caplog):
-    """O formato do back-pressure/shutdown: só `job_id`, `status` e `error`."""
+    """The back-pressure/shutdown format: only `job_id`, `status` and `error`."""
     erro = "Fila do executor cheia — back-pressure."
     cenario.linha = (f"executor:{EX}", "running", None)
 
@@ -334,7 +334,7 @@ async def test_falha_do_executor_novo_leva_a_taxonomia(cenario, caplog):
 
 
 async def test_cancelado_nao_e_falha_nem_leva_taxonomia(cenario):
-    """Cancelar é pedido do usuário: nível info, sem categoria, sem retryable."""
+    """Cancelling is a user request: info level, no category, no retryable."""
     erro = "Cancelado pelo usuário."
     await RES._handle_job_result(EX, {
         "type": "job_result", "job_id": RUN, "run_id": RUN, "status": "cancelled",
@@ -345,7 +345,7 @@ async def test_cancelado_nao_e_falha_nem_leva_taxonomia(cenario):
     assert d[1][3] == _efemero(status="cancelled", run_id=RUN, error=erro)
     raw, res = _run_result(d)
     assert raw == _run_result_esperado(res, status="cancelled", error_message=erro)
-    # O webhook síncrono é destravado com o status cru do executor.
+    # The synchronous webhook is unblocked with the executor's raw status.
     assert _unico(d, "lpush", WEBHOOK)[2] == json.dumps(
         {"job_status": "cancelled", "error": erro, "response": None},
     )
@@ -380,7 +380,7 @@ async def test_sem_conexao_neste_worker_o_ip_vai_nulo(cenario):
     assert raw == _run_result_esperado(res, status="success", executor_ip=None)
 
 
-# ── Webhook síncrono e body no MinIO ─────────────────────────────────────────
+# ── Synchronous webhook and body in MinIO ────────────────────────────────────
 
 
 async def test_response_inline_vai_ao_webhook_antes_da_conclusao(cenario):
@@ -430,9 +430,9 @@ async def test_body_ref_sem_s3_key_nao_registra_artifact(cenario):
 
 @pytest.mark.parametrize("body_ref", ["webhook-responses/ws-1/body.json", ["s3_key"], 7])
 async def test_body_ref_fora_do_formato_nao_impede_a_conclusao(cenario, body_ref):
-    """Um executor defeituoso (ou comprometido) que manda o `body_ref` fora do
-    formato não tira do painel o fim do run: o body não é registrado, e a
-    conclusão sai como sempre."""
+    """A faulty (or compromised) executor that sends a malformed `body_ref`
+    does not take the end of the run away from the panel: the body is not
+    registered, and the completion goes out as always."""
     await RES._handle_job_result(EX, {
         "job_id": RUN, "run_id": RUN, "status": "ok",
         "stats": {"__response__": {"status": 200, "body_ref": body_ref}},
@@ -459,12 +459,12 @@ async def test_falha_ao_registrar_o_body_nao_impede_a_conclusao(cenario, caplog)
     )
 
 
-# ── Validação e truncagem de stats/error ─────────────────────────────────────
+# ── Validation and truncation of stats/error ─────────────────────────────────
 
 
 async def test_truncagem_que_levou_as_chaves_de_controle_vira_erro_no_webhook(cenario):
-    """Executor (novo) que truncou `stats` até sem o `__response__`: o webhook
-    recebe um erro explícito em vez de esperar o timeout."""
+    """A (new) executor that truncated `stats` down to without `__response__`: the webhook
+    receives an explicit error instead of waiting for the timeout."""
     stats = {STATS_TRUNCADO: True, STATS_TAMANHO_ORIGINAL: 20_000_000, STATS_CONTROLE_DESCARTADO: True}
 
     await RES._handle_job_result(EX, {"job_id": RUN, "run_id": RUN, "status": "ok", "stats": stats})
@@ -481,7 +481,7 @@ async def test_truncagem_que_levou_as_chaves_de_controle_vira_erro_no_webhook(ce
         ),
         "response": None,
     })
-    # O desfecho do RUN continua sucesso: só o body é que não coube.
+    # The RUN's outcome is still success: only the body did not fit.
     raw_ev, ev = _conclusao(d)
     assert raw_ev == _conclusao_esperada(ev, level="info", status="completed")
 
@@ -498,8 +498,8 @@ async def test_truncagem_que_preservou_o_response_entrega_o_body(cenario):
 
 
 async def test_stats_acima_do_teto_e_reduzido_antes_de_todos_os_destinos(cenario):
-    """O servidor reaplica a truncagem do protocolo: os stats por nó saem, as
-    chaves de controle ficam — o webhook ainda recebe a resposta."""
+    """The server reapplies the protocol's truncation: the per-node stats go, the
+    control keys stay — the webhook still receives the response."""
     resposta = {"status": 200, "body": "ok"}
     stats = {f"node-{i}": {"rows": "x" * 2000} for i in range(2500)}
     stats["__response__"] = resposta
@@ -565,8 +565,8 @@ async def test_error_nao_textual_e_gigante_e_contido_em_todos_os_destinos(cenari
 
 
 async def test_frame_grande_serializa_fora_do_loop_com_o_mesmo_resultado(cenario, monkeypatch):
-    """Acima do limiar, a contenção de `stats` e o dumps do webhook vão para uma
-    thread — e o que chega ao Redis é o mesmo."""
+    """Above the threshold, the containment of `stats` and the webhook dumps go to a
+    thread — and what reaches Redis is the same."""
     real = asyncio.to_thread
     em_thread: list[str] = []
 
@@ -594,7 +594,7 @@ async def test_frame_grande_serializa_fora_do_loop_com_o_mesmo_resultado(cenario
 async def test_frame_pequeno_nao_usa_thread(cenario, monkeypatch):
     em_thread: list = []
 
-    async def _espiao(fn, *a, **kw):  # pragma: no cover - não pode ser chamado
+    async def _espiao(fn, *a, **kw):  # pragma: no cover - must not be called
         em_thread.append(fn)
         return fn(*a, **kw)
 
@@ -605,13 +605,13 @@ async def test_frame_pequeno_nao_usa_thread(cenario, monkeypatch):
     assert em_thread == []
 
 
-# ── Idempotência, posse e limites ────────────────────────────────────────────
+# ── Idempotency, ownership and limits ────────────────────────────────────────
 
 
 @pytest.mark.parametrize("terminal", ["success", "failed", "cancelled"])
 async def test_job_result_repetido_de_run_ja_fechado_nao_grava_nada(cenario, caplog, terminal):
-    """Reentrega pelo outbox (executor antigo ou novo): o primeiro fecha o run,
-    o segundo encontra a linha terminal e sai sem tocar no Redis."""
+    """Redelivery via the outbox (old or new executor): the first one closes the run,
+    the second finds the terminal row and exits without touching Redis."""
     msg = {"type": "job_result", "job_id": RUN, "run_id": RUN, "status": "ok", "stats": {"n1": {}}}
     await RES._handle_job_result(EX, dict(msg))
     primeira = list(cenario.diario)
@@ -674,7 +674,7 @@ async def test_sem_job_id_nao_toca_em_nada(cenario, caplog):
 
 
 def _fechamento_inconclusivo(diario, motivo: str) -> None:
-    """O pipeline único de `_fechar_run_inconclusivo`, conferido byte a byte."""
+    """The single pipeline of `_fechar_run_inconclusivo`, checked byte by byte."""
     mensagem = f"Resultado do executor não pôde ser processado: {motivo}"
     assert _nomes(diario)[-8:] == [
         "pipe.lpush", "pipe.rpush", "pipe.ltrim", "pipe.expire", "pipe.publish",
@@ -705,7 +705,7 @@ def _fechamento_inconclusivo(diario, motivo: str) -> None:
         "error":       mensagem,
         "extra":       {"error_category": "internal", "retryable": True},
     })
-    # O evento carimba o MESMO instante do fim gravado no resultado.
+    # The event stamps the SAME instant as the end stored in the result.
     assert evento["timestamp"] == datetime.fromisoformat(resultado["end_time"]).timestamp()
     assert cmds[1:5] == _pipeline_da_conclusao(cmds[1][2])[:4]
     assert cmds[5] == ("pipe.lpush", WEBHOOK, json.dumps(
@@ -721,7 +721,7 @@ async def test_rate_limit_com_posse_provada_fecha_o_run_como_falho(cenario, monk
     with caplog.at_level("ERROR"):
         await RES._handle_job_result(EX, {"job_id": "job-x", "run_id": RUN, "status": "ok"})
 
-    # Nem chega a ler o banco: o descarte vem antes da autorização.
+    # It does not even read the database: the discard comes before authorization.
     assert "snapshot" not in _nomes(cenario.diario)
     _fechamento_inconclusivo(cenario.diario, "rate limit de job_result")
     assert (
@@ -760,7 +760,7 @@ async def test_banco_fora_sem_posse_provada_nao_fecha_nada(cenario):
     assert cenario.conn.db_auth_cooldown_until > time.monotonic()
 
 
-# ── Um destino que falha não derruba os seguintes ────────────────────────────
+# ── A failing destination does not bring down the following ones ─────────────
 
 
 @pytest.mark.parametrize(

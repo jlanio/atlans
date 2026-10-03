@@ -1,22 +1,22 @@
 # tests/unit/test_executor_sysinfo.py
 """
-Testes de `executor/sysinfo.py` — o módulo não tinha nenhum.
+Tests for `executor/sysinfo.py` — the module had none.
 
-Todo o valor deste arquivo está nas invariantes que os caches introduzidos por
-desempenho podem violar em silêncio, porque nenhuma delas produz erro:
+All the value of this file is in the invariants that the caches introduced for
+performance can silently violate, because none of them produces an error:
 
-  * o número de disco servido ao painel, ao desktop e ao `capacity` precisa ser
-    ou recente ou explicitamente DESCONHECIDO — nunca um valor de horas atrás
-    passando por leitura corrente (é ele que decide o alerta "Disco quase
-    cheio", a única proteção de um artefato de localidade local);
-  * uma coleta pendurada (NFS `hard`, FUSE travado) não pode bloquear o
-    chamador, nem travar toda tentativa futura, nem vazar uma thread por tick;
-  * o limite de RAM/CPU de um container MUDA em voo (`docker update`, in-place
-    pod resize do k8s) e o memo precisa se autocorrigir.
+  * the disk figure served to the panel, the desktop and `capacity` must be
+    either recent or explicitly UNKNOWN — never a value from hours ago passing
+    as a current reading (it is what decides the "Disco quase cheio" (disk
+    almost full) alert, the only protection for a local-locality artifact);
+  * a hung collection (NFS `hard`, stuck FUSE) must not block the caller, nor
+    lock up every future attempt, nor leak a thread per tick;
+  * a container's RAM/CPU limit CHANGES in flight (`docker update`, k8s
+    in-place pod resize) and the memo must self-correct.
 
-O tempo é simulado mexendo nos marcadores monotônicos do módulo em vez de
-falsear `time.monotonic`: o teste usa threads de verdade, e trocar o relógio
-global quebraria o próprio `threading`.
+Time is simulated by touching the module's monotonic markers instead of
+faking `time.monotonic`: the test uses real threads, and swapping the global
+clock would break `threading` itself.
 """
 import threading
 import time
@@ -37,7 +37,7 @@ class _UsoDeDisco:
 
 
 class PsutilFalso:
-    """Só o que `_coletar_disco` usa. `bloqueio` simula o mount pendurado."""
+    """Only what `_coletar_disco` uses. `bloqueio` simulates the hung mount."""
 
     def __init__(self, livre_gb: float = 100.0, total_gb: float = 500.0,
                  bloqueio: threading.Event | None = None) -> None:
@@ -49,8 +49,8 @@ class PsutilFalso:
     def disk_usage(self, path):
         self.chamadas += 1
         if self.bloqueio is not None:
-            # Um NFS `hard` mount que parou de responder não devolve erro: ele
-            # simplesmente não volta.
+            # An NFS `hard` mount that stopped responding does not return an error: it
+            # simply never comes back.
             self.bloqueio.wait()
         return _UsoDeDisco(self.livre_gb, self.total_gb)
 
@@ -67,24 +67,24 @@ def _esperar_coleta(timeout: float = 5.0) -> None:
 
 @pytest.fixture(autouse=True)
 def _caches_limpos():
-    """Isola os globais do módulo entre testes — ver `_resetar_caches`."""
+    """Isolates the module's globals between tests — see `_resetar_caches`."""
     sysinfo._resetar_caches()
     yield
-    # Nenhuma thread pendurada pode sobreviver ao teste: ela mexeria nos globais
-    # no meio do teste SEGUINTE.
+    # No hung thread may survive the test: it would touch the globals in the
+    # middle of the NEXT test.
     for t in _threads_de_disco():
         t.join(2.0)
     sysinfo._resetar_caches()
 
 
-# ── Coleta assíncrona e primeira leitura ─────────────────────────────────────
+# ── Async collection and first reading ───────────────────────────────────────
 
 
 def test_primeira_leitura_nao_bloqueia_e_o_valor_pousa_depois():
     fake = PsutilFalso(livre_gb=100.0)
 
-    # A primeira chamada não pode fazer I/O de disco no event loop: devolve
-    # desconhecido e delega para a thread.
+    # The first call must not do disk I/O on the event loop: it returns
+    # unknown and delegates to the thread.
     assert sysinfo._metricas_de_disco(fake) == {}
     _esperar_coleta()
 
@@ -104,7 +104,7 @@ def test_leituras_seguintes_saem_do_cache_sem_novas_syscalls():
     assert fake.chamadas == chamadas, "o TTL deixou de segurar as syscalls"
 
 
-# ── A23: teto de idade ───────────────────────────────────────────────────────
+# ── A23: age ceiling ─────────────────────────────────────────────────────────
 
 
 def test_valor_velho_vira_desconhecido_em_vez_de_passar_por_leitura_corrente(caplog):
@@ -113,20 +113,20 @@ def test_valor_velho_vira_desconhecido_em_vez_de_passar_por_leitura_corrente(cap
     _esperar_coleta()
     assert sysinfo._metricas_de_disco(fake)["artifacts_disk_free_gb"] == 100.0
 
-    # O share pendurou logo depois: a coleta em voo não volta, e o último valor
-    # bom envelhece além do teto.
+    # The share hung right after: the in-flight collection does not come back,
+    # and the last good value ages beyond the ceiling.
     agora = time.monotonic()
     sysinfo._disco_coletado_em = agora - (sysinfo.IDADE_MAXIMA_DISCO_S + 1)
     sysinfo._disco_expira = 0.0
     sysinfo._disco_em_voo = 1
-    sysinfo._disco_iniciou_em = agora  # ainda dentro do prazo: nada a disparar
+    sysinfo._disco_iniciou_em = agora  # still within the deadline: nothing to fire
 
     with caplog.at_level("WARNING", logger="executor.sysinfo"):
         assert sysinfo._metricas_de_disco(fake) == {}
     assert any("obsoletas" in r.message for r in caplog.records), \
         "o painel passou a mentir sem nem registrar no log"
 
-    sysinfo._disco_em_voo = 0  # teardown: não havia thread de verdade
+    sysinfo._disco_em_voo = 0  # teardown: there was no real thread
 
 
 def test_valor_abaixo_do_teto_de_idade_continua_servindo():
@@ -134,7 +134,7 @@ def test_valor_abaixo_do_teto_de_idade_continua_servindo():
     sysinfo._metricas_de_disco(fake)
     _esperar_coleta()
 
-    # Servir dado velho é aceitável; o que não pode é servi-lo para sempre.
+    # Serving stale data is acceptable; what is not is serving it forever.
     sysinfo._disco_coletado_em = time.monotonic() - (sysinfo.IDADE_MAXIMA_DISCO_S - 5)
     assert sysinfo._metricas_de_disco(fake)["disk_free_gb"] == 100.0
 
@@ -179,14 +179,14 @@ def test_coleta_pendurada_nao_trava_as_tentativas_futuras_para_sempre():
         sysinfo._metricas_de_disco(fake)
         assert sysinfo._disco_em_voo == 1
 
-        # Dentro do prazo: nenhuma thread nova, mesmo com o TTL vencido.
+        # Within the deadline: no new thread, even with the TTL expired.
         sysinfo._disco_expira = 0.0
         sysinfo._metricas_de_disco(fake)
         assert sysinfo._disco_em_voo == 1
 
-        # Passado o prazo, a coleta é dada por pendurada e uma nova é permitida
-        # — sem isto, `_disco_em_voo` seria um cadeado permanente e o valor
-        # congelado nunca mais seria substituído.
+        # Past the deadline, the collection is considered hung and a new one is
+        # allowed — without this, `_disco_em_voo` would be a permanent lock and
+        # the frozen value would never be replaced again.
         sysinfo._disco_iniciou_em = time.monotonic() - sysinfo.TIMEOUT_COLETA_DISCO_S - 1
         sysinfo._disco_expira = 0.0
         sysinfo._metricas_de_disco(fake)
@@ -201,8 +201,8 @@ def test_mount_pendurado_nao_vaza_uma_thread_por_tick():
     fake = PsutilFalso(livre_gb=100.0, bloqueio=bloqueio)
     try:
         for _ in range(30):
-            # Cenário mais hostil possível: prazo sempre estourado e TTL sempre
-            # vencido. Só o teto pode segurar.
+            # The most hostile scenario possible: deadline always blown and TTL always
+            # expired. Only the ceiling can hold it.
             sysinfo._disco_iniciou_em = time.monotonic() - sysinfo.TIMEOUT_COLETA_DISCO_S - 1
             sysinfo._disco_expira = 0.0
             assert sysinfo._metricas_de_disco(fake) == {}
@@ -218,8 +218,8 @@ def test_disparo_empurra_o_vencimento_para_nao_abrir_thread_por_tick():
     fake = PsutilFalso(livre_gb=100.0, bloqueio=bloqueio)
     try:
         sysinfo._metricas_de_disco(fake)
-        # Se o vencimento só fosse empurrado no fim da coleta, uma coleta que
-        # nunca termina deixaria `_disco_expira` no passado para sempre.
+        # If the expiration were only pushed at the end of the collection, a
+        # collection that never finishes would leave `_disco_expira` in the past forever.
         assert sysinfo._disco_expira >= time.monotonic() + sysinfo.TIMEOUT_COLETA_DISCO_S - 1
     finally:
         bloqueio.set()
@@ -238,13 +238,13 @@ def test_falha_na_coleta_sai_no_log_e_mantem_o_valor_anterior(caplog, monkeypatc
     with caplog.at_level("WARNING", logger="executor.sysinfo"):
         sysinfo._refrescar_disco(fake)
 
-    # Uma pasta de artefatos inacessível era totalmente silenciosa (logger.debug).
+    # An inaccessible artifacts folder was completely silent (logger.debug).
     assert any("Falha ao coletar metricas de disco" in r.message for r in caplog.records)
     assert sysinfo._metricas_de_disco(fake)["disk_free_gb"] == 100.0
     assert sysinfo._disco_em_voo == 0, "a vaga precisa voltar mesmo na falha"
 
 
-# ── A48: TTL adaptativo perto do fim do disco ────────────────────────────────
+# ── A48: adaptive TTL near the end of the disk ───────────────────────────────
 
 
 def test_ttl_longo_quando_ha_folga():
@@ -255,8 +255,8 @@ def test_ttl_longo_quando_ha_folga():
 
 
 def test_ttl_curto_quando_o_disco_dos_artefatos_esta_apertado():
-    # 3 GB livres: um nó GIS gravando um raster consome isso em segundos, e o
-    # toast "Disco quase cheio" precisa chegar ANTES da falha de gravação.
+    # 3 GB free: a GIS node writing a raster consumes that in seconds, and the
+    # "Disco quase cheio" (disk almost full) toast must arrive BEFORE the write fails.
     assert sysinfo._ttl_do_valor(
         {"disk_free_gb": 200.0, "artifacts_disk_free_gb": 3.0}
     ) == sysinfo.TTL_DISCO_APERTADO_S
@@ -309,8 +309,8 @@ def test_ram_disponivel_acompanha_o_limite_reduzido(monkeypatch):
 
     assert sysinfo._get_cgroup_ram_available() == 3 * GB
 
-    # `docker update --memory=2g`: a folga real cai para 1 GB. Com o memo
-    # permanente o executor anunciaria 3 GB que não existem.
+    # `docker update --memory=2g`: the real headroom drops to 1 GB. With a
+    # permanent memo the executor would announce 3 GB that do not exist.
     arquivos["/sys/fs/cgroup/memory.max"] = 2 * GB
     sysinfo._cache_ram_total_em -= sysinfo.TTL_CGROUP_S + 1
     assert sysinfo._get_cgroup_ram_available() == 1 * GB
@@ -342,7 +342,7 @@ def test_o_memo_de_cgroup_evita_reler_a_cada_tick(monkeypatch):
 
 
 def test_fora_do_linux_nao_toca_no_sysfs(monkeypatch):
-    """Este caso SIM é imutável, e é o que gerava FileNotFoundError por segundo."""
+    """This case IS immutable, and it is what generated FileNotFoundError every second."""
     monkeypatch.setattr(sysinfo, "_EH_LINUX", False)
 
     def nao_deveria(*_a, **_k):
@@ -356,7 +356,7 @@ def test_fora_do_linux_nao_toca_no_sysfs(monkeypatch):
     assert sysinfo._get_cgroup_ram_available() is None
 
 
-# ── Hook de reset ────────────────────────────────────────────────────────────
+# ── Reset hook ───────────────────────────────────────────────────────────────
 
 
 def test_resetar_caches_zera_todo_o_estado(monkeypatch):

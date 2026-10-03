@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react"
 
 import CartaoCamada from "@/app/components/home/assistente/cartao-camada"
 
-/** O cartão de camada pipoca ao chegar (`home-pop`) — nos dois ramos. */
+/** The layer card pops in on arrival (`home-pop`) — in both branches. */
 describe("CartaoCamada", () => {
   it("disponível: 'no globo', com o pop", () => {
     render(<CartaoCamada camada={{ artifact_id: "a1", nome: "Focos", available: true }} />)

@@ -2,22 +2,23 @@
 
 // web/extensoes/limite.tsx
 //
-// Uma extensão que falha não derruba o núcleo. Cada peça que uma extensão
-// pendura na tela passa por aqui: se ela quebrar ao desenhar (um defeito dela,
-// ou o pedaço carregado sob demanda que não chegou — deploy no meio, rede que
-// caiu), o lugar mostra a `reserva`, que é o que o núcleo mostraria sem
-// extensão nenhuma. Sem isto, o erro subiria até a raiz e o React desmontaria o
-// app inteiro — inclusive o «Voltar ao padrão do ambiente» do painel do
-// modelo, que existe justamente para quando algo dá errado.
+// An extension that fails does not take down the core. Every piece an extension
+// hangs on the screen passes through here: if it breaks while rendering (a bug
+// of its own, or the lazily loaded chunk that never arrived — a deploy midway,
+// a dropped network), the spot shows the `reserva`, which is what the core
+// would show with no extension at all. Without this, the error would bubble up
+// to the root and React would unmount the whole app — including the "Voltar ao
+// padrão do ambiente" (back to the environment default) of the model panel,
+// which exists precisely for when something goes wrong.
 //
-// O erro não some: vai para o console, com o nome da extensão.
+// The error does not vanish: it goes to the console, with the extension's name.
 
 import { Component, type ErrorInfo, type ReactNode } from "react"
 
 interface Props {
-  /** O nome da extensão, para o registro do erro. */
+  /** The extension's name, for logging the error. */
   nome: string
-  /** O que fica no lugar se a extensão falhar. Padrão: nada. */
+  /** What stays in place if the extension fails. Default: nothing. */
   reserva?: ReactNode
   children: ReactNode
 }

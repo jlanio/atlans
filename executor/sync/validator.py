@@ -1,6 +1,6 @@
 # executor/sync/validator.py
 """
-SpatialValidator — valida integridade de datasets espaciais antes do upload.
+SpatialValidator — validates the integrity of spatial datasets before upload.
 """
 import logging
 
@@ -18,8 +18,8 @@ class ValidationResult:
 
 def validate_dataset(dataset: Dataset) -> ValidationResult:
     """
-    Valida um dataset espacial.
-    Retorna ValidationResult com valid=True/False e lista de warnings/errors.
+    Validates a spatial dataset.
+    Returns a ValidationResult with valid=True/False and a list of warnings/errors.
     """
     warnings: list[str] = []
     errors: list[str] = []
@@ -29,7 +29,7 @@ def validate_dataset(dataset: Dataset) -> ValidationResult:
         errors.append(f"Shapefile '{dataset.name}' incompleto — faltam componentes obrigatorios (.shp/.dbf/.shx).")
         return ValidationResult(False, warnings, errors)
 
-    # 2. Arquivo existe e nao esta vazio
+    # 2. File exists and is not empty
     for fname, finfo in dataset.files.items():
         if not finfo.path.exists():
             errors.append(f"Arquivo '{fname}' nao encontrado.")

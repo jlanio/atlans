@@ -24,13 +24,13 @@ describe("lerEstado", () => {
     expect(e.origem).toBeNull()
   })
   it("assistente é o fluxo, origem é o disparo: os dois convivem na URL", () => {
-    // `origem` já é do disparo (`trigger_source`); o chip do assistente recorta
-    // por QUEM CRIOU o fluxo — daí o nome próprio, e daí poderem se combinar.
+    // `origem` is already the trigger's (`trigger_source`); the assistant chip
+    // slices by WHO CREATED the workflow — hence its own name, and hence they can be combined.
     const e = lerEstado(sp("origem=manual&assistente=1"))
     expect([e.origem, e.assistente]).toEqual(["manual", true])
     expect(escreverEstado({ ...ESTADO_PADRAO, origem: "manual", assistente: true }))
       .toBe("origem=manual&assistente=1")
-    // Só "1" liga: qualquer outra coisa é o padrão (desligado), sem quebrar.
+    // Only "1" turns it on: anything else is the default (off), without breaking.
     expect(lerEstado(sp("assistente=sim")).assistente).toBe(false)
     expect(escreverEstado(ESTADO_PADRAO)).toBe("")
   })

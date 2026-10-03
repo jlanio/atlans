@@ -3,9 +3,9 @@ import { act, cleanup, render, screen, waitFor } from "@testing-library/react"
 import type { IWorkspaceMember } from "@/service/types"
 
 /**
- * Seção «Membros» do painel do workspace: trocar o workspace com a lista do
- * anterior ainda em voo. Sem guarda, a resposta que chegasse por último
- * vencia — os membros do workspace ANTERIOR sob o nome do atual.
+ * The workspace panel's "Membros" (members) section: switching workspaces with
+ * the previous one's list still in flight. Without a guard, the response that
+ * arrived last won — the PREVIOUS workspace's members under the current one's name.
  */
 
 const svc = vi.hoisted(() => ({ listWorkspaceMembers: vi.fn() }))

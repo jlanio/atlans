@@ -4,9 +4,9 @@ import { render } from "@testing-library/react"
 import { FormatBadge } from "@/app/components/artifacts/badges"
 
 /**
- * Os formatos da carta imagem (png/jpg/pdf) têm ícone próprio no badge de
- * formato — um formato desconhecido cai no ícone genérico de código. Compara
- * o SVG desenhado, sem importar os ícones: é o que o olho vê.
+ * The image map formats (png/jpg/pdf) have their own icon in the format
+ * badge — an unknown format falls back to the generic code icon. Compares
+ * the drawn SVG, without importing the icons: it is what the eye sees.
  */
 function svgDe(format: string): string {
   const { container } = render(<FormatBadge format={format} />)

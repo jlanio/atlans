@@ -1,11 +1,11 @@
 # tests/unit/test_run_trigger_source.py
 """
-Origem, autor e categoria de erro do run (docs/specs/metrics-history.md §2).
+Origin, author and error category of the run (docs/specs/metrics-history.md §2).
 
-Antes, `workflow_runs` não sabia dizer se um run nasceu de um clique, de um
-webhook ou do cron — e `schedule_id` só chegava ao banco quando o agendamento
-FALHAVA. O Histórico precisa dos três rótulos no INSERT do run `pending` e da
-`error_category` em todo caminho que fecha um run como `failed` fora da fila.
+Before, `workflow_runs` could not tell whether a run was born from a click, a
+webhook or the cron — and `schedule_id` only reached the database when the
+scheduling FAILED. History needs the three labels in the INSERT of the `pending`
+run and the `error_category` on every path that closes a run as `failed` outside the queue.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from app.services import workflow_execution_service as wes
 from app.services.workflow_service import DispatchResult, WorkflowService
 
 
-# ── Fábricas ──────────────────────────────────────────────────────────────────
+# ── Factories ─────────────────────────────────────────────────────────────────
 
 def _wf(id_hash="wf-1", workspace_id="ws-1"):
     wf = MagicMock()
@@ -54,7 +54,7 @@ def _runs_adicionados(db) -> list[WorkflowRun]:
 
 
 def _servico_com_dispatch_capturado():
-    """WorkflowService com tudo antes do despacho mockado; devolve (service, kwargs)."""
+    """WorkflowService with everything before dispatch mocked; returns (service, kwargs)."""
     wf = _wf()
     db = MagicMock()
     db.execute = AsyncMock(return_value=MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[])))))
@@ -78,7 +78,7 @@ def _patches_do_start_analysis():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# start_analysis → _dispatch_job: os rótulos passam intactos
+# start_analysis → _dispatch_job: the labels pass through intact
 # ══════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
@@ -106,12 +106,12 @@ async def test_start_analysis_agendado_leva_schedule_id():
         )
     assert capturado["trigger_source"] == "schedule"
     assert capturado["schedule_id"] == 7
-    assert capturado["triggered_by"] is None   # cron não tem usuário
+    assert capturado["triggered_by"] is None   # cron has no user
 
 
 @pytest.mark.asyncio
 async def test_chamador_antigo_sem_os_parametros_novos_continua_funcionando():
-    """Compatibilidade: quem não passa nada cai em "manual" sem autor."""
+    """Compatibility: a caller that passes nothing falls back to "manual" with no author."""
     service, capturado = _servico_com_dispatch_capturado()
     a, b, c = _patches_do_start_analysis()
     with a, b, c:
@@ -123,7 +123,7 @@ async def test_chamador_antigo_sem_os_parametros_novos_continua_funcionando():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# _dispatch_job: INSERT do run pending e as categorias de erro do servidor
+# _dispatch_job: INSERT of the pending run and the server's error categories
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _patches_do_dispatch(reg):
@@ -150,9 +150,9 @@ async def test_insert_do_run_pending_grava_os_tres_rotulos():
     assert run.trigger_source == "schedule"
     assert run.triggered_by is None
     assert run.schedule_id == 7
-    assert run.error_category is None          # caminho feliz: sem categoria
-    # A gravação é no INSERT — o primeiro commit já leva os rótulos, sem
-    # UPDATE extra no caminho crítico.
+    assert run.error_category is None          # happy path: no category
+    # The write happens in the INSERT — the first commit already carries the labels,
+    # with no extra UPDATE on the critical path.
     assert db.commit.await_count == 2          # INSERT + pending→running
 
 
@@ -170,8 +170,8 @@ async def test_dispatch_sem_rotulos_grava_nulos():
 
 @pytest.mark.asyncio
 async def test_despacho_esgotado_marca_no_executor():
-    """Todos recusam: a categoria da coluna é a FIXA ("no_executor"), não a
-    granular da exceção — "no_executor_chain" nem cabe em VARCHAR(16)."""
+    """All of them refuse: the column's category is the FIXED one ("no_executor"),
+    not the exception's granular one — "no_executor_chain" does not even fit in VARCHAR(16)."""
     reg = MagicMock(); reg.send_job = AsyncMock(return_value=False)
     cadeia = wes.CandidateList(
         [_executor("ag-1"), _executor("ag-2")], tiers={}, allowed=None, mode="pool",
@@ -186,7 +186,7 @@ async def test_despacho_esgotado_marca_no_executor():
     assert run.status == "failed"
     assert run.error_category == "no_executor"
     assert len(run.error_category) <= 16
-    assert exc.value.category == "no_executor_chain"   # a exceção não muda
+    assert exc.value.category == "no_executor_chain"   # the exception does not change
     assert run.trigger_source == "manual"
 
 
@@ -222,8 +222,8 @@ async def test_excecao_no_despacho_marca_dispatch():
 
 @pytest.mark.asyncio
 async def test_rede_de_seguranca_nao_reescreve_categoria_do_despacho_esgotado():
-    """`_close_orphan_dispatch` é idempotente: o caminho (4) já fechou o run
-    com "no_executor" e o except externo não pode trocar por "dispatch"."""
+    """`_close_orphan_dispatch` is idempotent: path (4) already closed the run
+    with "no_executor" and the outer except must not change it to "dispatch"."""
     reg = MagicMock(); reg.send_job = AsyncMock(return_value=False)
     db = _db_dispatch()
     a, b, c, d = _patches_do_dispatch(reg)
@@ -274,7 +274,7 @@ async def test_execute_dispara_como_manual_com_o_usuario(rota_com_servico):
 
 async def test_retry_dispara_como_retry_com_o_usuario(rota_com_servico):
     ac, svc, usuario = rota_com_servico
-    # A rota valida que o run existe e pertence ao workflow.
+    # The route validates that the run exists and belongs to the workflow.
     from app.api.dependencies import get_db
     from app.main import app
 
@@ -296,8 +296,8 @@ async def test_retry_dispara_como_retry_com_o_usuario(rota_com_servico):
 
 
 async def test_webhook_dispara_como_webhook_sem_usuario(client):
-    """Sem `triggered_by`: o chamador é um sistema externo — inventar um dono
-    abriria credenciais privadas a quem só tem o token do gatilho."""
+    """No `triggered_by`: the caller is an external system — inventing an owner
+    would open private credentials to whoever only holds the trigger token."""
     from app.api.dependencies import get_workflow_service
     from app.main import app
 
@@ -317,7 +317,7 @@ async def test_webhook_dispara_como_webhook_sem_usuario(client):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Agendador: schedule + schedule_id no caminho feliz E no de falha
+# Scheduler: schedule + schedule_id on the happy path AND on the failure one
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _sessao(db):
@@ -342,7 +342,7 @@ async def test_agendador_rotula_o_despacho_normal():
     kwargs = service.start_analysis.await_args.kwargs
     assert kwargs["trigger_source"] == "schedule"
     assert kwargs["schedule_id"] == 7
-    assert "triggered_by" not in kwargs        # cron não inventa usuário
+    assert "triggered_by" not in kwargs        # cron does not invent a user
 
 
 @pytest.mark.asyncio
@@ -370,7 +370,7 @@ async def test_agendador_sem_executor_rotula_o_run_sintetico():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Consumer: categoria do job_result só no desfecho failed
+# Consumer: job_result category only on the failed outcome
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _payload(status, categoria=None):
@@ -404,9 +404,9 @@ async def test_consumer_nao_carimba_categoria_em_sucesso_nem_cancelamento():
 
 @pytest.mark.asyncio
 async def test_consumer_ignora_categoria_fora_do_vocabulario():
-    """Um executor fora da taxonomia não pode derrubar o commit do fechamento —
-    nem gravar um texto mutilado ("no_executor_chai") que a tela agruparia
-    como se fosse outra categoria: fora do vocabulário, fica None."""
+    """An executor outside the taxonomy must not bring down the closing commit —
+    nor store a mangled text ("no_executor_chai") that the screen would group
+    as if it were another category: outside the vocabulary, it stays None."""
     from app.core.run_result_consumer import _update_run_status
 
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
@@ -423,7 +423,7 @@ async def test_consumer_ignora_categoria_fora_do_vocabulario():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# WS router: executor caiu → executor_lost (desconexão e watchdog passam aqui)
+# WS router: executor dropped → executor_lost (disconnect and watchdog go through here)
 # ══════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio

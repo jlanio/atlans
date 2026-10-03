@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest"
 import { OUTPUT_ICONS, NODE_ICONS } from "@/consts/WorkflowIcons"
 
 /**
- * Os nós de saída abaixo espelham o registro do backend (`flow/nodes/outputs/`,
- * `type: "output"`). Sem entrada em `OUTPUT_ICONS` o card nasce com o ícone de
- * erro ("404") e o `satisfies` do arquivo só acusa quando o union e o mapa
- * divergem entre si — não quando o backend ganha um nó e ninguém lembra do
- * ícone. Este teste falha e aponta qual ficou de fora.
+ * The output nodes below mirror the backend registry (`flow/nodes/outputs/`,
+ * `type: "output"`). Without an entry in `OUTPUT_ICONS` the card is born with the
+ * error icon ("404") and the file's `satisfies` only complains when the union and
+ * the map diverge from each other — not when the backend gains a node and nobody
+ * remembers the icon. This test fails and points out which one was left out.
  */
 const SAIDAS_DO_BACKEND = [
   "SaveToPostGIS",

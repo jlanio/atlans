@@ -1,12 +1,12 @@
 import "@testing-library/jest-dom/vitest"
 
-// O jsdom não implementa ResizeObserver, e os componentes do Radix que medem o
-// próprio tamanho (tooltip, popover, select) quebram com "ResizeObserver is not
-// defined" ao montar — antes de qualquer asserção, então o erro não diz nada
-// sobre o que o teste queria verificar.
+// jsdom does not implement ResizeObserver, and the Radix components that
+// measure their own size (tooltip, popover, select) break with "ResizeObserver
+// is not defined" on mount — before any assertion, so the error says nothing
+// about what the test wanted to check.
 //
-// Polyfill inerte de propósito: nada aqui redimensiona, então o callback nunca
-// precisa disparar. Serve só para o componente montar.
+// An inert polyfill on purpose: nothing here resizes, so the callback never
+// needs to fire. It only serves to let the component mount.
 if (!globalThis.ResizeObserver) {
   globalThis.ResizeObserver = class {
     observe() {}
@@ -15,32 +15,33 @@ if (!globalThis.ResizeObserver) {
   } as unknown as typeof ResizeObserver
 }
 
-// Mesma história do ResizeObserver: o jsdom não implementa `scrollIntoView`, e
-// qualquer componente que gruda a rolagem no fim de uma lista (a conversa do
-// assistente) quebra ao montar, antes de qualquer asserção.
-// A guarda de `typeof Element` não é zelo: alguns testes declaram
-// `@vitest-environment node` (o SSR do SessionSync), e lá não existe DOM nenhum.
+// Same story as ResizeObserver: jsdom does not implement `scrollIntoView`, and
+// any component that pins the scroll to the end of a list (the assistant's
+// conversation) breaks on mount, before any assertion.
+// The `typeof Element` guard is not overcaution: some tests declare
+// `@vitest-environment node` (the SessionSync SSR), and there is no DOM there at all.
 if (typeof Element !== "undefined" && !Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = function () {}
 }
 
-// O jsdom 30.1.0 dispara `blur` no `window` quando um elemento ganha o foco
-// depois que o elemento focado antes saiu do DOM (o cleanup do Testing Library
-// tira tudo ao fim de cada teste). O navegador não faz isso: lá, o `blur` do
-// `window` é a janela perdendo o foco, e vem sem `relatedTarget`. Este `blur`
-// falso traz o elemento que ganhou o foco, e assim dá para separá-lo do
-// verdadeiro. O DropdownMenu e o Select do Radix fecham ao ouvir o `blur` do
-// `window`: do segundo teste de um arquivo em diante, o menu abria e fechava na
-// mesma hora. O jsdom 30.1.1 já não dispara esse `blur` (ele segue a
-// especificação ao mover o foco), e aí isto pode sair.
+// jsdom 30.1.0 fires `blur` on `window` when an element gains focus after the
+// previously focused element has left the DOM (Testing Library's cleanup
+// removes everything at the end of each test). The browser does not do this:
+// there, the `window` `blur` is the window losing focus, and it comes without
+// `relatedTarget`. This fake `blur` carries the element that gained focus, and
+// that is how it can be told apart from the real one. Radix's DropdownMenu and
+// Select close when they hear the `window` `blur`: from the second test of a
+// file on, the menu opened and closed at once. jsdom 30.1.1 no longer fires
+// this `blur` (it follows the spec when moving focus), and then this can go.
 if (typeof window !== "undefined") {
   window.addEventListener(
     "blur",
     (evento) => {
-      // Na fase de captura passam também os `blur` dos elementos (não sobem,
-      // mas descem pelo `window`): só o que tem o próprio `window` como alvo
-      // interessa. `evento.target === window` não serve no Vitest: o `window`
-      // global não é o mesmo objeto que o jsdom põe no `target`.
+      // The elements' `blur` events also pass through the capture phase (they do
+      // not bubble up, but they travel down through `window`): only the one
+      // targeting `window` itself matters. `evento.target === window` does not
+      // work in Vitest: the global `window` is not the same object jsdom puts
+      // in `target`.
       if (evento.eventPhase === Event.AT_TARGET && evento.relatedTarget !== null) {
         evento.stopImmediatePropagation()
       }

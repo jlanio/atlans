@@ -1,14 +1,15 @@
 // web/extensoes/index.ts
 //
-// As extensões do web: o que uma instalação tem além do núcleo. O núcleo lê
-// daqui, e só daqui; quem lista as extensões presentes é `instaladas.ts` (na
-// distribuição livre, a lista vazia de `nenhuma.ts`). Ver `tipos.ts`.
+// The web's extensions: what an installation has beyond the core. The core
+// reads from here, and only from here; the list of extensions present is in
+// `instaladas.ts` (in the free distribution, the empty list from `nenhuma.ts`).
+// See `tipos.ts`.
 
 import { INSTALADAS } from "@/extensoes/instaladas"
 import type { ExtensaoDoWeb, PropsDoEnvoltorioDoPainel } from "./tipos"
 
 export type { ExtensaoDoWeb, PropsDoEnvoltorioDoPainel }
-/** Por onde passa cada peça de extensão na tela: se ela falhar, sai sozinha. */
+/** What every extension piece on the screen passes through: if it fails, it drops out on its own. */
 export { LimiteDaExtensao } from "./limite"
 
 export const EXTENSOES: readonly ExtensaoDoWeb[] = INSTALADAS

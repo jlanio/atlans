@@ -1,13 +1,13 @@
-"""Jinja nos parâmetros que não são string de topo.
+"""Jinja in parameters that are not top-level strings.
 
-`render_node_parameters` parava na primeira linha — `if not isinstance(raw, str):
-continue` — e só renderizava parâmetro string de topo. Quem ficava de fora eram
-justamente os campos feitos para receber valor dinâmico: `queryParams` dos nós
-de banco (os valores dos `:placeholders`) e `headers`/`params` do HttpRequest.
+`render_node_parameters` stopped at the first line — `if not isinstance(raw, str):
+continue` — and only rendered top-level string parameters. What was left out were
+precisely the fields meant to receive dynamic values: `queryParams` of the
+database nodes (the values of the `:placeholders`) and `headers`/`params` of HttpRequest.
 
-E o modo de falha era pior que "não funciona": o dicionário seguia cru, o
-template ia como TEXTO para o banco (`WHERE bairro = '{{ ... }}'`), a consulta
-rodava, voltava vazia e o fluxo continuava. Nenhum erro em lugar nenhum.
+And the failure mode was worse than "doesn't work": the dictionary went through
+raw, the template went as TEXT to the database (`WHERE bairro = '{{ ... }}'`), the
+query ran, came back empty and the workflow went on. No error anywhere.
 """
 import pytest
 
@@ -20,7 +20,7 @@ class NoFalso:
 
 
 def _render(parameters, named=None):
-    """Roda o renderizador com o mesmo formato de contexto do executor."""
+    """Runs the renderer with the same context shape as the executor."""
     named = named if named is not None else {
         "Filtro": {"bairro": "Centro", "limite": 50, "ativo": True,
                    "taxa": 1.5, "nada": None},
@@ -30,7 +30,7 @@ def _render(parameters, named=None):
     return render_node_parameters(NoFalso(parameters), "n1", named, context)
 
 
-# ── O caso do pedido: queryParams ───────────────────────────────────────────
+# ── The case from the request: queryParams ──────────────────────────────────
 
 def test_expressao_no_valor_do_queryparams_e_resolvida():
     saida = _render({
@@ -46,16 +46,16 @@ def test_alias_sem_chaves_tambem_vale_no_queryparams():
 
 
 def test_string_de_topo_continua_funcionando():
-    """A regressão que eu mais temeria: o caminho antigo tinha de ficar igual."""
+    """The regression I would fear most: the old path had to stay the same."""
     saida = _render({"query": "SELECT * FROM t LIMIT {{ $Filtro.limite }}"})
     assert saida["query"] == "SELECT * FROM t LIMIT 50"
 
 
-# ── Tipo do valor ───────────────────────────────────────────────────────────
+# ── Value type ──────────────────────────────────────────────────────────────
 #
-# O valor de `queryParams` vira bind de SQL (`$1`), e o tipo decide como o
-# Postgres compara com a coluna. `Template.render()` do Jinja devolve texto
-# sempre — `{{ x }}` com 50 vira `'50'` e com None vira a string `'None'`.
+# The value of `queryParams` becomes a SQL bind (`$1`), and the type decides how
+# Postgres compares it with the column. Jinja's `Template.render()` always
+# returns text — `{{ x }}` with 50 becomes `'50'` and with None the string `'None'`.
 
 @pytest.mark.parametrize("expressao,esperado,tipo", [
     ("{{ $Filtro.limite }}", 50,       int),
@@ -71,15 +71,15 @@ def test_tipo_e_preservado_quando_o_valor_e_a_expressao_inteira(expressao, esper
 
 
 def test_template_misto_continua_texto():
-    """`ano-{{ x }}` pede concatenação — texto é o resultado certo."""
+    """`ano-{{ x }}` asks for concatenation — text is the right result."""
     saida = _render({"queryParams": {"v": "ano-{{ $Filtro.limite }}"}})
     assert saida["queryParams"]["v"] == "ano-50"
 
 
 def test_topo_nao_muda_de_tipo():
-    """No topo o comportamento antigo é preservado de propósito: há nós que
-    fazem `.strip()` no parâmetro, e trocar o tipo lá misturaria correção com
-    quebra."""
+    """At the top level the old behavior is preserved on purpose: some nodes
+    call `.strip()` on the parameter, and changing the type there would mix a fix
+    with breakage."""
     saida = _render({"timeout": "{{ $Filtro.limite }}"})
     assert saida["timeout"] == "50"
 
@@ -92,7 +92,7 @@ def test_desce_por_lista_e_dicionario_aninhados():
 
 
 def test_chave_do_dicionario_nao_e_renderizada():
-    """A chave é o nome do `:placeholder` e precisa casar com o SQL."""
+    """The key is the name of the `:placeholder` and must match the SQL."""
     saida = _render({"queryParams": {"{{ $Filtro.bairro }}": "x"}})
     assert list(saida["queryParams"]) == ["{{ $Filtro.bairro }}"]
 
@@ -105,17 +105,17 @@ def test_valor_sem_expressao_passa_intacto():
 def test_erro_aponta_o_caminho_dentro_da_estrutura():
     with pytest.raises(ValueError) as exc:
         _render({"queryParams": {"bairro": "{{ $Filtro.inexistente }}"}})
-    # Sem o caminho, a mensagem diria só "queryParams" e o usuário teria de
-    # adivinhar qual das chaves quebrou.
+    # Without the path, the message would say only "queryParams" and the user would
+    # have to guess which of the keys broke.
     assert "queryParams.bairro" in str(exc.value)
 
 
-# ── O que o servidor injeta da credencial não é template ─────────────────────
+# ── What the server injects from the credential is not a template ────────────
 
 @pytest.mark.parametrize("senha", ["p@ss{{w0rd}}", "abc{%x%}def", "x$Filtro.bairro"])
 def test_a_credencial_injetada_passa_intacta_e_sem_erro(senha):
-    # Renderizada, a senha mudaria em silêncio — ou a falha de renderização a
-    # repetiria na mensagem de erro, que vai à tela, ao banco e ao log.
+    # Rendered, the password would change silently — or the rendering failure would
+    # repeat it in the error message, which goes to the screen, the database and the log.
     parametros = {
         "http_auth": {"type": "wfs", "username": "leitor", "password": senha},
         "connectionString": f"postgresql://u:{senha}@h/db",

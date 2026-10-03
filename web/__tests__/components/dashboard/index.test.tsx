@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { IWorkflow, IWorkflowSchedule } from "@/service/types"
 import type { IObservabilityMetrics, INowBlock } from "@/service/types"
 
-// ── Dublês ───────────────────────────────────────────────────────────────────
-// URL e roteador: o escopo vive na query (`?escopo=`) e as ações roteiam por
-// push. `replace` é o que o toggle usa (mesma tela, sem empilhar histórico).
+// ── Doubles ──────────────────────────────────────────────────────────────────
+// URL and router: the scope lives in the query (`?escopo=`) and the actions route via
+// push. `replace` is what the toggle uses (same screen, without stacking history).
 const url = vi.hoisted(() => ({ sp: new URLSearchParams(""), pathname: "/dashboard" }))
 const roteador = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }))
 vi.mock("next/navigation", () => ({
@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
   useSearchParams: () => url.sp,
 }))
 
-// WorkspaceContext com dois workspaces (o toggle de escopo só existe com > 1).
+// WorkspaceContext with two workspaces (the scope toggle only exists with > 1).
 const workspace = vi.hoisted(() => ({
   current: { id_hash: "ws-1", name: "Bacia" } as { id_hash: string; name: string } | null,
   setCurrent: vi.fn(),
@@ -106,16 +106,16 @@ describe("Dashboard — página", () => {
     render(<DashboardView />)
     expect(screen.getByRole("heading", { level: 1, name: "Dashboard" })).toBeInTheDocument()
 
-    // Saúde (calma), atenção, próximas e resumo do período.
+    // Health (calm), attention, upcoming and period summary.
     await waitFor(() => expect(screen.getByText("Tudo tranquilo — nada pedindo atenção agora.")).toBeInTheDocument())
     expect(screen.getByRole("region", { name: "Precisa de atenção" })).toBeInTheDocument()
     expect(screen.getByRole("region", { name: "Próximas execuções" })).toBeInTheDocument()
     expect(screen.getByRole("region", { name: "Resumo do período · últimos 30 dias" })).toBeInTheDocument()
 
-    // Subtítulo do escopo ativo, com a contagem de ativos das métricas.
+    // Subtitle of the active scope, with the metrics' active count.
     expect(screen.getByText("«Bacia» · 8 workflows ativos")).toBeInTheDocument()
 
-    // As cinco fontes, por workspace, com a janela de 30 dias.
+    // The five sources, per workspace, with the 30-day window.
     expect(svc.getObservabilityMetrics).toHaveBeenCalledWith(30, false, { workspace_id: "ws-1" })
     expect(svc.getRunsByDay).toHaveBeenCalledWith(30, expect.objectContaining({ workspace_id: "ws-1" }))
     expect(svc.getObservabilityRuns).toHaveBeenCalledWith(expect.objectContaining({ limit: 6, workspace_id: "ws-1" }))
@@ -146,8 +146,8 @@ describe("Dashboard — página", () => {
     render(<DashboardView />)
     await screen.findByRole("region", { name: "Precisa de atenção" })
 
-    // As três fontes de janela na janela de 90 dias; execuções recentes (limit) e
-    // workflows (futuras) não têm período.
+    // The three windowed sources in the 90-day window; recent runs (limit) and
+    // workflows (upcoming) have no period.
     expect(svc.getObservabilityMetrics).toHaveBeenCalledWith(90, false, { workspace_id: "ws-1" })
     expect(svc.getRunsByDay).toHaveBeenCalledWith(90, expect.objectContaining({ workspace_id: "ws-1" }))
     expect(svc.getExecutorMetrics).toHaveBeenCalledWith(90, false, { workspace_id: "ws-1" })
@@ -156,7 +156,7 @@ describe("Dashboard — página", () => {
   })
 
   it("escopo 'todos': fontes sem workspace_id e etiqueta do workspace nas próximas", async () => {
-    // A próxima é de outro workspace, para a etiqueta ter o que mostrar.
+    // The upcoming one is from another workspace, so the tag has something to show.
     svc.getWorkflows.mockResolvedValue(ok([wf("a", { workspace_id: "ws-2" })]))
     url.sp = new URLSearchParams("escopo=todos")
     render(<DashboardView />)
@@ -164,10 +164,10 @@ describe("Dashboard — página", () => {
     await waitFor(() => expect(svc.getWorkflows).toHaveBeenLastCalledWith(undefined, { incluirDoAssistente: true }))
     expect(svc.getObservabilityMetrics).toHaveBeenLastCalledWith(30, false, { workspace_id: undefined })
 
-    // Espera o CONTEÚDO montar, não só as chamadas dispararem: a chamada de
-    // serviço acontece durante a carga, mas as seções só renderizam quando o
-    // `carregando` zera. Consultar de forma síncrona aqui corria com o skeleton
-    // (verde local, vermelho sob a lentidão do CI). `findBy*` reintenta até pintar.
+    // Waits for the CONTENT to mount, not just for the calls to fire: the service
+    // call happens during loading, but the sections only render when
+    // `carregando` clears. Querying synchronously here raced with the skeleton
+    // (green locally, red under CI's slowness). `findBy*` retries until it paints.
     const proximas = await screen.findByRole("region", { name: "Próximas execuções" })
     expect(await within(proximas).findByText("Segundo WS")).toBeInTheDocument()
   })
@@ -195,7 +195,7 @@ describe("Dashboard — página", () => {
 
     const atencao = await screen.findByRole("region", { name: "Precisa de atenção" })
     fireEvent.click(within(atencao).getByRole("button", { name: /Ver falhas/ }))
-    // Visão padrão (execuções) aplica workflow+status; `&workspace=` preserva o escopo ativo.
+    // The default view (runs) applies workflow+status; `&workspace=` preserves the active scope.
     expect(roteador.push).toHaveBeenCalledWith("/observability?workflow=wf-fail&status=failed&workspace=ws-1")
   })
 

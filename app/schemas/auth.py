@@ -7,10 +7,10 @@ _USERNAME_RE = re.compile(r"^[a-z0-9_]+$")
 
 
 def _normalize_email(value: str) -> str:
-    """Canoniza e-mail para minúsculas + sem espaços nas bordas.
+    """Canonicalizes e-mail to lowercase + no surrounding whitespace.
 
-    Garante que a constraint unique (case-sensitive no Postgres) não permita
-    contas duplicadas variando apenas a caixa (Joao@x.com vs joao@x.com).
+    Ensures the unique constraint (case-sensitive in Postgres) does not allow
+    duplicate accounts differing only in case (Joao@x.com vs joao@x.com).
     """
     return value.strip().lower()
 
@@ -26,10 +26,10 @@ class UserCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_fields(self) -> "UserCreate":
-        # Valida formato do username: apenas letras minúsculas, números e underscore
+        # Validates the username format: only lowercase letters, digits and underscore
         if not _USERNAME_RE.match(self.username):
             raise ValueError("O nome de usuário só pode conter letras minúsculas, números e underscore (_).")
-        # Valida confirmação de senha, se fornecida
+        # Validates the password confirmation, if provided
         if self.password_confirm is not None and self.password != self.password_confirm:
             raise ValueError("As senhas não coincidem.")
         return self

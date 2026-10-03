@@ -12,15 +12,15 @@ import { plural } from "@/lib/formatos"
 interface Props {
   itens: ItemDeAtencao[]
   carregando: boolean
-  /** Frase para a lista vazia (`textoDeVazio` de `atencao.ts`). */
+  /** Sentence for the empty list (`textoDeVazio` from `atencao.ts`). */
   vazio: string
   onAcao: (acao: AcaoDeAtencao) => void
-  /** Aviso quando uma das fontes (métricas, executores) falhou. */
+  /** Notice when one of the sources (metrics, executors) failed. */
   falha?: string
 }
 
-// Cores dos status, as do `StatusBadge`: presa é "em andamento além da
-// conta" (âmbar), falhas são falhas (vermelho), teto é fila (azul).
+// Status colors, the ones from `StatusBadge`: stuck is "in progress for too
+// long" (amber), failures are failures (red), ceiling is queue (blue).
 const ESTILO: Record<ItemDeAtencao["tipo"], { icone: IconType; classe: string }> = {
   presa: { icone: TbClock, classe: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" },
   falhas: { icone: TbAlertTriangle, classe: "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" },
@@ -28,14 +28,16 @@ const ESTILO: Record<ItemDeAtencao["tipo"], { icone: IconType; classe: string }>
 }
 
 /**
- * "Precisa de atenção" (spec §4.3). Cada item é UM botão — o item inteiro é
- * o alvo, e a ação (abrir a execução, filtrar por falhas, abrir o executor)
- * é decidida por quem compõe a página; aqui só se diz o que aconteceu.
+ * "Precisa de atenção" (Needs attention, spec §4.3). Each item is ONE button —
+ * the whole item is the target, and the action (open the run, filter by
+ * failures, open the executor) is decided by whoever composes the page; here
+ * we only say what happened.
  *
- * Os alertas são derivados de métricas ao vivo, então antes ficavam abertos sem
- * como limpar. Agora cada item tem um "dispensar" (×), com "Limpar tudo" e
- * "Restaurar" no topo — uma conveniência por navegador (`atencao-dispensados`).
- * Dispensar não cega: o item volta se o problema piorar (a assinatura muda).
+ * The alerts are derived from live metrics, so they used to stay open with no
+ * way to clear them. Now each item has a "dismiss" (×), with "Limpar tudo"
+ * (clear all) and "Restaurar" (restore) at the top — a per-browser convenience
+ * (`atencao-dispensados`). Dismissing does not blind: the item comes back if
+ * the problem gets worse (the signature changes).
  */
 export function AtencaoLista({ itens, carregando, vazio, onAcao, falha }: Props) {
   const { ocultar, contarOcultos, dispensar, dispensarTodos, restaurar } = useAtencaoDispensada()
@@ -43,8 +45,9 @@ export function AtencaoLista({ itens, carregando, vazio, onAcao, falha }: Props)
   const ocultos = contarOcultos(itens)
 
   const mostrandoSkeleton = carregando && itens.length === 0 && !falha
-  // Distingue "nada pede atenção" (verde) de "você dispensou tudo" (neutro): o
-  // segundo NÃO é motivo de comemoração, e a saída é restaurar, não relaxar.
+  // Tells "nothing needs attention" (green) from "you dismissed everything"
+  // (neutral): the second is NOT cause for celebration, and the way out is to
+  // restore, not to relax.
   const tudoDispensado = visiveis.length === 0 && ocultos > 0
 
   return (
@@ -136,9 +139,9 @@ export function AtencaoLista({ itens, carregando, vazio, onAcao, falha }: Props)
             const resto = item.titulo.startsWith(item.nome) ? item.titulo.slice(item.nome.length) : ` ${item.titulo}`
             return (
               <li key={item.chave}>
-                {/* Linha = ação principal (o item inteiro) + um "dispensar" à
-                    direita. Como não se aninha <button> em <button>, os dois são
-                    irmãos dentro de um contêiner que compartilha o hover. */}
+                {/* Row = main action (the whole item) + a "dismiss" on the
+                    right. Since a <button> cannot nest in a <button>, the two
+                    are siblings inside a container that shares the hover. */}
                 <div className="group/item flex items-stretch gap-0.5 rounded-md transition-colors hover:bg-accent/60">
                   <button
                     type="button"

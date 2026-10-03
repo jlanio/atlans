@@ -1,21 +1,22 @@
 # tests/unit/test_admin_workspaces_router.py
-"""Autorizacao da lixeira de workspaces (/admin/workspaces/*).
+"""Authorization of the workspace trash (/admin/workspaces/*).
 
-A lixeira lista, restaura e descarta workspaces de QUALQUER usuario da
-plataforma. A garantia vem do router (`dependencies=[Depends(require_admin)]`),
-nao de codigo nos handlers — e por isso e fragil: basta alguem mover um endpoint
-para outro router, ou criar um router novo sem a dependency, para abrir tudo.
-Estes testes falham no instante em que isso acontecer.
+The trash lists, restores and discards workspaces of ANY user on the
+platform. The guarantee comes from the router
+(`dependencies=[Depends(require_admin)]`), not from code in the handlers — and
+that is why it is fragile: someone only has to move an endpoint to another
+router, or create a new router without the dependency, to open everything up.
+These tests fail the moment that happens.
 """
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 
-# ── Negado para usuario comum ────────────────────────────────────────────────
+# ── Denied for a regular user ────────────────────────────────────────────────
 
 async def test_trash_negado_para_usuario_comum(client):
-    """client autentica com role='user' (ver conftest)."""
+    """client authenticates with role='user' (see conftest)."""
     resp = await client.get("/admin/workspaces/trash")
     assert resp.status_code == 403
 
@@ -33,7 +34,7 @@ async def test_purge_negado_para_usuario_comum(client):
     assert resp.status_code == 403
 
 
-# ── Guardas do purge (com admin autenticado) ─────────────────────────────────
+# ── Purge guards (with an authenticated admin) ───────────────────────────────
 
 @pytest.fixture
 def admin_client_db(client, mock_current_user):
@@ -57,7 +58,7 @@ def admin_client_db(client, mock_current_user):
 
 
 async def test_purge_exige_confirm_igual_ao_id(admin_client_db):
-    """Guarda contra clique na linha errada da tabela — checada no servidor."""
+    """Guard against a click on the wrong row of the table — checked on the server."""
     ac, _ = admin_client_db
     resp = await ac.post(
         "/admin/workspaces/ws-test-001/purge",
@@ -67,7 +68,7 @@ async def test_purge_exige_confirm_igual_ao_id(admin_client_db):
 
 
 async def test_purge_404_para_workspace_fora_da_lixeira(admin_client_db):
-    """Só workspace com deleted_at preenchido pode ser purgado."""
+    """Only a workspace with deleted_at set can be purged."""
     ac, db = admin_client_db
     result = MagicMock()
     result.scalar_one_or_none.return_value = None   # nada casa deleted_at IS NOT NULL

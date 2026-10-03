@@ -1,13 +1,13 @@
 # tests/unit/test_limite_de_memoria_do_executor.py
-"""O limite de memória do executor acompanha a máquina.
+"""The executor's memory limit follows the machine.
 
-O `memory: 2G` fixo do docker-compose.executor.yml matou um executor por OOM do
-cgroup — numa máquina de 16 GB com 13 GB livres —, e o job que ele
-rodava ficou sem desfecho. Agora o instalador grava EXECUTOR_MEMORIA (75% da
-memória que o Docker enxerga) no .env que o compose interpola.
+The fixed `memory: 2G` of docker-compose.executor.yml killed an executor by cgroup
+OOM — on a 16 GB machine with 13 GB free —, and the job it was
+running was left without an outcome. Now the installer writes EXECUTOR_MEMORIA (75% of
+the memory Docker sees) into the .env that compose interpolates.
 
-A função é EXECUTADA como está no instalador — recortada entre os marcadores,
-não copiada para cá: uma cópia continuaria verde com o script quebrado.
+The function is EXECUTED as it is in the installer — cut out between the markers,
+not copied here: a copy would stay green with the script broken.
 """
 import re
 import subprocess
@@ -43,13 +43,13 @@ def _limite(total_bytes: int) -> str:
 
 
 @pytest.mark.parametrize("total,esperado", [
-    (16 * GIB, "12G"),   # a máquina do incidente: 12G era o que o diagnóstico recomendou
+    (16 * GIB, "12G"),   # the incident's machine: 12G was what the diagnosis recommended
     (8 * GIB, "6G"),
     (4 * GIB, "3G"),
     (64 * GIB, "48G"),
-    (int(15.5 * GIB), "11G"),   # arredonda para baixo: nunca promete o que não há
-    # Piso: os 2G fixos de antes. Numa VPS de "2 GB" (1,93 GiB) 75% daria 1G, e
-    # um job de 1,5 GB que rodava passaria a morrer por OOM.
+    (int(15.5 * GIB), "11G"),   # rounds down: never promises what isn't there
+    # Floor: the fixed 2G from before. On a "2 GB" VPS (1.93 GiB) 75% would give 1G, and
+    # a 1.5 GB job that used to run would start dying from OOM.
     (int(2.66 * GIB), "2G"),
     (int(1.93 * GIB), "2G"),
     (512 * 1024 ** 2, "2G"),
@@ -60,8 +60,8 @@ def test_limite_e_75_por_cento_da_memoria_do_docker(total, esperado):
 
 @pytest.mark.parametrize("valor,aceito", [
     ("12G", True), ("1536M", True), ("512M", True), ("512m", True), ("1g", True),
-    ("08G", True),                  # zero à esquerda não vira octal
-    ("511M", False),                # abaixo da reserva do compose: o Docker recusa
+    ("08G", True),                  # a leading zero does not become octal
+    ("511M", False),                # below the compose reservation: Docker refuses
     ("256M", False), ("0G", False),
     ("12", False), ("12GB", False), ("1.5G", False), ("", False),
 ])
@@ -70,8 +70,8 @@ def test_memoria_manual_respeita_a_reserva_do_compose(valor, aceito):
 
 
 def test_avisa_quando_o_compose_local_nao_le_o_limite(tmp_path):
-    """Compose com edição local: o `git pull --ff-only` aborta e o arquivo segue
-    com o `memory: 2G` fixo — gravar o .env sozinho não muda nada."""
+    """Compose with a local edit: `git pull --ff-only` aborts and the file keeps
+    the fixed `memory: 2G` — writing the .env alone changes nothing."""
     velho = tmp_path / "docker-compose.executor.yml"
     velho.write_text("services:\n  executor:\n    deploy: {resources: {limits: {memory: 2G}}}\n")
 
@@ -87,8 +87,8 @@ def test_compose_le_o_limite_do_env_com_2g_de_padrao():
 
 
 def test_o_instalador_grava_o_limite_no_env_do_projeto():
-    """O compose interpola do .env AO LADO dele — não do executor/.env, que é o
-    ambiente do container."""
+    """Compose interpolates from the .env NEXT TO it — not from executor/.env, which is the
+    container's environment."""
     assert "EXECUTOR_MEMORIA=%s" in INSTALL_SH
     assert "docker info --format '{{.MemTotal}}'" in INSTALL_SH
     assert "--memoria=*)" in INSTALL_SH

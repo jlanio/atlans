@@ -1,10 +1,11 @@
 /**
- * O que acontece dentro de um sub-fluxo, visto do painel do fluxo pai.
+ * What happens inside a sub-workflow, seen from the parent workflow's panel.
  *
- * Os nós do filho não existem no canvas do pai: o executor os publica com o id
- * prefixado (`nóPai::nóFilho`) e marca `subworkflow_parent_node` no `extra`.
- * Nada lia essa marca — a linha aparecia com o id cru, sem dizer de onde veio, e
- * clicar nela era um no-op silencioso (`focusNode` não acha o id no canvas).
+ * The child's nodes don't exist on the parent's canvas: the executor publishes
+ * them with a prefixed id (`nóPai::nóFilho`) and marks `subworkflow_parent_node`
+ * in `extra`. Nothing read that mark — the row showed up with the raw id, without
+ * saying where it came from, and clicking it was a silent no-op (`focusNode`
+ * doesn't find the id on the canvas).
  */
 import { describe, it, expect } from "vitest"
 
@@ -62,11 +63,11 @@ describe("buildTimeline com eventos de sub-fluxo", () => {
     const t = buildTimeline([doFilho("c", "started", 100)], [canvasPai], T0)
     const linha = t.nodes.find(n => n.nodeId === "pai::c")!
 
-    // Sem isto, focar/destacar/abrir configuração não fazia nada: o id do
-    // filho não existe no canvas do pai.
+    // Without this, focusing/highlighting/opening the configuration did nothing:
+    // the child's id doesn't exist on the parent's canvas.
     expect(linha.canvasNodeId).toBe("pai")
-    // O selo mostra o ALIAS do nó no canvas, não o id — é o que a pessoa vê
-    // desenhado na tela.
+    // The badge shows the node's ALIAS on the canvas, not the id — it's what the
+    // person sees drawn on the screen.
     expect(linha.subFlow).toBe("Calcular área")
   })
 
@@ -82,7 +83,7 @@ describe("buildTimeline com eventos de sub-fluxo", () => {
   })
 
   it("cai no id do nó SubWorkflow quando ele não está no canvas", () => {
-    // Acontece ao abrir um run histórico de um fluxo que mudou desde então.
+    // Happens when opening a historical run of a workflow that has changed since.
     const t = buildTimeline([doFilho("c", "started", 100)], [], T0)
     expect(t.nodes[0].subFlow).toBe("pai")
   })

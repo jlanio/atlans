@@ -1,17 +1,18 @@
 /**
- * Recuperação do stream de execução.
+ * Recovery of the execution stream.
  *
- * O canal executor→servidor→browser é lossy em TODAS as camadas (fila do
- * executor, inbox do servidor, buffer do espectador, rate limit), e o servidor
- * fecha o socket com código 1000 mesmo quando a assinatura do Redis termina sem
- * o `__workflow_complete__`. O cliente tratava esse 1000 como encerramento
- * normal e não fazia nada: os nós ficavam girando e o painel dizia "Executando"
- * para sempre, com o run já concluído no banco e no log do executor.
+ * The executor→server→browser channel is lossy at EVERY layer (executor
+ * queue, server inbox, viewer buffer, rate limit), and the server closes
+ * the socket with code 1000 even when the Redis subscription ends without
+ * `__workflow_complete__`. The client treated that 1000 as a normal
+ * shutdown and did nothing: the nodes kept spinning and the panel said
+ * "Executando" forever, with the run already finished in the database and in
+ * the executor log.
  *
- * Estes testes cobram as três defesas que fecham esse buraco:
- *   1. nenhum nó sobrevive ao fim do run em `started`;
- *   2. queda com o run aberto reconcilia pela API;
- *   3. run ainda vivo faz o cliente reconectar, e fechamento intencional não.
+ * These tests demand the three defenses that close that hole:
+ *   1. no node outlives the end of the run in `started`;
+ *   2. a drop with the run open reconciles through the API;
+ *   3. a still-live run makes the client reconnect, and an intentional close does not.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
@@ -22,7 +23,7 @@ const RUN = "run-x"
 
 let workflowAtual = "wf-a"
 const runsPorWorkflow: Record<string, { run_id: string; status: string }[]> = {}
-/** Status que a API devolve para o run — o que o `onclose` vai consultar. */
+/** Status the API returns for the run — what `onclose` will query. */
 let statusNaApi = "running"
 
 const nosDoCanvas = [
@@ -71,12 +72,12 @@ class SocketFalso {
     SocketFalso.abertos.push(this)
   }
   send() {}
-  /** Fechamento pedido pelo CÓDIGO (intencional). */
+  /** Close requested by the CODE (intentional). */
   close(code = 1000) {
     this.fechadoCom = code
     this.onclose?.({ code })
   }
-  /** Queda vinda do SERVIDOR — o caso que precisa de recuperação. */
+  /** Drop coming from the SERVER — the case that needs recovery. */
   cairDoServidor(code = 1000) {
     this.onclose?.({ code })
   }
@@ -108,7 +109,7 @@ describe("recuperação do stream de execução", () => {
       return id
     })
     vi.stubGlobal("cancelAnimationFrame", (id: number) => { quadros.delete(id) })
-    // Jitter determinístico: o backoff vira exatamente a base.
+    // Deterministic jitter: the backoff becomes exactly the base.
     vi.spyOn(Math, "random").mockReturnValue(1)
     useWorkflowExecutionStore.getState().resetExecution()
   })
@@ -119,7 +120,7 @@ describe("recuperação do stream de execução", () => {
     vi.useRealTimers()
   })
 
-  // ── 1. Nenhum nó sobrevive ao fim do run girando ────────────────────────
+  // ── 1. No node outlives the end of the run spinning ─────────────────────
 
   it("nó preso em 'started' vira 'unknown' quando o run conclui", () => {
     const store = useWorkflowExecutionStore.getState()
@@ -132,14 +133,14 @@ describe("recuperação do stream de execução", () => {
 
     const final = useWorkflowExecutionStore.getState()
     expect(final.statusById.get("n2")?.status).toBe("unknown")
-    // O que de fato concluiu não pode ser rebaixado junto.
+    // What actually completed must not be downgraded along with it.
     expect(final.statusById.get("n1")?.status).toBe("completed")
     expect(final.isExecuting).toBe(false)
   })
 
   it("cancelamento continua devolvendo o nó a 'idle', não a 'unknown'", () => {
-    // São desfechos diferentes: cancelar interrompeu o trabalho de verdade;
-    // `unknown` é trabalho que provavelmente terminou e cuja notícia se perdeu.
+    // These are different outcomes: canceling really interrupted the work;
+    // `unknown` is work that probably finished and whose news got lost.
     const store = useWorkflowExecutionStore.getState()
     const nos = [{ id: "n1", status: "started" }] as INodeStatusWorkFlow[]
     store.startExecution(nos)
@@ -148,7 +149,7 @@ describe("recuperação do stream de execução", () => {
     expect(useWorkflowExecutionStore.getState().statusById.get("n1")?.status).toBe("idle")
   })
 
-  // ── 2. Queda com o run aberto reconcilia pela API ───────────────────────
+  // ── 2. A drop with the run open reconciles through the API ──────────────
 
   it("queda com código 1000 e run já concluído fecha o painel com o desfecho real", async () => {
     const { view, ws } = await anexar()
@@ -163,13 +164,13 @@ describe("recuperação do stream de execução", () => {
       expect(estado.statusWorkflow?.status).toBe("completed")
     })
     expect(getRunDetail).toHaveBeenCalled()
-    // Reconciliou: não faz sentido reconectar a um run que já acabou.
+    // Reconciled: it makes no sense to reconnect to a run that already ended.
     expect(SocketFalso.abertos).toHaveLength(1)
 
     view.unmount()
   })
 
-  // ── 3. Run ainda vivo → reconecta; intencional → não ────────────────────
+  // ── 3. Run still live → reconnects; intentional → does not ─────────────
 
   it("queda com o run ainda em andamento reconecta com backoff", async () => {
     const { view, ws } = await anexar()
@@ -177,12 +178,12 @@ describe("recuperação do stream de execução", () => {
 
     vi.useFakeTimers()
     await act(async () => { ws.cairDoServidor(1000) })
-    // A consulta à API é assíncrona; deixa a microtask resolver antes do timer.
+    // The API query is asynchronous; let the microtask resolve before the timer.
     await act(async () => { await vi.advanceTimersByTimeAsync(1_100) })
 
     expect(SocketFalso.abertos.length).toBeGreaterThan(1)
     expect(SocketFalso.abertos[1].url).toContain(RUN)
-    // O painel NÃO foi fechado: o run continua vivo.
+    // The panel was NOT closed: the run is still live.
     expect(useWorkflowExecutionStore.getState().isExecuting).toBe(true)
 
     view.unmount()
@@ -193,33 +194,34 @@ describe("recuperação do stream de execução", () => {
     statusNaApi = "running"
 
     vi.useFakeTimers()
-    // Desmontar fecha o socket pelo caminho do próprio código.
+    // Unmounting closes the socket through the code's own path.
     await act(async () => { view.unmount() })
     await act(async () => { await vi.advanceTimersByTimeAsync(5_000) })
 
     expect(SocketFalso.abertos).toHaveLength(1)
-    // E não foi perguntar à API por um run que o usuário deixou para trás.
+    // And it did not go ask the API about a run the user left behind.
     expect(getRunDetail).not.toHaveBeenCalled()
   })
 
-  // ── 4. Um dono só para o socket ─────────────────────────────────────────
+  // ── 4. A single owner for the socket ────────────────────────────────────
 
   it("uma segunda instância do hook não abre um socket concorrente", async () => {
-    // O hook é montado no botão Executar E na aba "Testar" do nó Webhook. Como
-    // a store de execução é global, a segunda instância abria um WebSocket
-    // paralelo para o mesmo run e, ao montar, chamava `startExecution` — que
-    // zera o canvas de quem já estava acompanhando. Nos logs de produção isso
-    // apareceu como três conexões ao mesmo run em 25 segundos.
+    // The hook is mounted on the Run button AND on the Webhook node's "Testar"
+    // tab. Since the execution store is global, the second instance opened a
+    // parallel WebSocket to the same run and, on mount, called
+    // `startExecution` — which wipes the canvas of whoever was already
+    // following. In production logs this showed up as three connections to the
+    // same run within 25 seconds.
     const { useExecuteWorkflow } = await import("@/app/hooks/workflow/useExecuteWorkflow")
 
     const dono = renderHook(() => useExecuteWorkflow())
     await waitFor(() => expect(SocketFalso.abertos).toHaveLength(1))
 
     const carona = renderHook(() => useExecuteWorkflow())
-    // Tempo REAL para a cadeia assíncrona da re-anexação (consulta à API +
-    // espera pela hidratação do canvas) completar. Com um `await
-    // Promise.resolve()` o teste passaria mesmo SEM a correção, porque o
-    // segundo socket ainda não teria sido aberto quando a asserção rodasse.
+    // REAL time for the async re-attach chain (API query + waiting for the
+    // canvas hydration) to complete. With an `await
+    // Promise.resolve()` the test would pass even WITHOUT the fix, because the
+    // second socket would not have been opened yet when the assertion ran.
     await act(async () => { await new Promise(r => setTimeout(r, 60)) })
 
     expect(SocketFalso.abertos).toHaveLength(1)
@@ -228,7 +230,7 @@ describe("recuperação do stream de execução", () => {
     dono.unmount()
   })
 
-  // ── 5. Frame ilegível não derruba o lote ────────────────────────────────
+  // ── 5. An unreadable frame does not bring down the batch ───────────────
 
   it("frame com JSON inválido é contabilizado e não lança", async () => {
     const { view, ws } = await anexar()
@@ -242,24 +244,24 @@ describe("recuperação do stream de execução", () => {
     view.unmount()
   })
 
-  // ── 5b. Socket mudo (Safari) é recuperado sem depender do onclose ───────
+  // ── 5b. A mute socket (Safari) is recovered without relying on onclose ──
   //
-  // No Safari um WebSocket ocioso é derrubado em silêncio, SEM disparar
-  // `onclose`. Como a reconexão vivia toda no `onclose`, a queda passava
-  // despercebida: o painel girava para sempre, com o run já concluído no
-  // servidor. O watchdog de inatividade fecha esse buraco — detecta o silêncio
-  // e recupera pela API/replay, mesmo que o `onclose` nunca venha.
+  // On Safari an idle WebSocket is dropped silently, WITHOUT firing
+  // `onclose`. Since reconnection lived entirely in `onclose`, the drop went
+  // unnoticed: the panel spun forever, with the run already finished on the
+  // server. The inactivity watchdog closes that hole — it detects the silence
+  // and recovers through the API/replay, even if `onclose` never comes.
 
   it("socket mudo além do limite recupera mesmo sem onclose (caso Safari)", async () => {
     const { view, ws } = await anexar()
     expect(useWorkflowExecutionStore.getState().isExecuting).toBe(true)
-    // A API sabe que o run terminou — o Safari só nunca recebeu os eventos.
+    // The API knows the run finished — Safari just never received the events.
     statusNaApi = "success"
 
     vi.useFakeTimers()
-    // Arma o watchdog no relógio falso (o socket falso não dispara onopen só).
+    // Arms the watchdog on the fake clock (the fake socket does not fire onopen by itself).
     act(() => { ws.onopen?.() })
-    // Silêncio TOTAL: nenhum onmessage e — de propósito — nenhum onclose.
+    // TOTAL silence: no onmessage and — on purpose — no onclose.
     await act(async () => { await vi.advanceTimersByTimeAsync(70_000) })
 
     // O watchdog assumiu o socket morto e reconciliou pela API.
@@ -276,8 +278,8 @@ describe("recuperação do stream de execução", () => {
 
     vi.useFakeTimers()
     act(() => { ws.onopen?.() })
-    // A cada 20s chega um heartbeat (lote vazio). O silêncio nunca acumula, então
-    // o watchdog não pode confundir uma conexão saudável com socket morto.
+    // A heartbeat (empty batch) arrives every 20s. Silence never accumulates, so
+    // the watchdog must not mistake a healthy connection for a dead socket.
     for (let t = 0; t < 90_000; t += 20_000) {
       await act(async () => { await vi.advanceTimersByTimeAsync(20_000) })
       act(() => { ws.onmessage?.({ data: '{"type":"events","dropped":0,"events":[]}' }) })
@@ -289,15 +291,15 @@ describe("recuperação do stream de execução", () => {
     view.unmount()
   })
 
-  // ── 6. Lote atrasado não ressuscita um run já liquidado ─────────────────
+  // ── 6. A late batch does not resurrect an already-settled run ───────────
   //
-  // O cliente aplica eventos por quadro de `requestAnimationFrame`. Com a aba em
-  // segundo plano o quadro NÃO roda, mas o WebSocket continua entregando: o lote
-  // fica pendente enquanto o run termina e é liquidado. Ao voltar para a aba, o
-  // quadro atrasado disparava e reaplicava eventos velhos por cima do desfecho —
-  // o nó voltava a `started` e ficava girando para sempre, agora sem socket, sem
-  // `isExecuting` e sem ninguém para liquidá-lo de novo. Era o que sobrava do
-  // sintoma depois de as duas correções anteriores fecharem os caminhos de PERDA.
+  // The client applies events per `requestAnimationFrame` frame. With the tab in
+  // the background the frame does NOT run, but the WebSocket keeps delivering: the
+  // batch stays pending while the run finishes and is settled. On returning to the
+  // tab, the late frame fired and reapplied old events on top of the outcome —
+  // the node went back to `started` and kept spinning forever, now with no socket,
+  // no `isExecuting` and nobody to settle it again. It was what remained of the
+  // symptom after the two earlier fixes closed the LOSS paths.
 
   function rodarQuadrosPendentes() {
     const pendentes = [...quadros.values()]
@@ -308,7 +310,7 @@ describe("recuperação do stream de execução", () => {
   it("quadro atrasado que roda depois da liquidação não devolve o nó a 'started'", async () => {
     const { view, ws } = await anexar()
 
-    // Chegam eventos, mas o quadro fica pendente (aba em segundo plano).
+    // Events arrive, but the frame stays pending (tab in the background).
     act(() => {
       ws.onmessage?.({ data: JSON.stringify({
         type: "events",
@@ -327,14 +329,14 @@ describe("recuperação do stream de execução", () => {
       expect(useWorkflowExecutionStore.getState().isExecuting).toBe(false)
     })
 
-    // O usuário volta para a aba: o que estava agendado dispara agora.
+    // The user returns to the tab: what was scheduled fires now.
     act(() => { rodarQuadrosPendentes() })
 
     const final = useWorkflowExecutionStore.getState()
     expect(final.statusById.get("n2")?.status).toBe("unknown")
     expect(final.statusById.get("n2")?.status).not.toBe("started")
-    // Drenar ANTES de liquidar preserva o que de fato chegou: o `completed` do
-    // n1 é informação legítima e não pode ser jogada fora junto com o lote.
+    // Draining BEFORE settling preserves what actually arrived: n1's `completed`
+    // is legitimate information and must not be thrown away with the batch.
     expect(final.statusById.get("n1")?.status).toBe("completed")
     expect(final.statusWorkflow?.status).toBe("completed")
 
@@ -347,8 +349,8 @@ describe("recuperação do stream de execução", () => {
     store.startExecution(nos)
     store.completeExecution("completed", nos, [])
 
-    // Cinto de segurança da store: mesmo que algum caminho futuro escape das
-    // guardas do hook, o desfecho é definitivo.
+    // The store's safety belt: even if some future path escapes the hook's
+    // guards, the outcome is final.
     useWorkflowExecutionStore.getState().updateNodeStatuses(
       [{ id: "n1", status: "started" }] as INodeStatusWorkFlow[], [],
     )
@@ -360,11 +362,11 @@ describe("recuperação do stream de execução", () => {
   })
 
   it("re-anexar a um run que o servidor diz vivo desfaz um encerramento precipitado", async () => {
-    // A guarda de `updateNodeStatuses` torna o desfecho definitivo — o que seria
-    // errado se o desfecho tivesse sido nosso engano. Aqui o cliente liquidou o
-    // run (reconciliação em corrida / desistência) mas a API o reporta em
-    // andamento: a re-anexação precisa re-semear, senão o replay é descartado
-    // pela guarda e o canvas congela no desfecho errado.
+    // The `updateNodeStatuses` guard makes the outcome final — which would be
+    // wrong if the outcome had been our mistake. Here the client settled the
+    // run (racing reconciliation / giving up) but the API reports it as in
+    // progress: the re-attach must re-seed, otherwise the replay is discarded
+    // by the guard and the canvas freezes on the wrong outcome.
     const store = useWorkflowExecutionStore.getState()
     store.startExecution([{ id: "n1", status: "started" }] as INodeStatusWorkFlow[])
     store.setTaskId(RUN)

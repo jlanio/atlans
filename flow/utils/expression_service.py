@@ -8,78 +8,79 @@ from flow.utils.datetime_utils import utc_now_naive
 from flow.utils.jinja_seguro import criar_ambiente_sandbox
 from flow.utils.safe_env import safe_env
 
-# Captura $Alias ou $Alias.key.subkey (com dotted path opcional).
+# Captures $Alias or $Alias.key.subkey (with an optional dotted path).
 #
-# `[^\W\d]` é "letra ou _" em Unicode — `\w` menos os dígitos. O padrão antigo
-# abria com `[A-Za-z_]` e recusava alias começado por letra acentuada: o
-# executor registra "Área" (str.isidentifier() aceita Unicode) e o modal deixa
-# criá-lo, mas `$Área.total` não casava aqui, o `$` sobrevivia ao pré-processo e
-# o Jinja estourava erro de sintaxe. Curiosamente "Bifurcação" funcionava — o
-# `\w*` do resto já era Unicode; só a primeira letra era ASCII-only.
+# `[^\W\d]` is "letter or _" in Unicode — `\w` minus digits. The old pattern
+# started with `[A-Za-z_]` and rejected an alias starting with an accented
+# letter: the executor registers "Área" (str.isidentifier() accepts Unicode) and
+# the modal lets you create it, but `$Área.total` did not match here, the `$`
+# survived preprocessing and Jinja blew up with a syntax error. Curiously
+# "Bifurcação" worked — the `\w*` for the rest was already Unicode; only the
+# first letter was ASCII-only.
 #
-# Vale também para o dotted path: nome de coluna vinda de shapefile costuma ter
-# acento, e `$Alias.população` caía no mesmo buraco.
+# The same applies to the dotted path: column names coming from shapefiles often
+# have accents, and `$Alias.população` fell into the same hole.
 _ALIAS_PATTERN = re.compile(r'\$(?P<alias>[^\W\d]\w*(?:\.[^\W\d]\w*)*)')
 
-# Blocos Jinja: expressão, statement e comentário. Servem para separar o que já
-# É Jinja do texto comum, porque `$Alias` recebe tratamento diferente nos dois.
+# Jinja blocks: expression, statement and comment. Used to separate what already
+# IS Jinja from plain text, because `$Alias` is treated differently in each.
 _BLOCO_JINJA = re.compile(r"(\{\{.*?\}\}|\{%.*?%\}|\{#.*?#\})", re.DOTALL)
 
 
 def _preprocessar_aliases(template: str) -> str:
-    """Traduz `$Alias` para Jinja, respeitando onde ele está.
+    """Translates `$Alias` into Jinja, respecting where it is.
 
-    FORA de um bloco Jinja, `$Alias.campo` vira `{{ Alias.campo }}` — que é o
-    que quem escreveu quis dizer. DENTRO de um bloco, vira só `Alias.campo`,
-    porque ali já se está numa expressão.
+    OUTSIDE a Jinja block, `$Alias.campo` becomes `{{ Alias.campo }}` — which is
+    what the author meant. INSIDE a block, it becomes just `Alias.campo`,
+    because there you are already in an expression.
 
-    A versão anterior fazia outra coisa: tirava o `$` do texto inteiro e, se
-    não houvesse nenhum `{{`, embrulhava a STRING INTEIRA em `{{ }}`. Isso só
-    funciona quando o template é um alias sozinho. Nos outros casos dava em
-    três desfechos, e o pior deles era silencioso:
+    The previous version did something else: it stripped the `$` from the whole
+    text and, if there was no `{{`, wrapped the ENTIRE STRING in `{{ }}`. That
+    only works when the template is a lone alias. In the other cases it had
+    three outcomes, and the worst of them was silent:
 
         $Pedido.id                          -> 42                    (ok)
 
         https://api.org/v1/$Pedido.id/dados -> TemplateSyntaxError:
                                                "expected token 'end of print
-                                               statement', got ':'" — quem
-                                               escreveu uma URL recebia um erro
-                                               de parser de template.
+                                               statement', got ':'" — whoever
+                                               wrote a URL got a template
+                                               parser error.
 
         {"id": $Pedido.id,                  -> "{'id': 42,
          "n": "$Pedido.nome"}                  'n': 'Pedido.nome'}"
-                                               A string inteira era avaliada
-                                               como expressão Python: o corpo
-                                               virava repr de dict (aspas
-                                               simples, JSON inválido) e o alias
-                                               entre aspas virava TEXTO literal.
-                                               Sem erro nenhum.
+                                               The whole string was evaluated
+                                               as a Python expression: the body
+                                               became a dict repr (single
+                                               quotes, invalid JSON) and the
+                                               quoted alias became literal TEXT.
+                                               No error at all.
 
         .../{{ Pedido.id }}/x/$Pedido.nome  -> ".../42/x/Pedido.nome"
-                                               Misturando as duas sintaxes, o
-                                               `$Alias` virava texto literal —
-                                               também em silêncio.
+                                               Mixing the two syntaxes, the
+                                               `$Alias` became literal text —
+                                               also silently.
     """
     partes = _BLOCO_JINJA.split(template)
     saida = []
     for i, parte in enumerate(partes):
-        if i % 2:  # separador capturado: já é um bloco Jinja
+        if i % 2:  # captured separator: already a Jinja block
             saida.append(_ALIAS_PATTERN.sub(lambda m: m.group("alias"), parte))
         else:
             saida.append(_ALIAS_PATTERN.sub(lambda m: "{{ " + m.group("alias") + " }}", parte))
     return "".join(saida)
 
 
-# Teto do cache de templates compilados. Templates sao definidos no workflow
-# (finitos por fluxo), mas o executor e long-lived e ve muitos fluxos — o cap
-# evita crescimento ilimitado. 512 cobre fluxos grandes com folga.
+# Ceiling for the compiled-template cache. Templates are defined in the workflow
+# (finite per workflow), but the executor is long-lived and sees many workflows —
+# the cap prevents unbounded growth. 512 covers large workflows comfortably.
 _TEMPLATE_CACHE_MAX = 512
 
 
 class ExpressionService:
     """
-    Serviço para renderizar templates Jinja2 em sandbox para o GISFlow.
-    Expõe utilitários como now(), uuid() e variáveis de ambiente.
+    Service for rendering sandboxed Jinja2 templates for GISFlow.
+    Exposes utilities such as now(), uuid() and environment variables.
     """
     def __init__(self):
         self.env = criar_ambiente_sandbox(undefined=StrictUndefined)
@@ -88,17 +89,18 @@ class ExpressionService:
             "uuid":     lambda: str(uuid4()),
             "env":      safe_env(),
         })
-        # Cache LRU de templates COMPILADOS. `env.from_string` compila
-        # source->AST->bytecode a cada chamada; era feito uma vez por parametro
-        # templatizado por node por run. O Template resultante e reutilizavel
-        # entre renders (stateless — o contexto entra so no .render()).
+        # LRU cache of COMPILED templates. `env.from_string` compiles
+        # source->AST->bytecode on every call; it used to run once per
+        # templated parameter per node per run. The resulting Template is reusable
+        # across renders (stateless — the context only enters in .render()).
         from collections import OrderedDict
         self._template_cache: "OrderedDict[str, object]" = OrderedDict()
-        # `_compiled` roda dentro dos `asyncio.to_thread` dos nos (o render de
-        # parametros vai para thread), entao varias threads mutavam este LRU ao
-        # mesmo tempo — `move_to_end`/`__setitem__`/`popitem` sem lock corrompem
-        # o OrderedDict ou levantam. O lock protege so as operacoes O(1) do dict;
-        # a compilacao (cara) fica FORA dele (dupla checagem em `_compiled`).
+        # `_compiled` runs inside the nodes' `asyncio.to_thread` (parameter
+        # rendering goes to a thread), so several threads mutated this LRU at
+        # the same time — `move_to_end`/`__setitem__`/`popitem` without a lock
+        # corrupt the OrderedDict or raise. The lock protects only the O(1) dict
+        # operations; the (expensive) compilation stays OUTSIDE it (double-checked
+        # in `_compiled`).
         self._template_cache_lock = threading.Lock()
 
     def _compiled(self, source: str):
@@ -107,9 +109,9 @@ class ExpressionService:
             if cached is not None:
                 self._template_cache.move_to_end(source)
                 return cached
-        # Compila FORA do lock: duas threads podem compilar o mesmo source cru
-        # concorrentemente (raro, so no aquecimento), mas o bloco abaixo
-        # reconcilia — em troca, `from_string` nao serializa entre threads.
+        # Compiles OUTSIDE the lock: two threads may compile the same raw source
+        # concurrently (rare, only during warm-up), but the block below
+        # reconciles — in exchange, `from_string` does not serialize across threads.
         tmpl = self.env.from_string(source)
         with self._template_cache_lock:
             existente = self._template_cache.get(source)
@@ -121,38 +123,39 @@ class ExpressionService:
                 self._template_cache.popitem(last=False)
             return tmpl
 
-    # Um template que é UMA expressão só, e nada além dela: `{{ x }}`, com
-    # espaço em volta permitido. É o caso em que faz sentido devolver o valor
-    # nativo em vez do texto — não há prefixo nem sufixo para concatenar.
+    # A template that is ONE single expression and nothing else: `{{ x }}`, with
+    # surrounding whitespace allowed. This is the case where returning the native
+    # value instead of the text makes sense — there is no prefix or suffix to
+    # concatenate.
     _SO_UMA_EXPRESSAO = re.compile(r"^\{\{(?P<expr>(?:(?!\}\}).)*)\}\}$", re.DOTALL)
 
     def render_native(self, template: str, context: dict):
-        """Como `render`, mas preserva o TIPO quando o template é uma expressão só.
+        """Like `render`, but preserves the TYPE when the template is a single expression.
 
-        `Template.render()` do Jinja devolve texto sempre: `{{ x }}` com x=50 vira
-        `'50'`, e com x=None vira a string `'None'`. Onde o resultado é
-        concatenado isso é o certo. Onde ele vira valor de bind de SQL, não é: o
-        `queryParams` de um nó de banco alimenta `$1`, e o tipo do valor decide
-        como o Postgres o compara com a coluna.
+        Jinja's `Template.render()` always returns text: `{{ x }}` with x=50 becomes
+        `'50'`, and with x=None it becomes the string `'None'`. Where the result is
+        concatenated that is right. Where it becomes an SQL bind value, it is not: the
+        `queryParams` of a database node feed `$1`, and the value's type decides
+        how Postgres compares it with the column.
 
-        Só o caso sem ambiguidade recebe tratamento nativo — o template inteiro
-        sendo uma única expressão. `ano-{{ x }}` continua string, porque texto é
-        exatamente o que ele pede. E o valor nativo só é devolvido para escalar
-        não-string (número, booleano, nulo); qualquer outra coisa volta pelo
-        caminho de texto, para não entregar a um nó um tipo que ele não espera.
+        Only the unambiguous case gets native treatment — the whole template
+        being a single expression. `ano-{{ x }}` stays a string, because text is
+        exactly what it asks for. And the native value is returned only for a
+        non-string scalar (number, boolean, null); anything else goes back through
+        the text path, so a node is not handed a type it does not expect.
         """
         preprocessado = _preprocessar_aliases(template).strip()
         m = self._SO_UMA_EXPRESSAO.match(preprocessado)
         if m:
-            # `compile_expression` avalia no MESMO ambiente sandboxado e devolve
-            # o objeto, em vez de passá-lo por str().
+            # `compile_expression` evaluates in the SAME sandboxed environment and
+            # returns the object, instead of passing it through str().
             #
-            # `undefined_to_none=False` é essencial: no padrão (True) uma
-            # referência inexistente vira None em silêncio, e o StrictUndefined
-            # do ambiente — que existe para transformar alias errado em erro
-            # acionável — seria contornado justo aqui. Com False, o Undefined
-            # volta intacto, não casa com nenhum tipo nativo e cai no `render`
-            # abaixo, que levanta com a mensagem de sempre.
+            # `undefined_to_none=False` is essential: by default (True) a
+            # nonexistent reference silently becomes None, and the environment's
+            # StrictUndefined — which exists to turn a wrong alias into an
+            # actionable error — would be bypassed right here. With False, the
+            # Undefined comes back intact, matches no native type and falls into
+            # the `render` below, which raises with the usual message.
             valor = self.env.compile_expression(
                 m.group("expr").strip(), undefined_to_none=False,
             )(**context)
@@ -162,13 +165,13 @@ class ExpressionService:
         return self.render(template, context)
 
     def find_alias(self, text: str) -> re.Match | None:
-        """Retorna o primeiro match de alias no texto, ou None."""
+        """Returns the first alias match in the text, or None."""
         return _ALIAS_PATTERN.search(text)
 
     def render(self, template: str, context: dict) -> str:
-        # 1) `$Alias` vira Jinja no lugar onde está (ver _preprocessar_aliases)
+        # 1) `$Alias` becomes Jinja where it stands (see _preprocessar_aliases)
         preprocessed = _preprocessar_aliases(template)
 
-        # 2) Delega ao Jinja2 (StrictUndefined) para renderizar. O template
-        #    compilado e cacheado por source — so o .render() roda por node.
+        # 2) Delegates rendering to Jinja2 (StrictUndefined). The compiled
+        #    template is cached by source — only .render() runs per node.
         return self._compiled(preprocessed).render(**context)

@@ -1,34 +1,35 @@
 // desktop/src/main/ui/autostart.ts
 //
-// Iniciar junto com o Windows.
+// Start together with Windows.
 //
-// Usa `setLoginItemSettings`, que escreve em
-// HKCU\Software\Microsoft\Windows\CurrentVersion\Run — sem privilegio de
-// administrador e sem tarefa agendada.
+// Uses `setLoginItemSettings`, which writes to
+// HKCU\Software\Microsoft\Windows\CurrentVersion\Run — no administrator
+// privilege and no scheduled task.
 //
-// Deliberadamente NAO e um Servico do Windows: servico roda fora da sessao do
-// usuario, e o GeoSync precisa dela — unidades de rede mapeadas, `%USERPROFILE%`
-// e as permissoes de quem de fato usa os arquivos. Um servico tambem exigiria
-// instalacao com elevacao, que e o que o instalador per-user evita.
+// Deliberately NOT a Windows Service: a service runs outside the user's
+// session, and GeoSync needs it — mapped network drives, `%USERPROFILE%` and
+// the permissions of whoever actually uses the files. A service would also
+// require an elevated installation, which is what the per-user installer
+// avoids.
 //
-// ## Duas armadilhas da API, ambas comprovadas na maquina
+// ## Two API pitfalls, both proven on the machine
 //
-// 1. **`openAtLogin` compara os ARGUMENTOS.** `getLoginItemSettings()` sem
-//    opcoes assume `args: []`, e o comando gravado aqui termina em `--hidden`.
-//    A leitura devolvia `false` com a entrada gravada e correta no registro —
-//    o resultado era um checkbox que ligava e voltava sozinho. Toda leitura
-//    precisa usar o MESMO `path`/`args` da escrita.
+// 1. **`openAtLogin` compares the ARGUMENTS.** `getLoginItemSettings()` without
+//    options assumes `args: []`, and the command written here ends in
+//    `--hidden`. The read returned `false` with the entry written and correct
+//    in the registry — the result was a checkbox that turned on and flipped
+//    back by itself. Every read must use the SAME `path`/`args` as the write.
 //
-// 2. **`openAtLogin` ignora a desativacao do Gerenciador de Tarefas.** O
-//    usuario pode desligar o item em Inicializar; a entrada continua no
-//    registro (`openAtLogin: true`) e o app simplesmente nao sobe.
-//    `executableWillLaunchAtLogin` e quem responde "vai executar de verdade?".
+// 2. **`openAtLogin` ignores disabling from Task Manager.** The user can turn
+//    the item off under Startup; the entry stays in the registry
+//    (`openAtLogin: true`) and the app simply does not start.
+//    `executableWillLaunchAtLogin` is what answers "will it really run?".
 //
-// O nome da entrada no registro e o AppUserModelID (`app.atlans.executor`,
-// definido no index.ts) — trocar aquele ID orfana esta entrada.
+// The name of the registry entry is the AppUserModelID (`app.atlans.executor`,
+// defined in index.ts) — changing that ID orphans this entry.
 import { app } from 'electron'
 
-/** Faz o app subir sem janela: so tray + spawn do executor. */
+/** Makes the app start without a window: only tray + executor spawn. */
 export const ARG_OCULTO = '--hidden'
 
 export function iniciadoOculto(): boolean {
@@ -39,27 +40,27 @@ export interface EstadoAutostart {
   /** A entrada existe e o comando bate exatamente com o deste app. */
   ativo: boolean
   /**
-   * O Windows vai MESMO executar no logon.
+   * Windows will REALLY run it at logon.
    *
-   * Difere de `ativo` quando o item foi desativado em Gerenciador de Tarefas →
-   * Inicializar: a entrada continua no registro, mas nao roda.
+   * Differs from `ativo` when the item was disabled in Task Manager →
+   * Startup: the entry stays in the registry, but does not run.
    */
   efetivo: boolean
-  /** O comando que fica no registro. Exibido na UI para nao ser magica. */
+  /** The command that sits in the registry. Shown in the UI so it is not magic. */
   comando: string
-  /** Rodando por `npm run dev` — ver a nota em `alvo()`. */
+  /** Running via `npm run dev` — see the note in `alvo()`. */
   dev: boolean
-  /** Mensagem quando o registro recusou a escrita (politica de grupo, AV). */
+  /** Message when the registry refused the write (group policy, AV). */
   erro: string | null
 }
 
 /**
- * Executavel e argumentos da entrada de logon.
+ * Executable and arguments of the logon entry.
  *
- * Em dev o executavel e o `electron.exe` do node_modules, e sem o caminho do
- * projeto o Windows subiria o app PADRAO do Electron a cada logon — uma janela
- * cinza que nao tem relacao nenhuma com o Atlans, e que sobreviveria ao fim do
- * `npm run dev`. Mesmo tratamento de `registrarProtocolo` em deeplink.ts.
+ * In dev the executable is `electron.exe` from node_modules, and without the
+ * project path Windows would launch Electron's DEFAULT app on every logon — a
+ * gray window that has nothing to do with Atlans, and that would outlive the
+ * end of `npm run dev`. Same treatment as `registrarProtocolo` in deeplink.ts.
  */
 function alvo(): { path: string; args: string[] } {
   if (process.defaultApp && process.argv.length >= 2) {
@@ -73,23 +74,23 @@ function comandoDe({ path, args }: { path: string; args: string[] }): string {
 }
 
 /**
- * Ultima leitura do registro.
+ * Last read of the registry.
  *
- * `getLoginItemSettings` e consulta SINCRONA a HKCU\...\Run (e a StartupApproved,
- * para `executableWillLaunchAtLogin`), e o tray a chamava a cada atualizacao de
- * estado — pelo menos uma vez por segundo com o executor rodando, e ate doze
- * numa rajada de ERROR. I/O sincrono no thread que atende janelas, bandeja e
- * IPC, para um valor que so muda quando o proprio usuario clica no menu da
- * bandeja ou no checkbox de Ajustes.
+ * `getLoginItemSettings` is a SYNCHRONOUS query to HKCU\...\Run (and to
+ * StartupApproved, for `executableWillLaunchAtLogin`), and the tray called it
+ * on every state update — at least once per second with the executor running,
+ * and up to twelve in a burst of ERRORs. Synchronous I/O on the thread that
+ * serves windows, tray and IPC, for a value that only changes when the user
+ * themselves clicks the tray menu or the checkbox in Settings.
  */
 let cache: EstadoAutostart | null = null
 
-/** Le do registro de fato e repovoa o cache. */
+/** Actually reads from the registry and repopulates the cache. */
 export function lerAutostart(): EstadoAutostart {
   const a = alvo()
   const base = { comando: comandoDe(a), dev: Boolean(process.defaultApp) }
   try {
-    // Os MESMOS path/args da escrita — ver a armadilha 1 no cabecalho.
+    // The SAME path/args as the write — see pitfall 1 in the header.
     const s = app.getLoginItemSettings(a)
     cache = { ...base, ativo: s.openAtLogin, efetivo: s.executableWillLaunchAtLogin, erro: null }
   } catch (e) {
@@ -99,23 +100,24 @@ export function lerAutostart(): EstadoAutostart {
 }
 
 /**
- * O booleano do menu da bandeja, servido do cache.
+ * The tray menu's boolean, served from the cache.
  *
- * O unico jeito de este valor mudar por fora do app e o usuario desativar a
- * entrada no Gerenciador de Tarefas — que ja hoje nao aparecia sem reabrir a
- * tela de Ajustes, e ela continua forcando releitura pelo IPC.
+ * The only way for this value to change from outside the app is the user
+ * disabling the entry in Task Manager — which already did not show up without
+ * reopening the Settings screen, and that screen still forces a re-read via
+ * IPC.
  */
 export function autostartAtivo(): boolean {
   return (cache ?? lerAutostart()).ativo
 }
 
 /**
- * Liga ou desliga, e devolve o estado RELIDO do registro.
+ * Turns it on or off, and returns the state RE-READ from the registry.
  *
- * Reler em vez de confiar no pedido: se a escrita foi bloqueada (politica de
- * grupo, antivirus), a UI precisa mostrar o estado real, e nao o desejado. A
- * releitura tambem e o que repovoa o cache com o valor RELIDO — este e o unico
- * caminho pelo qual o autostart muda com o app aberto.
+ * Re-read instead of trusting the request: if the write was blocked (group
+ * policy, antivirus), the UI must show the real state, not the desired one.
+ * The re-read is also what repopulates the cache with the RE-READ value — this
+ * is the only path through which autostart changes with the app open.
  */
 export function definirAutostart(ativar: boolean): EstadoAutostart {
   const a = alvo()

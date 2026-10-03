@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # scripts/backup-stepca.sh
-# Backup do volume step-ca-data em backups/step-ca-YYYY-MM-DD-HHMM.tar.gz.
-# Mantem os 14 backups mais recentes; remove os antigos.
+# Backs up the step-ca-data volume to backups/step-ca-YYYY-MM-DD-HHMM.tar.gz.
+# Keeps the 14 most recent backups; removes the older ones.
 #
-# Recomendado rodar via cron diariamente:
+# Recommended to run daily via cron:
 #   0 3 * * * cd /caminho/do/deploy && ./scripts/backup-stepca.sh >> backups/cron.log 2>&1
 
 set -euo pipefail
@@ -36,7 +36,7 @@ docker run --rm \
 SIZE=$(du -h "$TARGET" | cut -f1)
 ok "Backup criado: ${TARGET} (${SIZE})"
 
-# Retencao: mantem os RETAIN mais recentes.
+# Retention: keeps the RETAIN most recent.
 KEEP="$RETAIN"
 DELETED=$(cd "$BACKUP_DIR" && ls -1t step-ca-*.tar.gz 2>/dev/null | tail -n "+$((KEEP + 1))" || true)
 if [ -n "$DELETED" ]; then

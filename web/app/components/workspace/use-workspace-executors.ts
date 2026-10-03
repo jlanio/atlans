@@ -6,16 +6,16 @@ import type { IWorkspacePolicy } from "@/service/types"
 import { createToast } from "@/utils/createToast"
 import type { Workspace } from "@/context/WorkspaceContext"
 
-/** Valor do <Select> para "pool da plataforma" — o backend representa como null. */
+/** <Select> value for "platform pool" — the backend represents it as null. */
 export const POOL = "__default__"
 
 /**
- * O "alvo" que o seletor rápido representa, lido da política.
+ * The "target" the quick picker represents, read from the policy.
  *
- * Segue o que o roteamento LÊ: com a flag ligada, o nível principal; com ela
- * desligada, o ponteiro legado — que é o que decide para onde a execução vai
- * até a virada. Mostrar o nível enquanto o servidor roteia pelo ponteiro
- * seria afirmar um destino que a próxima execução não vai ter.
+ * Follows what routing READS: with the flag on, the primary tier; with it off,
+ * the legacy pointer — which is what decides where the run goes until the
+ * switchover. Showing the tier while the server routes by the pointer would be
+ * claiming a destination the next run will not have.
  */
 export function alvoDaPolitica(p: IWorkspacePolicy): string | null {
   return p.policy_routing_enabled
@@ -24,39 +24,40 @@ export function alvoDaPolitica(p: IWorkspacePolicy): string | null {
 }
 
 /**
- * Executor de cada workspace da lista, para a troca rápida no próprio card.
+ * Executor of each workspace in the list, for the quick switch on the card itself.
  *
- * Vive aqui, e não dentro do card, por três motivos: `getMyAgents` é UMA
- * chamada para a tela inteira; a troca precisa de rollback; e "não consegui
- * ler" NÃO pode virar "pool da plataforma" — o card estaria mentindo sobre para
- * onde as execuções daquele workspace vão.
+ * Lives here, and not inside the card, for three reasons: `getMyAgents` is ONE
+ * call for the whole screen; the switch needs a rollback; and "couldn't read"
+ * must NOT become "platform pool" — the card would be lying about where that
+ * workspace's runs go.
  */
 export function useWorkspaceExecutors(workspaces: Workspace[]) {
   const [executores, setExecutores] = useState<IExecutor[]>([])
   const [alvos, setAlvos] = useState<Record<string, string | null>>({})
-  /** Política completa por workspace — níveis, terminal, piso e saúde. */
+  /** Full policy per workspace — tiers, terminal, floor and health. */
   const [politicas, setPoliticas] = useState<Record<string, IWorkspacePolicy>>({})
-  /** Workspaces cuja leitura do executor falhou — estado "não sei", nem pool nem alvo. */
+  /** Workspaces whose executor read failed — "don't know" state, neither pool nor target. */
   const [desconhecidos, setDesconhecidos] = useState<Set<string>>(new Set())
-  /** Falha ao listar MEUS executores: sem ela, todo alvo pareceria "removido". */
+  /** Failure listing MY executors: without it, every target would look "removed". */
   const [erro, setErro] = useState<string | null>(null)
   const [salvando, setSalvando] = useState<Set<string>>(new Set())
 
-  // Só a lista de ids entra na dependência: o array `workspaces` é recriado a
-  // cada reload do context e dispararia o fetch em laço.
+  // Only the list of ids goes into the dependency: the `workspaces` array is
+  // recreated on every context reload and would fire the fetch in a loop.
   const ids = workspaces.map(w => w.id_hash).join(",")
 
-  // Época da carga: só serve para "uma carga MAIS NOVA vence a mais velha".
-  // Uma `trocar` NÃO mexe aqui — invalidar a época inteira descartaria uma
-  // recarga geral concorrente por completo (todos os OUTROS workspaces perdiam
-  // o dado fresco).
+  // Load epoch: only serves for "a NEWER load beats an older one".
+  // A `trocar` does NOT touch this — invalidating the whole epoch would discard
+  // a concurrent general reload entirely (all the OTHER workspaces lost the
+  // fresh data).
   const epocaRef = useRef(0)
-  // Ids com gravação em voo — preservados por qualquer recarga concorrente.
+  // Ids with a write in flight — preserved by any concurrent reload.
   const emVooRef = useRef<Set<string>>(new Set())
-  // Relógio monotônico para ordenar escritas. Cada `carregar` guarda o carimbo
-  // de quando COMEÇOU; cada `trocar` autoritativo carimba o workspace ao sair do
-  // "em voo". Uma carga velha, ao mesclar, preserva o workspace cujo carimbo de
-  // escrita é mais novo que seu início — protege a troca sem jogar fora o resto.
+  // Monotonic clock for ordering writes. Each `carregar` keeps the stamp of when
+  // it STARTED; each authoritative `trocar` stamps the workspace when leaving
+  // "in flight". An old load, when merging, preserves the workspace whose write
+  // stamp is newer than its start — protects the switch without throwing away
+  // the rest.
   const relogioRef = useRef(0)
   const escritoEmRef = useRef<Record<string, number>>({})
 
@@ -67,9 +68,9 @@ export function useWorkspaceExecutors(workspaces: Workspace[]) {
       return
     }
     const minha = ++epocaRef.current
-    const inicio = ++relogioRef.current   // carimbo de início desta carga
-    // Uma leitura por workspace: a política traz junto o ponteiro legado
-    // (`target_executor_id`), então o executor não precisa de leitura própria.
+    const inicio = ++relogioRef.current   // start stamp of this load
+    // One read per workspace: the policy brings along the legacy pointer
+    // (`target_executor_id`), so the executor does not need its own read.
     const [meus, ...respostas] = await Promise.all([
       GisFlowService.getMyAgents(),
       ...lista.map(id => GisFlowService.getWorkspacePolicy(id)),
@@ -80,8 +81,8 @@ export function useWorkspaceExecutors(workspaces: Workspace[]) {
       setErro(meus.error.message ?? "Não foi possível carregar seus executores.")
     } else {
       setErro(null)
-      // Mantém inclusive revoked/inactive: é assim que se detecta um executor
-      // removido que ainda está apontado como alvo do workspace.
+      // Keeps even revoked/inactive: that is how you detect a removed executor
+      // that is still pointed at as the workspace's target.
       setExecutores(meus.data ?? [])
     }
 
@@ -93,13 +94,13 @@ export function useWorkspaceExecutors(workspaces: Workspace[]) {
       if (r.error || !r.data) falhas.add(id)
       else { mapa[id] = alvoDaPolitica(r.data); lidas[id] = r.data }
     })
-    // Um workspace é preservado (não sobrescrito por esta carga) quando tem uma
-    // gravação EM VOO ou uma escrita autoritativa de `trocar` mais nova que o
-    // início desta carga — o instantâneo aqui é anterior a ela.
+    // A workspace is preserved (not overwritten by this load) when it has a
+    // write IN FLIGHT or an authoritative `trocar` write newer than the start
+    // of this load — the snapshot here predates it.
     const preservar = (id: string) =>
       emVooRef.current.has(id) || (escritoEmRef.current[id] ?? 0) > inicio
-    // Mescla (não substitui): uma recarga parcial não pode apagar o que já se
-    // sabia, e o valor de uma troca (em voo ou recém-escrita) tem precedência.
+    // Merges (does not replace): a partial reload cannot erase what was already
+    // known, and a switch's value (in flight or just written) takes precedence.
     setAlvos(prev => {
       const merged = { ...prev, ...mapa }
       for (const id of Object.keys(merged)) if (preservar(id) && id in prev) merged[id] = prev[id]
@@ -110,21 +111,21 @@ export function useWorkspaceExecutors(workspaces: Workspace[]) {
       for (const id of Object.keys(merged)) if (preservar(id) && id in prev) merged[id] = prev[id]
       return merged
     })
-    // Um workspace protegido não vira "desconhecido" por uma falha de leitura
-    // desta carga velha: seu valor autoritativo acabou de ser escrito.
+    // A protected workspace does not become "unknown" because of a read failure
+    // in this stale load: its authoritative value was just written.
     setDesconhecidos(new Set([...falhas].filter(id => !preservar(id))))
   }, [ids])
 
   useEffect(() => { carregar() }, [carregar])
 
-  // O valor anterior sai de um ref: entre o clique e a resposta o mapa já foi
-  // reescrito pela atualização otimista.
+  // The previous value comes from a ref: between the click and the response the
+  // map has already been rewritten by the optimistic update.
   const alvosRef = useRef<Record<string, string | null>>({})
   useEffect(() => { alvosRef.current = alvos }, [alvos])
   const desconhecidosRef = useRef<Set<string>>(new Set())
   useEffect(() => { desconhecidosRef.current = desconhecidos }, [desconhecidos])
 
-  // Nome do executor para o toast — a lista já está na tela.
+  // Executor name for the toast — the list is already on screen.
   const executoresRef = useRef<IExecutor[]>([])
   useEffect(() => { executoresRef.current = executores }, [executores])
 
@@ -132,14 +133,14 @@ export function useWorkspaceExecutors(workspaces: Workspace[]) {
     if (emVooRef.current.has(workspaceId)) return
     const agentId = valor === POOL ? null : valor
     const anterior = alvosRef.current[workspaceId] ?? null
-    // Se a leitura deste workspace havia FALHADO, "anterior" é `null` — que na
-    // tela significa "pool da plataforma". Sem restaurar o desconhecido, uma
-    // troca que falha faz o card afirmar pool, a mesma mentira que o estado
-    // "não sei" existe para evitar.
+    // If this workspace's read had FAILED, "previous" is `null` — which on screen
+    // means "platform pool". Without restoring the unknown state, a failing
+    // switch makes the card claim pool, the same lie the "don't know" state
+    // exists to avoid.
     const eraDesconhecido = desconhecidosRef.current.has(workspaceId)
 
-    // Conjunto, e não um id só: trocar dois cards em sequência apagava o
-    // spinner do card errado e reabilitava um Select ainda em voo.
+    // A set, and not a single id: switching two cards in sequence cleared the
+    // wrong card's spinner and re-enabled a Select still in flight.
     emVooRef.current.add(workspaceId)
     setSalvando(s => new Set(s).add(workspaceId))
     setAlvos(prev => ({ ...prev, [workspaceId]: agentId }))
@@ -158,18 +159,18 @@ export function useWorkspaceExecutors(workspaces: Workspace[]) {
       createToast.error("Erro ao trocar o executor", res.error.message)
       return
     }
-    // O endpoint legado grava os dois lados (ponteiro e nível principal), mas
-    // devolve só o ponteiro: a política deste workspace — níveis, modo, saúde —
-    // é relida para o selo e a frase do painel não ficarem com a versão antiga.
-    // Ainda "em voo" durante a releitura: uma recarga geral concorrente não
-    // pode sobrescrever a troca com um instantâneo anterior a ela.
+    // The legacy endpoint writes both sides (pointer and primary tier), but
+    // returns only the pointer: this workspace's policy — tiers, mode, health —
+    // is re-read so the badge and the panel sentence are not left with the old
+    // version. Still "in flight" during the re-read: a concurrent general reload
+    // must not overwrite the switch with a snapshot that predates it.
     const pol = await GisFlowService.getWorkspacePolicy(workspaceId)
-    // Protege esta escrita contra uma recarga geral que começou ANTES e ainda
-    // não respondeu (traz um instantâneo anterior a esta troca). Em vez de
-    // invalidar a época inteira — que descartava o resultado dessa recarga para
-    // TODOS os workspaces —, carimba SÓ este no relógio e só então sai do "em
-    // voo": a carga velha, ao mesclar, vê o carimbo > seu início e preserva
-    // este workspace, sem perder o dado fresco dos demais.
+    // Protects this write against a general reload that started BEFORE and has
+    // not responded yet (it carries a snapshot from before this switch). Instead
+    // of invalidating the whole epoch — which discarded that reload's result
+    // for ALL workspaces —, it stamps ONLY this one on the clock and only then
+    // leaves "in flight": the old load, when merging, sees stamp > its start and
+    // preserves this workspace, without losing the fresh data of the others.
     escritoEmRef.current[workspaceId] = ++relogioRef.current
     emVooRef.current.delete(workspaceId)
     setSalvando(s => { const n = new Set(s); n.delete(workspaceId); return n })
@@ -178,7 +179,7 @@ export function useWorkspaceExecutors(workspaces: Workspace[]) {
       setPoliticas(prev => ({ ...prev, [workspaceId]: lida }))
       setAlvos(prev => ({ ...prev, [workspaceId]: alvoDaPolitica(lida) }))
     }
-    // O toast diz o RESULTADO: onde este workspace passa a executar.
+    // The toast states the RESULT: where this workspace now runs.
     const quem = nomeDoWorkspace ? `«${nomeDoWorkspace}»` : "O workspace"
     if (agentId === null) {
       createToast.success(`${quem} agora usa o pool compartilhado.`)

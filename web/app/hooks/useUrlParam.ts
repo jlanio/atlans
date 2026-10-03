@@ -1,6 +1,6 @@
 import { useSearchParams, usePathname, useRouter } from "next/navigation"
 
-// Hook base para gerenciar um parâmetro de URL
+// Base hook to manage a URL parameter
 export function useUrlParam(key: string) {
   const searchParams = useSearchParams()
   const pathname     = usePathname()
@@ -11,18 +11,18 @@ export function useUrlParam(key: string) {
   function set(val: string) {
     const params = new URLSearchParams(searchParams.toString())
     params.set(key, val)
-    // `replace`, nao `push`: `cn`/`ndid`/`ndhid` sao params EFEMEROS de UI (modal
-    // de config, drawer de conexao). `push` empilhava uma entrada de historico a
-    // cada abrir/fechar, e o Voltar do navegador reabria um modal ja fechado.
+    // `replace`, not `push`: `cn`/`ndid`/`ndhid` are EPHEMERAL UI params (config
+    // modal, connection drawer). `push` stacked a history entry on every
+    // open/close, and the browser's Back reopened an already-closed modal.
     router.replace(`${pathname}/?${params.toString()}`)
   }
 
   function remove() {
     const params = new URLSearchParams(searchParams.toString())
     params.delete(key)
-    // `replace`, nao `push`: `cn`/`ndid`/`ndhid` sao params EFEMEROS de UI (modal
-    // de config, drawer de conexao). `push` empilhava uma entrada de historico a
-    // cada abrir/fechar, e o Voltar do navegador reabria um modal ja fechado.
+    // `replace`, not `push`: `cn`/`ndid`/`ndhid` are EPHEMERAL UI params (config
+    // modal, connection drawer). `push` stacked a history entry on every
+    // open/close, and the browser's Back reopened an already-closed modal.
     router.replace(`${pathname}/?${params.toString()}`)
   }
 

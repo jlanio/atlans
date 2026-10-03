@@ -1,22 +1,22 @@
 # tests/unit/test_executor_boot_ordem_de_nomes.py
 """
-Ordem de ligacao de nomes no boot do executor.
+Name binding order in the executor boot.
 
-`main()` passava `ao_sincronizar=_sincronizar_agora` para `dashboard.start(...)`
-— uma chamada que executa NA HORA — mas so definia `_sincronizar_agora` DEPOIS,
-no mesmo escopo. Em Python isso nao e "definido mais tarde": o nome vira uma
-local nao-ligada e a leitura levanta `UnboundLocalError`.
+`main()` passed `ao_sincronizar=_sincronizar_agora` to `dashboard.start(...)`
+— a call that executes RIGHT AWAY — but only defined `_sincronizar_agora` AFTER,
+in the same scope. In Python that is not "defined later": the name becomes an
+unbound local and reading it raises `UnboundLocalError`.
 
-O efeito era um crash de inicializacao no modo RICH, que e o default de quem
-roda o executor num terminal (`agent_main` so captura `KeyboardInterrupt`, entao
-o processo morria). Passou despercebido porque os dois caminhos empacotados
-forcam outro modo: o app desktop usa `json` e o compose usa `off`.
+The effect was a startup crash in RICH mode, which is the default for anyone
+running the executor in a terminal (`agent_main` only catches `KeyboardInterrupt`,
+so the process died). It went unnoticed because the two packaged paths force
+another mode: the desktop app uses `json` and the compose uses `off`.
 
-Dois testes, em niveis diferentes de abstracao de proposito:
+Two tests, at different levels of abstraction on purpose:
 
-  ESPECIFICO   a regressao exata, verificada no escopo real de `main()`.
-  GERAL        varredura por qualquer outra closure usada antes de existir no
-               mesmo escopo — a classe inteira do erro, nao so esta instancia.
+  SPECIFIC     the exact regression, checked in the real scope of `main()`.
+  GENERAL      a sweep for any other closure used before it exists in the
+               same scope — the whole class of the error, not just this instance.
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def _funcao(nome: str):
 # ── ESPECIFICO ───────────────────────────────────────────────────────────────
 
 def test_sincronizar_agora_e_definido_antes_de_ser_passado_ao_dashboard():
-    """A regressao exata: def na frente do uso, no escopo de main()."""
+    """The exact regression: def ahead of the use, in the scope of main()."""
     main = _funcao("main")
 
     definicao = [
@@ -67,10 +67,11 @@ def test_sincronizar_agora_e_definido_antes_de_ser_passado_ao_dashboard():
 
 
 def test_symtable_confirma_que_o_nome_e_local_de_main():
-    """Ancora a premissa do teste acima.
+    """Anchors the premise of the test above.
 
-    A ordem so importa porque o nome e LOCAL de `main()`. Se um dia ele virar
-    global ou parametro, o teste de ordem perde o sentido e este aqui avisa.
+    The order only matters because the name is LOCAL to `main()`. If it ever
+    becomes a global or a parameter, the order test loses its meaning and this
+    one warns.
     """
     st = symtable.symtable(FONTE.read_text(encoding="utf-8"), str(FONTE), "exec")
 
@@ -92,12 +93,12 @@ def test_symtable_confirma_que_o_nome_e_local_de_main():
 # ── GERAL ────────────────────────────────────────────────────────────────────
 
 def test_nenhuma_closure_de_main_e_usada_antes_de_existir():
-    """Varre a classe inteira do erro, nao apenas a instancia ja corrigida.
+    """Sweeps the whole class of the error, not just the instance already fixed.
 
-    Para cada funcao aninhada definida diretamente em `main()`, exige que
-    nenhuma leitura do nome apareca antes da linha do `def`. Uma leitura dentro
-    do corpo de OUTRA aninhada nao conta: ela so roda quando chamada, e a essa
-    altura o nome ja esta ligado.
+    For each nested function defined directly in `main()`, requires that no read
+    of the name appear before the line of the `def`. A read inside the body of
+    ANOTHER nested function does not count: it only runs when called, and by
+    then the name is already bound.
     """
     main = _funcao("main")
 

@@ -5,22 +5,23 @@ import { Button } from "@/app/components/ui/button"
 import { Skeleton } from "@/app/components/ui/skeleton"
 
 interface Props {
-  /** Frase de escopo já pronta; `null` na 1ª carga (vira esqueleto). */
+  /** Ready-made scope sentence; `null` on the 1st load (becomes a skeleton). */
   subtitulo: string | null
-  /** Recarga em curso: o botão gira e trava. */
+  /** Reload in progress: the button spins and locks. */
   atualizando: boolean
-  /** Quantos artefatos o botão vermelho promete apagar (interseção seleção×carregado). */
+  /** How many artifacts the red button promises to delete (selection×loaded intersection). */
   aExcluir: number
-  /** Só editores do workspace veem o botão de excluir. */
+  /** Only workspace editors see the delete button. */
   podeExcluir: boolean
   onAtualizar: () => void
   onExcluir: () => void
 }
 
 /**
- * Cabeçalho de Artefatos (contrato §1): título, subtítulo de escopo com
- * esqueleto na 1ª carga, "Atualizar" em ghost e — só quando há seleção — a ação
- * destrutiva "Excluir N" à direita de tudo. Antes o Atualizar era outline.
+ * Artifacts header (contract §1): title, scope subtitle with a skeleton on the
+ * 1st load, "Atualizar" as ghost and — only when there is a selection — the
+ * destructive "Excluir N" action to the right of everything. Before, Refresh
+ * was outline.
  */
 export function CabecalhoDeArtefatos({
   subtitulo, atualizando, aExcluir, podeExcluir, onAtualizar, onExcluir,

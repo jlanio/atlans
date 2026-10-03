@@ -1,10 +1,10 @@
 /**
- * O passo da vez na barra do rodapé.
+ * The current step in the footer bar.
  *
- * A barra desce ao rodapé assim que a pessoa envia (antes do 1º token de
- * texto), e durante o raciocínio e as ferramentas — que podem levar segundos —
- * este indicador conta o que está acontecendo AGORA. O que se protege aqui é a
- * leitura do último bloco do turno em curso e os rótulos (os mesmos do painel).
+ * The bar moves down to the footer as soon as the person submits (before the 1st text
+ * token), and during reasoning and tools — which can take seconds —
+ * this indicator tells what is happening NOW. What is protected here is the
+ * reading of the last block of the turn in progress and the labels (the same as the panel's).
  */
 import { describe, it, expect, afterEach } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
@@ -72,7 +72,7 @@ describe("IndicadorDeEtapa", () => {
     render(<IndicadorDeEtapa etapa={{ tipo: "pensando", rotulo: "Pensando" }} />)
     const el = screen.getByTestId("etapa-da-barra")
     expect(el.textContent).toContain("Pensando…")
-    // aria-live para o leitor de tela anunciar a troca de passo.
+    // aria-live so the screen reader announces the step change.
     expect(el.getAttribute("aria-live")).toBe("polite")
   })
 

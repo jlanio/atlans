@@ -16,7 +16,7 @@ import type { FieldProps } from "./types"
 
 type CredentialFieldProps = FieldProps<{
   nodeFound: INodeContext
-  /** Quando true, bloqueia o botão Aplicar enquanto nenhuma credencial estiver selecionada */
+  /** When true, blocks the Apply button while no credential is selected */
   required?: boolean
 }>
 
@@ -24,8 +24,8 @@ const CredentialField = ({ nodeFound, field, values, setNodeField, required = fa
 
   const credentials = useWorkflowCatalogStore(s => s.credentials)
   const setCredentials = useWorkflowCatalogStore(s => s.setCredentials)
-  // Editor ou superior edita credenciais; viewer só lê. Não é "dono" —
-  // o nome anterior (isOwner) descrevia uma regra que não existe.
+  // Editor or above edits credentials; viewer only reads. It isn't "owner" —
+  // the previous name (isOwner) described a rule that doesn't exist.
   const { canEdit } = useWorkspace()
   const [createOpen, setCreateOpen] = useState(false)
   const [credentialTypes, setCredentialTypes] = useState<ICredentialTypeSchema[]>([])
@@ -45,7 +45,7 @@ const CredentialField = ({ nodeFound, field, values, setNodeField, required = fa
 
   const nodeCategory = nodeFound.data.type as string
 
-  // Tipos definidos diretamente na propriedade têm prioridade sobre os tipos do nó
+  // Types defined directly on the property take precedence over the node's types
   const allowedByProperty: string[] | undefined = (field as INodesPropertyAPI).credential_types
 
   const compatibleTypes = allowedByProperty
@@ -63,15 +63,15 @@ const CredentialField = ({ nodeFound, field, values, setNodeField, required = fa
   const selectedId = values?.[field.name] as string ?? ""
   const isMissingRequired = required && !selectedId
 
-  // A lista vem de GET /credentials/, que o backend filtra por owner_id: a
-  // credencial de outro membro do workspace NUNCA aparece aqui. Sem tratar
-  // isso, o Select não acha item para o value e cai no placeholder — o campo
-  // parece vazio embora o nó esteja configurado e executando.
+  // The list comes from GET /credentials/, which the backend filters by owner_id:
+  // another workspace member's credential NEVER shows up here. Without handling
+  // that, the Select finds no item for the value and falls back to the
+  // placeholder — the field looks empty although the node is configured and running.
   const selectedCredential = credentials.find(c => c.id === selectedId)
   const isForeign = !!selectedId && !selectedCredential
-  // Mesmo sintoma, outra causa: a credencial é do usuário, mas o tipo não é
-  // aceito por este nó, então ficou fora de `filtered`. Aqui o nome pode ser
-  // mostrado, já que pertence a quem está vendo.
+  // Same symptom, different cause: the credential belongs to the user, but its
+  // type isn't accepted by this node, so it was left out of `filtered`. Here the
+  // name can be shown, since it belongs to whoever is viewing.
   const isIncompatible = !!selectedCredential && !filtered.some(c => c.id === selectedId)
 
   // Viewer — estado somente leitura
@@ -87,7 +87,7 @@ const CredentialField = ({ nodeFound, field, values, setNodeField, required = fa
               <span className="text-xs">{getCredentialLabel(selectedCredential.type)}</span>
             </div>
           ) : isForeign ? (
-            // Antes caía em "Edição Indisponível", que sugere nó sem credencial.
+            // It used to fall into "Edição Indisponível" (editing unavailable), which suggests a node without a credential.
             <span className="text-foreground">Credencial de outro usuário</span>
           ) : (
             <span className="italic">Nenhuma credencial configurada</span>
@@ -139,8 +139,8 @@ const CredentialField = ({ nodeFound, field, values, setNodeField, required = fa
             </SelectItem>
           )}
 
-          {/* Itens sintéticos: sem um SelectItem com este value, o Radix não
-              tem o que casar e exibe o placeholder — o campo pareceria vazio. */}
+          {/* Synthetic items: without a SelectItem with this value, Radix has
+              nothing to match and shows the placeholder — the field would look empty. */}
           {isForeign && (
             <SelectItem value={selectedId}>
               <div className="flex items-center gap-1.5">

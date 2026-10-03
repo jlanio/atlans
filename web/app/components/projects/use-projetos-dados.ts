@@ -10,38 +10,39 @@ import type { IWorkflowMetricsRow } from "@/service/types"
 import { JANELA_EM_DIAS } from "./como-anda"
 
 /**
- * Dados de Projetos (docs/specs/projects.md §3.3).
+ * Projects data (docs/specs/projects.md §3.3).
  *
- * Três chamadas partem juntas por workspace: listagem, grupos e métricas
- * (`/observability/metrics/workflows`, janela de 30 dias). As duas primeiras
- * são obrigatórias — sem elas não há estante; a terceira é a coluna "como
- * anda", e a lista sai completa sem ela, com um aviso discreto. Nada de
- * cache local: a listagem já é magra e o backend guarda as métricas por 45 s.
+ * Three calls go out together per workspace: listing, groups and metrics
+ * (`/observability/metrics/workflows`, 30-day window). The first two are
+ * mandatory — without them there is no shelf; the third is the "como anda"
+ * column, and the list comes out complete without it, with a discreet notice.
+ * No local cache: the listing is already lean and the backend keeps the
+ * metrics for 45 s.
  */
 
 export interface DadosDeProjetos {
   workflows: IWorkflow[]
   grupos: IWorkflowGroup[]
-  /** Por `workflow_hash`; nulo quando as métricas falharam (a coluna some). */
+  /** By `workflow_hash`; null when the metrics failed (the column disappears). */
   metricas: Map<string, IWorkflowMetricsRow> | null
-  /** Primeira carga do workspace (skeleton). */
+  /** First load of the workspace (skeleton). */
   carregando: boolean
-  /** Recargas seguintes (o botão gira, a lista fica). */
+  /** Subsequent reloads (the button spins, the list stays). */
   atualizando: boolean
-  /** Listagem ou grupos falharam — estado de erro com "Tentar de novo". */
+  /** Listing or groups failed — error state with "Tentar de novo" (try again). */
   erro: string | null
-  /** Só as métricas falharam — aviso discreto acima da lista. */
+  /** Only the metrics failed — discreet notice above the list. */
   metricasIndisponiveis: boolean
-  /** Carimbo (ms) da última resposta aceita, para o "atualizado há X". */
+  /** Stamp (ms) of the last accepted response, for the "atualizado há X". */
   atualizadoEm: number | null
-  /** "Atualizar" passa `force: true` para furar o cache das métricas no backend. */
+  /** "Atualizar" passes `force: true` to bypass the metrics cache on the backend. */
   recarregar: (opcoes?: { force?: boolean }) => void
-  /** Mutações otimistas do `index` (ativar, mover, excluir…); aceitam valor ou função. */
+  /** Optimistic mutations from `index` (activate, move, delete…); they accept a value or a function. */
   definirWorkflows: Dispatch<SetStateAction<IWorkflow[]>>
   definirGrupos: Dispatch<SetStateAction<IWorkflowGroup[]>>
 }
 
-/** As métricas se atualizam sozinhas neste ritmo com a aba visível; a listagem, não. */
+/** The metrics refresh on their own at this pace while the tab is visible; the listing does not. */
 export const INTERVALO_DAS_METRICAS_MS = 60_000
 
 const ERRO_PADRAO = "Não foi possível carregar os projetos."
@@ -50,7 +51,7 @@ function mapaDeMetricas(linhas: IWorkflowMetricsRow[]): Map<string, IWorkflowMet
   return new Map(linhas.map(l => [l.workflow_hash, l]))
 }
 
-/** `allSettled` nunca rejeita; o service também não — mas um `throw` inesperado não pode derrubar a tela. */
+/** `allSettled` never rejects; neither does the service — but an unexpected `throw` must not bring down the screen. */
 function resposta<T>(r: PromiseSettledResult<IResponse<T> | null>): IResponse<T> | null {
   return r.status === "fulfilled" ? r.value : null
 }
@@ -76,29 +77,29 @@ export function useProjetosDados(opts: { intervaloDasMetricasMs?: number } = {})
   const [metricasIndisponiveis, setMetricasIndisponiveis] = useState(false)
   const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null)
 
-  // Carimbo de sequência: trocar de workspace duas vezes seguidas dispara
-  // duas cargas, e a mais lenta pode responder por último. Só a última
-  // carga pedida escreve na tela.
+  // Sequence stamp: switching workspaces twice in a row fires two loads, and
+  // the slower one may respond last. Only the last load requested writes to
+  // the screen.
   const seq = useRef(0)
-  // Workspace cujos dados estão NA TELA (`undefined` = nunca carregou). É o
-  // que separa skeleton (primeira carga deste workspace) de "o botão gira".
+  // Workspace whose data is ON SCREEN (`undefined` = never loaded). It is what
+  // separates the skeleton (first load of this workspace) from "the button spins".
   const workspaceNaTela = useRef<string | null | undefined>(undefined)
-  // O `recarregar` lê o workspace corrente sem trocar de identidade a cada
-  // render (desce para o botão Atualizar).
+  // `recarregar` reads the current workspace without changing identity on every
+  // render (it goes down to the Atualizar button).
   const workspaceRef = useRef(workspaceId)
   workspaceRef.current = workspaceId
 
-  // Quando o "Atualizar" (force) escreveu métricas frescas. Um tick de fundo
-  // que começou ANTES desse instante busca a versão em cache (45 s) e, se
-  // chegar depois, sobrescreveria o fresco pelo velho — os dois não trocam
-  // de sequência (o tick não incrementa `seq`). O tick confere este carimbo
-  // e desiste quando um force o ultrapassou.
+  // When "Atualizar" (force) wrote fresh metrics. A background tick that
+  // started BEFORE that instant fetches the cached version (45 s) and, if it
+  // arrives later, would overwrite the fresh with the stale — the two do not
+  // change sequence (the tick does not bump `seq`). The tick checks this stamp
+  // and gives up when a force has overtaken it.
   const forcadasEm = useRef(0)
 
-  // Assinatura da última resposta de métricas aceita. O tick de 60s reconstrói
-  // o Map mesmo quando o payload é idêntico, e essa troca de identidade invalida
-  // os `useMemo` da lista inteira (todas as linhas re-renderizam sem nada mudar).
-  // Só escreve o estado quando o conteúdo de fato muda.
+  // Signature of the last accepted metrics response. The 60s tick rebuilds the
+  // Map even when the payload is identical, and that identity change invalidates
+  // the whole list's `useMemo`s (every row re-renders with nothing changed).
+  // It only writes the state when the content actually changes.
   const assinaturaMetricas = useRef<string>("")
 
   const carregar = useCallback(async (alvo: string | undefined, force: boolean) => {
@@ -108,12 +109,12 @@ export function useProjetosDados(opts: { intervaloDasMetricasMs?: number } = {})
     else setAtualizando(true)
 
     const [rWorkflows, rGrupos, rMetricas] = await Promise.allSettled([
-      // Com os do assistente: eles são fluxos como os outros e a estante é
-      // onde a pessoa acompanha o que existe. O chip "Assistente" recorta.
+      // Including the assistant's: they are workflows like the others and the shelf
+      // is where the person keeps track of what exists. The "Assistente" chip slices.
       GisFlowService.getWorkflows(alvo, { incluirDoAssistente: true }),
       GisFlowService.getWorkflowGroups(alvo),
-      // Métricas sempre recortadas por workspace (spec §2.3): sem workspace
-      // não há o que recortar — e a lista também virá vazia.
+      // Metrics always sliced by workspace (spec §2.3): without a workspace there
+      // is nothing to slice by — and the list will come empty too.
       alvo ? GisFlowService.getWorkflowMetricsList(JANELA_EM_DIAS, force, { workspace_id: alvo }) : Promise.resolve(null),
     ])
     if (mine !== seq.current) return
@@ -129,13 +130,14 @@ export function useProjetosDados(opts: { intervaloDasMetricasMs?: number } = {})
       setAtualizadoEm(Date.now())
       workspaceNaTela.current = alvo ?? null
     } else {
-      // O que já estava na tela fica (é de quem recarregou); quem trocou de
-      // workspace vê o bloco de erro por cima, porque `erro` manda na tela.
+      // What was already on screen stays (it belongs to whoever reloaded); whoever
+      // switched workspaces sees the error block on top, because `erro` rules the screen.
       const mensagem = mensagemDe(listagem, gruposRes)
       setErro(mensagem)
-      // Sem carga aceita, o cartão de erro toma a tela e já anuncia a falha
-      // (`role="alert"`); o toast repetiria o aviso ao leitor de tela. Ele é
-      // da carga que falha com uma lista já na tela.
+      // With no accepted load, the error card takes over the screen and already
+      // announces the failure (`role="alert"`); the toast would repeat the notice
+      // to the screen reader. The toast is for a load that fails with a list
+      // already on screen.
       if (workspaceNaTela.current !== undefined) createToast.error("Erro ao carregar projetos", mensagem)
     }
 
@@ -145,13 +147,13 @@ export function useProjetosDados(opts: { intervaloDasMetricasMs?: number } = {})
       setMetricasIndisponiveis(false)
     } else if (metricasRes?.data?.workflows) {
       if (force) forcadasEm.current = Date.now()
-      // Alinha a assinatura para o primeiro tick de fundo não re-setar à toa.
+      // Aligns the signature so the first background tick does not re-set for nothing.
       assinaturaMetricas.current = JSON.stringify(metricasRes.data.workflows)
       setMetricas(mapaDeMetricas(metricasRes.data.workflows))
       setMetricasIndisponiveis(false)
     } else {
-      // Nulo, e não o mapa antigo: numa troca de workspace ele seria de
-      // outra estante, e numa recarga a spec pede a lista sem a coluna.
+      // Null, and not the old map: on a workspace switch it would belong to
+      // another shelf, and on a reload the spec asks for the list without the column.
       assinaturaMetricas.current = ""
       setMetricas(null)
       setMetricasIndisponiveis(true)
@@ -161,35 +163,35 @@ export function useProjetosDados(opts: { intervaloDasMetricasMs?: number } = {})
     setAtualizando(false)
   }, [])
 
-  // Recarrega ao trocar de workspace, esperando o context resolver qual é —
-  // antes disso `current` é nulo e a chamada traria a lista de todos.
+  // Reloads when switching workspaces, waiting for the context to resolve which
+  // one it is — before that `current` is null and the call would bring everyone's list.
   useEffect(() => {
     if (workspaceLoading) return
     carregar(workspaceId, false)
   }, [workspaceLoading, workspaceId, carregar])
 
-  // Só as métricas, sem ligar `carregando`/`atualizando` — senão a lista
-  // piscaria a cada minuto. Não incrementa a sequência: uma carga completa
-  // pedida no meio vence.
+  // Only the metrics, without turning on `carregando`/`atualizando` — otherwise
+  // the list would flicker every minute. It does not bump the sequence: a full
+  // load requested in the middle wins.
   useEffect(() => {
     if (workspaceLoading || !workspaceId || intervaloDasMetricasMs <= 0) return
     let ultimo = Date.now()
     async function atualizarMetricas() {
-      // As métricas anotam a lista NA TELA. Sem ela (a 1ª carga falhou, ou a
-      // do workspace novo ainda não chegou), o tick não tem o que anotar, e o
-      // carimbo que ele grava tirava o cartão de erro da tela: ela passava a
-      // dizer "primeiro uso" de uma estante que nem carregou.
+      // The metrics annotate the list ON SCREEN. Without it (the 1st load failed, or
+      // the new workspace's has not arrived yet), the tick has nothing to annotate,
+      // and the stamp it writes took the error card off the screen: the screen
+      // then said "first use" for a shelf that never even loaded.
       if (workspaceNaTela.current !== workspaceId) return
       const mine = seq.current
       const inicio = Date.now()
       ultimo = inicio
       const res = await GisFlowService.getWorkflowMetricsList(JANELA_EM_DIAS, false, { workspace_id: workspaceId })
-      // Falhou, chegou tarde (outra carga assumiu), ou um "Atualizar" escreveu
-      // dados frescos enquanto este tick buscava o cache: fica o que havia; o
-      // próximo tick tenta de novo.
+      // Failed, arrived late (another load took over), or an "Atualizar" wrote
+      // fresh data while this tick was fetching the cache: what was there stays;
+      // the next tick tries again.
       if (mine !== seq.current || forcadasEm.current > inicio || !res.data?.workflows) return
-      // Payload idêntico ao último aceito: não troca a identidade do Map, para
-      // não re-renderizar a lista inteira a cada minuto sem motivo.
+      // Payload identical to the last accepted one: do not change the Map's identity,
+      // so the whole list does not re-render every minute for no reason.
       const assinatura = JSON.stringify(res.data.workflows)
       if (assinatura === assinaturaMetricas.current) return
       assinaturaMetricas.current = assinatura
@@ -200,8 +202,8 @@ export function useProjetosDados(opts: { intervaloDasMetricasMs?: number } = {})
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") atualizarMetricas()
     }, intervaloDasMetricasMs)
-    // Voltar para a aba depois de um tempo longe: atualiza na hora em vez de
-    // esperar o próximo tick — mas não a cada alt-tab.
+    // Returning to the tab after a long time away: refreshes right away instead of
+    // waiting for the next tick — but not on every alt-tab.
     const onVisibility = () => {
       if (document.visibilityState === "visible" && Date.now() - ultimo >= intervaloDasMetricasMs) atualizarMetricas()
     }

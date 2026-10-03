@@ -8,17 +8,17 @@ logger = logging.getLogger(__name__)
 
 class WorkflowGraph:
     """
-    Constrói e analisa o grafo de execução do workflow.
-    - Indexa arestas de entrada e saída para cada nó.
-    - Calcula ordem topológica garantindo DAG.
-    - Ignora nós isolados (sem arestas) opcionalmente.
-    - Restringe execução aos nós alcançáveis a partir dos triggers E às
-      dependências (ancestrais) desses nós, opcionalmente.
+    Builds and analyzes the workflow execution graph.
+    - Indexes incoming and outgoing edges for each node.
+    - Computes the topological order, guaranteeing a DAG.
+    - Optionally ignores isolated nodes (no edges).
+    - Optionally restricts execution to the nodes reachable from the triggers AND
+      to the dependencies (ancestors) of those nodes.
     """
     def __init__(
         self,
-        node_defs: Dict[str, dict],  # mapeamento id -> definição de node
-        edges: List[dict],           # lista de conexões {'source', 'target'}
+        node_defs: Dict[str, dict],  # mapping id -> node definition
+        edges: List[dict],           # list of connections {'source', 'target'}
         filter_isolated: bool = True,
         filter_trigger_reachable: bool = True,
     ):
@@ -32,14 +32,14 @@ class WorkflowGraph:
 
     def _index_edges(self) -> None:
         """
-        Indexa arestas por origem e destino em estruturas de fácil busca.
+        Indexes edges by source and target in easy-to-search structures.
 
-        Arestas ÓRFÃS — cujo `source` e/ou `target` não existe em `node_defs` —
-        são descartadas (e logadas), não indexadas. Elas surgem de cruft real:
-        um nó deletado no canvas deixando a aresta pendurada, expansão de
-        sub-fluxo, import/edição manual do JSON. Se retidas, envenenam o run —
-        `KeyError` na montagem de inputs (o run lê `self.incoming`) e na
-        instanciação. `compute_order` aplica a mesma guarda na ordenação.
+        ORPHAN edges — whose `source` and/or `target` does not exist in `node_defs` —
+        are discarded (and logged), not indexed. They come from real cruft:
+        a node deleted on the canvas leaving the edge dangling, sub-workflow
+        expansion, manual JSON import/editing. If kept, they poison the run —
+        `KeyError` while assembling inputs (the run reads `self.incoming`) and at
+        instantiation. `compute_order` applies the same guard when ordering.
         """
         self.orphan_edges: List[dict] = []
         for edge in self.edges:
@@ -59,46 +59,46 @@ class WorkflowGraph:
 
     def compute_order(self) -> List[str]:
         """
-        Retorna lista de IDs dos nós na ordem de execução (topológica),
-        removendo nós isolados se filter_isolated == True.
+        Returns the list of node IDs in execution (topological) order,
+        removing isolated nodes if filter_isolated == True.
         """
-        # Cria mapa de predecessores
+        # Builds the predecessor map
         predecessors = {nid: set() for nid in self.node_defs}
         for edge in self.edges:
             src = edge['source']
             tgt = edge['target']
-            # Guarda contra aresta órfã (mesma cruft tratada em _index_edges):
-            #  - target fora de node_defs → predecessors[tgt] daria KeyError cru
-            #    (dict comum), abortando TODO o run antes de qualquer filtro;
-            #  - source fora de node_defs → o id fantasma entraria como valor no
-            #    set de predecessores e o TopologicalSorter o devolveria em
-            #    static_order() como nó sem predecessores; os filtros abaixo só
-            #    removem CHAVES, então ele vazaria para a instanciação (KeyError
-            #    em node_defs[fantasma]).
+            # Guard against orphan edges (the same cruft handled in _index_edges):
+            #  - target outside node_defs → predecessors[tgt] would raise a raw KeyError
+            #    (plain dict), aborting the WHOLE run before any filter;
+            #  - source outside node_defs → the phantom id would go in as a value in
+            #    the predecessor set and TopologicalSorter would return it in
+            #    static_order() as a node with no predecessors; the filters below only
+            #    remove KEYS, so it would leak into instantiation (KeyError
+            #    on node_defs[fantasma]).
             if src in self.node_defs and tgt in self.node_defs:
                 predecessors[tgt].add(src)
 
-        # Se solicitado, remove nós sem arestas de entrada ou saída.
-        # O filtro só faz sentido quando o workflow tem arestas — se não há
-        # arestas, todos os nós são "isolados" por definição e devem executar.
+        # If requested, removes nodes with no incoming or outgoing edges.
+        # The filter only makes sense when the workflow has edges — if there are no
+        # edges, every node is "isolated" by definition and must run.
         if self.filter_isolated and self.edges:
             envolvidos = set(self.incoming.keys()) | set(self.outgoing.keys())
             for nid in list(predecessors.keys()):
                 if nid not in envolvidos:
                     predecessors.pop(nid)
 
-        # Se solicitado, restringe execução aos nós alcançáveis a partir dos
-        # triggers E às dependências (ancestrais) desses nós.
-        # Preserva fluxos paralelos legítimos (ex: dois triggers convergindo num Merge)
-        # e elimina árvores desconectadas sem caminho até um trigger.
-        # Quando não há triggers (ex: testes unitários isolados), o filtro não é aplicado.
+        # If requested, restricts execution to the nodes reachable from the
+        # triggers AND to the dependencies (ancestors) of those nodes.
+        # Preserves legitimate parallel flows (e.g. two triggers converging on a Merge)
+        # and eliminates disconnected trees with no path to a trigger.
+        # When there are no triggers (e.g. isolated unit tests), the filter is not applied.
         if self.filter_trigger_reachable:
             trigger_ids = {
                 nid for nid in predecessors
                 if self.node_defs.get(nid, {}).get("type") == "trigger"
             }
             if trigger_ids:
-                # Frente: o run "desce" dos triggers seguindo as arestas de saída.
+                # Forward: the run "flows down" from the triggers following outgoing edges.
                 reachable: set = set()
                 queue: deque = deque(trigger_ids)
                 while queue:
@@ -108,16 +108,16 @@ class WorkflowGraph:
                     reachable.add(nid)
                     for edge in self.outgoing.get(nid, []):
                         queue.append(edge["target"])
-                # Trás: as DEPENDÊNCIAS (ancestrais) de cada nó que vai rodar também
-                # rodam. Sem isto, uma fonte "lateral" que alimenta um nó alcançável
-                # (ex.: WFS→Filtro→Caixa, com o trigger ligado só na Caixa) ficava de
-                # fora, e a junção TRAVAVA: o executor conta os pais por aresta (Kahn),
-                # e o pai que não entrou no run nunca decrementa esse contador — a
-                # junção e o ramo inteiro nunca rodavam, só o trigger. (O predecessor
-                # direto até vazava para a ORDEM como valor, mas o mesmo contador de
-                # pais o segurava, então nem ele rodava.) Fechar o cone de entrada
-                # resolve tudo: todo predecessor de um nó mantido também é mantido —
-                # sem pai faltante travando o Kahn nem id pendurado no TopologicalSorter.
+                # Backward: the DEPENDENCIES (ancestors) of each node that will run also
+                # run. Without this, a "side" source feeding a reachable node
+                # (e.g. WFS→Filter→Box, with the trigger connected only to the Box) was
+                # left out, and the join HUNG: the executor counts parents per edge (Kahn),
+                # and the parent that did not enter the run never decrements that counter —
+                # the join and the whole branch never ran, only the trigger. (The direct
+                # predecessor did even leak into the ORDER as a value, but the same parent
+                # counter held it back, so not even it ran.) Closing the input cone
+                # solves everything: every predecessor of a kept node is also kept —
+                # no missing parent hanging Kahn and no dangling id in TopologicalSorter.
                 manter: set = set(reachable)
                 queue = deque(reachable)
                 while queue:

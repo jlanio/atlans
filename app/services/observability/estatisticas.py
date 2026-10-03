@@ -1,6 +1,6 @@
 # app/services/observability/estatisticas.py
-# Lógica de negócio e consultas de observabilidade extraídas do router.
-# Contrato com a web: docs/specs/metrics-history.md (§3).
+# Business logic and observability queries extracted from the router.
+# Contract with the web app: docs/specs/metrics-history.md (§3).
 
 from datetime import datetime, timedelta
 from typing import Iterable, Optional, Sequence
@@ -11,15 +11,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.models import WorkflowRun
 
 
-# "Duracao tipica" e a mediana das execucoes CONCLUIDAS com duracao positiva:
-# falhas, zeros do agendador e orfaos entravam na media antiga e uma execucao
-# de 40 min entre cem de 30 s virava "54 s". A janela de 90 dias e a mesma do
-# criterio de execucao presa (spec §3.1) e do `typical_seconds` do detalhe.
+# "Typical duration" is the median of COMPLETED runs with a positive duration:
+# failures, scheduler zeros and orphans went into the old average, and a 40-min
+# run among a hundred of 30 s became "54 s". The 90-day window is the same as the
+# stuck-run criterion (spec §3.1) and the detail's `typical_seconds`.
 _TIPICO_DIAS = 90
 
 
-# Tamanho maximo do `last_error` nos resumos (spec §3.1): a mensagem inteira
-# fica no detalhe do run; aqui ela e uma linha da tabela.
+# Maximum size of `last_error` in the summaries (spec §3.1): the full message
+# stays in the run detail; here it is a table row.
 _ERRO_RESUMIDO = 200
 
 
@@ -28,9 +28,9 @@ from app.services.observability.escopo import _e_postgres
 
 # ── Percentis ─────────────────────────────────────────────────────────────────
 
-# So execucoes concluidas com duracao positiva entram nos percentis (spec
-# §3.1): falha/cancelamento nao dizem quanto o fluxo demora, e `0` e o que o
-# agendador grava quando nem chegou a despachar.
+# Only completed runs with a positive duration go into the percentiles (spec
+# §3.1): failure/cancellation say nothing about how long the workflow takes, and `0` is
+# what the scheduler writes when it did not even get to dispatch.
 _DURACAO_VALIDA = (WorkflowRun.status == "success", WorkflowRun.duration_seconds > 0)
 
 
@@ -46,12 +46,12 @@ def _arredondar(valor) -> Optional[float]:
 
 
 async def _percentis(db: AsyncSession, filtros: list, ps: Sequence[float]) -> list[Optional[float]]:
-    """Percentis da duracao das execucoes concluidas que passam em `filtros`.
+    """Duration percentiles of the completed runs that pass `filtros`.
 
-    No PostgreSQL e um `percentile_cont(...) WITHIN GROUP` — uma linha de
-    resposta. Fora dele projeta SO a coluna `duration_seconds` do recorte e
-    interpola em Python; `filtros` sempre traz a janela, entao o volume e o
-    que a tela pede, nunca a tabela.
+    On PostgreSQL it is a `percentile_cont(...) WITHIN GROUP` — a single response
+    row. Elsewhere it projects ONLY the `duration_seconds` column of the slice and
+    interpolates in Python; `filtros` always carries the window, so the volume is
+    what the screen asks for, never the table.
     """
     if _e_postgres(db):
         row = (await db.execute(
@@ -69,9 +69,9 @@ async def _percentis(db: AsyncSession, filtros: list, ps: Sequence[float]) -> li
 async def _percentis_por(
     db: AsyncSession, coluna, filtros: list, ps: Sequence[float],
 ) -> dict:
-    """`_percentis` agrupado por `coluna` (workflow_hash ou host) —
-    `{valor da coluna: [percentis...]}`. Grupos sem execucao concluida nao
-    aparecem: quem consulta trata a ausencia como `None`."""
+    """`_percentis` grouped by `coluna` (workflow_hash or host) —
+    `{column value: [percentiles...]}`. Groups with no completed run do not
+    appear: the caller treats the absence as `None`."""
     if _e_postgres(db):
         result = await db.execute(
             select(coluna.label("grupo"), *_colunas_percentil(ps))
@@ -97,9 +97,9 @@ async def _percentis_por(
 async def _p50_por_workflow(
     db: AsyncSession, workflow_hashes: Iterable[str], now: datetime,
 ) -> dict[str, Optional[float]]:
-    """Mediana dos ultimos 90 dias, por workflow — o `typical_seconds` da spec.
-    Sem filtro de workspace de proposito: e um numero agregado do workflow, e
-    quem chega aqui ja teve o acesso ao workflow (ou ao run) verificado."""
+    """Median of the last 90 days, per workflow — the spec's `typical_seconds`.
+    No workspace filter on purpose: it is an aggregate number of the workflow, and
+    whoever gets here already had their access to the workflow (or the run) checked."""
     hashes = [h for h in set(workflow_hashes) if isinstance(h, str)]
     if not hashes:
         return {}
@@ -116,18 +116,18 @@ async def _ultima_execucao_por_workflow(
     db: AsyncSession, filtros: list, workflow_hashes: Optional[Iterable[str]] = None,
     *, com_erro: bool = True,
 ) -> dict[str, object]:
-    """Ultima execucao (status, erro, categoria, inicio) de cada workflow que
-    passa em `filtros`, numa consulta so.
+    """Last run (status, error, category, start) of each workflow that
+    passes `filtros`, in a single query.
 
     ROW_NUMBER() OVER (PARTITION BY workflow_hash ORDER BY start_time DESC)
-    compila igual no PostgreSQL e no SQLite (>= 3.25), entao nao ha dois
-    caminhos para manter. `filtros` sempre traz a janela e o escopo — sem
-    eles a funcao de janela varreria a tabela inteira.
+    compiles the same on PostgreSQL and SQLite (>= 3.25), so there are not two
+    paths to maintain. `filtros` always carries the window and the scope — without
+    them the window function would scan the whole table.
 
-    `com_erro=False` deixa `error_message` fora da projecao: a chamada que so
-    quer status e inicio da ultima execucao ordena a janela inteira, e o texto
-    do erro e a coluna mais larga da tabela — carrega-lo para descartar e o
-    custo que nao vale pagar em instalacao grande.
+    `com_erro=False` leaves `error_message` out of the projection: the call that only
+    wants the status and start of the last run sorts the whole window, and the error
+    text is the widest column in the table — loading it only to discard it is a
+    cost not worth paying on a large installation.
     """
     condicoes = list(filtros)
     if workflow_hashes is not None:

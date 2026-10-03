@@ -1,16 +1,16 @@
 "use client"
 
 /**
- * Editor estruturado das `rules` do nó Switch.
+ * Structured editor for the Switch node's `rules`.
  *
- * Antes o campo era `object` cru: cada regra era um dict digitado à mão num
- * editor de JSON — `{"field":"uf","operator":"==","value":"MT","output":
- * "output_1"}` — com operador e saída fáceis de errar e nenhum lugar para as
- * colunas conhecidas. Aqui cada regra é uma linha campo+operador+valor+saída,
- * com selects para o que é enumerável.
+ * The field used to be a raw `object`: each rule was a dict typed by hand in a
+ * JSON editor — `{"field":"uf","operator":"==","value":"MT","output":
+ * "output_1"}` — with an operator and output easy to get wrong and no place
+ * for the known columns. Here each rule is a field+operator+value+output row,
+ * with selects for what is enumerable.
  *
- * O valor persiste como a MESMA lista de dicts que o execute lê — um fluxo
- * salvo pelo editor de JSON abre aqui, e vice-versa.
+ * The value persists as the SAME list of dicts that execute reads — a workflow
+ * saved by the JSON editor opens here, and vice versa.
  */
 import { Button } from "@/app/components/ui/button"
 import { Input } from "@/app/components/ui/input"
@@ -27,38 +27,38 @@ import { FieldLabel } from "./field-label"
 import SugestoesDeColunas from "./sugestoes-de-colunas"
 import type { FieldProps } from "./types"
 
-/** Espelha `_OP_FUNCS` + extras do switch.py — a fonte é o backend. */
+/** Mirrors `_OP_FUNCS` + the extras in switch.py — the backend is the source. */
 export const OPERADORES_DO_SWITCH = ["==", "!=", ">", "<", ">=", "<=", "contains", "starts", "ends"] as const
 
-/** As saídas que o descriptor do Switch declara (outputs output_0..3).
- *  output_0 é a saída padrão/fallback — as regras normalmente apontam 1..3. */
+/** The outputs the Switch descriptor declares (outputs output_0..3).
+ *  output_0 is the default/fallback output — rules normally point to 1..3. */
 export const SAIDAS_DO_SWITCH = ["output_0", "output_1", "output_2", "output_3"] as const
 
-/** Colunas da grade de regras (cabeçalho e linhas): campo, operador, valor,
- *  saída, remover. As trilhas fixas cabem o valor mais largo em fonte mono —
- *  "contains" no operador, "Saída padrão" na saída —, e os triggers ocupam a
- *  trilha inteira (`w-full min-w-0`) em vez de `w-fit`: um trigger que passa da
- *  própria trilha fica por cima do botão "Remover regra", e o clique na seta do
- *  select apagava a regra. */
+/** Columns of the rules grid (header and rows): field, operator, value,
+ *  output, remove. The fixed tracks fit the widest value in monospace —
+ *  "contains" for the operator, "Saída padrão" for the output —, and the
+ *  triggers fill the whole track (`w-full min-w-0`) instead of `w-fit`: a
+ *  trigger that overflows its own track sits on top of the "Remover regra"
+ *  (remove rule) button, and clicking the select's arrow deleted the rule. */
 const COLUNAS_DAS_REGRAS = "grid-cols-[1fr_6.75rem_1fr_8.75rem_auto]"
 
 export interface RegraDoSwitch {
   field: string
   operator: string
   value: string
-  /** "" = SEM `output` na regra: o execute roteia para o fallback
-   *  (`rule.get("output", fallback)`). Não é um estado inventável — uma
-   *  definition legada sem a chave TEM esse comportamento, e normalizá-la
-   *  para "output_1" mudaria o roteamento na primeira edição salva. */
+  /** "" = NO `output` in the rule: execute routes to the fallback
+   *  (`rule.get("output", fallback)`). It isn't an invented state — a legacy
+   *  definition without the key HAS that behavior, and normalizing it to
+   *  "output_1" would change the routing on the first saved edit. */
   output: string
 }
 
-/** Lê o valor salvo, venha como lista (ObjectField/definition) ou JSON-string.
+/** Reads the saved value, whether it comes as a list (ObjectField/definition) or a JSON string.
  *
- * `field`/`operator`/`value` ganham os MESMOS defaults do execute
- * (`rule.get("field","")`, `"=="`, `""`), então normalizá-los não muda
- * comportamento. `output` é o único cuja ausência significa outra coisa
- * (fallback) — fica "" e a serialização omite a chave. */
+ * `field`/`operator`/`value` get the SAME defaults as execute
+ * (`rule.get("field","")`, `"=="`, `""`), so normalizing them doesn't change
+ * behavior. `output` is the only one whose absence means something else
+ * (fallback) — it stays "" and serialization omits the key. */
 export function lerRegras(bruto: unknown): RegraDoSwitch[] {
   let lista: unknown = bruto
   if (typeof bruto === "string" && bruto.trim().startsWith("[")) {
@@ -75,8 +75,8 @@ export function lerRegras(bruto: unknown): RegraDoSwitch[] {
     }))
 }
 
-/** O que vai para a definition: a regra como o execute a lê — sem `output`
- *  quando a regra roteia para o fallback. */
+/** What goes into the definition: the rule as execute reads it — without
+ *  `output` when the rule routes to the fallback. */
 export function serializarRegras(regras: RegraDoSwitch[]): Record<string, string>[] {
   return regras.map(({ field, operator, value, output }) => ({
     field, operator, value,
@@ -84,7 +84,7 @@ export function serializarRegras(regras: RegraDoSwitch[]): Record<string, string
   }))
 }
 
-/** Valor do SelectItem da saída padrão — Select não aceita item com value "". */
+/** SelectItem value for the default output — Select doesn't accept an item with value "". */
 const FALLBACK = "__fallback__"
 
 type SwitchRulesFieldProps = FieldProps<{
@@ -96,8 +96,8 @@ type SwitchRulesFieldProps = FieldProps<{
 const SwitchRulesField = ({ field, values, setNodeField, sugestoes = [], sugestoesDesatualizadas = false, sugestoesParciais = false }: SwitchRulesFieldProps) => {
   const regras = lerRegras(values?.[field.name])
 
-  // A lista REAL, não JSON-string — mesmo cast do SetFieldsHelper. Serializa
-  // pelo contrato do execute: regra de fallback vai SEM a chave `output`.
+  // The REAL list, not a JSON string — same cast as SetFieldsHelper. Serializes
+  // by execute's contract: a fallback rule goes WITHOUT the `output` key.
   const gravar = (next: RegraDoSwitch[]) =>
     setNodeField(field.name, serializarRegras(next) as unknown as string)
 
@@ -107,10 +107,10 @@ const SwitchRulesField = ({ field, values, setNodeField, sugestoes = [], sugesto
   const novaRegra = (nomeDoCampo = ""): RegraDoSwitch =>
     ({ field: nomeDoCampo, operator: "==", value: "", output: "output_1" })
 
-  // Clique numa sugestão: preenche a primeira regra sem campo ou abre uma
-  // nova — nunca substitui o que já foi digitado. A MESMA coluna pode reger
-  // várias regras (uf == MT → 1, uf == GO → 2), então aqui a lista não é
-  // filtrada pelo que já está em uso.
+  // Click on a suggestion: fills the first rule without a field or opens a
+  // new one — never replaces what has already been typed. The SAME column can
+  // govern several rules (uf == MT → 1, uf == GO → 2), so here the list isn't
+  // filtered by what is already in use.
   function escolher(nome: string) {
     const vazia = regras.findIndex(r => r.field.trim() === "")
     if (vazia >= 0) editar(vazia, { field: nome })
@@ -157,9 +157,9 @@ const SwitchRulesField = ({ field, values, setNodeField, sugestoes = [], sugesto
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Operador fora do vocabulário (definition editada à mão):
-                      vira item para o valor aparecer e sobreviver à edição —
-                      um Select mudo apagaria a escolha na primeira gravação. */}
+                  {/* Operator outside the vocabulary (hand-edited definition):
+                      it becomes an item so the value shows and survives editing —
+                      a mute Select would erase the choice on the first save. */}
                   {!OPERADORES_DO_SWITCH.includes(regra.operator as never) && (
                     <SelectItem value={regra.operator} className="font-mono text-xs">{regra.operator}</SelectItem>
                   )}
@@ -182,9 +182,9 @@ const SwitchRulesField = ({ field, values, setNodeField, sugestoes = [], sugesto
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Regra sem `output` roteia para a saída padrão E encerra a
-                      avaliação — é um estado legítimo de definition legada,
-                      não um buraco a preencher. */}
+                  {/* A rule without `output` routes to the default output AND ends
+                      evaluation — it is a legitimate state of a legacy definition,
+                      not a hole to fill. */}
                   <SelectItem value={FALLBACK} className="text-xs">Saída padrão</SelectItem>
                   {regra.output !== "" && !SAIDAS_DO_SWITCH.includes(regra.output as never) && (
                     <SelectItem value={regra.output} className="font-mono text-xs">{regra.output}</SelectItem>

@@ -1,26 +1,26 @@
 # desktop/scripts/smoke.py
 #
-# Smoke test do bundle Python empacotado no app desktop.
+# Smoke test of the Python bundle packaged in the desktop app.
 #
-# Roda DENTRO do runtime embarcado, com cwd=resources e PYTHONPATH=resources —
-# exatamente o ambiente do spawn em producao. Se algo aqui falha, o instalador
-# gerado seria um app que abre e nao executa workflow nenhum.
+# Runs INSIDE the embedded runtime, with cwd=resources and PYTHONPATH=resources —
+# exactly the production spawn environment. If something here fails, the
+# generated installer would be an app that opens and runs no workflow at all.
 #
-# O passo mais importante e o 3: e ele que exercita o sys.path hack de
-# executor/job_executor.py e o registry dinamico de flow/, que carrega ~60
-# modulos de nos via importlib. E o unico jeito de descobrir, em tempo de build,
-# que a poda comeu algo de que um no precisava.
+# The most important step is 3: it is the one that exercises the sys.path hack
+# of executor/job_executor.py and flow/'s dynamic registry, which loads ~60
+# node modules via importlib. It is the only way to find out, at build time,
+# that pruning ate something a node needed.
 #
-# Invocado por scripts/smoke-python.mjs. Nao depende de pytest de proposito:
-# o runtime empacotado nao tem pytest, e nao vai ter.
+# Invoked by scripts/smoke-python.mjs. Does not depend on pytest on purpose:
+# the packaged runtime has no pytest, and never will.
 import json
 import os
 import sys
 import tempfile
 import traceback
 
-MIN_NOS = 60          # eram 64 na Fase 0; margem para remocao pontual de no
-MIN_CAMPOS_SNAPSHOT = 50  # eram 55; o contrato do IPC vive aqui
+MIN_NOS = 60          # there were 64 in Phase 0; margin for the occasional node removal
+MIN_CAMPOS_SNAPSHOT = 50  # there were 55; the IPC contract lives here
 
 _passos = []
 
@@ -103,11 +103,11 @@ def _():
 
 @passo("matplotlib: contourf em PNG e PDF (carta imagem)")
 def _():
-    # O no CartaImagem so importa o matplotlib quando roda, entao nenhum passo
-    # acima o carregava: as extensoes nativas que ele puxa (contourpy,
-    # kiwisolver, as fontes via fonttools) — trocadas a cada versao do CPython —
-    # so falhariam na maquina do usuario. contourf exercita o contourpy; o PDF,
-    # a embutida de fontes do fonttools.
+    # The CartaImagem node only imports matplotlib when it runs, so no step
+    # above loaded it: the native extensions it pulls in (contourpy,
+    # kiwisolver, the fonts via fonttools) — swapped on every CPython version —
+    # would only fail on the user's machine. contourf exercises contourpy; the
+    # PDF, fonttools' font embedding.
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt

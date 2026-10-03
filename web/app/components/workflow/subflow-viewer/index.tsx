@@ -21,17 +21,17 @@ import { SubflowScope } from "./scope"
 import { useSubflowDefinition } from "./use-subflow-definition"
 
 interface Props {
-  /** Nome do workflow aberto no editor — primeiro degrau da trilha. */
+  /** Name of the workflow open in the editor — first step of the breadcrumb. */
   rootLabel: string
 }
 
 /**
- * Visualizador do que aconteceu DENTRO de um sub-fluxo, numa execução.
+ * Viewer of what happened INSIDE a sub-workflow, in a run.
  *
- * Sobrepõe o editor em vez de navegar para o workflow filho: o run vive na store
- * desta sessão do canvas, então sair da página o descartaria — e ainda esbarraria
- * nas edições não salvas do pai. Sobrepondo, o painel de execução continua
- * visível abaixo e a trilha devolve o caminho de volta.
+ * Overlays the editor instead of navigating to the child workflow: the run lives
+ * in this canvas session's store, so leaving the page would discard it — and
+ * would also run into the parent's unsaved edits. By overlaying, the run panel
+ * stays visible below and the breadcrumb provides the way back.
  */
 export default function SubflowViewer({ rootLabel }: Props) {
   const path = useSubflowDrilldownStore(s => s.path)
@@ -67,13 +67,13 @@ function Conteudo({ path, rootLabel }: Props & { path: SubflowLevel[] }) {
     [workflow?.definition, nodes],
   )
 
-  // Endereço deste nível nos eventos: os ids dos nós SubWorkflow atravessados.
+  // This level's address in the events: the ids of the SubWorkflow nodes traversed.
   const caminho = useMemo(() => path.map(n => n.canvasNodeId), [path])
 
-  // Enquanto o grafo não chegou não há com o que comparar, e comparar mesmo
-  // assim acusaria TODOS os nós executados como "não existem mais no grafo" —
-  // um alarme falso em toda abertura, justamente do aviso que existe para não
-  // deixar a tela passar por completa.
+  // Until the graph arrives there is nothing to compare against, and comparing
+  // anyway would flag ALL executed nodes as "no longer in the graph" — a false
+  // alarm on every opening, from the very warning that exists to keep the
+  // screen from passing for complete.
   const grafoPronto = !!workflow
   const { estadoPorId, semCorrespondencia } = useMemo(() => {
     if (!grafoPronto) return { estadoPorId: new Map(), semCorrespondencia: [] }
@@ -81,7 +81,7 @@ function Conteudo({ path, rootLabel }: Props & { path: SubflowLevel[] }) {
     return recortarNivel(timeline.nodes, caminho, idsDoGrafo)
   }, [timeline.nodes, caminho, nodes, grafoPronto])
 
-  // Esc fecha a descida inteira — o gesto esperado para sair de uma sobreposição.
+  // Esc closes the whole descent — the expected gesture for leaving an overlay.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") close()
@@ -90,15 +90,15 @@ function Conteudo({ path, rootLabel }: Props & { path: SubflowLevel[] }) {
     return () => window.removeEventListener("keydown", onKeyDown)
   }, [close])
 
-  // Centraliza o nó que originou a descida (ex.: o que falhou). Enquadra o grafo
-  // inteiro quando não há alvo — chegar num canvas fora de vista seria pior que
-  // não enquadrar nada.
+  // Centers the node that started the descent (e.g. the one that failed). Frames
+  // the whole graph when there is no target — landing on an out-of-view canvas
+  // would be worse than framing nothing.
   //
-  // As dependências são o controle: `nodes` só muda quando o grafo desenhado
-  // muda, ou seja, a cada troca de nível — descendo E voltando pela trilha, que
-  // reusa a mesma instância do React Flow e herdaria o zoom do nível anterior.
-  // As atualizações do painel, que num run ao vivo chegam oito vezes por
-  // segundo, não passam por aqui: `nodes` é memoizado sobre a definition.
+  // The dependencies are the control: `nodes` only changes when the drawn graph
+  // changes, i.e. on each level change — going down AND back via the breadcrumb,
+  // which reuses the same React Flow instance and would inherit the previous
+  // level's zoom. Panel updates, which in a live run arrive eight times per
+  // second, do not go through here: `nodes` is memoized on the definition.
   useEffect(() => {
     if (nodes.length === 0) return
     const alvo = focusNodeId && nodes.some(n => n.id === focusNodeId) ? focusNodeId : null
@@ -195,7 +195,7 @@ function Conteudo({ path, rootLabel }: Props & { path: SubflowLevel[] }) {
         </div>
       )}
 
-      {/* ── Canvas do sub-fluxo ───────────────────────────────────────────── */}
+      {/* ── Sub-workflow canvas ───────────────────────────────────────────── */}
       <div className="relative min-h-0 flex-1">
         {erro ? (
           <p className="p-6 text-center text-xs text-destructive">{erro}</p>

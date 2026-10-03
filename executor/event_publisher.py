@@ -1,10 +1,10 @@
 # executor/event_publisher.py
 """
-Publisher de eventos de workflow para o executor externo.
+Workflow event publisher for the external executor.
 
-Enfileira eventos numa asyncio.Queue para envio ao servidor via WebSocket
-como mensagens do tipo 'node_event'. O servidor então os republica no
-Redis pub/sub, conectando ao mesmo pipeline usado pelo Celery.
+Enqueues events in an asyncio.Queue to be sent to the server over WebSocket
+as 'node_event' messages. The server then republishes them on
+Redis pub/sub, connecting to the same pipeline used by Celery.
 """
 import asyncio
 import logging
@@ -17,40 +17,41 @@ from flow.utils.publisher.events import (
 
 logger = logging.getLogger(__name__)
 
-# Ocupação a partir da qual a fila passa a aceitar SÓ ciclo de vida. A fila é
-# compartilhada por todos os jobs e pelo GeoSync: sem prioridade, um nó barulhento
-# (print em laço, debug mode) enchia os 500 slots e a vítima do descarte era o
-# `completed` de um nó de OUTRO workflow — telemetria que a UI não recupera.
+# Occupancy above which the queue accepts ONLY lifecycle events. The queue is
+# shared by all jobs and by GeoSync: without priority, a noisy node (print in a
+# loop, debug mode) filled the 500 slots and the victim of the drop was the
+# `completed` of a node from ANOTHER workflow — telemetry the UI cannot recover.
 _LIMIAR_PRIORIDADE = 0.8
-# Kinds descartáveis sob pressão: são log, não estado do grafo.
+# Kinds that can be dropped under pressure: they are log, not graph state.
 _KINDS_DESCARTAVEIS = frozenset({KIND_STDOUT, KIND_DEBUG})
 
 
 class ColetorDeLifecycle:
-    """Guarda o ÚLTIMO lifecycle por (run_id, nó) que não conseguiu ser enviado.
+    """Keeps the LAST lifecycle per (run_id, node) that could not be sent.
 
-    Existe por causa de DOIS cenários, e o segundo é o mais comum:
+    It exists because of TWO scenarios, and the second is the more common:
 
-      - janela de reconexão: no `ConnectionClosed` o sender para, ninguém drena a
-        fila, os jobs seguem produzindo e o que chega é descartado. Como o
-        backoff chega a dezenas de segundos, os nós que terminaram nesse
-        intervalo ficavam com o spinner de "executando" para sempre — o usuário
-        lê isso como "o workflow travou", com o run vivo e correndo bem;
-      - PRESSÃO com o WebSocket vivo: um workflow de 300 nós em debug_mode
-        produz mais rápido do que o sender envia, a fila de 500 slots enche e o
-        `completed` de vários nós cai aqui. Se o coletor só fosse drenado na
-        reconexão (que pode nunca acontecer), esses nós ficariam girando até o
-        fim do run e as entradas ficariam retidas em memória. Por isso o sender
-        também drena assim que a fila folga — ver `_ressincronizar_lifecycle`.
+      - reconnect window: on `ConnectionClosed` the sender stops, nobody drains
+        the queue, the jobs keep producing and whatever arrives is dropped. Since
+        the backoff reaches tens of seconds, the nodes that finished in that
+        interval kept the "running" spinner forever — the user reads that as
+        "the workflow is stuck", with the run alive and going fine;
+      - PRESSURE with the WebSocket alive: a 300-node workflow in debug_mode
+        produces faster than the sender sends, the 500-slot queue fills up and
+        the `completed` of several nodes lands here. If the collector were only
+        drained on reconnect (which may never happen), those nodes would keep
+        spinning until the end of the run and the entries would stay held in
+        memory. That is why the sender also drains as soon as the queue frees
+        up — see `_ressincronizar_lifecycle`.
 
-    Coalescer por nó limita a memória a O(nós) em vez de O(eventos), e os eventos
-    guardados voltam para a fila como node_events normais. Reenviar um
-    `completed` que o servidor já viu é inofensivo (ele ordena por timestamp);
-    não reenviar deixa o canvas errado até o fim do run.
+    Coalescing per node bounds memory to O(nodes) instead of O(events), and the
+    stored events go back to the queue as normal node_events. Resending a
+    `completed` the server has already seen is harmless (it orders by timestamp);
+    not resending leaves the canvas wrong until the end of the run.
     """
 
-    # Teto de segurança para o caso patológico (WS fora por muito tempo, milhares
-    # de nós): melhor perder ressincronização do que crescer sem limite.
+    # Safety ceiling for the pathological case (WS down for a long time, thousands
+    # of nodes): better to lose resync than to grow without bound.
     _MAX_ENTRADAS = 2_000
 
     def __init__(self) -> None:
@@ -58,14 +59,14 @@ class ColetorDeLifecycle:
         self._avisou_estouro = False
 
     def registrar(self, event: Dict[str, Any]) -> None:
-        """Anota um evento descartado. Ignora tudo que não é ciclo de vida."""
+        """Records a dropped event. Ignores everything that is not lifecycle."""
         if not isinstance(event, dict) or event.get("kind") != KIND_LIFECYCLE:
             return
         chave = (event.get("run_id"), event.get("node"))
         anterior = self._por_no.get(chave)
         if anterior is not None:
-            # Último status vence — mas só se for mesmo o mais recente: o requeue
-            # pode devolver um evento antigo depois de um novo já ter passado.
+            # Last status wins — but only if it really is the most recent: the requeue
+            # can return an old event after a new one has already gone through.
             if (anterior.get("timestamp") or 0.0) > (event.get("timestamp") or 0.0):
                 return
         elif len(self._por_no) >= self._MAX_ENTRADAS:
@@ -80,10 +81,10 @@ class ColetorDeLifecycle:
         self._por_no[chave] = event
 
     def drenar(self) -> list:
-        """Devolve e esquece o snapshot acumulado.
+        """Returns and forgets the accumulated snapshot.
 
-        Chamado ao (re)conectar E sempre que a fila de eventos folga com a
-        sessão viva — ver `ExecutorConnection._ressincronizar_lifecycle`.
+        Called on (re)connect AND whenever the event queue frees up with the
+        session alive — see `ExecutorConnection._ressincronizar_lifecycle`.
         """
         pendentes = list(self._por_no.values())
         self._por_no.clear()
@@ -91,12 +92,12 @@ class ColetorDeLifecycle:
         return pendentes
 
     def esquecer_run(self, run_id) -> None:
-        """Descarta o lifecycle retido de um run que já terminou.
+        """Discards the retained lifecycle of a run that has already finished.
 
-        Sem isto, um reenvio tardio (reconexão horas depois) ressuscitava as
-        entradas por-run dos contadores da fila que `esquecer_run` acabara de
-        expurgar — e nada mais as removia. Além de reenviar node_events de runs
-        que o servidor já fechou como terminais, e que ele recusa.
+        Without this, a late resend (reconnecting hours later) revived the
+        per-run entries of the queue counters that `esquecer_run` had just
+        purged — and nothing removed them again. Besides resending node_events
+        of runs the server has already closed as terminal, which it rejects.
         """
         for chave in [k for k in self._por_no if k[0] == run_id]:
             del self._por_no[chave]
@@ -108,26 +109,26 @@ class ColetorDeLifecycle:
 
 class ExecutorEventPublisher(WorkflowEventPublisher):
     """
-    Implementação de WorkflowEventPublisher para o executor externo.
-    Coloca eventos numa asyncio.Queue — best-effort (descarta se fila cheia).
+    WorkflowEventPublisher implementation for the external executor.
+    Puts events in an asyncio.Queue — best-effort (drops if the queue is full).
 
-    Thread-safe: pode ser chamado de threads secundárias (asyncio.to_thread)
-    via call_soon_threadsafe, que agenda o enqueue no event loop principal.
+    Thread-safe: can be called from secondary threads (asyncio.to_thread)
+    via call_soon_threadsafe, which schedules the enqueue on the main event loop.
     """
 
     def __init__(self, event_queue: asyncio.Queue):
         self._queue = event_queue
-        # Captura o event loop principal no momento da criação do publisher
+        # Captures the main event loop at the moment the publisher is created
         self._loop = asyncio.get_running_loop()
         self._descartados_por_pressao = 0
 
     def _safe_enqueue(self, event: Dict[str, Any]) -> None:
-        """Enfileira o evento, com prioridade para o ciclo de vida.
+        """Enqueues the event, giving priority to the lifecycle.
 
-        Duas regras, na ordem: (1) acima de _LIMIAR_PRIORIDADE de ocupação, só
-        lifecycle entra — stdout/debug de um nó barulhento não pode custar o
-        `completed` de outro job; (2) se ainda assim a fila estiver cheia, o
-        lifecycle descartado vai para o coletor, que o reenvia na reconexão.
+        Two rules, in order: (1) above _LIMIAR_PRIORIDADE occupancy, only
+        lifecycle gets in — a noisy node's stdout/debug cannot cost another
+        job's `completed`; (2) if the queue is still full, the dropped
+        lifecycle goes to the collector, which resends it on reconnect.
         """
         if self._e_descartavel_sob_pressao(event):
             return
@@ -141,7 +142,7 @@ class ExecutorEventPublisher(WorkflowEventPublisher):
             )
 
     def _e_descartavel_sob_pressao(self, event: Dict[str, Any]) -> bool:
-        """True quando o evento é log e a fila já está perto do limite."""
+        """True when the event is log and the queue is already close to the limit."""
         if event.get("kind") not in _KINDS_DESCARTAVEIS:
             return False
         maxsize = getattr(self._queue, "maxsize", 0) or 0
@@ -158,7 +159,7 @@ class ExecutorEventPublisher(WorkflowEventPublisher):
         return True
 
     def _registrar_descarte(self, event: Dict[str, Any]) -> None:
-        """Entrega o evento perdido ao coletor da fila, quando houver um."""
+        """Hands the lost event to the queue's collector, when there is one."""
         coletor = getattr(self._queue, "coletor", None)
         if coletor is not None:
             coletor.registrar(event)
@@ -190,10 +191,10 @@ class ExecutorEventPublisher(WorkflowEventPublisher):
         if extra is not None:
             event["extra"] = extra
 
-        # call_soon_threadsafe é seguro de qualquer thread e também do próprio
-        # event loop — agenda _safe_enqueue no loop principal sem bloquear.
+        # call_soon_threadsafe is safe from any thread and also from the event loop
+        # itself — schedules _safe_enqueue on the main loop without blocking.
         try:
             self._loop.call_soon_threadsafe(self._safe_enqueue, event)
         except RuntimeError:
-            # Loop já encerrado (shutdown) — descarta o evento
+            # Loop already closed (shutdown) — drops the event
             logger.debug("Evento descartado (loop encerrado): nó '%s'", event.get("node_id", "?"))

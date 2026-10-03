@@ -1,14 +1,14 @@
 """
-Regressoes da auditoria de seguranca.
+Security audit regressions.
 
-Um teste por achado corrigido. Cada um falha se a correcao for revertida —
-varias delas sao de uma linha so, exatamente o tipo que volta sem querer num
-merge. O que estes testes protegem:
+One test per fixed finding. Each one fails if the fix is reverted — several of
+them are one-liners, exactly the kind that comes back by accident in a merge.
+What these tests protect:
 
-C1  JinjaBranch avaliava a expressao do usuario num `Environment` comum.
-C3  `WorkflowUpdate` aceitava `workspace_id`, permitindo mover o workflow de tenant.
-C4  A `s3_key` do executor virava `Artifact.s3_key` sem validacao.
-A3  Credencial com `owner_id` NULL era acessivel a qualquer autenticado.
+C1  JinjaBranch evaluated the user's expression in a plain `Environment`.
+C3  `WorkflowUpdate` accepted `workspace_id`, allowing the workflow to be moved across tenants.
+C4  The executor's `s3_key` became `Artifact.s3_key` without validation.
+A3  A credential with a NULL `owner_id` was accessible to any authenticated user.
 """
 from unittest.mock import MagicMock
 
@@ -17,10 +17,10 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 
 
-# ── C1: sandbox do JinjaBranch ────────────────────────────────────────────────
+# ── C1: JinjaBranch sandbox ───────────────────────────────────────────────────
 
-# Cadeias classicas de escape de sandbox Jinja2. Todas RENDERIZAVAM antes da
-# correcao; a do `cycler` chegava a executar comando no processo do executor.
+# Classic Jinja2 sandbox escape chains. All of them RENDERED before the fix;
+# the `cycler` one even executed a command in the executor process.
 _PAYLOADS_ESCAPE = [
     "{% set x = cycler.__init__.__globals__ %}{{ x }}",
     "{{ ''.__class__.__mro__[1].__subclasses__() }}",
@@ -54,7 +54,7 @@ async def test_c1_jinja_branch_bloqueia_escape_de_sandbox(payload):
 )
 @pytest.mark.asyncio
 async def test_c1_jinja_branch_preserva_expressoes_legitimas(expressao, inputs, esperado):
-    """A sandbox nao pode custar o uso normal do no — este e o outro lado do C1."""
+    """The sandbox must not cost the node's normal use — this is the other side of C1."""
     from flow.nodes.control.jinja_branch import JinjaBranchNode
 
     node = JinjaBranchNode.__new__(JinjaBranchNode)
@@ -67,17 +67,17 @@ async def test_c1_jinja_branch_preserva_expressoes_legitimas(expressao, inputs, 
 
 
 def test_c1_gate_de_prerenderizacao_reconhece_statements():
-    """Param so com `{% %}` tem que passar pelo ExpressionService (sandboxed).
+    """A param with only `{% %}` has to go through ExpressionService (sandboxed).
 
-    O gate exigia `{{` E `}}`, entao statements escapavam da pre-renderizacao e
-    chegavam crus ao no — que era justamente quem avaliava sem sandbox.
+    The gate required `{{` AND `}}`, so statements escaped pre-rendering and
+    reached the node raw — which was precisely what evaluated without a sandbox.
     """
     from flow.executor.rendering import render_node_parameters
 
     node = MagicMock()
     node.parameters = {"expression": "{% set x = 1 %}"}
 
-    # Sem o reconhecimento de `{%`, o valor sairia identico ao de entrada.
+    # Without recognizing `{%`, the value would come out identical to the input.
     saida = render_node_parameters(node, "n1", {}, {"inputs": {}})
     assert saida["expression"] != "{% set x = 1 %}"
 
@@ -117,7 +117,7 @@ def test_c4_valida_s3_key_recusa_workspace_alheio():
     [
         "drive/../../etc/passwd",       # traversal
         "/drive/ws-1/a.csv",            # absoluto
-        "outro-prefixo/ws-1/a.csv",     # fora dos prefixos conhecidos
+        "outro-prefixo/ws-1/a.csv",     # outside the known prefixes
         "drive/ws-1/arq\x00.csv",       # NUL
     ],
 )
@@ -130,11 +130,11 @@ def test_c4_valida_s3_key_recusa_chave_malformada(chave):
 
 @pytest.mark.parametrize("valor", [123, True, {"a": 1}, ["x"], b"drive/ws-1/a.csv", None])
 def test_c4_valida_s3_key_recusa_tipo_nao_string(valor):
-    """O payload vem de JSON do executor — precisa rejeitar, nao estourar.
+    """The payload comes from the executor's JSON — it must reject, not blow up.
 
-    As comparacoes internas levantavam TypeError/AttributeError para tipos que
-    nao fossem str. Os callers capturam apenas HTTPException, entao o erro subia
-    ate o handler generico e virava 500 em vez de rejeicao limpa.
+    The internal comparisons raised TypeError/AttributeError for types that
+    weren't str. The callers only catch HTTPException, so the error propagated
+    up to the generic handler and became a 500 instead of a clean rejection.
     """
     from app.api.routers.executor_drive_router import _validate_agent_s3_key
 
@@ -146,17 +146,17 @@ def test_c4_valida_s3_key_recusa_tipo_nao_string(valor):
 def test_c4_valida_s3_key_aceita_chave_do_proprio_workspace():
     from app.api.routers.executor_drive_router import _validate_agent_s3_key
 
-    _validate_agent_s3_key("drive/ws-1/pasta/arquivo.csv", ["ws-1"])  # nao levanta
+    _validate_agent_s3_key("drive/ws-1/pasta/arquivo.csv", ["ws-1"])  # does not raise
 
 
 def test_c4_webhook_response_aceita_do_proprio_workspace():
-    """Body grande do ResponseNode: a key `webhook-responses/{ws}/{run}/...` deve
-    passar quando o `{ws}` pertence ao escopo — o prefixo estava fora do allowlist
-    e o `{run}` (segmento errado) reprovava a validação, então o body_ref >1MB
-    dava 403 no upload, no readback e no registro do artefato."""
+    """Large ResponseNode body: the key `webhook-responses/{ws}/{run}/...` must
+    pass when `{ws}` belongs to the scope — the prefix was outside the allowlist
+    and `{run}` (wrong segment) failed validation, so a body_ref >1MB got a 403
+    on upload, on readback and on artifact registration."""
     from app.api.routers.executor_drive_router import _validate_agent_s3_key
 
-    _validate_agent_s3_key("webhook-responses/ws-1/run-abc/deadbeef.bin", ["ws-1"])  # nao levanta
+    _validate_agent_s3_key("webhook-responses/ws-1/run-abc/deadbeef.bin", ["ws-1"])  # does not raise
 
 
 def test_c4_webhook_response_recusa_workspace_alheio():
@@ -167,7 +167,7 @@ def test_c4_webhook_response_recusa_workspace_alheio():
     assert exc.value.status_code == 403
 
 
-# ── A3: credencial sem dono ──────────────────────────────────────────────────
+# ── A3: ownerless credential ─────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_a3_credencial_sem_dono_e_inacessivel():
@@ -196,24 +196,24 @@ async def test_a3_dono_continua_acessando_a_propria_credencial():
         assert await get_credential_metadata(MagicMock(), "cred-1", owner_id="usuario-1") is cred
 
 
-# ── A9: confinamento de caminho de arquivo ───────────────────────────────────
+# ── A9: file path confinement ────────────────────────────────────────────────
 
 @pytest.mark.parametrize(
     "caminho",
     [
-        "/data-secreto/roubo.shp",   # irmao com prefixo textual igual
+        "/data-secreto/roubo.shp",   # sibling with the same textual prefix
         "/datax/y.shp",              # idem
-        "/tmpfoo/z.shp",             # idem, sobre /tmp
-        "/etc/passwd",               # fora de tudo
+        "/tmpfoo/z.shp",             # same, under /tmp
+        "/etc/passwd",               # outside everything
         "/data/../etc/passwd",       # traversal apos normalizacao
     ],
 )
 def test_a9_recusa_caminho_fora_da_hierarquia(caminho):
-    """A checagem era `str(resolved).startswith(str(allowed_dir))`.
+    """The check was `str(resolved).startswith(str(allowed_dir))`.
 
-    Comparacao textual deixava passar diretorio IRMAO cujo nome comecasse
-    igual: com `/data` permitido, `/data-secreto` era aceito. `is_relative_to`
-    exige que o diretorio permitido seja ancestral de verdade.
+    Textual comparison let through a SIBLING directory whose name started the
+    same: with `/data` allowed, `/data-secreto` was accepted. `is_relative_to`
+    requires the allowed directory to be a real ancestor.
     """
     from flow.utils.geo_helpers import validate_file_path
 
@@ -225,4 +225,4 @@ def test_a9_recusa_caminho_fora_da_hierarquia(caminho):
 def test_a9_aceita_caminho_dentro_da_hierarquia(caminho):
     from flow.utils.geo_helpers import validate_file_path
 
-    validate_file_path(caminho)  # nao levanta
+    validate_file_path(caminho)  # does not raise

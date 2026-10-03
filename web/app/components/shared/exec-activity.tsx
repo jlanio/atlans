@@ -1,17 +1,17 @@
 /**
- * Indicador de atividade do nó em execução — quatro barras oscilando fora de
- * fase.
+ * Activity indicator for the node being executed — four bars oscillating out
+ * of phase.
  *
- * Substituiu o spinner girando (`TbLoader`/`TbLoader2`). Rotação é o glifo
- * universal de "aguarde", e o que este badge precisa dizer é outra coisa: que
- * há trabalho ACONTECENDO ali dentro. A oscilação fora de fase lê como
- * atividade — processamento, cálculo — em vez de espera.
+ * It replaced the spinning spinner (`TbLoader`/`TbLoader2`). Rotation is the
+ * universal "please wait" glyph, and what this badge needs to say is something
+ * else: that there is work HAPPENING in there. Out-of-phase oscillation reads as
+ * activity — processing, computing — rather than waiting.
  *
- * Um SVG local e não um ícone da `react-icons`: nenhum glifo do Tabler tem esta
- * forma, e a animação precisa atingir cada barra com um atraso próprio, o que
- * exige controlar os elementos internos. A animação em si mora no `globals.css`
- * (`.exec-activity`), junto com os demais estados de execução — inclusive a
- * degradação sob `prefers-reduced-motion`.
+ * A local SVG and not a `react-icons` icon: no Tabler glyph has this shape, and
+ * the animation needs to hit each bar with its own delay, which requires
+ * controlling the inner elements. The animation itself lives in `globals.css`
+ * (`.exec-activity`), alongside the other execution states — including the
+ * degradation under `prefers-reduced-motion`.
  */
 const ExecActivity = ({ size = 14, className }: { size?: number; className?: string }) => (
   <svg

@@ -1,17 +1,18 @@
 /**
- * Mascaramento de literais SQL — porta do scanner de `flow/utils/sql_guard.py`.
+ * Masking of SQL literals — port of the scanner in `flow/utils/sql_guard.py`.
  *
- * Existe para responder uma pergunta só: uma posição do SQL é código ou texto?
- * Quem precisa disso no editor é a detecção de `:placeholders` — sem ela,
- * `WHERE obs = 'urgente:revisar'` fazia o painel oferecer um parâmetro
- * `:revisar` que não existe, e o backend recusava a consulta inteira.
+ * It exists to answer a single question: is a position in the SQL code or text?
+ * What needs this in the editor is `:placeholders` detection — without it,
+ * `WHERE obs = 'urgente:revisar'` made the panel offer a `:revisar` parameter
+ * that does not exist, and the backend rejected the whole query.
  *
- * A saída tem o MESMO COMPRIMENTO da entrada: cada caractere de comentário,
- * string ou identificador entre aspas vira um espaço na posição em que estava.
- * Mantido em par com a versão Python — se um dos dois mudar, o outro muda junto.
+ * The output has the SAME LENGTH as the input: each character of a comment,
+ * string or quoted identifier becomes a space at the position where it was.
+ * Kept paired with the Python version — if one of them changes, the other
+ * changes along with it.
  */
 
-/** Abertura de dollar-quoting: `$$` ou `$tag$`. */
+/** Dollar-quoting opener: `$$` or `$tag$`. */
 const DOLLAR_TAG = /^\$([A-Za-z_]\w*)?\$/
 
 export function mascararLiteraisSql(sql: string): string {
@@ -25,7 +26,7 @@ export function mascararLiteraisSql(sql: string): string {
     const inicio = i
     const c = sql[i]
 
-    // -- comentário de linha
+    // -- line comment
     if (c === "-" && sql.startsWith("--", i)) {
       const quebra = sql.indexOf("\n", i)
       i = quebra === -1 ? n : quebra
@@ -42,14 +43,14 @@ export function mascararLiteraisSql(sql: string): string {
         else if (sql.startsWith("*/", i)) { profundidade--; i += 2 }
         else i++
       }
-      // Bloco não fechado: o resto é comentário. Diferente do backend, aqui não
-      // é erro — o usuário ainda está digitando, e o editor não pode explodir a
-      // cada tecla no meio de um `/*`.
+      // Unclosed block: the rest is a comment. Unlike the backend, here it is not
+      // an error — the user is still typing, and the editor cannot blow up on
+      // every keystroke in the middle of a `/*`.
       out.push(branco(inicio, i))
       continue
     }
 
-    // 'string' — aspa dobrada ('') escapa; com prefixo E'' o backslash também
+    // 'string' — a doubled quote ('') escapes; with the E'' prefix, backslash does too
     if (c === "'") {
       const anterior = sql[i - 1]
       const escapaBarra =
@@ -103,12 +104,12 @@ export function mascararLiteraisSql(sql: string): string {
   return out.join("")
 }
 
-/** Regex de placeholder `:nome` — a mesma do backend. */
+/** Regex for the `:nome` placeholder — the same as the backend's. */
 const PLACEHOLDER = /(?<!:):([A-Za-z_]\w*)\b/g
 
 /**
- * Nomes únicos dos `:placeholders` da query, em ordem de aparição, ignorando os
- * que estão dentro de string ou comentário.
+ * Unique names of the query's `:placeholders`, in order of appearance, ignoring
+ * those inside a string or comment.
  */
 export function extrairPlaceholders(sql: string): string[] {
   const nomes: string[] = []

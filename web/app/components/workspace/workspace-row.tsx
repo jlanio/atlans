@@ -22,17 +22,18 @@ interface Props extends EntradaDoResumo {
 }
 
 /**
- * Linha compacta de um workspace que NÃO é o ativo: identidade, papel e o
- * executor por texto, com "Usar" para promovê-lo ao painel. Nada aqui é
- * editável — quem precisa mexer no executor ou nos membros abre o painel.
+ * Compact row of a workspace that is NOT the active one: identity, role and the
+ * executor as text, with "Usar" (Use) to promote it to the panel. Nothing here
+ * is editable — whoever needs to touch the executor or the members opens the panel.
  */
 export function WorkspaceRow({ workspace, onUsar, onConfigurar, ...entrada }: Props) {
   const resumo = resumirExecutor(entrada)
   const alerta = emAlerta(resumo, entrada.politica)
   const ponto = corDoPonto(resumo, entrada.politica)
   const papel = workspace.my_role === "owner" ? "Proprietário" : roleLabel(workspace.my_role)
-  // Só quando há dedicado: "Compartilhado" é o padrão e um selo em toda linha
-  // seria ruído — o rótulo "Pool" já diz isso.
+  // Only when there is a dedicated executor: "Compartilhado" (Shared) is the
+  // default and a badge on every row would be noise — the "Pool" label already
+  // says so.
   const politica = entrada.politica && entrada.politica.mode !== "pool" ? entrada.politica : null
   const emVigor = politica?.policy_routing_enabled === true
 
@@ -47,8 +48,8 @@ export function WorkspaceRow({ workspace, onUsar, onConfigurar, ...entrada }: Pr
             <Badge variant="secondary" className="px-1.5 py-0 text-[11px]">padrão</Badge>
           )}
         </div>
-        {/* `div`, não `p`: o esqueleto do executor é um bloco, e bloco dentro
-            de parágrafo é HTML inválido. */}
+        {/* `div`, not `p`: the executor skeleton is a block, and a block inside
+            a paragraph is invalid HTML. */}
         <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
           <span>{papel}</span>
           <span aria-hidden="true">·</span>

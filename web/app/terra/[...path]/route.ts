@@ -1,44 +1,44 @@
 /**
- * Proxy catch-all: /terra/:path* → API_INTERNA/:path*
+ * Catch-all proxy: /terra/:path* → API_INTERNA/:path*
  *
- * Lê API_INTERNA em runtime (não em build time), portanto funciona
- * independentemente de onde a imagem é executada.
+ * Reads API_INTERNA at runtime (not at build time), so it works regardless of
+ * where the image runs.
  *
- * Segurança: todos os paths exigem sessão NextAuth válida, exceto os
- * listados em PUBLIC_PREFIXES / PUBLIC_SUFFIXES (portal público de mapas).
+ * Security: every path requires a valid NextAuth session, except those
+ * listed in PUBLIC_PREFIXES / PUBLIC_SUFFIXES (public map portal).
  */
 import { type NextRequest, NextResponse } from "next/server"
 import { auth, SESSION_HEADER, decodeSessionHeader } from "@/auth"
 
 const UPSTREAM = process.env.API_INTERNA ?? "http://localhost:8000"
 
-// Paths acessíveis sem autenticação (portal público de mapas e healthcheck)
+// Paths accessible without authentication (public map portal and healthcheck)
 const PUBLIC_PREFIXES = ["artifacts/portal/", "artifacts/tiles/", "auth/"]
 const PUBLIC_SUFFIXES = ["/download"]
 
-// Headers que não devem ser repassados ao upstream
+// Headers that must not be forwarded to the upstream
 const HOP_BY_HOP = new Set([
   "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
   "te", "trailer", "transfer-encoding", "upgrade", "host",
-  // Deixa o fetch do Node.js gerenciar compressão — evita conflito de content-encoding
+  // Lets Node.js fetch manage compression — avoids content-encoding conflicts
   "accept-encoding",
 ])
 
-// Cabeçalhos de CONFIANÇA que o cliente NÃO pode injetar. A API confia no
-// cabeçalho de certificado mTLS quando o peer está em TRUSTED_PROXIES — e o
-// container web ESTÁ. Se o /terra repassasse esse cabeçalho vindo do browser,
-// um usuário autenticado forjaria a identidade mTLS de um executor
-// (X-Forwarded-Tls-Client-Cert-Info). São removidos aqui, sempre; o Traefik é
-// quem legitimamente os injeta nas rotas diretas da API.
+// TRUST headers that the client must NOT be able to inject. The API trusts the
+// mTLS certificate header when the peer is in TRUSTED_PROXIES — and the web
+// container IS. If /terra forwarded that header coming from the browser, an
+// authenticated user could forge an executor's mTLS identity
+// (X-Forwarded-Tls-Client-Cert-Info). They are removed here, always; Traefik is
+// what legitimately injects them on the API's direct routes.
 //
-// O X-Forwarded-For é a exceção e SEGUE para a API. O web-prod só é alcançável
-// pelo Traefik (sem porta publicada), que reescreve o XFF vindo de peer fora
-// das faixas da Cloudflare e, vindo delas, anexa o IP do seu peer; a API lê o
-// header da direita para a esquerda (`get_client_ip`), pulando a nossa infra e
-// no máximo UM edge da Cloudflare — o IP seguinte é o que a Cloudflare anexou,
-// e o que o cliente (ou um Worker) escreve à esquerda não muda o resolvido. Sem
-// o XFF, a API via só o IP do container web e todos os usuários dividiam um
-// único balde de rate limit.
+// X-Forwarded-For is the exception and DOES go on to the API. web-prod is only
+// reachable through Traefik (no published port), which rewrites the XFF coming
+// from a peer outside the Cloudflare ranges and, coming from them, appends its
+// peer's IP; the API reads the header right to left (`get_client_ip`), skipping
+// our infra and at most ONE Cloudflare edge — the next IP is the one Cloudflare
+// appended, and whatever the client (or a Worker) writes to the left does not
+// change the resolved one. Without the XFF, the API saw only the web container's
+// IP and all users shared a single rate-limit bucket.
 function isCabecalhoDeConfianca(k: string): boolean {
   if (k === "x-forwarded-for") return false
   return (
@@ -52,10 +52,10 @@ function isCabecalhoDeConfianca(k: string): boolean {
   )
 }
 
-// Segmento de path suspeito: vazio, "." ou "..", ou com barra invertida /
-// caracteres de controle. O parser de URL do fetch trata "\" como "/" e remove
-// TAB/LF, então "..\\" ou ".%09." reconstruído escaparia da lista de prefixos
-// públicos e alcançaria rotas não publicadas no Traefik (/openapi.json, /docs).
+// Suspicious path segment: empty, "." or "..", or with a backslash /
+// control characters. fetch's URL parser treats "\" as "/" and strips
+// TAB/LF, so a reconstructed "..\\" or ".%09." would escape the public prefix
+// list and reach routes not published in Traefik (/openapi.json, /docs).
 function segmentoSuspeito(seg: string): boolean {
   return (
     seg === "" || seg === "." || seg === ".." ||
@@ -63,21 +63,21 @@ function segmentoSuspeito(seg: string): boolean {
   )
 }
 
-// CSRF: o /terra transforma o cookie de sessão em Bearer para o upstream, sem
-// checar origem. Um POST top-level de outro site (formulário auto-submetido)
-// chegaria autenticado. Para métodos que mudam estado, exige origem própria:
-// bloqueia Sec-Fetch-Site cross-site e Origin de outro host.
+// CSRF: /terra turns the session cookie into a Bearer for the upstream, without
+// checking the origin. A top-level POST from another site (an auto-submitted
+// form) would arrive authenticated. For state-changing methods, it requires a
+// same origin: blocks cross-site Sec-Fetch-Site and an Origin from another host.
 function csrfBloqueado(req: NextRequest): boolean {
   const secFetchSite = req.headers.get("sec-fetch-site")
   if (secFetchSite === "cross-site") return true
-  // Navegadores modernos afirmam a origem própria: confia e evita comparar Host
-  // (que um proxy pode reescrever), sem deixar de barrar o cross-site acima.
+  // Modern browsers assert same-origin: trust it and avoid comparing Host
+  // (which a proxy may rewrite), while still blocking cross-site above.
   if (secFetchSite === "same-origin" || secFetchSite === "same-site") return false
   const origin = req.headers.get("origin")
   if (origin) {
     try {
-      // Compara com o host público quando o proxy o preserva (x-forwarded-host),
-      // caindo no Host direto.
+      // Compares against the public host when the proxy preserves it (x-forwarded-host),
+      // falling back to the direct Host.
       const alvo = req.headers.get("x-forwarded-host") || req.headers.get("host")
       if (alvo && new URL(origin).host !== alvo) return true
     } catch {
@@ -93,8 +93,8 @@ async function proxy(
 ): Promise<NextResponse> {
   const { path } = await params
 
-  // Rejeita travessia de path ANTES de montar a URL do upstream ou testar os
-  // prefixos públicos (SEG-18).
+  // Rejects path traversal BEFORE building the upstream URL or testing the
+  // public prefixes (SEG-18).
   if (path.some(segmentoSuspeito)) {
     return NextResponse.json({ detail: "Caminho inválido" }, { status: 400 })
   }
@@ -104,22 +104,22 @@ async function proxy(
     PUBLIC_PREFIXES.some((p) => pathStr.startsWith(p)) ||
     PUBLIC_SUFFIXES.some((s) => pathStr.endsWith(s))
 
-  // CSRF em métodos que mudam estado, fora dos paths públicos (auth/ tem CSRF
-  // próprio do NextAuth; portal é leitura).
+  // CSRF on state-changing methods, outside the public paths (auth/ has
+  // NextAuth's own CSRF; the portal is read-only).
   const mudaEstado = req.method !== "GET" && req.method !== "HEAD" && req.method !== "OPTIONS"
   if (mudaEstado && !isPublic && csrfBloqueado(req)) {
     return NextResponse.json({ detail: "Origem não permitida" }, { status: 403 })
   }
 
-  // Token de acesso com que o upstream é autenticado (só em paths protegidos).
+  // Access token the upstream is authenticated with (only on protected paths).
   let accessToken: string | null = null
   if (!isPublic) {
-    // A sessão vem do middleware via SESSION_HEADER — já RENOVADA e com o cookie
-    // rotacionado PERSISTIDO lá. `await auth()` é só rede de segurança para o
-    // caso raro de o header faltar (middleware não rodou); no caminho normal ele
-    // NÃO é chamado, então este handler não dispara mais o refresh que rotacionava
-    // a família e descartava o cookie (a causa do logout espúrio). Mesmo padrão
-    // do layout do dashboard.
+    // The session comes from the middleware via SESSION_HEADER — already RENEWED and
+    // with the rotated cookie PERSISTED there. `await auth()` is only a safety net
+    // for the rare case of the header missing (middleware did not run); on the
+    // normal path it is NOT called, so this handler no longer fires the refresh
+    // that rotated the family and discarded the cookie (the cause of the spurious
+    // logout). Same pattern as the dashboard layout.
     const session = decodeSessionHeader(req.headers.get(SESSION_HEADER)) ?? (await auth())
     if (!session) {
       return NextResponse.json({ detail: "Não autenticado" }, { status: 401 })
@@ -134,36 +134,37 @@ async function proxy(
   req.headers.forEach((value, key) => {
     const k = key.toLowerCase()
     if (HOP_BY_HOP.has(k)) return
-    if (isCabecalhoDeConfianca(k)) return // não deixa o cliente forjar o cert mTLS
+    if (isCabecalhoDeConfianca(k)) return // does not let the client forge the mTLS cert
     headers.set(key, value)
   })
-  // SESSION_HEADER é de uso interno (middleware → handler): nunca vaza ao upstream.
+  // SESSION_HEADER is for internal use (middleware → handler): it never leaks to the upstream.
   headers.delete(SESSION_HEADER)
-  // Autentica o upstream com o access token do SERVIDOR (renovado pelo middleware),
-  // e não com o Authorization do cliente — que, numa sessão longa só de polling,
-  // fica velho até o useSession refazer, gerando 401 no backend mesmo sem logout.
-  // Em paths públicos o Bearer do cliente (quando houver) segue intacto.
+  // Authenticates the upstream with the SERVER's access token (renewed by the
+  // middleware), and not with the client's Authorization — which, in a long
+  // polling-only session, goes stale until useSession refreshes it, producing a
+  // 401 in the backend even without a logout.
+  // On public paths the client's Bearer (when present) passes through intact.
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`)
 
-  // Corpo pequeno (content-length conhecido, ≤32MB) é BUFFERIZADO; o resto
-  // segue em stream.
+  // A small body (known content-length, ≤32MB) is BUFFERED; the rest
+  // goes as a stream.
   //
-  // O buffer é rede de segurança contra o redirect de barra final. A URL
-  // canônica da API é SEM barra (rotas de coleção declaradas como "" nos
-  // routers), alinhada com o Next, que remove a barra do browser (308) — no
-  // caminho normal não há redirect nenhum. Mas se uma rota nova nascer com "/",
-  // o FastAPI responde 307; um corpo em stream já consumido não pode ser
-  // reenviado e a mutação viraria 502 (que o Cloudflare apresenta como "invalid
-  // or incomplete response" — foi um incidente real em 2026-09). Um ArrayBuffer
-  // é reenviável, então o 307 é seguido e a requisição funciona.
+  // The buffer is a safety net against the trailing-slash redirect. The API's
+  // canonical URL has NO slash (collection routes declared as "" in the
+  // routers), aligned with Next, which strips the slash from the browser (308) —
+  // on the normal path there is no redirect at all. But if a new route is born
+  // with "/", FastAPI answers 307; an already consumed streamed body cannot be
+  // resent and the mutation would become a 502 (which Cloudflare presents as
+  // "invalid or incomplete response" — it was a real incident in 2026-09). An
+  // ArrayBuffer can be resent, so the 307 is followed and the request works.
   //
-  // O streaming continua para corpos grandes/sem JSON (uploads do Drive):
-  // bufferizar ali custava 3× o tamanho do arquivo na memória do Node e nenhum
-  // byte chegava ao FastAPI antes do upload terminar de subir para o Next.
-  // `duplex: "half"` é obrigatório para body em stream (runtime Node).
-  // Teto do buffer: acima disso nem JSON é bufferizado (proteção de memória do
-  // web-prod, que roda com limite de 512MB) — segue em stream e, se um redirect
-  // aparecer, cai no guard que falha alto.
+  // Streaming remains for large/non-JSON bodies (Drive uploads): buffering
+  // there cost 3× the file size in Node's memory and no byte reached FastAPI
+  // before the upload finished going up to Next.
+  // `duplex: "half"` is mandatory for a streamed body (Node runtime).
+  // Buffer ceiling: above it not even JSON is buffered (memory protection for
+  // web-prod, which runs with a 512MB limit) — it goes as a stream and, if a
+  // redirect shows up, falls into the guard that fails loudly.
   const BUFFER_MAX = 33_554_432 // 32MB
   let body: BodyInit | null = null
   let bodyReenviavel = false
@@ -187,8 +188,8 @@ async function proxy(
   try {
     res = await fetch(upstream, init)
 
-    // Follow manual do redirect.
-    // SEG: valida que o redirect permanece no mesmo upstream (previne SSRF).
+    // Manual follow of the redirect.
+    // SEC: validates that the redirect stays on the same upstream (prevents SSRF).
     if (res.status >= 300 && res.status < 400) {
       const location = res.headers.get("location")
       if (location) {
@@ -196,7 +197,7 @@ async function proxy(
           ? location
           : new URL(location, upstream).toString()
 
-        // Bloqueia redirects para hosts diferentes do upstream
+        // Blocks redirects to hosts other than the upstream
         try {
           const upstreamHost = new URL(UPSTREAM).hostname
           const redirectHost = new URL(redirectUrl).hostname
@@ -208,12 +209,12 @@ async function proxy(
           return NextResponse.json({ detail: "URL de redirect inválida" }, { status: 400 })
         }
 
-        // Reenviar o corpo só é legítimo em 307/308 (preservam método+corpo).
-        // Um 303 exige virar GET, e 301/302 num POST viram GET nos browsers —
-        // seguir esses com o corpo re-POSTado seria inventar semântica. Corpo
-        // em stream já foi consumido e não há como reenviá-lo de todo modo.
-        // Nos dois casos, falha alto em vez de mandar ao browser um Location
-        // apontando para o host interno.
+        // Resending the body is only legitimate on 307/308 (they preserve method+body).
+        // A 303 requires switching to GET, and 301/302 on a POST become GET in
+        // browsers — following those with the body re-POSTed would be inventing
+        // semantics. A streamed body has already been consumed and cannot be
+        // resent anyway. In both cases, fail loudly instead of sending the
+        // browser a Location pointing to the internal host.
         const preservaMetodoECorpo = res.status === 307 || res.status === 308
         if (body != null && (!bodyReenviavel || !preservaMetodoECorpo)) {
           console.warn(`[terra] redirect ${res.status} em ${req.method} com corpo não reenviável: ${redirectUrl}`)
@@ -234,10 +235,10 @@ async function proxy(
     return NextResponse.json({ detail: "Serviço indisponível" }, { status: 502 })
   }
 
-  // O fetch do undici descomprime automaticamente respostas gzip/br/deflate,
-  // mas mantém os headers originais. Repassar Content-Encoding ao browser causa
-  // ERR_CONTENT_DECODING_FAILED — ele tenta descomprimir um body já em texto.
-  // Content-Length também fica errado pelo mesmo motivo.
+  // undici's fetch automatically decompresses gzip/br/deflate responses,
+  // but keeps the original headers. Forwarding Content-Encoding to the browser
+  // causes ERR_CONTENT_DECODING_FAILED — it tries to decompress an already
+  // plain-text body. Content-Length is also wrong for the same reason.
   const STRIP_AFTER_DECODE = new Set(["content-encoding", "content-length"])
 
   const resHeaders = new Headers()

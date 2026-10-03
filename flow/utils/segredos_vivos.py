@@ -1,38 +1,38 @@
 # flow/utils/segredos_vivos.py
 #
-# Os segredos em uso agora, e nenhum registro de log com eles.
+# The secrets in use right now, and no log record containing them.
 #
-# Biblioteca de terceiro loga o que quer: o owslib e o urllib3 escrevem em
-# DEBUG a URL de cada pedido (a chave authkey vai na URL), e o urllib3 a repete
-# num WARNING quando o servidor manda um cabeçalho malformado — no nível
-# padrão. Um filtro por logger não alcança esses registros, e um filtro por
-# handler teria de estar em cada handler que o executor (e o painel) instala —
-# o próximo handler o esqueceria. A fábrica de LogRecord é o único ponto por
-# onde TODO registro do processo passa: enquanto um segredo está em uso
-# (`em_uso`), cada registro que o contém sai com ele trocado por `***` — a
-# mensagem, os argumentos, a exceção e a pilha.
+# Third-party libraries log whatever they want: owslib and urllib3 write the URL
+# of each request at DEBUG (the authkey key goes in the URL), and urllib3 repeats
+# it in a WARNING when the server sends a malformed header — at the default
+# level. A per-logger filter doesn't reach those records, and a per-handler
+# filter would have to be on every handler the executor (and the panel)
+# installs — the next handler would forget it. The LogRecord factory is the only
+# point EVERY record in the process passes through: while a secret is in use
+# (`em_uso`), every record containing it comes out with it replaced by `***` —
+# the message, the arguments, the exception and the traceback.
 #
-# O registro sai com a MESMA forma que entrou: `msg` e cada `args` redigidos
-# um a um, e não `msg` já interpolada com `args = None`. Há formatadores que
-# leem `record.args` (o de acesso do uvicorn desempacota cinco campos dele);
-# achatar os argumentos os quebrava, e a linha de acesso se perdia.
+# The record comes out with the SAME shape it went in: `msg` and each `args`
+# redacted one by one, not `msg` already interpolated with `args = None`. Some
+# formatters read `record.args` (uvicorn's access formatter unpacks five fields
+# from it); flattening the arguments broke them, and the access line was lost.
 #
-# Fora de um `em_uso` o custo é um teste de tupla vazia por registro.
+# Outside an `em_uso` the cost is one empty-tuple test per record.
 import logging
 import threading
 from collections import Counter
 from contextlib import contextmanager
 
-# O mesmo mínimo de `credencial_wfs.TAMANHO_MINIMO_DO_SEGREDO` (repetido para
-# este módulo não depender daquele): abaixo disto a troca mutilaria datas, ids
-# e contadores de todo log do processo.
+# The same minimum as `credencial_wfs.TAMANHO_MINIMO_DO_SEGREDO` (repeated so
+# this module doesn't depend on that one): below it the replacement would mangle
+# dates, ids and counters in every log of the process.
 _TAMANHO_MINIMO = 6
 
 _lock = threading.Lock()
 _contagem: Counter = Counter()
-# O que a fábrica lê: uma tupla trocada inteira sob o lock (a leitura, sem
-# lock, nunca vê o Counter no meio de uma mudança). Maiores primeiro, para
-# uma forma que contém outra ser trocada inteira.
+# What the factory reads: a tuple swapped whole under the lock (the read, without
+# a lock, never sees the Counter mid-change). Longest first, so that a form
+# containing another is replaced whole.
 _formas: tuple[str, ...] = ()
 _instalada = False
 
@@ -48,14 +48,14 @@ def _tem(texto: str, formas: tuple[str, ...]) -> bool:
 
 
 def _redigir_valor(valor, formas: tuple[str, ...]):
-    """Uma string redigida; qualquer outra coisa como veio (o `%r`/`%s` de um
-    objeto cuja repr carregue o segredo é apanhado pela mensagem interpolada,
-    no passo seguinte)."""
+    """A string redacted; anything else as it came (the `%r`/`%s` of an
+    object whose repr carries the secret is caught by the interpolated message,
+    in the next step)."""
     return _redigir(valor, formas) if isinstance(valor, str) else valor
 
 
 def _limpar(registro: logging.LogRecord, formas: tuple[str, ...]) -> None:
-    # 1. A forma do registro preservada: `msg` e cada argumento, um a um.
+    # 1. The record's shape preserved: `msg` and each argument, one by one.
     if isinstance(registro.msg, str):
         registro.msg = _redigir(registro.msg, formas)
     args = registro.args
@@ -63,10 +63,10 @@ def _limpar(registro: logging.LogRecord, formas: tuple[str, ...]) -> None:
         registro.args = {k: _redigir_valor(v, formas) for k, v in args.items()}
     elif isinstance(args, tuple):
         registro.args = tuple(_redigir_valor(a, formas) for a in args)
-    # 2. O que só aparece interpolado (a repr de um objeto, um argumento que
-    #    não é string): aí sim a mensagem pronta, sem os argumentos. Um
-    #    `%`-format que não bate com os argumentos falha aqui — e o registro
-    #    segue com o que o passo 1 já redigiu, em vez de intacto.
+    # 2. What only shows up interpolated (an object's repr, an argument that
+    #    is not a string): here, yes, the finished message, without the arguments.
+    #    A `%`-format that doesn't match the arguments fails here — and the record
+    #    goes on with what step 1 already redacted, instead of intact.
     try:
         mensagem = registro.getMessage()
     except Exception:
@@ -76,7 +76,7 @@ def _limpar(registro: logging.LogRecord, formas: tuple[str, ...]) -> None:
     if registro.exc_info and not registro.exc_text:
         texto = logging.Formatter().formatException(registro.exc_info)
         if _tem(texto, formas):
-            # O formatter usa `exc_text` pronto em vez de formatar `exc_info`.
+            # The formatter uses the ready-made `exc_text` instead of formatting `exc_info`.
             registro.exc_text, registro.exc_info = _redigir(texto, formas), None
     if registro.stack_info and _tem(registro.stack_info, formas):
         registro.stack_info = _redigir(registro.stack_info, formas)
@@ -92,7 +92,7 @@ def _instalar() -> None:
         if formas:
             try:
                 _limpar(registro, formas)
-            except Exception:  # o log nunca derruba quem loga
+            except Exception:  # logging never brings down the caller
                 pass
         return registro
 
@@ -107,10 +107,10 @@ def _publicar() -> None:
 
 @contextmanager
 def em_uso(*formas: str):
-    """Enquanto o bloco roda, nenhum registro de log do processo leva `formas`.
+    """While the block runs, no log record in the process carries `formas`.
 
-    Contado por forma: dois nós com a mesma chave em paralelo — o primeiro a
-    terminar não a libera enquanto o outro ainda a usa.
+    Counted per form: two nodes with the same key in parallel — the first to
+    finish does not release it while the other is still using it.
     """
     formas = tuple({f for f in formas if f and len(f) >= _TAMANHO_MINIMO})
     with _lock:

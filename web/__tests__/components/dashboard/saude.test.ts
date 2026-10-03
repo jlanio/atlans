@@ -30,7 +30,7 @@ describe("tomDeSaude", () => {
 
   it("crítico por frota inteira offline (com executores)", () => {
     expect(tomDeSaude(now({ executors: { online: 0, total: 6 } }), false)).toBe("critico")
-    // Sem executores cadastrados não é crítico — não há frota para cair.
+    // No registered executors is not critical — there is no fleet to go down.
     expect(tomDeSaude(now({ executors: { online: 0, total: 0 } }), false)).toBe("calmo")
   })
 
@@ -89,7 +89,7 @@ describe("motivosDeSaude", () => {
     const m = motivosDeSaude(now({ stuck_count: 1, stuck: [stuck({ elapsed_seconds: 1080 })] }), { falhas: 2, saturado: 0 })
     expect(m[0]).toBe("1 execução presa há 18 min")
     expect(m[1]).toBe("2 workflows falhando")
-    expect(m).toHaveLength(2) // a presa não aparece duas vezes
+    expect(m).toHaveLength(2) // the stuck one does not show up twice
   })
 })
 

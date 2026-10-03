@@ -7,43 +7,45 @@ import { useTextos } from "./i18n"
 
 export interface GloboProps {
   layers?: MapLayer[];
-  /** Do useCamadas, para enquadrar/voar às camadas que a conversa põe no globo. */
+  /** From useCamadas, to frame/fly to the layers the conversation puts on the globe. */
   mapaRef?: Ref<MapLibreMapHandle>;
   /**
-   * Gira o globo devagar (o hero da Home). Ao desligar, o mapa volta à REGIÃO
-   * de quem abriu a página (o mesmo centro do início) — o primeiro token da
-   * resposta traz o globo de volta.
+   * Spins the globe slowly (the Home hero). When turned off, the map returns to
+   * the REGION of whoever opened the page (the same center as at the start) —
+   * the first token of the answer brings the globe back.
    */
   girando?: boolean;
-  /** O país da conexão (`CF-IPCountry`), a reserva quando o navegador esconde o fuso. */
+  /** The connection's country (`CF-IPCountry`), the fallback when the browser hides the time zone. */
   pais?: string | null;
-  /** Sobe a localização resolvida (o `geolocate` do controle) para a Home anexar ao turno. */
+  /** Lifts the resolved location (the control's `geolocate`) up for the Home to attach to the turn. */
   aoLocalizar?: (pos: PosicaoDoUsuario) => void;
-  /** Sobe a falha de localização (código do navegador; 1 = permissão negada) — vira toast. */
+  /** Lifts the location failure up (browser code; 1 = permission denied) — becomes a toast. */
   aoErroDeLocalizacao?: (codigo: number) => void;
 }
 
 /**
- * O globo 3D da Home: o MapLibreMap em projeção globe sobre a imagem HÍBRIDA
- * (satélite + vias e rótulos) que a instalação configurou (MAPA_HIBRIDO_URL; sem
- * ela, o satélite e, sem este, as ruas — web/lib/fundos-do-mapa.ts). É o único
- * basemap da Home — saiu o Dark Matter da CARTO e, com ele, a chave, o estilo
- * vetorial e o alternador (com um basemap só, não há para o que alternar). Não
- * há estado "sem basemap": a página sempre tem mapa.
+ * The Home's 3D globe: the MapLibreMap in globe projection over the HYBRID
+ * imagery (satellite + roads and labels) the installation configured
+ * (MAPA_HIBRIDO_URL; without it, satellite and, without that, streets —
+ * web/lib/fundos-do-mapa.ts). It is the Home's only basemap — CARTO's Dark
+ * Matter went away and, with it, the key, the vector style and the switcher
+ * (with a single basemap, there is nothing to switch to). There is no "no
+ * basemap" state: the page always has a map.
  *
- * Raster na esfera deforma um pouco ao mudar de zoom (o MapLibre recomenda o
- * vetorial para o globo); com a imagem como basemap único isso é permanente e
- * aceito. A atribuição (MAPA_*_CREDITO) vem da fonte, recolhida no "ⓘ" da
- * chrome discreta — nunca escrita por nós.
+ * Raster on the sphere warps a little when zooming (MapLibre recommends vector
+ * for the globe); with imagery as the only basemap this is permanent and
+ * accepted. The attribution (MAPA_*_CREDITO) comes from the source, tucked into
+ * the "ⓘ" of the discreet chrome — never written by us.
  *
- * As camadas (saídas das execuções) entram por `layers`; o `mapaRef` deixa o
- * useCamadas enquadrar a camada nova.
+ * The layers (run outputs) come in through `layers`; `mapaRef` lets useCamadas
+ * frame the new layer.
  */
 export default function Globo({ layers = [], mapaRef, girando = false, pais = null, aoLocalizar, aoErroDeLocalizacao }: GloboProps) {
-  // A região é lida UMA vez, na montagem: o MapLibreMap constrói o mapa com
-  // este centro e guarda-o como o destino da volta do hero — um array novo a
-  // cada render não muda nada ali, mas o estado deixa isso explícito. No
-  // servidor o fuso é o dele (e o valor não entra no HTML); vale o do cliente.
+  // The region is read ONCE, on mount: MapLibreMap builds the map with this
+  // center and keeps it as the destination of the hero's return — a new array
+  // on every render changes nothing there, but the state makes that explicit.
+  // On the server the time zone is the server's (and the value does not go into
+  // the HTML); the client's is the one that counts.
   const [centro] = useState(() => centroDaRegiao({ fuso: fusoDoNavegador(), pais }))
   const textos = useTextos().casca.mapa
   return (

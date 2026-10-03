@@ -1,15 +1,15 @@
 /**
- * Itens de admin da paleta de comandos. Dashboard, Usuários e Configurações são
- * rotas de administrador do sistema — antes a paleta os oferecia a todos e só o
- * middleware barrava, terminando em redirect. Agora carregam a marca `admin` e
- * `itensVisiveis` os esconde de quem não é admin.
+ * Admin items of the command palette. Dashboard, Usuários and Configurações are
+ * system administrator routes — before, the palette offered them to everyone and only the
+ * middleware blocked them, ending in a redirect. Now they carry the `admin` mark and
+ * `itensVisiveis` hides them from non-admins.
  *
- * Hoje a marca não muda o que ninguém vê: quem não é admin só alcança a Home
- * (`proxy.ts`), onde a paleta não abre para ele. Ela protege o dia em que uma
- * rota for reaberta a quem não é admin — e por isso continua testada.
+ * Today the mark does not change what anyone sees: a non-admin only reaches the Home
+ * (`proxy.ts`), where the palette does not open for them. It protects the day a
+ * route is reopened to non-admins — and that is why it is still tested.
  *
- * Testado no nível puro (a função e a lista, sem render): a regra de visibilidade
- * não depende de sessão nem de DOM.
+ * Tested at the pure level (the function and the list, no render): the visibility rule
+ * depends on neither the session nor the DOM.
  */
 import { describe, it, expect, vi } from "vitest"
 import { STATIC_ITEMS, itensVisiveis, paletaDisponivel } from "@/app/components/command-palette"
@@ -24,14 +24,14 @@ describe("itensVisiveis", () => {
   it("esconde os itens de admin de quem não é admin", () => {
     const visiveis = ids(itensVisiveis(STATIC_ITEMS(router), false))
     for (const id of SO_ADMIN) expect(visiveis).not.toContain(id)
-    // O resto continua visível.
+    // The rest stays visible.
     expect(visiveis).toContain("projects")
     expect(visiveis).toContain("drive")
     expect(visiveis).toContain("new-workflow")
-    // «planos» NÃO está aqui: a rota não existe mais (numa instalação com os
-    // planos, eles são um modal aberto pelo menu da conta). Um item de paleta
-    // faria `router.push` para o nada — e a paleta nem abre na Home para quem
-    // não é admin.
+    // "planos" is NOT here: the route no longer exists (in an install with the
+    // plans, they are a modal opened from the account menu). A palette item
+    // would `router.push` into nothing — and the palette does not even open on the Home for
+    // non-admins.
     expect(visiveis).not.toContain("planos")
   })
 
@@ -41,16 +41,16 @@ describe("itensVisiveis", () => {
   })
 
   it("exatamente Dashboard, Usuários e Configurações são marcados admin", () => {
-    // Guarda a marca: se alguém marcar (ou desmarcar) um item por engano, cai.
+    // Guards the mark: if someone marks (or unmarks) an item by mistake, this fails.
     const marcados = STATIC_ITEMS(router).filter(i => i.admin).map(i => i.id).sort()
     expect(marcados).toEqual([...SO_ADMIN].sort())
   })
 })
 
 describe("paletaDisponivel", () => {
-  // A Home não OFERECE saída a quem não administra o sistema. Não é controle de
-  // acesso: quem barra é o `proxy.ts`, que hoje devolve `/` a quem não é admin
-  // em toda página fora da Home.
+  // The Home does not OFFER a way out to someone who does not administer the system. It is not access
+  // control: what blocks is `proxy.ts`, which today returns `/` to non-admins
+  // on every page outside the Home.
   it("na Home, só o admin tem paleta", () => {
     expect(paletaDisponivel("/", false)).toBe(false)
     expect(paletaDisponivel("/", true)).toBe(true)
@@ -63,15 +63,15 @@ describe("paletaDisponivel", () => {
   })
 
   it("a Home é casamento EXATO, não prefixo", () => {
-    // Um `startsWith("/")` casaria o app inteiro; e uma rota que só COMEÇA com
-    // "/" seguido de mais coisa nunca é a Home.
+    // A `startsWith("/")` would match the whole app; and a route that merely STARTS with
+    // "/" followed by more is never the Home.
     expect(paletaDisponivel("/projetos", false)).toBe(true)
     expect(paletaDisponivel("/*", false)).toBe(true)
   })
 
   it("pathname ausente não fecha a paleta", () => {
-    // `usePathname()` pode devolver nulo fora de uma rota resolvida; fechar aí
-    // seria esconder a paleta do app inteiro por um estado transitório.
+    // `usePathname()` can return null outside a resolved route; closing there
+    // would hide the palette from the whole app because of a transient state.
     expect(paletaDisponivel(null, false)).toBe(true)
     expect(paletaDisponivel(undefined, false)).toBe(true)
   })

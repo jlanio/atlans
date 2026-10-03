@@ -2,23 +2,24 @@ import { INodePortAPI, INodeOutputField } from "@/service/types"
 import { saidasDoNo } from "./node-ports"
 
 /**
- * Regras de resolução das chaves de uma aresta.
+ * Rules for resolving an edge's keys.
  *
- * Vivem aqui porque duas telas criam conexões — arrastar de um handle
- * (`handleConnectNodes` no canvas) e o botão "+" do handle, que abre o drawer e
- * já cria a aresta junto com o nó. A segunda nascia sem `from_key`, e no
- * executor isso cai em `inputs.update(parent_outputs)`: o nó filho recebe TODAS
- * as saídas do pai espalhadas, em vez da porta que o usuário escolheu.
+ * They live here because two screens create connections — dragging from a
+ * handle (`handleConnectNodes` on the canvas) and the handle's "+" button,
+ * which opens the drawer and creates the edge along with the node. The second
+ * one was born without `from_key`, and in the executor that falls into
+ * `inputs.update(parent_outputs)`: the child node receives ALL of the parent's
+ * outputs spread out, instead of the port the user picked.
  */
 
 /**
- * Candidatos a `from_key` de um nó: os campos de saída da instância.
+ * A node's `from_key` candidates: the instance's output fields.
  *
- * `saidasDoNo` resolve a fonte: os campos do catálogo (`saidas`) ou, no
- * Script Python, as variáveis de `output_vars` — oferecer o "result" do
- * catálogo criava uma aresta com `from_key` que o executor não acha no
- * resultado. Ramos (`true`/`false`) nunca aparecem: roteiam a execução e não
- * são campos.
+ * `saidasDoNo` resolves the source: the catalog's fields (`saidas`) or, in the
+ * Python Script, the `output_vars` variables — offering the catalog's "result"
+ * created an edge with a `from_key` the executor does not find in the result.
+ * Branches (`true`/`false`) never show up: they route execution and are not
+ * fields.
  */
 export function getCandidateKeys(nodeData?: {
   saidas?: INodeOutputField[]
@@ -36,20 +37,20 @@ export function getCandidateKeys(nodeData?: {
 }
 
 /**
- * `from_key` de uma conexão cujo handle de origem já é conhecido.
+ * `from_key` of a connection whose source handle is already known.
  *
- * Retorna `undefined` quando a escolha é ambígua — nesse caso o chamador deve
- * abrir o seletor em vez de adivinhar.
+ * Returns `undefined` when the choice is ambiguous — in that case the caller
+ * should open the picker instead of guessing.
  */
 export function resolveFromKey(
   sourceHandle: string | null | undefined,
   candidateKeys: INodePortAPI[],
 ): string | undefined {
-  // Handle que é porta de dado: ele próprio é a chave.
+  // A handle that is a data port: it is the key itself.
   if (sourceHandle && candidateKeys.some(f => f.name === sourceHandle)) {
     return sourceHandle
   }
-  // Candidato único: não há o que escolher.
+  // Single candidate: nothing to choose.
   if (candidateKeys.length === 1) {
     return candidateKeys[0]?.name
   }
@@ -58,18 +59,18 @@ export function resolveFromKey(
 
 
 /**
- * `to_key` de uma conexão cujo handle de destino já é conhecido.
+ * `to_key` of a connection whose target handle is already known.
  *
- * Só preenche quando o destino declara MÚLTIPLOS inputs nomeados (ex.:
- * OverlapPercentage/AttributeJoin layerA/layerB) — com um input só, o executor
- * resolve sozinho e gravar `to_key` seria ruído. Sem o preenchimento, o
- * executor cai em `inputs[from_key]` em vez de `inputs[to_key]` e mapeia
- * errado as portas de entrada — e a sugestão de colunas POR PORTA
- * (`colunas-conhecidas` indexa por `to_key || from_key`) fica vazia.
+ * Only fills it when the target declares MULTIPLE named inputs (e.g.
+ * OverlapPercentage/AttributeJoin layerA/layerB) — with a single input, the
+ * executor resolves it alone and writing `to_key` would be noise. Without
+ * filling it, the executor falls into `inputs[from_key]` instead of
+ * `inputs[to_key]` and maps the input ports wrong — and the PER-PORT column
+ * suggestion (`colunas-conhecidas` indexes by `to_key || from_key`) is empty.
  *
- * Puro e aqui, e não no canvas: o botão "+" do handle também cria aresta
- * (drawer) e nascia sem `to_key` — a mesma história do `from_key` que este
- * arquivo existe para impedir.
+ * Pure and here, not on the canvas: the handle's "+" button also creates an
+ * edge (drawer) and it was born without `to_key` — the same story as the
+ * `from_key` this file exists to prevent.
  */
 export function resolveToKey(
   targetHandle: string | null | undefined,
@@ -84,13 +85,14 @@ export function resolveToKey(
 }
 
 /**
- * Porta de entrada padrão para uma aresta criada SEM escolha explícita de
- * destino — o botão "+" cria nó e aresta de uma vez, sem ninguém soltar a
- * linha sobre um handle.
+ * Default input port for an edge created WITHOUT an explicit target choice —
+ * the "+" button creates node and edge at once, without anyone dropping the
+ * line on a handle.
  *
- * Mesma regra do `resolveToKey`: só há o que escolher quando o destino declara
- * mais de uma porta; aí vale a primeira, como o `from_key` já cai em
- * `candidatos[0]` no mesmo fluxo — e o badge da aresta permite trocar depois.
+ * Same rule as `resolveToKey`: there is only something to choose when the
+ * target declares more than one port; then the first one applies, just as
+ * `from_key` already falls to `candidatos[0]` in the same flow — and the edge
+ * badge lets you change it later.
  */
 export function portaDeEntradaPadrao(declaredInputs: unknown): string | undefined {
   const inputs = (declaredInputs ?? []) as INodePortAPI[]
@@ -98,23 +100,23 @@ export function portaDeEntradaPadrao(declaredInputs: unknown): string | undefine
 }
 
 /**
- * `sourceHandle` que uma aresta deve carregar ao escolher a chave `nome` na
- * origem, mantendo a invariante `sourceHandle === from_key` dos nós multi-saída
- * sem apontar a linha para um handle que não existe.
+ * `sourceHandle` an edge should carry when choosing key `nome` at the source,
+ * keeping the `sourceHandle === from_key` invariant of multi-output nodes
+ * without pointing the line at a handle that does not exist.
  *
- * Só há handle NOMEADO quando o nó desenha 2+ saídas REAIS (`outputs`) — ver
- * `default-type` / `default-trigger-icon`, que renderizam um `HandleSource` por
- * `outputs[].name` apenas nesse caso, e um handle ANÔNIMO caso contrário.
- * Campo sem `port` NÃO vira handle: sincronizar o `sourceHandle` com um campo
- * sem ponto de conexão (que `getCandidateKeys` também oferece no seletor)
- * apontava a aresta para um handle inexistente, e o React Flow deixava de
- * desenhá-la — a aresta "sumia". Espelha a regra de `resolveSourceHandle`
- * (edge-persistence): porta real só com `outputs.length > 1 && nome ∈ outputs`.
+ * There is only a NAMED handle when the node draws 2+ REAL outputs (`outputs`) —
+ * see `default-type` / `default-trigger-icon`, which render one `HandleSource`
+ * per `outputs[].name` only in that case, and an ANONYMOUS handle otherwise.
+ * A field without `port` does NOT become a handle: syncing `sourceHandle` with a
+ * field that has no connection point (which `getCandidateKeys` also offers in
+ * the picker) pointed the edge at a nonexistent handle, and React Flow stopped
+ * drawing it — the edge "vanished". Mirrors the rule of `resolveSourceHandle`
+ * (edge-persistence): a real port only with `outputs.length > 1 && nome ∈ outputs`.
  *
- *   • saída única (0/1 output)          → `null`      (handle anônimo; também
- *                                          limpa um handle fantasma já gravado)
- *   • multi-saída e `nome` é uma porta  → `nome`
- *   • multi-saída e `nome` não é porta  → `undefined` (deixa o handle como está)
+ *   • single output (0/1 output)          → `null`      (anonymous handle; also
+ *                                            clears an already saved ghost handle)
+ *   • multi-output and `nome` is a port   → `nome`
+ *   • multi-output and `nome` is no port  → `undefined` (leaves the handle as is)
  */
 export function sourceHandleDaChave(
   outputs: ReadonlyArray<{ name?: string }> | undefined,
@@ -126,21 +128,22 @@ export function sourceHandleDaChave(
 }
 
 /**
- * Nó que só aceita UMA aresta chegando — o que depende do que ele declara.
+ * A node that accepts only ONE incoming edge — which depends on what it declares.
  *
- * O `SubWorkflowOutput` define o valor de retorno do sub-fluxo. Sem portas
- * declaradas ele tem um ponto de conexão anônimo: duas arestas espalham os dois
- * dicts nas mesmas chaves e a última vence, então o contrato anuncia uma saída
- * e entrega outra conforme a ordem das arestas. A partir de DUAS portas cada
- * aresta cai na sua própria chave — o editor preenche o `to_key` com o nome da
- * porta — e a disputa deixa de existir: aí várias conexões são o objetivo, e
- * não o problema.
+ * `SubWorkflowOutput` defines the sub-workflow's return value. With no declared
+ * ports it has an anonymous connection point: two edges spread both dicts into
+ * the same keys and the last one wins, so the contract announces one output and
+ * delivers another depending on the order of the edges. From TWO ports on, each
+ * edge lands in its own key — the editor fills `to_key` with the port name —
+ * and the contention ceases to exist: then multiple connections are the goal,
+ * not the problem.
  *
- * Uma porta só não basta: `resolveToKey` só preenche `to_key` quando o destino
- * declara MAIS DE UMA, então com uma as arestas voltariam a disputar a chave.
+ * A single port is not enough: `resolveToKey` only fills `to_key` when the
+ * target declares MORE THAN ONE, so with one the edges would compete for the
+ * key again.
  *
- * O `SubWorkflowInput` era barrado por simetria e não precisava: cada aresta
- * que sai dele espalha o dict de entrada no seu próprio destino, sem disputa.
+ * `SubWorkflowInput` was blocked for symmetry and did not need to be: each edge
+ * leaving it spreads the input dict into its own target, with no contention.
  */
 export function limitadoAUmaAresta(
   nodeName: string | undefined,
@@ -150,10 +153,11 @@ export function limitadoAUmaAresta(
 }
 
 /**
- * Os nós que só aceitam uma aresta sem portas declaradas. A Carta imagem entra
- * pelo mesmo motivo do SubWorkflowOutput: com um ponto de conexão anônimo, duas
- * camadas ligadas espalhariam os dois dicts na mesma chave (`output`), a última
- * venceria e a carta sairia com uma camada só — sem que o nó pudesse perceber
- * a perda. A partir de duas portas cada camada chega pelo nome da sua porta.
+ * The nodes that accept only one edge when no ports are declared. The image map
+ * is included for the same reason as SubWorkflowOutput: with an anonymous
+ * connection point, two connected layers would spread both dicts into the same
+ * key (`output`), the last would win and the map would come out with a single
+ * layer — without the node being able to notice the loss. From two ports on,
+ * each layer arrives under its own port's name.
  */
 const NOS_DE_UMA_ARESTA: ReadonlySet<string> = new Set(["SubWorkflowOutput", "CartaImagem"])

@@ -1,27 +1,27 @@
 // web/app/components/home/i18n/secoes/listas.ts
 //
-// As três listas do grupo Meus na barra lateral — Chats (com o diálogo de
-// renomear), Agendamentos e Artefatos — e o que os hooks delas escolhem dizer
-// (toasts, a microcopy das falhas). O português é o texto de sempre, byte a
-// byte: quem usa a Home em português não vê mudança nenhuma, e os testes que
-// conferem texto continuam conferindo o mesmo texto.
+// The three lists of the Meus group in the sidebar — Chats (with the rename
+// dialog), Agendamentos and Artefatos — and what their hooks choose to say
+// (toasts, the failure microcopy). The Portuguese is the usual text, byte for
+// byte: whoever uses the Home in Portuguese sees no change at all, and the tests
+// that check text keep checking the same text.
 //
-// Não mora aqui o que vem do servidor (título de conversa, nome de fluxo, o
-// `detail` de um erro) nem as palavras genéricas (Cancelar, Salvar, Apagar,
-// Renomear, Tentar de novo), que são de `comum`. Os componentes compartilhados
-// com o painel de administração (AvisoAmbar, RetencaoHint, DeleteDialog)
-// seguem em português por padrão — a Home passa a eles os textos daqui.
+// What comes from the server (conversation title, workflow name, an error's
+// `detail`) does not live here, nor do the generic words (Cancelar, Salvar,
+// Apagar, Renomear, Tentar de novo), which belong to `comum`. The components
+// shared with the administration panel (AvisoAmbar, RetencaoHint, DeleteDialog)
+// stay in Portuguese by default — the Home passes them the texts from here.
 
-/** 0 = domingo … 6 = sábado, como no cron (o 7 chega aqui já como 0). */
+/** 0 = Sunday … 6 = Saturday, as in cron (7 arrives here already as 0). */
 const DIAS_PT = ["aos domingos", "às segundas", "às terças", "às quartas", "às quintas", "às sextas", "aos sábados"]
 const DIAS_EN = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"]
 const DIAS_ES = ["los domingos", "los lunes", "los martes", "los miércoles", "los jueves", "los viernes", "los sábados"]
 
-/** "a las 6:00", mas "a la 1:00": em espanhol o artigo concorda com a hora. */
+/** "a las 6:00", but "a la 1:00": in Spanish the article agrees with the hour. */
 const aLas = (hora: string) => (/^0?1:/.test(hora) ? `a la ${hora}` : `a las ${hora}`)
 
 export const pt = {
-  /** O que as três listas repetem: o rodapé do corte e o fallback das falhas. */
+  /** What the three lists repeat: the cut-off footer and the failure fallback. */
   geral: {
     mostrando: (n: string, total: string) => `mostrando ${n} de ${total}`,
     verMais: "Ver mais",
@@ -69,10 +69,10 @@ export const pt = {
     prepararFalhou: "Não foi possível preparar a execução.",
     lerParametrosFalhou: "Falha ao ler os parâmetros do workflow. Tente de novo.",
     /**
-     * As frases do resumo ("todo dia às 06:00 · amanhã, 06:00"). Em português a
-     * lista usa `resumirAgendamento` de projects/gatilho tal e qual; estas
-     * chaves são o MOLDE dos outros idiomas, e um teste confere que, passadas
-     * pelo mesmo caminho, dão exatamente o texto do gatilho.
+     * The summary sentences ("todo dia às 06:00 · amanhã, 06:00"). In Portuguese
+     * the list uses `resumirAgendamento` from projects/gatilho as is; these keys
+     * are the TEMPLATE for the other languages, and a test checks that, run
+     * through the same path, they give exactly the trigger's text.
      */
     resumo: {
       aCadaSegundos: (n: number) => `a cada ${n} s`,
@@ -103,7 +103,7 @@ export const pt = {
     vazioSemDrive: "Nenhum artefato de execução — o Drive não pôde ser lido.",
     vazioSemArtefatos: "Nenhum arquivo no Drive — os artefatos não puderam ser lidos.",
     exibirNoGlobo: "Exibir no globo",
-    /** O fim do `title` da linha que vai ao globo: "nome · GEOJSON — exibir no globo". */
+    /** The end of the `title` of the row that goes to the globe: "nome · GEOJSON — exibir no globo". */
     dicaExibirNoGlobo: "exibir no globo",
     baixar: "Baixar",
     metadados: "Metadados",
@@ -117,7 +117,7 @@ export const pt = {
       descricao: (nome: string) => `"${nome}" será removido. Esta ação não pode ser desfeita.`,
       excluindo: "Excluindo…",
     },
-    /** Por que a linha não vai ao globo — a chave é o `motivo` de `artefatos/normalizar`. */
+    /** Why the row does not go to the globe — the key is the `motivo` from `artefatos/normalizar`. */
     semPrevia: {
       executor: "o conteúdo ficou no executor e nunca subiu para a nuvem",
       cartaImagem: "carta imagem: sem prévia no globo — baixe o arquivo",
@@ -125,14 +125,14 @@ export const pt = {
       formatoSemPrevia: "formato sem prévia no globo — publique o mapa para exibi-lo",
       drive: "arquivo do Drive não vai ao globo nesta versão",
     },
-    /** A dica de retenção do artefato efêmero (`RetencaoHint`). `n` é `dias` já formatado. */
+    /** The ephemeral artifact's retention hint (`RetencaoHint`). `n` is `dias` already formatted. */
     retencao: {
       expirado: "expirado",
       expiraHoje: "expira hoje",
       expiraEm: (dias: number, n: string) => `expira em ${n} ${dias === 1 ? "dia" : "dias"}`,
       removidoEm: (quando: string) => `Removido automaticamente em ${quando}`,
     },
-    /** O diálogo de metadados do Drive (`MetadataDialog`); números e datas vêm dos formatos da Home. */
+    /** The Drive metadata dialog (`MetadataDialog`); numbers and dates come from the Home's formatters. */
     metadadosDialogo: {
       descricao: "Metadados do arquivo",
       rotulos: {
@@ -155,7 +155,7 @@ export const pt = {
         "Workflows que rodem nesse executor conseguem lê-lo normalmente.",
       executor: (id: string) => `executor ${id}`,
     },
-    /** A marca de conteúdo que ficou no executor (`LocalBadge`). */
+    /** The marker for content that stayed on the executor (`LocalBadge`). */
     local: {
       rotulo: "Conteúdo apenas no executor",
       titulo: (executorId: string | null | undefined) =>
@@ -163,7 +163,7 @@ export const pt = {
         "e nunca foi enviado para a nuvem. Não pode ser baixado pela plataforma, mas continua " +
         "disponível para workflows que rodem nesse executor.",
     },
-    /** O erro do download (`baixarArtefato`); a mensagem do servidor, quando vem, passa como veio. */
+    /** The download error (`baixarArtefato`); the server message, when present, passes through as it came. */
     download: {
       noExecutor: "Este arquivo permanece no executor e não pode ser baixado daqui.",
       tenteDeNovo: "Tente de novo.",

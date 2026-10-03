@@ -5,21 +5,22 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
 
 /**
- * Estados da tela de Admin › Configurações (contrato §3): skeleton da 1ª carga
- * por seção, cartão de erro quando a fonte da seção cai antes de haver qualquer
- * leitura, vazios com ícone-em-círculo e o aviso âmbar de falha parcial. Os
- * skeletons e as frases ficam aqui; a moldura é a de `shared/estados.tsx`.
+ * States of the Admin › Settings screen (contract §3): per-section 1st-load
+ * skeleton, error card when the section's source goes down before there is any
+ * read, empty states with icon-in-circle and the amber partial-failure notice.
+ * The skeletons and the sentences live here; the frame is that of
+ * `shared/estados.tsx`.
  *
- * Como cada seção mora dentro de uma casca `<section>` que já desenha a moldura
- * (borda + `bg-card`) e o cabeçalho, os skeletons aqui são só o CORPO — não
- * repetem a borda, senão a seção teria duas.
+ * Since each section lives inside a `<section>` shell that already draws the
+ * frame (border + `bg-card`) and the header, the skeletons here are only the
+ * BODY — they do not repeat the border, otherwise the section would have two.
  */
 
-// ── Skeletons de 1ª carga (corpo da seção) ──────────────────────────────────
+// ── 1st-load skeletons (section body) ───────────────────────────────────────
 
 /**
- * Visão geral: os quatro indicadores (altura real `h-24`) e o bloco de
- * pendências. `aria-busy` no wrapper para o leitor de tela anunciar a espera.
+ * Overview: the four indicators (real height `h-24`) and the pending-items
+ * block. `aria-busy` on the wrapper so the screen reader announces the wait.
  */
 export function SkeletonVisaoGeral() {
   return (
@@ -36,9 +37,8 @@ export function SkeletonVisaoGeral() {
 }
 
 /**
- * Tabela empilhável (Armazenamento, Lixeira, Isolamento): uma faixa de
- * cabeçalho e algumas linhas com a altura de verdade, para a troca para o
- * conteúdo não pular a página.
+ * Stackable table (Storage, Trash, Isolation): a header strip and a few rows
+ * with the real height, so the swap to the content does not make the page jump.
  */
 export function SkeletonDeTabela({ linhas = 4, rotulo }: { linhas?: number; rotulo: string }) {
   return (
@@ -52,8 +52,8 @@ export function SkeletonDeTabela({ linhas = 4, rotulo }: { linhas?: number; rotu
 }
 
 /**
- * Formulário curto (Whitelist, Retenção, Drive): o rótulo, a linha de campo +
- * botão e a nota de ajuda.
+ * Short form (Whitelist, Retention, Drive): the label, the field + button
+ * row and the help note.
  */
 export function SkeletonDeFormulario({ rotulo }: { rotulo: string }) {
   return (
@@ -83,15 +83,15 @@ export function SkeletonDeNodes() {
   )
 }
 
-// ── Erro (a fonte da seção caiu antes de haver leitura) ──────────────────────
+// ── Error (the section's source went down before there was a read) ───────────
 
 /**
- * A leitura de uma seção falhou e não há nada em tela: o corpo dá lugar ao
- * cartão de erro. Antes o `error` do `useFetchData` era ignorado e a seção
- * ficava simplesmente em branco — sem dizer que falhou nem como tentar de novo.
+ * A section's read failed and there is nothing on screen: the body gives way to
+ * the error card. Before, `useFetchData`'s `error` was ignored and the section
+ * simply stayed blank — without saying it failed or how to try again.
  *
- * Numa RECARGA com dados já na tela isto não aparece (o hook mantém o que
- * havia); é o `AvisoDeSecao` que cobre essa falha parcial.
+ * On a RELOAD with data already on screen this does not appear (the hook keeps
+ * what was there); `AvisoDeSecao` is what covers that partial failure.
  */
 export function CartaoDeErro({
   mensagem, onTentar,
@@ -102,12 +102,12 @@ export function CartaoDeErro({
   return <Estado.ErroDeCarga titulo="Não foi possível carregar as configurações" mensagem={mensagem} onTentar={onTentar} />
 }
 
-// ── Vazio (a leitura foi bem, mas não há nada a listar) ──────────────────────
+// ── Empty (the read went fine, but there is nothing to list) ─────────────────
 
 /**
- * Vazio de uma seção — Armazenamento sem arquivos, Lixeira vazia, Drive sem
- * extensões. Ícone-em-círculo e uma frase; substitui o `<p italic>` solto que
- * havia antes, que não se distinguia de um rótulo qualquer.
+ * A section's empty state — Storage with no files, empty Trash, Drive with no
+ * extensions. Icon-in-circle and a sentence; replaces the loose `<p italic>`
+ * that was there before, which could not be told apart from any label.
  */
 export function VazioEmCirculo({
   icone, titulo, descricao,
@@ -119,11 +119,11 @@ export function VazioEmCirculo({
   return <Estado.CartaoDeEstado icone={icone} titulo={titulo} descricao={descricao} />
 }
 
-// ── Aviso âmbar (falha parcial de uma seção, sem derrubar o bloco) ───────────
+// ── Amber notice (partial failure of a section, without bringing down the block) ─
 
 /**
- * Falha parcial por seção (§3.4): a fonte daquele bloco caiu numa recarga, mas
- * havia dado em tela. A linha âmbar de `shared/estados.tsx`, com o "Tentar de
- * novo" inline.
+ * Per-section partial failure (§3.4): that block's source went down on a
+ * reload, but there was data on screen. The amber line from `shared/estados.tsx`,
+ * with the inline "Tentar de novo".
  */
 export { AvisoAmbar as AvisoDeSecao } from "@/app/components/shared/estados"

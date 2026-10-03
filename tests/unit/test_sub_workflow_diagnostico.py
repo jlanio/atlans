@@ -1,10 +1,10 @@
 """
-O que o sub-fluxo CONTA quando algo dá errado.
+What the sub-workflow TELLS when something goes wrong.
 
-Os seis defeitos cobertos aqui tinham o mesmo formato: a execução seguia (ou
-parava) sem dizer o que de fato aconteceu, e o operador ia investigar a coisa
-errada. Nenhum era um crash — todos eram silêncio, ou uma mensagem que apontava
-para o lugar errado.
+The six defects covered here had the same shape: execution went on (or stopped)
+without saying what actually happened, and the operator went to investigate the
+wrong thing. None was a crash — all were silence, or a message that pointed to
+the wrong place.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from flow.utils.workflow_contract import MAX_PROFUNDIDADE
 
 
 def _filho_valido() -> dict:
-    """Definição mínima que passa no contrato — Input + Output declarados."""
+    """Minimal definition that passes the contract — Input + Output declared."""
     return {
         "nodes": [
             {"id": "in", "name": "SubWorkflowInput"},
@@ -46,10 +46,10 @@ def _no(*, workflow_hash="ALVO", inputs_mapping=None, context=None) -> SubWorkfl
     return node
 
 
-# ── 1. mapeamento apontando para chave que não chega ────────────────────────
+# ── 1. mapping pointing to a key that does not arrive ───────────────────────
 
 class TestMapeamentoOrfao:
-    """Antes: o dict do filho recebia `None` na chave e o run terminava verde."""
+    """Before: the child's dict received `None` under the key and the run finished green."""
 
     @pytest.mark.asyncio
     async def test_falha_nomeando_a_chave_que_faltou_e_as_que_chegaram(self):
@@ -63,8 +63,8 @@ class TestMapeamentoOrfao:
         msg = str(exc.value)
         assert "buffer_out" in msg, "não diz qual chave de origem faltou"
         assert "area" in msg, "não diz para qual porta do filho ela ia"
-        # Sem a lista do que chegou, o operador não tem como corrigir o
-        # mapeamento sem sair adivinhando nomes.
+        # Without the list of what arrived, the operator has no way to fix the
+        # mapping without guessing names.
         assert "gdf" in msg and "output" in msg
 
     @pytest.mark.asyncio
@@ -80,9 +80,9 @@ class TestMapeamentoOrfao:
 # ── 2. fluxo que chama a si mesmo ───────────────────────────────────────────
 
 class TestAutoReferenciaDaRaiz:
-    """Antes: a raiz não constava dos ancestrais, então A→A só era pego no
-    SEGUNDO nível — depois de o primeiro já ter rodado os efeitos colaterais
-    (e-mail enviado, arquivo publicado) uma vez a mais."""
+    """Before: the root was not among the ancestors, so A→A was only caught at the
+    SECOND level — after the first had already run the side effects (e-mail
+    sent, file published) one extra time."""
 
     def test_a_raiz_entra_nos_ancestrais(self):
         ex = WorkflowExecutor(
@@ -93,8 +93,8 @@ class TestAutoReferenciaDaRaiz:
         assert ex.context["_subflow_ancestors"] == {"RAIZ"}
 
     def test_sem_hash_o_conjunto_fica_vazio(self):
-        # Execução avulsa (sem workflow salvo) não tem o que semear, e semear
-        # `None` faria qualquer sub-fluxo sem hash bater falso-positivo.
+        # An ad hoc execution (no saved workflow) has nothing to seed, and seeding
+        # `None` would make any sub-workflow without a hash hit a false positive.
         ex = WorkflowExecutor({"nodes": [], "edges": []}, task_id="t1")
         assert ex.context["_subflow_ancestors"] == set()
 
@@ -105,12 +105,12 @@ class TestAutoReferenciaDaRaiz:
             await node.execute({})
 
 
-# ── 3. porta de saída com o nome reservado ──────────────────────────────────
+# ── 3. output port with the reserved name ───────────────────────────────────
 
 class TestPortaReservada:
-    """Antes: o node devolvia `{RESULTADO: tudo, **tudo}` — uma porta chamada
-    `subWorkflowResult` sobrescrevia o envelope e quem lesse a chave recebia o
-    valor daquela porta, sem erro."""
+    """Before: the node returned `{RESULTADO: tudo, **tudo}` — a port named
+    `subWorkflowResult` overwrote the envelope and whoever read the key got the
+    value of that port, with no error."""
 
     def _definicao(self, portas):
         return {
@@ -133,12 +133,13 @@ class TestPortaReservada:
 
 
 
-# ── 4. cadeia mais funda que o limite ───────────────────────────────────────
+# ── 4. chain deeper than the limit ──────────────────────────────────────────
 
 class TestProfundidade:
-    """Antes: o servidor parava de pré-resolver em MAX_PROFUNDIDADE e o node
-    dizia "não existe, está desativado, ou é de outro workspace" — as três
-    falsas. O conselho ("re-salve o workflow") também não resolvia."""
+    """Before: the server stopped pre-resolving at MAX_PROFUNDIDADE and the node
+    said "não existe, está desativado, ou é de outro workspace" (does not exist,
+    is deactivated, or belongs to another workspace) — all three false. The
+    advice ("re-salve o workflow", re-save the workflow) did not solve it either."""
 
     @pytest.mark.asyncio
     async def test_diz_que_a_cadeia_estourou(self):
@@ -157,8 +158,8 @@ class TestProfundidade:
 
     @pytest.mark.asyncio
     async def test_dentro_do_limite_a_mensagem_continua_a_do_snapshot(self):
-        # Uma cadeia curta com o snapshot vazio é um problema DIFERENTE, e a
-        # mensagem antiga é a certa para ele.
+        # A short chain with an empty snapshot is a DIFFERENT problem, and the
+        # old message is the right one for it.
         node = _no(
             workflow_hash="ALVO",
             context={"_subflow_ancestors": {"A", "B"}, "_subworkflow_definitions": {}},
@@ -167,7 +168,7 @@ class TestProfundidade:
             await node.execute({})
 
 
-# ── 5. qual nó do filho falhou ──────────────────────────────────────────────
+# ── 5. which node of the child failed ───────────────────────────────────────
 
 class _ChildFalso:
     def __init__(self, stats):
@@ -175,8 +176,8 @@ class _ChildFalso:
 
 
 class TestOndeFalhou:
-    """Antes: "Erro ao executar o sub-workflow 'F': division by zero" — num
-    sub-fluxo de quinze nós isso não localiza nada."""
+    """Before: "Erro ao executar o sub-workflow 'F': division by zero" — in a
+    fifteen-node sub-workflow that pinpoints nothing."""
 
     def test_nomeia_o_no_que_falhou(self):
         child = _ChildFalso({
@@ -187,8 +188,8 @@ class TestOndeFalhou:
         assert "PythonScript" in onde and "b" in onde
 
     def test_vazio_quando_nenhum_no_falhou(self):
-        # Timeout/cancelamento não marcam nó como failed; inventar um nó ali
-        # seria pior que não dizer nada.
+        # Timeout/cancellation do not mark a node as failed; inventing a node there
+        # would be worse than saying nothing.
         assert _onde_falhou(_ChildFalso({"a": {"status": "completed"}})) == ""
 
     def test_tolera_child_sem_stats(self):
@@ -198,7 +199,7 @@ class TestOndeFalhou:
         assert "b" in _onde_falhou(_ChildFalso({"b": {"status": "failed"}}))
 
 
-# ── 6. eventos do filho no painel do pai ────────────────────────────────────
+# ── 6. the child's events in the parent's panel ─────────────────────────────
 
 class _PublisherEspiao:
     def __init__(self):
@@ -217,8 +218,8 @@ class TestRepublicacaoDeEventos:
 
         ev = espiao.eventos[0]
         assert ev["node"] == "no-pai::filho-3"
-        # É o que a linha do painel usa para saber a qual nó do canvas se
-        # amarrar — sem isso ela ficava órfã e clicar nela não fazia nada.
+        # It is what the panel row uses to know which canvas node to attach to
+        # — without it the row was orphaned and clicking it did nothing.
         assert ev["extra"]["subworkflow_parent_node"] == "no-pai"
 
     def test_descarta_o_denominador_de_progresso_do_filho(self):

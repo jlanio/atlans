@@ -19,16 +19,17 @@ interface Props {
   workspace: Workspace
   canManage: boolean
   currentUserId: string | null
-  /** Notifica a contagem para o badge da navegação. */
+  /** Reports the count to the navigation badge. */
   onCountChange?: (count: number) => void
 }
 
 export function MembersSection({ workspace, canManage, currentUserId, onCountChange }: Props) {
-  // A carga é o `useFetchData`, com o workspace como dep: trocar de workspace
-  // com a lista do anterior em voo não deixa mais a resposta velha vencer.
-  // No erro a lista NÃO vira []: era isso que fazia uma falha de rede virar
-  // "Nenhum membro convidado ainda" na tela. `loading` é qualquer carga em voo
-  // (a seção troca a lista pelo skeleton, como sempre).
+  // Loading is `useFetchData`, with the workspace as a dep: switching workspaces
+  // with the previous one's list in flight no longer lets the stale response win.
+  // On error the list does NOT become []: that is what turned a network failure
+  // into "Nenhum membro convidado ainda" (no members invited yet) on screen.
+  // `loading` is any load in flight (the section swaps the list for the
+  // skeleton, as always).
   const { data, loading, error, refetch: load, setData } = useFetchData(
     () => GisFlowService.listWorkspaceMembers(workspace.id_hash),
     "Não foi possível carregar os membros.",
@@ -49,8 +50,8 @@ export function MembersSection({ workspace, canManage, currentUserId, onCountCha
     if (savingUserId) return
     const previous = members.find(m => m.user_id === userId)?.role
     setSavingUserId(userId)
-    // Otimista: o select já mostra o novo valor enquanto o PUT viaja. O rollback
-    // abaixo é o que impede a tela de afirmar um papel que o servidor recusou.
+    // Optimistic: the select already shows the new value while the PUT travels. The
+    // rollback below is what keeps the screen from claiming a role the server rejected.
     setMembers(prev => prev.map(m => (m.user_id === userId ? { ...m, role } : m)))
 
     const res = await GisFlowService.updateWorkspaceMemberRole(workspace.id_hash, userId, role)
@@ -115,8 +116,8 @@ export function MembersSection({ workspace, canManage, currentUserId, onCountCha
         <div className="space-y-2">
           <AnimatePresence initial={false}>
             {members.map(member => (
-              // Sem `layout`: a projeção medida por render (layout thrash) não é
-              // necessária — entrada/saída seguem via initial/animate/exit.
+              // No `layout`: the per-render measured projection (layout thrash) is not
+              // needed — enter/exit go through initial/animate/exit.
               <motion.div
                 key={member.user_id}
                 initial={{ opacity: 0, x: -8 }}

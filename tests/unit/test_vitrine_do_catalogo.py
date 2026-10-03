@@ -1,19 +1,20 @@
 # tests/unit/test_vitrine_do_catalogo.py
-"""Os números e os nomes da vitrine da Home contra a semente do catálogo.
+"""The numbers and names of the Home showcase against the catalog seed.
 
-`web/lib/catalogo.ts` guarda CONSTANTES — a barra anônima da Home não pode fazer
-requisição (ver o cabeçalho daquele arquivo e o do `home-sidebar.tsx`), então o
-que ela mostra é escrito à mão. O preço disso é envelhecer em silêncio: alguém
-acrescenta uma instituição em `catalogo/geoservicos/` e a Home segue anunciando
-o número velho, que é pior do que não anunciar nada.
+`web/lib/catalogo.ts` holds CONSTANTS — the Home's anonymous sidebar cannot make
+requests (see the header of that file and of `home-sidebar.tsx`), so what it
+shows is written by hand. The price of that is aging silently: someone adds an
+institution under `catalogo/geoservicos/` and the Home keeps announcing the old
+number, which is worse than announcing nothing.
 
-Este teste é o que cobra o preço. Ele recalcula tudo a partir da pasta e, quando
-diverge, diz o número novo na mensagem — atualizar a vitrine é copiar de volta.
+This test is what collects the price. It recomputes everything from the folder
+and, when it diverges, states the new number in the message — updating the
+showcase means copying it back.
 
-O conjunto que conta é o MESMO que a importação leva a sério: pasta com
-`Camadas.md`, `Atributos.md` e uma nota de instituição que declara endpoint WFS.
-As outras (ArcGIS REST, "metadados em validação") ficam de fora com o motivo
-`sem_endpoint_wfs` — ver `docs/sources.md`.
+The set that counts is the SAME one the import takes seriously: a folder with
+`Camadas.md`, `Atributos.md` and an institution note that declares a WFS
+endpoint. The others (ArcGIS REST, "metadados em validação") are left out with
+the reason `sem_endpoint_wfs` — see `docs/sources.md`.
 """
 import re
 from pathlib import Path
@@ -24,14 +25,14 @@ RAIZ = Path(__file__).resolve().parents[2]
 SEMENTE = RAIZ / "catalogo" / "geoservicos"
 VITRINE = RAIZ / "web" / "lib" / "catalogo.ts"
 
-# O CMR é da FUNAI: duas pastas, uma instituição. É a diferença entre as 77
-# pastas com WFS e as 76 instituições que `docs/sources.md` anuncia.
+# The CMR belongs to FUNAI: two folders, one institution. That is the difference
+# between the 77 folders with WFS and the 76 institutions `docs/sources.md` announces.
 PASTAS_DA_MESMA_INSTITUICAO = {"FUNAI CMR": "FUNAI"}
 
-# O vocabulário de países da semente (o prefixo com que as pastas de fora do
-# Brasil são nomeadas). Está aqui, e não no TypeScript, porque serve para o
-# teste detectar o caso que a vitrine não tem como perceber sozinha: um país
-# NOVO ganhar WFS e continuar de fora da fita.
+# The seed's country vocabulary (the prefix used to name the folders from
+# outside Brazil). It lives here, and not in the TypeScript, because it lets the
+# test detect the case the showcase has no way to notice on its own: a NEW
+# country gaining WFS and staying out of the strip.
 PREFIXOS_DE_PAIS = (
     "Antígua e Barbuda", "Argentina", "Barbados", "Bolivia", "Canadá", "Chile",
     "Colombia", "Costa Rica", "Dominica", "EUA", "Equador", "Granada",
@@ -41,7 +42,7 @@ PREFIXOS_DE_PAIS = (
 
 
 def _tem_endpoint_wfs(pasta: Path) -> bool:
-    """A nota da instituição declara um endpoint WFS."""
+    """The institution note declares a WFS endpoint."""
     for nota in pasta.glob("*.md"):
         if nota.name in ("Camadas.md", "Atributos.md"):
             continue
@@ -52,7 +53,7 @@ def _tem_endpoint_wfs(pasta: Path) -> bool:
 
 @pytest.fixture(scope="module")
 def pastas_com_wfs() -> dict[str, int]:
-    """`{nome da pasta: camadas}` para o que a importação de fato leva."""
+    """`{nome da pasta: camadas}` for what the import actually takes."""
     if not SEMENTE.is_dir():
         pytest.skip("a semente do catálogo não está neste checkout")
     achadas: dict[str, int] = {}
@@ -104,7 +105,7 @@ def test_instituicoes(vitrine, pastas_com_wfs):
 
 
 def test_paises(vitrine, pastas_com_wfs):
-    """O Brasil mais os países de fora — e a fita tem de nomear todos eles."""
+    """Brazil plus the countries outside it — and the strip has to name all of them."""
     de_fora = {
         prefixo
         for prefixo in PREFIXOS_DE_PAIS
@@ -124,7 +125,7 @@ def test_paises(vitrine, pastas_com_wfs):
 
 @pytest.mark.parametrize("constante", ["ORGAOS_FEDERAIS", "ORGAOS_REGIONAIS", "PAISES"])
 def test_cada_nome_citado_existe_na_semente(constante, vitrine, pastas_com_wfs):
-    """Nenhum rótulo da vitrine é ficção: cada um tem pasta com WFS por trás."""
+    """No showcase label is fiction: each one has a folder with WFS behind it."""
     for rotulo, pasta in _bases(vitrine, constante):
         casa = [n for n in pastas_com_wfs if n == pasta or n.startswith(pasta + " ")]
         assert casa, (

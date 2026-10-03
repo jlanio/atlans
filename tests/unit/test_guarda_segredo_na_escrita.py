@@ -1,19 +1,19 @@
-"""Segredo nao entra na definition pelas bordas de escrita da REST.
+"""A secret does not get into the definition through the REST write edges.
 
-Credencial mora em `credentials`, cifrada; a definition guarda o `credential_id`
-e o servidor injeta o valor numa COPIA no despacho. Um segredo escrito na
-definition ficaria cifrado no banco, mas ja teria viajado por transporte e log —
-e a redacao da saida o apagaria depois, dando a falsa impressao de que ele nao
-esta la.
+A credential lives in `credentials`, encrypted; the definition stores the `credential_id`
+and the server injects the value into a COPY on dispatch. A secret written into the
+definition would be encrypted in the database, but would already have traveled through
+transport and logs — and output redaction would erase it afterwards, giving the false
+impression that it is not there.
 
-O servidor MCP ja recusava nas suas tres tools de construcao
-(`app/mcp/tools/construcao.py`); a REST, que e por onde o editor grava, nao. Um
-levantamento em producao (2026-09-14) mediu 286 nos, 56 com `credential_id` e
-ZERO segredos gravados: a recusa torna invariante um estado que ja era verdade
-por convencao, sem recusar nada do que existe.
+The MCP server already refused it in its three construction tools
+(`app/mcp/tools/construcao.py`); the REST API, which is what the editor saves through, did not. A
+survey in production (2026-09-14) measured 286 nodes, 56 with `credential_id` and
+ZERO stored secrets: the refusal makes invariant a state that was already true
+by convention, without refusing anything that exists.
 
-Os testes chamam as funcoes de rota direto, sem cliente HTTP: o que se prova
-aqui e a guarda, e as dependencias (papel, sessao) so atrapalhariam.
+The tests call the route functions directly, with no HTTP client: what is proven
+here is the guard, and the dependencies (role, session) would only get in the way.
 """
 import pytest
 from fastapi import HTTPException
@@ -39,10 +39,10 @@ def test_connection_string_literal_e_recusada():
 
 
 def test_cabecalho_de_autorizacao_tambem_e_recusado():
-    """Decisao explicita do dono: cabecalho livre entra na recusa.
+    """Explicit decision by the owner: a free-form header is included in the refusal.
 
-    Quem precisa mandar token em header cria credencial. Nao ha excecao nem
-    modo "so avisa" — e o caminho por credencial ja existe (`http_auth`).
+    Whoever needs to send a token in a header creates a credential. There is no exception
+    and no "warn only" mode — and the credential path already exists (`http_auth`).
     """
     with pytest.raises(HTTPException) as exc:
         WR._recusar_segredo(_no({"headers": {"Authorization": f"Bearer {TOKEN}"}}))
@@ -51,17 +51,17 @@ def test_cabecalho_de_autorizacao_tambem_e_recusado():
 
 
 def test_a_recusa_cita_o_caminho_e_nunca_o_valor():
-    """A mensagem de recusa nao pode ser o vazamento que ela evita."""
+    """The refusal message must not be the leak it prevents."""
     with pytest.raises(HTTPException) as exc:
         WR._recusar_segredo(_no({"connectionString": SEGREDO}))
 
     detalhe = str(exc.value.detail)
     assert "connectionString" in detalhe          # o caminho, para o usuario achar
-    assert SEGREDO not in detalhe                 # o valor, nunca
+    assert SEGREDO not in detalhe                 # the value, never
     assert "senha-secretissima" not in detalhe
 
 
-# ── O que NAO pode ser recusado ─────────────────────────────────────────────
+# ── What must NOT be refused ────────────────────────────────────────────────
 
 def test_expressao_pura_passa():
     """`{{ ... }}` e referencia resolvida em runtime, nao segredo gravado."""
@@ -86,14 +86,14 @@ def test_definition_vazia_passa():
     WR._recusar_segredo(None)
 
 
-# ── A fiacao das rotas ──────────────────────────────────────────────────────
+# ── The route wiring ────────────────────────────────────────────────────────
 
 async def test_update_sem_definition_nao_dispara_a_guarda(monkeypatch):
-    """A regressao mais provavel: `WorkflowUpdate` e PARCIAL.
+    """The most likely regression: `WorkflowUpdate` is PARTIAL.
 
-    `definition` ausente significa "nao mexe nela". Uma guarda distraida, que
-    checasse sem testar a ausencia, barraria ate renomear um workflow — e o
-    sintoma (nao consigo salvar o nome) nao apontaria para segredo nenhum.
+    A missing `definition` means "don't touch it". A careless guard, one that
+    checked without testing for absence, would block even renaming a workflow — and the
+    symptom (I can't save the name) would not point to any secret.
     """
     from app.schemas.workflow import WorkflowUpdate
 
@@ -111,8 +111,8 @@ async def test_update_sem_definition_nao_dispara_a_guarda(monkeypatch):
         id_hash = "wf-1"
         workspace_id = "ws-1"
 
-    # O papel é conferido pela dependência da rota (`workflow_com_papel`), que
-    # a chamada direta não passa; aqui só o limiter atrapalha.
+    # The role is checked by the route's dependency (`workflow_com_papel`), which
+    # the direct call does not go through; here only the limiter gets in the way.
     monkeypatch.setattr(WR.limiter, "enabled", False)
 
     class _User:
@@ -127,15 +127,15 @@ async def test_update_sem_definition_nao_dispara_a_guarda(monkeypatch):
         current_user=_User(),
     )
 
-    assert chamado == []                 # guarda nao foi consultada
+    assert chamado == []                 # guard was not consulted
     assert gravado["nome"] == "nome novo"  # e a edicao passou
 
 
 def test_paridade_com_a_borda_do_mcp():
-    """A REST nao pode ser mais permissiva que o servidor MCP.
+    """The REST API must not be more permissive than the MCP server.
 
-    As duas chamam `definition_contem_segredo`; este teste quebra se alguem
-    criar uma segunda lista de chaves para um dos lados.
+    Both call `definition_contem_segredo`; this test breaks if someone
+    creates a second list of keys for one of the sides.
     """
     from app.mcp.tools.construcao import _recusar_segredo as mcp_recusa
 
@@ -147,12 +147,12 @@ def test_paridade_com_a_borda_do_mcp():
         mcp_recusa(definicao)
 
 
-# ── A guarda esta LIGADA nas rotas ──────────────────────────────────────────
+# ── The guard is WIRED INTO the routes ──────────────────────────────────────
 #
-# Sem estes, a funcionalidade inteira podia ser removida das rotas e a suite
-# continuava verde: os testes acima exercitam o helper, nao a fiacao. Foi
-# exatamente o que uma revisao mediu — apagar as chamadas (eram tres; a de
-# /workflows/validate saiu com a rota) nao mexia num unico nome na suite.
+# Without these, the whole feature could be removed from the routes and the suite
+# stayed green: the tests above exercise the helper, not the wiring. That is
+# exactly what a review measured — deleting the calls (there were three; the one in
+# /workflows/validate went away with the route) did not change a single name in the suite.
 
 class _Usuario:
     id_hash = "u-1"
@@ -165,11 +165,11 @@ class _Wf:
 
 @pytest.fixture
 def rota_liberada(monkeypatch):
-    """Tira do caminho o que nao e o assunto: limiter e papel.
+    """Gets what is not the subject out of the way: limiter and role.
 
-    Nas rotas `/{id_hash}` o papel e da dependencia (`workflow_com_papel`), que
-    a chamada direta nao passa; no POST ele e conferido no corpo da rota, e
-    aqui a pessoa e `editor` — a comparacao roda de verdade.
+    On the `/{id_hash}` routes the role comes from the dependency (`workflow_com_papel`),
+    which the direct call does not go through; on POST it is checked in the route body, and
+    here the person is `editor` — the comparison really runs.
     """
     from app.core.authorization import workflow_access
 
@@ -211,7 +211,7 @@ async def test_rota_de_atualizacao_recusa(rota_liberada):
 
 
 async def test_params_schema_tambem_e_guardado(rota_liberada):
-    """Coluna irma, gravavel no mesmo corpo, e que NAO e cifrada no banco."""
+    """Sibling column, writable in the same body, and NOT encrypted in the database."""
     from app.schemas.workflow import WorkflowUpdate
 
     with pytest.raises(HTTPException) as exc:
@@ -227,7 +227,7 @@ async def test_params_schema_tambem_e_guardado(rota_liberada):
     assert TOKEN not in str(exc.value.detail)
 
 
-# ── Os falsos positivos ACEITOS ─────────────────────────────────────────────
+# ── The ACCEPTED false positives ────────────────────────────────────────────
 
 @pytest.mark.parametrize("caso,props", [
     ("bind :token numa query SQL",
@@ -240,22 +240,22 @@ async def test_params_schema_tambem_e_guardado(rota_liberada):
      {"body": {"pagina": 2, "token": "eyJhbGciOiJIUzI1NiJ9"}}),
 ])
 def test_recusas_deliberadas_em_mapas_de_dado_do_usuario(caso, props):
-    """Quatro padroes LEGITIMOS que a guarda recusa — e isso foi decidido.
+    """Four LEGITIMATE patterns the guard refuses — and that was decided.
 
-    A regra casa por NOME DE CHAVE, e nestes mapas a chave e dado do usuario:
-    nome de bind, nome de coluna, nome de campo do payload. Uma revisao mediu
-    30 definitions realistas e achou exatamente estes quatro.
+    The rule matches by KEY NAME, and in these maps the key is user data:
+    bind name, column name, payload field name. A review measured
+    30 realistic definitions and found exactly these four.
 
-    A alternativa — isentar `queryParams`, `renameFields`, `payload_schema` e
-    `body` da regra por nome — foi considerada e RECUSADA: um token de verdade
-    colado ali passaria em silencio, e a deteccao ficaria mais estreita que a
-    redacao, que segue redigindo esses caminhos. `redacao.py` proibe isso por
-    escrito: "a borda aceita o que a entrega depois apaga".
+    The alternative — exempting `queryParams`, `renameFields`, `payload_schema` and
+    `body` from the by-name rule — was considered and REJECTED: a real token
+    pasted there would pass silently, and detection would become narrower than
+    redaction, which keeps redacting those paths. `redacao.py` forbids this in
+    writing: "the edge accepts what delivery later erases".
 
-    Este teste existe para que a proxima pessoa que topar com um 422 desses
-    saiba que nao e bug. A saida e usar `credential_id`. Se voce veio aqui para
-    fazer o teste passar afrouxando a regra, isso e decisao de produto — nao
-    conserto.
+    This test exists so that the next person who runs into one of these 422s
+    knows it is not a bug. The way out is to use `credential_id`. If you came here to
+    make the test pass by loosening the rule, that is a product decision — not
+    a fix.
     """
     with pytest.raises(HTTPException) as exc:
         WR._recusar_segredo(_no(props))

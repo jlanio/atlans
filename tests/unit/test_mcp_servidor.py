@@ -1,33 +1,34 @@
 # tests/unit/test_mcp_servidor.py
 """
-O servidor `/mcp` inteiro: fábrica, filtro de catálogo, guarda de escopo e borda.
+The whole `/mcp` server: factory, catalog filter, scope guard and edge.
 
-Este arquivo exercita a pilha real — middleware de PAT + transporte streamable
-HTTP + `ServidorAtlans` — porque é a composição que erra: um filtro que funciona
-no objeto e não funciona por HTTP não protege ninguém.
+This file exercises the real stack — PAT middleware + streamable HTTP transport
++ `ServidorAtlans` — because the composition is what goes wrong: a filter that
+works on the object and doesn't work over HTTP protects nobody.
 
-Os pontos fixados aqui:
+The points pinned down here:
 
-- `create_mcp_server()` é fábrica. `session_manager.run()` só pode ser entrado
-  UMA vez por instância; um singleton de módulo faria o segundo teste (ou um
-  reload em produção) encontrar o gerenciador já consumido;
-- o `initialize` responde nos dois caminhos que os clientes usam: o legado, que
-  fixa `protocolVersion` e fala JSON-RPC cru, e o moderno do SDK;
-- `tools/list` esconde o que o token não alcança — nos dois caminhos, porque o
-  escopo chega ao `list_tools` por um `ContextVar` e é preciso provar que ele
-  sobrevive à task que o transporte cria;
-- esconder é conforto; a garantia é `call_tool`, que recusa nomeando o escopo
-  que falta mesmo quando o cliente chama um nome que nunca viu na lista;
-- o default é RECUSAR: tool sem linha em `GUARDAS` não aparece no catálogo e não
-  roda. É o caso que falharia ABERTO se o default fosse delegar ao SDK — uma
-  tool nova rodaria sem escopo, sem cota e sem papel;
-- toda chamada deixa UMA linha de auditoria, inclusive a que foi recusada pela
-  guarda, e nenhuma delas carrega os argumentos;
-- `Host` fora da lista é 421 e `Origin` presente é 403 — mas sem PAT o 401 vem
-  ANTES, porque o middleware é externo ao transporte.
+- `create_mcp_server()` is a factory. `session_manager.run()` can only be
+  entered ONCE per instance; a module singleton would make the second test (or a
+  reload in production) find the manager already consumed;
+- `initialize` answers on both paths clients use: the legacy one, which pins
+  `protocolVersion` and speaks raw JSON-RPC, and the SDK's modern one;
+- `tools/list` hides what the token can't reach — on both paths, because the
+  scope reaches `list_tools` through a `ContextVar` and it has to be proven that
+  it survives the task the transport creates;
+- hiding is a convenience; the guarantee is `call_tool`, which refuses naming
+  the missing scope even when the client calls a name it never saw in the list;
+- the default is to REFUSE: a tool with no row in `GUARDAS` doesn't appear in
+  the catalog and doesn't run. It is the case that would fail OPEN if the
+  default were to delegate to the SDK — a new tool would run without scope,
+  without quota and without role;
+- every call leaves ONE audit row, including the one refused by the guard, and
+  none of them carries the arguments;
+- a `Host` outside the list is 421 and a present `Origin` is 403 — but without
+  a PAT the 401 comes FIRST, because the middleware is outside the transport.
 
-Como as tools de domínio ainda não existem, os testes registram tools próprias
-na instância do teste, com os nomes que a tabela de guardas conhece.
+Since the domain tools don't exist yet, the tests register their own tools on
+the test instance, with the names the guard table knows.
 """
 from __future__ import annotations
 
@@ -62,7 +63,7 @@ from tests.unit._mcp_harness import (
 
 _JSON = {
     "Content-Type": "application/json",
-    # Sem os dois tipos no Accept o transporte responde 406 antes de olhar o resto.
+    # Without both types in Accept the transport answers 406 before looking at the rest.
     "Accept": "application/json, text/event-stream",
 }
 
@@ -79,14 +80,15 @@ _INITIALIZE = {
 
 
 def servidor_de_teste():
-    """Servidor sem as tools reais, com duas de mentira — uma por escopo da tabela.
+    """A server without the real tools, with two fake ones — one per scope in the table.
 
-    O que se exercita aqui é a COMPOSIÇÃO (filtro de catálogo, guarda de escopo,
-    cota, auditoria), não o corpo de nenhuma tool. Por isso a instância é montada
-    à mão em vez de sair de `create_mcp_server()`: com as tools reais registradas,
-    um segundo registro com o mesmo nome seria ignorado pelo SDK e os testes
-    estariam medindo a tool de produção sem querer. Os nomes continuam sendo dois
-    da tabela de guardas, que é o que dá sentido ao filtro por escopo.
+    What is exercised here is the COMPOSITION (catalog filter, scope guard,
+    quota, audit), not the body of any tool. That is why the instance is built
+    by hand instead of coming from `create_mcp_server()`: with the real tools
+    registered, a second registration with the same name would be ignored by the
+    SDK and the tests would be measuring the production tool by accident. The
+    names are still two from the guard table, which is what gives meaning to
+    the scope filter.
     """
     server = ServidorAtlans(
         name="atlans",
@@ -107,7 +109,7 @@ def servidor_de_teste():
 
 
 def _resposta_jsonrpc(r: httpx.Response) -> dict:
-    """O corpo JSON-RPC, venha ele como JSON ou dentro de um evento SSE."""
+    """The JSON-RPC body, whether it comes as JSON or inside an SSE event."""
     if r.headers.get("content-type", "").startswith("application/json"):
         return r.json()
     for linha in r.text.splitlines():
@@ -118,7 +120,7 @@ def _resposta_jsonrpc(r: httpx.Response) -> dict:
 
 @pytest.fixture
 async def ambiente(monkeypatch):
-    """Banco em memória com um usuário e um workspace; infra do MCP redirecionada."""
+    """In-memory database with one user and one workspace; MCP infra redirected."""
     async with banco_em_memoria() as fabrica:
         async with fabrica() as db:
             await criar_usuario(db, "usr-1", "ana")
@@ -134,25 +136,25 @@ async def _pat(fabrica, escopos) -> str:
         return await criar_pat(db, "usr-1", escopos, None)
 
 
-# ── Fábrica ───────────────────────────────────────────────────────────────────
+# ── Factory ───────────────────────────────────────────────────────────────────
 
 
 def test_a_fabrica_devolve_instancias_independentes():
     a, b = create_mcp_server(), create_mcp_server()
     assert a is not b
-    # Cada instância tem o seu gerenciador de sessões — é o que permite um
-    # servidor por teste sem "cannot be used twice".
+    # Each instance has its own session manager — that is what allows one
+    # server per test without "cannot be used twice".
     criar_app_mcp(a)
     criar_app_mcp(b)
     assert a.session_manager is not b.session_manager
 
 
 def test_criar_app_mcp_duas_vezes_devolve_o_mesmo_app():
-    """Duas chamadas trocariam o `session_manager` em silêncio.
+    """Two calls would swap the `session_manager` silently.
 
-    `streamable_http_app()` cria um gerenciador novo a cada chamada, e quem
-    entra no gerenciador é o `lifespan` de `app.main`, uma vez só: um segundo
-    app deixaria o servido com um gerenciador que ninguém iniciou.
+    `streamable_http_app()` creates a new manager on every call, and what
+    enters the manager is `app.main`'s `lifespan`, only once: a second app
+    would leave the served one with a manager nobody started.
     """
     server = create_mcp_server()
     primeiro = criar_app_mcp(server)
@@ -162,13 +164,13 @@ def test_criar_app_mcp_duas_vezes_devolve_o_mesmo_app():
 
 
 def test_a_fabrica_carrega_identidade_e_instrucoes():
-    """A versão fica presa de propósito: mudá-la tem de ser deliberado.
+    """The version is pinned on purpose: changing it has to be deliberate.
 
-    É o único discriminador que um cliente tem para saber QUAL contrato está no
-    ar — foi o que faltou na conferência da entrega anterior, quando o `1.0.0`
-    parado impediu de distinguir, pelo `initialize`, o servidor novo do antigo.
-    Ferramenta nova sobe a menor; ferramenta removida fica uma versão menor
-    marcada como obsoleta antes de sumir.
+    It is the only discriminator a client has to know WHICH contract is live —
+    it is what was missing when checking the previous delivery, when the stuck
+    `1.0.0` made it impossible to tell, via `initialize`, the new server from
+    the old one. A new tool bumps the minor; a removed tool stays one minor
+    version marked as deprecated before disappearing.
     """
     server = create_mcp_server()
     assert server.name == "atlans"
@@ -184,7 +186,7 @@ def test_hosts_permitidos_vem_da_configuracao(monkeypatch):
 
 
 def test_default_dos_hosts_cobre_o_site_e_o_desenvolvimento():
-    """Sem MCP_ALLOWED_HOSTS, valem o host do FRONTEND_URL e o dev local."""
+    """Without MCP_ALLOWED_HOSTS, the FRONTEND_URL host and local dev apply."""
     from app.core import config
 
     assert config.hosts_mcp_padrao("https://atlans.example.org")[:2] == [
@@ -197,13 +199,14 @@ def test_default_dos_hosts_cobre_o_site_e_o_desenvolvimento():
 
 
 async def test_toda_tool_registrada_tem_guarda():
-    """Nenhuma tool registrada fica sem linha na tabela de guardas.
+    """No registered tool is left without a row in the guard table.
 
-    Segunda linha de defesa, e de propósito: em produção a tool sem guarda já é
-    escondida e recusada, mas isso a torna INÚTIL em silêncio. Este teste é o
-    que avisa em CI — e por isso ele lê o catálogo CRU do SDK
-    (`MCPServer.list_tools`), sem o filtro do `ServidorAtlans`, senão a tool
-    esquecida sumiria da lista e o teste passaria sem ver nada.
+    A second line of defense, on purpose: in production a tool without a guard
+    is already hidden and refused, but that makes it silently USELESS. This
+    test is what warns in CI — and that is why it reads the SDK's RAW catalog
+    (`MCPServer.list_tools`), without the `ServidorAtlans` filter, otherwise the
+    forgotten tool would vanish from the list and the test would pass without
+    seeing anything.
     """
     from mcp.server.mcpserver import MCPServer
 
@@ -214,13 +217,13 @@ async def test_toda_tool_registrada_tem_guarda():
 
 
 async def test_o_catalogo_cru_e_o_filtrado_coincidem_no_servidor_real():
-    """Com a tabela em dia, esconder não tira nada de quem tem escopo total."""
+    """With the table up to date, hiding takes nothing away from whoever has full scope."""
     from mcp.server.mcpserver import MCPServer
 
     server = create_mcp_server()
     crus = {t.name for t in await MCPServer.list_tools(server)}
-    # Escopo total = a união do que a tabela exige; assim a lista não envelhece
-    # quando uma tool nova traz um escopo que ninguém usava.
+    # Full scope = the union of what the table requires; that way the list doesn't
+    # go stale when a new tool brings a scope nobody used.
     ficha = ESCOPO_ATUAL.set(
         escopo_falso(scopes={g.escopo for g in GUARDAS.values()})
     )
@@ -231,8 +234,8 @@ async def test_o_catalogo_cru_e_o_filtrado_coincidem_no_servidor_real():
     assert filtrados == crus
 
 
-# As tools de leitura, separadas das demais porque é sobre elas que valem as
-# promessas de "não muda nada e não gasta balde extra".
+# The read tools, separated from the rest because they are the ones the
+# promises of "changes nothing and spends no extra bucket" apply to.
 TOOLS_DE_LEITURA = {
     "list_workspaces",
     "list_workflows",
@@ -248,35 +251,35 @@ TOOLS_DE_LEITURA = {
     "get_run",
     "list_runs",
     "get_run_artifacts",
-    # Fase 2: ler o log de uma execução é leitura como o resto da
-    # observabilidade — não interrompe nem dispara nada.
+    # Phase 2: reading a run's log is a read like the rest of
+    # observability — it neither interrupts nor dispatches anything.
     "get_run_events",
-    # Fase 2, acervo: o histórico e o que as execuções produziram. Ler uma
-    # versão antiga não muda nada; `list_artifacts` assina URL, o que a torna
-    # não idempotente, mas continua sendo leitura.
+    # Phase 2, collection: the history and what the runs produced. Reading an
+    # old version changes nothing; `list_artifacts` signs a URL, which makes it
+    # non-idempotent, but it is still a read.
     "list_workflow_versions",
     "get_workflow_version",
     "list_artifacts",
-    # Fase 2, pins: saber QUAIS saídas estão congeladas é leitura — e é a
-    # única forma de descobrir que um resultado veio de cache.
+    # Phase 2, pins: knowing WHICH outputs are frozen is a read — and it is the
+    # only way to find out that a result came from cache.
     "list_pins",
-    # Fase 2, gatilhos: ver QUANDO um fluxo dispara sozinho é leitura, e pede
-    # `workflows:read` e não `triggers:manage` — pelo mesmo motivo de
-    # `get_run`: quem só acompanha não precisa de poder para mexer.
+    # Phase 2, triggers: seeing WHEN a workflow fires on its own is a read, and
+    # requires `workflows:read` and not `triggers:manage` — for the same reason
+    # as `get_run`: whoever only follows along doesn't need the power to change things.
     "list_schedules",
-    # Fontes: buscar e descrever são leitura da tabela, sem rede.
+    # Sources: search and describe are table reads, with no network.
     "search_sources",
     "describe_source",
 }
 
 
 def test_a_tabela_de_guardas_tem_exatamente_as_tools_registradas():
-    """A lista é escrita à mão de propósito.
+    """The list is written by hand on purpose.
 
-    Derivá-la de `GUARDAS` tornaria o teste tautológico: ele passaria a afirmar
-    que a tabela é igual a si mesma, e uma tool nova entraria sem ninguém
-    decidir se ela lê ou escreve. Manter as duas listas e compará-las é o que
-    obriga essa decisão a ser tomada por uma pessoa.
+    Deriving it from `GUARDAS` would make the test tautological: it would start
+    asserting that the table equals itself, and a new tool would get in without
+    anyone deciding whether it reads or writes. Keeping both lists and
+    comparing them is what forces that decision to be made by a person.
     """
     assert set(GUARDAS) == TOOLS_DE_LEITURA | {
         "validate_workflow",
@@ -285,26 +288,26 @@ def test_a_tabela_de_guardas_tem_exatamente_as_tools_registradas():
         "set_workflow_active",
         "set_portal_access",
         "run_workflow",
-        # Fase 2 — mexem no que está rodando.
+        # Phase 2 — they touch what is running.
         "cancel_run",
         "retry_run",
-        # Fase 2 — acervo: as duas que escrevem.
+        # Phase 2 — collection: the two that write.
         "restore_workflow_version",
         "duplicate_workflow",
-        # Fase 2 — pins: as duas mudam a coluna do workflow.
+        # Phase 2 — pins: both change the workflow's column.
         "pin_node_output",
         "unpin_node_output",
-        # Fase 2 — gatilhos: as três mexem em quando o fluxo dispara sozinho.
+        # Phase 2 — triggers: all three change when the workflow fires on its own.
         "create_schedule",
         "update_schedule",
         "delete_schedule",
-        # Fase 2 — escrita no Drive: as três mexem no acervo do workspace.
+        # Phase 2 — Drive writes: all three touch the workspace's collection.
         "create_drive_upload_url",
         "confirm_drive_upload",
         "delete_drive_file",
-        # Fontes: `probe_source` fala com a internet, atualiza o estado de uma
-        # fonte já catalogada e paga balde — não é leitura, como
-        # `validate_workflow` não é; `register_source` sonda E grava.
+        # Sources: `probe_source` talks to the internet, updates the state of an
+        # already cataloged source and spends bucket — it is not a read, just as
+        # `validate_workflow` isn't; `register_source` probes AND saves.
         "probe_source",
         "register_source",
     }
@@ -315,20 +318,20 @@ def test_toda_guarda_de_leitura_e_somente_leitura_e_nao_gasta_cota():
         guarda = GUARDAS[nome]
         assert guarda.read_only is True, nome
         assert guarda.cota is None, nome
-    # A URL pré-assinada é a única que muda a cada chamada (assinatura nova) —
-    # tanto a do Drive quanto as dos artefatos de um run.
+    # The presigned URL is the only one that changes on every call (new signature) —
+    # both the Drive one and those of a run's artifacts.
     assert GUARDAS["get_drive_download_url"].idempotente is False
     assert GUARDAS["get_run_artifacts"].idempotente is False
 
 
 def test_ler_execucao_nao_exige_escopo_de_disparo():
-    """Acompanhar um run é leitura; disparar é outra coisa.
+    """Following a run is a read; dispatching is something else.
 
-    Paridade com a REST, onde `/observability` só pede ser membro do
-    workspace. Se `get_run` passasse a exigir `runs:execute`, quem quisesse
-    apenas acompanhar precisaria de um token capaz de DISPARAR — um escopo
-    maior do que a tarefa, que é o oposto do que esta tabela existe para
-    garantir.
+    Parity with REST, where `/observability` only requires being a member of
+    the workspace. If `get_run` started requiring `runs:execute`, whoever only
+    wanted to follow along would need a token capable of DISPATCHING — a scope
+    larger than the task, which is the opposite of what this table exists to
+    guarantee.
     """
     for nome in ("get_run", "list_runs", "get_run_artifacts"):
         assert GUARDAS[nome].escopo == "workflows:read", nome
@@ -338,11 +341,11 @@ def test_ler_execucao_nao_exige_escopo_de_disparo():
 
 
 def test_toda_guarda_de_escrita_nao_e_somente_leitura():
-    """Escrever nunca pode anunciar `readOnlyHint` — o cliente confia nisso.
+    """Writing can never announce `readOnlyHint` — the client trusts it.
 
-    A anotação é o que faz um cliente decidir se pede confirmação antes de
-    chamar. Uma tool que grava anunciando-se como leitura roda sem ninguém
-    perguntar nada.
+    The annotation is what makes a client decide whether to ask for confirmation
+    before calling. A tool that writes while announcing itself as a read runs
+    without anyone asking anything.
     """
     for nome, guarda in GUARDAS.items():
         if nome in TOOLS_DE_LEITURA:
@@ -354,24 +357,24 @@ def test_toda_guarda_de_escrita_nao_e_somente_leitura():
         assert guarda.papel in ("editor", "operator"), nome
 
 
-# Os dois baldes extras, escritos à mão pelo mesmo motivo da lista de leitura:
-# derivá-los da tabela faria o teste concordar com qualquer valor que lá
-# estivesse. `run` é de quem reserva um executor; `validate` é de quem roda a
-# simulação da definição — que `create` e `update` fazem antes de gravar.
+# The two extra buckets, written by hand for the same reason as the read list:
+# deriving them from the table would make the test agree with whatever value
+# was there. `run` is for whoever reserves an executor; `validate` is for whoever
+# runs the definition's simulation — which `create` and `update` do before saving.
 TOOLS_QUE_DESPACHAM = {"run_workflow", "retry_run"}
 TOOLS_QUE_SIMULAM = {"validate_workflow", "create_workflow", "update_workflow"}
-# As que SONDAM um WFS de terceiro (GetCapabilities/DescribeFeatureType): I/O
-# contra fora, com balde próprio, mais apertado que o de validação.
+# The ones that PROBE a third-party WFS (GetCapabilities/DescribeFeatureType):
+# outbound I/O, with its own bucket, tighter than the validation one.
 TOOLS_QUE_SONDAM = {"probe_source", "register_source"}
 
 
 def test_cada_balde_de_cota_cobre_exatamente_quem_gasta_o_recurso():
-    """Sem isto, `retry_run` podia perder a cota e continuar passando.
+    """Without this, `retry_run` could lose its quota and keep passing.
 
-    A cota `run` é o que impede um agente em laço de encher a fila de execuções
-    — e `retry_run` dispara uma execução por chamada, como `run_workflow`. Os
-    outros testes de guarda conferem `read_only`, `escopo` e `papel`, e nenhum
-    olhava para `cota`: apagar `"run"` da linha de `retry_run` passava inteiro.
+    The `run` quota is what keeps a looping agent from filling the run queue —
+    and `retry_run` dispatches one run per call, like `run_workflow`. The other
+    guard tests check `read_only`, `escopo` and `papel`, and none looked at
+    `cota`: deleting `"run"` from `retry_run`'s row passed entirely.
     """
     for nome, guarda in GUARDAS.items():
         if nome in TOOLS_QUE_DESPACHAM:
@@ -386,34 +389,34 @@ def test_cada_balde_de_cota_cobre_exatamente_quem_gasta_o_recurso():
 
 
 def test_o_hint_de_idempotencia_de_cada_tool_e_uma_decisao_registrada():
-    """`idempotentHint` é publicado ao cliente, e ele age em cima.
+    """`idempotentHint` is published to the client, and it acts on it.
 
-    Uma tool anunciada como idempotente autoriza o agente a repetir a chamada
-    depois de um erro de rede. Em `retry_run` cada repetição é uma execução
-    NOVA, com executor reservado — por isso ela é a única das três de execução
-    marcada como não idempotente, e por isso o valor precisa estar preso aqui:
-    nenhum outro teste de guarda olhava para este campo.
+    A tool announced as idempotent authorizes the agent to repeat the call
+    after a network error. In `retry_run` each repetition is a NEW run, with an
+    executor reserved — that is why it is the only one of the three execution
+    tools marked as non-idempotent, and why the value needs to be pinned here:
+    no other guard test looked at this field.
     """
     nao_idempotentes = {
         # Assinam URL nova a cada chamada.
         "get_drive_download_url", "get_run_artifacts",
         "list_artifacts",
-        # Gravam ou disparam algo diferente a cada chamada.
+        # They save or dispatch something different on every call.
         "create_workflow", "update_workflow", "run_workflow", "retry_run",
-        # Restaurar grava um auto-snapshot novo a cada chamada; duplicar cria
-        # um fluxo novo com id novo.
+        # Restoring saves a new auto-snapshot on every call; duplicating creates
+        # a new workflow with a new id.
         "restore_workflow_version", "duplicate_workflow",
-        # Cada chamada cria um `job_id` novo: repetir depois de um erro de rede
-        # deixaria DOIS agendamentos disparando o mesmo fluxo.
+        # Each call creates a new `job_id`: repeating after a network error
+        # would leave TWO schedules firing the same workflow.
         "create_schedule",
-        # Cada chamada cria uma linha pendente e assina uma URL nova.
+        # Each call creates a pending row and signs a new URL.
         "create_drive_upload_url",
     }
-    # Os pins NÃO entram: `pin_node_output` reescreve a mesma entrada e
-    # `unpin_node_output` removê-la duas vezes não muda nada. São as únicas
-    # tools de escrita do servidor que podem ser repetidas com segurança, e
-    # deixar isso explícito aqui é o que impede alguém de "corrigir" a linha
-    # delas em `GUARDAS` por analogia com as outras escritas.
+    # The pins are NOT included: `pin_node_output` rewrites the same entry and
+    # `unpin_node_output` removing it twice changes nothing. They are the only
+    # write tools in the server that can be safely repeated, and making that
+    # explicit here is what keeps someone from "fixing" their row in `GUARDAS`
+    # by analogy with the other writes.
     assert not ({"pin_node_output", "unpin_node_output"} & nao_idempotentes)
     for nome, guarda in GUARDAS.items():
         esperado = nome not in nao_idempotentes
@@ -426,7 +429,7 @@ def test_o_hint_de_idempotencia_de_cada_tool_e_uma_decisao_registrada():
 
 
 async def test_sem_escopo_no_contexto_a_lista_sai_inteira():
-    """É o caso do cliente em processo, que não passa pelo middleware."""
+    """This is the in-process client's case, which doesn't go through the middleware."""
     server = servidor_de_teste()
     assert ESCOPO_ATUAL.get() is None
     assert {t.name for t in await server.list_tools()} == {"list_workspaces", "list_drive_files"}
@@ -490,7 +493,7 @@ async def test_tool_com_o_escopo_certo_roda(ambiente):
 
 
 async def test_chamar_tool_escondida_e_recusado_nomeando_o_escopo_que_falta(ambiente):
-    """Filtrar a lista é conforto; a garantia é esta recusa."""
+    """Filtering the list is a convenience; the guarantee is this refusal."""
     segredo = await _pat(ambiente, ["drive:read"])
     server = servidor_de_teste()
     app_mcp = criar_app_mcp(server)
@@ -504,7 +507,7 @@ async def test_chamar_tool_escondida_e_recusado_nomeando_o_escopo_que_falta(ambi
 
 
 async def test_chamada_sem_identidade_nenhuma_e_proibida():
-    """Cliente em processo: sem middleware, sem escopo — a tool não roda."""
+    """In-process client: no middleware, no scope — the tool doesn't run."""
     server = servidor_de_teste()
     from mcp import Client
 
@@ -518,7 +521,7 @@ async def test_cota_estourada_recusa_a_chamada_antes_de_rodar_a_tool(ambiente, m
     segredo = await _pat(ambiente, ["workflows:read"])
     redis = RedisFalso()
     monkeypatch.setattr(infra, "redis_ou_none", lambda: redis)
-    # O balde geral deste token já chega no teto.
+    # This token's general bucket is already at the ceiling.
     redis.dados[f"ratelimit:mcp:{await _token_id(ambiente)}:geral"] = cotas.LIMITE_GERAL
 
     server = servidor_de_teste()
@@ -539,15 +542,16 @@ async def _token_id(fabrica) -> str:
         return (await db.execute(select(ApiToken.id_hash))).scalars().first()
 
 
-# ── Tool sem guarda: o default é recusar ──────────────────────────────────────
+# ── Tool without a guard: the default is to refuse ────────────────────────────
 
 
 def _servidor_com_tool_sem_guarda(nome: str = "tool_sem_guarda"):
-    """Servidor com uma única tool que NÃO tem linha na tabela de guardas.
+    """A server with a single tool that has NO row in the guard table.
 
-    É o esquecimento que se quer cobrir: alguém registra a tool e não declara a
-    guarda. Antes, o servidor delegava ao SDK e a tool rodava sem escopo, sem
-    cota e sem papel — exatamente o contrário do que a tabela existe para fazer.
+    It is the oversight we want to cover: someone registers the tool and doesn't
+    declare the guard. Before, the server delegated to the SDK and the tool ran
+    without scope, without quota and without role — exactly the opposite of
+    what the table exists to do.
     """
     server = ServidorAtlans(
         name="atlans", title="Atlans", instructions=INSTRUCOES, version=VERSAO_MCP,
@@ -568,7 +572,7 @@ async def test_tool_sem_guarda_nao_aparece_no_catalogo():
 
 
 async def test_tool_sem_guarda_e_recusada_sem_rodar_o_corpo():
-    """O default invertido: sem guarda declarada, a chamada não acontece."""
+    """The inverted default: with no declared guard, the call doesn't happen."""
     from mcp import Client
 
     server, rastro = _servidor_com_tool_sem_guarda()
@@ -583,8 +587,8 @@ async def test_tool_sem_guarda_e_recusada_sem_rodar_o_corpo():
     assert rastro["rodou"] is False
     corpo = json.loads(resultado.content[0].text)
     assert corpo["code"] == "not_found"
-    # A recusa não conta ao cliente se o nome existe e ficou sem guarda ou se
-    # nunca existiu — e não carrega nada de dentro da tool.
+    # The refusal doesn't tell the client whether the name exists and was left
+    # without a guard or never existed — and carries nothing from inside the tool.
     assert "GUARDAS" not in json.dumps(corpo)
     assert "segredo_da_casa" not in json.dumps(corpo)
 
@@ -611,7 +615,7 @@ def _linhas_de_auditoria(caplog) -> list[str]:
 
 
 async def _chamar_em_processo(server, nome: str, argumentos: dict, escopo):
-    """Chama uma tool pelo cliente em processo, com o escopo no `ContextVar`."""
+    """Calls a tool through the in-process client, with the scope in the `ContextVar`."""
     from mcp import Client
 
     ficha = ESCOPO_ATUAL.set(escopo)
@@ -638,7 +642,7 @@ async def test_chamada_bem_sucedida_deixa_uma_linha_de_auditoria(caplog):
 
 
 async def test_recusa_por_falta_de_escopo_tambem_e_auditada(caplog):
-    """A chamada barrada é justamente a que mais interessa registrar."""
+    """The blocked call is precisely the one most worth recording."""
     server = servidor_de_teste()
     with caplog.at_level("INFO", logger="app.mcp.auditoria"):
         resultado = await _chamar_em_processo(
@@ -664,11 +668,10 @@ async def test_recusa_por_cota_tambem_e_auditada(caplog, monkeypatch):
 
 
 async def test_a_auditoria_nunca_registra_os_argumentos_da_chamada(caplog):
-    """Sem este teste, um mutante que acrescentasse `arguments=%s` passaria.
+    """Without this test, a mutant that added `arguments=%s` would pass.
 
-    O argumento é dado do usuário: nome de arquivo, texto de busca, id de
-    workflow. A linha de auditoria diz QUEM chamou O QUÊ e como terminou —
-    nunca com quê.
+    The argument is user data: a file name, search text, a workflow id. The
+    audit row says WHO called WHAT and how it ended — never with what.
     """
     sentinela = "SENTINELA-9f3c-nome-do-no"
     server = ServidorAtlans(
@@ -692,7 +695,7 @@ async def test_a_auditoria_nunca_registra_os_argumentos_da_chamada(caplog):
 
 
 async def test_tool_que_falha_registra_o_codigo_do_erro(caplog):
-    """Falha da tool e recusa de guarda têm desfechos diferentes de propósito."""
+    """A tool failure and a guard refusal have different outcomes on purpose."""
     from mcp.server.mcpserver.exceptions import ToolError
 
     from app.mcp.erros import erro as montar_erro
@@ -713,7 +716,7 @@ async def test_tool_que_falha_registra_o_codigo_do_erro(caplog):
     assert resultado.is_error is True
     assert isinstance(ToolError("x"), Exception)
     assert "desfecho=tool_error:not_found" in _linhas_de_auditoria(caplog)[0]
-    # O prefixo que o SDK coloca na frente do JSON é removido antes de sair.
+    # The prefix the SDK puts in front of the JSON is removed before going out.
     assert json.loads(resultado.content[0].text)["code"] == "not_found"
 
 
@@ -737,7 +740,7 @@ async def test_host_fora_da_lista_e_421_mesmo_com_pat_valido(ambiente):
 
 
 async def test_origin_presente_e_403_mesmo_com_pat_valido(ambiente):
-    """Cliente de navegador só na fase do OAuth — qualquer `Origin` é recusado."""
+    """Browser clients only in the OAuth phase — any `Origin` is refused."""
     segredo = await _pat(ambiente, ["workflows:read"])
     server = servidor_de_teste()
     app_mcp = criar_app_mcp(server)
@@ -754,7 +757,7 @@ async def test_origin_presente_e_403_mesmo_com_pat_valido(ambiente):
 
 
 async def test_sem_pat_o_401_vem_antes_do_421(ambiente):
-    """O middleware é externo ao transporte: quem não se identifica nem chega lá."""
+    """The middleware is outside the transport: whoever doesn't identify never even gets there."""
     server = servidor_de_teste()
     app_mcp = criar_app_mcp(server)
     async with server.session_manager.run():
@@ -770,10 +773,10 @@ async def test_sem_pat_o_401_vem_antes_do_421(ambiente):
 
 
 def test_como_usuario_nunca_carrega_papel_de_administrador():
-    """Os services de observabilidade decidem o que mostrar olhando `user.role`.
+    """The observability services decide what to show by looking at `user.role`.
 
-    Entregar a eles o `User` do banco daria a um PAT o alcance global de um
-    administrador — o substituto é sempre `role="user"`.
+    Handing them the database `User` would give a PAT an administrator's
+    global reach — the substitute is always `role="user"`.
     """
     escopo = escopo_falso(user_id="usr-admin", username="raiz")
     usuario = escopo.como_usuario()
@@ -790,7 +793,7 @@ def test_workspace_unico_so_existe_quando_ha_exatamente_um():
 
 
 def test_escopo_da_chamada_prefere_o_estado_da_request():
-    """Com chamadas concorrentes, `request.state` é o canal que não se confunde."""
+    """With concurrent calls, `request.state` is the channel that doesn't get mixed up."""
     from app.mcp.escopo import escopo_da_chamada
 
     da_request = escopo_falso(token_id="tok-request")
@@ -827,7 +830,7 @@ def test_exigir_escopo_lista_todos_os_que_faltam():
     from app.mcp.escopo import exigir_escopo
 
     escopo = escopo_falso(scopes={"workflows:read"})
-    exigir_escopo(escopo, "workflows:read")  # não levanta
+    exigir_escopo(escopo, "workflows:read")  # doesn't raise
     with pytest.raises(ToolError) as exc:
         exigir_escopo(escopo, "workflows:write", "runs:execute")
     corpo = json.loads(str(exc.value))
@@ -836,9 +839,9 @@ def test_exigir_escopo_lista_todos_os_que_faltam():
 
 
 def test_o_hint_de_escopo_diz_quem_alcanca_a_pagina_de_tokens():
-    """A página de tokens só abre para o administrador do sistema
-    (`web/proxy.ts`), e o token é pessoal: o hint não pode mandar pedir um token
-    ao admin (seria o token DELE, agindo em nome dele)."""
+    """The tokens page only opens for the system administrator
+    (`web/proxy.ts`), and the token is personal: the hint can't tell the user to
+    ask the admin for a token (it would be HIS token, acting on his behalf)."""
     from mcp.server.mcpserver.exceptions import ToolError
 
     from app.mcp.escopo import exigir_escopo
@@ -852,23 +855,23 @@ def test_o_hint_de_escopo_diz_quem_alcanca_a_pagina_de_tokens():
 
 
 async def test_o_escopo_chega_a_tool_pelo_estado_da_request(ambiente):
-    """Prova o canal primário ponta a ponta, sem o reserva do `ContextVar`.
+    """Proves the primary channel end to end, without the `ContextVar` fallback.
 
-    A tool lê `ctx.request_context.request.state.escopo` diretamente: é o que
-    `escopo_da_chamada` consulta primeiro, e o único canal que não se confunde
-    entre chamadas concorrentes.
+    The tool reads `ctx.request_context.request.state.escopo` directly: it is
+    what `escopo_da_chamada` checks first, and the only channel that doesn't
+    get mixed up between concurrent calls.
     """
     segredo = await _pat(ambiente, ["workflows:read"])
-    # Instância sem as tools reais: o corpo aqui só devolve a identidade que
-    # chegou pelo estado da request (ver `servidor_de_teste`).
+    # Instance without the real tools: the body here only returns the identity
+    # that arrived through the request state (see `servidor_de_teste`).
     server = ServidorAtlans(
         name="atlans", title="Atlans", instructions=INSTRUCOES, version=VERSAO_MCP,
     )
 
     @server.tool(name="list_workspaces", description="Devolve a identidade da chamada (teste).")
     async def _quem_sou(ctx: Context) -> dict:
-        # A anotação `Context` é o que faz o SDK injetar o contexto em vez de
-        # cobrar um argumento do cliente.
+        # The `Context` annotation is what makes the SDK inject the context instead
+        # of requiring an argument from the client.
         from starlette.requests import Request
 
         requisicao = ctx.request_context.request

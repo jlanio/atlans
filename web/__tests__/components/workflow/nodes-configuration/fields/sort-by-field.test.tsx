@@ -1,9 +1,9 @@
 /**
- * Editor estruturado do `sort_by` do Ordenar.
+ * Structured editor for the Sort node's `sort_by`.
  *
- * O contrato que importa: o valor persiste como a MESMA lista
- * `[{field, direction}]` que o execute do backend lê — um fluxo salvo pelo
- * editor de JSON antigo abre aqui, e um salvo aqui roda em executor antigo.
+ * The contract that matters: the value persists as the SAME list
+ * `[{field, direction}]` that the backend's execute reads — a workflow saved by
+ * the old JSON editor opens here, and one saved here runs on an old executor.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent } from "@testing-library/react"
@@ -85,7 +85,7 @@ describe("SortByField", () => {
   it("com uma linha vazia aberta, a sugestão a preenche em vez de duplicar", () => {
     const setNodeField = montar([{ field: "", direction: "desc" }], ["pop"])
     fireEvent.click(screen.getByRole("button", { name: "pop" }))
-    // A direção que a pessoa já escolheu na linha vazia não é resetada.
+    // The direction the person already chose on the empty row isn't reset.
     expect(setNodeField).toHaveBeenCalledWith("sort_by", [
       { field: "pop", direction: "desc" },
     ])

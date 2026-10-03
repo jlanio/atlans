@@ -1,18 +1,18 @@
 // desktop/src/main/state/store.test.ts
 //
-// O store entrega para o renderer via IPC, e cada entrega custa um structured
-// clone POR JANELA. A versão anterior mandava o log inteiro (até 1000 linhas)
-// dentro do estado, e notificava UMA VEZ POR LINHA — 100 linhas de um workflow
-// viravam 100 broadcasts de 1000 linhas, mais 100 cópias do array inteiro.
-// Quadrático no volume de log, e exatamente quando o executor está mais ocupado.
+// The store delivers to the renderer via IPC, and each delivery costs one
+// structured clone PER WINDOW. The previous version sent the whole log (up to
+// 1000 lines) inside the state, and notified ONCE PER LINE — 100 lines from a
+// workflow became 100 broadcasts of 1000 lines, plus 100 copies of the whole
+// array. Quadratic in log volume, and exactly when the executor is busiest.
 //
-// Estes testes travam as duas propriedades que consertaram isso:
+// These tests lock in the two properties that fixed it:
 //
-//   COALESCE     uma rajada de eventos vira UM broadcast de estado.
-//   INCREMENTAL  o log sai por canal próprio, só com as linhas novas.
+//   COALESCE     a burst of events becomes ONE state broadcast.
+//   INCREMENTAL  the log goes out on its own channel, with only the new lines.
 //
-// Nenhuma das duas é visível em code review — as duas voltam se alguém trocar
-// `agendar()` por uma chamada direta "para simplificar".
+// Neither is visible in code review — both come back if someone replaces
+// `agendar()` with a direct call "to simplify".
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppStore, type EstadoApp, type LoteLog } from './store.js'
 import type { ExecutorEvent } from '../../shared/events.js'
@@ -39,7 +39,7 @@ afterEach(() => { vi.useRealTimers() })
 describe('coalescência', () => {
   it('uma rajada de 100 linhas vira UM lote', () => {
     for (let i = 0; i < 100; i++) store.aplicarEvento(log(`linha ${i}`))
-    expect(lotes).toHaveLength(0)   // nada antes do flush
+    expect(lotes).toHaveLength(0)   // nothing before the flush
 
     vi.runAllTimers()
 
@@ -56,16 +56,16 @@ describe('coalescência', () => {
     vi.runAllTimers()
 
     expect(estados).toHaveLength(1)
-    // O último estado vence — é o que a UI precisa mostrar.
+    // The last state wins — it is what the UI needs to show.
     expect(estados[0]!.supervisor).toBe('running')
   })
 
   it('a janela é FIXA, e não reiniciada a cada evento', () => {
-    // Debounce seria um bug: num executor falante o timer nunca venceria e a
-    // tela congelaria enquanto houvesse log chegando.
+    // Debounce would be a bug: on a chatty executor the timer would never expire
+    // and the screen would freeze for as long as log kept arriving.
     store.aplicarEvento(log('a'))
     vi.advanceTimersByTime(60)
-    store.aplicarEvento(log('b'))   // não pode adiar o flush
+    store.aplicarEvento(log('b'))   // must not postpone the flush
     vi.advanceTimersByTime(30)
 
     expect(lotes).toHaveLength(1)
@@ -73,7 +73,8 @@ describe('coalescência', () => {
   })
 
   it('log NÃO arrasta um broadcast de estado junto', () => {
-    // O ponto do canal separado: linha de log não muda o estado agregado.
+    // The point of the separate channel: a log line does not change the
+    // aggregate state.
     store.aplicarEvento(log('só log'))
     vi.runAllTimers()
 
@@ -118,8 +119,8 @@ describe('canal incremental', () => {
   })
 
   it('o buffer é aparado, e `primeiroSeq` denuncia o que se perdeu', () => {
-    // 1200 linhas com teto de 1000: as 200 primeiras já não existem mais, e o
-    // renderer precisa saber disso para recarregar em vez de emendar um buraco.
+    // 1200 lines with a ceiling of 1000: the first 200 no longer exist, and the
+    // renderer needs to know that to reload instead of patching over a gap.
     for (let i = 0; i < 1200; i++) store.aplicarEvento(log(`l${i}`))
     vi.runAllTimers()
 
@@ -130,8 +131,9 @@ describe('canal incremental', () => {
   })
 
   it('o contador de erros acompanha o descarte do buffer', () => {
-    // O erro sai do buffer, e o contador tem de sair junto — senão a sidebar
-    // mostra "3 erros" para sempre, sem nenhuma linha correspondente no log.
+    // The error leaves the buffer, and the counter has to go with it — otherwise
+    // the sidebar shows "3 erros" (3 errors) forever, with no matching line in
+    // the log.
     store.aplicarEvento(log('erro antigo', 'ERROR'))
     for (let i = 0; i < 1000; i++) store.aplicarEvento(log(`l${i}`))
     vi.runAllTimers()
@@ -140,7 +142,7 @@ describe('canal incremental', () => {
   })
 
   it('o estado NÃO carrega o log', () => {
-    // A regressão que este arquivo inteiro existe para impedir.
+    // The regression this whole file exists to prevent.
     store.aplicarEvento(log('nao devo viajar no estado'))
     store.aplicarEstadoSupervisor('running')
     vi.runAllTimers()

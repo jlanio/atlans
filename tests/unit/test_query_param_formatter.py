@@ -1,22 +1,22 @@
-"""`:placeholder` só conta em posição de código.
+"""`:placeholder` only counts in code position.
 
-O regex varria o texto cru da query, então `:nome` dentro de literal ou
-comentário era tratado como parâmetro. Dois desfechos, ambos silenciosos para
-quem escreveu a consulta:
+The regex scanned the raw query text, so `:nome` inside a literal or a comment
+was treated as a parameter. Two outcomes, both silent for whoever wrote the
+query:
 
   WHERE obs = 'urgente:revisar'   -> "Parâmetro SQL 'revisar' não fornecido":
-                                     uma query válida era recusada.
-  WHERE tag = 'nota:importante'   -> virava `'nota$1'` se existisse um parâmetro
-                                     chamado `importante` — o conteúdo do
-                                     literal trocado por um bind, e a consulta
-                                     passando a filtrar outra coisa.
+                                     a valid query was rejected.
+  WHERE tag = 'nota:importante'   -> became `'nota$1'` if there was a parameter
+                                     called `importante` — the literal's content
+                                     replaced by a bind, and the query starting
+                                     to filter on something else.
 """
 import pytest
 
 from flow.utils.query_param_formatter import prepare_query
 
 
-# ── O que deve ser substituído ──────────────────────────────────────────────
+# ── What must be replaced ───────────────────────────────────────────────────
 
 def test_placeholder_simples():
     q, v = prepare_query("SELECT * FROM t WHERE b = :bairro", {"bairro": "Centro"})
@@ -43,7 +43,7 @@ def test_parametro_ausente_falha_alto():
         prepare_query("SELECT * FROM t WHERE b = :bairro", {})
 
 
-# ── O que NÃO deve ser tocado ───────────────────────────────────────────────
+# ── What must NOT be touched ────────────────────────────────────────────────
 
 def test_dois_pontos_dentro_de_string_nao_vira_parametro():
     q, v = prepare_query("SELECT * FROM notas WHERE obs = 'urgente:revisar'", {})
@@ -52,8 +52,8 @@ def test_dois_pontos_dentro_de_string_nao_vira_parametro():
 
 
 def test_string_nao_e_corrompida_quando_o_nome_existe_nos_params():
-    """O caso pior: o texto do literal era trocado por um bind, e a consulta
-    passava a comparar outra coisa — sem erro nenhum."""
+    """The worst case: the literal's text was replaced by a bind, and the query
+    started comparing something else — with no error at all."""
     q, v = prepare_query(
         "SELECT * FROM t WHERE tag = 'nota:importante' AND id = :id",
         {"importante": "IGNORAR", "id": 7},
@@ -90,13 +90,13 @@ def test_hora_dentro_de_literal_nao_confunde():
     assert v == [1]
 
 
-# ── Origem dos parâmetros: aresta ou formulário ─────────────────────────────
+# ── Source of the parameters: edge or form ──────────────────────────────────
 #
-# A forma anterior era `inputs.get('queryParams') or parameters.get(...)`, e o
-# `or` tratava `{}` como ausência. Mas um dicionário vazio vindo de uma aresta é
-# uma RESPOSTA — "não há filtro nenhum" —, não um silêncio: a consulta que
-# deveria rodar sem filtro rodava com os filtros antigos gravados no formulário,
-# e o resultado voltava plausível, só que errado.
+# The previous form was `inputs.get('queryParams') or parameters.get(...)`, and
+# the `or` treated `{}` as absence. But an empty dictionary coming from an edge
+# is an ANSWER — "there is no filter at all" —, not silence: the query that
+# should run with no filter ran with the old filters stored in the form, and the
+# result came back plausible, just wrong.
 
 from flow.utils.query_param_formatter import resolver_query_params
 
@@ -109,7 +109,7 @@ def test_valor_da_aresta_vence_o_do_formulario():
 
 
 def test_dicionario_vazio_da_aresta_e_uma_resposta_e_nao_ausencia():
-    """O defeito em uma linha: `{}` caía no valor estático por causa do `or`."""
+    """The defect in one line: `{}` fell through to the static value because of the `or`."""
     assert resolver_query_params(
         {"queryParams": {}},
         {"queryParams": {"bairro": "Antigo"}},
@@ -128,13 +128,13 @@ def test_sem_aresta_e_sem_formulario_e_vazio():
 
 
 def test_none_na_aresta_vira_vazio():
-    """Aresta ligada a uma saída que não trouxe nada — vazio, não erro."""
+    """Edge connected to an output that brought nothing — empty, not an error."""
     assert resolver_query_params({"queryParams": None}, {"queryParams": {"a": 1}}) == {}
 
 
 @pytest.mark.parametrize("valor", ["texto", 42, ["a"]])
 def test_tipo_errado_falha_dizendo_a_origem(valor):
-    """As duas origens pedem ações opostas: mexer na aresta ou no formulário."""
+    """The two sources call for opposite actions: change the edge or the form."""
     with pytest.raises(ValueError, match="recebido do nó anterior"):
         resolver_query_params({"queryParams": valor}, {})
 

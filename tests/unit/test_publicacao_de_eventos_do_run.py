@@ -1,16 +1,16 @@
 # tests/unit/test_publicacao_de_eventos_do_run.py
-"""Histórico e canal de eventos de um run: um dono só para chave, pipeline e JSON.
+"""History and event channel of a run: a single owner for key, pipeline and JSON.
 
-A escrita `rpush(history) / ltrim(-MAX) / expire(1h) / publish(canal)` existia
-em quatro cópias (node_events, job_result, run inconclusivo e
-`publicar_conclusao`), o JSON do `__workflow_complete__` em três, e as chaves
-`workflow:{run}:history`/`:events` eram montadas à mão em seis pontos,
-leitores inclusos. Uma cópia que divergisse (TTL, teto, nome da chave) não
-quebrava nada na hora: o painel só deixava de ver o evento.
+The write `rpush(history) / ltrim(-MAX) / expire(1h) / publish(canal)` existed
+in four copies (node_events, job_result, inconclusive run and
+`publicar_conclusao`), the `__workflow_complete__` JSON in three, and the keys
+`workflow:{run}:history`/`:events` were built by hand in six places, readers
+included. A copy that diverged (TTL, ceiling, key name) broke nothing right
+away: the dashboard just stopped seeing the event.
 
-Os dois primeiros blocos prendem o formato de HOJE de cada caminho (passam
-antes e depois da unificação); o último prova que escritores e leitores
-passaram a sair do mesmo lugar — `run_events_service`.
+The first two blocks pin down TODAY's format of each path (they pass before and
+after the unification); the last one proves that writers and readers now come
+from the same place — `run_events_service`.
 """
 import json
 from types import SimpleNamespace
@@ -81,12 +81,12 @@ class _Redis:
         return [cmd for bloco in self.executados for cmd in bloco] + self.soltos
 
 
-# ── Formato de hoje: publicar_conclusao ──────────────────────────────────────
+# ── Today's format: publicar_conclusao ───────────────────────────────────────
 
 
 async def test_publicar_conclusao_nao_leva_duration_ms_e_carimba_um_instante_so(monkeypatch):
-    """O servidor não mede a duração de quem ele fecha: a chave nunca saiu
-    neste caminho, e todos os runs do mesmo fechamento levam o MESMO instante."""
+    """The server does not measure the duration of what it closes: the key never
+    went out on this path, and all runs of the same closing carry the SAME instant."""
     rc = _Redis()
     monkeypatch.setattr(run_events_service, "get_redis_pool", lambda: rc)
 
@@ -130,7 +130,7 @@ async def test_publicar_conclusao_nivel_so_e_erro_na_falha(monkeypatch, status, 
     assert (evento["level"], evento["status"], evento["error"], evento["extra"]) == (level, status, None, None)
 
 
-# ── Formato de hoje: node_events em lote ─────────────────────────────────────
+# ── Today's format: batched node_events ──────────────────────────────────────
 
 
 async def test_node_events_de_dois_runs_saem_num_pipeline_com_a_sequencia_de_sempre(monkeypatch):
@@ -164,7 +164,7 @@ async def test_node_events_de_dois_runs_saem_num_pipeline_com_a_sequencia_de_sem
     ]]
 
 
-# ── Um lugar só ──────────────────────────────────────────────────────────────
+# ── A single place ───────────────────────────────────────────────────────────
 
 
 def test_as_chaves_do_run_tem_um_dono():
@@ -188,7 +188,7 @@ def test_anexar_eventos_grava_o_historico_com_teto_e_ttl_e_publica_cada_um():
 
 
 def test_evento_de_conclusao_monta_as_tres_variantes_de_hoje():
-    # Fechamento pelo servidor (`publicar_conclusao`): sem a chave de duração.
+    # Closing by the server (`publicar_conclusao`): without the duration key.
     assert run_events_service.evento_de_conclusao(
         "r-1", "cancelled", erro="Cancelado antes.", timestamp=10.5,
     ) == json.dumps({
@@ -196,7 +196,7 @@ def test_evento_de_conclusao_monta_as_tres_variantes_de_hoje():
         "level": "info", "status": "cancelled", "timestamp": 10.5,
         "error": "Cancelado antes.", "extra": None,
     })
-    # job_result sem início conhecido e run inconclusivo: a chave sai nula.
+    # job_result with no known start and inconclusive run: the key goes out null.
     assert run_events_service.evento_de_conclusao(
         "r-1", "failed", erro="x", extra={"error_category": "internal", "retryable": True},
         duration_ms=None, timestamp=1.0,
@@ -205,7 +205,7 @@ def test_evento_de_conclusao_monta_as_tres_variantes_de_hoje():
         "level": "error", "status": "failed", "timestamp": 1.0, "duration_ms": None,
         "error": "x", "extra": {"error_category": "internal", "retryable": True},
     })
-    # job_result com duração medida.
+    # job_result with a measured duration.
     evento = json.loads(run_events_service.evento_de_conclusao("r-1", "completed", duration_ms=1234.5))
     assert list(evento) == [
         "run_id", "node", "kind", "level", "status", "timestamp", "duration_ms", "error", "extra",
@@ -218,7 +218,7 @@ def test_evento_de_conclusao_monta_as_tres_variantes_de_hoje():
 
 @pytest.fixture
 def chaves_marcadas(monkeypatch):
-    """Troca o dono das chaves: quem ainda monta a sua à mão aparece no teste."""
+    """Swaps the owner of the keys: whoever still builds their own by hand shows up in the test."""
     monkeypatch.setattr(run_events_service, "chave_do_historico", lambda run_id: f"H<{run_id}>")
     monkeypatch.setattr(run_events_service, "canal_do_run", lambda run_id: f"C<{run_id}>")
 
@@ -279,7 +279,7 @@ async def test_leitores_usam_as_chaves_do_dono(monkeypatch, chaves_marcadas):
         async def subscribe(self, canal):
             self.canais.append(canal)
 
-        async def listen(self):  # pragma: no cover - o replay já encerra
+        async def listen(self):  # pragma: no cover - the replay already ends it
             if False:
                 yield
 

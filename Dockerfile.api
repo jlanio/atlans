@@ -1,12 +1,12 @@
-# ── Stage 1: builder — instala dependências de compilação ────────────────────
-# Pina debian bookworm (OpenSSL 3.0, libffi 8) — requerido por cryptography>=42
-# (cryptography 46.0.5 em requirements.in). Antes era `python:3.10-slim` sem
-# tag debian, que pode rotear para bullseye e quebrar build no futuro.
+# ── Stage 1: builder — installs build dependencies ───────────────────────────
+# Pins Debian bookworm (OpenSSL 3.0, libffi 8) — required by cryptography>=42
+# (cryptography 46.0.5 in requirements.in). It used to be `python:3.10-slim` with no
+# Debian tag, which could route to bullseye and break the build in the future.
 #
-# Python 3.12: o 3.10 sai de suporte em out/2026. A mesma versão do
-# Dockerfile.executor, do setup-python do CI, do runtime do app desktop
-# (desktop/python-runtime.json) e do .python-version (com ela o Dependabot
-# resolve as dependências) — subir aqui exige subir em todos.
+# Python 3.12: 3.10 goes out of support in Oct 2026. The same version as
+# Dockerfile.executor, the CI's setup-python, the desktop app runtime
+# (desktop/python-runtime.json) and .python-version (Dependabot uses it to
+# resolve dependencies) — bumping it here requires bumping it in all of them.
 FROM python:3.12-slim-bookworm AS builder
 
 WORKDIR /build
@@ -15,12 +15,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# O requirements.txt é o LOCK (gerado do requirements.in por
-# scripts/travar_python.py): todas as dependências, diretas e transitivas, com o
-# hash de cada arquivo. `--require-hashes`: um arquivo diferente do revisado —
-# trocado no PyPI ou no caminho — não instala, e nada entra no build sem ter
-# passado por um PR. `--only-binary=:all:`: nenhum setup.py roda aqui (build de
-# sdist executa código do pacote); todas as 117 têm wheel para o bookworm.
+# requirements.txt is the LOCK (generated from requirements.in by
+# scripts/travar_python.py): every dependency, direct and transitive, with
+# each file's hash. `--require-hashes`: a file different from the reviewed one —
+# swapped on PyPI or in transit — does not install, and nothing enters the build
+# without going through a PR. `--only-binary=:all:`: no setup.py runs here
+# (building an sdist executes package code); all 117 have wheels for bookworm.
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --require-hashes --only-binary=:all: --prefix=/install -r requirements.txt
 
@@ -29,7 +29,7 @@ FROM python:3.12-slim-bookworm
 
 WORKDIR /app
 
-# Apenas runtime libs (libpq5 para psycopg2, sem gcc/headers)
+# Runtime libs only (libpq5 for psycopg2, no gcc/headers)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     && rm -rf /var/lib/apt/lists/* \
@@ -38,36 +38,36 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copia pacotes Python compilados do builder
 COPY --from=builder /install /usr/local
 
-# Copia código da aplicação
+# Copy the application code
 COPY app ./app
 COPY flow ./flow
 
-# Migrations Alembic — disponiveis no container para rodar manualmente:
+# Alembic migrations — available in the container to run manually:
 #   docker compose exec api-prod alembic upgrade head
-# ENTRYPOINT automatico foi removido em 2026-05 — ha um ciclo nas revisoes
-# que precisa ser resolvido antes de reativar (ver docs/operations.md).
+# The automatic ENTRYPOINT was removed in 2026-05 — there is a cycle in the revisions
+# that must be resolved before re-enabling it (see docs/operations.md).
 COPY alembic ./alembic
 COPY alembic.ini ./alembic.ini
 
-# O corpo da migração base-zero (20260924_0001) é LIDO EM RUNTIME de
-# scripts/init_schema.sql (`_RAIZ / "scripts" / "init_schema.sql"`). Sem esta
-# cópia, qualquer `alembic upgrade head` na imagem — banco novo, ou um deploy
-# que aplique as migrações sozinho num banco vazio — morre em FileNotFoundError
-# antes de criar o schema; em produção carimbada ninguém percebe porque o
-# upgrade nunca roda. Só o .sql: o resto de scripts/ é ferramenta de operador
-# (step-ca, bootstrap, smoke) e não pertence à imagem.
+# The body of the base-zero migration (20260924_0001) is READ AT RUNTIME from
+# scripts/init_schema.sql (`_RAIZ / "scripts" / "init_schema.sql"`). Without this
+# copy, any `alembic upgrade head` in the image — a new database, or a deploy
+# that applies migrations on its own to an empty database — dies with FileNotFoundError
+# before creating the schema; in a stamped production database nobody notices because
+# the upgrade never runs. Only the .sql: the rest of scripts/ is operator tooling
+# (step-ca, bootstrap, smoke) and does not belong in the image.
 COPY scripts/init_schema.sql ./scripts/init_schema.sql
 
 # Scripts publicos servidos via endpoints (ex.: static/install.sh em /executores/install)
 COPY static ./static
 
-# Catálogo de fontes (a cópia versionada do Vault de geosserviços). A API o
-# importa na subida (FONTES_CATALOGO_DIR, ver docs/sources.md); sem esta cópia a
-# importação não roda em produção e o assistente fica sem catálogo.
+# Source catalog (the versioned copy of the geoservice Vault). The API
+# imports it at startup (FONTES_CATALOGO_DIR, see docs/sources.md); without this copy
+# the import does not run in production and the assistant has no catalog.
 COPY catalogo ./catalogo
 
-# A licença do Atlans e os avisos de terceiros vão com a imagem: quem a
-# distribui distribui junto o que vai dentro dela.
+# The Atlans license and the third-party notices go with the image: whoever
+# distributes it distributes what is inside it along with it.
 COPY LICENSE THIRD-PARTY-NOTICES.md ./
 
 RUN chown -R appuser:appuser /app

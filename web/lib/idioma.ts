@@ -1,33 +1,36 @@
 // web/lib/idioma.ts
 //
-// Os idiomas da Home e a regra que escolhe um deles por requisição. Puro de
-// propósito: roda no servidor (o layout do dashboard resolve antes do primeiro
-// byte, sem a página nascer em português e trocar depois) e nos testes.
+// The Home's languages and the rule that picks one of them per request. Pure on
+// purpose: it runs on the server (the dashboard layout resolves it before the
+// first byte, without the page starting in Portuguese and switching later) and
+// in tests.
 //
-// A ordem da decisão, do sinal mais forte ao mais fraco:
-//   1. a escolha explícita da pessoa (Preferências → cookie `idioma`);
-//   2. o idioma do navegador (`Accept-Language`) — o sinal mais fiel do que a
-//      pessoa LÊ: uma brasileira com o navegador em inglês escolheu inglês, e
-//      um turista americano no Brasil não quer a tela em português;
-//   3. o país da conexão (`CF-IPCountry`, quando a Cloudflare o manda) — mas
-//      SÓ quando o navegador mandou um `Accept-Language` que não atendemos;
-//   4. o padrão: português se o pedido não trouxe `Accept-Language`; inglês se
-//      trouxe, mas sem nenhum dos nossos idiomas (quem lê francês lê melhor
-//      inglês que português).
+// The order of the decision, from the strongest signal to the weakest:
+//   1. the person's explicit choice (Preferences → `idioma` cookie);
+//   2. the browser's language (`Accept-Language`) — the most faithful signal of
+//      what the person READS: a Brazilian woman with her browser in English
+//      chose English, and an American tourist in Brazil does not want the
+//      screen in Portuguese;
+//   3. the connection's country (`CF-IPCountry`, when Cloudflare sends it) — but
+//      ONLY when the browser sent an `Accept-Language` we do not support;
+//   4. the default: Portuguese if the request carried no `Accept-Language`;
+//      English if it did, but with none of our languages (someone who reads
+//      French reads English better than Portuguese).
 //
-// Sem `Accept-Language` o pedido não veio de um navegador — todo navegador o
-// manda. Vem de robô de busca ou de script, e o país da conexão diria só onde
-// fica o servidor dele: o Googlebot sai dos EUA e indexaria a Home em inglês.
+// Without `Accept-Language` the request did not come from a browser — every
+// browser sends it. It comes from a search crawler or a script, and the
+// connection's country would only say where its server is: Googlebot comes
+// from the US and would index the Home in English.
 
 export const IDIOMAS = ["pt-BR", "en", "es"] as const
 export type Idioma = (typeof IDIOMAS)[number]
 
 export const IDIOMA_PADRAO: Idioma = "pt-BR"
 
-/** O cookie da escolha explícita — mesmo modelo do `theme` (ThemeContext). */
+/** The explicit-choice cookie — same model as `theme` (ThemeContext). */
 export const COOKIE_DO_IDIOMA = "idioma"
 
-/** O nome de cada idioma nele mesmo: é assim que a pessoa o reconhece numa lista. */
+/** Each language's name in itself: that is how people recognize it in a list. */
 export const NOME_DO_IDIOMA: Record<Idioma, string> = {
   "pt-BR": "Português (Brasil)",
   en: "English",
@@ -47,8 +50,8 @@ function _idiomaDaEtiqueta(etiqueta: string): Idioma | null {
 }
 
 /**
- * O primeiro dos nossos idiomas na preferência do navegador, respeitando os
- * pesos `q` (`q=0` é recusa explícita). `"fr-FR,fr;q=0.9,en;q=0.8"` → `"en"`.
+ * The first of our languages in the browser's preference, honoring the `q`
+ * weights (`q=0` is an explicit refusal). `"fr-FR,fr;q=0.9,en;q=0.8"` → `"en"`.
  */
 export function idiomaDoAcceptLanguage(cabecalho: string | null | undefined): Idioma | null {
   if (!cabecalho) return null
@@ -63,7 +66,7 @@ export function idiomaDoAcceptLanguage(cabecalho: string | null | undefined): Id
       return { etiqueta: etiqueta.trim(), peso: Number.isFinite(peso) ? peso : 0, ordem }
     })
     .filter((item) => item.etiqueta && item.peso > 0)
-    // Peso maior primeiro; no empate vale a ordem do cabeçalho.
+    // Highest weight first; on a tie, the header's order wins.
     .sort((a, b) => b.peso - a.peso || a.ordem - b.ordem)
   for (const { etiqueta } of itens) {
     const idioma = _idiomaDaEtiqueta(etiqueta)
@@ -79,8 +82,8 @@ const PAISES_HISPANOFONOS = new Set([
 ])
 
 /**
- * O idioma pelo país da conexão (ISO 3166-1 alfa-2). `XX` (desconhecido) e
- * `T1` (Tor) são códigos da Cloudflare que não dizem nada — viram `null`.
+ * The language by the connection's country (ISO 3166-1 alpha-2). `XX` (unknown)
+ * and `T1` (Tor) are Cloudflare codes that say nothing — they become `null`.
  */
 export function idiomaDoPais(pais: string | null | undefined): Idioma | null {
   const codigo = (pais ?? "").trim().toUpperCase()
@@ -91,11 +94,11 @@ export function idiomaDoPais(pais: string | null | undefined): Idioma | null {
 }
 
 export interface IdiomaResolvido {
-  /** O que a tela usa: a escolha, ou o detectado quando não há escolha. */
+  /** What the screen uses: the choice, or the detected one when there is no choice. */
   idioma: Idioma
-  /** O que a detecção automática daria — as Preferências o mostram em "Automático". */
+  /** What automatic detection would give — Preferences shows it under "Automático". */
   detectado: Idioma
-  /** A escolha explícita (cookie), ou `null` quando está no automático. */
+  /** The explicit choice (cookie), or `null` when on automatic. */
   escolhido: Idioma | null
 }
 

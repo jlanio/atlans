@@ -6,21 +6,22 @@ import { ChevronRightIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 
-// `modal` cai para `false` por padrão (o Radix usa `true`). Um DropdownMenu
-// modal tranca o scroll do body via react-remove-scroll e injeta um
-// `padding-right` para compensar a barra de rolagem; com o
-// `scrollbar-gutter: stable` do body (globals.css) essa compensação sobra e
-// empurra o conteúdo centralizado do PageRoot ~meia-barra para o lado ao abrir
-// — o deslocamento visível em páginas altas/largas (/drive, /observability).
-// Um menu não precisa travar o scroll da página; quem de fato precisar de modal
-// passa `modal` explicitamente. (Dialog/Sheet são outra primitiva e seguem
-// modais por design — o overlay dimmed torna o mesmo efeito esperado.)
+// `modal` falls back to `false` by default (Radix uses `true`). A modal
+// DropdownMenu locks the body scroll via react-remove-scroll and injects a
+// `padding-right` to compensate for the scrollbar; with the body's
+// `scrollbar-gutter: stable` (globals.css) that compensation is extra and
+// pushes PageRoot's centered content ~half a scrollbar sideways on open
+// — the visible shift on tall/wide pages (/drive, /observability).
+// A menu doesn't need to lock page scroll; whoever really needs a modal
+// passes `modal` explicitly. (Dialog/Sheet are a different primitive and stay
+// modal by design — the dimmed overlay makes the same effect expected.)
 //
-// Contrapartida de `modal={false}`: o Radix também deixa de bloquear o ponteiro
-// no fundo, então um clique fora FECHA o menu E atinge o elemento sob o cursor
-// no mesmo gesto. Foi um custo aceito — evitar o deslocamento acima venceu, e as
-// ações destrutivas ficam atrás de confirmação. Um menu que precise absorver o
-// clique de fora passa `modal` (aceitando o pequeno deslocamento naquele caso).
+// The trade-off of `modal={false}`: Radix also stops blocking the pointer
+// on the background, so a click outside CLOSES the menu AND hits the element
+// under the cursor in the same gesture. It was an accepted cost — avoiding the
+// shift above won, and destructive actions sit behind a confirmation. A menu that
+// needs to absorb the outside click passes `modal` (accepting the small shift in
+// that case).
 function DropdownMenu({
   modal = false,
   ...props

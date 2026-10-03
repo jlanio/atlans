@@ -45,8 +45,8 @@ router = APIRouter(
 )
 async def list_credential_types(_user=Depends(get_current_user)):
     """
-    Retorna os schemas dos tipos de credencial suportados.
-    O frontend usa esses dados para renderizar formulários guiados.
+    Returns the schemas of the supported credential types.
+    The frontend uses this data to render guided forms.
     """
     return list(CREDENTIAL_TYPE_SCHEMAS.values())
 
@@ -62,22 +62,22 @@ async def credential_usage(
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
     """
-    Para cada credencial referenciada em um workflow do(s) workspace(s) do
-    usuário, retorna {node_count, workflow_count}. Não descriptografa nada
-    — apenas lê `properties.credential_id` da definition (texto puro).
+    For each credential referenced in a workflow of the user's workspace(s),
+    returns {node_count, workflow_count}. Decrypts nothing — it only reads
+    `properties.credential_id` from the definition (plain text).
 
-    A contagem é feita no Postgres. Antes esta rota materializava a
-    `definition` de TODOS os workflows do workspace (a camada de CRUD estima
-    ~10 KB cada) e iterava nó a nó em Python: o event loop do worker ficava
-    desserializando JSON enquanto todos os outros requests daquele worker
-    esperavam — e a varredura inteira se repetia a cada modal de credencial
-    fechado. Mesmo caminho já usado por `workflow_crud._tem_node`.
+    The count is done in Postgres. Previously this route materialized the
+    `definition` of ALL the workspace's workflows (the CRUD layer estimates
+    ~10 KB each) and iterated node by node in Python: the worker's event loop
+    was busy deserializing JSON while every other request on that worker
+    waited — and the whole scan repeated every time a credential modal was
+    closed. Same path already used by `workflow_crud._tem_node`.
     """
     from sqlalchemy import bindparam, text
 
-    # O `OR workspace_id IS NULL` que existia nos dois ramos entregava a
-    # contagem de uso das credenciais de todo workflow legado sem workspace,
-    # para qualquer autenticado. A coluna e NOT NULL desde 20260828_0001.
+    # The `OR workspace_id IS NULL` that existed in both branches handed the usage
+    # count of the credentials of every legacy workflow without a workspace to
+    # any authenticated user. The column is NOT NULL since 20260828_0001.
     if workspace_id:
         verify_workspace_access(workspace_id, workspace_ids)
         escopo = [workspace_id]
@@ -87,9 +87,9 @@ async def credential_usage(
     if not escopo:
         return {}
 
-    # `json_array_elements` estoura se `definition->'nodes'` não for array
-    # (definition vazia, formato antigo) — daí o CASE, avaliado antes do WHERE
-    # no LATERAL.
+    # `json_array_elements` blows up if `definition->'nodes'` is not an array
+    # (empty definition, old format) — hence the CASE, evaluated before the
+    # WHERE in the LATERAL.
     stmt = text("""
         SELECT
             node -> 'properties' ->> 'credential_id' AS credential_id,
@@ -128,9 +128,9 @@ async def test_credential(
     _user=Depends(get_current_user),
 ):
     """
-    Valida os campos obrigatórios (e, para as do WFS, as regras do nó — as
-    mesmas da gravação) e, quando possível, testa a conectividade real.
-    Não persiste nada — serve apenas para feedback imediato ao usuário.
+    Validates the required fields (and, for WFS ones, the node's rules — the
+    same as on save) and, when possible, tests the real connectivity.
+    Persists nothing — it only serves as immediate feedback to the user.
     """
     error = erro_de_validacao(data.type, data.data)
     if error:
@@ -197,8 +197,8 @@ async def _test_s3_connection(data: dict) -> dict:
 
     def _try_s3():
         try:
-            # O mesmo cliente que o nó SaveToS3 monta com a credencial resolvida:
-            # o teste aprova exatamente o que a execução vai usar.
+            # The same client that the SaveToS3 node builds with the resolved
+            # credential: the test approves exactly what the execution will use.
             from flow.utils.s3_cliente import cliente_s3
             cliente_s3(data).list_buckets()
             return {"ok": True, "message": "Credenciais S3 válidas!"}
@@ -226,9 +226,9 @@ async def create_credential_route(
     current_user=Depends(get_current_user),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
-    # Só é possível COMPARTILHAR com um workspace do qual o usuário participa —
-    # senão bastaria adivinhar um id_hash para injetar uma credencial na tela de
-    # membros de outro tenant.
+    # It is only possible to SHARE with a workspace the user belongs to —
+    # otherwise guessing an id_hash would be enough to inject a credential into
+    # another tenant's members screen.
     if data.workspace_id:
         verify_workspace_access(data.workspace_id, workspace_ids)
     credential = await create_credential(data, db, owner_id=current_user.id_hash)
@@ -243,9 +243,9 @@ async def list_credentials(
     current_user=Depends(get_current_user),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
-    # Devolve as credenciais do usuário UNIÃO as compartilhadas com seus
-    # workspaces (workspace_id preenchido). O escopo nunca é aberto: owner_id
-    # sempre entra na cláusula.
+    # Returns the user's credentials UNION those shared with their workspaces
+    # (workspace_id filled in). The scope is never opened up: owner_id always
+    # enters the clause.
     return await list_credential_metadata(
         db, owner_id=current_user.id_hash, type=type, workspace_ids=workspace_ids,
     )
@@ -258,15 +258,16 @@ async def get_credential_data(
     current_user=Depends(get_current_user),
 ):
     """
-    Retorna os dados descriptografados da credencial para pré-popular o formulário de edição.
-    Apenas o dono da credencial pode acessar este endpoint.
+    Returns the credential's decrypted data to pre-fill the edit form.
+    Only the credential's owner can access this endpoint.
     """
     from app.core.utils.encryption import decrypt_credential_data
     cred = await get_credential_metadata(db, cred_id, owner_id=current_user.id_hash)
     decrypted = decrypt_credential_data(cred.data or {})
-    # model_validate traz metadados + expires_at (property) e as novas colunas;
-    # a linha seguinte SUBSTITUI o data cifrado pelo descriptografado. A ordem
-    # importa: sem o overwrite, o segredo sairia cifrado (e inútil) no corpo.
+    # model_validate brings metadata + expires_at (property) and the new columns;
+    # the next line REPLACES the encrypted data with the decrypted one. The order
+    # matters: without the overwrite, the secret would go out encrypted (and
+    # useless) in the body.
     out = CredentialOutWithData.model_validate(cred)
     out.data = decrypted
     return out

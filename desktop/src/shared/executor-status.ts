@@ -1,23 +1,23 @@
 // desktop/src/shared/executor-status.ts
 //
-// O status REDIGIDO do executor local que a janela web pode ler.
+// The REDACTED status of the local executor that the web window can read.
 //
-// Este é o único dado que atravessa a ponte do preload/web.ts (main → web, só
-// leitura). Ele existe para a UI web, rodando DENTRO do app desktop, poder
-// dizer "o executor deste computador está online" — algo que ela não sabe pela
-// ótica do servidor, que enxerga os executores da conta mas não qual deles é a
-// máquina à frente do usuário.
+// This is the only data that crosses the preload/web.ts bridge (main → web,
+// read-only). It exists so the web UI, running INSIDE the desktop app, can say
+// "this computer's executor is online" — something it does not know from the
+// server's point of view, which sees the account's executors but not which of
+// them is the machine in front of the user.
 //
-// `derivarStatus` é o ÚNICO ponto que serializa para a ponte: tudo o que sai
-// passa por aqui, então a redação (o que é seguro expor) fica revisável num só
-// lugar. Nada além destes campos cruza — sem certificado, OTP, server_url,
-// caminhos, log, métricas de recurso ou histórico.
+// `derivarStatus` is the ONLY point that serializes for the bridge: everything
+// that goes out passes through here, so the redaction (what is safe to expose)
+// can be reviewed in a single place. Nothing beyond these fields crosses — no
+// certificate, OTP, server_url, paths, log, resource metrics or history.
 import type { EstadoApp } from '../main/state/store.js'
 import type { EstadoConfiguracao } from '../main/state/config.js'
 
-/** Canais IPC da ponte. Fonte única para o preload e o main (como ipc.ts). */
+/** IPC channels of the bridge. Single source for the preload and main (like ipc.ts). */
 export const CANAIS_WEB = {
-  /** web → main, com resposta: o status atual (usado no primeiro render). */
+  /** web → main, with a response: the current status (used on the first render). */
   status: 'atlas-web:executor-status',
   /** main → web, push: novo status quando a assinatura muda. */
   statusMudou: 'atlas-web:executor-status-mudou',
@@ -26,13 +26,13 @@ export const CANAIS_WEB = {
 export type EstadoExecutorLocal = 'online' | 'ocupado' | 'offline' | 'sem-vinculo'
 
 export interface StatusExecutorLocal {
-  /** Sobe se o formato mudar; a web faz feature-detect por cima disto. */
+  /** Bumped if the format changes; the web does feature detection on top of this. */
   versaoContrato: 1
   /**
-   * Identidade PÚBLICA deste executor — o mesmo `id_hash` que o servidor já
-   * mostra ao usuário logado (é o `executor_id` do enrollment). Deixa a web
-   * casar "este computador" com a linha da lista de Executores. Não é segredo:
-   * os segredos são o certificado e o OTP, que nunca cruzam.
+   * PUBLIC identity of this executor — the same `id_hash` the server already
+   * shows the logged-in user (it is the enrollment's `executor_id`). Lets the
+   * web match "this computer" with the row in the Executores list. It is not a
+   * secret: the secrets are the certificate and the OTP, which never cross.
    */
   executorId: string | null
   vinculado: boolean
@@ -42,12 +42,12 @@ export interface StatusExecutorLocal {
 }
 
 /**
- * Deriva o status público a partir do estado vivo + a configuração.
+ * Derives the public status from the live state + the configuration.
  *
- * Espelha a lógica de `estadoDoIcone` da bandeja e acrescenta o caso
- * "sem-vinculo" (sem enrollment não há executor a mostrar). `emExecucao` só é
- * significativo quando online/ocupado — fora disso é 0, para a UI nunca dizer
- * "offline · 2 em execução".
+ * Mirrors the logic of the tray's `estadoDoIcone` and adds the "sem-vinculo"
+ * case (without enrollment there is no executor to show). `emExecucao` is only
+ * meaningful when online/busy — otherwise it is 0, so the UI never says
+ * "offline · 2 em execução" (offline · 2 running).
  */
 export function derivarStatus(
   estado: Pick<EstadoApp, 'supervisor' | 'snapshot'>,
@@ -78,11 +78,12 @@ export function derivarStatus(
 }
 
 /**
- * Chave curta para deduplicar broadcasts.
+ * Short key to deduplicate broadcasts.
  *
- * O estado do executor é reavaliado a cada tick (≈12 Hz com o executor ativo),
- * mas o que a ponte carrega muda raramente. Comparar a assinatura evita mandar
- * um structured clone à janela a cada tick por nada — mesma guarda da bandeja.
+ * The executor state is re-evaluated on every tick (≈12 Hz with the executor
+ * active), but what the bridge carries rarely changes. Comparing the signature
+ * avoids sending a structured clone to the window on every tick for nothing —
+ * same guard as the tray.
  */
 export function assinaturaStatus(s: StatusExecutorLocal): string {
   return [s.estado, s.executorId ?? '', s.emExecucao, s.capacidade ?? '', s.vinculado ? 1 : 0].join('|')

@@ -6,7 +6,7 @@ afterEach(cleanup)
 
 type Campos = Record<string, string | number | boolean>
 
-/** Coleta os setNodeField num objeto (último valor por campo). */
+/** Collects the setNodeField calls into an object (last value per field). */
 function harness(valores: Campos) {
   const escritos: Campos = {}
   const setNodeField = vi.fn((f: string, v: string | number | boolean) => { escritos[f] = v })
@@ -23,7 +23,7 @@ describe("ScheduleTriggerHelper — leitura inicial", () => {
   it("cron semanal abre com a frequência e os dias certos", () => {
     harness({ ...DEFAULTS, cron_expression: "30 14 * * 2,4" })
     expect(screen.getByRole("button", { name: "Semanalmente" }).getAttribute("aria-pressed")).toBe("true")
-    // Terça e quinta marcados; segunda não.
+    // Tuesday and Thursday checked; Monday not.
     expect(screen.getByRole("button", { name: "terça" }).getAttribute("aria-pressed")).toBe("true")
     expect(screen.getByRole("button", { name: "quinta" }).getAttribute("aria-pressed")).toBe("true")
     expect(screen.getByRole("button", { name: "segunda" }).getAttribute("aria-pressed")).toBe("false")
@@ -53,7 +53,7 @@ describe("ScheduleTriggerHelper — edição grava os campos canônicos", () => 
     const { escritos } = harness({ ...DEFAULTS, cron_expression: "30 14 * * 2,4" }) // semanal 14:30
     fireEvent.click(screen.getByRole("button", { name: "Diariamente" }))
     expect(escritos.cron_expression).toBe("30 14 * * *")
-    // strategy continua 'cron' → gravação diff-only não reescreve o que não mudou
+    // strategy stays 'cron' → diff-only write doesn't rewrite what didn't change
     expect(escritos.strategy).toBeUndefined()
   })
 
@@ -70,9 +70,9 @@ describe("ScheduleTriggerHelper — edição grava os campos canônicos", () => 
   })
 
   it("não deixa desmarcar o último dia (semanal sempre tem ≥1)", () => {
-    const { setNodeField } = harness({ ...DEFAULTS, cron_expression: "30 14 * * 2" }) // só terça
-    fireEvent.click(screen.getByRole("button", { name: "terça" })) // tenta remover o único
-    // Nenhuma gravação: o clique foi ignorado.
+    const { setNodeField } = harness({ ...DEFAULTS, cron_expression: "30 14 * * 2" }) // Tuesday only
+    fireEvent.click(screen.getByRole("button", { name: "terça" })) // tries to remove the only one
+    // No write: the click was ignored.
     expect(setNodeField).not.toHaveBeenCalled()
     expect(screen.getByRole("button", { name: "terça" }).getAttribute("aria-pressed")).toBe("true")
   })
@@ -92,7 +92,7 @@ describe("ScheduleTriggerHelper — edição grava os campos canônicos", () => 
   })
 
   it("cron avançado inválido não é gravado (preserva o agendamento) e mostra erro", () => {
-    const { escritos } = harness({ ...DEFAULTS }) // diário 09:00 (cron válido)
+    const { escritos } = harness({ ...DEFAULTS }) // daily 09:00 (valid cron)
     fireEvent.click(screen.getByRole("button", { name: "Avançado" }))
     fireEvent.change(screen.getByPlaceholderText("0 9 * * *"), { target: { value: "0 9 * *" } }) // 4 campos
     expect(escritos.cron_expression).not.toBe("0 9 * *")
@@ -100,8 +100,8 @@ describe("ScheduleTriggerHelper — edição grava os campos canônicos", () => 
   })
 
   it("abrir a aba RRule vazia NÃO apaga o cron salvo (ALTA #2)", () => {
-    // Nó salvo com cron diário. Ir para Avançado → aba RRule (vazia = inválida)
-    // não pode gravar strategy=rrule + cron_expression="" por cima do schedule.
+    // Node saved with a daily cron. Going to Advanced → RRule tab (empty = invalid)
+    // must not write strategy=rrule + cron_expression="" over the schedule.
     const { setNodeField } = harness({ ...DEFAULTS, cron_expression: "0 9 * * *", strategy: "cron" })
     fireEvent.click(screen.getByRole("button", { name: "Avançado" }))
     fireEvent.click(screen.getByRole("button", { name: "RRule" }))
@@ -126,9 +126,9 @@ describe("ScheduleTriggerHelper — edição grava os campos canônicos", () => 
 
 describe("ScheduleTriggerHelper — re-sincroniza com valores que chegam depois (ALTA #1)", () => {
   it("monta com values=undefined e re-sincroniza quando os valores salvos chegam", () => {
-    // O node-config-modal MONTA o helper com values=undefined e só popula os
-    // campos num efeito seguinte (mesmo nodeId). Sem re-sync, o nó salvo abriria
-    // no padrão e a edição gravaria por cima da regra real.
+    // node-config-modal MOUNTS the helper with values=undefined and only fills
+    // the fields in a later effect (same nodeId). Without re-sync, the saved node
+    // would open on the default and the edit would write over the real rule.
     const setNodeField = vi.fn()
     const { rerender } = render(
       <ScheduleTriggerHelper values={undefined} setNodeField={setNodeField} hasUnsaved={false} nodeId="n1" />,
@@ -143,20 +143,20 @@ describe("ScheduleTriggerHelper — re-sincroniza com valores que chegam depois 
     )
     expect(screen.getByRole("button", { name: "Semanalmente" }).getAttribute("aria-pressed")).toBe("true")
     expect(screen.getByRole("button", { name: "terça" }).getAttribute("aria-pressed")).toBe("true")
-    // Re-sincronizar não é edição do usuário: nada deve ser gravado.
+    // Re-syncing isn't a user edit: nothing should be written.
     expect(setNodeField).not.toHaveBeenCalled()
   })
 
   it("o eco da própria gravação (cron equivalente) NÃO re-inicializa o estado", () => {
-    // Usuário está em Avançado; o parent re-renderiza com um cron canonicamente
-    // igual — a comparação canônica evita jogar o usuário de volta pra Diariamente.
+    // The user is in Advanced; the parent re-renders with a canonically equal
+    // cron — the canonical comparison avoids throwing the user back to Diariamente (daily).
     const setNodeField = vi.fn()
     const { rerender } = render(
       <ScheduleTriggerHelper values={{ ...DEFAULTS, cron_expression: "*/15 * * * *" }}
         setNodeField={setNodeField} hasUnsaved={false} nodeId="n1" />,
     )
     expect(screen.getByRole("button", { name: "Avançado" }).getAttribute("aria-pressed")).toBe("true")
-    // Novo objeto values, mesmo conteúdo canônico.
+    // New values object, same canonical content.
     rerender(
       <ScheduleTriggerHelper values={{ ...DEFAULTS, cron_expression: "*/15 * * * *" }}
         setNodeField={setNodeField} hasUnsaved={false} nodeId="n1" />,

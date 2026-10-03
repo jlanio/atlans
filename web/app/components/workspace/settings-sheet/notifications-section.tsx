@@ -18,17 +18,18 @@ import { SheetSection } from "./section-shell"
 interface Props {
   workspaceId: string
   canManage: boolean
-  /** Sinaliza workflows bloqueados para o badge de alerta da navegação. */
+  /** Flags blocked workflows for the navigation's alert badge. */
   onAlertChange?: (hasAlert: boolean) => void
 }
 
 /**
- * Allowlist de hosts para os webhooks do workspace.
+ * Host allowlist for the workspace's webhooks.
  *
- * A coluna já existia e já bloqueava notificações em produção — sem UI nenhuma.
- * Quem configurava um webhook e não o recebia não tinha como descobrir o motivo:
- * o bloqueio só aparecia como um warning no log do servidor. Daí o preview: a
- * seção mostra, para cada workflow que notifica, se a lista atual o deixa passar.
+ * The column already existed and was already blocking notifications in
+ * production — with no UI at all. Whoever set up a webhook and did not receive
+ * it had no way to find out why: the block only showed up as a warning in the
+ * server log. Hence the preview: the section shows, for each workflow that
+ * notifies, whether the current list lets it through.
  */
 export function NotificationsSection({ workspaceId, canManage, onAlertChange }: Props) {
   const inputId = useId()
@@ -40,23 +41,23 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
   const [novoHost, setNovoHost] = useState("")
   const [inputError, setInputError] = useState<string | null>(null)
 
-  // Lido na chegada de cada resposta: a carga não pode depender de `draft`
-  // sem ser refeita a cada tecla.
+  // Read when each response arrives: the load cannot depend on `draft`
+  // without being redone on every keystroke.
   const dirtyRef = useRef(false)
 
-  // A carga é o `useFetchData`, com o workspace como dep (e a guarda contra a
-  // resposta de um workspace anterior). O `error` dele é a falha de LEITURA,
-  // separada da de gravação de propósito: o `SheetSection` troca o conteúdo
-  // pelo erro, e usar o mesmo estado para as duas faria um PUT recusado apagar
-  // da tela os chips, o campo e o botão Salvar — levando junto o rascunho que
-  // causou a recusa, sem como corrigi-lo.
+  // Loading is `useFetchData`, with the workspace as a dep (and the guard against
+  // a previous workspace's response). Its `error` is the READ failure, kept
+  // separate from the write failure on purpose: `SheetSection` swaps the content
+  // for the error, and using the same state for both would make a rejected PUT
+  // wipe the chips, the field and the Save button off the screen — taking with
+  // it the draft that caused the rejection, with no way to fix it.
   const { data, loading, error, refetch: load, setData } = useFetchData(
     () => GisFlowService.getWorkspaceNotifications(workspaceId),
     "Não foi possível carregar a allowlist.",
     [workspaceId], 0,
     {
-      // O rascunho sobrevive ao refresh: "Atualizar" existe para trazer os
-      // workflows atuais, não para apagar em silêncio a edição em andamento.
+      // The draft survives the refresh: "Atualizar" (Refresh) exists to bring the
+      // current workflows, not to silently erase the edit in progress.
       onDados: dados => { if (!dirtyRef.current) setDraft(dados.allowlist ?? []) },
     },
   )
@@ -70,17 +71,17 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
 
   useEffect(() => { dirtyRef.current = dirty }, [dirty])
 
-  // Recalculado com o RASCUNHO, não com o que está salvo: é o que permite ver o
-  // efeito de uma mudança antes de gravá-la. O backend recomputa e devolve o
-  // resultado autoritativo no PUT.
+  // Recomputed with the DRAFT, not with what is saved: this is what lets you see
+  // the effect of a change before saving it. The backend recomputes and returns
+  // the authoritative result on the PUT.
   const preview = useMemo(
     () => workflows.map(wf => ({ ...wf, allowed: isHostAllowed(wf.host, draft) })),
     [workflows, draft],
   )
 
   const bloqueadosAgora = preview.filter(wf => !wf.allowed)
-  // Os que a edição pendente passaria a bloquear — o aviso só é útil se separar
-  // "já estava bloqueado" de "você acabou de bloquear".
+  // The ones the pending edit would start blocking — the warning is only useful
+  // if it separates "already blocked" from "you just blocked".
   const novosBloqueios = dirty
     ? preview.filter(wf => !wf.allowed && workflows.find(w => w.id_hash === wf.id_hash)?.allowed)
     : []
@@ -114,8 +115,9 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
     setSaving(true)
     const res = await GisFlowService.updateWorkspaceNotificationAllowlist(workspaceId, draft)
     if (res.error) {
-      // O rascunho continua na tela: a mensagem do backend costuma apontar a
-      // entrada exata que foi recusada, e sem os chips não haveria o que corrigir.
+      // The draft stays on screen: the backend's message usually points at the
+      // exact entry that was rejected, and without the chips there would be
+      // nothing to fix.
       const msg = res.error.message ?? "Erro ao salvar a allowlist."
       setSaveError(msg)
       createToast.error(msg)

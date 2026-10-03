@@ -13,8 +13,8 @@ logger = get_logger(__name__)
 @register_node
 class ComputeBoundingBox(BaseNode):
     """
-    Nó que computa a caixa delimitadora (bounding box) de um GeoDataFrame.
-    Pode retornar o bounding box geral ou um por-feição.
+    Node that computes the bounding box of a GeoDataFrame.
+    Can return the overall bounding box or one per feature.
     """
 
     @classmethod
@@ -46,7 +46,7 @@ class ComputeBoundingBox(BaseNode):
 
     @staticmethod
     def _to_gdf(data) -> gpd.GeoDataFrame:
-        """Converte GeoJSON (dict ou string) para GeoDataFrame. Passthrough se ja for GDF."""
+        """Converts GeoJSON (dict or string) to a GeoDataFrame. Passthrough if it is already a GDF."""
         if isinstance(data, gpd.GeoDataFrame):
             return data
         if isinstance(data, str):
@@ -76,8 +76,8 @@ class ComputeBoundingBox(BaseNode):
         def _compute_boxes(df: gpd.GeoDataFrame, per_feat: bool) -> gpd.GeoDataFrame:
             if per_feat:
                 bounds_df = df.bounds
-                # PERF: shapely.box vetorizado — 1 chamada sobre arrays numpy em
-                # vez de uma box() por feature em loop Python (O(n) interpretado).
+                # PERF: vectorized shapely.box — 1 call over numpy arrays instead
+                # of one box() per feature in a Python loop (interpreted O(n)).
                 geometries = shapely.box(
                     bounds_df.minx.values, bounds_df.miny.values,
                     bounds_df.maxx.values, bounds_df.maxy.values,

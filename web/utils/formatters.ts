@@ -1,4 +1,4 @@
-// Formata duração em ms para string legível (ex: "123ms" ou "1.23s")
+// Formats a duration in ms as a readable string (e.g. "123ms" or "1.23s")
 export function formatDuration(ms?: number | null): string | null {
   if (ms == null) return null
   if (ms < 1000) return `${Math.round(ms)}ms`
@@ -6,16 +6,17 @@ export function formatDuration(ms?: number | null): string | null {
 }
 
 /**
- * Formata bytes na maior unidade que couber.
+ * Formats bytes in the largest unit that fits.
  *
- * Havia quatro cópias disto, em duas famílias incompatíveis: `/artifacts` e
- * `/drive` paravam em MB (um arquivo de 3 GB virava "3072.0 MB"), enquanto
- * `/dashboard` e `/admin/settings` escalavam até TB com precisão adaptativa.
- * Esta é a segunda — a que de fato serve para os tamanhos que o Drive recebe.
+ * There were four copies of this, in two incompatible families: `/artifacts`
+ * and `/drive` stopped at MB (a 3 GB file became "3072.0 MB"), while
+ * `/dashboard` and `/admin/settings` scaled up to TB with adaptive precision.
+ * This is the second one — the one that actually works for the sizes the
+ * Drive receives.
  *
- * Precisão adaptativa: 2 casas abaixo de 10, 1 casa abaixo de 100, inteiro
- * acima. Mantém a largura da coluna estável sem perder resolução nos valores
- * pequenos.
+ * Adaptive precision: 2 decimals below 10, 1 decimal below 100, integer
+ * above. Keeps the column width stable without losing resolution on small
+ * values.
  */
 export function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null) return "—"
@@ -28,19 +29,19 @@ export function formatBytes(bytes: number | null | undefined): string {
 }
 
 /**
- * Classe de cor para uma taxa de sucesso (0..1).
+ * Color class for a success rate (0..1).
  *
- * A regra estava copiada em quatro telas, e uma delas divergia: três usavam
- * `>= 0.9 verde / >= 0.7 âmbar / resto vermelho`, e `/observability/[id]` usava
- * `>= 0.9 verde / < 0.5 vermelho / resto âmbar`. O efeito era um workflow com
- * 60% de sucesso aparecendo VERMELHO em três telas e ÂMBAR na quarta — o mesmo
- * número, dois julgamentos opostos, dependendo de onde o usuário olhasse.
+ * The rule was copied across four screens, and one of them diverged: three
+ * used `>= 0.9 verde / >= 0.7 âmbar / resto vermelho`, and `/observability/[id]`
+ * used `>= 0.9 verde / < 0.5 vermelho / resto âmbar`. The effect was a workflow
+ * with 60% success showing up RED on three screens and AMBER on the fourth —
+ * the same number, two opposite judgments, depending on where the user looked.
  *
- * Unificado na regra da maioria (o limiar de 0.7), que é também a mais
- * conservadora: 60% passa a ser vermelho em todos os lugares.
+ * Unified on the majority rule (the 0.7 threshold), which is also the more
+ * conservative one: 60% is now red everywhere.
  *
- * `tom` cobre a diferença de paleta que já existia entre as telas
- * (`text-amber-600` no card de executor, `text-yellow-500` nas tabelas).
+ * `tom` covers the palette difference that already existed between the screens
+ * (`text-amber-600` on the executor card, `text-yellow-500` in the tables).
  */
 export function successRateColor(rate: number | null | undefined, tom: "amber" | "yellow" = "yellow"): string {
   if (rate == null) return "text-muted-foreground"

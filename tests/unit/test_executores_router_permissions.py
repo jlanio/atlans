@@ -1,5 +1,5 @@
 # tests/unit/test_agents_router_permissions.py
-"""Testes do controle owner-or-admin para ações de ciclo de vida de executores."""
+"""Tests for the owner-or-admin check on executor lifecycle actions."""
 from unittest.mock import MagicMock
 from uuid import uuid4
 
@@ -39,7 +39,7 @@ def test_terceiro_recebe_403():
 
 
 def test_dono_nao_gerencia_executor_do_pool():
-    """Auditoria SEG-94: promovido ao pool (is_default), só admin gerencia."""
+    """Audit SEG-94: promoted to the pool (is_default), only an admin manages it."""
     with pytest.raises(HTTPException) as ei:
         _assert_pode_gerenciar_executor(_user("user", "user-1"), _agent(created_by="user-1", is_default=True))
     assert ei.value.status_code == 403

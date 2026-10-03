@@ -1,25 +1,25 @@
 # tests/unit/test_http_request_auth_retry.py
 """
-Requisição HTTP — autenticação por credencial, repetição e redirecionamento.
+HTTP request — credential authentication, retry and redirection.
 
-Os três recursos compartilham a mesma característica: quando erram, erram EM
-SILÊNCIO. Uma requisição sai anônima e volta 401 (que o usuário lê como "a API
-está fora"), um POST repetido cobra o cliente duas vezes, um redirect seguido
-sem revalidação vira SSRF. Nenhum deles falha de forma barulhenta, então os
-testes cobrem exatamente as bordas onde o defeito passaria despercebido:
+The three features share the same trait: when they go wrong, they go wrong
+SILENTLY. A request goes out anonymous and comes back 401 (which the user reads as "the API
+is down"), a repeated POST charges the customer twice, a redirect followed
+without revalidation becomes SSRF. None of them fails loudly, so the
+tests cover exactly the edges where the defect would go unnoticed:
 
-  AUTH        o segredo tem de sair da CREDENCIAL, nunca da definition — e
-              vencer um `Authorization` escrito à mão, senão um header
-              esquecido no formulário derruba a credencial escolhida.
+  AUTH        the secret must come from the CREDENTIAL, never from the definition — and
+              win over a hand-written `Authorization`, otherwise a header
+              forgotten in the form overrides the chosen credential.
 
-  REPETIÇÃO   POST/PATCH JAMAIS repetem: a resposta pode ter se perdido na
-              volta, com o efeito já aplicado no servidor.
+  RETRY       POST/PATCH NEVER retry: the response may have been lost on the
+              way back, with the effect already applied on the server.
 
-  4xx         não repete (exceto 429) — repetir dá exatamente o mesmo erro e
-              só gasta o tempo do run.
+  4xx         no retry (except 429) — retrying gives exactly the same error and
+              only wastes the run's time.
 
-  REDIRECT    desligado por padrão; e ao seguir, 303 (e 301/302 sobre POST)
-              tem de virar GET SEM CORPO, como faz todo cliente HTTP.
+  REDIRECT    off by default; and when following, 303 (and 301/302 on POST)
+              must become a GET WITHOUT A BODY, as every HTTP client does.
 """
 import asyncio
 from unittest.mock import AsyncMock, patch
@@ -37,7 +37,7 @@ from flow.nodes.action.http_request import (
 
 
 class RespostaFalsa:
-    """Mínimo de httpx.Response que o nó consome."""
+    """The minimum of httpx.Response that the node consumes."""
 
     def __init__(self, status_code=200, headers=None, json_data=None, text=""):
         self.status_code = status_code
@@ -59,7 +59,7 @@ def _no(**props):
     return HttpRequestNode(node_id="n1", parameters={"url": "https://api.exemplo.com/x", **props})
 
 
-# ── Autenticação ────────────────────────────────────────────────────────────
+# ── Authentication ──────────────────────────────────────────────────────────
 
 def test_bearer_monta_o_header():
     h = _aplicar_auth({}, {"type": "http_bearer", "token": "segredo"})
@@ -73,7 +73,7 @@ def test_basic_codifica_em_base64():
 
 
 def test_credencial_vence_authorization_escrito_a_mao():
-    """Um header esquecido no formulário não pode derrubar a credencial."""
+    """A header forgotten in the form must not override the credential."""
     h = _aplicar_auth(
         {"Authorization": "Bearer antigo-e-errado"},
         {"type": "http_bearer", "token": "novo"},
@@ -87,23 +87,23 @@ def test_sem_credencial_preserva_os_headers():
 
 
 def test_credencial_incompleta_falha_alto():
-    """Token vazio sairia como 'Bearer ' e voltaria 401 — erro difícil de ler."""
+    """An empty token would go out as 'Bearer ' and come back 401 — an error hard to read."""
     with pytest.raises(ValueError, match="token"):
         _aplicar_auth({}, {"type": "http_bearer", "token": "  "})
 
 
 def test_credencial_de_outro_tipo_nao_sai_anonima():
-    """O resolver injeta `http_auth` também para as credenciais do WFS; escolhida
-    aqui, uma delas era ignorada e a requisição saía sem autenticação."""
+    """The resolver injects `http_auth` for WFS credentials too; when chosen
+    here, one of them was ignored and the request went out without authentication."""
     with pytest.raises(ValueError, match="não serve para requisição HTTP"):
         _aplicar_auth({}, {"type": "geoserver_authkey", "token": "k"})
-    assert _aplicar_auth({"X": "1"}, {}) == {"X": "1"}  # sem credencial, nada muda
+    assert _aplicar_auth({"X": "1"}, {}) == {"X": "1"}  # without a credential, nothing changes
 
 
-# ── Repetição ───────────────────────────────────────────────────────────────
+# ── Retry ───────────────────────────────────────────────────────────────────
 
 def test_post_e_patch_nunca_repetem():
-    """Repetir escrita não idempotente duplica o efeito no servidor."""
+    """Retrying a non-idempotent write duplicates the effect on the server."""
     assert "POST" not in _METODOS_REPETIVEIS
     assert "PATCH" not in _METODOS_REPETIVEIS
     assert {"GET", "HEAD", "OPTIONS", "PUT", "DELETE"} <= _METODOS_REPETIVEIS
@@ -112,7 +112,7 @@ def test_post_e_patch_nunca_repetem():
 def test_repete_apenas_status_transitorios():
     assert 429 in _STATUS_REPETIVEIS          # sobrecarga: esperar ajuda
     assert 503 in _STATUS_REPETIVEIS
-    assert 404 not in _STATUS_REPETIVEIS      # erro do pedido: repetir dá o mesmo
+    assert 404 not in _STATUS_REPETIVEIS      # request error: retrying gives the same thing
     assert 401 not in _STATUS_REPETIVEIS
 
 
@@ -134,7 +134,7 @@ def test_get_repete_ate_obter_sucesso():
 
 
 def test_post_nao_repete_mesmo_com_retries_configurado():
-    """A configuração não pode vencer a regra de idempotência."""
+    """Configuration must not override the idempotency rule."""
     chamadas = []
 
     async def falsa(**kw):
@@ -153,7 +153,7 @@ def test_post_nao_repete_mesmo_com_retries_configurado():
 # ── Redirecionamento ────────────────────────────────────────────────────────
 
 def test_nao_segue_redirect_por_padrao():
-    """Padrão seguro: o 3xx volta como resposta, sem virar proxy."""
+    """Safe default: the 3xx comes back as the response, without becoming a proxy."""
     async def falsa(**kw):
         return RespostaFalsa(301, headers={"location": "https://outro.exemplo.com/y"})
 
@@ -165,7 +165,7 @@ def test_nao_segue_redirect_por_padrao():
 
 
 def test_segue_redirect_quando_ligado_e_revalida_cada_salto():
-    """Cada salto passa de novo por safe_httpx_request — é o que mantém o SSRF fechado."""
+    """Each hop goes through safe_httpx_request again — that is what keeps SSRF closed."""
     urls = []
 
     async def falsa(**kw):
@@ -184,7 +184,7 @@ def test_segue_redirect_quando_ligado_e_revalida_cada_salto():
 
 
 def test_redirect_303_vira_get_sem_corpo():
-    """Mandar o corpo adiante depois de um 303 quebra a API do outro lado."""
+    """Forwarding the body after a 303 breaks the API on the other side."""
     chamadas = []
 
     async def falsa(**kw):
@@ -212,7 +212,7 @@ def test_estoura_limite_de_saltos():
             asyncio.run(no.execute({}))
 
 
-# ── Limite de resposta ──────────────────────────────────────────────────────
+# ── Response limit ──────────────────────────────────────────────────────────
 
 def test_limite_de_tamanho_chega_ao_transporte():
     recebido = {}
@@ -242,21 +242,21 @@ def test_zero_remove_o_limite():
     assert "max_response_bytes" not in recebido
 
 
-# ── Pelo execute(), e não pelo helper ───────────────────────────────────────
+# ── Through execute(), not through the helper ───────────────────────────────
 #
-# Os testes de autenticação acima exercitam `_aplicar_auth` como função pura, e
-# por isso passavam enquanto NENHUMA requisição autenticada funcionava: o
-# `validate()` da primeira linha do `execute()` reconstrói `self.parameters` a
-# partir das propriedades DECLARADAS e descarta o resto — e `http_auth`, que o
-# servidor injeta, não estava declarada. O token era jogado fora antes de
-# `_aplicar_auth` sequer ser chamado.
+# The authentication tests above exercise `_aplicar_auth` as a pure function, and
+# that is why they passed while NO authenticated request worked: the
+# `validate()` on the first line of `execute()` rebuilds `self.parameters` from
+# the DECLARED properties and discards the rest — and `http_auth`, which the
+# server injects, was not declared. The token was thrown away before
+# `_aplicar_auth` was even called.
 #
-# A lição não é sobre HTTP: é sobre onde o teste toca. Um helper puro não prova
-# que o valor chega até ele. Estes testes atravessam o `execute()` inteiro e
-# olham o que sai no transporte.
+# The lesson is not about HTTP: it is about where the test touches. A pure helper does
+# not prove that the value reaches it. These tests go through the whole `execute()` and
+# look at what comes out on the transport.
 
 def _capturar(**props):
-    """Roda o nó com o transporte substituído e devolve os kwargs recebidos."""
+    """Runs the node with the transport replaced and returns the kwargs received."""
     recebido = {}
 
     async def falsa(**kw):
@@ -282,27 +282,27 @@ def test_credencial_basic_pelo_execute():
         method="GET",
         http_auth={"type": "http_basic", "username": "u", "password": "p"},
     )
-    # dToA= é base64 de "u:p"
+    # dToA= is base64 of "u:p"
     assert recebido["headers"].get("Authorization") == "Basic dTpw"
 
 
 def test_http_auth_e_declarado_no_schema():
-    """Guarda direta da causa: se a propriedade sumir, o validate() volta a
-    descartar o segredo e nenhum outro teste desta suíte percebe."""
+    """Direct guard on the cause: if the property disappears, validate() goes back to
+    discarding the secret and no other test in this suite notices."""
     nomes = [p["name"] for p in HttpRequestNode.description()["properties"]]
     assert "http_auth" in nomes
 
 
 # ── Query string ────────────────────────────────────────────────────────────
 #
-# `params` do httpx SUBSTITUI a query da URL em vez de somar a ela. Como o campo
-# tem `{}` por padrão e o nó o entregava sempre, qualquer endereço colado pronto
-# perdia a query — e endereço de WFS/OGC é quase só query.
+# httpx's `params` REPLACES the URL's query instead of adding to it. Since the field
+# defaults to `{}` and the node always passed it, any ready-made pasted address
+# lost its query — and a WFS/OGC address is almost all query.
 
 def test_query_da_url_sobrevive_quando_o_campo_esta_vazio():
     recebido = _capturar(method="GET")
-    # Sem nada a acrescentar, o nó não entrega `params` ao transporte, e a query
-    # que veio na URL segue intacta.
+    # With nothing to add, the node does not pass `params` to the transport, and the query
+    # that came in the URL stays intact.
     assert not recebido.get("params")
 
 
@@ -349,16 +349,16 @@ def test_campo_vence_a_url_na_chave_repetida():
     with patch("flow.nodes.action.http_request.safe_httpx_request", side_effect=falsa):
         asyncio.run(no.execute({}))
 
-    # A ocorrência que veio da URL sai — não se soma ao valor digitado.
+    # The occurrence that came from the URL goes — it does not add to the typed value.
     assert recebido["params"] == [("a", "docampo")]
 
 
-# ── Chave repetida na query ─────────────────────────────────────────────────
+# ── Repeated key in the query ───────────────────────────────────────────────
 #
-# A query HTTP admite a mesma chave mais de uma vez, e em endereço geoespacial
-# isso é rotina: `?bbox=..&bbox=..`, `?typeName=a&typeName=b`. A primeira versão
-# desta junção passava por `dict(parse_qsl(...))`, que guarda só a última
-# ocorrência — a URL saía do nó diferente da que o usuário colou, sem aviso.
+# An HTTP query allows the same key more than once, and in geospatial addresses
+# that is routine: `?bbox=..&bbox=..`, `?typeName=a&typeName=b`. The first version
+# of this merge went through `dict(parse_qsl(...))`, which keeps only the last
+# occurrence — the URL left the node different from the one the user pasted, without warning.
 
 def test_chave_repetida_na_url_sobrevive():
     recebido = _capturar(
@@ -369,7 +369,7 @@ def test_chave_repetida_na_url_sobrevive():
 
 
 def test_chave_repetida_chega_intacta_ao_endereco_final():
-    """Prova pelo httpx, não pela estrutura: é a URL montada que importa."""
+    """Proof via httpx, not via the structure: it is the assembled URL that matters."""
     recebido = _capturar(
         url="https://exemplo.org/wfs?bbox=1&bbox=2",
         method="GET",
@@ -378,13 +378,13 @@ def test_chave_repetida_chega_intacta_ao_endereco_final():
     assert str(montada) == "https://exemplo.org/wfs?bbox=1&bbox=2"
 
 
-# ── Redirecionamento ────────────────────────────────────────────────────────
+# ── Redirection ─────────────────────────────────────────────────────────────
 #
-# Quem escolhe o destino de um 3xx é o servidor remoto. Três coisas que o nó
-# levava adiante e não devia.
+# Whoever picks the destination of a 3xx is the remote server. Three things the node
+# carried along and should not have.
 
 def _seguir(url, location, **props):
-    """Roda um GET que recebe um 3xx e devolve os kwargs de CADA salto."""
+    """Runs a GET that receives a 3xx and returns the kwargs of EACH hop."""
     saltos = []
 
     async def falsa(**kw):
@@ -400,7 +400,7 @@ def _seguir(url, location, **props):
 
 
 def test_credencial_nao_atravessa_mudanca_de_origem():
-    """SEG: o token não pode ir para um host que o outro lado apontou."""
+    """SEC: the token must not go to a host the other side pointed to."""
     saltos = _seguir(
         "https://confiavel.org/v1",
         "https://outro.example/coleta",
@@ -411,7 +411,7 @@ def test_credencial_nao_atravessa_mudanca_de_origem():
 
 
 def test_credencial_segue_na_mesma_origem():
-    """O caso comum `/api` → `/api/` não pode voltar 401 por falta de header."""
+    """The common case `/api` → `/api/` must not come back 401 for lack of a header."""
     saltos = _seguir(
         "https://confiavel.org/api",
         "https://confiavel.org/api/",
@@ -431,14 +431,14 @@ def test_cookie_tambem_cai_na_troca_de_origem():
 
 
 def test_query_do_destino_nao_e_trocada_pela_da_origem():
-    """O caso do download assinado: a assinatura vem na query do `Location`."""
+    """The signed-download case: the signature comes in the `Location` query."""
     saltos = _seguir(
         "https://portal.org/download?id=123",
         "https://cdn.portal.org/arq.zip?X-Amz-Signature=abc",
     )
     assert saltos[0]["params"] == [("id", "123")]
-    # No salto o nó não entrega `params`, então a query do destino — que já está
-    # na URL — é a que vale.
+    # On the hop the node does not pass `params`, so the destination's query — which is already
+    # in the URL — is the one that counts.
     assert not saltos[1].get("params")
     assert saltos[1]["url"] == "https://cdn.portal.org/arq.zip?X-Amz-Signature=abc"
 
@@ -457,12 +457,12 @@ def test_disjuntor_do_salto_e_o_do_host_de_destino():
     assert consultados == ["http:a.example", "http:b.example"]
 
 
-# ── Credencial que não resolve ──────────────────────────────────────────────
+# ── Credential that does not resolve ────────────────────────────────────────
 #
-# O servidor REMOVE `credential_id` ao injetar a credencial resolvida. Chegar ao
-# `execute()` com o id ainda presente e sem `http_auth` significa que a resolução
-# falhou — credencial apagada, órfã, ou fora do escopo de quem disparou. Isso
-# passava em silêncio e a requisição saía anônima.
+# The server REMOVES `credential_id` when injecting the resolved credential. Reaching
+# `execute()` with the id still present and without `http_auth` means resolution
+# failed — credential deleted, orphaned, or outside the scope of whoever triggered. That
+# went through silently and the request went out anonymous.
 
 def test_credencial_que_nao_resolve_nao_sai_anonima():
     chamou = []
@@ -476,19 +476,19 @@ def test_credencial_que_nao_resolve_nao_sai_anonima():
         with pytest.raises(ValueError, match="não pôde ser resolvida"):
             asyncio.run(no.execute({}))
 
-    # E a requisição não chegou a sair — não adianta falhar depois de o pedido
-    # sem autenticação já ter batido no servidor.
+    # And the request never went out — there is no point failing after the
+    # unauthenticated request has already hit the server.
     assert chamou == []
 
 
 def test_sem_credencial_escolhida_a_requisicao_anonima_e_legitima():
-    """API pública é o caso normal — a guarda não pode atrapalhá-lo."""
+    """A public API is the normal case — the guard must not get in its way."""
     recebido = _capturar(method="GET")
     assert "Authorization" not in recebido["headers"]
 
 
 def test_credencial_resolvida_passa_pela_guarda():
-    """No caminho feliz o servidor já removeu o `credential_id`."""
+    """On the happy path the server has already removed `credential_id`."""
     recebido = _capturar(
         method="GET",
         http_auth={"type": "http_bearer", "token": "SEGREDO"},
@@ -496,15 +496,15 @@ def test_credencial_resolvida_passa_pela_guarda():
     assert recebido["headers"]["Authorization"] == "Bearer SEGREDO"
 
 
-# ── O que NÃO deve ser repetido ─────────────────────────────────────────────
+# ── What must NOT be retried ────────────────────────────────────────────────
 #
-# Repetir um erro determinístico não custa só a espera: cada tentativa passa
-# pelo disjuntor e conta uma falha, então uma URL recusada num nó abria o
-# circuito do host e derrubava os pedidos legítimos dos outros fluxos.
+# Retrying a deterministic error does not just cost the wait: every attempt goes
+# through the circuit breaker and counts as a failure, so a URL refused in one node opened
+# the host's circuit and brought down the legitimate requests of other workflows.
 
-# O disjuntor é um singleton POR HOST e sobrevive entre testes: quem provoca
-# falha precisa de host próprio, senão abre o circuito para os testes seguintes.
-# É o mesmo efeito que este conserto existe para evitar em produção.
+# The circuit breaker is a singleton PER HOST and survives between tests: whoever causes
+# a failure needs their own host, otherwise it opens the circuit for the following tests.
+# It is the same effect this fix exists to prevent in production.
 @pytest.mark.parametrize("host,erro", [
     ("ssrf", ValueError("Requisições para endereços internos/privados não são permitidas.")),
     ("tamanho", ValueError("Resposta excedeu o limite de 1024 bytes.")),
@@ -543,11 +543,11 @@ def test_erro_de_transporte_continua_sendo_repetido():
     assert saida["status_code"] == 200
 
 
-# ── Caixa do cabeçalho ──────────────────────────────────────────────────────
+# ── Header case ─────────────────────────────────────────────────────────────
 
 def test_credencial_derruba_authorization_de_qualquer_caixa():
-    """Header HTTP não distingue caixa; dicionário sim. Sem isso o nó enviava
-    DOIS cabeçalhos de autenticação e o servidor escolhia qual valia."""
+    """HTTP headers are case-insensitive; dictionaries are not. Without this the node sent
+    TWO authentication headers and the server picked which one counted."""
     recebido = _capturar(
         url="https://caixa.exemplo.com/x",
         method="GET",

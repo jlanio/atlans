@@ -1,5 +1,5 @@
 # app/mcp/tools/workspaces.py
-"""Tools de workspaces. As guardas de cada uma estão em app/mcp/guardas.py."""
+"""Workspace tools. The guards for each one are in app/mcp/guardas.py."""
 from __future__ import annotations
 
 from mcp.server.mcpserver import Context
@@ -14,14 +14,15 @@ from app.services.workspace_service import listar_workspaces_do_usuario
 
 @ferramenta
 async def list_workspaces(ctx: Context) -> dict:
-    """Lista os workspaces que este token alcança.
+    """Lists the workspaces this token reaches.
 
-    É a primeira chamada de quase toda conversa: os demais parâmetros
-    `workspace_id` aceitam o id daqui (ou o nome, quando não houver repetição).
+    It is the first call of almost every conversation: the other `workspace_id`
+    parameters accept the id from here (or the name, when there are no
+    duplicates).
 
-    O filtro pelo alcance do token é feito aqui, sobre a lista do usuário: um
-    token restrito a um workspace não revela sequer o nome dos outros, mesmo
-    que o dono seja membro deles.
+    Filtering by the token's reach is done here, over the user's list: a token
+    restricted to one workspace does not reveal even the names of the others,
+    even if the owner is a member of them.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -50,7 +51,7 @@ async def list_workspaces(ctx: Context) -> dict:
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="list_workspaces",
         title="Listar workspaces",

@@ -1,15 +1,15 @@
 # tests/unit/test_assistente_lifecycle_auditoria.py
-"""PR 5 — ciclo de vida do assistente (Redis/SSE).
+"""PR 5 — assistant lifecycle (Redis/SSE).
 
-Os consertos cujo efeito e timing ou cancelamento — nao observavel no
-`ASGITransport` bufferizado dos testes de rota, nem no `RedisFalso` sem relogio —
-sao travados por SOURCE-CHECK de AST: a mutacao que cada teste descreve apaga a
-estrutura, e o walk falha. E o precedente do PR 1/PR 4.
+The fixes whose effect is timing or cancellation — not observable in the
+buffered `ASGITransport` of the route tests, nor in the clockless `RedisFalso` —
+are locked down by an AST SOURCE-CHECK: the mutation each test describes deletes
+the structure, and the walk fails. It is the precedent of PR 1/PR 4.
 
-Os consertos observaveis tem teste de comportamento onde mora o harness:
-  - #2 trava renovada e #5 progresso ao vivo → test_assistente_service.py
-  - #3 cota que nao fica imortal            → test_mcp_cotas.py
-  - #7 confirmacao consumida no gerador     → test_agente_rota.py
+The observable fixes have behavior tests where the harness lives:
+  - #2 renewed lock and #5 live progress  → test_assistente_service.py
+  - #3 quota that doesn't become immortal → test_mcp_cotas.py
+  - #7 confirmation consumed in generator → test_agente_rota.py
 """
 import ast
 import asyncio
@@ -32,7 +32,7 @@ def _arvore(obj) -> ast.AST:
 
 
 def _tem_call_aninhada(obj, externa: str, interna: str) -> bool:
-    """Existe `externa(interna(...))` no fonte de `obj` (modulo ou funcao)?"""
+    """Is there an `externa(interna(...))` in the source of `obj` (module or function)?"""
     for node in ast.walk(_arvore(obj)):
         if isinstance(node, ast.Call) and _nome_da_call(node.func) == externa:
             if any(isinstance(a, ast.Call) and _nome_da_call(a.func) == interna for a in node.args):
@@ -47,7 +47,7 @@ def _chama(obj, nome: str) -> bool:
 
 
 def _chama_dentro_de_asyncwith(func, nome: str) -> bool:
-    """`nome(...)` e chamado DENTRO de algum `async with` de `func`?"""
+    """Is `nome(...)` called INSIDE some `async with` of `func`?"""
     for aw in (n for n in ast.walk(_arvore(func)) if isinstance(n, ast.AsyncWith)):
         if any(isinstance(s, ast.Call) and _nome_da_call(s.func) == nome for s in ast.walk(aw)):
             return True
@@ -58,8 +58,8 @@ def _chama_dentro_de_asyncwith(func, nome: str) -> bool:
 
 
 async def test_com_batimento_pinga_no_silencio_e_passa_o_dado():
-    """Fix #1: um `: ping` a cada `intervalo` de silencio; senao o proxy derruba
-    o SSE de um turno longo antes do primeiro quadro."""
+    """Fix #1: a `: ping` every `intervalo` of silence; otherwise the proxy kills
+    the SSE of a long turn before the first frame."""
 
     async def gerador():
         await asyncio.sleep(0.03)  # silencio > intervalo
@@ -83,14 +83,14 @@ async def test_com_batimento_sem_silencio_nao_pinga():
 
 
 def test_a_rota_do_assistente_envolve_transmitir_no_batimento():
-    """Mutacao (#1): tirar o wrap → o SSE do editor volta a ficar mudo num turno
-    longo e o proxy o derruba. O espacamento nao e testavel no ASGITransport."""
+    """Mutation (#1): remove the wrap → the editor's SSE goes silent again on a long
+    turn and the proxy kills it. The spacing is not testable in ASGITransport."""
     assert _tem_call_aninhada(assistente_editor_router, "com_batimento", "_transmitir")
 
 
 def test_o_salvar_conversa_do_editor_e_blindado_com_shield():
-    """Mutacao (#4): tirar o shield → o cancelamento do gerador (aba fechada no
-    meio da resposta) aborta a gravacao e o turno se perde."""
+    """Mutation (#4): remove the shield → the generator's cancellation (tab closed
+    mid-response) aborts the write and the turn is lost."""
     assert _chama(assistente_editor_router._transmitir, "shield"), "salvar_conversa sem asyncio.shield"
     assert _chama(assistente_editor_router._transmitir, "salvar_conversa")
 
@@ -99,8 +99,8 @@ def test_o_salvar_conversa_do_editor_e_blindado_com_shield():
 
 
 def test_o_fecho_do_agente_corre_dentro_da_trava():
-    """Mutacao (#6): `_fechar_protegido` no `finally` EXTERNO, fora da trava →
-    corrida em `proxima_ordem`/UNIQUE entre duas abas. A colisao exige
-    concorrencia real, que o harness (trava pre-semeada) nao simula."""
+    """Mutation (#6): `_fechar_protegido` in the OUTER `finally`, outside the lock →
+    race on `proxima_ordem`/UNIQUE between two tabs. The collision requires real
+    concurrency, which the harness (pre-seeded lock) does not simulate."""
     for gerador in (assistente_router._transmitir_conversa, assistente_router._transmitir_confirmacao):
         assert _chama_dentro_de_asyncwith(gerador, "_fechar_protegido"), gerador.__name__

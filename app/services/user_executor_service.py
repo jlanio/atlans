@@ -1,11 +1,11 @@
 # app/services/user_executor_service.py
 """
-Operações de negócio para vinculação de executores a usuários/workspaces.
+Business operations for linking executors to users/workspaces.
 
-Regras de acesso:
-  - Executor default: acessível a todos automaticamente
-  - Executor dedicated: acessível via workspace (Workspace.target_executor_id)
-    ou via atribuição direta pelo admin (user_agent_assignments)
+Access rules:
+  - Default executor: accessible to everyone automatically
+  - Dedicated executor: accessible via workspace (Workspace.target_executor_id)
+    or via direct assignment by the admin (user_agent_assignments)
 """
 from uuid import uuid4
 
@@ -17,7 +17,7 @@ from app.models.user_executor_assignment import UserExecutorAssignment
 
 
 async def get_default_agents(db: AsyncSession) -> list[Executor]:
-    """Retorna todos os executores do pool padrão (is_default=true, status=active)."""
+    """Returns all executors in the default pool (is_default=true, status=active)."""
     result = await db.execute(
         select(Executor).where(
             Executor.is_default == True,  # noqa: E712
@@ -29,24 +29,24 @@ async def get_default_agents(db: AsyncSession) -> list[Executor]:
 
 
 async def get_default_agent(db: AsyncSession) -> Executor | None:
-    """Wrapper de compatibilidade — retorna o primeiro executor default ou None."""
+    """Compatibility wrapper — returns the first default executor or None."""
     executores = await get_default_agents(db)
     return executores[0] if executores else None
 
 
 async def get_user_accessible_agents(db: AsyncSession, user_id: str) -> list[dict]:
     """
-    Retorna executores acessíveis ao usuário:
-    1. Executor default (disponível para todos)
-    2. Executores atribuídos a workspaces dos quais o usuário é owner ou membro
+    Returns the executors accessible to the user:
+    1. Default executor (available to everyone)
+    2. Executors assigned to workspaces of which the user is owner or member
     """
     from app.models.workspace import Workspace
     from app.models.workspace_member import WorkspaceMember
 
-    # Executores do pool default
+    # Executors in the default pool
     default_agents = await get_default_agents(db)
 
-    # Executores dos workspaces do usuário (owner + membro)
+    # Executors of the user's workspaces (owner + member)
     ws_result = await db.execute(
         select(Workspace.target_executor_id).where(
             Workspace.target_executor_id.isnot(None),
@@ -61,9 +61,9 @@ async def get_user_accessible_agents(db: AsyncSession, user_id: str) -> list[dic
     )
     ws_agent_ids = set(ws_result.scalars().all())
 
-    # Membros de NÍVEL da política dos mesmos workspaces: quem entrou pelo
-    # editor da política precisa aparecer aqui, senão o dono não vê nem
-    # consegue remover um executor que roda os workflows dele.
+    # Policy TIER members of the same workspaces: whoever came in through the
+    # policy editor must show up here, otherwise the owner can neither see nor
+    # remove an executor that runs their workflows.
     from app.services.workspace_executor_service import executor_ids_for_workspaces
     meus_ws = await db.execute(
         select(Workspace.id_hash).where(
@@ -78,7 +78,7 @@ async def get_user_accessible_agents(db: AsyncSession, user_id: str) -> list[dic
     )
     ws_agent_ids |= await executor_ids_for_workspaces(db, list(meus_ws.scalars().all()))
 
-    # Buscar executores dos workspaces
+    # Fetch the workspaces' executors
     ws_agents: list[Executor] = []
     if ws_agent_ids:
         ag_result = await db.execute(
@@ -101,7 +101,7 @@ async def get_user_accessible_agents(db: AsyncSession, user_id: str) -> list[dic
             executores.append(_agent_to_dict(ag))
             seen_ids.add(ag.id_hash)
 
-    # Executores atribuídos diretamente ao usuário pelo admin
+    # Executors assigned directly to the user by the admin
     from app.models.user_executor_assignment import UserExecutorAssignment
 
     assign_result = await db.execute(
@@ -123,17 +123,17 @@ async def get_user_accessible_agents(db: AsyncSession, user_id: str) -> list[dic
 
 
 async def get_user_bindable_agents(db: AsyncSession, user_id: str) -> list[dict]:
-    """Executores que o usuário pode VINCULAR a um workspace que administra.
+    """Executors the user may LINK to a workspace they administer.
 
-    Diferente de `get_user_accessible_agents` (usada só para EXIBIR), esta é o
-    critério de escrita e é mais estrita (auditoria SEG-13): um executor
-    dedicado só entra se o usuário for DONO do workspace ao qual ele já está
-    ligado — não basta ser admin por membresia. Sem isso, um viewer convidado a
-    um workspace B (com executor dedicado X) via X aparecer como "acessível" e o
-    vinculava ao próprio workspace A, rodando código na máquina de B.
+    Unlike `get_user_accessible_agents` (used only to DISPLAY), this is the
+    write criterion and is stricter (audit SEG-13): a dedicated executor
+    only gets in if the user is the OWNER of the workspace it is already
+    linked to — being admin by membership is not enough. Without this, a viewer invited to
+    a workspace B (with dedicated executor X) saw X show up as "accessible" and
+    linked it to their own workspace A, running code on B's machine.
 
-    Inclui: pool padrão; executores criados pelo usuário; atribuídos a ele
-    (UserExecutorAssignment); e executores de workspaces cujo `owner_id` é ele.
+    Includes: default pool; executors created by the user; those assigned to them
+    (UserExecutorAssignment); and executors of workspaces whose `owner_id` is them.
     """
     from app.models.workspace import Workspace
     from app.models.user_executor_assignment import UserExecutorAssignment
@@ -147,19 +147,19 @@ async def get_user_bindable_agents(db: AsyncSession, user_id: str) -> list[dict]
         seen.add(dag.id_hash)
 
     ids: set[str] = set()
-    # Criados pelo usuário.
+    # Created by the user.
     criados = await db.execute(
         select(Executor.id_hash).where(
             Executor.created_by == user_id, Executor.deleted_at.is_(None)
         )
     )
     ids |= set(criados.scalars().all())
-    # Atribuídos diretamente pelo admin.
+    # Assigned directly by the admin.
     atrib = await db.execute(
         select(UserExecutorAssignment.executor_id).where(UserExecutorAssignment.user_id == user_id)
     )
     ids |= set(atrib.scalars().all())
-    # Executores de workspaces DE QUE O USUÁRIO É DONO (ponteiro legado + política).
+    # Executors of workspaces THE USER OWNS (legacy pointer + policy).
     meus_ws = await db.execute(
         select(Workspace.id_hash).where(
             Workspace.owner_id == user_id, Workspace.deleted_at.is_(None)
@@ -191,12 +191,12 @@ async def get_user_bindable_agents(db: AsyncSession, user_id: str) -> list[dict]
 async def set_default_agent(
     db: AsyncSession, executor_id: str, *, force: bool = False, actor_id: str | None = None,
 ) -> Executor:
-    """Adiciona um executor ao pool padrão da plataforma.
+    """Adds an executor to the platform's default pool.
 
-    Operação inversa do Q3 da política de execução: um executor do pool não
-    pode estar num nível dedicado, então ele é RETIRADO de todos os níveis —
-    bloqueando (409) se isso esvaziaria o nível principal de algum workspace e
-    `force` não foi pedido.
+    Inverse operation of Q3 of the execution policy: a pool executor cannot
+    be in a dedicated tier, so it is REMOVED from all tiers —
+    blocking (409) if that would empty some workspace's main tier and
+    `force` was not requested.
     """
     from app.services import workspace_executor_service as politica
 
@@ -218,7 +218,7 @@ async def set_default_agent(
 
 
 async def unset_default_agent(db: AsyncSession, executor_id: str) -> Executor:
-    """Remove um executor do pool padrão, tornando-o dedicado."""
+    """Removes an executor from the default pool, making it dedicated."""
     result = await db.execute(
         select(Executor).where(Executor.id_hash == executor_id, Executor.deleted_at.is_(None))
     )
@@ -235,11 +235,11 @@ async def unset_default_agent(db: AsyncSession, executor_id: str) -> Executor:
 
 async def get_agent_workspace_ids(db: AsyncSession, agent_id_hash: str, is_default: bool) -> list[str]:
     """
-    Retorna workspace_ids que este executor pode acessar.
-    - Default: todos os workspaces
-    - Dedicated: workspaces que o apontam (ponteiro legado) OU que o têm em
-      algum nível da política de execução — é para esses que o dispatch
-      manda jobs, e o job precisa do Drive/artefatos do workspace.
+    Returns the workspace_ids this executor can access.
+    - Default: all workspaces
+    - Dedicated: workspaces that point to it (legacy pointer) OR that have it in
+      some tier of the execution policy — those are the ones the dispatch
+      sends jobs to, and the job needs the workspace's Drive/artifacts.
     """
     from app.models.workspace import Workspace
     from app.services.workspace_executor_service import workspace_ids_for_executor
@@ -253,10 +253,10 @@ async def get_agent_workspace_ids(db: AsyncSession, agent_id_hash: str, is_defau
     return sorted(await workspace_ids_for_executor(db, agent_id_hash))
 
 
-# ── CRUD de atribuições diretas (admin) ───────────────────────────────────────
+# ── CRUD of direct assignments (admin) ────────────────────────────────────────
 
 async def list_agent_users(db: AsyncSession, executor_id: str) -> list[dict]:
-    """Retorna usuários atribuídos diretamente ao executor pelo admin."""
+    """Returns users assigned directly to the executor by the admin."""
     from app.models.user import User
 
     result = await db.execute(
@@ -284,8 +284,8 @@ async def assign_user_to_agent(
     assigned_by: str,
 ) -> UserExecutorAssignment:
     """
-    Cria atribuição direta de executor a usuário.
-    Lança ValueError se o executor não estiver ativo ou se a atribuição já existir.
+    Creates a direct assignment of an executor to a user.
+    Raises ValueError if the executor is not active or if the assignment already exists.
     """
     from app.models.user import User
 
@@ -326,8 +326,8 @@ async def assign_user_to_agent(
 
 async def remove_user_from_agent(db: AsyncSession, executor_id: str, user_id: str) -> None:
     """
-    Remove atribuição direta de executor a usuário.
-    Lança ValueError se a atribuição não existir.
+    Removes a direct assignment of an executor to a user.
+    Raises ValueError if the assignment does not exist.
     """
     result = await db.execute(
         select(UserExecutorAssignment).where(
@@ -350,7 +350,7 @@ async def remove_user_from_agent(db: AsyncSession, executor_id: str, user_id: st
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _agent_to_dict(ag: Executor) -> dict:
-    """Serializa Executor para resposta."""
+    """Serializes an Executor for the response."""
     return {
         "id_hash": ag.id_hash,
         "name": ag.name,

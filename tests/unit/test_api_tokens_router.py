@@ -1,10 +1,11 @@
 """
-/auth/tokens — as rotas do token pessoal de acesso.
+/auth/tokens — the personal access token routes.
 
-Banco real (SQLite) por trás da app real: o que se afirma aqui é o contrato
-HTTP — 201 com o segredo uma vez, lista sem segredo, revogação idempotente,
-404 para token alheio, 409 no teto, 422 de validação no formato do repo, 401
-sem sessão — e que o reset de senha derruba os tokens.
+Real database (SQLite) behind the real app: what is asserted here is the HTTP
+contract — 201 with the secret once, a list without the secret, idempotent
+revocation, 404 for someone else's token, 409 at the ceiling, 422 validation in
+the repo's format, 401 without a session — and that a password reset kills the
+tokens.
 """
 from datetime import timedelta
 from unittest.mock import AsyncMock, patch
@@ -24,7 +25,7 @@ from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
 
 TABELAS = [User.__table__, Workspace.__table__, WorkspaceMember.__table__, ApiToken.__table__]
-USUARIO = "usr-test-001"  # o id_hash do mock_current_user do conftest
+USUARIO = "usr-test-001"  # the id_hash of the conftest's mock_current_user
 
 
 @pytest_asyncio.fixture
@@ -36,8 +37,8 @@ async def sessao():
     async with fabrica() as s:
         s.add_all([
             User(id_hash=USUARIO, username="teste", email="t@x.test", hashed_password="x"),
-            # A outra pessoa existe de verdade: `api_tokens.user_id` tem FK para
-            # `users`, e o SQLite só não a impõe por padrão.
+            # The other person really exists: `api_tokens.user_id` has an FK to
+            # `users`, and SQLite just doesn't enforce it by default.
             User(id_hash="u-outro", username="outro", email="o@x.test", hashed_password="x"),
             Workspace(id_hash="ws-test-001", name="Meu", owner_id=USUARIO),
             Workspace(id_hash="ws-outro", name="Alheio", owner_id="u-outro"),
@@ -49,7 +50,7 @@ async def sessao():
 
 @pytest_asyncio.fixture
 async def api(client, sessao, monkeypatch):
-    """Cliente autenticado (conftest) com o banco SQLite no lugar do get_db."""
+    """Authenticated client (conftest) with the SQLite database in place of get_db."""
     from app.api.dependencies import get_db
     from app.main import app
 
@@ -57,7 +58,7 @@ async def api(client, sessao, monkeypatch):
         yield sessao
 
     app.dependency_overrides[get_db] = _db
-    # O `10/hour` é real e conta por IP entre testes do mesmo processo.
+    # The `10/hour` is real and counts per IP across tests in the same process.
     monkeypatch.setattr(limiter, "enabled", False)
     yield client
     app.dependency_overrides.pop(get_db, None)
@@ -88,7 +89,7 @@ async def test_post_cria_e_mostra_o_segredo_uma_unica_vez(api, sessao):
         "last_used_at", "revoked_at", "created_at", "status", "token",
     }
 
-    # No banco só o hash; a listagem nunca devolve o segredo.
+    # Only the hash in the database; the listing never returns the secret.
     linha = (await sessao.execute(select(ApiToken).where(ApiToken.id_hash == corpo["id"]))).scalar_one()
     assert linha.token_hash == pat.hash_segredo(corpo["token"])
     lista = (await api.get("/auth/tokens")).json()
@@ -153,7 +154,7 @@ async def test_delete_revoga_sem_apagar_e_e_idempotente(api):
     assert r2.json()["revoked_at"] == r1.json()["revoked_at"]
 
     lista = (await api.get("/auth/tokens")).json()
-    assert lista[0]["status"] == "revoked"  # continua na lista, marcado
+    assert lista[0]["status"] == "revoked"  # still in the list, flagged
 
 
 @pytest.mark.asyncio
@@ -182,14 +183,14 @@ async def test_sem_sessao_e_401(api):
 
 
 def test_criacao_tem_rate_limit_de_10_por_hora():
-    """Pelo registro do slowapi, não pelo texto-fonte: é o que a request usa."""
+    """Through the slowapi registry, not the source text: it is what the request uses."""
     from app.api.routers import api_tokens_router  # noqa: F401 — importar registra a rota no limiter
 
     limites = limiter._route_limits["app.api.routers.api_tokens_router.criar_token"]
     assert [str(l.limit) for l in limites] == ["10 per 1 hour"]
 
 
-# ── cascata no reset de senha ────────────────────────────────────────────────
+# ── cascade on password reset ────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio

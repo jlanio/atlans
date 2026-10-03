@@ -8,11 +8,11 @@ import { formatarInteiro } from "@/lib/formatos"
 import { PERIODOS, type EstadoDoEscopo, type Periodo } from "./dashboard-url"
 
 interface ContagensDoSubtitulo {
-  /** Nome do workspace ativo; usado só no escopo "ativo". */
+  /** Name of the active workspace; used only in the "ativo" (active) scope. */
   workspaceNome: string | null
-  /** Quantos workspaces o usuário tem; usado só no escopo "todos". */
+  /** How many workspaces the user has; used only in the "todos" (all) scope. */
   workspaces: number
-  /** `metrics.active_workflows`; `null` na 1ª carga (subtítulo vira esqueleto). */
+  /** `metrics.active_workflows`; `null` on the 1st load (subtitle becomes a skeleton). */
   ativos: number | null
 }
 
@@ -25,16 +25,17 @@ interface Props extends ContagensDoSubtitulo {
   onAtualizar: () => void
 }
 
-/** "N workflow(s) ativo(s)" — o plural do número, não a forma fixa da spec. */
+/** "N workflow(s) ativo(s)" — the plural from the number, not the spec's fixed form. */
 function ativosTexto(n: number): string {
   return `${formatarInteiro(n)} ${n === 1 ? "workflow ativo" : "workflows ativos"}`
 }
 
 /**
- * Subtítulo por escopo (docs/specs/dashboard.md §3.9). Exportado para teste.
- * No escopo do workspace ativo, o nome e a contagem de ativos; no "todos", o
- * número de workspaces mais os ativos somados. `ativos` nulo é a 1ª carga —
- * quem chama (o cabeçalho) troca por um esqueleto em vez de escrever "— ativos".
+ * Subtitle per scope (docs/specs/dashboard.md §3.9). Exported for testing.
+ * In the active-workspace scope, the name and the count of active workflows;
+ * in "todos", the number of workspaces plus the summed active ones. A null
+ * `ativos` is the 1st load — the caller (the header) swaps in a skeleton
+ * instead of writing "— ativos".
  */
 export function textoDoSubtitulo(escopo: EstadoDoEscopo, { workspaceNome, workspaces, ativos }: ContagensDoSubtitulo): string {
   const n = ativos ?? 0
@@ -46,10 +47,10 @@ export function textoDoSubtitulo(escopo: EstadoDoEscopo, { workspaceNome, worksp
 }
 
 /**
- * Cabeçalho do Dashboard (docs/specs/dashboard.md §3.9): o título, o subtítulo
- * que diz de que escopo o painel fala, o toggle de escopo (só com mais de um
- * workspace) e o Atualizar. O toggle troca `?escopo=` — a mesma escolha que
- * desce para todas as chamadas de dados.
+ * Dashboard header (docs/specs/dashboard.md §3.9): the title, the subtitle
+ * that says which scope the dashboard is about, the scope toggle (only with
+ * more than one workspace) and Atualizar (refresh). The toggle switches
+ * `?escopo=` — the same choice that flows down to every data call.
  */
 export function CabecalhoDoDashboard({
   escopo, onEscopo, periodo, onPeriodo, workspaceNome, workspaces, ativos, atualizando, onAtualizar,
@@ -68,8 +69,8 @@ export function CabecalhoDoDashboard({
       </div>
 
       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-        {/* Atualizar à esquerda, como em /projetos: a ação de recarregar vem
-            primeiro; o toggle de escopo é filtro, fica depois. */}
+        {/* Atualizar on the left, as in /projetos: the reload action comes
+            first; the scope toggle is a filter, it goes after. */}
         <Button
           variant="ghost"
           size="sm"
@@ -81,8 +82,8 @@ export function CabecalhoDoDashboard({
           <TbRefresh size={14} className={atualizando ? "motion-safe:animate-spin" : undefined} aria-hidden="true" />
           Atualizar
         </Button>
-        {/* Toggle só faz sentido com mais de um workspace: com um só, não há
-            "todos" diferente do "ativo". */}
+        {/* The toggle only makes sense with more than one workspace: with just
+            one, there is no "todos" different from the "ativo". */}
         {workspaces > 1 && (
           <div
             role="group"
@@ -101,9 +102,9 @@ export function CabecalhoDoDashboard({
             />
           </div>
         )}
-        {/* Seletor de período (docs/specs/dashboard.md §3.1): o mesmo grupo do
-            Histórico. Governa a janela dos indicadores/gráfico e das falhas em
-            "Precisa de atenção"; a "Saúde · agora" e as "Próximas" não mudam. */}
+        {/* Period selector (docs/specs/dashboard.md §3.1): the same group as
+            History. It governs the window of the indicators/chart and of the
+            failures in "Precisa de atenção"; "Saúde · agora" and "Próximas" don't change. */}
         <div
           role="group"
           aria-label="Período"

@@ -1,9 +1,9 @@
 // @vitest-environment node
 /**
- * O coletor de relatos da CSP é público (o navegador posta sem sessão). Dois
- * limites: um LOTE do Reporting API — até um minuto de relatos, cada um com a
- * política inteira (~900 bytes) — tem de caber, e um corpo gigante sem
- * Content-Length (chunked) não pode ser bufferizado inteiro antes da recusa.
+ * The CSP report collector is public (the browser posts with no session). Two
+ * limits: a Reporting API BATCH — up to a minute of reports, each with the
+ * whole policy (~900 bytes) — has to fit, and a huge body with no
+ * Content-Length (chunked) must not be buffered whole before being refused.
  */
 import { describe, it, expect, vi, afterEach } from "vitest"
 
@@ -60,7 +60,7 @@ describe("POST /api/csp-report", () => {
     const fluxo = new ReadableStream<Uint8Array>({
       pull(ctrl) {
         lidos += pedaco.byteLength
-        ctrl.enqueue(pedaco)   // infinito: sem o teto, ninguém terminaria
+        ctrl.enqueue(pedaco)   // infinite: without the ceiling, nobody would finish
       },
       cancel() { cancelado = true },
     })

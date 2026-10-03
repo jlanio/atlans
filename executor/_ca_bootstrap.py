@@ -1,39 +1,39 @@
 """
-Auto-bootstrap do root cert da CA interna atlans.
+Auto-bootstrap of the atlans internal CA root cert.
 
-Rodar `python -m executor` num ambiente novo (sem `SSL_CERT_FILE` setado
-e sem `atlans-root.crt` local) hoje quebra com CERTIFICATE_VERIFY_FAILED
-— o cert do host dos executores (`agents.<dominio>`) e emitido pela step-ca interna, que nao
-esta no trust store do sistema. O `install.sh` do fluxo Docker resolve
-isso automaticamente; este modulo faz o mesmo no fluxo Python nativo.
+Running `python -m executor` in a fresh environment (no `SSL_CERT_FILE` set
+and no local `atlans-root.crt`) currently breaks with CERTIFICATE_VERIFY_FAILED
+— the executors' host cert (`agents.<dominio>`) is issued by the internal step-ca, which
+is not in the system trust store. The Docker flow's `install.sh` solves
+this automatically; this module does the same in the native Python flow.
 
-O trust store publicado nas env vars e um bundle COMBINADO — CAs publicas
-(certifi) MAIS a CA interna —, nunca a CA interna sozinha: SSL_CERT_FILE
-substitui o trust store do processo em vez de somar, e aponta-lo so para a
-CA interna quebrava todo acesso HTTPS a servidor publico feito pelos nos de
-workflow (WFS, WMS, APIs) com `unable to get local issuer certificate`.
+The trust store published in the env vars is a COMBINED bundle — public CAs
+(certifi) PLUS the internal CA —, never the internal CA alone: SSL_CERT_FILE
+replaces the process trust store instead of adding to it, and pointing it only
+at the internal CA broke every HTTPS access to public servers made by workflow
+nodes (WFS, WMS, APIs) with `unable to get local issuer certificate`.
 
-Idempotente: se o cert ja existe em `<EXECUTOR_CERT_DIR>/atlans-root.crt`,
-so remonta o bundle e seta as env vars. Se `SSL_CERT_FILE` ja esta setado
-externamente, respeita e nao toca. Falhas de download NAO persistem nada:
-o bootstrap aborta com instrucao de instalacao manual e o executor segue
-o comportamento pre-existente (que provavelmente vai falhar com
-CERTIFICATE_VERIFY_FAILED, dizendo ao operador exatamente o que falta).
+Idempotent: if the cert already exists at `<EXECUTOR_CERT_DIR>/atlans-root.crt`,
+it only rebuilds the bundle and sets the env vars. If `SSL_CERT_FILE` is already set
+externally, it is respected and left alone. Download failures persist NOTHING:
+the bootstrap aborts with manual installation instructions and the executor keeps
+its pre-existing behavior (which will probably fail with
+CERTIFICATE_VERIFY_FAILED, telling the operator exactly what is missing).
 
-SEGURANCA: o material baixado aqui vira ANCORA DE CONFIANCA do host —
-cobre o OTP do enroll, a chave Ed25519 do cert mTLS e todo job futuro.
-Por isso o download so acontece sobre TLS verificado. O unico escape
-para ambientes com inspetor SSL corporativo e o pinning explicito por
-fingerprint (`ATLANS_CA_SHA256`), que valida o material APOS o download.
-Nunca ha um caminho "confia em qualquer coisa": um URL `http://`
-(vindo de `--server=ws://...` ou de EXECUTOR_PUBLIC_SERVER_URL) tambem e
-recusado, porque ali nao ha cadeia nenhuma para verificar — so o pin por
-fingerprint destrava esse caso.
+SECURITY: the material downloaded here becomes the host's TRUST ANCHOR —
+it covers the enroll OTP, the mTLS cert's Ed25519 key and every future job.
+That is why the download only happens over verified TLS. The only escape
+for environments with a corporate SSL inspector is explicit pinning by
+fingerprint (`ATLANS_CA_SHA256`), which validates the material AFTER the download.
+There is never a "trust anything" path: an `http://` URL
+(coming from `--server=ws://...` or from EXECUTOR_PUBLIC_SERVER_URL) is also
+refused, because there is no chain at all to verify there — only the fingerprint
+pin unlocks that case.
 
-Zero dependencias transitivas: usa apenas stdlib. NAO importa
-`executor.config` (que exige `EXECUTOR_ID` — quebraria no 1o boot antes
-do enroll) nem `executor.utils.logger` (que carrega o formatter customizado
-antes do env estar pronto).
+Zero transitive dependencies: uses only the stdlib. Does NOT import
+`executor.config` (which requires `EXECUTOR_ID` — it would break on the 1st boot before
+enroll) nor `executor.utils.logger` (which loads the custom formatter
+before the env is ready).
 """
 from __future__ import annotations
 
@@ -52,8 +52,8 @@ _logger = logging.getLogger("executor.ca_bootstrap")
 
 
 def _emit(level: str, msg: str) -> None:
-    """Escreve em stderr direto — o root logger pode não ter handler ainda
-    quando o bootstrap roda (antes do import de executor.main)."""
+    """Writes to stderr directly — the root logger may not have a handler yet
+    when the bootstrap runs (before executor.main is imported)."""
     print(f"[ca-bootstrap] {level}: {msg}", file=sys.stderr, flush=True)
     if level == "ERROR":
         _logger.error(msg)
@@ -65,37 +65,37 @@ def _emit(level: str, msg: str) -> None:
         _logger.debug(msg)
 
 _CERT_FILENAME = "atlans-root.crt"
-# Trust store efetivo do processo: CAs publicas + CA interna. Derivado, nunca
-# editado a mao — regravado a cada boot quando muda. Ver _ensure_combined_bundle.
+# Effective trust store of the process: public CAs + internal CA. Derived, never
+# edited by hand — rewritten on each boot when it changes. See _ensure_combined_bundle.
 _BUNDLE_FILENAME = "atlans-ca-bundle.crt"
 _CA_BUNDLE_PATH = "/executores/ca-bundle"
 _DOWNLOAD_TIMEOUT_SEC = 15
 
-# Pinning opcional: SHA-256 (hex) do root cert esperado, como sai de
-# `openssl x509 -in atlans-root.crt -noout -fingerprint -sha256`. Aceita com
-# ou sem os `:`. Quando setado, o material baixado e validado contra ele — e
-# so nesse caso a verificacao de cadeia TLS pode ser dispensada (o operador
-# ja provou saber o que esperar). Sem ele, TLS verificado e a unica via.
+# Optional pinning: SHA-256 (hex) of the expected root cert, as output by
+# `openssl x509 -in atlans-root.crt -noout -fingerprint -sha256`. Accepted with
+# or without the `:`. When set, the downloaded material is validated against it — and
+# only in that case can the TLS chain verification be skipped (the operator
+# has already proven they know what to expect). Without it, verified TLS is the only way.
 _PIN_ENV = "ATLANS_CA_SHA256"
 
-# O host dos executores (agents.<dominio>) usa cert da step-ca interna — o
-# proprio download do CA bundle a partir dele quebraria com CERT_VERIFY_FAILED
-# (circular). O install.sh contorna baixando do dominio raiz (cert publico).
-# Replicamos aqui: se o server comeca com `agents.`, usamos `<dominio>` para o
-# download. EXECUTOR_PUBLIC_SERVER_URL permite override manual quando a
-# convencao nao aplica.
+# The executors' host (agents.<dominio>) uses a cert from the internal step-ca — the
+# download of the CA bundle from it would itself break with CERT_VERIFY_FAILED
+# (circular). install.sh works around this by downloading from the root domain (public cert).
+# We replicate it here: if the server starts with `agents.`, we use `<dominio>` for the
+# download. EXECUTOR_PUBLIC_SERVER_URL allows a manual override when the
+# convention does not apply.
 _MTLS_SUBDOMAIN_PREFIX = "agents."
 
 
 def bootstrap_ca() -> None:
-    """Garante um trust store que cobre a CA interna E as CAs publicas.
+    """Ensures a trust store that covers the internal CA AND the public CAs.
 
-    Chamado como PRIMEIRA linha de `executor/__main__.main()`. Nesse
-    ponto nenhum modulo do executor foi importado alem de stdlib do
-    __main__ — setar env aqui e visto por todos os httpx.SSLContext
-    criados nos sub-comandos (default/enroll/status).
+    Called as the FIRST line of `executor/__main__.main()`. At that
+    point no executor module has been imported besides the stdlib of
+    __main__ — setting env here is seen by every httpx.SSLContext
+    created in the subcommands (default/enroll/status).
     """
-    # 1) Override explicito do operador vence — nao toca.
+    # 1) An explicit operator override wins — leave it alone.
     if os.environ.get("SSL_CERT_FILE"):
         _emit(
             "INFO",
@@ -109,27 +109,27 @@ def bootstrap_ca() -> None:
     cert_dir = Path(os.getenv("EXECUTOR_CERT_DIR") or "./certs")
     cert_path = cert_dir / _CERT_FILENAME
 
-    # 2) Cert ja existe (Docker com install.sh, ou boot subsequente) — reusa.
+    # 2) Cert already exists (Docker with install.sh, or a subsequent boot) — reuse it.
     if cert_path.is_file() and cert_path.stat().st_size > 0:
-        # Se o operador configurou um pin, ele vale AQUI TAMBEM, e nao so no
-        # download. O arquivo mora num volume: trocar `atlans-root.crt` por
-        # outro e reiniciar o container instalava a CA do atacante como ancora
-        # de confianca, em silencio — o pin era verificado exatamente uma vez,
-        # no primeiro boot que baixou o bundle, e nunca mais.
+        # If the operator configured a pin, it applies HERE TOO, and not only on
+        # download. The file lives in a volume: replacing `atlans-root.crt` with
+        # another one and restarting the container installed the attacker's CA as a
+        # trust anchor, silently — the pin was checked exactly once,
+        # on the first boot that downloaded the bundle, and never again.
         #
-        # Falha FECHADA: quem configurou o pin optou por ele. Uma CA rotacionada
-        # com pin velho no .env para o boot, e a mensagem diz o que fazer — que
-        # e o desfecho certo para um controle de confianca.
+        # Fail CLOSED: whoever configured the pin opted into it. A rotated CA
+        # with an old pin in .env stops the boot, and the message says what to do — which
+        # is the right outcome for a trust control.
         try:
             pins = _expected_pins()
         except ValueError as exc:
             _emit("ERROR", str(exc))
             raise
         if pins:
-            # Uma leitura so, e o bundle combinado e montado a partir DESTES
-            # bytes. Ler o arquivo aqui e deixar `_set_env` le-lo de novo abriria
-            # uma janela para trocar o conteudo entre a verificacao e o uso —
-            # contra exatamente o atacante que esta checagem existe para barrar.
+            # A single read, and the combined bundle is built from THESE
+            # bytes. Reading the file here and letting `_set_env` read it again would open
+            # a window to swap the content between the check and the use —
+            # against exactly the attacker this check exists to stop.
             material = cert_path.read_bytes()
             try:
                 _assert_pinned(material, pins)
@@ -153,8 +153,8 @@ def bootstrap_ca() -> None:
     # 3) Cert ausente — tenta baixar.
     server_url = _resolve_server_url()
     if not server_url:
-        # Sem servidor nao ha de onde baixar: nada de padrao apontando para uma
-        # instalacao que ninguem escolheu. O enroll traz o --server.
+        # Without a server there is nowhere to download from: no default pointing at an
+        # installation nobody chose. Enroll brings the --server.
         _emit(
             "WARNING",
             "Root cert da CA interna ausente e nenhum servidor configurado "
@@ -168,9 +168,9 @@ def bootstrap_ca() -> None:
         cert_dir.mkdir(parents=True, exist_ok=True)
         _download_atomic(bundle_url, cert_path)
     except Exception as exc:
-        # ABORTA sem persistir nada. Nao existe fallback sem verificacao: o
-        # arquivo viraria ancora de confianca permanente do host, e um atacante
-        # on-path so precisaria corromper o handshake para forcar o downgrade.
+        # ABORTS without persisting anything. There is no unverified fallback: the
+        # file would become the host's permanent trust anchor, and an on-path
+        # attacker would only need to corrupt the handshake to force the downgrade.
         _emit(
             "WARNING",
             f"Nao foi possivel baixar root cert de {bundle_url}: "
@@ -194,20 +194,20 @@ def bootstrap_ca() -> None:
 # ── Helpers ─────────────────────────────────────────────────────────────
 
 def _set_env(cert_path: Path, material: bytes | None = None) -> None:
-    """Aponta as env vars de trust store para o bundle COMBINADO (CAs publicas
-    + CA interna) — nunca para o root cert interno sozinho.
+    """Points the trust store env vars at the COMBINED bundle (public CAs
+    + internal CA) — never at the internal root cert alone.
 
-    Setar SSL_CERT_FILE SUBSTITUI o trust store do processo, nao soma. Apontando
-    so para a CA interna, todo HTTPS de saida para servidor publico quebrava com
-    `unable to get local issuer certificate` — inclusive dentro dos nos de
-    workflow (WFS/WMS via owslib+requests, GDAL/pyogrio, boto3). O executor
-    contornava caso a caso no proprio codigo (`utils.build_mtls_ssl_context`,
-    `enrollment._resolve_enroll_verify`), mas biblioteca de terceiro le a env var
-    direto e nao tem como contornar; a correcao tem que ser aqui.
+    Setting SSL_CERT_FILE REPLACES the process trust store, it does not add. Pointing
+    only at the internal CA, all outbound HTTPS to public servers broke with
+    `unable to get local issuer certificate` — including inside workflow
+    nodes (WFS/WMS via owslib+requests, GDAL/pyogrio, boto3). The executor
+    worked around it case by case in its own code (`utils.build_mtls_ssl_context`,
+    `enrollment._resolve_enroll_verify`), but third-party libraries read the env var
+    directly and cannot be worked around; the fix has to be here.
 
-    As tres env vars cobrem stacks distintas: SSL_CERT_FILE (stdlib ssl, httpx),
-    REQUESTS_CA_BUNDLE (requests/urllib3) e CURL_CA_BUNDLE (libcurl — GDAL,
-    pyogrio e os drivers /vsicurl ignoram as outras duas).
+    The three env vars cover different stacks: SSL_CERT_FILE (stdlib ssl, httpx),
+    REQUESTS_CA_BUNDLE (requests/urllib3) and CURL_CA_BUNDLE (libcurl — GDAL,
+    pyogrio and the /vsicurl drivers ignore the other two).
     """
     p = str(_ensure_combined_bundle(cert_path, material=material))
     os.environ["SSL_CERT_FILE"] = p
@@ -216,11 +216,11 @@ def _set_env(cert_path: Path, material: bytes | None = None) -> None:
 
 
 def _public_ca_pem() -> tuple[bytes | None, str]:
-    """PEM das CAs publicas: certifi (dep do executor), senao o cafile do SO.
+    """PEM of the public CAs: certifi (an executor dependency), otherwise the OS cafile.
 
-    `ssl.get_default_verify_paths()` honra SSL_CERT_FILE, mas aqui ele ainda nao
-    foi setado por nos — `bootstrap_ca` retorna cedo quando o operador ja setou —
-    entao o cafile lido e mesmo o do sistema, sem risco de auto-referencia.
+    `ssl.get_default_verify_paths()` honors SSL_CERT_FILE, but here it has not yet
+    been set by us — `bootstrap_ca` returns early when the operator already set it —
+    so the cafile read really is the system one, with no risk of self-reference.
     """
     try:
         import certifi  # type: ignore
@@ -239,19 +239,19 @@ def _public_ca_pem() -> tuple[bytes | None, str]:
 
 
 def _ensure_combined_bundle(root_cert: Path, material: bytes | None = None) -> Path:
-    """Grava (idempotente) `<dir>/atlans-ca-bundle.crt` = CAs publicas + CA interna.
+    """Writes (idempotently) `<dir>/atlans-ca-bundle.crt` = public CAs + internal CA.
 
-    Retorna o caminho do bundle. Em qualquer falha retorna o proprio `root_cert`:
-    o executor continua falando com o host dos executores (que e o que o torna
-    utilizavel), e o WARNING explica por que HTTPS publico vai falhar.
+    Returns the bundle path. On any failure it returns `root_cert` itself:
+    the executor keeps talking to the executors' host (which is what makes it
+    usable), and the WARNING explains why public HTTPS will fail.
 
-    O diretorio de certs pode estar montado read-only (o compose oferece
-    `./executor-certs:/data/certs:ro`), por isso o fallback para o tmpdir — o
-    bundle e derivado e so precisa sobreviver ao processo.
+    The certs directory may be mounted read-only (the compose offers
+    `./executor-certs:/data/certs:ro`), hence the fallback to the tmpdir — the
+    bundle is derived and only needs to survive the process.
     """
     if material is not None:
-        # Bytes JA verificados contra o pin pelo chamador. Reler o arquivo aqui
-        # abriria uma janela entre a verificacao e o uso.
+        # Bytes ALREADY verified against the pin by the caller. Re-reading the file here
+        # would open a window between the check and the use.
         internal_pem = material.strip()
     else:
         try:
@@ -277,8 +277,8 @@ def _ensure_combined_bundle(root_cert: Path, material: bytes | None = None) -> P
     for target_dir in (root_cert.parent, Path(tempfile.gettempdir())):
         bundle = target_dir / _BUNDLE_FILENAME
         try:
-            # Regrava so quando o conteudo muda (root cert renovado, certifi
-            # atualizado numa nova imagem) — boot normal nao toca o disco.
+            # Rewrites only when the content changes (root cert renewed, certifi
+            # updated in a new image) — a normal boot does not touch the disk.
             if not (bundle.is_file() and bundle.read_bytes() == payload):
                 tmp = bundle.with_suffix(bundle.suffix + ".tmp")
                 tmp.write_bytes(payload)
@@ -298,8 +298,8 @@ def _ensure_combined_bundle(root_cert: Path, material: bytes | None = None) -> P
 
 
 def _do_env_do_executor(nome: str) -> str:
-    """O valor no `executor/.env` (`_env_utils.read_env_var`, stdlib puro), sem
-    as aspas que o dotenv tiraria; vazio se nao houver."""
+    """The value in `executor/.env` (`_env_utils.read_env_var`, pure stdlib), without
+    the quotes dotenv would strip; empty if there is none."""
     from executor._env_utils import read_env_var
 
     try:
@@ -313,27 +313,27 @@ def _do_env_do_executor(nome: str) -> str:
 
 def _resolve_server_url() -> str:
     """
-    Resolve o URL para download do CA bundle.
+    Resolves the URL for downloading the CA bundle.
 
-    Ordem de prioridade:
-      1. EXECUTOR_PUBLIC_SERVER_URL do env — override explicito quando a
-         convencao agents.<dominio> nao aplica.
-      2. --server=<X> ou --server <X> no argv (preferido para enroll),
-         convertido: agents.<dominio> -> <dominio>.
-      3. EXECUTOR_SERVER_URL do ambiente ou, sem ele, do `executor/.env`, mesma
-         conversao. O `.env` pelo motivo de `_expected_pins`: este bootstrap
-         roda antes do `load_dotenv()` de `executor/config.py`, e no executor
-         nativo (systemd, terminal) o servidor so existe no arquivo.
-      4. Nenhum dos tres: vazio, e nada e baixado.
+    Priority order:
+      1. EXECUTOR_PUBLIC_SERVER_URL from the env — explicit override when the
+         agents.<dominio> convention does not apply.
+      2. --server=<X> or --server <X> in argv (preferred for enroll),
+         converted: agents.<dominio> -> <dominio>.
+      3. EXECUTOR_SERVER_URL from the environment or, failing that, from `executor/.env`,
+         same conversion. The `.env` for the reason given in `_expected_pins`: this
+         bootstrap runs before the `load_dotenv()` in `executor/config.py`, and in the
+         native executor (systemd, terminal) the server only exists in the file.
+      4. None of the three: empty, and nothing is downloaded.
 
-    Depois converte wss:// -> https:// e ws:// -> http://. Feito inline
-    (sem importar `executor.utils.ws_to_http`) para nao carregar config.
+    Then converts wss:// -> https:// and ws:// -> http://. Done inline
+    (without importing `executor.utils.ws_to_http`) so as not to load config.
 
-    A conversao PRESERVA o `http://` de um `--server=ws://...` de proposito:
-    quem decide o que fazer com ele e `_download_atomic`, que recusa baixar a
-    ancora de confianca por canal nao verificado (a menos que ATLANS_CA_SHA256
-    esteja setado). Reescrever para https aqui esconderia o problema atras de um
-    erro de conexao confuso.
+    The conversion PRESERVES the `http://` of a `--server=ws://...` on purpose:
+    the one that decides what to do with it is `_download_atomic`, which refuses to
+    download the trust anchor over an unverified channel (unless ATLANS_CA_SHA256
+    is set). Rewriting to https here would hide the problem behind a
+    confusing connection error.
     """
     public_override = os.getenv("EXECUTOR_PUBLIC_SERVER_URL")
     if public_override:
@@ -348,23 +348,23 @@ def _resolve_server_url() -> str:
 
 
 def _strip_mtls_subdomain(url: str) -> str:
-    """`https://agents.<dominio>` -> `https://<dominio>`. Se o host nao
-    comeca com `agents.`, retorna igual. Preserva scheme, path, port."""
+    """`https://agents.<dominio>` -> `https://<dominio>`. If the host does not
+    start with `agents.`, returns it unchanged. Preserves scheme, path, port."""
     from urllib.parse import urlsplit, urlunsplit
     parts = urlsplit(url)
     host = parts.hostname or ""
     if not host.startswith(_MTLS_SUBDOMAIN_PREFIX):
         return url
     new_host = host[len(_MTLS_SUBDOMAIN_PREFIX):]
-    # Preserva porta se houver
+    # Preserve the port if there is one
     netloc = new_host if not parts.port else f"{new_host}:{parts.port}"
     return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment))
 
 
 def _parse_server_from_argv(argv: list[str]) -> str | None:
-    """Parse defensivo — nao mexe no argv, nao usa argparse (que
-    consumiria args conhecidos e quebraria o dispatcher do __main__).
-    Aceita as duas formas comuns: `--server=URL` e `--server URL`.
+    """Defensive parse — does not touch argv, does not use argparse (which
+    would consume known args and break the __main__ dispatcher).
+    Accepts the two common forms: `--server=URL` and `--server URL`.
     """
     for i, arg in enumerate(argv):
         if arg.startswith("--server="):
@@ -375,30 +375,30 @@ def _parse_server_from_argv(argv: list[str]) -> str | None:
 
 
 def _expected_pins() -> frozenset[str]:
-    """Fingerprints SHA-256 aceitos para o root cert, normalizados.
+    """Accepted SHA-256 fingerprints for the root cert, normalized.
 
-    Fontes, nesta ordem: `ATLANS_CA_SHA256` no ambiente, depois no
-    `executor/.env`. O `.env` importa porque `bootstrap_ca()` e a PRIMEIRA linha
-    de `executor/__main__.main()` e roda ANTES do `load_dotenv()` de
-    `executor/config.py`: no compose a variavel chega pelo `env_file`, mas nos
-    fluxos nativo e desktop o pin gravado pelo instalador so existe no arquivo.
+    Sources, in this order: `ATLANS_CA_SHA256` in the environment, then in
+    `executor/.env`. The `.env` matters because `bootstrap_ca()` is the FIRST line
+    of `executor/__main__.main()` and runs BEFORE the `load_dotenv()` in
+    `executor/config.py`: in compose the variable arrives through `env_file`, but in
+    the native and desktop flows the pin written by the installer only exists in the file.
 
-    A leitura usa `_env_utils.read_env_var`, o parser de `.env` que o executor ja
-    tem (stdlib puro, usado pelo enrollment). Ter um segundo parser aqui foi um
-    erro: os dois divergiram na primeira revisao.
+    The read uses `_env_utils.read_env_var`, the `.env` parser the executor already
+    has (pure stdlib, used by enrollment). Having a second parser here was a
+    mistake: the two diverged on the first review.
 
-    Aceita VARIOS fingerprints separados por virgula. Sem isso, o pin estrito
-    tornava impossivel uma rotacao de CA com sobreposicao — o periodo em que o
-    bundle legitimamente carrega o root velho E o novo —, e o executor ficaria
-    sem boot ate alguem desligar o pinning, que e o desfecho oposto ao desejado.
+    Accepts SEVERAL comma-separated fingerprints. Without this, strict pinning
+    made a CA rotation with overlap impossible — the period in which the
+    bundle legitimately carries the old root AND the new one —, and the executor would
+    not boot until someone turned pinning off, which is the opposite of the desired outcome.
 
-    Devolve frozenset vazio quando nao ha pin configurado.
+    Returns an empty frozenset when no pin is configured.
     """
     from executor._env_utils import read_env_var
 
-    # `or`, e nao `is None`: uma env var definida como VAZIA (comum em compose,
-    # `ATLANS_CA_SHA256=` sem valor) sombreava o pin gravado no .env e desligava
-    # o pinning sem nenhum aviso.
+    # `or`, and not `is None`: an env var defined as EMPTY (common in compose,
+    # `ATLANS_CA_SHA256=` with no value) shadowed the pin written in .env and turned
+    # pinning off without any warning.
     bruto = os.environ.get(_PIN_ENV) or ""
     if not bruto.strip():
         try:
@@ -408,8 +408,8 @@ def _expected_pins() -> frozenset[str]:
     if not bruto.strip():
         return frozenset()
 
-    # `export KEY=v` e comentario inline sao formas que o operador escreve a mao
-    # e que o parser compartilhado nao trata; normalizar aqui evita divergir dele.
+    # `export KEY=v` and inline comments are forms the operator writes by hand
+    # and the shared parser does not handle; normalizing here avoids diverging from it.
     bruto = bruto.split("#", 1)[0]
     if bruto.lstrip().startswith("export "):
         bruto = bruto.lstrip()[len("export "):]
@@ -428,10 +428,10 @@ def _expected_pins() -> frozenset[str]:
     return frozenset(pins)
 
 
-# `CERTIFICATE` nao e o unico rotulo que o OpenSSL carrega como ancora:
-# `TRUSTED CERTIFICATE` e `X509 CERTIFICATE` tambem entram em
-# `load_verify_locations`. Reconhecer so o primeiro deixava a checagem de
-# acrescimo ser contornada por um bloco com outro rotulo.
+# `CERTIFICATE` is not the only label OpenSSL loads as an anchor:
+# `TRUSTED CERTIFICATE` and `X509 CERTIFICATE` also go into
+# `load_verify_locations`. Recognizing only the first let the
+# addition check be bypassed by a block with another label.
 _PEM_CERT_RE = re.compile(
     rb"-----BEGIN (?:TRUSTED |X509 )?CERTIFICATE-----"
     rb".*?"
@@ -441,19 +441,19 @@ _PEM_CERT_RE = re.compile(
 
 
 def _pem_fingerprints(payload: bytes) -> list[str]:
-    """SHA-256 (hex) do DER de cada cert do bundle PEM baixado.
+    """SHA-256 (hex) of the DER of each cert in the downloaded PEM bundle.
 
-    O fingerprint e calculado sobre o DER, nao sobre os bytes crus do arquivo —
-    e assim que `openssl x509 -fingerprint -sha256` calcula, entao o operador
-    compara com o valor que o admin passou, e diferencas de whitespace/CRLF ou
-    ordem dos certs no bundle nao invalidam a comparacao.
+    The fingerprint is computed over the DER, not over the raw bytes of the file —
+    that is how `openssl x509 -fingerprint -sha256` computes it, so the operator
+    compares against the value the admin passed, and differences in whitespace/CRLF or
+    in the order of the certs in the bundle do not invalidate the comparison.
     """
     fps: list[str] = []
     for block in _PEM_CERT_RE.findall(payload):
-        # `PEM_cert_to_DER_cert` so aceita o rotulo canonico. Um bloco
-        # `TRUSTED CERTIFICATE` levantava e caia no `continue` — ou seja, NAO
-        # era contado, que e o oposto do que a checagem de acrescimo precisa: o
-        # OpenSSL carrega esse bloco como ancora de confianca do mesmo jeito.
+        # `PEM_cert_to_DER_cert` only accepts the canonical label. A
+        # `TRUSTED CERTIFICATE` block raised and fell into the `continue` — that is, it
+        # was NOT counted, which is the opposite of what the addition check needs: the
+        # OpenSSL loads that block as a trust anchor all the same.
         texto = (block.decode("ascii", errors="replace")
                  .replace("BEGIN TRUSTED CERTIFICATE", "BEGIN CERTIFICATE")
                  .replace("END TRUSTED CERTIFICATE", "END CERTIFICATE")
@@ -462,8 +462,8 @@ def _pem_fingerprints(payload: bytes) -> list[str]:
         try:
             der = ssl.PEM_cert_to_DER_cert(texto)
         except Exception:
-            # Bloco ilegivel: nao da para provar que e o cert pinado, entao
-            # conta como intruso em vez de sumir da verificacao.
+            # Unreadable block: there is no way to prove it is the pinned cert, so
+            # it counts as an intruder instead of vanishing from the check.
             fps.append("<bloco-pem-ilegivel>")
             continue
         fps.append(hashlib.sha256(der).hexdigest())
@@ -471,21 +471,21 @@ def _pem_fingerprints(payload: bytes) -> list[str]:
 
 
 def _assert_pinned(payload: bytes, pins: frozenset[str]) -> None:
-    """Aborta se o bundle contiver QUALQUER cert fora do conjunto pinado.
+    """Aborts if the bundle contains ANY cert outside the pinned set.
 
-    Exigir "todos batem", e nao "algum bate", e o que fecha o ataque por
-    ACRESCIMO. O arquivo inteiro e concatenado as CAs publicas por
-    `_ensure_combined_bundle` e o resultado vira o trust store do processo
-    (SSL_CERT_FILE/REQUESTS_CA_BUNDLE/CURL_CA_BUNDLE): TODO cert dentro dele
-    vira ancora de confianca, e nao so o que casa com o pin. Com a checagem
-    frouxa, um bundle com [root_legitimo, ca_do_atacante] passava — o pin casava
-    com o primeiro — e a segunda entrava no trust store em silencio.
+    Requiring "all match", and not "some match", is what closes the attack by
+    ADDITION. The whole file is concatenated to the public CAs by
+    `_ensure_combined_bundle` and the result becomes the process trust store
+    (SSL_CERT_FILE/REQUESTS_CA_BUNDLE/CURL_CA_BUNDLE): EVERY cert in it
+    becomes a trust anchor, not only the one that matches the pin. With the loose
+    check, a bundle with [legitimate_root, attacker_ca] passed — the pin matched
+    the first — and the second entered the trust store silently.
 
-    O conjunto (e nao um unico valor) e o que mantem viavel a rotacao de CA com
-    sobreposicao: durante a troca, o bundle legitimo carrega os dois roots.
+    The set (and not a single value) is what keeps CA rotation with overlap
+    viable: during the switch, the legitimate bundle carries both roots.
 
-    Vale para os dois caminhos (download e reuso do arquivo ja em disco), porque
-    os dois terminam alimentando o mesmo bundle combinado.
+    Applies to both paths (download and reuse of the file already on disk), because
+    both end up feeding the same combined bundle.
     """
     found = _pem_fingerprints(payload)
     if not found:
@@ -502,12 +502,12 @@ def _assert_pinned(payload: bytes, pins: frozenset[str]) -> None:
 
 
 def _build_download_context() -> tuple[ssl.SSLContext | None, str]:
-    """SSLContext verificado para o download, na ordem:
-      1. `certifi` (a lib traz um bundle de CAs publicos e ja e dep do
-         executor). Resolve o gotcha do Windows onde urllib default
-         nao tem trust store algum e cai em CERTIFICATE_VERIFY_FAILED.
-      2. Default do sistema (`ssl.create_default_context()`). Funciona
-         no Linux/macOS onde o OS mantem trust store.
+    """Verified SSLContext for the download, in this order:
+      1. `certifi` (the lib ships a bundle of public CAs and is already an
+         executor dependency). Solves the Windows gotcha where the default urllib
+         has no trust store at all and falls into CERTIFICATE_VERIFY_FAILED.
+      2. System default (`ssl.create_default_context()`). Works
+         on Linux/macOS where the OS maintains a trust store.
     """
     try:
         import certifi  # type: ignore
@@ -521,7 +521,7 @@ def _build_download_context() -> tuple[ssl.SSLContext | None, str]:
 
 
 def _fetch(req: urllib.request.Request, ctx: ssl.SSLContext | None) -> bytes:
-    """GET simples com timeout. `ctx=None` usa o default do urllib."""
+    """Simple GET with timeout. `ctx=None` uses the urllib default."""
     open_kwargs: dict = {"timeout": _DOWNLOAD_TIMEOUT_SEC}
     if ctx is not None:
         open_kwargs["context"] = ctx
@@ -537,22 +537,22 @@ def _fetch(req: urllib.request.Request, ctx: ssl.SSLContext | None) -> bytes:
 
 
 def _download_atomic(url: str, dest: Path) -> None:
-    """Baixa `url` para `dest.tmp` e faz rename atomico — evita cert
-    corrompido se o processo for interrompido no meio do download.
+    """Downloads `url` to `dest.tmp` and does an atomic rename — avoids a corrupted
+    cert if the process is interrupted in the middle of the download.
 
-    So grava sobre TLS VERIFICADO. Nao existe fallback nao verificado: o
-    arquivo resultante e a ancora de confianca do host, entao um downgrade
-    acionavel por qualquer erro de handshake daria a um atacante on-path
-    comprometimento persistente (OTP do enroll, chave do cert mTLS, jobs).
+    Only writes over VERIFIED TLS. There is no unverified fallback: the
+    resulting file is the host's trust anchor, so a downgrade
+    triggerable by any handshake error would give an on-path attacker
+    persistent compromise (enroll OTP, mTLS cert key, jobs).
 
-    Isso inclui o SCHEME: `http://` nao e um TLS que falhou, e um TLS que nunca
-    existiu — o SSLContext montado abaixo seria simplesmente ignorado pelo
-    urllib e o payload chegaria em texto claro. Sem pin, aborta.
+    That includes the SCHEME: `http://` is not a TLS that failed, it is a TLS that never
+    existed — the SSLContext built below would simply be ignored by
+    urllib and the payload would arrive in cleartext. Without a pin, abort.
 
-    Escape unico para inspetor SSL corporativo (ou para o `http://` do on-prem):
-    `ATLANS_CA_SHA256`. Com o fingerprint pinado a cadeia pode nao validar, mas o
-    material baixado e conferido contra o pin ANTES de qualquer escrita —
-    divergencia aborta.
+    The only escape for a corporate SSL inspector (or for the on-prem `http://`):
+    `ATLANS_CA_SHA256`. With the fingerprint pinned the chain may not validate, but the
+    downloaded material is checked against the pin BEFORE any write —
+    a mismatch aborts.
     """
     from urllib.parse import urlsplit
 
@@ -599,14 +599,14 @@ def _download_atomic(url: str, dest: Path) -> None:
             used_source = source
             break
         except urllib.error.HTTPError:
-            # Resposta do servidor (404, 500...): trocar de contexto TLS nao ajuda.
+            # Server response (404, 500...): switching TLS context does not help.
             raise
         except urllib.error.URLError as exc:
-            # urllib encapsula o SSLError do handshake em URLError.reason — o
-            # `except ssl.SSLError` anterior nunca casava e a segunda tentativa
-            # so acontecia por acaso.
+            # urllib wraps the handshake SSLError in URLError.reason — the
+            # earlier `except ssl.SSLError` never matched and the second attempt
+            # only happened by accident.
             if not isinstance(exc.reason, ssl.SSLError):
-                raise  # DNS, connection refused, timeout: nao e problema de cadeia
+                raise  # DNS, connection refused, timeout: not a chain problem
             last_exc = exc
             continue
         except ssl.SSLError as exc:
@@ -616,7 +616,7 @@ def _download_atomic(url: str, dest: Path) -> None:
     if payload is None:
         raise last_exc or RuntimeError("Download do root cert falhou sem excecao registrada.")
 
-    # Validacao ANTES de escrever: nada toca o disco se o pin divergir.
+    # Validation BEFORE writing: nothing touches the disk if the pin mismatches.
     if pins:
         _assert_pinned(payload, pins)
 

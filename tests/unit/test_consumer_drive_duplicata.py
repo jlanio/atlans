@@ -1,24 +1,26 @@
 # tests/unit/test_consumer_drive_duplicata.py
-"""O consumer criava uma linha de Drive por execucao, apesar da sobrescrita.
+"""The consumer created one Drive row per run, despite the overwrite.
 
-Cadeia real, observada em producao com dois runs seguidos:
+Real chain, observed in production with two consecutive runs:
 
-  run A -> DataOutput sobrescreve a linha existente, cuja s3_key e de um run
-           ANTIGO (.../6f1e9667/imovel.geojson). O PUT vai para essa key.
-  run A -> _register_artifacts DERIVA a key do task_id do run atual
-           (.../91da8a94/imovel.geojson — ver _derive_s3_key e o SEG na
-           docstring: a key vinda do executor e ignorada de proposito).
-           A guarda `WHERE s3_key == <derivada>` nao acha nada e cria uma linha
-           NOVA, confirmed, apontando para uma key onde ninguem escreveu.
-  run B -> a busca da sobrescrita pega a mais recente do workspace, que e
-           justamente essa orfa, e escreve nela. E o consumer cria outra.
+  run A -> DataOutput overwrites the existing row, whose s3_key is from an
+           OLD run (.../6f1e9667/imovel.geojson). The PUT goes to that key.
+  run A -> _register_artifacts DERIVES the key from the current run's task_id
+           (.../91da8a94/imovel.geojson — see _derive_s3_key and the SEG in
+           the docstring: the key coming from the executor is ignored on purpose).
+           The guard `WHERE s3_key == <derivada>` finds nothing and creates a
+           NEW row, confirmed, pointing to a key nobody wrote to.
+  run B -> the overwrite lookup takes the workspace's most recent one, which
+           is precisely that orphan, and writes to it. And the consumer creates
+           another.
 
-Resultado: o log dizia "sobrescreveu arquivo existente" — e dizia a verdade —
-enquanto o Drive acumulava uma copia por execucao. O `file_created` que o
-executor recebia (em vez de `file_updated`) era o evento desta linha nova.
+Result: the log said "sobrescreveu arquivo existente" (overwrote existing file)
+— and it was telling the truth — while the Drive piled up one copy per run. The
+`file_created` the executor received (instead of `file_updated`) was the event
+for this new row.
 
-A guarda passou a usar o `drive_file_id` que o executor devolve, validado
-contra o banco.
+The guard now uses the `drive_file_id` that the executor returns, validated
+against the database.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -29,8 +31,8 @@ from app.core.run_result_consumer import _register_artifacts
 
 WS = "ws-1"
 TASK_ATUAL = "task-B"
-# A linha reaproveitada guarda a key de um run antigo; o consumer deriva a do
-# run atual. Esse descasamento e o coracao do bug.
+# The reused row holds the key of an old run; the consumer derives the
+# current run's. That mismatch is the heart of the bug.
 S3_ANTIGA = f"artifacts/{WS}/task-ANTIGO/imovel.geojson"
 S3_DERIVADA = f"artifacts/{WS}/{TASK_ATUAL}/imovel.geojson"
 
@@ -50,33 +52,33 @@ def _meta(**extra) -> dict:
 
 def _db(*, id_hash_no_banco: str | None = None, workspace_da_linha: str = WS,
         s3_keys_no_banco: tuple[str, ...] = ()):
-    """Duble que responde por QUERY, nao um valor unico para todas.
+    """Test double that answers per QUERY, not a single value for all of them.
 
-    Necessario: um duble que devolve o mesmo resultado para tudo faz a busca por
-    s3_key mascarar a busca por id_hash, e o teste passa mesmo com a guarda nova
-    removida. O caso real e justamente aquele em que as duas discordam — o
-    id_hash casa e a s3_key derivada nao existe.
+    Necessary: a double that returns the same result for everything makes the
+    s3_key lookup mask the id_hash lookup, and the test passes even with the new
+    guard removed. The real case is precisely the one where the two disagree —
+    the id_hash matches and the derived s3_key does not exist.
 
-    As duas guardas viraram consultas EM LOTE (`in_()`) fora do laco — antes
-    eram duas queries por item de Drive, um N+1 dentro do processamento de um
-    unico item da fila. Por isso o duble devolve listas por `.scalars().all()`,
-    e nao um objeto por `.scalar_one_or_none()`.
+    Both guards became BATCH queries (`in_()`) outside the loop — before, they
+    were two queries per Drive item, an N+1 inside the processing of a single
+    queue item. That is why the double returns lists via `.scalars().all()`,
+    and not an object via `.scalar_one_or_none()`.
     """
     db = MagicMock(commit=AsyncMock(), add=MagicMock())
 
     async def _execute(stmt):
-        # So o WHERE distingue as consultas: `select(WorkspaceFile)` lista
-        # id_hash E s3_key na clausula SELECT, entao casar no SQL inteiro faria
-        # a busca por s3_key cair no ramo do id_hash.
+        # Only the WHERE distinguishes the queries: `select(WorkspaceFile)` lists
+        # id_hash AND s3_key in the SELECT clause, so matching on the whole SQL
+        # would make the s3_key lookup fall into the id_hash branch.
         onde = str(stmt).split("WHERE")[-1]
         res = MagicMock()
         res.scalar_one_or_none.return_value = None
-        # A guarda de idempotencia de Artifact le `.all()` de (node_id, filename);
-        # itens de Drive nao geram linha Artifact, entao ela volta vazia aqui.
+        # The Artifact idempotency guard reads `.all()` of (node_id, filename);
+        # Drive items do not produce an Artifact row, so it comes back empty here.
         res.all.return_value = []
         if "id_hash" in onde:
-            # Sem o filtro de workspace no SQL, um id de OUTRO workspace casaria
-            # — e a guarda suprimiria o registro deste run.
+            # Without the workspace filter in the SQL, an id from ANOTHER workspace would
+            # match — and the guard would suppress this run's record.
             casa_ws = (workspace_da_linha == WS) if "workspace_id" in onde else True
             achou = bool(id_hash_no_banco) and casa_ws
             linhas = [MagicMock(id_hash=id_hash_no_banco)] if achou else []
@@ -99,13 +101,13 @@ def _adicionados(db) -> list:
 
 @pytest.fixture
 def eventos():
-    """Captura o que seria publicado no Redis para os executores."""
+    """Captures what would be published to Redis for the executors."""
     return []
 
 
 @pytest.fixture(autouse=True)
 def _sem_io(eventos):
-    """Sem S3 e sem WebSocket; os eventos vao para a lista `eventos`."""
+    """No S3 and no WebSocket; the events go to the `eventos` list."""
     async def _emit(workspace_id, action, file_info, **kwargs):
         eventos.append((action, file_info))
 
@@ -118,11 +120,11 @@ def _sem_io(eventos):
 
 @pytest.mark.asyncio
 async def test_nao_duplica_apos_sobrescrita():
-    """Regressão: era exatamente aqui que nascia uma cópia por execução.
+    """Regression: this is exactly where one copy per run was born.
 
-    O id_hash casa no banco e a s3_key derivada NÃO existe — porque a linha
-    reaproveitada guardou a key do run antigo. A guarda por s3_key, sozinha,
-    deixa passar.
+    The id_hash matches in the database and the derived s3_key does NOT exist —
+    because the reused row kept the old run's key. The s3_key guard alone lets
+    it through.
     """
     db = _db(id_hash_no_banco="file-1", s3_keys_no_banco=())
 
@@ -133,14 +135,15 @@ async def test_nao_duplica_apos_sobrescrita():
 
 @pytest.mark.asyncio
 async def test_executor_e_avisado_mesmo_sem_criar_linha(eventos):
-    """Regressão introduzida ao suprimir a criação: o executor ficava sem o evento.
+    """Regression introduced when suppressing the creation: the executor was left without the event.
 
-    `agent_confirm_upload` emite com exclude_agent_id=<executor que subiu>, e há
-    um único target_executor_id por workspace — normalmente o mesmo. O evento
-    morre ali. Isso é correto para o GeoSync, que sobe o que já tem em disco
-    (uploader.py usa o MESMO endpoint), mas não para um artefato de run: o
-    arquivo foi produzido em memória e o executor não o tem localmente. Sem
-    esta emissão, SYNC_MODE download/bidirectional para de receber o arquivo.
+    `agent_confirm_upload` emits with exclude_agent_id=<executor that uploaded>,
+    and there is a single target_executor_id per workspace — usually the same one.
+    The event dies there. That is correct for GeoSync, which uploads what it
+    already has on disk (uploader.py uses the SAME endpoint), but not for a run
+    artifact: the file was produced in memory and the executor does not have it
+    locally. Without this emission, SYNC_MODE download/bidirectional stops
+    receiving the file.
     """
     db = _db(id_hash_no_banco="file-1")
 
@@ -172,7 +175,7 @@ async def test_linha_criada_aqui_tambem_avisa(eventos):
 
 @pytest.mark.asyncio
 async def test_id_inexistente_nao_impede_o_registro():
-    """O id vem do executor, então não vale por si só."""
+    """The id comes from the executor, so it is not trusted on its own."""
     db = _db(id_hash_no_banco=None)
 
     await _register_artifacts(db, _run(), _meta(drive_file_id="file-forjado"))
@@ -182,8 +185,8 @@ async def test_id_inexistente_nao_impede_o_registro():
 
 @pytest.mark.asyncio
 async def test_id_de_outro_workspace_nao_impede_o_registro():
-    """A guarda tem de restringir ao workspace do run — senão um id_hash válido
-    de outro workspace suprimiria o registro deste."""
+    """The guard has to restrict to the run's workspace — otherwise a valid id_hash
+    from another workspace would suppress this one's record."""
     db = _db(id_hash_no_banco="file-de-outro", workspace_da_linha="ws-2")
 
     await _register_artifacts(db, _run(), _meta(drive_file_id="file-de-outro"))
@@ -193,7 +196,7 @@ async def test_id_de_outro_workspace_nao_impede_o_registro():
 
 @pytest.mark.asyncio
 async def test_sem_drive_file_id_mantem_a_guarda_por_s3_key():
-    """Caminho que não passou pelo executor-upload-url continua protegido."""
+    """A path that did not go through executor-upload-url is still protected."""
     db = _db(id_hash_no_banco=None, s3_keys_no_banco=(S3_DERIVADA,))
 
     await _register_artifacts(db, _run(), _meta())
@@ -209,14 +212,14 @@ async def test_cria_a_linha_quando_ninguem_registrou():
 
     criadas = _adicionados(db)
     assert len(criadas) == 1
-    # A key continua sendo a DERIVADA — o SEG de _derive_s3_key não muda.
+    # The key is still the DERIVED one — the SEG of _derive_s3_key does not change.
     assert criadas[0].s3_key == S3_DERIVADA
     assert criadas[0].status == "confirmed"
 
 
 @pytest.mark.asyncio
 async def test_artefato_comum_nao_e_afetado():
-    """context="artifacts" não passa pela guarda de Drive."""
+    """context="artifacts" does not go through the Drive guard."""
     from app.models.workspace_file import WorkspaceFile
 
     db = _db(id_hash_no_banco="file-1")

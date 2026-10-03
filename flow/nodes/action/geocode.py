@@ -1,12 +1,12 @@
 # flow/nodes/action/geocode.py
 """
-Nó Geocode — geocodifica endereços via Nominatim (OpenStreetMap) e retorna um GeoDataFrame.
-Sem chave de API necessária; respeita o Nominatim Usage Policy (1 req/s).
+Geocode node — geocodes addresses via Nominatim (OpenStreetMap) and returns a GeoDataFrame.
+No API key required; honors the Nominatim Usage Policy (1 req/s).
 
-O servidor é o público (nominatim.openstreetmap.org) ou o que o executor
-configurar em NOMINATIM_URL (um Nominatim próprio, para volume maior). O
-User-Agent leva o site da instalação (flow/utils/identidade.py), como a política
-pede; o campo do nó o substitui.
+The server is the public one (nominatim.openstreetmap.org) or whatever the executor
+configures in NOMINATIM_URL (a self-hosted Nominatim, for higher volume). The
+User-Agent carries the installation's site (flow/utils/identidade.py), as the policy
+asks; the node's field overrides it.
 """
 import asyncio
 import os
@@ -22,15 +22,15 @@ from flow.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# O padrão antigo do campo, e o que continua no catálogo. O web grava os
-# padrões no nó, e um executor anterior a esta versão chamaria o Nominatim com
-# User-Agent vazio — o geopy recusa (ConfigurationError). Este nó trata o valor
-# antigo como vazio: os dois querem dizer "o da instalação".
+# The field's old default, and the one still in the catalog. The web app writes
+# the defaults into the node, and an executor older than this version would call
+# Nominatim with an empty User-Agent — geopy refuses it (ConfigurationError). This
+# node treats the old value as empty: both mean "the installation's".
 USER_AGENT_ANTIGO = "atlas-studio-geocode/1.0"
 
 
 def user_agent_do_no(valor) -> str:
-    """O User-Agent do campo, ou o da instalação quando ele é vazio ou o antigo."""
+    """The field's User-Agent, or the installation's when it is empty or the old one."""
     texto = (valor or "").strip()
     if texto in ("", USER_AGENT_ANTIGO):
         return user_agent_da_instalacao("geocode")
@@ -38,7 +38,7 @@ def user_agent_do_no(valor) -> str:
 
 
 def _servidor_nominatim(ambiente=None) -> dict[str, str]:
-    """`domain`/`scheme` do geopy para NOMINATIM_URL; vazio = o servidor público."""
+    """geopy `domain`/`scheme` for NOMINATIM_URL; empty = the public server."""
     ambiente = os.environ if ambiente is None else ambiente
     url = (ambiente.get("NOMINATIM_URL") or "").strip().rstrip("/")
     if not url:
@@ -68,8 +68,8 @@ class GeocodeNode(BaseNode):
                     "label": "Coluna de Endereço",
                     "type": "string",
                     "default": "address",
-                    # O editor oferece os nomes vistos na última execução do nó
-                    # anterior — mesma dica do AttributeFilter.
+                    # The editor offers the names seen in the last run of the
+                    # previous node — same hint as AttributeFilter.
                     "suggest_columns": "*",
                     "description": "Nome da coluna que contém os endereços a geocodificar.",
                 },
@@ -114,8 +114,8 @@ class GeocodeNode(BaseNode):
         user_agent     = user_agent_do_no(self.parameters.get("user_agent"))
         servidor       = _servidor_nominatim()
 
-        # Obtém o dado de entrada: pode ser GeoDataFrame ou DataFrame regular
-        # Se houver um GDF, usa-o; caso contrário, pega o primeiro valor dos inputs
+        # Gets the input data: may be a GeoDataFrame or a regular DataFrame
+        # If there is a GDF, uses it; otherwise, takes the first value of the inputs
         data = None
         for v in inputs.values():
             if isinstance(v, (gpd.GeoDataFrame, pd.DataFrame)):

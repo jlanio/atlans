@@ -1,13 +1,13 @@
 "use client"
 
-// "Nova senha", dentro do modal: o que a página /reset-password fazia. O token
-// vem do link do e-mail, pela query da Home (`/?redefinir=1&token=…`), e é
-// SÓ isto que esta tela recebe de fora — ela não sabe de quem é a conta, e não
-// precisa saber.
+// "Nova senha", inside the modal: what the /reset-password page did. The token
+// comes from the e-mail link, via the Home's query (`/?redefinir=1&token=…`), and
+// it is the ONLY thing this screen receives from outside — it does not know
+// whose account it is, and does not need to.
 //
-// No sucesso não há navegação: o painel troca para o login, já com o aviso de
-// que a senha foi trocada. Se a pessoa chegou aqui pela barra (com uma mensagem
-// pendente), ela continua esperando o login.
+// On success there is no navigation: the panel switches to login, already with
+// the notice that the password was changed. If the person got here via the bar
+// (with a pending message), it keeps waiting for the login.
 
 import { useState } from "react"
 import axios from "axios"
@@ -21,10 +21,10 @@ import { BotaoDoModal, LinkDoModal } from "./botao-do-modal"
 import { textoDaRecusaDoLink } from "./recusas"
 
 interface Props {
-  /** O token do link do e-mail. Vazio = link inválido ou truncado. */
+  /** The token from the e-mail link. Empty = invalid or truncated link. */
   token?: string
   onEnviando: (enviando: boolean) => void
-  /** A senha foi trocada: o modal volta ao login com o aviso. */
+  /** The password was changed: the modal returns to login with the notice. */
   onRedefiniu: () => void
   /** Pedir um link novo — o painel de "Esqueceu a senha?". */
   onRecuperar: () => void
@@ -32,8 +32,8 @@ interface Props {
 
 export function PainelRedefinir({ token, onEnviando, onRedefiniu, onRecuperar }: Props) {
   const t = useTextos().entrada.painelRedefinir
-  // O servidor só fala português: nos outros idiomas, a recusa pelo texto do
-  // idioma (ver ./recusas).
+  // The server only speaks Portuguese: in the other languages, the rejection via
+  // the language's text (see ./recusas).
   const traduzir = useIdiomaDaTela() !== "pt-BR"
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
@@ -66,9 +66,9 @@ export function PainelRedefinir({ token, onEnviando, onRedefiniu, onRecuperar }:
     }
   }
 
-  // Sem token não há o que redefinir. Em vez do beco sem saída que a página
-  // antiga dava ("Link inválido" + um link para outra página), o caminho de
-  // volta é um clique, no mesmo modal.
+  // Without a token there is nothing to reset. Instead of the dead end the old
+  // page gave ("Link inválido" + a link to another page), the way back is one
+  // click, in the same modal.
   if (!token) {
     return (
       <>

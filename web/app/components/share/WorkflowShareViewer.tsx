@@ -21,7 +21,7 @@ const MapLibreMap = dynamic(() => import("./MapLibreMap"), {
   loading: () => (
     <div className="w-full h-full flex items-center justify-center bg-muted">
       <div className="flex flex-col items-center gap-3">
-        {/* Movimento sob motion-safe: quem pede menos animação vê o ícone parado. */}
+        {/* Motion under motion-safe: whoever asks for less animation sees the icon still. */}
         <TbLoader2 className="motion-safe:animate-spin text-muted-foreground size-8" aria-hidden="true" />
         <span className="text-xs text-muted-foreground">Carregando mapa…</span>
       </div>
@@ -44,7 +44,7 @@ interface PortalLayer {
   features: number | null;
   bbox: [number, number, number, number] | null;
   geometry_type: string | null;
-  /** ISO timestamp da ultima publicacao — usado como cache-buster nas URLs de tile MVT. */
+  /** ISO timestamp of the last publication — used as cache-buster in MVT tile URLs. */
   updated_at: string | null;
   publish_config: PublishConfig | null;
 }
@@ -111,8 +111,8 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
   const runDateFormatted = formatLocal(data.run_date, "DD/MM/YYYY HH:mm:ss")
   const runDateLabel = runDateFormatted === "—" ? null : runDateFormatted
 
-  // Classe comum dos botões-ícone do cabeçalho: anel de foco padrão (§5) e alvo
-  // de 40px no telefone (size-10/p-2.5), reduzindo no desktop.
+  // Shared class for the header icon buttons: standard focus ring (§5) and a
+  // 40px target on the phone (size-10/p-2.5), shrinking on desktop.
   const botaoHeader =
     "flex items-center justify-center rounded-lg p-2.5 sm:p-1.5 max-md:size-10 text-muted-foreground transition-colors outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50";
 
@@ -173,12 +173,12 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
       {/* ── Body ───────────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden relative">
 
-        {/* Toggle sidebar — visível em todos os tamanhos */}
+        {/* Toggle sidebar — visible at every size */}
         <button
           type="button"
           onClick={() => setSidebarOpen(!sidebarOpen)}
-          // No telefone este é o único controle que abre a lista de camadas, e
-          // a 28px ficava bem abaixo do alvo de toque de 44px.
+          // On the phone this is the only control that opens the layer list, and
+          // at 28px it fell well short of the 44px touch target.
           className="absolute top-3 z-20 p-3 sm:p-1.5 rounded-lg bg-background/90 backdrop-blur-sm border border-border/60 shadow-xs transition-all outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
           style={{ left: sidebarOpen ? "16.5rem" : "0.75rem" }}
           aria-label={sidebarOpen ? "Recolher camadas" : "Mostrar camadas"}
@@ -211,7 +211,7 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
           </div>
 
           {layers.length === 0 ? (
-            // Vazio canônico (§3.3), adaptado à largura da lateral.
+            // Canonical empty state (§3.3), adapted to the sidebar width.
             <section
               aria-labelledby="camadas-vazio-titulo"
               className="flex-1 flex flex-col items-center justify-center gap-3 px-6 py-14 text-center"
@@ -258,11 +258,11 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
                         </span>
                       </button>
 
-                      {/* Spinner de carregamento */}
+                      {/* Loading spinner */}
                       {layer.loading ? (
                         <TbLoader2 className="size-3.5 motion-safe:animate-spin text-muted-foreground shrink-0" aria-hidden="true" />
                       ) : (
-                        /* Botão zoom para camada */
+                        /* Zoom-to-layer button */
                         <button
                           type="button"
                           onClick={() => mapRef.current?.fitToLayer(layer.id)}
@@ -329,7 +329,7 @@ export default function WorkflowShareViewer({ data, workflowHash }: { data: Port
         {/* ── Mapa ─────────────────────────────────────────────────── */}
         <main className="flex-1 overflow-hidden">
           {layers.length === 0 ? (
-            // Vazio canônico (§3.3): sem camadas publicadas não há o que desenhar.
+            // Canonical empty state (§3.3): with no published layers there is nothing to draw.
             <div className="w-full h-full flex items-center justify-center bg-muted p-6">
               <section aria-labelledby="mapa-vazio-titulo">
                 <CartaoDeEstado

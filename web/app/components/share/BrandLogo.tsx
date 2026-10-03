@@ -1,11 +1,11 @@
 import Link from "next/link";
 
 /**
- * Identidade de marca do portal público (`/share`). O gradiente laranja é a
- * exceção de cor crua explicitamente permitida pelo contrato (§6 — logotipo de
- * marca como identidade), então fica isolado neste componente único para não
- * duplicar o hex entre a página de erro e o cabeçalho do visualizador. Sem
- * hooks: serve tanto no server component (`page.tsx`) quanto no client
+ * Brand identity of the public portal (`/share`). The orange gradient is the
+ * raw-color exception explicitly allowed by the contract (§6 — brand logo as
+ * identity), so it is isolated in this single component to avoid duplicating
+ * the hex between the error page and the viewer header. No hooks: it works both
+ * in the server component (`page.tsx`) and in the client
  * (`WorkflowShareViewer`).
  */
 export function BrandLogo({ size = "sm", href }: { size?: "sm" | "md"; href?: string }) {
@@ -16,7 +16,7 @@ export function BrandLogo({ size = "sm", href }: { size?: "sm" | "md"; href?: st
     <span className="inline-flex items-center gap-2">
       <span
         className={`flex items-center justify-center font-bold text-white ${marca}`}
-        // Gradiente da marca (identidade permitida) — ver comentário do componente.
+        // Brand gradient (allowed identity) — see the component comment.
         style={{ background: "linear-gradient(135deg, #FF6A00, #FF9A00)" }}
         aria-hidden="true"
       >

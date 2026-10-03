@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 
-// A URL é dublada por um `URLSearchParams` mutável: o teste controla o que
-// `useSearchParams` devolve e observa o que `router.replace` recebe.
+// The URL is doubled by a mutable `URLSearchParams`: the test controls what
+// `useSearchParams` returns and observes what `router.replace` receives.
 const url = { sp: new URLSearchParams(""), pathname: "/projects" }
 const replace = vi.fn()
 const push = vi.fn()
@@ -47,8 +47,8 @@ describe("useProjetosUrl", () => {
   it("duas escritas seguidas, antes de a URL refletir a primeira, se acumulam", () => {
     const { result } = renderHook(() => useProjetosUrl())
     act(() => result.current.atualizar({ filtro: "falha" }))
-    // A URL ainda é a antiga (o router não respondeu): a tecla na busca
-    // parte do que foi escrito, não do que está na barra.
+    // The URL is still the old one (the router has not responded): the keystroke in the search
+    // starts from what was typed, not from what is in the bar.
     act(() => result.current.atualizar({ q: "sic" }))
     expect(ultimaUrl()).toBe("/projects?q=sic&filtro=falha")
   })

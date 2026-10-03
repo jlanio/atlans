@@ -1,21 +1,21 @@
 # tests/unit/test_usage_daily_corrida.py
-"""usage_daily: incremento atomico e recuperacao da corrida do INSERT.
+"""usage_daily: atomic increment and recovery from the INSERT race.
 
-O agregado diario e escrito por DOIS caminhos com sessoes SEPARADAS para o mesmo
-(date, workspace_id): o consumer (fila run_results) e `account_terminal_run`
-(falha de despacho, cancel antes do executor, watchdog de executor desconectado).
-Antes, `_upsert_usage_daily` fazia SELECT -> UPDATE-em-Python OU INSERT -> commit:
-duas sessoes liam o mesmo total e ambas gravavam o mesmo +1 (lost update), e no
-1o run do dia os dois INSERTs colidiam em uq_usage_daily. Agora o upsert e
-atomico: UPDATE `coluna = coluna + delta` no SQL e, quando a linha ainda nao
-existe, um INSERT sob savepoint que, ao perder a corrida, re-faz o UPDATE.
+The daily aggregate is written by TWO paths with SEPARATE sessions for the same
+(date, workspace_id): the consumer (run_results queue) and `account_terminal_run`
+(dispatch failure, cancel before the executor, disconnected-executor watchdog).
+Before, `_upsert_usage_daily` did SELECT -> UPDATE-in-Python OR INSERT -> commit:
+two sessions read the same total and both wrote the same +1 (lost update), and on
+the 1st run of the day the two INSERTs collided on uq_usage_daily. Now the upsert
+is atomic: UPDATE `coluna = coluna + delta` in SQL and, when the row does not
+exist yet, an INSERT under a savepoint that, on losing the race, redoes the UPDATE.
 
-Por que estes testes NAO usam `asyncio.gather`: o SQLite em memoria e StaticPool
-(uma unica conexao), entao duas corrotinas "concorrentes" sao serializadas — a
-intercalacao UPDATE/UPDATE/INSERT/INSERT nao acontece. Em lugar disso a linha
-vencedora e plantada de verdade e o 1o UPDATE do perdedor e forcado a ver 0
-linhas, para o INSERT dele bater na constraint REAL (nao um erro fabricado) — o
-mesmo padrao de `test_versao_corrida.py`.
+Why these tests do NOT use `asyncio.gather`: the in-memory SQLite is a StaticPool
+(a single connection), so two "concurrent" coroutines are serialized — the
+UPDATE/UPDATE/INSERT/INSERT interleaving does not happen. Instead, the winning
+row is actually planted and the loser's 1st UPDATE is forced to see 0 rows, so
+that its INSERT hits the REAL constraint (not a fabricated error) — the same
+pattern as `test_versao_corrida.py`.
 """
 import pytest
 import pytest_asyncio
@@ -52,8 +52,8 @@ def _run(status="failed", ws="ws-1") -> WorkflowRun:
 
 
 async def _linhas(db, ws="ws-1") -> list[dict]:
-    """Le por Core (nao pelo identity map do ORM, que ficaria com o valor velho da
-    linha plantada depois do UPDATE atomico)."""
+    """Reads via Core (not via the ORM's identity map, which would keep the stale
+    value of the planted row after the atomic UPDATE)."""
     hoje = utc_now_naive().date()
     res = await db.execute(
         sa_select(UsageDaily.__table__).where(
@@ -77,8 +77,8 @@ async def test_cria_linha_quando_nao_existe(db):
 
 @pytest.mark.asyncio
 async def test_incrementa_linha_existente_no_sql(db):
-    """A linha do dia ja existe: o incremento e `coluna = coluna + delta` no SQL
-    (nao um read-modify-write em Python que perderia updates concorrentes)."""
+    """The day's row already exists: the increment is `coluna = coluna + delta` in
+    SQL (not a read-modify-write in Python that would lose concurrent updates)."""
     hoje = utc_now_naive().date()
     db.add(UsageDaily(
         date=hoje, workspace_id="ws-1",
@@ -99,10 +99,10 @@ async def test_incrementa_linha_existente_no_sql(db):
 
 @pytest.mark.asyncio
 async def test_perdedor_da_corrida_do_insert_reincrementa(db, monkeypatch):
-    """A linha vencedora e plantada; o 1o UPDATE do perdedor e forcado a ver 0
-    linhas (leitura velha), entao o INSERT dele bate na uq_usage_daily REAL. O
-    savepoint isola a violacao e o run re-faz o UPDATE atomico sobre a vencedora —
-    resultado: UMA linha, com a soma das duas contribuicoes, e nenhum erro sobe."""
+    """The winning row is planted; the loser's 1st UPDATE is forced to see 0 rows
+    (stale read), so its INSERT hits the REAL uq_usage_daily. The savepoint
+    isolates the violation and the run redoes the atomic UPDATE on the winner —
+    result: ONE row, with the sum of both contributions, and no error surfaces."""
     hoje = utc_now_naive().date()
     db.add(UsageDaily(
         date=hoje, workspace_id="ws-1",
@@ -118,15 +118,15 @@ async def test_perdedor_da_corrida_do_insert_reincrementa(db, monkeypatch):
     async def _execute_forjado(stmt, *args, **kwargs):
         chamadas["n"] += 1
         if chamadas["n"] == 1:
-            # So o 1o UPDATE (o do perdedor) enxerga 0 linhas — forca o caminho do
-            # INSERT, que bate na constraint real da linha ja plantada.
+            # Only the 1st UPDATE (the loser's) sees 0 rows — it forces the INSERT
+            # path, which hits the real constraint of the already-planted row.
             class _R:
                 rowcount = 0
             return _R()
         return await real_execute(stmt, *args, **kwargs)
 
     monkeypatch.setattr(db, "execute", _execute_forjado)
-    await rrc._upsert_usage_daily(db, _run(status="failed"), {}, True)  # nao levanta
+    await rrc._upsert_usage_daily(db, _run(status="failed"), {}, True)  # does not raise
     monkeypatch.undo()
 
     linhas = await _linhas(db)
@@ -137,9 +137,9 @@ async def test_perdedor_da_corrida_do_insert_reincrementa(db, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_nan_nas_metricas_nao_contamina_o_agregado(db):
-    """`NaN or 0` é NaN, e NaN + x = NaN: um único run com métrica NaN
-    envenenaria o total do workspace no dia para sempre. Um None viraria NULL
-    na soma do SQL. As duas coisas entram como 0."""
+    """`NaN or 0` is NaN, and NaN + x = NaN: a single run with a NaN metric would
+    poison the workspace's total for the day forever. A None would become NULL
+    in the SQL sum. Both go in as 0."""
     nan = float("nan")
     stats = {"__metrics__": {"run": {
         "duration_ms": nan, "cpu_avg_pct": nan, "mem_avg_mb": float("inf"),
@@ -154,7 +154,7 @@ async def test_nan_nas_metricas_nao_contamina_o_agregado(db):
     [linha] = await _linhas(db)
     assert linha["total_runs"] == 2
     assert linha["total_nodes_executed"] == 3
-    assert linha["total_duration_ms"] == 1000     # só o segundo run (1 s)
+    assert linha["total_duration_ms"] == 1000     # only the second run (1 s)
     for coluna in ("total_cpu_seconds", "total_mem_mb_seconds", "total_input_bytes",
                    "total_output_bytes", "total_features"):
         assert linha[coluna] == 0, coluna

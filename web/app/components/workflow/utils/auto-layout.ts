@@ -4,30 +4,31 @@ import { INodeContext } from "@/context/useFlowContext"
 import { measuredHeight, measuredWidth } from "./node-metrics"
 
 /**
- * Layout hierárquico da esquerda para a direita, via dagre (`@dagrejs/dagre`).
+ * Left-to-right hierarchical layout, via dagre (`@dagrejs/dagre`).
  *
- * Substitui a versão feita à mão. Aquela alinhava o Y deslocando a COLUNA
- * INTEIRA pela média dos pais (em vez de posicionar cada nó no seu próprio
- * baricentro) e não inseria nós virtuais para arestas que pulam camadas — então
- * ramificações desencontravam e uma aresta longa cortava a coluna do meio (o
- * caso do gatilho ligado direto na junção, com a fonte lateral atrás). O dagre
- * resolve os dois: coordenada por nó (Brandes–Köpf) e roteamento por camadas
- * com nós virtuais, além de uma minimização de cruzamentos madura.
+ * Replaces the hand-written version. That one aligned Y by shifting the WHOLE
+ * COLUMN by the parents' average (instead of placing each node at its own
+ * barycenter) and did not insert virtual nodes for edges that skip layers — so
+ * branches went out of line and a long edge cut through the middle column (the
+ * case of the trigger wired straight into the join, with the side source behind
+ * it). dagre solves both: per-node coordinates (Brandes–Köpf) and layered
+ * routing with virtual nodes, plus mature crossing minimization.
  *
- * Contrapartida de adotar o algoritmo de referência: a ORDEM dos nós dentro de
- * uma camada passa a vir da estrutura do grafo (o dagre reordena para reduzir
- * cruzamentos), não mais da disposição atual do canvas. Em troca, o resultado é
- * estável (mesmo grafo → mesmas posições) e independe de onde os cards estavam.
+ * The trade-off of adopting the reference algorithm: the ORDER of nodes within a
+ * layer now comes from the graph structure (dagre reorders to reduce
+ * crossings), no longer from the canvas's current arrangement. In exchange, the
+ * result is stable (same graph → same positions) and independent of where the
+ * cards were.
  *
- * Usa as medidas reais de cada card (`measuredWidth`/`measuredHeight`), então
- * nós altos (muitas portas) não se sobrepõem. Mantém o snap de 8px para que
- * arrastes manuais posteriores continuem alinhados à grade.
+ * Uses each card's real measurements (`measuredWidth`/`measuredHeight`), so
+ * tall nodes (many ports) do not overlap. Keeps the 8px snap so that later
+ * manual drags stay aligned to the grid.
  */
 
 export interface LayoutOptions {
-  /** Folga entre camadas (`ranksep` do dagre) — horizontal, no sentido LR. */
+  /** Gap between layers (dagre's `ranksep`) — horizontal, in the LR direction. */
   hGap?: number
-  /** Folga entre nós da mesma camada (`nodesep` do dagre) — vertical, no sentido LR. */
+  /** Gap between nodes of the same layer (dagre's `nodesep`) — vertical, in the LR direction. */
   vGap?: number
   originX?: number
   originY?: number
@@ -38,7 +39,7 @@ export interface LayoutPosition {
   y: number
 }
 
-/** Arredonda para a grade de 8px, para que arrastes manuais posteriores alinhem. */
+/** Rounds to the 8px grid, so that later manual drags line up. */
 const snap = (v: number) => Math.round(v / 8) * 8
 
 export function computeAutoLayout(
@@ -62,8 +63,9 @@ export function computeAutoLayout(
   }
 
   for (const edge of edges) {
-    // Arestas órfãs (nó já removido) e self-loops não influenciam o layout — e o
-    // self-loop ainda faria o dagre criar um nó virtual inútil ao lado do card.
+    // Orphan edges (node already removed) and self-loops do not influence the
+    // layout — and a self-loop would also make dagre create a useless virtual
+    // node next to the card.
     if (!known.has(edge.source) || !known.has(edge.target)) continue
     if (edge.source === edge.target) continue
     g.setEdge(edge.source, edge.target)
@@ -71,9 +73,9 @@ export function computeAutoLayout(
 
   dagre.layout(g)
 
-  // O dagre entrega o CENTRO de cada nó; o React Flow posiciona pelo canto
-  // superior-esquerdo. Reancoramos ainda o bounding box em (originX, originY),
-  // para o resultado não depender de onde o dagre centrou o grafo.
+  // dagre returns the CENTER of each node; React Flow positions by the top-left
+  // corner. We also re-anchor the bounding box at (originX, originY), so the
+  // result does not depend on where dagre centered the graph.
   let minX = Infinity
   let minY = Infinity
   for (const node of nodes) {

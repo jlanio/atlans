@@ -1,14 +1,14 @@
 # tests/unit/test_pin_service.py
 """
-Os pins como serviço — a regra que os dois transportes usam.
+Pins as a service — the rule both transports use.
 
-Este arquivo existe por causa de uma ausência medida: antes dele,
+This file exists because of a measured absence: before it,
 `grep -rn '/pin\\b|/pins|pin_node_output|unpin_node_output|list_pinned_nodes|
-PinOutputPayload' tests/` devolvia **um** acerto, e era um comentário. As três
-rotas de pin nunca foram exercitadas — o que é exatamente como cinco defeitos
-ficaram armados nelas sem ninguém notar.
+PinOutputPayload' tests/` returned **one** hit, and it was a comment. The three
+pin routes were never exercised — which is exactly how five defects stayed
+armed in them without anyone noticing.
 
-Cada bloco abaixo trava um deles. Todos falham contra o código anterior.
+Each block below locks down one of them. All of them fail against the previous code.
 """
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def _definicao() -> dict:
         "nodes": [
             {"id": "n1", "type": "action", "name": "PostgresQuery", "properties": {}},
             {"id": "n2", "type": "action", "name": "Buffer", "properties": {}},
-            # Um nó de saída de verdade, pelo nome que o registro conhece.
+            # A real output node, by the name the registry knows.
             {"id": "saida", "type": "output", "name": "DataOutput", "properties": {}},
         ],
         "edges": [{"source": "n1", "target": "n2"}],
@@ -62,17 +62,17 @@ async def banco():
 
 @pytest.fixture
 async def banco_sem_indice():
-    """Uma base que ainda NÃO rodou a migração do índice único parcial.
+    """A database that has NOT yet run the partial unique index migration.
 
-    O índice `uq_artifact_pin_por_no` torna a duplicata de pin-cache impossível
-    de criar — mas o deploy não roda migração, então existe base em produção
-    sem ele até alguém rodar `alembic upgrade head`. A tolerância do código
-    (colapso no consumer, `ORDER BY id DESC LIMIT 1` na leitura) existe
-    exatamente para esse mundo, e testá-la exige reproduzi-lo.
+    The `uq_artifact_pin_por_no` index makes a pin-cache duplicate impossible
+    to create — but the deploy does not run migrations, so there are production
+    databases without it until someone runs `alembic upgrade head`. The code's
+    tolerance (collapsing in the consumer, `ORDER BY id DESC LIMIT 1` on read)
+    exists exactly for that world, and testing it requires reproducing it.
 
-    Derrubar o índice depois do `create_all` é o jeito honesto de dizer isso:
-    o teste declara em qual base está, em vez de o modelo divergir do schema
-    de produção para acomodá-lo.
+    Dropping the index after `create_all` is the honest way to say that:
+    the test declares which database it is on, instead of the model diverging
+    from the production schema to accommodate it.
     """
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
@@ -95,13 +95,13 @@ async def _fluxo(fabrica):
         return db, wf
 
 
-# ── Defeito 1: o GET /pins estourava 500 com data malformada ─────────────────
+# ── Defect 1: GET /pins blew up with a 500 on a malformed date ───────────────
 #
-# O escritor de hoje grava `utc_now_naive().isoformat()`, então nenhum destes
-# vem dele. Vêm do banco: a coluna é JSON, já viu outras versões do código, e
-# `datetime.fromisoformat` nu quebra de quatro jeitos — todos virando 500 numa
-# LISTAGEM, que é a operação que mais precisa ser robusta, porque é a que a
-# pessoa abre justamente quando algo está errado.
+# Today's writer stores `utc_now_naive().isoformat()`, so none of these come
+# from it. They come from the database: the column is JSON, it has seen other
+# versions of the code, and bare `datetime.fromisoformat` breaks in four ways —
+# all becoming a 500 in a LISTING, which is the operation that most needs to be
+# robust, because it is the one a person opens precisely when something is wrong.
 
 
 @pytest.mark.parametrize("sufixo, rotulo", [
@@ -109,12 +109,12 @@ async def _fluxo(fabrica):
     ("+00:00", "offset — TypeError ao comparar ciente com o ingênuo de utc_now_naive"),
 ])
 def test_fuso_explicito_e_lido_em_vez_de_derrubar(sufixo, rotulo):
-    """Estes dois são LEGÍVEIS — e derrubavam a rota mesmo assim.
+    """These two are READABLE — and they brought the route down anyway.
 
-    Não basta não levantar: a data tem de ser de fato comparada, senão um
-    `except` que devolvesse `None` para tudo passaria aqui e ainda assim não
-    saberia dizer que o pin venceu. Por isso o caso é de vencido, e a asserção
-    é `True` e não "não levantou".
+    Not raising is not enough: the date must actually be compared, otherwise an
+    `except` returning `None` for everything would pass here and still could
+    not tell that the pin expired. That is why the case is an expired one, and
+    the assertion is `True` and not "did not raise".
     """
     ontem = (utc_now_naive() - timedelta(days=1)).isoformat() + sufixo
 
@@ -124,18 +124,18 @@ def test_fuso_explicito_e_lido_em_vez_de_derrubar(sufixo, rotulo):
 
 
 def test_o_sufixo_Z_e_normalizado_antes_do_parse(monkeypatch):
-    """O caso acima NÃO prova este, e a diferença é o runtime.
+    """The case above does NOT prove this one, and the difference is the runtime.
 
-    Do 3.11 em diante `datetime.fromisoformat` já aceita `Z`; no **3.10** — o
-    runtime e o CI antes do 3.12 — ele é o restrito e levanta `ValueError`. O
-    `.replace("Z", "+00:00")` é o que separava "funciona" de "500" lá, e
-    apagá-lo passaria batido por qualquer teste de comportamento rodado num
-    Python novo (medido: a mutação sobrevive).
+    From 3.11 onward `datetime.fromisoformat` accepts `Z`; on **3.10** — the
+    runtime and CI before 3.12 — it is the strict one and raises `ValueError`.
+    The `.replace("Z", "+00:00")` is what separated "works" from "500" there,
+    and deleting it would slip past any behavior test run on a newer Python
+    (measured: the mutation survives).
 
-    Então o 3.10 é simulado: um `datetime` cujo `fromisoformat` recusa `Z`, que
-    é a única diferença relevante entre as duas versões. Com a normalização, o
-    parse recebe `+00:00` e passa; sem ela, recebe o `Z` cru e a data vira
-    ilegível.
+    So 3.10 is simulated: a `datetime` whose `fromisoformat` rejects `Z`, which
+    is the only relevant difference between the two versions. With the
+    normalization, the parse gets `+00:00` and passes; without it, it gets the
+    raw `Z` and the date becomes unreadable.
     """
     class _ComoNo310(datetime):
         @classmethod
@@ -161,19 +161,20 @@ def test_data_ilegivel_nao_derruba_a_listagem(valor, rotulo):
     pins = pin_service.listar_pins({"n1": {"expires_at": valor}}, {})
 
     assert len(pins) == 1, rotulo
-    # `None` e não `False`: "há uma data e eu não consigo lê-la" não é "não
-    # expirou". Achatar os dois esconderia dado corrompido atrás de uma
-    # resposta tranquilizadora.
+    # `None` and not `False`: "there is a date and I cannot read it" is not "it
+    # has not expired". Flattening the two would hide corrupted data behind a
+    # reassuring answer.
     #
-    # A string vazia é a exceção justa: `expires_at: ""` é indistinguível de
-    # "não gravei prazo", e aí `False` é a leitura certa.
+    # The empty string is the fair exception: `expires_at: ""` is
+    # indistinguishable from "I did not store a deadline", and then `False` is
+    # the right reading.
     esperado = False if valor == "" else None
     assert pins[0]["expired"] is esperado, rotulo
 
 
 def test_entrada_de_metadata_que_nao_e_dict_nao_derruba_a_listagem():
-    """O quinto jeito de quebrar: `meta.get(nid, {})` devolvia o valor solto, e
-    o `.get` seguinte era AttributeError."""
+    """The fifth way to break: `meta.get(nid, {})` returned the bare value, and
+    the following `.get` was an AttributeError."""
     pins = pin_service.listar_pins({"n1": "isto não é um dict"}, {})
 
     assert pins[0]["node_id"] == "n1"
@@ -181,7 +182,7 @@ def test_entrada_de_metadata_que_nao_e_dict_nao_derruba_a_listagem():
 
 
 def test_pin_no_prazo_nao_e_marcado_como_vencido():
-    """O contraponto do caso de cima: `expired` tem de saber dizer NÃO."""
+    """The counterpart of the case above: `expired` must be able to say NO."""
     amanha = (utc_now_naive() + timedelta(days=1)).isoformat() + "Z"
     assert pin_service.listar_pins({"n1": {"expires_at": amanha}}, {})[0]["expired"] is False
 
@@ -190,14 +191,15 @@ def test_sem_data_gravada_o_pin_nao_expira():
     assert pin_service.listar_pins({"n1": {"expires_at": None}}, {})[0]["expired"] is False
 
 
-# ── Defeito 2: ttl_hours sem faixa ───────────────────────────────────────────
+# ── Defect 2: ttl_hours without a range ──────────────────────────────────────
 
 
 async def test_ttl_zero_e_recusado_em_vez_de_virar_sem_expiracao(banco):
-    """`0` caía no ramo falsy e gravava `expires_at: None`.
+    """`0` fell into the falsy branch and stored `expires_at: None`.
 
-    Quem digita `0` está pedindo "vence imediatamente" ou errou; nas duas
-    leituras, "nunca vence" é o oposto — e era o que acontecia, calado.
+    Whoever types `0` is asking for "expires immediately" or made a mistake;
+    under both readings, "never expires" is the opposite — and that is what
+    happened, silently.
     """
     db, wf = await _fluxo(banco)
     with pytest.raises(ValueError):
@@ -235,22 +237,22 @@ async def test_sem_ttl_o_pin_nao_expira(banco):
     assert saida["expires_at"] is None
 
 
-# ── Defeito 3: o unpin apagava do storage ANTES do commit ────────────────────
+# ── Defect 3: unpin deleted from storage BEFORE the commit ───────────────────
 
 
 async def test_o_banco_fecha_antes_de_o_storage_ser_tocado(banco):
-    """A inversão de ordem é a decisão central do módulo, e ela precisa morder.
+    """The order inversion is the module's central decision, and it has to bite.
 
-    Antes: `delete_async` e só vinte linhas depois o `commit()`. Commit falhar
-    ali deixava `__pin_s3_key__` apontando para objeto que não existe mais — e
-    isso NÃO se cura, porque `_safe_pinned_outputs` só dispara auto-pin com ref
-    vazia.
+    Before: `delete_async` and only twenty lines later the `commit()`. A commit
+    failing there left `__pin_s3_key__` pointing at an object that no longer
+    exists — and that does NOT heal, because `_safe_pinned_outputs` only fires
+    auto-pin with an empty ref.
 
-    A asserção é sobre a ORDEM DAS CHAMADAS, e não sobre o que uma segunda
-    sessão enxerga. A segunda sessão não serve: o SQLite em memória usa
-    `StaticPool`, então todas as sessões compartilham a MESMA conexão e
-    enxergam o não-commitado uma da outra — com isso a mutação que remove o
-    `commit()` sobrevive (medido). Gravar a sequência é o que distingue.
+    The assertion is about the ORDER OF THE CALLS, not about what a second
+    session sees. A second session does not work: in-memory SQLite uses
+    `StaticPool`, so all sessions share the SAME connection and see each
+    other's uncommitted data — with that, the mutation that removes the
+    `commit()` survives (measured). Recording the sequence is what tells them apart.
     """
     db, wf = await _fluxo(banco)
     await pin_service.fixar_saida(db, wf, "n1")
@@ -278,7 +280,7 @@ async def test_o_banco_fecha_antes_de_o_storage_ser_tocado(banco):
 
 
 async def test_falha_do_storage_nao_desfaz_o_unpin_e_vira_aviso(banco):
-    """O pin já saiu. Responder erro faria o cliente repetir o que já aconteceu."""
+    """The pin is already gone. Answering with an error would make the client repeat what already happened."""
     db, wf = await _fluxo(banco)
     await pin_service.fixar_saida(db, wf, "n1")
     wf.pinned_outputs = {"n1": {"__pin_s3_key__": f"pin-cache/{WS}/n1.geojson"}}
@@ -304,10 +306,10 @@ async def test_desfixar_o_que_nao_estava_fixado_nao_e_erro(banco):
 
 
 async def test_as_duas_chaves_sao_apagadas_quando_divergem(banco):
-    """A ref e a linha `Artifact` podem apontar para objetos diferentes.
+    """The ref and the `Artifact` row can point to different objects.
 
-    O código anterior só apagava a da ref e removia a LINHA — o objeto da linha
-    ficava no MinIO sem nada que o referenciasse.
+    The previous code only deleted the ref's object and removed the ROW — the
+    row's object stayed in MinIO with nothing referencing it.
     """
     db, wf = await _fluxo(banco)
     wf.pinned_outputs = {"n1": {"__pin_s3_key__": f"pin-cache/{WS}/velho.geojson"}}
@@ -329,13 +331,13 @@ async def test_as_duas_chaves_sao_apagadas_quando_divergem(banco):
 
 
 async def test_duas_linhas_de_pin_cache_nao_derrubam_o_unpin(banco_sem_indice):
-    """`scalar_one_or_none()` levantava `MultipleResultsFound` → 500.
+    """`scalar_one_or_none()` raised `MultipleResultsFound` → 500.
 
-    E duas linhas eram alcançáveis: sem o índice único parcial, o
-    `_upsert_pin_artifact` do consumidor insere quando não acha, e dois runs do
-    mesmo fluxo terminando juntos inserem cada um a sua. A migração de
-    2026-09-15 fecha essa porta; esta tolerância continua valendo para a base
-    que ainda não a rodou — daí a fixture `banco_sem_indice`.
+    And two rows were reachable: without the partial unique index, the
+    consumer's `_upsert_pin_artifact` inserts when it finds nothing, and two runs
+    of the same workflow finishing together each insert their own. The
+    2026-09-15 migration closes that door; this tolerance still holds for the
+    database that has not run it yet — hence the `banco_sem_indice` fixture.
     """
     db, wf = await _fluxo(banco_sem_indice)
     for n in ("a", "b"):
@@ -352,7 +354,7 @@ async def test_duas_linhas_de_pin_cache_nao_derrubam_o_unpin(banco_sem_indice):
 
 
 async def test_com_duas_linhas_a_mais_nova_e_a_escolhida(banco_sem_indice):
-    """Escolher a antiga repontaria o pin para um objeto de uma run passada."""
+    """Picking the old one would re-point the pin to an object from a past run."""
     async with banco_sem_indice() as db:
         for n in ("velha", "nova"):
             db.add(Artifact(workspace_id=WS, workflow_hash=WF, node_id="n1",
@@ -365,21 +367,22 @@ async def test_com_duas_linhas_a_mais_nova_e_a_escolhida(banco_sem_indice):
     assert escolhida.filename == "nova.geojson"
 
 
-# ── A órfã que o unpin ressuscitava ──────────────────────────────────────────
+# ── The orphan that unpin resurrected ────────────────────────────────────────
 
 
 async def test_desfixar_o_ultimo_pin_nao_ressuscita_uma_orfa(banco):
-    """Amarra o unpin REAL ao filtro do despacho, que é onde o dano aparecia.
+    """Ties the REAL unpin to the dispatch filter, which is where the damage showed up.
 
-    O teste unitário do filtro (`test_workflow_service.py`) prova a regra. Este
-    prova o valor: `desfixar_saida` grava `pin_metadata = None` quando apaga o
-    último pin, e era essa coluna vazia que fazia o filtro liberar tudo.
+    The filter's unit test (`test_workflow_service.py`) proves the rule. This
+    one proves the value: `desfixar_saida` stores `pin_metadata = None` when it
+    deletes the last pin, and it was that empty column that made the filter
+    let everything through.
 
-    Cenário: A é um pin de verdade, B é órfã com `__pin_s3_key__` — resto de um
-    nó removido da definição. Enquanto A existe, B fica de fora. Desfixar A
-    esvazia a metadata, e antes deste conserto B voltava ao executor na
-    execução seguinte, como cache que **nunca expira** (a validade é lida de
-    `pin_metadata[node_id]`, que não existe para ela).
+    Scenario: A is a real pin, B is an orphan with `__pin_s3_key__` — left over
+    from a node removed from the definition. While A exists, B stays out.
+    Unpinning A empties the metadata, and before this fix B went back to the
+    executor on the next run, as a cache that **never expires** (the validity
+    is read from `pin_metadata[node_id]`, which does not exist for it).
     """
     db, wf = await _fluxo(banco)
     db.add(Artifact(workspace_id=WS, workflow_hash=WF, node_id="A",
@@ -392,7 +395,7 @@ async def test_desfixar_o_ultimo_pin_nao_ressuscita_uma_orfa(banco):
     wf.pin_metadata = {"A": {"pinned_at": utc_now_naive().isoformat()}}
     await db.commit()
 
-    # Antes do unpin: só A é despachada. B é órfã e já ficava de fora.
+    # Before the unpin: only A is dispatched. B is an orphan and already stayed out.
     assert set(_safe_pinned_outputs(wf.pinned_outputs, wf.pin_metadata)) == {"A"}
 
     with patch("app.core.storage.delete_strict_async", new=AsyncMock()):
@@ -401,51 +404,51 @@ async def test_desfixar_o_ultimo_pin_nao_ressuscita_uma_orfa(banco):
     assert saida["outcome"] == "unpinned"
     assert wf.pin_metadata is None, "é este None que fazia o filtro liberar tudo"
 
-    # Depois do unpin: NADA é despachado. B não pode voltar.
+    # After the unpin: NOTHING is dispatched. B must not come back.
     assert _safe_pinned_outputs(wf.pinned_outputs, wf.pin_metadata) == {}
 
 
-# ── O portão do nó de saída ──────────────────────────────────────────────────
+# ── The output-node gate ─────────────────────────────────────────────────────
 
 
 def test_o_discriminador_de_no_de_saida_e_o_registro_de_verdade():
-    """Sem isto, o portão poderia estar olhando para uma chave que não existe.
+    """Without this, the gate could be looking at a key that does not exist.
 
-    `DataOutput` declara `"type": "output"` em `description()`; `Buffer` não.
-    Se o campo mudar de nome no registro, este teste cai — e é ele que impede o
-    portão de virar um `if` que nunca fecha.
+    `DataOutput` declares `"type": "output"` in `description()`; `Buffer` does
+    not. If the field is renamed in the registry, this test fails — and it is
+    what keeps the gate from becoming an `if` that never closes.
     """
     assert pin_service.e_no_de_saida("DataOutput") is True
     assert pin_service.e_no_de_saida("Buffer") is False
 
 
 def test_nome_desconhecido_nao_fecha_o_portao():
-    """Recusar o que não se reconhece tornaria todo nó novo não-fixável."""
+    """Refusing what is not recognized would make every new node unpinnable."""
     assert pin_service.e_no_de_saida("NoQueNaoExiste") is False
     assert pin_service.e_no_de_saida(None) is False
 
 
 async def test_fixar_no_de_saida_e_recusado(banco):
-    """Congelar a saída de um nó que grava arquivo faz o executor PULAR a
-    gravação: o fluxo termina verde e o arquivo não aparece."""
+    """Freezing the output of a node that writes a file makes the executor SKIP
+    the write: the workflow finishes green and the file does not show up."""
     db, wf = await _fluxo(banco)
     with pytest.raises(pin_service.PinEmNoDeSaidaError):
         await pin_service.fixar_saida(db, wf, "saida")
 
 
 async def test_fixar_no_comum_continua_passando(banco):
-    """O portão não pode ser um `raise` que pegou todo mundo."""
+    """The gate cannot be a `raise` that catches everyone."""
     db, wf = await _fluxo(banco)
     saida = await pin_service.fixar_saida(db, wf, "n1")
     assert saida["pinned"] == "n1"
 
 
 async def test_a_rota_nao_passa_a_recusar_no_inexistente(banco):
-    """`exigir_no_existente=False` existe para não mudar o contrato da tela.
+    """`exigir_no_existente=False` exists so as not to change the screen's contract.
 
-    Fixar um id que a definition não tem é inútil, mas transformar isso em erro
-    numa rota que já existia seria quebra de compatibilidade — e o MCP, que é
-    novo, pede a checagem.
+    Pinning an id the definition does not have is useless, but turning that into
+    an error on a route that already existed would break compatibility — and
+    MCP, which is new, asks for the check.
     """
     db, wf = await _fluxo(banco)
     saida = await pin_service.fixar_saida(db, wf, "fantasma", exigir_no_existente=False)
@@ -455,15 +458,15 @@ async def test_a_rota_nao_passa_a_recusar_no_inexistente(banco):
         await pin_service.fixar_saida(db, wf, "fantasma2", exigir_no_existente=True)
 
 
-# ── A leitura que os dois transportes compartilham ───────────────────────────
+# ── The read both transports share ───────────────────────────────────────────
 
 
 def test_a_listagem_percorre_a_uniao_das_duas_colunas():
-    """Os dois leitores anteriores discordavam, e cada um perdia metade.
+    """The two previous readers disagreed, and each one lost half.
 
-    A rota iterava `pinned_outputs`; o MCP iterava `pin_metadata`. Uma entrada
-    de auto-pin sem metadata sumia da visão do MCP, e uma intenção cujo cache
-    nunca materializou sumia da visão da tela. Só a união não perde nenhuma.
+    The route iterated `pinned_outputs`; MCP iterated `pin_metadata`. An
+    auto-pin entry without metadata vanished from MCP's view, and an intent whose
+    cache never materialized vanished from the screen's view. Only the union loses none.
     """
     pins = pin_service.listar_pins(
         {"so_intencao": {"pinned_at": "2026-01-01T00:00:00"}},
@@ -474,7 +477,7 @@ def test_a_listagem_percorre_a_uniao_das_duas_colunas():
 
 
 def test_cached_distingue_pin_pedido_de_pin_materializado():
-    """É a resposta para "por que meu fluxo continua recalculando"."""
+    """It is the answer to "why does my workflow keep recomputing"."""
     pins = pin_service.listar_pins(
         {"a": {}, "b": {}},
         {"a": {}, "b": {"__pin_s3_key__": f"pin-cache/{WS}/b.geojson"}},
@@ -486,7 +489,7 @@ def test_cached_distingue_pin_pedido_de_pin_materializado():
 
 
 def test_o_filtro_de_nos_existentes_e_opcional_e_so_o_MCP_o_usa():
-    """A tela precisa enxergar o pin órfão — é ela que vai limpá-lo."""
+    """The screen needs to see the orphan pin — it is the one that will clean it up."""
     metadata = {"n1": {}, "apagado": {}}
 
     sem_filtro = pin_service.listar_pins(metadata, {})
@@ -497,8 +500,8 @@ def test_o_filtro_de_nos_existentes_e_opcional_e_so_o_MCP_o_usa():
 
 
 async def test_desfixar_nao_apaga_chave_de_outro_workspace(banco):
-    """Auditoria SEG-10: um `__pin_s3_key__` fora do prefixo do workspace do
-    fluxo (entrada forjada) é IGNORADO no delete — nunca apaga objeto alheio."""
+    """Audit SEG-10: a `__pin_s3_key__` outside the prefix of the workflow's
+    workspace (forged input) is IGNORED on delete — it never deletes someone else's object."""
     db, wf = await _fluxo(banco)
     wf.pinned_outputs = {"n1": {"__pin_s3_key__": "pin-cache/OUTRO-WS/segredo.geojson"}}
     wf.pin_metadata = {"n1": {"pinned_at": utc_now_naive().isoformat()}}
@@ -508,18 +511,18 @@ async def test_desfixar_nao_apaga_chave_de_outro_workspace(banco):
     with patch("app.core.storage.delete_strict_async", new=falso):
         await pin_service.desfixar_saida(db, wf, "n1")
 
-    assert falso.await_count == 0  # nada foi apagado
+    assert falso.await_count == 0  # nothing was deleted
 
 
 async def test_fixar_nao_persiste_chave_forjada_do_cliente(banco):
-    """Auditoria SEG-10: `outputs` do cliente nunca é gravado; um
-    `__pin_s3_key__` forjado é recusado, e o pin fica `{}`."""
+    """Audit SEG-10: the client's `outputs` is never stored; a forged
+    `__pin_s3_key__` is rejected, and the pin stays `{}`."""
     db, wf = await _fluxo(banco)
     with pytest.raises(ValueError):
         await pin_service.fixar_saida(
             db, wf, "n1", outputs={"__pin_s3_key__": "pin-cache/OUTRO-WS/x"},
             exigir_no_existente=False,
         )
-    # E o caminho normal grava {} (não o conteúdo do cliente).
+    # And the normal path stores {} (not the client's content).
     await pin_service.fixar_saida(db, wf, "n1", outputs={"lixo": 1}, exigir_no_existente=False)
     assert wf.pinned_outputs["n1"] == {}

@@ -1,11 +1,11 @@
-"""Regressao do sandbox Jinja endurecido (auditoria SEG-03).
+"""Regression for the hardened Jinja sandbox (audit SEG-03).
 
-O SandboxedEnvironment do Jinja bloqueia atributos com sublinhado e chamaveis
-marcados como unsafe, mas deixava passar QUALQUER metodo publico dos objetos do
-contexto. Os outputs dos nos entram no contexto como GeoDataFrame/DataFrame/
-ndarray vivos, cujos metodos `to_file`/`to_csv(path)`/`to_parquet`/`tofile`
-gravam arquivo no processo do executor (que guarda o cert mTLS e credenciais).
-Cada teste falha sem o endurecimento de flow/utils/jinja_seguro.py.
+Jinja's SandboxedEnvironment blocks underscore attributes and callables
+marked as unsafe, but let through ANY public method of the context objects.
+The nodes' outputs enter the context as live GeoDataFrame/DataFrame/
+ndarray objects, whose `to_file`/`to_csv(path)`/`to_parquet`/`tofile` methods
+write files in the executor process (which holds the mTLS cert and credentials).
+Each test fails without the hardening in flow/utils/jinja_seguro.py.
 """
 import os
 import tempfile
@@ -54,7 +54,7 @@ def test_bloqueia_escrita_de_arquivo_e_nao_cria_o_arquivo(expr):
 
 
 @pytest.mark.parametrize("expr,esperado_contains", [
-    ("{{ Dados.output.to_csv() }}", "a"),          # sem destino → string
+    ("{{ Dados.output.to_csv() }}", "a"),          # no destination → string
     ("{{ Camada.output.shape[0] }}", "2"),
     ("{{ Dados.output['a'].sum() }}", "3"),
 ])

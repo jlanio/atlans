@@ -1,10 +1,10 @@
 # tests/unit/test_get_first_gdf_diagnostico.py
-"""A mensagem de `get_first_gdf` precisa dizer O QUE chegou.
+"""The `get_first_gdf` message must say WHAT arrived.
 
-SaveToPostGIS aceita apenas GeoDataFrame, enquanto DataInput entrega
-GeoDataFrame, DataFrame, dict, list ou bytes conforme a extensao do arquivo do
-Drive. Ligar um CSV no PostGIS falhava com "Nenhum GeoDataFrame encontrado nos
-inputs." — sem chave, sem tipo, sem pista de onde olhar.
+SaveToPostGIS only accepts a GeoDataFrame, while DataInput delivers a
+GeoDataFrame, DataFrame, dict, list or bytes depending on the Drive file's
+extension. Connecting a CSV to PostGIS failed with "Nenhum GeoDataFrame encontrado nos
+inputs." (no GeoDataFrame found in the inputs) — no key, no type, no clue where to look.
 """
 import geopandas as gpd
 import pandas as pd
@@ -15,16 +15,16 @@ from flow.nodes.base import BaseNode
 
 
 class _Node(BaseNode):
-    """BaseNode e abstrata; aqui so interessa o helper de inputs."""
+    """BaseNode is abstract; here only the inputs helper matters."""
 
     def __init__(self):
         pass
 
     @classmethod
-    def description(cls):  # pragma: no cover - exigido pela ABC
+    def description(cls):  # pragma: no cover - required by the ABC
         return {"name": "_Node", "type": "output", "properties": []}
 
-    async def execute(self, inputs):  # pragma: no cover - nao usado
+    async def execute(self, inputs):  # pragma: no cover - unused
         return {}
 
 
@@ -45,13 +45,13 @@ def test_erro_lista_chaves_e_tipos_recebidos():
         _Node().get_first_gdf({"output": pd.DataFrame({"a": [1]}), "metadata": {"x": 1}})
 
     msg = str(exc.value)
-    assert "output" in msg and "DataFrame" in msg      # chave e tipo do dado
+    assert "output" in msg and "DataFrame" in msg      # the data's key and type
     assert "metadata" in msg and "dict" in msg
 
 
 def test_erro_sinaliza_gdf_vazio_em_vez_de_so_dizer_ausente():
-    """GeoDataFrame vazio e ignorado pelo loop — sem esta pista o usuario
-    procuraria erro de conexao, nao filtro que nao retornou nada."""
+    """An empty GeoDataFrame is ignored by the loop — without this clue the user
+    would look for a connection error, not a filter that returned nothing."""
     with pytest.raises(ValueError) as exc:
         _Node().get_first_gdf({"output": _gdf(vazio=True)})
 

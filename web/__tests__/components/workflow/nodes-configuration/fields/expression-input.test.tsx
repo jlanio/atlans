@@ -3,19 +3,19 @@ import { render, screen, cleanup, fireEvent } from "@testing-library/react"
 import { INodeContext } from "@/context/useFlowContext"
 
 /**
- * Regressão: o dropdown de `{{$` sugeria o rótulo de exibição do nó e inseria
- * `{{$Caixa Delimitadora.bbox}}` — nome que não existe no contexto do executor,
- * que registra o nó como `ComputeBoundingBox` (flow/executor/core.py::
- * _resolve_alias exige identificador válido, senão usa o `name` da classe).
+ * Regression: the `{{$` dropdown suggested the node's display label and inserted
+ * `{{$Caixa Delimitadora.bbox}}` — a name that doesn't exist in the executor's
+ * context, which registers the node as `ComputeBoundingBox` (flow/executor/core.py::
+ * _resolve_alias requires a valid identifier, otherwise it uses the class's `name`).
  *
- * O espaço também travava o próprio autocomplete: o gatilho varre
- * identificadores, então depois de inserir o rótulo o texto deixava de casar e
- * digitar "." nunca listava os campos de saída.
+ * The space also jammed the autocomplete itself: the trigger scans
+ * identifiers, so after inserting the label the text stopped matching and
+ * typing "." never listed the output fields.
  */
 
-// O componente lê o canvas de forma imperativa: tira uma fotografia do grafo
-// quando o gatilho do autocomplete aparece, em vez de assinar `useNodes()` e
-// recalcular as sugestões a cada quadro de arraste.
+// The component reads the canvas imperatively: it takes a snapshot of the graph
+// when the autocomplete trigger appears, instead of subscribing to `useNodes()`
+// and recomputing the suggestions on every drag frame.
 let nodesMock: INodeContext[] = []
 let edgesMock: Array<{ id: string; source: string; target: string }> = []
 vi.mock("@xyflow/react", () => ({
@@ -30,8 +30,8 @@ function no(id: string, data: DadosNo): INodeContext {
   return { id, data } as unknown as INodeContext
 }
 
-// Campos de saída do catálogo (`saidas`) — é por eles que o autocomplete
-// monta `$Alias.campo`.
+// Catalog output fields (`saidas`) — it's from them that the autocomplete
+// builds `$Alias.campo`.
 const CAIXA = no("n1", {
   name: "ComputeBoundingBox",
   alias: "Caixa Delimitadora",
@@ -43,7 +43,7 @@ const CAIXA = no("n1", {
 
 const DESTINO = no("n2", { name: "DataOutput", alias: "Saída", inputs: [] } as DadosNo)
 
-/** Renderiza com o input controlado, como o formulário real faz. */
+/** Renders with the controlled input, as the real form does. */
 function montar(inicial = "") {
   const onChange = vi.fn()
   let valor = inicial
@@ -72,9 +72,9 @@ describe("sugestões de alias", () => {
 
     digitar("{{$")
 
-    // O que vai para o texto.
+    // What goes into the text.
     expect(screen.getByText("ComputeBoundingBox")).toBeTruthy()
-    // O rótulo do canvas continua visível, como descrição.
+    // The canvas label stays visible, as a description.
     expect(screen.getByText("Caixa Delimitadora")).toBeTruthy()
   })
 
@@ -123,7 +123,7 @@ describe("sugestões de alias", () => {
   })
 
   it("dois nós sem alias próprio aparecem uma vez só", () => {
-    // Mesmo `name` → mesma chave no contexto do executor.
+    // Same `name` → same key in the executor's context.
     nodesMock = [
       no("n1", { name: "ComputeBoundingBox" } as DadosNo),
       no("n3", { name: "ComputeBoundingBox" } as DadosNo),
@@ -141,8 +141,8 @@ describe("sugestões de alias", () => {
   })
 
   it("usa o alias que o usuário configurou", () => {
-    // Ao salvar o modal, o alias digitado é promovido para data.alias — é ele
-    // que chega ao banco e é o que o executor registra.
+    // When the modal is saved, the typed alias is promoted to data.alias — it's
+    // what reaches the database and what the executor registers.
     nodesMock = [
       no("n1", {
         name: "ComputeBoundingBox",
@@ -160,9 +160,9 @@ describe("sugestões de alias", () => {
   })
 
   it("lista os campos de nó NÃO conectado", () => {
-    // Quem monta o fluxo de trás para frente digitava "{{$Alias." e não via
-    // nada, sem pista de que conectar mudaria isso — mas os campos são
-    // declarados pelo nó, não dependem da conexão.
+    // Someone building the workflow back to front typed "{{$Alias." and saw
+    // nothing, with no hint that connecting would change that — but the fields
+    // are declared by the node, they don't depend on the connection.
     edgesMock = []
     const { digitar } = montar()
 
@@ -173,7 +173,7 @@ describe("sugestões de alias", () => {
   })
 
   it("reserva vagas para aliases quando um nó tem muitos campos", () => {
-    // Corte reto escondia TODOS os aliases atrás dos campos do primeiro nó.
+    // A straight cut hid ALL the aliases behind the first node's fields.
     const muitosCampos = no("n1", {
       name: "NoGordo",
       saidas: Array.from({ length: 20 }, (_, i) => ({ name: `campo${i}` })),
@@ -186,7 +186,7 @@ describe("sugestões de alias", () => {
     digitar("{{$")
 
     expect(screen.getByText("NoGordo")).toBeTruthy()
-    // Sem a cota, este alias ficava fora das 12 primeiras entradas.
+    // Without the quota, this alias was left out of the first 12 entries.
     expect(screen.getByText("SegundoNo")).toBeTruthy()
   })
 
@@ -218,7 +218,7 @@ describe("sugestões de inputs", () => {
   })
 
   it("campo declarado por dois pais aparece uma vez, marcado", () => {
-    // `inputs` é um dict só — a chave `output` é a mesma para os dois.
+    // `inputs` is a single dict — the `output` key is the same for both.
     const comOutput = (id: string, nome: string) =>
       no(id, {
         name: nome,

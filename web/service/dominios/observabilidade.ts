@@ -8,18 +8,18 @@ import type {
 // ── Observabilidade ────────────────────────────────────────────────────────
 
 /**
- * Métricas agregadas da janela pedida.
+ * Aggregated metrics for the requested window.
  *
- * `days` viaja de verdade (o painel deixava o backend cair no default de 90
- * enquanto a tela anunciava outra janela) e `force` ignora o cache Redis de
- * ~45s — é o que faz o botão Atualizar trazer números novos em vez de repetir
- * a mesma resposta memorizada. Os nomes são os do Query em
- * app/api/routers/observability_router.py (`days`, `force`).
+ * `days` is actually sent (the panel let the backend fall back to the default
+ * of 90 while the screen announced another window) and `force` bypasses the
+ * ~45s Redis cache — that is what makes the Refresh button bring new numbers
+ * instead of repeating the same memoized response. The names are those of the
+ * Query in app/api/routers/observability_router.py (`days`, `force`).
  */
 /**
- * Filtros comuns do Histórico (docs/specs/metrics-history.md §3):
- * `workspace_id` e `workflow_id` recortam a janela; `tz` só importa para
- * `runs-by-day`, que corta o dia no fuso do usuário.
+ * Common History filters (docs/specs/metrics-history.md §3):
+ * `workspace_id` and `workflow_id` slice the window; `tz` only matters for
+ * `runs-by-day`, which cuts the day in the user's timezone.
  */
 export function getObservabilityMetrics(
   days = 90, force = false, filtros: { workspace_id?: string; workflow_id?: string } = {},
@@ -29,7 +29,7 @@ export function getObservabilityMetrics(
   )
 }
 
-/** Visão "Por workflow": todos os workflows acessíveis com números da janela. */
+/** "By workflow" view: every accessible workflow with the window's numbers. */
 export function getWorkflowMetricsList(days = 30, force = false, filtros: { workspace_id?: string } = {}) {
   return get<{ period_days: number; workflows: IWorkflowMetricsRow[] }>(
     `/observability/metrics/workflows${qs({ days, force: force || undefined, ...filtros })}`,
@@ -40,7 +40,7 @@ export function getWorkflowMetrics(id: string, limit = 20) {
   return get<IWorkflowMetrics>(`/observability/metrics/workflow/${id}${qs({ limit })}`)
 }
 
-/** Mesma janela e mesmo cache de `getObservabilityMetrics` — ver ali. */
+/** Same window and same cache as `getObservabilityMetrics` — see there. */
 export function getExecutorMetrics(days = 90, force = false, filtros: { workspace_id?: string } = {}) {
   return get<{ executores: IExecutorMetrics[] }>(
     `/observability/metrics/executores${qs({ days, force: force || undefined, ...filtros })}`,
@@ -54,22 +54,22 @@ export function getRunsByDay(days = 7, filtros: { workspace_id?: string; workflo
 export function getObservabilityRuns(params: {
   workflow_id?: string; status?: string; date_from?: string; date_to?: string;
   workspace_id?: string; trigger_source?: string; tier?: string
-  /** Origem do FLUXO ("assistente"), não do disparo — este é `trigger_source`. */
+  /** Origin of the WORKFLOW ("assistente"), not of the trigger — that one is `trigger_source`. */
   workflow_origem?: string
-  /** Busca em `error_message` e no nome do workflow. */
+  /** Searches in `error_message` and in the workflow name. */
   q?: string
-  /** Hostname do executor. O nome tem de bater com o Query do backend —
-   *  `agent_host` era descartado em silêncio pelo FastAPI. */
+  /** Executor hostname. The name has to match the backend's Query —
+   *  `agent_host` was silently discarded by FastAPI. */
   worker_host?: string; limit?: number; offset?: number
-  /** Pede o COUNT completo. O COUNT sobre `runs` filtrado é a parte cara da
-   *  listagem e só a primeira página precisa dele — nas seguintes basta
-   *  `has_more`, que o backend responde de graça. */
+  /** Requests the full COUNT. The COUNT over filtered `runs` is the expensive
+   *  part of the listing and only the first page needs it — on the following
+   *  ones `has_more` is enough, which the backend answers for free. */
   with_total?: boolean
 } = {}) {
   return get<{
     total: number; limit: number; offset: number; runs: IRunSummary[]
-    /** Existe pelo menos mais uma página depois desta. Vem no lugar de um
-     *  `total` recalculado a cada "ver mais". */
+    /** There is at least one more page after this one. Comes instead of a
+     *  `total` recomputed on every "see more". */
     has_more?: boolean
   }>(
     `/observability/runs${qs(params)}`,
@@ -78,23 +78,24 @@ export function getObservabilityRuns(params: {
 
 export function getRunDetail(runId: string) { return get<IRunDetail>(`/observability/runs/${runId}`) }
 
-/** Interrompe uma execução em andamento. O status final chega pelo mesmo
- *  caminho de sempre (job_result do executor → `__workflow_complete__`). */
+/** Interrupts a run in progress. The final status arrives through the usual
+ *  path (the executor's job_result → `__workflow_complete__`). */
 export function cancelRun(runId: string) {
   return post<{ run_id: string; outcome: string }>(`/workflows/runs/${runId}/cancel`, {})
 }
 
-/** Dispara uma execução NOVA do workflow desta run (a definição atual; não
- *  é replay — `WorkflowRun` não guarda as entradas). O backend valida que a
- *  run pertence ao workflow e grava `trigger_source="retry"`. 403 quando o
- *  papel não permite executar ou o workflow está desativado. */
+/** Triggers a NEW run of this run's workflow (the current definition; it is
+ *  not a replay — `WorkflowRun` does not store the inputs). The backend
+ *  validates that the run belongs to the workflow and records
+ *  `trigger_source="retry"`. 403 when the role does not allow executing or the
+ *  workflow is disabled. */
 export function retryRun(workflowId: string, runId: string) {
   return post<{ task_id: string; message: string }>(`/workflows/${workflowId}/runs/${runId}/retry`, {})
 }
 
-/** Eventos brutos de um run — o mesmo replay que o WebSocket entrega ao
- *  conectar, exposto por HTTP para reabrir o log de execuções concluídas.
- *  O histórico vive no Redis com TTL de 1h (`expired` sinaliza vencido). */
+/** Raw events of a run — the same replay the WebSocket delivers on
+ *  connecting, exposed over HTTP to reopen the log of finished runs.
+ *  The history lives in Redis with a 1h TTL (`expired` signals it has expired). */
 export function getRunEvents(runId: string) {
   return get<IRunEventsResponse>(`/observability/runs/${runId}/events`)
 }

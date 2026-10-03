@@ -14,15 +14,15 @@ import type { IWorkflow } from "@/service/types"
 
 interface ConfigureProjectProps {
   workflow: IWorkflow
-  /** Atualização otimista na lista do pai (nome e descrição), antes do PUT. */
+  /** Optimistic update in the parent's list (name and description), before the PUT. */
   onSaved: (workflow: IWorkflow) => void
-  /** Fecha o diálogo depois de o PUT dar certo. */
+  /** Closes the dialog after the PUT succeeds. */
   onDone: () => void
 }
 
-// Recebe o workflow por prop, e não por um contexto de página: a lista vive
-// no hook de dados de Projetos, e um segundo lugar guardando "os projetos"
-// divergiria dela na primeira mutação otimista.
+// Takes the workflow by prop, not through a page context: the list lives
+// in the Projects data hook, and a second place holding "the projects"
+// would diverge from it on the first optimistic mutation.
 const ConfigureProject = ({ workflow, onSaved, onDone }: ConfigureProjectProps) => {
   const form = useForm<z.infer<typeof formConfigureProjectSchema>>({
     resolver: zodResolver(formConfigureProjectSchema),
@@ -39,10 +39,10 @@ const ConfigureProject = ({ workflow, onSaved, onDone }: ConfigureProjectProps) 
       description: data.description ?? "",
     })
 
-    // Só os campos que este formulário edita. O objeto espalhado acima serve ao
-    // estado local; mandá-lo inteiro para a API reenviava campos que o cliente
-    // não deve definir (workspace_id, created_by_id, timestamps) — e o backend
-    // agora responde 422 a campo desconhecido (WorkflowUpdate usa extra="forbid").
+    // Only the fields this form edits. The object spread above serves the
+    // local state; sending it whole to the API resent fields the client
+    // must not set (workspace_id, created_by_id, timestamps) — and the backend
+    // now answers 422 to an unknown field (WorkflowUpdate uses extra="forbid").
     const respFlow = await GisFlowService.updateWorkflowById(workflow.id_hash, {
       name: data.name,
       description: data.description ?? "",

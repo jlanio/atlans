@@ -9,35 +9,37 @@ import { useTextos } from "./i18n"
 
 interface Props {
   camadas: MapLayer[]
-  /** artifact_id → aviso de "sem prévia". */
+  /** artifact_id → "no preview" notice. */
   avisos: Record<string, AvisoDeCamada>
-  /** artifact_id → rótulo do que está sendo buscado agora. */
+  /** artifact_id → label of what is being fetched right now. */
   carregando?: Record<string, string>
   onAlternar: (id: string) => void
   onRemover: (id: string) => void
   onEnquadrar: (id: string) => void
   onDispensarAviso: (artifactId: string) => void
-  /** Baixa o arquivo de origem da camada. Recebe o `artifact_id` (sem `art:`). */
+  /** Downloads the layer's source file. Takes the `artifact_id` (without `art:`). */
   onBaixar: (artifactId: string, nome: string) => void
 }
 
 const TITULO = "camadas-do-globo"
 
 /**
- * A lista das camadas ativas no globo, com olho/enquadrar/remover, no canto
- * SUPERIOR ESQUERDO DA ÁREA DO GLOBO — `absolute` dentro da raiz da HomeView,
- * que já começa depois do sidebar. Fixa na viewport ela cobria a marca, o
- * "Nova conversa" e o gatilho de recolher, e ainda comia os cliques deles.
+ * The list of layers active on the globe, with eye/zoom-to/remove, in the
+ * TOP LEFT CORNER OF THE GLOBE AREA — `absolute` inside the HomeView root,
+ * which already starts after the sidebar. Fixed to the viewport it covered the
+ * logo, the "Nova conversa" (new conversation) button and the collapse trigger,
+ * and also swallowed their clicks.
  *
- * No telefone nasce recolhida a uma faixa com a contagem: o painel do
- * assistente é opaco e vai de `top-16` até embaixo, então a lista aberta ali
- * ficava inalcançável. Recolhida, a faixa continua visível acima dele, e
- * expandir sobe por cima — que é quando a pessoa pediu para ver.
+ * On the phone it starts collapsed to a strip with the count: the assistant
+ * panel is opaque and runs from `top-16` to the bottom, so the open list there
+ * was unreachable. Collapsed, the strip stays visible above it, and expanding
+ * goes over it — which is when the person asked to see it.
  *
- * Empilhamento da Home, de cima para baixo: gatilho móvel da barra lateral
- * (`app-header.tsx`, z-50) > este painel (z-40) > painel/barra do assistente
- * (z-30). Este painel NÃO sobe para z-50: empatado com o gatilho, ele o cobria
- * em tela estreita, e o gatilho é o único jeito de abrir a barra no telefone.
+ * Home stacking, from top to bottom: mobile sidebar trigger
+ * (`app-header.tsx`, z-50) > this panel (z-40) > assistant panel/bar
+ * (z-30). This panel does NOT go up to z-50: tied with the trigger, it covered
+ * it on narrow screens, and the trigger is the only way to open the bar on the
+ * phone.
  */
 export default function PainelCamadas({
   camadas, avisos, carregando = {}, onAlternar, onRemover, onEnquadrar, onDispensarAviso, onBaixar,
@@ -73,9 +75,9 @@ export default function PainelCamadas({
       {expandido && (
         <ul className="max-h-[40vh] overflow-y-auto p-1.5">
           {camadas.map((c) => {
-            // Camada MVT sem bbox útil: a geometria vem dos tiles e o
-            // `fitToLayer` não tem por onde calcular o enquadramento. O botão
-            // vivo que não faz nada é pior do que o botão desabilitado.
+            // MVT layer with no useful bbox: the geometry comes from the tiles and
+            // `fitToLayer` has no way to compute the framing. A live button
+            // that does nothing is worse than a disabled button.
             const podeEnquadrar = !!c.bbox || (c.geojson?.features?.length ?? 0) > 0
             return (
               <li key={c.id} className="group/camada flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-accent/50 max-md:gap-2">
@@ -87,11 +89,11 @@ export default function PainelCamadas({
                 <span className={cn("min-w-0 flex-1 truncate text-xs", !c.visible && "text-muted-foreground line-through")}>
                   {c.label}
                 </span>
-                {/* Só quando o servidor disse que o arquivo existe para baixar
-                    (`baixavel`): uma camada publicada aparece no globo com o
-                    conteúdo no PostGIS e pode não ter arquivo no storage — ali
-                    o download responderia 409/404, e botão vivo que falha é
-                    pior que botão ausente. */}
+                {/* Only when the server said the file exists to download
+                    (`baixavel`): a published layer appears on the globe with
+                    its content in PostGIS and may have no file in storage —
+                    there the download would answer 409/404, and a live button
+                    that fails is worse than a missing button. */}
                 {c.baixavel && (
                   <BotaoIcone
                     label={t.baixar(c.label)}
@@ -119,8 +121,8 @@ export default function PainelCamadas({
             )
           })}
 
-          {/* Entre o clique e a camada nascer podiam passar segundos sem nada
-              na tela — a pessoa clicava de novo e baixava o arquivo duas vezes. */}
+          {/* Between the click and the layer appearing, seconds could pass with nothing
+              on screen — the person clicked again and downloaded the file twice. */}
           {buscando.map(([id, nome]) => (
             <li key={`carregando-${id}`} className="flex items-center gap-1.5 px-1.5 py-1 text-xs text-muted-foreground" aria-busy="true">
               <span className="size-2.5 shrink-0 animate-pulse rounded-sm bg-muted-foreground/40" aria-hidden="true" />
@@ -151,7 +153,7 @@ export default function PainelCamadas({
   )
 }
 
-/** `art:<artifact_id>` → `<artifact_id>`. O prefixo é do `useCamadas`. */
+/** `art:<artifact_id>` → `<artifact_id>`. The prefix comes from `useCamadas`. */
 export function idDoArtefato(idDaCamada: string): string {
   return idDaCamada.startsWith("art:") ? idDaCamada.slice(4) : idDaCamada
 }
@@ -163,7 +165,7 @@ function BotaoIcone({
   onClick: () => void
   destaque?: boolean
   desabilitado?: boolean
-  /** Aparece ao passar o mouse na linha (ou ao receber foco). Ver abaixo. */
+  /** Appears when hovering the row (or on receiving focus). See below. */
   soNoHover?: boolean
   titulo?: string
   children: React.ReactNode
@@ -180,15 +182,15 @@ function BotaoIcone({
         destaque && "hover:text-destructive",
         desabilitado && "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground",
         soNoHover && [
-          // `opacity`, e não `hidden`: a largura fica reservada, então a linha
-          // não se reorganiza (e o nome não re-corta) quando o mouse entra.
+          // `opacity`, not `hidden`: the width stays reserved, so the row
+          // does not reflow (and the name does not re-truncate) when the mouse enters.
           //
-          // Três guardas para que "só no hover" não vire "inalcançável":
-          // `@media (hover:hover)` restringe o esconderijo a quem TEM mouse —
-          // no toque o botão é permanente, porque lá não existe hover; o foco
-          // do teclado o revela (ele nunca sai da ordem de tabulação); e
-          // `group-focus-within` cobre o foco chegando por outro botão da mesma
-          // linha. Sem isto a ação existiria só para quem usa mouse.
+          // Three guards so that "hover only" does not become "unreachable":
+          // `@media (hover:hover)` limits the hiding to those who HAVE a mouse —
+          // on touch the button is permanent, because there is no hover there;
+          // keyboard focus reveals it (it never leaves the tab order); and
+          // `group-focus-within` covers focus arriving through another button on
+          // the same row. Without this the action would exist only for mouse users.
           "max-md:opacity-100",
           "[@media(hover:hover)]:opacity-0",
           "[@media(hover:hover)]:group-hover/camada:opacity-100",

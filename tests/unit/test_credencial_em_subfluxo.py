@@ -1,12 +1,13 @@
 """
-Credencial de banco usada DENTRO de um sub-fluxo.
+Database credential used INSIDE a sub-workflow.
 
-O executor não tem DB: o servidor troca `credential_id` pelo DSN ao montar o
-envelope e remove o id. Isso só acontecia na definition raiz — a cadeia de
-sub-fluxos viajava crua no mesmo envelope. Um nó de banco dentro de um
-sub-fluxo chegava ao executor com o id e sem conexão, e morria com
+The executor has no DB: the server swaps `credential_id` for the DSN when
+building the envelope and removes the id. That only happened in the root
+definition — the chain of sub-workflows traveled raw in the same envelope. A
+database node inside a sub-workflow reached the executor with the id and no
+connection, and died with
 "'connectionString' é obrigatório (deve ser resolvido antes da execução)":
-uma frase que descreve um problema do servidor como se fosse configuração do nó.
+a sentence that describes a server problem as if it were node configuration.
 """
 from __future__ import annotations
 
@@ -48,7 +49,7 @@ def _def_filho():
     }
 
 
-# ── coleta dos ids ──────────────────────────────────────────────────────────
+# ── collecting the ids ──────────────────────────────────────────────────────
 
 class TestColetaDeIds:
 
@@ -62,23 +63,23 @@ class TestColetaDeIds:
         assert set(ids) == {CRED_PAI, CRED_FILHO}
 
     def test_so_a_raiz_continua_funcionando(self):
-        # A assinatura passou a aceitar várias definitions; a chamada com uma só
-        # é a de todo o resto do código.
+        # The signature now accepts several definitions; the call with just one
+        # is the one the rest of the code makes.
         assert _collect_credential_ids(_def_filho()) == [CRED_FILHO]
 
     def test_tolera_definition_vazia_ou_nula(self):
         assert _collect_credential_ids({}, None, _def_filho()) == [CRED_FILHO]
 
 
-# ── resolução no dispatch ───────────────────────────────────────────────────
+# ── resolution at dispatch ──────────────────────────────────────────────────
 
 class TestResolucaoNoDispatch:
 
     @pytest.mark.asyncio
     async def test_a_credencial_do_filho_e_resolvida(self):
-        """Sem isto, `pre_resolved` não continha a credencial do filho e a
-        injeção não tinha o que injetar, mesmo depois de passar a percorrer
-        os sub-fluxos."""
+        """Without this, `pre_resolved` did not contain the child's credential and
+        the injection had nothing to inject, even after it started walking the
+        sub-workflows."""
         pai = MagicMock()
         pai.id_hash, pai.workspace_id, pai.flag_ative = "parent-A", "ws-test", True
         pai.pinned_outputs = pai.pin_metadata = None
@@ -119,15 +120,15 @@ class TestResolucaoNoDispatch:
 
     @pytest.mark.asyncio
     async def test_o_envelope_leva_o_dsn_dentro_do_subfluxo(self):
-        """O que o executor de fato recebe: `connectionString` no nó do filho,
-        e `credential_id` removido."""
+        """What the executor actually receives: `connectionString` in the child's
+        node, and `credential_id` removed."""
         wf = MagicMock()
         wf.id_hash, wf.workspace_id = "parent-A", "ws-test"
         wf.pinned_outputs = wf.pin_metadata = None
 
-        # O UPDATE pending->running e construido com o modelo real, entao ele
-        # nao pode ser trocado por mock; `db` inteiro e de mentira e nada chega
-        # ao banco.
+        # The pending->running UPDATE is built with the real model, so it cannot
+        # be swapped for a mock; the whole `db` is fake and nothing reaches
+        # the database.
         transicao = MagicMock()
         transicao.rowcount = 1
         db = MagicMock()
@@ -137,8 +138,8 @@ class TestResolucaoNoDispatch:
         capturado: dict = {}
 
         def _capturar(**kwargs):
-            # O payload chega ja serializado: o dispatch faz o json.dumps uma
-            # vez so, fora do laco de candidatos.
+            # The payload arrives already serialized: the dispatch does the json.dumps
+            # only once, outside the candidates loop.
             import json as _json
             capturado.update(_json.loads(kwargs["payload"]))
             return {"job": "cifrado"}
@@ -173,12 +174,12 @@ class TestResolucaoNoDispatch:
 
 
 async def _injetar_falso(definition, pre_resolved=None, **_):
-    """Mesmo contrato de `inject_credentials`, sem tocar o banco."""
+    """Same contract as `inject_credentials`, without touching the database."""
     from app.services.credential_resolver import inject_credentials
     return await inject_credentials(definition, pre_resolved=pre_resolved or {})
 
 
-# ── a mensagem que o operador lê ────────────────────────────────────────────
+# ── the message the operator reads ──────────────────────────────────────────
 
 class TestMensagemDoNo:
 
@@ -186,8 +187,8 @@ class TestMensagemDoNo:
         assert obter_conexao({"connectionString": " dsn://x "}) == "dsn://x"
 
     def test_credencial_escolhida_mas_nao_resolvida_culpa_o_servidor(self):
-        # `credential_id` sobrevivendo é o rastro: `inject_credentials` o remove
-        # justamente ao injetar o DSN.
+        # `credential_id` surviving is the trail: `inject_credentials` removes it
+        # precisely when injecting the DSN.
         with pytest.raises(ValueError) as exc:
             obter_conexao({"credential_id": CRED_FILHO})
         msg = str(exc.value)

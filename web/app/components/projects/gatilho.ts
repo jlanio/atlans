@@ -3,20 +3,20 @@ import { fromBackend, dayjs } from "@/lib/dayjs"
 import { formatarInicio } from "@/lib/formatos"
 
 /**
- * "O que ele é": gatilho e agendamento de um workflow (docs/specs/projects.md
- * §3.4). Puro — recebe os booleanos e o resumo que a listagem já traz e
- * devolve tipo, rótulo e texto; o ícone é do componente, que é quem sabe de
- * cor e tamanho.
+ * "What it is": a workflow's trigger and schedule (docs/specs/projects.md
+ * §3.4). Pure — takes the booleans and the summary the listing already carries
+ * and returns type, label and text; the icon belongs to the component, which is
+ * the one that knows about color and size.
  */
 
 export type TipoDeGatilho = "agendado" | "webhook" | "arquivo" | "geofence" | "manual" | "subfluxo"
 
 export interface Gatilho {
-  /** O principal, nesta precedência: subfluxo > agendado > webhook > arquivo > geofence > manual. */
+  /** The main one, in this precedence: sub-workflow > scheduled > webhook > file > geofence > manual. */
   tipo: TipoDeGatilho
   /** "Agendado", "Agendado + webhook", "Só manual", "Chamado por outros workflows"… */
   rotulo: string
-  /** Demais gatilhos presentes, na mesma precedência. */
+  /** Other triggers present, in the same precedence. */
   extras: TipoDeGatilho[]
 }
 
@@ -29,8 +29,8 @@ export const ROTULO_DO_GATILHO: Record<TipoDeGatilho, string> = {
   subfluxo: "Chamado por outros workflows",
 }
 
-// Como o gatilho aparece quando é o segundo da lista ("Agendado + webhook"):
-// sem preposição e em caixa baixa, para ler como uma frase só.
+// How the trigger appears when it is the second in the list ("Agendado + webhook"):
+// no preposition and in lowercase, so it reads as a single phrase.
 const ROTULO_DE_EXTRA: Record<TipoDeGatilho, string> = {
   agendado: "agendado",
   webhook: "webhook",
@@ -46,8 +46,8 @@ type CamposDoGatilho = Pick<
 >
 
 export function derivarGatilho(wf: CamposDoGatilho): Gatilho {
-  // Sub-fluxo vem primeiro mesmo com gatilho próprio: a natureza dele é ser
-  // chamado por outro workflow, e é isso que muda como a pessoa o executa.
+  // Sub-workflow comes first even with its own trigger: its nature is to be
+  // called by another workflow, and that is what changes how the person runs it.
   const presentes: TipoDeGatilho[] = []
   if (wf.is_subworkflow) presentes.push("subfluxo")
   if (wf.has_schedule_trigger) presentes.push("agendado")
@@ -62,15 +62,15 @@ export function derivarGatilho(wf: CamposDoGatilho): Gatilho {
 }
 
 export interface ResumoDoAgendamento {
-  /** pausado = `schedule.active` false (ou workflow inativo); calculando = ativo sem `next_run_at`. */
+  /** pausado = `schedule.active` false (or inactive workflow); calculando = active without `next_run_at`. */
   estado: "ativo" | "pausado" | "calculando"
-  /** "todo dia às 06:00" · "a cada 6 h" · cron cru quando não reconhecido · "recorrência (RRULE)". */
+  /** "todo dia às 06:00" · "a cada 6 h" · raw cron when not recognized · "recorrência (RRULE)". */
   descricao: string
-  /** `descricao` é a expressão cron sem tradução — o componente a mostra em `code`. */
+  /** `descricao` is the untranslated cron expression — the component shows it in `code`. */
   descricaoCrua: boolean
-  /** "hoje, 18:00" / "amanhã, 06:00" / "1 out, 08:00"; nulo quando pausado ou calculando. */
+  /** "hoje, 18:00" / "amanhã, 06:00" / "1 out, 08:00"; null when paused or calculating. */
   proxima: string | null
-  /** Quando pausado porque o próprio workflow está inativo. */
+  /** When paused because the workflow itself is inactive. */
   motivoPausa: "workflow inativo" | null
 }
 
@@ -81,14 +81,14 @@ export function resumirAgendamento(
 ): ResumoDoAgendamento | null {
   if (!schedule) return null
 
-  // Workflow inativo conta como pausado mesmo que a linha do schedule ainda
-  // diga `active`: o backend alinha os dois ao desativar, mas a lista faz a
-  // troca otimista antes de recarregar — e o que a pessoa precisa saber é
-  // que não vai rodar.
+  // An inactive workflow counts as paused even if the schedule row still
+  // says `active`: the backend aligns the two on deactivation, but the list does
+  // the optimistic switch before reloading — and what the person needs to know
+  // is that it will not run.
   //
-  // `next_run_at` no passado é "calculando", não "ativo": o agendador ainda
-  // não avançou a marca (roda a cada ~30 s). Sem isto a linha diria "próxima
-  // há 3 h" ou "próxima hoje, 06:00" para um horário que já passou.
+  // `next_run_at` in the past is "calculando", not "ativo": the scheduler has
+  // not advanced the mark yet (it runs every ~30 s). Without this the row would
+  // say "próxima há 3 h" or "próxima hoje, 06:00" for a time that already passed.
   const proxima = fromBackend(schedule.next_run_at)
   const proximaNoFuturo = proxima != null && proxima.isAfter(dayjs(agora))
   const estado: ResumoDoAgendamento["estado"] =
@@ -122,9 +122,9 @@ function descreverEstrategia(schedule: IWorkflowSchedule): { descricao: string; 
 }
 
 /**
- * Próxima execução para a pessoa que olha a lista hoje: "amanhã, 06:00" é o
- * caso mais comum de um agendamento diário e `formatarInicio` (feito para o
- * passado) o mostraria como "8 set, 06:00". Os demais casos são os dele.
+ * Next run for the person looking at the list today: "amanhã, 06:00" is the
+ * most common case of a daily schedule, and `formatarInicio` (made for the
+ * past) would show it as "8 set, 06:00". The other cases are its own.
  */
 export function formatarProxima(iso: string | null | undefined, agora: Date = new Date()): string {
   const d = fromBackend(iso)
@@ -135,8 +135,8 @@ export function formatarProxima(iso: string | null | undefined, agora: Date = ne
 
 // ── Cron ──────────────────────────────────────────────────────────────────
 
-// Dia da semana como se fala: "às segundas", "aos domingos". O 7 é domingo
-// também (as duas grafias valem no cron).
+// Weekday as it is spoken: "às segundas", "aos domingos". 7 is Sunday
+// too (both spellings are valid in cron).
 const DIAS_DA_SEMANA = ["aos domingos", "às segundas", "às terças", "às quartas", "às quintas", "às sextas", "aos sábados", "aos domingos"]
 
 function inteiro(campo: string, min: number, max: number): number | null {
@@ -150,9 +150,10 @@ function hora(h: number, m: number): string {
 }
 
 /**
- * Formas que a tela traduz — as que o editor oferece como preset e as que se
- * escrevem à mão sem pensar. A hora é a do cron no fuso do agendamento, sem
- * converter: é o que a pessoa escreveu. Devolve nulo para o resto.
+ * Forms the screen translates — the ones the editor offers as presets and the
+ * ones people write by hand without thinking. The hour is the cron's, in the
+ * schedule's time zone, unconverted: it is what the person wrote. Returns null
+ * for the rest.
  */
 function traduzirCron(expr: string): string | null {
   const partes = expr.trim().split(/\s+/)
@@ -196,7 +197,7 @@ function traduzirCron(expr: string): string | null {
   return null
 }
 
-/** "a cada 15 min" / "a cada 6 h" / "a cada 2 dias" — unidades do agendador (`seconds|minutes|hours|days`). */
+/** "a cada 15 min" / "a cada 6 h" / "a cada 2 dias" — scheduler units (`seconds|minutes|hours|days`). */
 export function descreverIntervalo(interval: number | null | undefined, unit: string | null | undefined): string {
   if (interval == null || !Number.isFinite(interval) || interval <= 0) return "intervalo"
   const n = Math.round(interval)

@@ -1,19 +1,19 @@
-"""Regressoes de isolamento de inquilino da auditoria de 28/08/2026.
+"""Tenant isolation regressions from the 2026-08-28 audit.
 
-Um teste por achado corrigido. Os tres primeiros sao correcoes de UMA LINHA no
-`where` de um select — exatamente o tipo que volta sem querer num merge, e que
-nao quebra nenhum teste funcional quando volta (a rota continua respondendo
-200; so passa a responder com dado alheio).
+One test per fixed finding. The first three are ONE-LINE fixes in the
+`where` of a select — exactly the kind that comes back by accident in a merge,
+and that breaks no functional test when it does (the route keeps responding
+200; it just starts responding with someone else's data).
 
-F3  workflow_groups vinculava Workflow resolvido so por id_hash (escrita cross-tenant).
-F4  /executores/{id}/status e /workspaces aceitavam qualquer JWT (leitura cross-tenant).
-F5  GET /workspaces/{id}/executor nao checava associacao ao workspace.
-F7  `OR workspace_id IS NULL` tornava linha legada visivel a todo autenticado.
-F9  ResponseNode definia Content-Type e cabecalhos arbitrarios na resposta.
+F3  workflow_groups linked a Workflow resolved only by id_hash (cross-tenant write).
+F4  /executores/{id}/status and /workspaces accepted any JWT (cross-tenant read).
+F5  GET /workspaces/{id}/executor did not check membership in the workspace.
+F7  `OR workspace_id IS NULL` made a legacy row visible to every authenticated user.
+F9  ResponseNode set Content-Type and arbitrary headers on the response.
 
-O teste de varredura no fim (`test_varredura_*`) e o de maior alcance: em vez de
-um caso por rota, ele afirma a INVARIANTE sobre o codigo — nenhuma consulta de
-tenant pode carregar um escape por NULL.
+The sweep test at the end (`test_varredura_*`) has the widest reach: instead of
+one case per route, it asserts the INVARIANT over the code — no tenant query
+may carry a NULL escape.
 """
 import inspect
 import re
@@ -27,11 +27,11 @@ from fastapi import HTTPException
 
 @pytest.fixture
 async def banco():
-    """SQLite em memoria com as tabelas REAIS de workflows e grupos.
+    """In-memory SQLite with the REAL workflow and group tables.
 
-    Vale o custo de um banco de verdade: a falha original nao mudava o codigo de
-    status (a rota respondia 204 nos dois casos, so que gravando na linha
-    errada), entao so olhando a linha depois do commit da para prova-la.
+    A real database is worth the cost: the original failure did not change the
+    status code (the route responded 204 in both cases, just writing to the wrong
+    row), so only looking at the row after the commit can prove it.
     """
     from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
@@ -92,10 +92,10 @@ async def test_f3_alvos_agrupaveis_recusa_workflow_de_outro_workspace(banco):
 
 @pytest.mark.asyncio
 async def test_f3_workflow_desativado_continua_agrupavel(banco):
-    """Regressao introduzida na primeira versao da correcao: com
-    `flag_ative.is_(True)` no filtro, um workflow desativado que o usuario
-    marcou na lista virava "nao encontrado" e derrubava a criacao do grupo
-    inteira. Agrupar e organizacao, nao execucao."""
+    """Regression introduced in the first version of the fix: with
+    `flag_ative.is_(True)` in the filter, a deactivated workflow that the user
+    ticked in the list became "not found" and brought down the creation of the
+    whole group. Grouping is organization, not execution."""
     from sqlalchemy import select
 
     from app.api.routers.workflow_groups_router import _alvos_agrupaveis
@@ -138,7 +138,7 @@ def test_f3_id_fora_do_grupo_e_recusado_com_404():
         _recusar_ids_fora_do_grupo(["wf-meu", "wf-alheio"], [encontrado])
 
     assert exc.value.status_code == 404
-    # Nao distingue "nao existe" de "e de outro tenant" — senao vira oraculo.
+    # Does not distinguish "does not exist" from "belongs to another tenant" — or it becomes an oracle.
     assert "wf-alheio" in exc.value.detail
 
 
@@ -159,11 +159,11 @@ _ROTAS_QUE_VINCULAM_WORKFLOW = [
 
 @pytest.mark.parametrize("nome_rota", _ROTAS_QUE_VINCULAM_WORKFLOW)
 def test_f3_toda_rota_que_mexe_em_group_id_casa_o_workspace(nome_rota):
-    """Complementa os testes de banco: garante que nenhuma das cinco rotas
-    resolva `Workflow` por fora do criterio compartilhado.
+    """Complements the database tests: ensures none of the five routes
+    resolves `Workflow` outside the shared criterion.
 
-    Aceita as duas formas (helper ou filtro literal) para nao travar refatoracao
-    que continue correta.
+    Accepts both forms (helper or literal filter) so as not to block a refactor
+    that remains correct.
     """
     from app.api.routers import workflow_groups_router
 
@@ -176,10 +176,10 @@ def test_f3_toda_rota_que_mexe_em_group_id_casa_o_workspace(nome_rota):
 
 
 def test_f3_create_group_nao_usa_mais_a_checagem_permissiva_antiga():
-    """`if wf.workspace_id and wf.workspace_id != ...` deixava passar NULL.
+    """`if wf.workspace_id and wf.workspace_id != ...` let NULL through.
 
-    Era a unica das cinco rotas que validava, mas o `and` curto-circuitava em
-    workflow legado sem workspace — que era justamente o caso mais exposto.
+    It was the only one of the five routes that validated, but the `and` short-circuited
+    on a legacy workflow without a workspace — which was precisely the most exposed case.
     """
     from app.api.routers import workflow_groups_router
 
@@ -187,7 +187,7 @@ def test_f3_create_group_nao_usa_mais_a_checagem_permissiva_antiga():
     assert "if wf.workspace_id and" not in fonte
 
 
-# ── F4: leitura de executor por qualquer conta ───────────────────────────────
+# ── F4: executor read by any account ─────────────────────────────────────────
 
 def _quem(*, executor_id=None, user_role=None, user_id="u-1"):
     from app.api.dependencies import ExecutorOuUsuario
@@ -230,8 +230,8 @@ def test_f4_executor_le_a_si_mesmo():
 
 
 def test_f4_executor_nao_enumera_a_frota():
-    """Qualquer usuario pode criar e enrolar um executor dedicado; sem esta
-    guarda, um executor comprometido lia o status de todos os outros."""
+    """Any user can create and enroll a dedicated executor; without this
+    guard, a compromised executor could read the status of all the others."""
     from app.api.routers.executores_router import _assert_pode_ler_executor
 
     with pytest.raises(HTTPException) as exc:
@@ -241,9 +241,9 @@ def test_f4_executor_nao_enumera_a_frota():
 
 @pytest.mark.asyncio
 async def test_f4_token_revogado_e_recusado():
-    """`agent_mtls_or_user_auth` usava `decode_token` solto: pulava a blacklist e
-    o lookup do User, entao token de sessao encerrada por /auth/logout — ou de
-    usuario suspenso — seguia valendo ate expirar sozinho."""
+    """`agent_mtls_or_user_auth` used a bare `decode_token`: it skipped the blacklist and
+    the User lookup, so a token from a session ended by /auth/logout — or from a
+    suspended user — stayed valid until it expired on its own."""
     from unittest.mock import AsyncMock, patch
 
     from app.api import dependencies
@@ -262,8 +262,8 @@ async def test_f4_token_revogado_e_recusado():
 
 @pytest.mark.parametrize("kwargs", [{}, {"executor": MagicMock(), "user": MagicMock()}])
 def test_f4_identidade_ambigua_e_recusada_na_construcao(kwargs):
-    """Estado invalido nao pode chegar ao helper de autorizacao: la ele viraria
-    `None.role` -> AttributeError -> 500, que nao nega nem concede acesso."""
+    """Invalid state must not reach the authorization helper: there it would become
+    `None.role` -> AttributeError -> 500, which neither denies nor grants access."""
     from app.api.dependencies import ExecutorOuUsuario
 
     with pytest.raises(ValueError):
@@ -281,15 +281,15 @@ def test_f4_rotas_de_executor_chamam_o_gate():
 # ── F5: GET /workspaces/{id}/executor ────────────────────────────────────────
 
 def test_f5_get_executor_do_workspace_usa_o_gate_de_visibilidade():
-    """Sem `_get_visible_workspace`, a rota devolvia `target_executor_id` de
-    qualquer workspace e ainda distinguia 404 de 200 — oraculo de enumeracao."""
+    """Without `_get_visible_workspace`, the route returned the `target_executor_id` of
+    any workspace and also distinguished 404 from 200 — an enumeration oracle."""
     from app.api.routers import workspace_router
 
     fonte = inspect.getsource(workspace_router.get_workspace_agent)
     assert "_get_visible_workspace" in fonte
 
 
-# ── F7: escape de tenant por workspace_id NULL ───────────────────────────────
+# ── F7: tenant escape via NULL workspace_id ──────────────────────────────────
 
 @pytest.mark.parametrize(
     "metodo",
@@ -314,8 +314,8 @@ def test_f7_credential_usage_nao_tem_escape_por_nulo():
 
 @pytest.mark.parametrize("modelo", ["Workflow", "WorkflowRun"])
 def test_f7_coluna_workspace_id_e_not_null(modelo):
-    """A garantia de verdade: com a coluna NOT NULL, nenhuma consulta futura
-    precisa (nem consegue justificar) o `OR workspace_id IS NULL`."""
+    """The real guarantee: with the column NOT NULL, no future query
+    needs (or can justify) the `OR workspace_id IS NULL`."""
     import app.models.models as m
 
     coluna = getattr(m, modelo).__table__.c.workspace_id
@@ -334,7 +334,7 @@ def test_f7_workflow_create_exige_workspace():
     assert wf.workspace_id == "ws-1"
 
 
-# ── F9: resposta do ResponseNode ─────────────────────────────────────────────
+# ── F9: ResponseNode response ────────────────────────────────────────────────
 
 def _req():
     """Request minimo — so precisa de `.state` mutavel."""
@@ -358,17 +358,17 @@ def test_f9_content_type_fora_da_allowlist_e_rebaixado(tipo):
 @pytest.mark.parametrize(
     "tipo",
     [
-        # Os cinco que o dropdown do ResponseNode oferece — rebaixar qualquer um
-        # deles quebraria workflows existentes em silencio.
+        # The five the ResponseNode dropdown offers — downgrading any one of
+        # them would silently break existing workflows.
         "application/json", "text/plain", "text/html", "application/xml", "text/csv",
         "application/geo+json",
     ],
 )
 def test_f9_content_type_anunciado_pelo_node_nao_e_rebaixado(tipo):
-    """Regressao: a primeira versao desta allowlist NAO incluia `text/html`, que
-    e opcao selecionavel no canvas (flow/nodes/outputs/response_node.py). O
-    efeito era um downgrade silencioso — a pagina passava a chegar como texto,
-    com aviso so no log do servidor."""
+    """Regression: the first version of this allowlist did NOT include `text/html`, which
+    is a selectable option on the canvas (flow/nodes/outputs/response_node.py). The
+    effect was a silent downgrade — the page started arriving as text,
+    with a warning only in the server log."""
     from app.api.routers.webhook_router import _sanear_resposta_do_node
 
     content_type, _ = _sanear_resposta_do_node({"content_type": tipo}, _req())
@@ -377,8 +377,8 @@ def test_f9_content_type_anunciado_pelo_node_nao_e_rebaixado(tipo):
 
 @pytest.mark.parametrize("tipo", ["text/html", "text/html; charset=utf-8", "TEXT/HTML"])
 def test_f9_html_marca_o_corpo_como_nao_confiavel(tipo):
-    """Preserva o recurso e ainda mata o XSS: o middleware troca a CSP por uma
-    com `sandbox` quando esta marca esta presente."""
+    """Preserves the feature and still kills the XSS: the middleware swaps the CSP for
+    one with `sandbox` when this marker is present."""
     from app.api.routers.webhook_router import _sanear_resposta_do_node
 
     request = _req()
@@ -389,7 +389,7 @@ def test_f9_html_marca_o_corpo_como_nao_confiavel(tipo):
 
 @pytest.mark.parametrize("tipo", ["application/json", "text/csv", "text/plain"])
 def test_f9_tipo_nao_renderizavel_nao_endurece_a_csp(tipo):
-    """A CSP restrita nao pode vazar para resposta comum de integracao."""
+    """The restricted CSP must not leak into an ordinary integration response."""
     from app.api.routers.webhook_router import _sanear_resposta_do_node
 
     request = _req()
@@ -408,12 +408,12 @@ def test_f9_csp_de_corpo_nao_confiavel_bloqueia_script():
 
 
 def test_f9_middleware_aplica_csp_restrita_de_ponta_a_ponta():
-    """Comportamental, e nao inspecao de fonte: sobe o middleware REAL e compara
-    as duas respostas.
+    """Behavioral, not source inspection: brings up the REAL middleware and compares
+    the two responses.
 
-    A marca vai por `request.state` porque o middleware sobrescreve o header
-    `Content-Security-Policy` de TODA resposta — defini-lo no handler seria
-    descartado. Este teste e o que prova que o canal funciona.
+    The marker goes through `request.state` because the middleware overwrites the
+    `Content-Security-Policy` header of EVERY response — setting it in the handler
+    would be discarded. This test is what proves the channel works.
     """
     from fastapi import FastAPI, Request
     from starlette.responses import Response
@@ -437,11 +437,11 @@ def test_f9_middleware_aplica_csp_restrita_de_ponta_a_ponta():
         csp_normal = c.get("/normal").headers["content-security-policy"]
         csp_html = c.get("/html").headers["content-security-policy"]
 
-    # A rota comum mantem a CSP da aplicacao (que permite script proprio).
+    # The ordinary route keeps the application's CSP (which allows its own scripts).
     assert "script-src 'self'" in csp_normal
     assert "sandbox" not in csp_normal
 
-    # A rota de corpo nao confiavel roda em origem opaca, sem script.
+    # The untrusted-body route runs in an opaque origin, without scripts.
     assert csp_html.startswith("sandbox")
     assert "script-src" not in csp_html
 
@@ -454,7 +454,7 @@ def test_f9_middleware_aplica_csp_restrita_de_ponta_a_ponta():
         "Strict-Transport-Security",
         "Set-Cookie",
         "Access-Control-Allow-Origin",
-        "x-content-type-options",   # caixa nao importa
+        "x-content-type-options",   # case does not matter
     ],
 )
 def test_f9_cabecalho_de_seguranca_nao_pode_ser_sobrescrito(cabecalho):
@@ -469,8 +469,8 @@ def test_f9_cabecalho_de_seguranca_nao_pode_ser_sobrescrito(cabecalho):
 
 
 def test_f9_cabecalho_proprio_do_workflow_passa():
-    """A allowlist nao pode custar o uso legitimo — integracoes usam headers
-    proprios para correlacionar a resposta."""
+    """The allowlist must not cost legitimate use — integrations use their own
+    headers to correlate the response."""
     from app.api.routers.webhook_router import _sanear_resposta_do_node
 
     _, headers = _sanear_resposta_do_node({"headers": {"X-Request-Id": "abc-123"}}, _req())
@@ -480,9 +480,9 @@ def test_f9_cabecalho_proprio_do_workflow_passa():
 
 @pytest.mark.parametrize("brutos", ["uma-string", ["a", "b"], 42, True])
 def test_f9_headers_nao_dict_nao_derruba_o_handler(brutos):
-    """`headers` e campo livre do tipo `object` no no e chega como JSON do
-    executor. `.items()` numa string levantava AttributeError, que o handler nao
-    captura — virava 500 em vez de ser ignorado."""
+    """`headers` is a free field of type `object` on the node and arrives as JSON from the
+    executor. `.items()` on a string raised AttributeError, which the handler does not
+    catch — it became a 500 instead of being ignored."""
     from app.api.routers.webhook_router import _sanear_resposta_do_node
 
     _, headers = _sanear_resposta_do_node({"headers": brutos}, _req())
@@ -490,7 +490,7 @@ def test_f9_headers_nao_dict_nao_derruba_o_handler(brutos):
     assert set(headers) == {"Content-Type"}
 
 
-# ── Varredura: a invariante, e nao mais um caso por rota ─────────────────────
+# ── Sweep: the invariant, not one more case per route ────────────────────────
 
 _MODULOS_COM_CONSULTA_DE_TENANT = [
     "app.api.routers.credentials_router",
@@ -498,8 +498,8 @@ _MODULOS_COM_CONSULTA_DE_TENANT = [
     "app.api.routers.workflows_router",
     "app.api.routers.artifacts_router",
     "app.api.routers.drive_router",
-    # F5 fatiou os monolitos: os NOVOS donos do codigo movido entram na
-    # varredura junto (a rede de regressao nao pode encolher com refactor).
+    # F5 split the monoliths: the NEW owners of the moved code join the
+    # sweep too (the regression net must not shrink with a refactor).
     "app.api.routers.drive_admin_router",
     "app.api.routers.executor_drive_router",
     "app.crud.workflow_crud",
@@ -519,17 +519,17 @@ _ESCAPE_POR_NULO = re.compile(r"workspace_id\s*\.\s*is_\(\s*None\s*\)")
 
 @pytest.mark.parametrize("modulo", _MODULOS_COM_CONSULTA_DE_TENANT)
 def test_varredura_nenhum_modulo_reintroduz_escape_por_workspace_nulo(modulo):
-    """Afirma a INVARIANTE, nao um caso.
+    """Asserts the INVARIANT, not a case.
 
-    As tres falhas de isolamento da auditoria tinham a mesma assinatura. Um
-    teste por rota protege as rotas que existiam naquele dia; este protege
-    tambem as que ainda vao ser escritas nesses modulos.
+    The audit's three isolation failures had the same signature. One test
+    per route protects the routes that existed that day; this one also protects
+    those yet to be written in these modules.
     """
     import importlib
 
     fonte = inspect.getsource(importlib.import_module(modulo))
-    # Descarta comentarios e docstrings de uma linha que CITAM o padrao ao
-    # explicar por que ele foi removido.
+    # Discards comments and one-line docstrings that QUOTE the pattern while
+    # explaining why it was removed.
     codigo = "\n".join(
         linha for linha in fonte.splitlines() if not linha.lstrip().startswith("#")
     )

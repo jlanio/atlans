@@ -1,5 +1,5 @@
 # flow/executor/pin.py
-"""Gerenciamento de pin-cache: upload/download/delete de artefatos no MinIO."""
+"""Pin-cache management: upload/download/delete of artifacts in MinIO."""
 import os
 import json
 from typing import Dict, Any
@@ -15,7 +15,7 @@ _PIN_RETRY_MAX_DELAY = int(os.getenv("PIN_UPLOAD_RETRY_MAX_DELAY", "30"))
 
 
 def upload_pin_artifact(node_id: str, outputs: Dict[str, Any], workspace_id: str, task_id: str) -> Dict[str, Any]:
-    """Serializa outputs e faz upload ao MinIO como artefato de pin cache."""
+    """Serializes outputs and uploads them to MinIO as a pin cache artifact."""
     import geopandas as gpd
     import pandas as pd
 
@@ -54,9 +54,9 @@ def upload_pin_artifact(node_id: str, outputs: Dict[str, Any], workspace_id: str
             content_type = "application/octet-stream"
         except (ImportError, Exception) as exc:
             logger.debug("Falha ao serializar pin como parquet, usando fallback GeoJSON: %s", exc)
-            # GeoDataFrame pelo helper unico (datetime vira texto numa copia —
-            # o `to_json` cru falhava com coluna datetime, derrubando o pin
-            # junto com o Parquet). DataFrame puro segue no `to_json` do pandas.
+            # GeoDataFrame through the single helper (datetime becomes text in a copy —
+            # the raw `to_json` failed on a datetime column, taking down the pin
+            # along with the Parquet). A plain DataFrame still goes through pandas' `to_json`.
             geojson_str = gdf_para_geojson(geo_val, nat_como_nulo=True) if isinstance(geo_val, gpd.GeoDataFrame) else geo_val.to_json()
             content = geojson_str.encode("utf-8")
             filename = f"{node_id}_pin.geojson"
@@ -85,8 +85,8 @@ def upload_pin_artifact(node_id: str, outputs: Dict[str, Any], workspace_id: str
 
 
 def upload_pin_to_minio(content: "bytes | str", s3_key: str, content_type: str) -> None:
-    """Upload ao MinIO via pre-signed URL. content pode ser bytes ou path de
-    arquivo temporário (nesse caso o arquivo é lido e removido)."""
+    """Upload to MinIO via pre-signed URL. content may be bytes or the path of a
+    temporary file (in which case the file is read and removed)."""
     import httpx
     from flow.utils.executor_http import get_agent_http_config
     from flow.utils.http_retry import retry_sync
@@ -100,8 +100,8 @@ def upload_pin_to_minio(content: "bytes | str", s3_key: str, content_type: str) 
         os.unlink(_tmp_path)
 
     def _do_upload() -> None:
-        # Re-obtem a pre-signed URL a cada tentativa: a URL anterior pode ter
-        # expirado entre retries (presign tem TTL curto).
+        # Re-obtains the pre-signed URL on every attempt: the previous URL may have
+        # expired between retries (presign has a short TTL).
         resp = httpx.post(
             f"{base_url}/drive/executor-presign-upload",
             json={"s3_key": s3_key, "content_type": content_type},
@@ -117,9 +117,9 @@ def upload_pin_to_minio(content: "bytes | str", s3_key: str, content_type: str) 
         )
         put_resp.raise_for_status()
 
-    # Upload best-effort: retenta qualquer falha (rede, storage, 5xx), pois
-    # quase toda falha de upload de pin é transitória e o custo de re-tentar
-    # e baixo comparado a perder o pin cache.
+    # Best-effort upload: retries any failure (network, storage, 5xx), since
+    # almost every pin upload failure is transient and the cost of retrying
+    # is low compared to losing the pin cache.
     retry_sync(
         _do_upload,
         max_attempts=_PIN_RETRY_COUNT + 1,
@@ -131,7 +131,7 @@ def upload_pin_to_minio(content: "bytes | str", s3_key: str, content_type: str) 
 
 
 def download_pin_artifact(pinned: Dict[str, Any]) -> Dict[str, Any]:
-    """Baixa artefato de pin do MinIO e reconstrói os outputs originais."""
+    """Downloads a pin artifact from MinIO and rebuilds the original outputs."""
     s3_key = pinned.get("__pin_s3_key__")
     fmt = pinned.get("__pin_format__", "json")
     geo_key = pinned.get("__pin_geo_key__")
@@ -177,8 +177,8 @@ def download_pin_artifact(pinned: Dict[str, Any]) -> Dict[str, Any]:
             df = pd.read_parquet(_io.BytesIO(content))
             outputs[geo_key or "output"] = df
     elif fmt == "geojson":
-        # `driver="GeoJSON"` NAO restringe o driver na leitura com pyogrio; o
-        # `ler_geodataframe` recusa conteudo VRT pelo proprio conteudo.
+        # `driver="GeoJSON"` does NOT restrict the driver when reading with pyogrio;
+        # `ler_geodataframe` rejects VRT content based on the content itself.
         from flow.utils.leitura_geo import ler_geodataframe
         gdf = ler_geodataframe(_io.BytesIO(content))
         outputs[geo_key or "output"] = gdf

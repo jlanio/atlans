@@ -8,8 +8,8 @@ from flow.utils.credencial import obter_conexao
 
 logger = get_logger(__name__)
 
-# Cache separado do SaveToPostGIS para não competir por slots do TTLCache
-# quando os dois nodes rodam concorrentes no mesmo executor.
+# Cache separate from SaveToPostGIS so as not to compete for TTLCache slots
+# when both nodes run concurrently on the same executor.
 _engine_cache = make_engine_cache("SaveToPostgres")
 
 
@@ -20,21 +20,21 @@ def _get_engine(conn_str: str):
 @register_node
 class SaveToPostgres(BaseNode):
     """
-    No que escreve um DataFrame em uma tabela PostgreSQL comum (sem PostGIS).
+    Node that writes a DataFrame to a regular PostgreSQL table (no PostGIS).
 
-    Aceita `pandas.DataFrame` OU `geopandas.GeoDataFrame`. Se receber um
-    GDF, a coluna de geometria e removida automaticamente antes do insert
-    (Postgres puro nao lida com geometria — para gravar com geom, use
+    Accepts `pandas.DataFrame` OR `geopandas.GeoDataFrame`. If it receives a
+    GDF, the geometry column is removed automatically before the insert
+    (plain Postgres does not handle geometry — to write with geom, use
     SaveToPostGIS).
 
-    Propriedades:
-      - credential_id: UUID da credencial PostgreSQL
-      - connectionString: DSN (injetado pelo backend via credencial)
-      - tableName: nome da tabela destino (obrigatorio)
-      - schema: schema Postgres (default 'public' quando vazio)
+    Properties:
+      - credential_id: UUID of the PostgreSQL credential
+      - connectionString: DSN (injected by the backend via the credential)
+      - tableName: name of the destination table (required)
+      - schema: Postgres schema (default 'public' when empty)
       - ifExists: 'fail' | 'replace' | 'truncate' | 'append' (default 'append')
-      - index: gravar indice do DataFrame como coluna (default False)
-      - chunksize: linhas por batch no INSERT (0 -> automatico pelo n. de colunas)
+      - index: write the DataFrame index as a column (default False)
+      - chunksize: rows per batch in the INSERT (0 -> automatic from the number of columns)
     """
 
     @classmethod
@@ -47,11 +47,11 @@ class SaveToPostgres(BaseNode):
             'requires_credential': True,
             'properties': [
                 {'name': 'credential_id', 'type': 'string', 'default': '', 'description': 'UUID da credencial PostgreSQL'},
-                # Injetada pelo backend via inject_credentials — precisa estar
-                # declarada aqui, senao validate_node_parameters descarta a chave
-                # apos self.validate() no execute() e o node explode com
-                # "Parametro 'connectionString' e obrigatorio.". Frontend nao
-                # renderiza campo (whitelist em node-config-form.tsx).
+                # Injected by the backend via inject_credentials — it must be
+                # declared here, otherwise validate_node_parameters drops the key
+                # after self.validate() in execute() and the node blows up with
+                # "Parametro 'connectionString' e obrigatorio.". The frontend does
+                # not render the field (whitelist in node-config-form.tsx).
                 {'name': 'connectionString', 'type': 'string', 'default': '', 'description': 'DSN de conexao (injetada automaticamente pela credencial)'},
                 {'name': 'tableName', 'required': True, 'type': 'string', 'label': 'Tabela de destino', 'default': '', 'description': 'Nome da tabela onde os dados serao gravados'},
                 {'name': 'schema', 'type': 'string', 'label': 'Schema', 'default': 'public', 'description': "Schema do Postgres (vazio = 'public')"},
@@ -86,8 +86,8 @@ class SaveToPostgres(BaseNode):
         if not table_name:
             raise ValueError("Parametro 'tableName' e obrigatorio.")
 
-        # Default 'public' quando o usuario nao informa schema (em vez de deixar
-        # None e depender do search_path do usuario, que pode variar).
+        # Default 'public' when the user does not provide a schema (instead of leaving
+        # None and depending on the user's search_path, which may vary).
         schema_raw = (self.parameters.get('schema') or '').strip()
         schema = schema_raw or 'public'
         if_exists = self.parameters.get('ifExists', 'append')
@@ -98,9 +98,9 @@ class SaveToPostgres(BaseNode):
         except (TypeError, ValueError):
             chunksize = None
 
-        # Dropa coluna de geometria se o input for GeoDataFrame — Postgres
-        # puro sem extensao PostGIS nao aceita geometry. Usuario que queira
-        # persistir geom deve usar SaveToPostGIS.
+        # Drops the geometry column if the input is a GeoDataFrame — plain
+        # Postgres without the PostGIS extension does not accept geometry. A user
+        # who wants to persist geom should use SaveToPostGIS.
         df = self._drop_geometry_column(df)
 
         logger.info(
@@ -123,7 +123,7 @@ class SaveToPostgres(BaseNode):
     # ── Helpers ──────────────────────────────────────────────────────────
 
     def _get_first_df(self, inputs: Dict[str, Any]):
-        """Retorna o primeiro DataFrame (pandas ou geopandas) nao vazio."""
+        """Returns the first non-empty DataFrame (pandas or geopandas)."""
         import pandas as pd
         for value in inputs.values():
             if isinstance(value, pd.DataFrame) and not value.empty:
@@ -131,7 +131,7 @@ class SaveToPostgres(BaseNode):
         raise ValueError("Nenhum DataFrame encontrado nos inputs.")
 
     def _drop_geometry_column(self, df):
-        """Se for GeoDataFrame, remove a coluna ativa de geometria."""
+        """If it is a GeoDataFrame, removes the active geometry column."""
         import geopandas as gpd
         if isinstance(df, gpd.GeoDataFrame):
             geom_name = df.geometry.name if df.geometry is not None else None
@@ -146,11 +146,11 @@ class SaveToPostgres(BaseNode):
         return df
 
     def _save_to_postgres(self, df, table_name, schema, if_exists, index, chunksize, engine):
-        # `method='multi'` monta UM INSERT com um parametro por celula, e o
-        # protocolo do Postgres nao aceita mais de 65535 por instrucao. Com o
-        # lote em 0 (o padrao de fabrica, cuja ajuda diz "todas de uma vez"),
-        # qualquer tabela de 10 colunas com mais de ~6.500 linhas era recusada
-        # pelo driver. O lote passa a ser derivado do numero de colunas.
+        # `method='multi'` builds ONE INSERT with one parameter per cell, and the
+        # Postgres protocol does not accept more than 65535 per statement. With the
+        # batch size at 0 (the factory default, whose help says "todas de uma vez"),
+        # any 10-column table with more than ~6,500 rows was rejected by the
+        # driver. The batch size is now derived from the number of columns.
         colunas = len(df.columns) + (1 if index else 0)
         lote = lote_seguro(colunas, chunksize)
         if chunksize and lote < chunksize:
@@ -159,14 +159,14 @@ class SaveToPostgres(BaseNode):
                 "usando %d linhas por instrucao.", chunksize, colunas, lote,
             )
 
-        # UMA transacao para esvaziar e gravar. Enquanto eram duas, o TRUNCATE
-        # commitava sozinho e uma falha na gravacao deixava a tabela VAZIA: o
-        # dado velho ja tinha ido e o novo nunca chegou.
+        # ONE transaction to empty and write. While there were two, the TRUNCATE
+        # committed on its own and a failure while writing left the table EMPTY:
+        # the old data was already gone and the new data never arrived.
         with engine.begin() as conn:
             ensure_schema(conn, schema)
             efetivo = if_exists
-            # 'truncate' nao existe no to_sql: esvaziamos a tabela aqui e
-            # gravamos como 'append' (que tambem cria a tabela se nao existir).
+            # 'truncate' does not exist in to_sql: we empty the table here and
+            # write as 'append' (which also creates the table if it does not exist).
             if efetivo == 'truncate':
                 if truncate_table(conn, schema, table_name):
                     logger.info("Tabela '%s.%s' esvaziada (TRUNCATE) antes da gravacao", schema, table_name)
@@ -178,5 +178,5 @@ class SaveToPostgres(BaseNode):
                 if_exists=efetivo,
                 index=index,
                 chunksize=lote,
-                method='multi',  # 1 INSERT com multi-values — mais rapido em batches
+                method='multi',  # 1 INSERT with multi-values — faster in batches
             )

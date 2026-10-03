@@ -7,22 +7,22 @@ import type {
 
 // ── Meu → Agendamentos ───────────────────────────────────────────────────
 
-/** Agendamentos da pessoa, entre todos os seus workspaces (painel da Home).
- *  Paginado com TOTAL (`{ itens, total }`), o mesmo envelope de
- *  `listarConversas`: a rota tem teto e sem o total ela truncava em silêncio.
- *  O servidor apara `limit` em 500. */
+/** The person's schedules, across all their workspaces (Home panel).
+ *  Paginated with a TOTAL (`{ itens, total }`), the same envelope as
+ *  `listarConversas`: the route has a ceiling and without the total it
+ *  truncated silently. The server clamps `limit` to 500. */
 export function getMySchedules(limit = 200, offset = 0) {
   return get<import("../types").IAgendamentosMeus>(`/me/schedules${qs({ limit, offset })}`)
 }
 
-/** Pausa/ativa um agendamento. Vai por `put` (mutação) para a época de escrita
- *  invalidar a leitura seguinte de `getMySchedules`. Religar zera `next_run_at`
- *  no servidor — nada dispara na hora de virar o interruptor. */
+/** Pauses/activates a schedule. Goes via `put` (mutation) so the write epoch
+ *  invalidates the next read of `getMySchedules`. Turning it back on resets
+ *  `next_run_at` on the server — nothing fires the moment the switch flips. */
 export function updateSchedule(workflowId: string, jobId: string, body: { active: boolean }) {
-  // A resposta é o schedule atualizado (ScheduleRead), sem `workflow_name`/
-  // `flag_ative` — não é um IAgendamentoMeu. O chamador só precisa de
-  // sucesso/erro e refaz `getMySchedules` (a época de escrita invalida a
-  // leitura), então o corpo fica como `unknown`.
+  // The response is the updated schedule (ScheduleRead), without `workflow_name`/
+  // `flag_ative` — it is not an IAgendamentoMeu. The caller only needs
+  // success/error and refetches `getMySchedules` (the write epoch invalidates
+  // the read), so the body stays `unknown`.
   return put<unknown>(`/workflows/${workflowId}/schedules/${jobId}`, body)
 }
 
@@ -39,8 +39,8 @@ export function updateWorkflowGroup(
   )
 }
 
-/** Nova ordem dos grupos, da primeira posição para a última.
- *  O backend grava a posição pelo ÍNDICE — não há numeração no cliente. */
+/** New order of the groups, from the first position to the last.
+ *  The backend stores the position by INDEX — there is no numbering on the client. */
 export function reorderWorkflowGroups(groupIds: string[]) {
   return put("/workflow-groups/reorder", { group_ids: groupIds })
 }

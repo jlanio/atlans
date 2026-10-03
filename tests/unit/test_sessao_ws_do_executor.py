@@ -1,16 +1,16 @@
 # tests/unit/test_sessao_ws_do_executor.py
 """
-A sessão WebSocket do executor, do accept ao teardown, pelo handler de verdade.
+The executor's WebSocket session, from accept to teardown, through the real handler.
 
-Caracterização: prende o que o executor vê no fio (as respostas `error` com o
-`reason`, os códigos e motivos de close), o que o servidor faz a cada tipo de
-mensagem (registry, banco, fila da drenadora), o que ele loga e a ordem do
-teardown. Os executores em campo são de versões diferentes e não são
-atualizados junto com o servidor: uma diferença aqui é mudança de protocolo.
+Characterization: pins what the executor sees on the wire (the `error` responses
+with their `reason`, the close codes and reasons), what the server does for each
+message type (registry, database, drainer queue), what it logs and the order of
+the teardown. The executors in the field run different versions and are not
+updated together with the server: a difference here is a protocol change.
 
-O socket é um dublê direto, sem TestClient, para a linha do tempo ser
-determinística: cada efeito entra em `linha` na ordem em que acontece, e os
-envios ao executor (`fio`) saem pelo escritor real da saída do socket.
+The socket is a direct test double, without TestClient, so the timeline is
+deterministic: each effect goes into `linha` in the order it happens, and the
+sends to the executor (`fio`) go out through the socket outbox's real writer.
 """
 import asyncio
 import json
@@ -32,7 +32,7 @@ CERT = 'Subject="CN=executor-ex-1";SerialNumber="1a2b"'
 
 
 class _WS:
-    """O que o handler e a saída do socket (`_Saida`) usam de um WebSocket."""
+    """What the handler and the socket outbox (`_Saida`) use from a WebSocket."""
 
     def __init__(self, linha, executor_id="ex-1"):
         self.linha = linha
@@ -48,10 +48,10 @@ class _WS:
             raise RuntimeError("socket caiu no accept")
 
     async def receive_text(self):
-        # Um receive de verdade passa pelo loop (é I/O de rede). Sem ceder a
-        # vez aqui, no Python 3.12 — em que o `wait_for` já não cria uma task —
-        # as mensagens enfileiradas seriam lidas em sequência e o escritor da
-        # saída nunca rodaria entre uma e outra.
+        # A real receive goes through the loop (it is network I/O). Without yielding
+        # here, on Python 3.12 — where `wait_for` no longer creates a task — the
+        # queued messages would be read in sequence and the outbox writer would
+        # never run between one and the next.
         await asyncio.sleep(0)
         item = await self.entrada.get()
         if isinstance(item, BaseException):
@@ -63,7 +63,7 @@ class _WS:
 
     async def close(self, code=1000, reason=""):
         self.linha.append(("close", code, reason))
-        # O executor responde ao close: um receive pendente vê a desconexão.
+        # The executor answers the close: a pending receive sees the disconnect.
         self.entrada.put_nowait(WebSocketDisconnect(code))
 
     def mandar(self, *mensagens):
@@ -75,7 +75,7 @@ class _WS:
 
 
 class _Registro:
-    """O mínimo do registry que o handler usa — sem Redis."""
+    """The minimum of the registry that the handler uses — without Redis."""
 
     def __init__(self, linha):
         self.linha = linha
@@ -119,7 +119,7 @@ class _Banco:
 
 @pytest.fixture
 def s(monkeypatch):
-    """Uma sessão montada: socket, registry, banco e a linha do tempo."""
+    """An assembled session: socket, registry, database and the timeline."""
     linha: list = []
     registro = _Registro(linha)
     banco = _Banco(linha)
@@ -156,7 +156,7 @@ def s(monkeypatch):
     encerrar_envios = R.encerrar_envios
 
     def _encerrar_envios(sock):
-        # A vigia já tem de estar cancelada quando os envios se encerram.
+        # The watcher must already be cancelled when the sends wind down.
         vigias = [t.cancelling() for t in asyncio.all_tasks() if t.get_name().startswith("revogacao-")]
         linha.append(("encerrar_envios", vigias))
         return encerrar_envios(sock)
@@ -200,7 +200,7 @@ async def _rodar(s, executor_id="ex-1"):
 
 
 def _abertura(s, executor_id="ex-1"):
-    """O começo de toda sessão aceita, até o loop de recebimento."""
+    """The start of every accepted session, up to the receive loop."""
     return [
         ("mtls", {
             "header_value": CERT, "client_host": "10.1.2.3",
@@ -216,7 +216,7 @@ def _abertura(s, executor_id="ex-1"):
 
 
 def _teardown(s, executor_id="ex-1", *, fim=True):
-    """O fim de toda sessão aceita, na ordem: envios, drenagem, presença, órfãos, carimbo."""
+    """The end of every accepted session, in order: sends, draining, presence, orphans, stamp."""
     passos = [
         ("encerrar_envios", [1]),
         ("drenagem",),
@@ -233,18 +233,18 @@ def _teardown(s, executor_id="ex-1", *, fim=True):
 HANDSHAKE = {"type": "handshake", "protocol_version": PROTOCOL_VERSION, "executor_version": "2.3.1"}
 
 
-# ── A sessão, mensagem a mensagem ────────────────────────────────────────────
+# ── The session, message by message ──────────────────────────────────────────
 
 
 async def test_sessao_inteira_mensagem_a_mensagem(s):
-    """Cada tipo do protocolo, na ordem em que o loop o trata, e o teardown.
+    """Each protocol type, in the order the loop handles it, and the teardown.
 
-    O schema é conferido ANTES do portão do handshake; tipo desconhecido (até
-    um que não é texto) só vai ao debug; o segundo handshake só renova a
-    presença."""
+    The schema is checked BEFORE the handshake gate; an unknown type (even
+    one that is not text) only goes to debug; the second handshake only renews
+    the presence."""
     s.ws.mandar(
-        {"type": "heartbeat"},                         # antes do handshake
-        {"type": "ack"},                               # schema antes do portão
+        {"type": "heartbeat"},                         # before the handshake
+        {"type": "ack"},                               # schema before the gate
         "{nao e json",
         {**HANDSHAKE, "system_info": {"hostname": "maq-1", "cpu_cores": 8}},
         {"type": "heartbeat"},
@@ -290,17 +290,17 @@ async def test_sessao_inteira_mensagem_a_mensagem(s):
         ("log", "debug", "Executor 'ex-1' enviou tipo desconhecido: coisa_nova"),
         ("log", "debug", "Executor 'ex-1' enviou tipo desconhecido: ['lista']"),
         ("log", "debug", "Executor 'ex-1' enviou tipo desconhecido: None"),
-        ("vivo", "ex-1"),                              # 2º handshake: nada vai ao banco
+        ("vivo", "ex-1"),                              # 2nd handshake: nothing goes to the database
         ("log", "info", "Executor 'ex-1' desconectou (WebSocketDisconnect)."),
     ] + _teardown(s)
     conn = s.registro.conexoes.get("ex-1")
-    assert conn is None                                # saiu no unregister
+    assert conn is None                                # left in unregister
     assert s.ws not in ec._saidas
 
 
 async def test_handshake_sem_protocol_version_vale_como_1_0(s):
-    """Executor antigo que não declara versão: vale "1.0". Sem versão nem
-    system_info, nada vai ao banco."""
+    """Old executor that does not declare a version: "1.0" applies. With neither
+    version nor system_info, nothing goes to the database."""
     s.ws.mandar({"type": "handshake"}, {"type": "heartbeat"})
     s.ws.desconectar()
 
@@ -314,8 +314,8 @@ async def test_handshake_sem_protocol_version_vale_como_1_0(s):
 
 
 async def test_protocolo_nao_suportado_fecha_com_4426(s):
-    """O `error` de versão é enfileirado e o close logo depois o descarta: o
-    que chega ao executor é o close 4426."""
+    """The version `error` is queued and the close right after discards it: what
+    reaches the executor is close 4426."""
     s.ws.mandar({**HANDSHAKE, "protocol_version": "9.0"}, {"type": "heartbeat"})
 
     await _rodar(s)
@@ -328,7 +328,7 @@ async def test_protocolo_nao_suportado_fecha_com_4426(s):
 
 
 async def test_resposta_de_versao_nao_suportada_leva_a_versao_do_servidor(s, monkeypatch):
-    """O corpo do `error` de versão (quando ele chega a sair)."""
+    """The body of the version `error` (when it actually goes out)."""
     respostas = []
     monkeypatch.setattr(R, "enfileirar_ao_executor", lambda _ws, texto, _eid: respostas.append(json.loads(texto)))
     s.ws.mandar({**HANDSHAKE, "protocol_version": "9.0"})
@@ -357,8 +357,8 @@ async def test_so_o_primeiro_handshake_passa_pelo_portao_da_versao(s):
 
 
 async def test_json_invalido_em_sequencia_fecha_com_1003_e_um_valido_zera_a_conta(s):
-    """Cinco seguidos derrubam; um válido no meio zera a sequência. A quinta
-    resposta é enfileirada e descartada pelo close."""
+    """Five in a row drop the session; a valid one in between resets the streak.
+    The fifth response is queued and discarded by the close."""
     s.ws.mandar(HANDSHAKE, *(["x"] * 4), {"type": "heartbeat"}, *(["x"] * 5))
 
     await _rodar(s)
@@ -413,8 +413,8 @@ async def test_sem_heartbeat_fecha_com_4408(s, monkeypatch):
 
 
 async def test_json_que_nao_e_objeto_derruba_a_sessao_com_log_de_erro(s):
-    """Uma lista passa pelo parse e quebra no `.get`: a sessão cai pelo
-    `except` genérico, sem resposta nem close do servidor."""
+    """A list gets through the parse and breaks at `.get`: the session drops via
+    the generic `except`, with no response and no close from the server."""
     s.ws.mandar(HANDSHAKE, "[1, 2]", {"type": "heartbeat"})
 
     await _rodar(s)
@@ -445,8 +445,8 @@ async def test_erro_no_meio_do_loop_loga_e_faz_o_teardown(s):
 
 
 async def test_banco_fora_no_inicio_da_sessao_ainda_faz_o_teardown(s, monkeypatch):
-    """O `update_agent_last_seen` fica DENTRO do try: com o banco fora, a
-    conexão não fica registrada sem ninguém lendo o socket."""
+    """`update_agent_last_seen` stays INSIDE the try: with the database down, the
+    connection does not stay registered with nobody reading the socket."""
     async def _banco_fora(db, executor_id):
         raise RuntimeError("banco fora")
 
@@ -454,15 +454,15 @@ async def test_banco_fora_no_inicio_da_sessao_ainda_faz_o_teardown(s, monkeypatc
 
     await _rodar(s)
 
-    # A purga é uma task à parte, agendada na abertura: roda na primeira espera
-    # do teardown, e a posição exata dela depende da versão do asyncio.
+    # The purge is a separate task, scheduled on open: it runs at the teardown's
+    # first wait, and its exact position depends on the asyncio version.
     assert ("purga", "ex-1") in s.linha
     assert [e for e in s.linha if e != ("purga", "ex-1")] == _abertura(s)[:3] + [
         ("log", "error", "Erro no WebSocket do executor 'ex-1': banco fora"),
     ] + _teardown(s)
 
 
-# ── A recusa na autenticação ─────────────────────────────────────────────────
+# ── The authentication refusal ───────────────────────────────────────────────
 
 
 @pytest.mark.parametrize(
@@ -470,8 +470,8 @@ async def test_banco_fora_no_inicio_da_sessao_ainda_faz_o_teardown(s, monkeypatc
     [*sorted(dependencies._MTLS_WS_CODE.items()), ("razao_nova", 4401)],
 )
 async def test_recusa_mtls_aceita_e_fecha_com_o_codigo_da_razao(s, monkeypatch, razao, codigo):
-    """O deny chega ao executor como close 44xx (terminal para ele), nunca como
-    status HTTP. Razão desconhecida vira 4401; o motivo do close é cortado."""
+    """The deny reaches the executor as a 44xx close (terminal for it), never as
+    an HTTP status. An unknown reason becomes 4401; the close reason is truncated."""
     detalhe = "d" * 150
 
     async def _nega(**kw):
@@ -561,7 +561,7 @@ async def test_purga_na_reconexao_loga_o_que_purgou_ou_a_falha(s, monkeypatch, r
 
 
 async def test_tarefas_da_sessao_levam_o_prefixo_do_executor(s, monkeypatch):
-    """Os nomes aparecem em dump de tasks e no debug do asyncio."""
+    """The names show up in task dumps and in asyncio debug."""
     executor_id = "exec-0123456789"
     s.ws = _WS(s.linha, executor_id)
     nomes = []
@@ -591,8 +591,8 @@ async def test_tarefas_da_sessao_levam_o_prefixo_do_executor(s, monkeypatch):
 
 
 async def test_ip_da_conexao_vai_com_o_job_result(s, monkeypatch):
-    """O job_result grava o IP DESTA conexão (o do socket), não o de quem
-    estiver no registro quando a drenadora chegar nele."""
+    """The job_result records THIS connection's IP (the socket's), not that of
+    whoever is in the registry when the drainer gets to it."""
     gravados = []
 
     async def _grava(executor_id, msg, frame_bytes, executor_ip=None):
@@ -608,12 +608,12 @@ async def test_ip_da_conexao_vai_com_o_job_result(s, monkeypatch):
     assert gravados == [("ex-1", "j1", 54, "10.1.2.3")]
 
 
-# ── Quando o registro não é mais desta sessão ────────────────────────────────
+# ── When the registration no longer belongs to this session ──────────────────
 
 
 async def test_registro_tomado_por_outra_sessao_nao_carimba_o_fim(s):
-    """Outra sessão registrou por cima entre o register e a conferência: o
-    "visto há" é dela, e o fim desta não é gravado."""
+    """Another session registered on top between the register and the check: the
+    "visto há" (seen ago) is theirs, and this one's end is not recorded."""
     register = s.registro.register
 
     async def _tomado(executor_id, ws, **kw):
@@ -634,8 +634,8 @@ async def test_registro_tomado_por_outra_sessao_nao_carimba_o_fim(s):
 
 
 async def test_sem_conexao_no_registro_o_portao_do_handshake_nao_se_aplica(s):
-    """Sem estado de conexão para conferir, o portão não barra; o handshake
-    ainda grava no banco e nada é carimbado no fim."""
+    """With no connection state to check, the gate does not block; the handshake
+    still writes to the database and nothing is stamped at the end."""
     s.registro.guardar = False
     s.ws.mandar({"type": "heartbeat"}, {**HANDSHAKE, "protocol_version": "9.0"})
     s.ws.desconectar()
@@ -671,9 +671,9 @@ async def test_descartes_por_fila_cheia_sao_somados_no_teardown(s, monkeypatch):
 
 
 async def test_drenagem_que_nao_termina_cancela_espera_as_gravacoes_e_resgata(s, monkeypatch):
-    """A drenagem final passa do prazo: a drenadora é cancelada, o job_result
-    em gravação ganha a carência, e o resgate dos pendentes roda (e loga se
-    falhar) — antes de a presença sair."""
+    """The final draining exceeds the deadline: the drainer is cancelled, the
+    job_result being written gets the grace period, and the rescue of pending
+    ones runs (and logs if it fails) — before the presence is removed."""
     liberar = asyncio.Event()
 
     async def _grava(executor_id, msg, frame_bytes, executor_ip=None):
@@ -692,7 +692,7 @@ async def test_drenagem_que_nao_termina_cancela_espera_as_gravacoes_e_resgata(s,
     monkeypatch.setattr(R, "_INBOX_CANCEL_GRACE", 0.05)
     s.ws.mandar(HANDSHAKE, {"type": "job_result", "job_id": "j1", "status": "ok"})
     sessao = asyncio.create_task(_rodar(s))
-    while ("gravando", "j1") not in s.linha:           # a drenadora já pegou o job_result
+    while ("gravando", "j1") not in s.linha:           # the drainer already picked up the job_result
         await asyncio.sleep(0.005)
     s.ws.desconectar()
 

@@ -4,15 +4,15 @@ import { INodesPropertyAPI } from "@/service/types"
 import { INodeContext } from "@/context/useFlowContext"
 
 /**
- * Regressão: num workspace compartilhado, o campo Credencial mostrava o
- * placeholder "Escolha a credencial" quando o nó estava configurado com a
- * credencial de OUTRO membro — como se estivesse vazio.
+ * Regression: in a shared workspace, the Credential field showed the
+ * placeholder "Escolha a credencial" (choose the credential) when the node was
+ * configured with ANOTHER member's credential — as if it were empty.
  *
- * A lista vem de GET /credentials/, que o backend filtra por owner_id, então a
- * credencial alheia nunca está nela e o Select não acha item para o value.
+ * The list comes from GET /credentials/, which the backend filters by owner_id,
+ * so someone else's credential is never in it and the Select finds no item for the value.
  */
 
-// A store é lida com seletor: useWorkflowCatalogStore(s => s.credentials).
+// The store is read with a selector: useWorkflowCatalogStore(s => s.credentials).
 let storeCredentials: Array<{ id: string; name: string; type: string }> = []
 vi.mock("@/app/stores/workflowCatalogStore", () => ({
   useWorkflowCatalogStore: (selector: (s: unknown) => unknown) =>
@@ -40,7 +40,7 @@ vi.mock("@/utils/createToast", () => ({
   createToast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), loading: vi.fn() },
 }))
 
-// O diálogo de criação arrasta a árvore de credenciais inteira — irrelevante aqui.
+// The creation dialog drags in the whole credentials tree — irrelevant here.
 vi.mock("@/app/components/credentials/dialog-content/create-credential", () => ({
   default: () => null,
 }))
@@ -120,8 +120,8 @@ describe("CredentialField — credencial do próprio usuário", () => {
   })
 
   it("tipo incompatível mostra o nome e sinaliza o problema", async () => {
-    // token-portal é do usuário, mas o nó só aceita postgresql: fica fora de
-    // `filtered` e antes também caía no placeholder.
+    // token-portal belongs to the user, but the node only accepts postgresql: it's
+    // left out of `filtered` and before it also fell into the placeholder.
     renderField(OUTRO_TIPO.id)
 
     expect(await screen.findByText("token-portal")).toBeDefined()
@@ -132,8 +132,8 @@ describe("CredentialField — credencial do próprio usuário", () => {
 
 describe("CredentialField — sem credencial", () => {
   it("alerta que é obrigatório e não inventa credencial", async () => {
-    // O texto do placeholder é interno do Radix e não vira nó de texto em
-    // jsdom; o que importa é não aparecer rótulo de credencial nenhuma.
+    // The placeholder text is internal to Radix and doesn't become a text node
+    // in jsdom; what matters is that no credential label appears.
     renderField("")
 
     expect(await screen.findByText(/requer uma credencial/i)).toBeDefined()
@@ -162,7 +162,7 @@ describe("CredentialField — viewer (somente leitura)", () => {
   it("não atribui a restrição ao dono do workspace", async () => {
     renderField(MINHA.id)
 
-    // O gate é `canEdit` (editor+), não posse do workspace.
+    // The gate is `canEdit` (editor+), not workspace ownership.
     expect(await screen.findByText(/papel neste workspace/i)).toBeDefined()
     expect(screen.queryByText(/dono do workspace/i)).toBeNull()
   })

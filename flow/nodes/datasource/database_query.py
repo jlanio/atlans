@@ -19,12 +19,12 @@ _CHUNK_SIZE = 10_000
 
 
 def _records_to_df(records) -> pd.DataFrame:
-    """Converte um lote de Record do asyncpg em DataFrame. Roda em thread."""
+    """Converts a batch of asyncpg Records into a DataFrame. Runs in a thread."""
     return pd.DataFrame([dict(rec) for rec in records])
 
 
 def _concat_chunks(chunks: list) -> pd.DataFrame:
-    """Junta os DataFrames de cada chunk num so. Roda em thread (ver execute)."""
+    """Joins each chunk's DataFrames into one. Runs in a thread (see execute)."""
     if not chunks:
         return pd.DataFrame()
     return pd.concat(chunks, ignore_index=True)
@@ -33,8 +33,8 @@ def _concat_chunks(chunks: list) -> pd.DataFrame:
 @register_node
 class DatabaseQuery(BaseNode):
     """
-    Executa uma consulta SQL parametrizada em um banco de dados e retorna o resultado como DataFrame.
-    Suporta named parameters no formato :param via queryParams, com fallback a parâmetros estáticos.
+    Executes a parameterized SQL query on a database and returns the result as a DataFrame.
+    Supports named parameters in the :param format via queryParams, falling back to static parameters.
     """
 
     @classmethod
@@ -53,15 +53,15 @@ class DatabaseQuery(BaseNode):
                     'description': 'UUID da credencial de banco de dados'
                 },
                 {
-                    # Injetada pelo servidor a partir de `credential_id`. Precisa
-                    # estar declarada: `validate_node_parameters` reconstroi os
-                    # parametros a partir desta lista e descarta o que nao esta
-                    # nela. O no funcionava sem a declaracao apenas porque nao
-                    # chamava `validate()` — bastava alguem seguir a instrucao da
-                    # docstring de `BaseNode.validate` para toda consulta de banco
-                    # da plataforma parar de achar a conexao. E o mesmo tratamento
-                    # que SaveToPostgres e SaveToPostGIS ja faziam. A UI nao
-                    # desenha campo para ela (lista de nomes em node-config-form).
+                    # Injected by the server from `credential_id`. It needs
+                    # to be declared: `validate_node_parameters` rebuilds the
+                    # parameters from this list and discards whatever is not
+                    # in it. The node worked without the declaration only because it
+                    # didn't call `validate()` — it was enough for someone to follow the
+                    # instruction in `BaseNode.validate`'s docstring for every database
+                    # query on the platform to stop finding the connection. It's the same
+                    # treatment SaveToPostgres and SaveToPostGIS already had. The UI
+                    # draws no field for it (list of names in node-config-form).
                     'name': 'connectionString',
                     'type': 'string',
                     'default': '',
@@ -98,17 +98,17 @@ class DatabaseQuery(BaseNode):
 
         validate_readonly_sql(raw_query)
 
-        # Antes do pool, como no DatabaseSpatialQuery: montar a query é trabalho
-        # puro, e fazê-lo depois de abrir conexão gastava uma ida ao banco para
-        # descobrir que faltava um parâmetro — ou prendia uma conexão do pool
-        # durante a substituição.
+        # Before the pool, as in DatabaseSpatialQuery: building the query is pure
+        # work, and doing it after opening a connection spent a round trip to the
+        # database to find out a parameter was missing — or held a pool connection
+        # during the substitution.
         #
-        # Sem o `if query_params:` que havia aqui: com params vazio e query SEM
-        # placeholder o `prepare_query` devolve a query intacta, e com
-        # placeholder ele levanta "Parâmetro SQL 'x' não fornecido" — que é o
-        # erro certo. O desvio antigo pulava justamente esse aviso e mandava o
-        # `:bairro` literal para o Postgres, que respondia com erro de sintaxe
-        # apontando um caractere.
+        # Without the `if query_params:` that used to be here: with empty params and a
+        # query WITHOUT placeholders, `prepare_query` returns the query intact, and with
+        # a placeholder it raises "Parâmetro SQL 'x' não fornecido" — which is the
+        # right error. The old shortcut skipped exactly that warning and sent the
+        # literal `:bairro` to Postgres, which answered with a syntax error
+        # pointing at a character.
         prepared_query, values = prepare_query(raw_query, query_params)
 
         pool = await get_asyncpg_pool(conn_str)
@@ -116,17 +116,18 @@ class DatabaseQuery(BaseNode):
         chunks: list = []
         async with pool.acquire(timeout=15) as connection:
             try:
-                # SEG: readonly=True impoe SET TRANSACTION READ ONLY no Postgres.
-                # Defesa real no engine — validate_readonly_sql roda antes so para
-                # dar erro acionavel ao usuario e barrar o que a transacao nao pega
-                # (dblink abre outra conexao, onde o READ ONLY local nao vale).
+                # SEC: readonly=True enforces SET TRANSACTION READ ONLY in Postgres.
+                # The real defense is in the engine — validate_readonly_sql runs first only
+                # to give the user an actionable error and block what the transaction
+                # doesn't catch (dblink opens another connection, where the local READ ONLY
+                # doesn't apply).
                 #
-                # PERF: cursor em chunks (como o DatabaseSpatialQuery) em vez de
-                # `fetch()` de tudo. `dict(rec)` + construcao do DataFrame de
-                # centenas de milhares de linhas de UMA vez segurava o event loop
-                # por dezenas de segundos (passando de 90s o servidor fecha a
-                # sessao com 4408). Cada chunk vira DataFrame numa thread; a
-                # conversao nao bloqueia o loop entre uma busca e outra.
+                # PERF: cursor in chunks (like DatabaseSpatialQuery) instead of
+                # `fetch()` of everything. `dict(rec)` + building the DataFrame from
+                # hundreds of thousands of rows AT ONCE held the event loop
+                # for tens of seconds (past 90s the server closes the
+                # session with 4408). Each chunk becomes a DataFrame in a thread; the
+                # conversion doesn't block the loop between one fetch and the next.
                 async with connection.transaction(readonly=True):
                     cursor = await connection.cursor(prepared_query, *values)
                     while True:
@@ -144,8 +145,8 @@ class DatabaseQuery(BaseNode):
                 logger.error(f"Erro ao executar consulta: {e}")
                 raise RuntimeError(f"Erro ao executar consulta: {e}") from e
 
-        # Concatena fora do `acquire`: a conexao do pool nao fica presa durante a
-        # montagem final do DataFrame.
+        # Concatenates outside the `acquire`: the pool connection isn't held during
+        # the final assembly of the DataFrame.
         df = await asyncio.to_thread(_concat_chunks, chunks)
 
         return {"output": df}

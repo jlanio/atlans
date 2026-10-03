@@ -1,15 +1,16 @@
-"""Parametro presente na definicao mas ausente do schema do no.
+"""Parameter present in the definition but missing from the node's schema.
 
-`validate_node_parameters` monta o retorno a partir de `props`, entao toda chave
-nao declarada e descartada. Isso protege o no de lixo na definition, mas tornava
-um executor defasado indistinguivel de um bug de logica:
+`validate_node_parameters` builds the return value from `props`, so every
+undeclared key is dropped. That protects the node from garbage in the definition,
+but it made an outdated executor indistinguishable from a logic bug:
 
-  servidor publica o catalogo -> UI mostra o campo novo e grava o valor
-  -> executor com `flow/` antigo nao declara a propriedade -> valor descartado
-  -> nenhum erro, nenhum log, comportamento inalterado
+  server publishes the catalog -> UI shows the new field and stores the value
+  -> executor with an old `flow/` does not declare the property -> value dropped
+  -> no error, no log, unchanged behavior
 
-Foi assim que a opcao "Sobrescrever se ja existir" do DataOutput nao surtiu
-efeito. O aviso existe para que a proxima ocorrencia caiba numa linha de log.
+That is how DataOutput's "Sobrescrever se ja existir" (overwrite if it already
+exists) option had no effect. The warning exists so the next occurrence fits in
+one log line.
 """
 import logging
 
@@ -42,7 +43,7 @@ def test_descarte_gera_aviso_com_nome_do_no(caplog):
 
 
 def test_aviso_lista_o_que_o_no_conhece(caplog):
-    """Sem os declarados, quem le o log nao sabe contra o que comparar."""
+    """Without the declared ones, whoever reads the log does not know what to compare against."""
     with caplog.at_level(logging.WARNING):
         validate_node_parameters({"label": "x", "overwrite": True}, PROPS)
 
@@ -58,11 +59,11 @@ def test_sem_descarte_nao_avisa(caplog):
 
 @pytest.mark.parametrize("chave", ["alias", "retry_count", "retry_delay_s"])
 def test_chaves_de_plataforma_nao_avisam(caplog, chave):
-    """Vivem em `properties` sem serem parametros do no.
+    """They live in `properties` without being node parameters.
 
-    `alias` e o rotulo gravado pelo modal; retry_count/retry_delay_s o executor
-    le direto de `parameters` antes do execute (core.py::get_retry_params).
-    Avisar sobre elas transformaria o log em ruido em todo run.
+    `alias` is the label stored by the modal; retry_count/retry_delay_s the
+    executor reads directly from `parameters` before execute (core.py::get_retry_params).
+    Warning about them would turn the log into noise on every run.
     """
     with caplog.at_level(logging.WARNING):
         validate_node_parameters({"label": "x", chave: "v"}, PROPS)
@@ -72,9 +73,9 @@ def test_chaves_de_plataforma_nao_avisam(caplog, chave):
 
 @pytest.mark.parametrize("chave", ["outputKey", "outputKeyA", "inputKey", "inputKeyB"])
 def test_mapeamentos_legados_agora_avisam(caplog, chave):
-    """auto_map_edges foi aposentado (ver node_manager / spec §5): esses prefixos
-    não têm mais efeito e DEVEM aparecer como descartados, para o dono corrigir
-    à mão o workflow legado em vez de o param sumir em silêncio."""
+    """auto_map_edges was retired (see node_manager / spec §5): these prefixes
+    no longer have any effect and MUST show up as dropped, so the owner fixes
+    the legacy workflow by hand instead of the param vanishing silently."""
     with caplog.at_level(logging.WARNING):
         validate_node_parameters({"label": "x", chave: "output"}, PROPS)
 
@@ -89,7 +90,7 @@ def test_aviso_e_deterministico_com_varios_descartes(caplog):
 
 
 def test_no_real_avisa_quando_o_schema_nao_tem_a_opcao(caplog):
-    """Reproduz o cenario do executor defasado, com o no de verdade."""
+    """Reproduces the outdated-executor scenario, with the real node."""
     from flow.nodes.outputs.data_output import DataOutput
 
     node = DataOutput("n1", {"label": "r", "context": "drive", "opcao_do_futuro": True})
@@ -103,7 +104,7 @@ def test_no_real_avisa_quando_o_schema_nao_tem_a_opcao(caplog):
 
 
 def test_no_real_nao_avisa_por_alias(caplog):
-    """O modal grava o alias em properties — nao pode virar aviso em todo run."""
+    """The modal stores the alias in properties — it must not become a warning on every run."""
     from flow.nodes.outputs.data_output import DataOutput
 
     node = DataOutput("n1", {"label": "r", "context": "drive", "alias": "Minha Saida"})
@@ -117,9 +118,9 @@ def test_no_real_nao_avisa_por_alias(caplog):
 # ── Campo numerico opcional limpo na UI ──────────────────────────────────────
 
 def test_campo_numerico_vazio_cai_no_default():
-    """Limpar um campo inteiro opcional grava "" (o input de texto nao remove a
-    chave). Isso e 'nao preenchido', nao um valor: sem o desvio, a run caia com
-    "deve ser inteiro. Recebido: ''"."""
+    """Clearing an optional integer field stores "" (the text input does not remove
+    the key). That means 'not filled in', not a value: without the detour, the run
+    failed with "deve ser inteiro. Recebido: ''"."""
     props = [{"name": "ttl_hours", "type": "integer", "default": 168}]
     assert validate_node_parameters({"ttl_hours": ""}, props)["ttl_hours"] == 168
     assert validate_node_parameters({"ttl_hours": None}, props)["ttl_hours"] == 168
@@ -128,8 +129,8 @@ def test_campo_numerico_vazio_cai_no_default():
 
 
 def test_campo_vazio_sem_default_continua_obrigatorio():
-    """O desvio vale so para param com default declarado — um obrigatorio limpo
-    continua sendo erro, nao um None silencioso."""
+    """The detour applies only to a param with a declared default — a cleared
+    required one is still an error, not a silent None."""
     props = [{"name": "max_items", "type": "integer"}]
     with pytest.raises(ValueError):
         validate_node_parameters({"max_items": ""}, props)

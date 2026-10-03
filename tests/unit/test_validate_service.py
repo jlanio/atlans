@@ -1,15 +1,16 @@
 # tests/unit/test_validate_service.py
 """
-`validar_definicao` chamada direto, sem HTTP — o contrato do service.
+`validar_definicao` called directly, without HTTP — the service's contract.
 
-As tools do servidor MCP (`validate_workflow` e a validação antes de gravar)
-consomem esta função; o que estes testes fixam é o que elas herdam dela: a
-sessão de banco NÃO abre sem credencial nem workspace, `properties` e
-`parameters` são aceitos como sinônimos, o `workspace_id` explícito vence o do
-corpo (o MCP resolve id-ou-nome antes de chamar), quem não é membro recebe 403
-antes de qualquer credencial, definição fatal sobe como `DefinicaoInvalidaError`
-carregando o relatório, e registry vazio é 503 (falha de boot, não da
-definição). O relatório em detalhe fica em `test_validate_report.py`.
+The MCP server tools (`validate_workflow` and the validation before saving)
+consume this function; what these tests pin down is what they inherit from it:
+the database session does NOT open without a credential or workspace,
+`properties` and `parameters` are accepted as synonyms, the explicit
+`workspace_id` beats the one in the body (the MCP resolves id-or-name before
+calling), a non-member gets a 403 before any credential, a fatal definition
+surfaces as `DefinicaoInvalidaError` carrying the report, and an empty registry
+is a 503 (a boot failure, not a definition one). The report in detail is in
+`test_validate_report.py`.
 """
 from __future__ import annotations
 
@@ -31,7 +32,7 @@ def _no(id_hash: str, name: str, tipo: str = "datasource", **params) -> dict:
 
 
 def _sem_sessao():
-    """Qualquer tentativa de abrir sessão derruba o teste."""
+    """Any attempt to open a session fails the test."""
     return patch(f"{NS}.get_session_async", MagicMock(side_effect=AssertionError("sessão de banco aberta")))
 
 
@@ -49,7 +50,7 @@ def _sessao_falsa():
 
 
 def _simulacao_falsa(saidas: dict | None = None, visto: dict | None = None):
-    """Substitui o `simulate_runner` real; `visto` recebe o nó `n1` como o executor o vê."""
+    """Replaces the real `simulate_runner`; `visto` receives node `n1` as the executor sees it."""
     from flow.executor.core import WorkflowExecutor
 
     async def _fake(self):
@@ -62,7 +63,7 @@ def _simulacao_falsa(saidas: dict | None = None, visto: dict | None = None):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Caso comum — sem banco
+# Common case — no database
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def test_sem_credencial_nem_workspace_nao_abre_sessao():
@@ -77,9 +78,9 @@ async def test_sem_credencial_nem_workspace_nao_abre_sessao():
 
 
 async def test_dict_e_modelo_sao_aceitos_e_properties_e_sinonimo_de_parameters():
-    """Um `dict` passa pelo mesmo `WorkflowDefinition` do endpoint: `properties`
-    (formato persistido) funde em `parameters` (formato do corpo) e o executor
-    recebe os dois apontando para o MESMO dict; `alias` sobrevive."""
+    """A `dict` goes through the same `WorkflowDefinition` as the endpoint:
+    `properties` (persisted format) merges into `parameters` (body format) and
+    the executor receives both pointing to the SAME dict; `alias` survives."""
     visto_dict: dict = {}
     visto_modelo: dict = {}
     no = {"id": "n1", "name": "ReadGeoJSON", "type": "datasource",
@@ -124,7 +125,7 @@ async def test_sem_workspace_o_relatorio_sugere_informar_um():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# workspace_id — explícito vence o corpo; filiação antes de tudo
+# workspace_id — explicit beats the body; membership before everything
 # ══════════════════════════════════════════════════════════════════════════════
 
 async def test_workspace_id_explicito_vence_o_do_corpo():
@@ -142,12 +143,12 @@ async def test_workspace_id_explicito_vence_o_do_corpo():
 
     assert papel.await_args.args[1:] == ("ws-explicito", USUARIO)
     assert subfluxo.await_args.kwargs["workspace_id"] == "ws-explicito"
-    # Com workspace, a dica de informar um não faz sentido.
+    # With a workspace, the hint to provide one makes no sense.
     assert saida["__report__"]["hints"] == []
 
 
 async def test_workspace_id_none_deixa_valer_o_do_corpo():
-    """`None` aqui é "use o que veio na definição" — o campo opcional do corpo."""
+    """`None` here means "use what came in the definition" — the optional body field."""
     papel = AsyncMock(return_value="owner")
 
     with _sessao_falsa(), _simulacao_falsa(), \
@@ -185,7 +186,7 @@ async def test_papel_operator_leva_o_workspace_ao_escopo_da_simulacao():
 
     escopos: list = []
 
-    # `credential_scope` é um context manager síncrono; o dublê precisa ser também.
+    # `credential_scope` is a synchronous context manager; the stub needs to be one too.
     @contextmanager
     def _escopo(*args, **kwargs):
         escopos.append((args, kwargs))
@@ -204,13 +205,14 @@ async def test_papel_operator_leva_o_workspace_ao_escopo_da_simulacao():
 
 
 async def test_credencial_de_tipo_errado_ou_vencida_vira_erro_antes_do_executar():
-    """Acessível não é usável: a resolução deixa de fora, em silêncio, a
-    credencial de um tipo que o nó não aceita e a vencida — e o nó só recusava
-    na execução, por "credencial não resolvida". Erro onde o nó consome o
-    segredo injetado (WFS, banco); aviso onde ele usa o próprio id (DataOutput),
-    porque ali a execução segue e só o download é recusado — e um erro
-    impediria o assistente de gravar uma edição em outro nó."""
-    import flow.nodes.datasource.database_spatial_query  # noqa: F401 — registra os nós
+    """Accessible is not usable: resolution silently leaves out a credential of a
+    type the node does not accept and an expired one — and the node only
+    refused at execution, with "credencial não resolvida" (credential not
+    resolved). An error where the node consumes the injected secret (WFS,
+    database); a warning where it uses its own id (DataOutput), because there
+    the execution goes on and only the download is refused — and an error would
+    keep the assistant from saving an edit to another node."""
+    import flow.nodes.datasource.database_spatial_query  # noqa: F401 — registers the nodes
     import flow.nodes.datasource.wfs  # noqa: F401
     import flow.nodes.outputs.data_output  # noqa: F401
 
@@ -230,7 +232,7 @@ async def test_credencial_de_tipo_errado_ou_vencida_vira_erro_antes_do_executar(
         saida = await validar_definicao(
             {"nodes": [_no("n1", "WFS", url="https://geo.x/ows", typeName="ns:a", credential_id=cid_pg),
                        _no("n2", "WFS", url="https://geo.x/ows", typeName="ns:b", credential_id=cid_vencida.upper()),
-                       # Nó de banco não declara `credential_types`: a FORMA da credencial decide.
+                       # A database node does not declare `credential_types`: the credential's SHAPE decides.
                        _no("n3", "DatabaseSpatialQuery", query="SELECT 1", credential_id=cid_authkey),
                        _no("n4", "DataOutput", "output", isPublic=False, credential_id=cid_token_vencido)],
              "edges": []},
@@ -281,11 +283,11 @@ async def test_definicao_fatal_sobe_como_definicao_invalida_com_report():
 
 
 async def test_registry_vazio_e_503():
-    # `patch.dict(..., clear=True)` esvazia e restaura o MESMO dict. Trocar o
-    # objeto (`patch(..., {})`) deixaria `flow.factory`, que prendeu o dict
-    # original no import, olhando para um registry que este teste nunca limpou
-    # — e qualquer `register_node` executado na janela do patch se perderia,
-    # fazendo o resultado depender da ordem dos arquivos na suíte.
+    # `patch.dict(..., clear=True)` empties and restores the SAME dict. Swapping
+    # the object (`patch(..., {})`) would leave `flow.factory`, which captured
+    # the original dict at import, looking at a registry this test never
+    # cleared — and any `register_node` run during the patch window would be
+    # lost, making the result depend on the order of the files in the suite.
     with _sem_sessao(), patch.dict("flow.registry.NODE_REGISTRY", clear=True):
         with pytest.raises(HTTPException) as exc:
             await validar_definicao(
@@ -296,7 +298,7 @@ async def test_registry_vazio_e_503():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Catálogo de fontes — avisos sem rede
+# Source catalog — warnings without network
 # ══════════════════════════════════════════════════════════════════════════════
 
 _AVISO_DESCONHECIDA = {
@@ -310,7 +312,7 @@ def _wfs(id_hash="n1"):
 
 
 def _banco_para_o_catalogo(conferir):
-    """Sessão falsa + o que a validação com workspace consulta, com o catálogo dublado."""
+    """Fake session + what validation with a workspace queries, with the catalog stubbed."""
     return (
         _sessao_falsa(),
         patch(f"{NS}.get_workspace_member_role", AsyncMock(return_value="editor")),
@@ -338,8 +340,8 @@ async def test_wfs_fora_do_catalogo_vira_aviso_e_nao_derruba_o_ok():
     assert report["ok"] is True and report["errors"] == []
     assert _AVISO_DESCONHECIDA in report["warnings"]
     assert HINT_FONTES in report["hints"]
-    # O catálogo recebe os nós no formato do executor e o descriptor do WFS
-    # (com `source_kind`), no workspace da validação.
+    # The catalog receives the nodes in the executor's format and the WFS
+    # descriptor (with `source_kind`), in the validation's workspace.
     nos, descritores, ws = conferir.await_args.args[1:]
     assert nos[0]["name"] == "WFS" and descritores["WFS"]["source_kind"] == "wfs" and ws == "ws-1"
 
@@ -372,7 +374,7 @@ async def test_catalogo_indisponivel_nao_derruba_a_validacao():
 
 
 async def test_sem_workspace_o_catalogo_nao_e_consultado():
-    """Sem a filiação provada não há catálogo de workspace a olhar — e nada de sessão."""
+    """Without proven membership there is no workspace catalog to look at — and no session."""
     conferir = AsyncMock(return_value=[_AVISO_DESCONHECIDA])
     with _sem_sessao(), _simulacao_falsa(), patch(f"{NS}.fontes_service.conferir_fontes_da_definicao", conferir):
         saida = await validar_definicao({"nodes": [_wfs()], "edges": []}, user_id=USUARIO, workspace_id=None)

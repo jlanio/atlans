@@ -15,16 +15,16 @@ router = APIRouter(
 )
 
 
-# Papel 'operator' ou superior. Agendar é executar: um schedule com intervalo
-# de 1 minuto dispara o workflow com as credenciais do dono indefinidamente.
-# Estas rotas já dependeram só do pertencimento ao workspace — e um membro
-# 'viewer' criava agendamentos e apagava os de produção, exatamente o que o 403
-# de POST /workflows/{id}/execute existe para impedir. O rbac.py já define
-# operator como quem "executa workflows e gerencia agendamentos".
+# Role 'operator' or higher. Scheduling is running: a schedule with a 1-minute
+# interval triggers the workflow with the owner's credentials indefinitely.
+# These routes once depended only on workspace membership — and a 'viewer'
+# member created schedules and deleted production ones, exactly what the 403
+# of POST /workflows/{id}/execute exists to prevent. rbac.py already defines
+# operator as the one who "runs workflows and manages schedules".
 #
-# Hoje só resta o PUT (pausar/retomar, na Home): os agendamentos nascem do nó
-# ScheduleTrigger ao salvar o workflow, e o MCP usa o ScheduleService direto.
-# Listar, criar e apagar por aqui saíram — não tinham chamador.
+# Today only the PUT remains (pause/resume, on Home): schedules are born from the
+# ScheduleTrigger node when the workflow is saved, and MCP uses ScheduleService directly.
+# Listing, creating and deleting through here were removed — they had no caller.
 _GERENCIAR_AGENDAMENTOS = workflow_com_papel(
     ROLE_OPERATOR, "Requer role 'operator' ou superior para gerenciar agendamentos.",
 )

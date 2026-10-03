@@ -1,15 +1,15 @@
 # tests/unit/test_agent_enrollment_service.py
 """
-Testes unitarios do servico de enrollment via Bootstrap OTP.
+Unit tests for the enrollment service via Bootstrap OTP.
 
-Cobertura:
-  - create_enrollment_otp: gera OTP plaintext + persiste HMAC.
-  - consume_otp: atomico, lanca em invalidos/expirados/duplicados.
-  - parse_and_validate_csr: aceita Ed25519, rejeita RSA/sem CN/CN errado.
-  - revoke_cert / is_cert_revoked: blacklist Redis fail-closed.
+Coverage:
+  - create_enrollment_otp: generates a plaintext OTP + persists the HMAC.
+  - consume_otp: atomic, raises on invalid/expired/duplicate.
+  - parse_and_validate_csr: accepts Ed25519, rejects RSA/missing CN/wrong CN.
+  - revoke_cert / is_cert_revoked: fail-closed Redis blacklist.
 
-step-ca client (sign_csr_via_stepca) nao e testado aqui — requer
-container step-ca rodando. Testes de integracao cobrem isso.
+The step-ca client (sign_csr_via_stepca) is not tested here — it requires a
+running step-ca container. Integration tests cover that.
 """
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -92,7 +92,7 @@ class TestConsumeOTP:
         from app.services.executor_enrollment_service import consume_otp
 
         result = MagicMock()
-        result.first.return_value = None  # nenhuma linha retornada -> invalido
+        result.first.return_value = None  # no row returned -> invalid
         mock_db.execute.return_value = result
 
         with patch("app.services.executor_enrollment_service.OTP_PEPPER", "p" * 32):
@@ -164,7 +164,7 @@ class TestRevokeCert:
 
         fake_redis.setex.assert_awaited_once()
         call_args = fake_redis.setex.await_args
-        # Key deve conter o serial
+        # Key must contain the serial
         assert "serial-abc" in str(call_args)
 
     @pytest.mark.asyncio

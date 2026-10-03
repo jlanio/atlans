@@ -1,60 +1,61 @@
 # flow/utils/backoff.py
 """
-Politica unica de espera entre tentativas.
+Single policy for waiting between attempts.
 
-Antes deste modulo o backoff exponencial estava escrito a mao em dez trechos
-espalhados por sete arquivos — o helper HTTP compartilhado, os nos de WFS e de
-Requisicao HTTP, a espera do banco na subida da API, os dois lacos de reconexao
-do Redis e os dois do GeoSync — cada um com sua propria decisao sobre
-crescimento, teto e o que conta como transitorio.
+Before this module, exponential backoff was handwritten in ten places
+scattered across seven files — the shared HTTP helper, the WFS and HTTP
+Request nodes, the database wait at API startup, the two Redis reconnection
+loops and the two in GeoSync — each with its own decision about growth,
+ceiling and what counts as transient.
 
-So UM deles dispersava as tentativas: o laco de reconexao de
-`executor/connection.py`, cujo comentario explica o motivo e o
-`executor/config.py` documenta. Os outros nove retentavam em unissono. E isso
-importa: quando o servidor volta de uma queda, a frota inteira de executores
-bate nele no mesmo instante, contra um rate limit que e balde unico da
-plataforma — a recuperacao vira uma segunda derrubada. O acerto ja existia na
-casa e nao tinha como se propagar, porque nao havia onde morar.
+Only ONE of them spread its attempts out: the reconnection loop in
+`executor/connection.py`, whose comment explains why and which
+`executor/config.py` documents. The other nine retried in unison. And that
+matters: when the server comes back from an outage, the whole executor fleet
+hits it at the same instant, against a rate limit that is a single
+platform-wide bucket — the recovery turns into a second takedown. The right
+approach already existed in-house and had no way to spread, because it had
+nowhere to live.
 
-O jitter aqui e PROPORCIONAL (50–100% do intervalo), e nao aditivo, por dois
-motivos: e a forma ja validada no executor, e preserva o teto — um jitter somado
-ao intervalo pode ultrapassar `teto`, um multiplicado nunca.
+The jitter here is PROPORTIONAL (50–100% of the interval), not additive, for two
+reasons: it is the form already validated in the executor, and it preserves the
+ceiling — a jitter added to the interval can exceed `teto`, a multiplied one never.
 
-Por que nao `tenacity`: ela substituiria o LACO de tentativas, nao esta politica,
-e so dois dos dez pontos tem laco separavel da logica de dominio — os outros
-carregam classificacao de erro TLS, circuit breaker, agendamento persistido ou
-reset por sessao saudavel. Alem disso, `flow/` roda no executor do Docker e no
-do desktop com as dependencias do lock do executor
-(`executor/requirements-full.txt`, com hash): adicionar a dependencia sem
-regerar o lock quebraria os dois no import. Este modulo nao adiciona
-dependencia nenhuma — depende so de `random`.
+Why not `tenacity`: it would replace the retry LOOP, not this policy, and only
+two of the ten places have a loop separable from the domain logic — the others
+carry TLS error classification, a circuit breaker, persisted scheduling or
+reset on a healthy session. Besides, `flow/` runs in the Docker executor and in
+the desktop one with the dependencies of the executor's lock file
+(`executor/requirements-full.txt`, with hashes): adding the dependency without
+regenerating the lock would break both at import. This module adds no
+dependency at all — it depends only on `random`.
 """
 import random
 
-# Piso da faixa de jitter: a espera real fica entre 50% e 100% do intervalo
-# calculado. Mesma faixa de `executor/connection.py`, que foi quem acertou
-# primeiro.
+# Floor of the jitter range: the actual wait falls between 50% and 100% of the
+# computed interval. Same range as `executor/connection.py`, which got it right
+# first.
 FATOR_JITTER_MIN = 0.5
 
-# Teto do expoente. `base ** tentativa` e aritmetica de PONTO FLUTUANTE, e
-# estoura (`OverflowError`) por volta de 2**1024 — o `2 ** n` INTEIRO que este
-# modulo substituiu tinha precisao arbitraria e nunca estourava. Contadores de
-# tentativa sem limite superior existem de verdade na base: o
-# `consecutive_errors` do ciclo do GeoSync so zera num ciclo bem-sucedido, e o
-# `tentativas` do no de Requisicao HTTP vem do canvas.
+# Exponent ceiling. `base ** tentativa` is FLOATING-POINT arithmetic, and
+# overflows (`OverflowError`) around 2**1024 — the INTEGER `2 ** n` this
+# module replaced had arbitrary precision and never overflowed. Attempt
+# counters with no upper bound really exist in the codebase: the GeoSync
+# cycle's `consecutive_errors` only resets on a successful cycle, and the HTTP
+# Request node's `tentativas` comes from the canvas.
 #
-# Cortar aqui nao muda valor nenhum devolvido: com `base > 1`, `inicial * 2**64`
-# ja passa de 1e18, muitas ordens de grandeza acima de qualquer `teto` real, e o
-# `min` satura de qualquer jeito.
+# Capping here changes no returned value: with `base > 1`, `inicial * 2**64`
+# already exceeds 1e18, many orders of magnitude above any real `teto`, and
+# the `min` saturates anyway.
 _EXPOENTE_MAX = 64
 
 
 def com_jitter(segundos: float) -> float:
-    """Dispersa uma espera ja calculada.
+    """Spreads out an already computed wait.
 
-    Para quando o intervalo NAO cresce exponencialmente — as escadas fixas de
-    reconexao (`_RECONNECT_DELAYS`) sao tao sincronizadas quanto uma potencia de
-    dois, e pelo mesmo motivo: todo mundo que caiu junto volta junto.
+    For when the interval does NOT grow exponentially — the fixed reconnection
+    ladders (`_RECONNECT_DELAYS`) are as synchronized as a power of two, and for
+    the same reason: everyone who went down together comes back together.
     """
     if segundos <= 0:
         return 0.0
@@ -68,14 +69,14 @@ def espera_exponencial(
     inicial: float = 1.0,
     base: float = 2.0,
 ) -> float:
-    """Espera apos a `tentativa`-esima falha (0 = a primeira), ja dispersa.
+    """Wait after the `tentativa`-th failure (0 = the first), already spread out.
 
-    O teto e aplicado ANTES do jitter, entao o retorno nunca o excede.
+    The ceiling is applied BEFORE the jitter, so the return value never exceeds it.
     """
     if tentativa < 0:
         tentativa = 0
-    # `base <= 1` nao cresce, entao nao estoura — e cortar o expoente ali MUDARIA
-    # o resultado, em vez de so evitar o estouro.
+    # `base <= 1` does not grow, so it does not overflow — and capping the exponent
+    # there WOULD CHANGE the result, instead of just avoiding the overflow.
     if base > 1 and tentativa > _EXPOENTE_MAX:
         tentativa = _EXPOENTE_MAX
     return com_jitter(min(inicial * (base ** tentativa), teto))

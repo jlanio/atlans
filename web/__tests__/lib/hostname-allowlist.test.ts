@@ -1,11 +1,11 @@
 /**
- * Espelha `tests/unit/test_workspace_notifications_router.py` e as regras de
+ * Mirrors `tests/unit/test_workspace_notifications_router.py` and the rules of
  * `app/core/utils/allowlist.py`.
  *
- * O preview da tela de notificações calcula "quais workflows esta allowlist
- * bloquearia" no cliente, para responder ANTES de salvar. Se este port divergir
- * do Python, a tela promete um resultado e a execução entrega outro — que é
- * exatamente o modo de falha silencioso que a tela existe para acabar.
+ * The notifications screen's preview computes "which workflows this allowlist
+ * would block" on the client, to answer BEFORE saving. If this port diverges
+ * from the Python, the screen promises one result and the run delivers another —
+ * which is exactly the silent failure mode the screen exists to end.
  */
 import { describe, it, expect } from "vitest"
 import {
@@ -30,12 +30,12 @@ describe("hostnameMatchesAllowlist", () => {
   })
 
   it("curinga NÃO cobre o domínio nu", () => {
-    // A regra mais fácil de perder ao portar — no Python é `hostname != suffix[1:]`.
+    // The easiest rule to lose when porting — in Python it's `hostname != suffix[1:]`.
     expect(hostnameMatchesAllowlist("exemplo.com", ["*.exemplo.com"])).toBe(false)
   })
 
   it("não casa sufixo colado sem o ponto", () => {
-    // "malexemplo.com" termina com "exemplo.com", mas não é subdomínio dele.
+    // "malexemplo.com" ends with "exemplo.com", but isn't a subdomain of it.
     expect(hostnameMatchesAllowlist("malexemplo.com", ["*.exemplo.com"])).toBe(false)
   })
 
@@ -50,7 +50,7 @@ describe("hostnameMatchesAllowlist", () => {
 
 describe("isHostAllowed", () => {
   it("allowlist vazia libera tudo", () => {
-    // Semântica invertida da coluna: sem lista, não há política adicional.
+    // Inverted column semantics: no list means no additional policy.
     expect(isHostAllowed("qualquer.host", [])).toBe(true)
   })
 
@@ -67,7 +67,7 @@ describe("validateAllowlistPattern", () => {
   })
 
   it.each([
-    "https://exemplo.com/hook",  // o engano óbvio: colar a URL inteira
+    "https://exemplo.com/hook",  // the obvious mistake: pasting the whole URL
     "exemplo.com/hook",
     "exemplo.com:8443",
     "user@exemplo.com",

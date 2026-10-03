@@ -4,16 +4,16 @@ import { forwardRef, useImperativeHandle, useRef, useState } from "react"
 import { TbCloudUpload } from "react-icons/tb"
 import { cn } from "@/lib/utils"
 
-/** Handle para abrir o seletor de fora (o CTA do estado de primeiro uso o usa). */
+/** Handle to open the picker from outside (the first-use state's CTA uses it). */
 export interface UploadZoneHandle {
   abrirSeletor: () => void
 }
 
 /**
- * Zona de envio drag-and-drop + clique. A área é `role="button"` acessível por
- * teclado (Enter/Espaço abrem o seletor) — antes era um `div` clicável que o
- * teclado não alcançava. As cores de arraste saíram do laranja literal para os
- * tokens (`primary`/`ring`), então acompanham o tema.
+ * Drag-and-drop + click upload zone. The area is a keyboard-accessible
+ * `role="button"` (Enter/Space open the picker) — before it was a clickable `div`
+ * the keyboard couldn't reach. The drag colors moved from literal orange to the
+ * tokens (`primary`/`ring`), so they follow the theme.
  */
 export const UploadZone = forwardRef<UploadZoneHandle, {
   uploading: boolean
@@ -42,7 +42,7 @@ export const UploadZone = forwardRef<UploadZoneHandle, {
       onDrop={onDrop}
       onClick={abrir}
       onKeyDown={e => {
-        // Enter/Espaço são o contrato de teclado de um role="button".
+        // Enter/Space are the keyboard contract of a role="button".
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir() }
       }}
       className={cn(

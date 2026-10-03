@@ -59,8 +59,8 @@ function ProblemCard({ node }: { node: NodeRun }) {
           {problem.message}
         </pre>
 
-        {/* A taxonomia responde "vale a pena repetir?" — mais útil que 18
-            linhas de stack para quem só quer saber o que fazer agora. */}
+        {/* The taxonomy answers "is it worth retrying?" — more useful than 18
+            stack lines for someone who just wants to know what to do now. */}
         {problem.category && (
           <div className="flex flex-wrap items-center gap-2 text-[11px]">
             <span className="inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-muted-foreground">
@@ -81,9 +81,9 @@ function ProblemCard({ node }: { node: NodeRun }) {
           </div>
         )}
 
-        {/* O backend SEMPRE envia o traceback numa falha. O painel antigo só o
-            exibia com o modo debug ligado — que precisa ser decidido antes de
-            executar, ou seja, nunca estava ligado quando fazia falta. */}
+        {/* The backend ALWAYS sends the traceback on a failure. The old panel only
+            showed it with debug mode on — which has to be decided before
+            running, meaning it was never on when it was needed. */}
         {problem.traceback && (
           <div>
             <button
@@ -102,9 +102,9 @@ function ProblemCard({ node }: { node: NodeRun }) {
         )}
 
         <div className="flex flex-wrap items-center gap-2 pt-0.5">
-          {/* Abre o grafo do filho no nó que de fato quebrou. `focusNode` abaixo
-              só alcança o nó SubWorkflow do pai — é o único id desta linha que
-              existe no canvas do editor. */}
+          {/* Opens the child's graph at the node that actually broke. `focusNode` below
+              only reaches the parent's SubWorkflow node — the only id in this row
+              that exists on the editor canvas. */}
           {podeAbrir(node) && (
             <button
               onClick={() => abrir(node)}
@@ -150,7 +150,7 @@ const ProblemsTab = ({ timeline }: { timeline: RunTimeline }) => {
         <ProblemCard key={node.nodeId} node={node} />
       ))}
 
-      {/* Falha do run que não é atribuível a um nó (ex.: executor caiu no meio) */}
+      {/* Run failure not attributable to a node (e.g. the executor died midway) */}
       {hasWorkflowError && timeline.problems.length === 0 && (
         <div className="m-3 rounded-md border border-destructive/30 bg-destructive/[0.03] p-3">
           <p className="mb-1 text-xs font-medium">Falha na execução</p>

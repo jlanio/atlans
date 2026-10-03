@@ -1,7 +1,7 @@
 # app/api/routers/executor_ws/inbox.py
 """
-Fila de despacho por conexão: enfileirar com back-pressure, drenar em
-lote, resgatar job_results no teardown.
+Per-connection dispatch queue: enqueue with back-pressure, drain in
+batches, rescue job_results on teardown.
 """
 import asyncio
 import time
@@ -23,83 +23,85 @@ from .resultados import (
 )
 from .orfaos import _reconciliar_inventario
 
-# ── Fila de despacho por conexão (ver `_drenar_inbox`) ───────────────────────
-# O loop de recepção processava cada mensagem INLINE: a próxima
-# `ws.receive_text()` só acontecia depois que o Redis (e às vezes o Postgres)
-# respondia. Heartbeat, capacity, ack e o job_result final ficavam presos atrás
-# da rajada de telemetria do MESMO executor — o canvas recebia updates em
-# rajadas engasgadas, o "concluído" chegava segundos depois do fim real e, em
-# fan-out alto, o executor chegava perto do timeout de 90s.
+# ── Per-connection dispatch queue (see `_drenar_inbox`) ──────────────────────
+# The receive loop used to process each message INLINE: the next
+# `ws.receive_text()` only happened after Redis (and sometimes Postgres)
+# answered. Heartbeat, capacity, ack and the final job_result got stuck behind
+# the SAME executor's telemetry burst — the canvas received updates in choppy
+# bursts, "concluído" (done) arrived seconds after the real end and, at high
+# fan-out, the executor got close to the 90s timeout.
 #
-# Agora o loop só faz parse + schema + rate limit + enfileirar; uma task
-# drenadora fala com Redis/Postgres. TUDO vai na MESMA fila para preservar a
-# ordem relativa entre node_event e job_result de um run.
+# Now the loop only does parse + schema + rate limit + enqueue; a draining
+# task talks to Redis/Postgres. EVERYTHING goes on the SAME queue to preserve
+# the relative order between a run's node_event and job_result.
 #
-# Fila cheia NÃO é simétrica: telemetria é descartada; ciclo de vida e
-# job_result esperam vaga (back-pressure) e, no limite, são processados inline.
-# Ver `_InboxQueue` e `_enfileirar_mensagem`.
+# A full queue is NOT symmetric: telemetry is dropped; lifecycle and job_result
+# wait for a slot (back-pressure) and, at the limit, are processed inline.
+# See `_InboxQueue` and `_enfileirar_mensagem`.
 _INBOX_MAXSIZE = 5000
 
-# Máximo de node_events consecutivos fundidos num único pipeline. Não há timer:
-# a drenadora só junta o que JÁ está na fila, então uma mensagem isolada sai na
-# hora (latência zero) e a rajada se agrupa sozinha enquanto o Redis responde.
+# Maximum consecutive node_events merged into a single pipeline. There is no
+# timer: the drainer only gathers what is ALREADY in the queue, so an isolated
+# message goes out right away (zero latency) and the burst groups itself while
+# Redis answers.
 _INBOX_COALESCE_MAX = 64
 
-# Teto de espera pelo flush da drenadora no teardown do WS. Sem o flush, os
-# últimos eventos do run (inclusive o __workflow_complete__) se perderiam.
+# Ceiling on waiting for the drainer's flush on WS teardown. Without the flush,
+# the run's last events (including __workflow_complete__) would be lost.
 _INBOX_FLUSH_TIMEOUT = 10.0
 
-# Intervalo mínimo entre dois WARNINGs de descarte por fila cheia.
+# Minimum interval between two full-queue drop WARNINGs.
 _INBOX_DROP_LOG_EVERY = 5.0
 
-# Carência dada ao job_result que já está sendo gravado quando o teardown
-# desiste de esperar a drenagem. Ver `_drenar_inbox` e o `finally` do handler.
+# Grace period given to the job_result already being written when the teardown
+# gives up waiting for the drain. See `_drenar_inbox` and the handler's `finally`.
 _INBOX_CANCEL_GRACE = 5.0
 
-# Sentinela de encerramento da fila — ver `_drenar_inbox`.
+# Queue shutdown sentinel — see `_drenar_inbox`.
 _INBOX_STOP = object()
 
-# Teto de espera por vaga quando a fila enche e a mensagem NÃO pode ser perdida.
-# Existe só para o loop de recepção não ficar preso para sempre se a drenadora travar:
-# esgotado o prazo, a mensagem é processada INLINE (que é lento, porém sem
-# perda), nunca descartada. Bem abaixo do _HEARTBEAT_TIMEOUT de 90s para o
-# executor não ser desconectado por causa da própria espera.
+# Ceiling on waiting for a slot when the queue fills up and the message must NOT
+# be lost. It exists only so the receive loop does not get stuck forever if the
+# drainer hangs: once the deadline runs out, the message is processed INLINE
+# (slow, but lossless), never dropped. Well below the 90s _HEARTBEAT_TIMEOUT so
+# the executor is not disconnected because of its own wait.
 _INBOX_PUT_TIMEOUT = 30.0
 
 class _InboxQueue(asyncio.Queue):
-    """Fila da conexão com política de descarte SELETIVA quando enche.
+    """Connection queue with a SELECTIVE drop policy when it fills up.
 
-    CONTRATO do que NUNCA cai (estado que nenhuma rede do cliente reconstrói):
+    CONTRACT of what is NEVER dropped (state no client safety net rebuilds):
 
-      * `job_result` — é, por construção, a ÚLTIMA mensagem de um run, e o
-        executor apaga a linha do outbox assim que o `send_text` retorna.
-        Perdido, o WorkflowRun fica preso em 'running' para sempre (a presença
-        do executor segue saudável, então nem `orphan_runs_watchdog` nem
-        `_fail_orphan_runs_if_gone` reconciliam; o BRPOP do webhook estoura).
-      * `sync_complete` — fecha a barra de progresso do GeoSync; perdê-lo a
-        prende em 99% (ver `_SYNC_TERMINAL_EVENTS`).
+      * `job_result` — it is, by construction, the LAST message of a run, and the
+        executor deletes the outbox row as soon as `send_text` returns.
+        If lost, the WorkflowRun is stuck in 'running' forever (the executor's
+        presence stays healthy, so neither `orphan_runs_watchdog` nor
+        `_fail_orphan_runs_if_gone` reconcile; the webhook's BRPOP times out).
+      * `sync_complete` — closes the GeoSync progress bar; losing it leaves the
+        bar stuck at 99% (see `_SYNC_TERMINAL_EVENTS`).
 
-    Todo o RESTO — telemetria (stdout/debug, sync_event de progresso) E os
-    node_event de ciclo de vida — é descartável sob pressão. Perder um `completed`
-    de nó deixa o nó em 'started' durante o run, mas no fim `completeExecution`
-    o pinta como 'unknown' ("sem resposta"); e se o canal ao vivo morrer, o
-    watchdog do cliente reconecta e reconcilia. É degradação honesta coberta pela
-    rede — não vale o custo de back-pressure aqui. (Já foi: a Opção B mantinha o
-    ciclo de vida sob back-pressure/inline, o que resolvia um sintoma cuja causa
-    real era de transporte, hoje coberta por heartbeat+watchdog.)
+    All the REST — telemetry (stdout/debug, progress sync_event) AND the
+    lifecycle node_events — can be dropped under pressure. Losing a node's
+    `completed` leaves the node 'started' during the run, but at the end
+    `completeExecution` paints it as 'unknown' ("sem resposta", no response);
+    and if the live channel dies, the client's watchdog reconnects and
+    reconciles. It is honest degradation covered by the safety net — not worth
+    the back-pressure cost here. (It used to be: Option B kept the lifecycle
+    under back-pressure/inline, which fixed a symptom whose real cause was in
+    the transport, now covered by heartbeat+watchdog.)
     """
 
-    # IP da conexão que recebeu as mensagens desta fila (a rota o define ao
-    # criá-la). O job_result leva ESTE IP para o run_results, e não o de quem
-    # estiver no registro quando for gravado: num takeover o listener tira a
-    # conexão do registro antes de a fila terminar de esvaziar.
+    # IP of the connection that received this queue's messages (the route sets it
+    # when creating it). The job_result carries THIS IP to run_results, not that
+    # of whoever is in the registry when it is written: on a takeover the listener
+    # removes the connection from the registry before the queue finishes emptying.
     ip_da_conexao: str | None = None
 
     def job_results_pendentes(self) -> list[tuple]:
-        """job_result ainda enfileirados, na ordem de chegada.
+        """job_results still queued, in order of arrival.
 
-        Usado no teardown para resgatar o que a drenadora cancelada não chegou a
-        processar — telemetria residual pode sumir, resultado não.
+        Used on teardown to rescue what the cancelled drainer did not get to
+        process — residual telemetry may vanish, results may not.
         """
         return [
             item for item in self._queue
@@ -107,18 +109,18 @@ class _InboxQueue(asyncio.Queue):
         ]
 
 def _novo_contador_de_descartes() -> dict:
-    """Estado do WARNING agregado de descarte por conexão."""
+    """State of the aggregated per-connection drop WARNING."""
     return {"total": 0, "desde_log": 0, "ultimo_log": 0.0}
 
 def _contabilizar_descarte(
     executor_id: str, descartes: dict, quantidade: int = 1,
 ) -> None:
-    """Contabiliza evento descartado por fila cheia, com WARNING agregado.
+    """Counts an event dropped because of a full queue, with an aggregated WARNING.
 
-    Uma linha por mensagem afogaria o log justamente no incidente em que ele
-    precisa ser lido. Cobre stdout/debug, sync_event de progresso E node_event de
-    ciclo de vida — um `completed` perdido aqui aparece como "sem resposta" no
-    painel, não como erro.
+    One line per message would drown the log precisely in the incident in which
+    it needs to be read. Covers stdout/debug, progress sync_event AND lifecycle
+    node_event — a `completed` lost here shows up as "sem resposta" (no response)
+    in the panel, not as an error.
     """
     descartes["total"] += quantidade
     descartes["desde_log"] += quantidade
@@ -142,24 +144,25 @@ async def _enfileirar_mensagem(
     msg: dict,
     frame_bytes: int,
 ) -> None:
-    """Enfileira para a drenadora. Sob fila cheia, só job_result, ack e
-    sync_complete escapam do descarte.
+    """Enqueues for the drainer. Under a full queue, only job_result, ack and
+    sync_complete escape being dropped.
 
-    Fila cheia significa que o executor produz mais rápido do que o Redis aceita.
-    A resposta depende do que a mensagem CARREGA:
+    A full queue means the executor produces faster than Redis accepts.
+    The response depends on what the message CARRIES:
 
-      * node_event (stdout/debug E ciclo de vida) e sync_event de progresso —
-        DESCARTADOS, com WARNING agregado. A perda de um `completed` vira um nó
-        'unknown' no fim do run (completeExecution), e o watchdog do cliente
-        recupera se o canal ao vivo morrer: degradação honesta, coberta pela rede.
-      * job_result, ack e sync_complete — NUNCA descartados. Carregam estado
-        que nenhuma rede reconstrói (o run preso em 'running' no Postgres; o
-        run entregue e preso em 'pending'; a barra do GeoSync em 99%).
-        job_result e ack vão INLINE na hora; sync_complete espera vaga e, no
-        limite, também vai inline.
+      * node_event (stdout/debug AND lifecycle) and progress sync_event —
+        DROPPED, with an aggregated WARNING. Losing a `completed` turns into an
+        'unknown' node at the end of the run (completeExecution), and the client's
+        watchdog recovers if the live channel dies: honest degradation, covered
+        by the safety net.
+      * job_result, ack and sync_complete — NEVER dropped. They carry state
+        no safety net rebuilds (the run stuck in 'running' in Postgres; the
+        delivered run stuck in 'pending'; the GeoSync bar at 99%).
+        job_result and ack go INLINE right away; sync_complete waits for a slot
+        and, at the limit, also goes inline.
 
-    O `await` no caminho feliz não suspende (put_nowait não cede o loop), então o
-    ganho de latência do enfileiramento continua intacto.
+    The `await` on the happy path does not suspend (put_nowait does not yield the
+    loop), so the latency gain from enqueuing stays intact.
     """
     entrada = (msg_type, msg, frame_bytes)
     try:
@@ -168,19 +171,19 @@ async def _enfileirar_mensagem(
     except asyncio.QueueFull:
         pass
 
-    # ── Fila cheia ────────────────────────────────────────────────────────────
-    # node_event (qualquer kind) e sync_event de progresso são descartáveis: a
-    # perda degrada honestamente (nó 'unknown', barra segue) e a rede do cliente
-    # cobre. Só job_result e sync_complete seguem adiante.
-    # O inventário também: é periódico, e o próximo chega em um minuto.
+    # ── Full queue ────────────────────────────────────────────────────────────
+    # node_event (any kind) and progress sync_event can be dropped: the loss
+    # degrades honestly (node 'unknown', bar keeps going) and the client's
+    # safety net covers it. Only job_result and sync_complete go ahead.
+    # The inventory too: it is periodic, and the next one arrives in a minute.
     if msg_type in ("node_event", "inventario") or _e_telemetria(msg_type, msg):
         _contabilizar_descarte(executor_id, descartes)
         return
 
-    # O ACK promove o run de 'pending' para 'running'. Perdido, um job que o
-    # executor recebeu ficaria em "Na fila" até a varredura dos não entregues
-    # fechá-lo como falho — com o executor rodando. É um UPDATE curto por job:
-    # inline, sem esperar vaga.
+    # The ACK promotes the run from 'pending' to 'running'. If lost, a job the
+    # executor received would stay "Na fila" (queued) until the sweep of
+    # undelivered runs closes it as failed — with the executor running it. It is
+    # a short UPDATE per job: inline, without waiting for a slot.
     if msg_type == "ack":
         try:
             await _record_job_ack(executor_id, msg.get("job_id"), msg.get("status") or "enqueued")
@@ -191,9 +194,9 @@ async def _enfileirar_mensagem(
             )
         return
 
-    # job_result não espera nem tenta abrir vaga: é UMA mensagem por run e o
-    # inline resolve na hora, sem perda. Bloquear o loop de recepção custa menos
-    # que pendurar o run em 'running' para sempre.
+    # job_result neither waits nor tries to open a slot: it is ONE message per run
+    # and inline resolves it right away, losslessly. Blocking the receive loop
+    # costs less than leaving the run hanging in 'running' forever.
     if msg_type == "job_result":
         logger.error(
             "Executor '%s': fila cheia — job_result do job '%s' processado INLINE "
@@ -209,16 +212,17 @@ async def _enfileirar_mensagem(
             )
         return
 
-    # Resta o sync_complete (terminal do GeoSync). Perdê-lo prende a barra em 99%
-    # e nenhum watchdog recupera — então ESPERA vaga (back-pressure: o loop para
-    # de ler, o TCP enche, o executor desacelera sozinho) e, esgotado o prazo,
-    # vai INLINE. É o único evento que ainda paga o custo do back-pressure aqui.
+    # What remains is sync_complete (GeoSync's terminal event). Losing it leaves
+    # the bar stuck at 99% and no watchdog recovers it — so it WAITS for a slot
+    # (back-pressure: the loop stops reading, TCP fills up, the executor slows
+    # down on its own) and, once the deadline runs out, goes INLINE. It is the
+    # only event that still pays the back-pressure cost here.
     try:
         await asyncio.wait_for(inbox.put(entrada), timeout=_INBOX_PUT_TIMEOUT)
         return
     except asyncio.TimeoutError:
-        # `asyncio.Queue.put` cancelado levanta ANTES do put_nowait interno,
-        # então o item não entrou na fila e não há risco de duplicata aqui.
+        # A cancelled `asyncio.Queue.put` raises BEFORE the internal put_nowait,
+        # so the item did not enter the queue and there is no risk of a duplicate here.
         pass
 
     logger.error(
@@ -235,7 +239,7 @@ async def _enfileirar_mensagem(
         )
 
 async def _flush_node_events(executor_id: str, eventos: list[dict]) -> None:
-    """Publica o lote acumulado. Não propaga: a drenadora não pode morrer."""
+    """Publishes the accumulated batch. Does not propagate: the drainer must not die."""
     if not eventos:
         return
     try:
@@ -250,23 +254,24 @@ async def _processar_job_result_blindado(
     executor_id: str, msg: dict, frame_bytes: int, inflight: set | None,
     executor_ip: str | None = None,
 ) -> None:
-    """Roda `_handle_job_result` numa task blindada contra cancelamento.
+    """Runs `_handle_job_result` in a task shielded against cancellation.
 
-    PORQUÊ: a gravação do resultado é uma sequência NÃO atômica (setex do
-    resultado → lpush em `run_results`, que vira o WorkflowRun para terminal no
-    Postgres → webhook_response → publish do `__workflow_complete__`), com vários
-    `await` de Redis no meio. Um `cancel()` da drenadora caindo entre eles deixa
-    o run terminal no banco e o canvas SEM o evento de conclusão — o painel gira
-    para sempre num run que já acabou. Com `shield`, o cancelamento chega a quem
-    espera, nunca a quem grava; a task segue até o fim e o teardown lhe dá
-    carência antes de encerrar (ver `_INBOX_CANCEL_GRACE`).
+    WHY: writing the result is a NON-atomic sequence (setex of the result →
+    lpush to `run_results`, which turns the WorkflowRun terminal in Postgres →
+    webhook_response → publish of `__workflow_complete__`), with several Redis
+    `await`s in between. A `cancel()` of the drainer landing between them leaves
+    the run terminal in the database and the canvas WITHOUT the completion
+    event — the panel spins forever on a run that has already finished. With
+    `shield`, the cancellation reaches whoever waits, never whoever writes; the
+    task goes on to the end and the teardown gives it a grace period before
+    shutting down (see `_INBOX_CANCEL_GRACE`).
     """
     tarefa = asyncio.create_task(
         _handle_job_result(executor_id, msg, frame_bytes, executor_ip=executor_ip),
         name=f"job-result-{executor_id[:8]}",
     )
-    # asyncio guarda só weakrefs para tasks — sem referência forte, uma task
-    # blindada pode ser coletada no meio da gravação.
+    # asyncio keeps only weakrefs to tasks — without a strong reference, a
+    # shielded task can be garbage-collected in the middle of the write.
     if inflight is not None:
         inflight.add(tarefa)
         tarefa.add_done_callback(inflight.discard)
@@ -275,21 +280,22 @@ async def _processar_job_result_blindado(
 async def _drenar_inbox(
     executor_id: str, inbox: asyncio.Queue, inflight: set | None = None,
 ) -> None:
-    """Consome a fila da conexão e faz o trabalho pesado (Redis/Postgres).
+    """Consumes the connection's queue and does the heavy work (Redis/Postgres).
 
-    Separar recepção de processamento é o que tira o head-of-line blocking: o
-    loop de recepção nunca mais espera por I/O, então heartbeat, capacity e ack
-    deixam de ficar presos atrás de uma rajada de telemetria.
+    Separating receiving from processing is what removes the head-of-line
+    blocking: the receive loop never waits for I/O again, so heartbeat, capacity
+    and ack no longer get stuck behind a telemetry burst.
 
-    COALESCÊNCIA SEM TIMER: cada volta pega o que JÁ está enfileirado (até
-    `_INBOX_COALESCE_MAX`). Numa rajada a fila enche enquanto esta task espera o
-    Redis, e a volta seguinte leva dezenas de eventos num pipeline só; com
-    tráfego baixo, a mensagem isolada sai imediatamente. Um timer de janela fixa
-    faria o oposto — adiaria justamente o evento único, que é o que o usuário vê.
+    COALESCING WITHOUT A TIMER: each round takes what is ALREADY queued (up to
+    `_INBOX_COALESCE_MAX`). In a burst the queue fills up while this task waits
+    for Redis, and the next round takes dozens of events in a single pipeline;
+    with low traffic, the isolated message goes out immediately. A fixed-window
+    timer would do the opposite — it would delay precisely the single event,
+    which is what the user sees.
 
-    ORDEM: tudo vem da MESMA fila e um job_result/sync_event fecha o lote de
-    node_events acumulado antes de ser processado, então a ordem relativa dentro
-    de um run é a de chegada.
+    ORDER: everything comes from the SAME queue and a job_result/sync_event
+    closes the accumulated batch of node_events before being processed, so the
+    relative order within a run is the order of arrival.
     """
     try:
         while True:
@@ -338,12 +344,12 @@ async def _drenar_inbox(
         logger.error("Drenagem da conexão do executor '%s' abortada: %s", executor_id, exc)
 
 async def _resgatar_job_results_pendentes(executor_id: str, inbox: "_InboxQueue") -> None:
-    """Última chance para os job_result que sobraram na fila cancelada.
+    """Last chance for the job_results left in the cancelled queue.
 
-    O `cancel()` do teardown para a drenadora com a fila ainda cheia. Telemetria
-    residual pode sumir; job_result não — sem ele o WorkflowRun fica em 'running'
-    para sempre. Tentamos gravar cada um aqui e, se nem isso der certo, fechamos
-    o run como falho em vez de deixá-lo pendurado.
+    The teardown's `cancel()` stops the drainer with the queue still full.
+    Residual telemetry may vanish; job_result may not — without it the
+    WorkflowRun stays in 'running' forever. We try to write each one here and,
+    if even that fails, we close the run as failed instead of leaving it hanging.
     """
     pendentes = inbox.job_results_pendentes()
     if not pendentes:
@@ -370,11 +376,11 @@ async def _resgatar_job_results_pendentes(executor_id: str, inbox: "_InboxQueue"
                 )
 
 async def _encerrar_drenagem(inbox: asyncio.Queue, drain_task: asyncio.Task) -> None:
-    """Enfileira a sentinela e espera a drenadora terminar o que já recebeu.
+    """Enqueues the sentinel and waits for the drainer to finish what it already received.
 
-    `put` (e não `put_nowait`) de propósito: se a fila estiver cheia no momento
-    da queda, a sentinela espera a vaga que a própria drenadora abre — com
-    `put_nowait` ela seria descartada e a task ficaria pendurada.
+    `put` (and not `put_nowait`) on purpose: if the queue is full at the moment
+    of the drop, the sentinel waits for the slot the drainer itself opens — with
+    `put_nowait` it would be dropped and the task would hang.
     """
     await inbox.put(_INBOX_STOP)
     await drain_task

@@ -1,10 +1,10 @@
 /**
- * Sugestão de nomes de coluna, a partir da última execução.
+ * Column name suggestions, from the last run.
  *
- * Antes, configurar um Join ou um filtro exigia adivinhar o nome da coluna —
- * ou executar, olhar o resultado, voltar e digitar. O executor passou a gravar
- * `output_columns` por saída, e estas funções dizem o que chega em cada porta
- * do nó que está sendo configurado.
+ * Before, configuring a Join or a filter required guessing the column name —
+ * or running, looking at the result, going back and typing. The executor now
+ * records `output_columns` per output, and these functions say what arrives at
+ * each port of the node being configured.
  */
 import { describe, it, expect } from "vitest"
 
@@ -24,7 +24,7 @@ const NOS: NoComColunas[] = [
 
 describe("colunasQueChegam", () => {
   it("separa as colunas por porta de entrada", () => {
-    // É a dúvida de quem configura um Join: o que é de A e o que é de B.
+    // It's the question of whoever configures a Join: what comes from A and what comes from B.
     const arestas = [
       { source: "malha", target: "join", data: { from_key: "output", to_key: "layerA" } },
       { source: "censo", target: "join", data: { from_key: "result", to_key: "layerB" } },
@@ -65,7 +65,7 @@ describe("colunasQueChegam", () => {
   })
 
   it("nó que nunca executou não contribui", () => {
-    // Nada de sugestão errada: sem execução, não há o que saber.
+    // No wrong suggestions: without a run, there's nothing to know.
     const arestas = [{ source: "sem_run", target: "x", data: { from_key: "output" } }]
     expect(colunasQueChegam(arestas, NOS, "x")).toEqual({})
   })
@@ -95,7 +95,7 @@ describe("sugestaoParaNo", () => {
     expect(sugestaoParaNo(arestas, porNo, "join")).toEqual({
       porPorta: { layerA: ["cod", "nome"], layerB: ["cod", "renda"] },
       todas: ["cod", "nome", "renda"],
-      // Um dos pais veio da re-hidratação: a lista inteira merece o aviso.
+      // One of the parents came from re-hydration: the whole list deserves the warning.
       desatualizadas: true,
       parciais: false,
     })
@@ -110,8 +110,8 @@ describe("sugestaoParaNo", () => {
   })
 
   it("pai stale que NÃO contribui não dispara o aviso", () => {
-    // O aviso fala das sugestões exibidas — um nó re-hidratado noutro canto do
-    // grafo não torna esta lista desatualizada.
+    // The warning is about the suggestions shown — a node re-hydrated in another
+    // corner of the graph doesn't make this list stale.
     expect(sugestaoParaNo(
       [{ source: "malha", target: "x", data: { from_key: "output" } }],
       porNo, "x",
@@ -123,7 +123,7 @@ describe("sugestaoParaNo", () => {
   })
 
   it("sem coluna nenhuma chegando, não há o que rotular", () => {
-    // `desatualizadas` acompanha a LISTA: vazia, o aviso não tem referente.
+    // `desatualizadas` follows the LIST: when it's empty, the warning has no referent.
     expect(sugestaoParaNo([], porNo, "join")).toEqual({
       porPorta: {}, todas: [], desatualizadas: false, parciais: false,
     })

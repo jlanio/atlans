@@ -26,7 +26,7 @@ import {
   ErroDeCarga, SemAcesso, SemResultado, SkeletonDeUsuarios, VazioPrimeiroUso,
 } from "@/app/components/admin/users/estados"
 
-// ── Página principal ─────────────────────────────────────────────────────────
+// ── Main page ────────────────────────────────────────────────────────────────
 
 type StatusFilter = "all" | "active" | "suspended" | "deleted"
 
@@ -40,10 +40,11 @@ const OPCOES_STATUS: { value: StatusFilter; label: string }[] = [
 ]
 
 /**
- * Subtítulo de escopo: diz quantas contas o recorte atual alcança e o que o
- * filtra. O total vem do backend para a consulta corrente (`data.total`); as
- * partes com role/busca só entram quando há filtro. Enquanto não há o que
- * contar (1ª carga), o cabeçalho mostra um Skeleton no lugar (contrato §1).
+ * Scope subtitle: says how many accounts the current slice reaches and what
+ * filters it. The total comes from the backend for the current query
+ * (`data.total`); the role/search parts only come in when there is a filter.
+ * While there is nothing to count (1st load), the header shows a Skeleton in
+ * its place (contract §1).
  */
 function textoDeEscopo(total: number, status: StatusFilter, role: string, q: string): string {
   const nucleo = (() => {
@@ -67,7 +68,7 @@ export default function AdminUsersPage() {
   const isAdmin = session?.user?.role === "admin"
   const currentUserId = session?.user?.id_hash ?? null
 
-  // Estado de filtros e busca
+  // Filter and search state
   const [search, setSearch]                   = useState("")
   const [debouncedSearch, setDebouncedSearch] = useState("")
   const [statusFilter, setStatusFilter]       = useState<StatusFilter>("active")
@@ -76,27 +77,27 @@ export default function AdminUsersPage() {
   const [sortOrder, setSortOrder]             = useState<"asc" | "desc">("desc")
   const [offset, setOffset]                   = useState(0)
 
-  // Seleção em massa
+  // Bulk selection
   const [selected, setSelected]     = useState<Set<string>>(new Set())
   const [bulkAction, setBulkAction] = useState<"suspend" | "reactivate" | "delete" | null>(null)
 
-  // Debounce da busca (400ms)
+  // Search debounce (400ms)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search)
-      setOffset(0) // reset paginação ao buscar
+      setOffset(0) // reset pagination on search
     }, 400)
     return () => clearTimeout(timer)
   }, [search])
 
-  // Fetch de dados. Os filtros são deps do `useFetchData`: cada troca de
-  // filtro, de página ou da busca (debounce) dispara uma busca nova, e a guarda
-  // de geração dele descarta a resposta de uma busca anterior que chegue
-  // depois — antes a que resolvesse por último vencia, e a lista de um filtro
-  // antigo sobrescrevia a do atual. `loading` é o dele: qualquer busca em voo.
+  // Data fetch. The filters are deps of `useFetchData`: every change of filter,
+  // page or (debounced) search triggers a new fetch, and its generation guard
+  // discards the response of an earlier fetch that arrives later — before, the
+  // one that resolved last won, and an old filter's list overwrote the current
+  // one. `loading` is its own: any fetch in flight.
   //
-  // `erro` só governa o cartão de erro na 1ª carga; numa recarga que falha
-  // sobre a lista pronta mantemos o que havia + um toast (contrato §3.2).
+  // `erro` only governs the error card on the 1st load; on a reload that fails
+  // over the ready list we keep what was there + a toast (contract §3.2).
   const { data, loading, error, refetch: fetchUsers } = useFetchData(
     () => GisFlowService.getAdminUsers({
       search: debouncedSearch || undefined,
@@ -117,8 +118,8 @@ export default function AdminUsersPage() {
   )
   const erro = error != null
 
-  // useCallback: `handleRefresh` desce como `onCompleted` para a tabela
-  // memoizada — recriá-lo a cada tecla na busca anularia o React.memo.
+  // useCallback: `handleRefresh` goes down as `onCompleted` to the memoized
+  // table — recreating it on every keystroke in the search would defeat React.memo.
   const handleRefresh = useCallback(() => {
     setSelected(new Set())
     fetchUsers()
@@ -132,13 +133,13 @@ export default function AdminUsersPage() {
     setOffset(0)
   }
 
-  // Seleção
-  // Memoizado por `data`: o `?? []` produzia um array novo a cada render quando
-  // `data.items` fosse indefinido, e isso desestabilizaria as deps abaixo.
+  // Selection
+  // Memoized by `data`: the `?? []` produced a new array on every render when
+  // `data.items` was undefined, and that would destabilize the deps below.
   const users = useMemo(() => data?.items ?? [], [data])
   const total = data?.total ?? 0
-  // useMemo: props estáveis para a tabela memoizada — sem isto o array/booleano
-  // recriado a cada tecla na busca anularia o React.memo.
+  // useMemo: stable props for the memoized table — without this the array/boolean
+  // recreated on every keystroke in the search would defeat React.memo.
   const selectableUsers = useMemo(
     () => users.filter(u => u.id_hash !== currentUserId && u.status !== "deleted"),
     [users, currentUserId],
@@ -148,7 +149,7 @@ export default function AdminUsersPage() {
     [selectableUsers, selected],
   )
 
-  // useCallback: handlers estáveis passados à tabela memoizada.
+  // useCallback: stable handlers passed to the memoized table.
   const toggleSelect = useCallback((id: string) => {
     if (id === currentUserId) return
     const user = users.find(u => u.id_hash === id)
@@ -196,7 +197,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  // Ordenação por coluna. useCallback: `onSort` estável para a tabela memoizada.
+  // Sorting by column. useCallback: stable `onSort` for the memoized table.
   const handleSort = useCallback((col: string) => {
     if (sortBy === col) {
       setSortOrder(prev => prev === "asc" ? "desc" : "asc")
@@ -219,14 +220,14 @@ export default function AdminUsersPage() {
     debouncedSearch.trim() !== "" || statusFilter !== "all" || roleFilter !== "all"
 
   return (
-    // Um provider para a página inteira: cada `<td>` de checkbox desabilitado
-    // montava o seu, e o provider existe para ser único por árvore — 25 cópias
-    // são 25 contextos independentes, sem o "skip delay" entre tooltips
-    // vizinhos e com o custo de montagem multiplicado a cada troca de página.
+    // One provider for the whole page: each disabled-checkbox `<td>` mounted its
+    // own, and the provider exists to be unique per tree — 25 copies are 25
+    // independent contexts, without the "skip delay" between neighboring
+    // tooltips and with the mount cost multiplied on every page change.
     <TooltipProvider delayDuration={100}>
       <PageRoot>
-        {/* Cabeçalho (contrato §1). `flex-wrap`: sem ele o título e a fila de
-            ações disputam a mesma linha no telefone e quem cede é o título. */}
+        {/* Header (contract §1). `flex-wrap`: without it the title and the action
+            row fight for the same line on the phone and the title gives way. */}
         <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-foreground">Usuários</h1>
@@ -272,7 +273,7 @@ export default function AdminUsersPage() {
               />
             </div>
 
-            {/* Filtro de status: grupo de toggle canônico (contrato §1). */}
+            {/* Status filter: canonical toggle group (contract §1). */}
             <div
               role="group"
               aria-label="Filtrar por status"
@@ -298,7 +299,7 @@ export default function AdminUsersPage() {
               })}
             </div>
 
-            {/* Filtro de role */}
+            {/* Role filter */}
             <Select value={roleFilter} onValueChange={(v) => { setRoleFilter(v); setOffset(0) }}>
               <SelectTrigger className="w-[150px] max-md:h-10">
                 <SelectValue placeholder="Role" />
@@ -311,8 +312,8 @@ export default function AdminUsersPage() {
             </Select>
           </div>
 
-          {/* Barra de ações em massa. Entrada por CSS sob `motion-safe:` no lugar
-              do framer-motion. */}
+          {/* Bulk action bar. Entrance via CSS under `motion-safe:` instead of
+              framer-motion. */}
           {selected.size > 0 && (
             <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-card px-4 py-2.5 shadow-xs motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-200">
               <span className="text-sm font-medium tabular-nums">
@@ -336,8 +337,8 @@ export default function AdminUsersPage() {
           )}
         </div>
 
-        {/* Corpo — precedência: carregando → erro (só se nunca houve carga) →
-            vazio/sem-resultado → tabela (contrato §3). */}
+        {/* Body — precedence: loading → error (only if there was never a load) →
+            empty/no-result → table (contract §3). */}
         {data === null && loading && <SkeletonDeUsuarios />}
 
         {data === null && erro && !loading && (
@@ -374,7 +375,7 @@ export default function AdminUsersPage() {
           />
         )}
 
-        {/* Diálogo de ação em massa */}
+        {/* Bulk action dialog */}
         {bulkAction && (
           <BulkActionDialog
             action={bulkAction}

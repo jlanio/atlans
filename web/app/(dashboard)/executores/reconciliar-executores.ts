@@ -1,28 +1,28 @@
 import type { IExecutor } from "@/service/types"
 
 /**
- * Reconcilia a resposta do poll contra a lista anterior, preservando a
- * IDENTIDADE dos objetos que não mudaram.
+ * Reconciles the poll response against the previous list, preserving the
+ * IDENTITY of the objects that did not change.
  *
- * O auto-refresh de 15s reparseia o JSON e devolve objetos novos mesmo para
- * executores idênticos ao ciclo anterior. Como o `React.memo` do ExecutorCard
- * compara props de forma rasa, ele errava em 100% dos ticks: a lista inteira
- * re-renderizava e o memo não economizava nada — só serviu de justificativa
- * para tirar o feedback visual de recarga da lista.
+ * The 15s auto-refresh re-parses the JSON and returns new objects even for
+ * executors identical to the previous cycle. Since ExecutorCard's `React.memo`
+ * compares props shallowly, it missed on 100% of ticks: the whole list
+ * re-rendered and the memo saved nothing — it only served as a justification
+ * for removing the list's reload visual feedback.
  *
- * Devolve o próprio array anterior quando NADA mudou (nem conteúdo, nem ordem,
- * nem tamanho), para que os `useMemo` derivados também parem de recalcular.
+ * Returns the previous array itself when NOTHING changed (neither content, nor
+ * order, nor size), so the derived `useMemo`s also stop recomputing.
  */
 
-// Assinatura JSON memoizada por identidade de objeto. Um executor preservado
-// entre ticks mantém a mesma referência, então sua assinatura é serializada uma
-// única vez (e não duas — velho + novo — a cada ciclo de 15s como antes). A
-// comparação continua sendo a do JSON inteiro: nenhum campo exibido escapa.
+// JSON signature memoized by object identity. An executor preserved across
+// ticks keeps the same reference, so its signature is serialized only once
+// (and not twice — old + new — every 15s cycle as before). The comparison is
+// still over the whole JSON: no displayed field slips through.
 const assinaturaCache = new WeakMap<IExecutor, string>()
 function assinatura(e: IExecutor): string {
   let s = assinaturaCache.get(e)
   if (s === undefined) {
-    // Seguro: os objetos vêm de JSON.parse da mesma resposta, ordem de chaves estável.
+    // Safe: the objects come from JSON.parse of the same response, stable key order.
     s = JSON.stringify(e)
     assinaturaCache.set(e, s)
   }

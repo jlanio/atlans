@@ -1,5 +1,5 @@
 # app/schemas/admin_users.py
-"""Schemas Pydantic para o módulo administrativo de gestão de usuários."""
+"""Pydantic schemas for the user management admin module."""
 
 from datetime import datetime
 from pydantic import BaseModel, Field
@@ -7,7 +7,7 @@ from typing import Optional
 
 
 class UserAdminOut(BaseModel):
-    """Representação completa de um usuário no painel admin."""
+    """Full representation of a user in the admin panel."""
     id_hash: str
     username: str
     email: str
@@ -26,7 +26,7 @@ class UserAdminOut(BaseModel):
 
 
 class UserListResponse(BaseModel):
-    """Resposta paginada de listagem de usuários."""
+    """Paginated user listing response."""
     items: list[UserAdminOut]
     total: int
     limit: int
@@ -34,43 +34,43 @@ class UserListResponse(BaseModel):
 
 
 class UserSuspendRequest(BaseModel):
-    """Payload opcional para suspensão com motivo."""
+    """Optional payload for suspension with a reason."""
     reason: Optional[str] = Field(None, max_length=500)
 
 
 class UserBulkActionRequest(BaseModel):
-    """Payload para ações em massa (suspender, reativar, deletar)."""
+    """Payload for bulk actions (suspend, reactivate, delete)."""
     user_ids: list[str] = Field(..., min_length=1, max_length=50)
     reason: Optional[str] = Field(None, max_length=500)
 
 
 class UserBulkActionResponse(BaseModel):
-    """Resposta de ações em massa com contagem e erros individuais."""
+    """Bulk action response with a count and individual errors."""
     processed: int
     errors: list[dict]
 
 
 class UserUpdateRoleRequest(BaseModel):
-    """Payload para alteração de role."""
+    """Payload for changing the role."""
     role: str = Field(..., pattern=r"^(admin|user)$")
 
 
 class UserUpdateAgentQuotaRequest(BaseModel):
-    """Payload para alteração da cota de executores dedicados do usuário."""
+    """Payload for changing the user's dedicated executor quota."""
     agent_quota: int = Field(..., ge=0, le=100)
 
 
 class UserExecutorStatsResponse(BaseModel):
-    """Estatística de executores do usuário — usada pelo dialog de cota no admin."""
+    """The user's executor statistics — used by the quota dialog in the admin."""
     user_id:     str
     agent_quota: int
-    created:     int  # criados pelo user e ainda ativos (não revogados, não soft-deletados)
-    accessible:  int  # acessíveis (pool + workspace + atribuição direta)
+    created:     int  # created by the user and still active (not revoked, not soft-deleted)
+    accessible:  int  # accessible (pool + workspace + direct assignment)
 
 
 class RevokeAllAgentsResponse(BaseModel):
-    """Resultado da ação destrutiva de revogar todos os executores criados pelo user."""
+    """Result of the destructive action of revoking all executors created by the user."""
     user_id:       str
     revoked_count: int
     agent_ids:     list[str]
-    affected_workspaces: int  # workspaces com target_executor_id apontando aos revogados
+    affected_workspaces: int  # workspaces with target_executor_id pointing to the revoked ones

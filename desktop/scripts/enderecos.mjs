@@ -1,23 +1,24 @@
 // desktop/scripts/enderecos.mjs
 //
-// Os dois endereços que o app grava no executável: o host dos executores (o
-// SERVIDOR de src/shared/servidor.ts) e a UI web (o UI_URL de src/shared/ui.ts).
+// The two addresses the app bakes into the executable: the executors' host (the
+// SERVIDOR of src/shared/servidor.ts) and the web UI (the UI_URL of src/shared/ui.ts).
 //
-// Vêm do ambiente do BUILD, e não do código: o mesmo código serve a qualquer
-// instalação, e cada build grava os seus. No executável continuam fixos, pelos
-// motivos de servidor.ts: trocar de servidor exige outro build.
+// They come from the BUILD environment, not from the code: the same code serves
+// any installation, and each build bakes in its own. In the executable they
+// stay fixed, for the reasons in servidor.ts: switching servers requires
+// another build.
 //
-//   ATLANS_DESKTOP_SERVIDOR  wss://agents.<domínio>
-//   ATLANS_DESKTOP_UI_URL    https://<domínio>
+//   ATLANS_DESKTOP_SERVIDOR  wss://agents.<domain>
+//   ATLANS_DESKTOP_UI_URL    https://<domain>
 //
-// Build sem eles falha: um instalador com endereço vazio, ou com o de outra
-// instalação, é pior que nenhum. Só o desenvolvimento local (`--dev`) e os
-// testes têm valores próprios.
+// A build without them fails: an installer with an empty address, or with
+// another installation's, is worse than none. Only local development (`--dev`)
+// and the tests have values of their own.
 
 /** Desenvolvimento local: a API e o web do `make dev`. */
 export const DEV = { servidor: 'ws://localhost:8000', ui: 'http://localhost:3000' }
 
-/** Testes: um domínio de exemplo, que não é de instalação nenhuma. */
+/** Tests: an example domain, which belongs to no installation. */
 export const TESTE = { servidor: 'wss://agents.atlans.example.org', ui: 'https://atlans.example.org' }
 
 function validar(nome, valor, protocolos) {
@@ -37,9 +38,9 @@ function validar(nome, valor, protocolos) {
 }
 
 /**
- * Os endereços deste build. `dev` cai nos de {@link DEV} quando o ambiente não
- * traz os seus, e aceita ws/http; um build de verdade exige wss/https e falha
- * sem eles.
+ * This build's addresses. `dev` falls back to those in {@link DEV} when the
+ * environment does not bring its own, and accepts ws/http; a real build
+ * requires wss/https and fails without them.
  */
 export function enderecosDoBuild({ dev = false } = {}) {
   const servidor = process.env.ATLANS_DESKTOP_SERVIDOR?.trim() || (dev ? DEV.servidor : '')
@@ -57,7 +58,7 @@ export function enderecosDoBuild({ dev = false } = {}) {
   }
 }
 
-/** O `define` do esbuild/vite que troca as duas constantes globais. */
+/** The esbuild/vite `define` that replaces the two global constants. */
 export function defineDosEnderecos({ servidor, ui }) {
   return {
     __ATLANS_SERVIDOR__: JSON.stringify(servidor),
@@ -65,15 +66,15 @@ export function defineDosEnderecos({ servidor, ui }) {
   }
 }
 
-/** O que build-main.mjs grava em dist/main/build.json: de que modo o bundle saiu. */
+/** What build-main.mjs writes to dist/main/build.json: which mode the bundle was built in. */
 export function marcaDoBuild({ dev = false, servidor, ui }) {
   return { modo: dev ? 'dev' : 'producao', servidor, ui }
 }
 
 /**
- * Só o bundle de produção vira instalador (build/antes-de-empacotar.cjs).
- * Depois de um `npm run dev`, o dist/main aponta para a máquina local, e um
- * `npm run empacotar` sozinho gerava, sem erro nenhum, um instalador assim.
+ * Only the production bundle becomes an installer (build/antes-de-empacotar.cjs).
+ * After an `npm run dev`, dist/main points at the local machine, and an
+ * `npm run empacotar` on its own produced, without any error, such an installer.
  */
 export function conferirMarcaDoBuild(marca) {
   if (!marca || typeof marca !== 'object') {

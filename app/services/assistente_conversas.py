@@ -1,25 +1,25 @@
 # app/services/assistente_conversas.py
 """
-Persistencia e replay das conversas do assistente da Home.
+Persistence and replay of the Home assistant's conversations.
 
-O laco (`assistente_service.conversar`) e a superficie (`assistente_superficie.HOME`)
-nao sabem de banco: quem guarda a conversa e este servico, e a rota
-(`assistente_router`) costura os dois. As responsabilidades aqui:
+The loop (`assistente_service.conversar`) and the surface (`assistente_superficie.HOME`)
+know nothing about the database: what stores the conversation is this service, and
+the route (`assistente_router`) stitches the two together. The responsibilities here:
 
-- **CRUD das conversas** — criar, carregar (com portao de dono), listar,
-  renomear, apagar (soft), e o `tocar` que carimba `updated_at`/`tokens_total`.
-- **Transcrito e persistencia incremental** — `transcrito_de` monta o que o
-  modelo recebe (`[{"role", "content"}]`), e `anexar_mensagens` grava as mensagens
-  novas com `ordem` contigua. A rota persiste turno a turno pelo gancho
-  `ao_fechar_turno`, e nao num blob no fim.
-- **Replay** — `quadros_do_replay` reconstroi a conversa nos MESMOS quadros do
-  SSE, para o painel reaplicar pelo mesmo caminho de um quadro ao vivo. Duas
-  regras de seguranca: um `tool_result` NUNCA sai (e a palavra do servidor,
-  nao conteudo de tela), e uma `confirmacao` so reaparece com o token se a chave
-  dela ainda existe no Redis (senao seria um botao morto).
-- **Confirmacao** — `ler`/`consumir` a chave que o portao da Home ja ESCREVEU
-  (PR das superficies). O consumo e um `get`+`delete`: quem apagou executa, quem
-  chegou depois perdeu a corrida.
+- **Conversation CRUD** — create, load (with an owner gate), list, rename,
+  delete (soft), and the `tocar` that stamps `updated_at`/`tokens_total`.
+- **Transcript and incremental persistence** — `transcrito_de` builds what the
+  model receives (`[{"role", "content"}]`), and `anexar_mensagens` writes the new
+  messages with a contiguous `ordem`. The route persists turn by turn through the
+  `ao_fechar_turno` hook, and not as a blob at the end.
+- **Replay** — `quadros_do_replay` rebuilds the conversation in the SAME SSE
+  frames, so the panel reapplies them along the same path as a live frame. Two
+  security rules: a `tool_result` NEVER goes out (it is the server's word, not
+  screen content), and a `confirmacao` only reappears with its token if its key
+  still exists in Redis (otherwise it would be a dead button).
+- **Confirmation** — `ler`/`consumir` the key that the Home gate has already
+  WRITTEN (surfaces PR). Consumption is a `get`+`delete`: whoever deleted it
+  executes, whoever arrived later lost the race.
 """
 from __future__ import annotations
 
@@ -48,11 +48,12 @@ TAMANHO_DO_TITULO = 60
 
 
 async def carregar_conversa_da_pessoa(db: AsyncSession, user_id: str, conversa_id: str) -> Conversa:
-    """A conversa, se e da pessoa e nao foi apagada. 404 uniforme senao.
+    """The conversation, if it belongs to the person and was not deleted. Uniform 404 otherwise.
 
-    404 e nao 403 de proposito: distinguir "nao existe" de "existe mas nao e sua"
-    responderia a pergunta "este id existe?" — que ninguem deveria poder fazer
-    varrendo ids. O mesmo criterio da borda do MCP (`resolucao.carregar_workflow`).
+    404 and not 403 on purpose: distinguishing "does not exist" from "exists but is
+    not yours" would answer the question "does this id exist?" — which nobody should
+    be able to ask by sweeping ids. The same criterion as the MCP edge
+    (`resolucao.carregar_workflow`).
     """
     conv = (
         await db.execute(
@@ -90,8 +91,8 @@ async def criar_conversa(
 
 
 def titulo_automatico(mensagem: str) -> str:
-    """As primeiras palavras da 1a mensagem, ate 60 chars. Titulo por modelo fica
-    para depois — este e o barato que ja diz do que a conversa trata."""
+    """The first words of the 1st message, up to 60 chars. A model-generated title
+    is left for later — this is the cheap one that already says what the conversation is about."""
     limpo = " ".join((mensagem or "").split())
     return limpo[:TAMANHO_DO_TITULO] if limpo else "Nova conversa"
 
@@ -99,7 +100,7 @@ def titulo_automatico(mensagem: str) -> str:
 async def listar_conversas(
     db: AsyncSession, user_id: str, *, limit: int = 50, offset: int = 0
 ) -> tuple[list[Conversa], int]:
-    """As minhas conversas nao apagadas, mais recentemente ativas em cima."""
+    """My non-deleted conversations, most recently active on top."""
     base = select(Conversa).where(Conversa.user_id == user_id, Conversa.deleted_at.is_(None))
     total = (
         await db.execute(
@@ -126,7 +127,7 @@ async def renomear_conversa(db: AsyncSession, user_id: str, conversa_id: str, ti
 
 
 async def apagar_conversa(db: AsyncSession, user_id: str, conversa_id: str) -> None:
-    """Soft delete: some da lista, o historico fica."""
+    """Soft delete: it disappears from the list, the history stays."""
     conv = await carregar_conversa_da_pessoa(db, user_id, conversa_id)
     conv.deleted_at = utc_now_naive()
     await db.commit()
@@ -138,17 +139,18 @@ async def apagar_conversa(db: AsyncSession, user_id: str, conversa_id: str) -> N
 async def transcrito_de(
     db: AsyncSession, conversa_id: str, *, persistir_fecho: bool = False
 ) -> list[dict[str, Any]]:
-    """O que o modelo recebe: `[{"role", "content"}]` na ordem, VERBATIM.
+    """What the model receives: `[{"role", "content"}]` in order, VERBATIM.
 
-    `blocos` ja esta no formato do projeto (o que o laco grava e o cliente do
-    modelo traduz na ida — `app/services/openrouter.py`), entao nao ha conversao
-    aqui — so a leitura em ordem.
+    `blocos` is already in the project's format (what the loop writes and the
+    model client translates on the way out — `app/services/openrouter.py`), so
+    there is no conversion here — only the read in order.
 
-    `persistir_fecho=True` grava tambem, no banco, o `tool_result` de fecho que
-    `_fechar_pendencias` acrescentou. Quem vai RETOMAR a conversa (anexar uma
-    mensagem nova depois) precisa disso: fechar so em memoria deixaria o orfao no
-    banco e, com a mensagem nova gravada depois dele, o fecho na leitura seguinte
-    nao aconteceria mais (`_fechar_pendencias` so olha a ULTIMA mensagem).
+    `persistir_fecho=True` also writes to the database the closing `tool_result`
+    that `_fechar_pendencias` appended. Whoever is going to RESUME the conversation
+    (append a new message afterwards) needs this: closing only in memory would
+    leave the orphan in the database and, with the new message written after it,
+    the closing on the next read would no longer happen (`_fechar_pendencias`
+    only looks at the LAST message).
     """
     linhas = (
         await db.execute(
@@ -157,13 +159,13 @@ async def transcrito_de(
             .order_by(Mensagem.ordem)
         )
     ).all()
-    # `_fechar_pendencias` NA LEITURA, e nao so na escrita: o laco so fecha as
-    # pendencias no evento `fim`, que nunca acontece quando o gerador e CANCELADO
-    # (a pessoa trocou de chat e o fetch abortou no meio de uma ferramenta). O
-    # `tool_use` orfao ficava gravado e a API recusava a conversa inteira na
-    # retomada ("tool_use ids were found without tool_result blocks"), para
-    # sempre. Fechando aqui, o que sai do banco esta sempre bem formado, seja qual
-    # for a causa da interrupcao.
+    # `_fechar_pendencias` ON READ, and not only on write: the loop only closes
+    # pending items on the `fim` event, which never happens when the generator is
+    # CANCELLED (the person switched chats and the fetch aborted in the middle of
+    # a tool). The orphan `tool_use` stayed recorded and the API rejected the
+    # whole conversation on resume ("tool_use ids were found without tool_result
+    # blocks"), forever. Closing here, what comes out of the database is always
+    # well formed, whatever the cause of the interruption.
     cru = [{"role": papel, "content": blocos} for papel, blocos in linhas]
     fechado = cs._fechar_pendencias(cru)
     if persistir_fecho and len(fechado) > len(cru):
@@ -174,12 +176,12 @@ async def transcrito_de(
 
 
 async def proxima_ordem(db: AsyncSession, conversa_id: str) -> int:
-    """A proxima `ordem` livre — `MAX(ordem)+1`, nunca a CONTAGEM das linhas.
+    """The next free `ordem` — `MAX(ordem)+1`, never the COUNT of rows.
 
-    A contagem so coincide com a proxima ordem enquanto nada escreve em paralelo.
-    Duas abas na mesma conversa liam a mesma contagem e colidiam na UNIQUE
-    `uq_mensagens_conversa_ordem` (500 sem tratamento), ou pulavam uma mensagem
-    inteira em silencio — deixando `tool_use` e `tool_result` desemparelhados.
+    The count only matches the next order while nothing writes in parallel.
+    Two tabs on the same conversation read the same count and collided on the
+    UNIQUE `uq_mensagens_conversa_ordem` (unhandled 500), or silently skipped a
+    whole message — leaving `tool_use` and `tool_result` unpaired.
     """
     maior = (
         await db.execute(
@@ -197,11 +199,11 @@ async def anexar_mensagens(
     ordem_inicial: int,
     metas: Optional[dict[int, dict[str, Any]]] = None,
 ) -> int:
-    """Grava mensagens no formato do laco (`[{"role", "content"}]`), com `ordem`
-    contigua a partir de `ordem_inicial`. Devolve a proxima ordem livre.
+    """Writes messages in the loop's format (`[{"role", "content"}]`), with a
+    contiguous `ordem` starting at `ordem_inicial`. Returns the next free order.
 
-    `metas` (opcional) marca uma mensagem pelo indice ABSOLUTO da ordem — usado
-    so pela mensagem sintetica de confirmacao, que leva `meta={"tipo":...}`.
+    `metas` (optional) marks a message by the ABSOLUTE index of the order — used
+    only by the synthetic confirmation message, which carries `meta={"tipo":...}`.
     """
     metas = metas or {}
     ordem = ordem_inicial
@@ -224,8 +226,8 @@ async def anexar_mensagens(
 async def tocar_conversa(
     db: AsyncSession, conversa_id: str, *, tokens_total: Optional[int] = None
 ) -> None:
-    """Carimba `updated_at` (e `tokens_total`, quando dado). Nunca levanta: e
-    contabilidade, nao pode derrubar a resposta que ja saiu."""
+    """Stamps `updated_at` (and `tokens_total`, when given). Never raises: it is
+    bookkeeping, it must not bring down the response that has already gone out."""
     conv = (
         await db.execute(select(Conversa).where(Conversa.id_hash == conversa_id))
     ).scalar_one_or_none()
@@ -233,34 +235,34 @@ async def tocar_conversa(
         return
     conv.updated_at = utc_now_naive()
     if tokens_total is not None:
-        # SOMA, nao atribui: o nome do campo, a docstring do modelo e o
-        # `ConversaResumo` prometem o total da CONVERSA. Atribuindo, ele guardava
-        # o custo do ultimo turno — e qualquer saida anormal antes do `fim`
-        # (trava tomada por outra aba, cota estourada) gravava 0 por cima do
-        # acumulado. Quem nao observou o `fim` passa `None` e nao carimba nada.
+        # ADDS, does not assign: the field name, the model's docstring and
+        # `ConversaResumo` promise the CONVERSATION total. When assigning, it kept
+        # the cost of the last turn — and any abnormal exit before `fim` (lock
+        # taken by another tab, quota exceeded) wrote 0 over the accumulated
+        # value. Whoever did not observe `fim` passes `None` and stamps nothing.
         conv.tokens_total = int(conv.tokens_total or 0) + int(tokens_total)
     await db.commit()
 
 
-# ── Confirmacao (a chave ja e escrita pelo portao da Home) ────────────────────
+# ── Confirmation (the key is already written by the Home gate) ────────────────
 
 
 async def ler_confirmacao(
     redis, user_id: str, conversa_id: str, tool_use_id: str
 ) -> Optional[dict[str, Any]]:
-    """O `{token, tool, args, criado_em}` guardado, ou None se expirou/nao existe."""
+    """The stored `{token, tool, args, criado_em}`, or None if it expired/does not exist."""
     if redis is None:
         return None
     try:
         cru = await redis.get(ag.chave_de_confirmacao(user_id, conversa_id, tool_use_id))
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao ler a confirmacao: %s", exc.__class__.__name__)
         return None
     if not cru:
         return None
     try:
         corpo = json.loads(cru)
-    except (TypeError, ValueError):  # pragma: no cover - valor corrompido
+    except (TypeError, ValueError):  # pragma: no cover - corrupted value
         return None
     return corpo if isinstance(corpo, dict) else None
 
@@ -268,31 +270,32 @@ async def ler_confirmacao(
 async def consumir_confirmacao(
     redis, user_id: str, conversa_id: str, tool_use_id: str
 ) -> bool:
-    """Apaga a chave uma unica vez. True se ESTA chamada apagou (venceu a corrida),
-    False se ja tinha sido decidida (delete devolveu 0)."""
+    """Deletes the key exactly once. True if THIS call deleted it (won the race),
+    False if it had already been decided (delete returned 0)."""
     if redis is None:
         return False
     try:
         apagadas = await redis.delete(ag.chave_de_confirmacao(user_id, conversa_id, tool_use_id))
-    except Exception as exc:  # pragma: no cover - depende do Redis
+    except Exception as exc:  # pragma: no cover - depends on Redis
         logger.warning("Falha ao consumir a confirmacao: %s", exc.__class__.__name__)
         return False
     return bool(apagadas)
 
 
-# ── Rastro auditavel do que o assistente ESCREVE ─────────────────────────────
+# ── Auditable trail of what the assistant WRITES ─────────────────────────────
 
 
 async def _workspace_do_alvo(
     db: AsyncSession, args: Any, workspace_ids: Any = None
 ) -> Optional[str]:
-    """O workspace do fluxo alvo, quando os argumentos carregam um `workflow_id`.
+    """The target workflow's workspace, when the arguments carry a `workflow_id`.
 
-    So resolve o que esta DENTRO do alcance do ator (`workspace_ids`) e nao foi
-    apagado. O `workflow_id` vem dos argumentos guardados da confirmacao: sem o
-    recorte, um id de outro workspace fazia o `AuditEvent` aterrissar na trilha de
-    um workspace do qual a pessoa nao e membro — escrita cross-tenant, ainda que
-    so de auditoria. Sem casar, quem chama cai no workspace da conversa.
+    It only resolves what is WITHIN the actor's reach (`workspace_ids`) and was
+    not deleted. The `workflow_id` comes from the confirmation's stored arguments:
+    without the filter, an id from another workspace made the `AuditEvent` land on
+    the trail of a workspace the person is not a member of — a cross-tenant write,
+    even if only an audit one. With no match, the caller falls back to the
+    conversation's workspace.
     """
     ref = args.get("workflow_id") if isinstance(args, dict) else None
     if not ref:
@@ -324,19 +327,20 @@ async def registrar_acao_confirmada(
     workspace_padrao: Optional[str] = None,
     workspace_ids: Any = None,
 ) -> None:
-    """Grava um `AuditEvent` por acao decidida no cartao de confirmacao.
+    """Writes one `AuditEvent` per action decided on the confirmation card.
 
-    Sem isto, o unico registro do que o assistente escreveu era o transcrito em
-    `mensagens.blocos` — que a propria pessoa apaga com `DELETE
-    /assistente/conversas/{id}`. Um admin investigando arquivos do Drive sumidos nao
-    tinha por onde comecar. O rastro cobre justamente o que passa pelo portao: as
-    escritas em recurso que ja existia.
+    Without this, the only record of what the assistant wrote was the transcript
+    in `mensagens.blocos` — which the person themselves deletes with `DELETE
+    /assistente/conversas/{id}`. An admin investigating missing Drive files had
+    nowhere to start. The trail covers exactly what goes through the gate: the
+    writes to resources that already existed.
 
-    O workspace da linha e o do fluxo alvo, mas so quando ele esta no alcance do
-    ator (`workspace_ids`); senao, o da conversa. Ver `_workspace_do_alvo`.
+    The row's workspace is the target workflow's, but only when it is within the
+    actor's reach (`workspace_ids`); otherwise, the conversation's. See
+    `_workspace_do_alvo`.
 
-    Nunca levanta: auditoria nao pode derrubar uma acao que ja aconteceu — o
-    `logger.exception` e o sinal de que o rastro falhou.
+    Never raises: auditing must not bring down an action that has already
+    happened — the `logger.exception` is the signal that the trail failed.
     """
     try:
         workspace_id = (
@@ -361,9 +365,9 @@ async def registrar_acao_confirmada(
         await db.commit()
     except Exception:  # pragma: no cover - auditoria e best-effort
         logger.exception("Falha ao auditar a acao do assistente (conversa %s).", conversa_id)
-        # Desfaz o flush que falhou: sem isto a sessao fica em `PendingRollback` e
-        # derruba a proxima escrita — a auditoria e o ultimo elo, nao pode
-        # contaminar quem vem depois.
+        # Undoes the flush that failed: without this the session stays in
+        # `PendingRollback` and brings down the next write — auditing is the last
+        # link, it must not contaminate whoever comes after.
         with suppress(Exception):
             await db.rollback()
 
@@ -387,8 +391,8 @@ def _texto_do_tool_result(bloco: dict[str, Any]) -> tuple[str, bool]:
 async def _confirmacao_reaberta(
     redis, user_id: str, conversa_id: str, tool_use_id: str
 ) -> Optional[dict[str, Any]]:
-    """O quadro `confirmacao` de uma chamada AINDA PENDENTE — so quando a chave
-    do Redis existe. Uma chave sumida (decidida ou expirada) nao vira botao morto."""
+    """The `confirmacao` frame of a call STILL PENDING — only when the Redis key
+    exists. A vanished key (decided or expired) does not become a dead button."""
     guardado = await ler_confirmacao(redis, user_id, conversa_id, tool_use_id)
     if not guardado:
         return None
@@ -407,14 +411,15 @@ async def _confirmacao_reaberta(
 async def quadros_do_replay(
     db: AsyncSession, conversa_id: str, *, redis, user_id: str, tokens_total: int
 ) -> list[dict[str, Any]]:
-    """A conversa reconstruida nos MESMOS quadros do SSE.
+    """The conversation rebuilt in the SAME SSE frames.
 
-    Uma mensagem do usuario vira `usuario`; o texto e o raciocinio do assistente
-    viram `texto`/`pensando`; cada `tool_use` vira `ferramenta` (com os argumentos
-    RESUMIDOS) e, se ja teve resultado, `ferramenta_fim` mais os quadros da Home
-    (`fluxo`/`camada`) daquele resultado — pelo MESMO `quadros_extras` do laco. Um
-    `tool_use` ainda sem resultado que tenha confirmacao viva no Redis reabre o
-    `confirmacao`. `tool_result` nunca sai. Um `fim` fecha com o total de tokens.
+    A user message becomes `usuario`; the assistant's text and reasoning become
+    `texto`/`pensando`; each `tool_use` becomes `ferramenta` (with SUMMARIZED
+    arguments) and, if it already had a result, `ferramenta_fim` plus the Home
+    frames (`fluxo`/`camada`) of that result — through the SAME `quadros_extras`
+    as the loop. A `tool_use` still without a result that has a live confirmation
+    in Redis reopens the `confirmacao`. `tool_result` never goes out. A `fim`
+    closes with the token total.
     """
     rows = (
         await db.execute(
@@ -424,7 +429,7 @@ async def quadros_do_replay(
         )
     ).all()
 
-    # Mapa tool_use_id -> (texto, erro), colhido dos tool_results (que nao saem).
+    # Map tool_use_id -> (text, error), gathered from the tool_results (which do not go out).
     resultados: dict[str, tuple[str, bool]] = {}
     for _papel, blocos, _meta in rows:
         if isinstance(blocos, list):
@@ -435,8 +440,8 @@ async def quadros_do_replay(
     quadros: list[dict[str, Any]] = []
     for papel, blocos, meta in rows:
         if papel == "user":
-            # Texto da pessoa (ou a mensagem sintetica de confirmacao, com meta).
-            # Lista = tool_results, que NUNCA saem no replay.
+            # The person's text (or the synthetic confirmation message, with meta).
+            # List = tool_results, which NEVER go out in the replay.
             if isinstance(blocos, str):
                 dados: dict[str, Any] = {"texto": blocos}
                 if meta:

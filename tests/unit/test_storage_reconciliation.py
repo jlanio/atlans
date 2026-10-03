@@ -1,11 +1,11 @@
 """
-Testes do modulo app.core.storage_reconciliation.
+Tests for the app.core.storage_reconciliation module.
 
-Cobre os jobs de reconciliacao DB <-> MinIO que enderecam os bugs de
-tracking do /admin/storage:
+Covers the DB <-> MinIO reconciliation jobs that address the /admin/storage
+tracking bugs:
 - fix_artifact_null_sizes (Bug 1)
 - cleanup_pending_workspace_files (Bug 4)
-- abort_stale_multipart_uploads (Bug 4 — lado S3)
+- abort_stale_multipart_uploads (Bug 4 — S3 side)
 - compute_storage_drift (Bug 2)
 - count_orphaned_workspace_artifacts (Bug 5)
 - count_orphaned_pinned_artifacts (Bug 8)
@@ -27,7 +27,7 @@ class TestFixArtifactNullSizes:
     async def test_preenche_quando_head_retorna_size(self, mock_head):
         from app.core import storage_reconciliation as mod
 
-        # 2 artifacts com size_bytes NULL, head() retorna 1234 para ambos
+        # 2 artifacts with NULL size_bytes, head() returns 1234 for both
         art_a = MagicMock(s3_key="artifacts/ws-1/file-a.json", size_bytes=None)
         art_b = MagicMock(s3_key="artifacts/ws-2/file-b.json", size_bytes=None)
         mock_head.return_value = {"size": 1234, "etag": "x"}
@@ -50,7 +50,7 @@ class TestFixArtifactNullSizes:
     async def test_pula_s3_key_local_de_fallback_agent(self, mock_head):
         from app.core import storage_reconciliation as mod
 
-        # Path local do executor (fallback): nao tenta head no MinIO
+        # Executor's local path (fallback): does not try head on MinIO
         art = MagicMock(s3_key="/data/artifacts/ws/run/file.json", size_bytes=None)
 
         db = MagicMock()
@@ -64,13 +64,13 @@ class TestFixArtifactNullSizes:
         assert summary == {"checked": 1, "fixed": 0, "still_null": 1}
         mock_head.assert_not_called()
         assert art.size_bytes is None
-        # Sem fixes: nao commita
+        # No fixes: does not commit
         db.commit.assert_not_awaited()
 
     @pytest.mark.asyncio
     @patch("app.core.storage.head")
     async def test_continua_null_quando_head_retorna_none(self, mock_head):
-        """MinIO ainda nao tem o objeto — deixa NULL e tenta de novo no proximo ciclo."""
+        """MinIO does not have the object yet — leaves NULL and tries again next cycle."""
         from app.core import storage_reconciliation as mod
 
         art = MagicMock(s3_key="artifacts/ws/file.json", size_bytes=None)
@@ -90,7 +90,7 @@ class TestFixArtifactNullSizes:
     @pytest.mark.asyncio
     @patch("app.core.storage.head")
     async def test_exception_no_head_e_tratada_como_still_null(self, mock_head):
-        """Excecao no head() nao quebra o loop — fica still_null."""
+        """An exception in head() does not break the loop — it stays still_null."""
         from app.core import storage_reconciliation as mod
 
         art = MagicMock(s3_key="artifacts/ws/file.json", size_bytes=None)
@@ -123,7 +123,7 @@ class TestCleanupPendingWorkspaceFiles:
         # Multipart abandonado existe para wf_a
         mock_list_mp.side_effect = [
             iter([{"key": "drive/ws/a.geojson", "upload_id": "u1", "initiated": None}]),
-            iter([]),  # nada pendente para wf_b
+            iter([]),  # nothing pending for wf_b
         ]
         mock_abort.return_value = True
 
@@ -178,7 +178,7 @@ class TestAbortStaleMultipart:
                 result = await mod.abort_stale_multipart_uploads()
 
         assert result == {"scanned": 2, "aborted": 1}
-        # Apenas o antigo foi abortado
+        # Only the old one was aborted
         mock_abort.assert_called_once_with("drive/old.geojson", "u_old")
 
 
@@ -223,11 +223,11 @@ class TestAudit:
 
     @pytest.mark.asyncio
     async def test_count_orphaned_workspace_artifacts(self):
-        """Conta artefatos cujo workspace_id nao existe mais em `workspaces`.
+        """Counts artifacts whose workspace_id no longer exists in `workspaces`.
 
-        A versao anterior filtrava `workspace_id IS NULL` numa coluna NOT NULL:
-        media sempre 0 enquanto os orfaos reais (workspace deletado por hard
-        delete, sem cascade) apareciam no painel como "(sem workspace)".
+        The previous version filtered `workspace_id IS NULL` on a NOT NULL column:
+        it always measured 0 while the real orphans (workspace removed by hard
+        delete, without cascade) showed up in the panel as "(sem workspace)" (no workspace).
         """
         from app.core import storage_reconciliation as mod
 
@@ -238,8 +238,8 @@ class TestAudit:
 
         assert await mod.count_orphaned_workspace_artifacts(db) == 7
 
-        # A query tem de ser um LEFT JOIN em workspaces procurando o lado NULL,
-        # nunca um filtro por Artifact.workspace_id IS NULL.
+        # The query has to be a LEFT JOIN on workspaces looking for the NULL side,
+        # never a filter on Artifact.workspace_id IS NULL.
         sql = str(db.execute.await_args[0][0]).lower()
         assert "join" in sql and "workspaces" in sql
 
@@ -261,7 +261,7 @@ class TestRunFullReconciliation:
 
     @pytest.mark.asyncio
     async def test_continua_quando_um_job_falha(self):
-        """Falha de um sub-job nao impede os outros."""
+        """A failure of one sub-job does not prevent the others."""
         from app.core import storage_reconciliation as mod
 
         # Mock AsyncSessionLocal
@@ -278,10 +278,10 @@ class TestRunFullReconciliation:
                                 with patch.object(mod, "count_orphaned_pinned_artifacts", return_value=0):
                                     summary = await mod.run_full_reconciliation()
 
-        # fix_null falhou mas registrou
+        # fix_null failed but was recorded
         fix_mock.assert_awaited()
         assert "error" in summary["fix_null"]
-        # Os outros rodaram
+        # The others ran
         cleanup_mock.assert_awaited()
         abort_mock.assert_awaited()
         drift_mock.assert_awaited()

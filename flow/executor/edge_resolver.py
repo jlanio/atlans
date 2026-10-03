@@ -1,20 +1,20 @@
 # flow/executor/edge_resolver.py
 """
-Resolvedor único da aresta: dada UMA aresta e a saída do nó de origem, decide o
-que entra no nó destino.
+Single edge resolver: given ONE edge and the source node's output, decides
+what goes into the target node.
 
-Fonte ÚNICA da semântica da aresta. Antes essa lógica vivia duplicada em dois
-pontos de flow/executor/core.py — a montagem de input do run e a simulação de
-schema — que divergiam no caso "sem chaves" (run espalhava tudo; a simulação
-nomeava por parent_id). Centralizar aqui mata a divergência run × preview.
-Ver docs/specs/edge-data-contract.md (PR 1).
+The SINGLE source of edge semantics. This logic used to be duplicated in two
+places in flow/executor/core.py — the run's input assembly and the schema
+simulation — which diverged in the "no keys" case (the run spread everything; the
+simulation named by parent_id). Centralizing it here kills the run × preview divergence.
+See docs/specs/edge-data-contract.md (PR 1).
 
-Modos (strict — sem palpite cego):
-  - from_key presente → {to_key or from_key: valor} se a chave existe no output;
-    se NÃO existe, a aresta não contribui ({}) — nunca o "primeiro valor"
-    (que cruzava dados de balde errado no Switch e injetava None em merge).
-  - só to_key         → {to_key: 1º valor} (rename; pai vazio → não contribui)
-  - nenhum            → espalha todos os outputs do pai (dict inteiro)
+Modes (strict — no blind guessing):
+  - from_key present → {to_key or from_key: value} if the key exists in the output;
+    if it does NOT exist, the edge does not contribute ({}) — never the "first value"
+    (which crossed data from the wrong bucket in Switch and injected None into merges).
+  - only to_key       → {to_key: 1st value} (rename; empty parent → does not contribute)
+  - neither           → spreads all of the parent's outputs (whole dict)
 """
 from __future__ import annotations
 
@@ -24,8 +24,8 @@ from typing import Any, List, Mapping
 
 @dataclass(frozen=True)
 class Edge:
-    """Visão tipada de uma aresta. `condition` é o roteamento de ramo dos nós
-    de controle — ortogonal ao mapeamento de dado."""
+    """Typed view of an edge. `condition` is the branch routing of control
+    nodes — orthogonal to the data mapping."""
     source: str
     target: str
     from_key: str | None = None
@@ -39,8 +39,8 @@ class Edge:
     @classmethod
     def from_dict(cls, d: Mapping[str, Any]) -> "Edge":
         cond = d.get("condition")
-        # `or None` normaliza "" (falsy, tratado como ausente pelo run) para None,
-        # preservando a semântica de truthiness do código original.
+        # `or None` normalizes "" (falsy, treated as absent by the run) to None,
+        # preserving the truthiness semantics of the original code.
         return cls(
             source=d["source"],
             target=d["target"],
@@ -62,22 +62,22 @@ def resolve_edge_inputs(
     node_id: str | None = None,
     parent_id: str | None = None,
 ) -> dict:
-    """Entradas que ESTA aresta injeta no nó destino.
+    """Inputs that THIS edge injects into the target node.
 
-    Retorna sempre um dict — modo mapeado: {porta: valor}; modo spread: cópia
-    rasa da saída do pai. O chamador aplica com `inputs.update(resultado)`, o
-    que é idêntico ao `inputs[k] = v` / `inputs.update(parent_outputs)` de antes.
+    Always returns a dict — mapped mode: {port: value}; spread mode: a shallow
+    copy of the parent's output. The caller applies it with `inputs.update(resultado)`,
+    which is identical to the previous `inputs[k] = v` / `inputs.update(parent_outputs)`.
     """
     e = edge if isinstance(edge, Edge) else Edge.from_dict(edge)
 
     if e.from_key:
         if e.from_key in parent_outputs:
             return {e.to_key or e.from_key: parent_outputs[e.from_key]}
-        # from_key não está no output do pai. NÃO cai mais no "primeiro valor"
-        # (o palpite cego que fazia o Switch com balde vazio cruzar dados do
-        # balde errado — F5, e o pai skipado injetar None no merge — F14). A
-        # aresta simplesmente NÃO contribui. A sinalização de from_key defasado
-        # (typo) é papel da validação estática (`validate_service`), não do run.
+        # from_key is not in the parent's output. NO longer falls back to the "first value"
+        # (the blind guess that made a Switch with an empty bucket cross data from the
+        # wrong bucket — F5, and a skipped parent inject None into the merge — F14). The
+        # edge simply does NOT contribute. Flagging a stale from_key (typo) is the
+        # job of static validation (`validate_service`), not of the run.
         if logger is not None:
             logger.warning(
                 "[%s] from_key '%s' não encontrado no output de '%s' "
@@ -87,8 +87,8 @@ def resolve_edge_inputs(
         return {}
 
     if e.to_key:
-        # to_key sem from_key: rename do output do pai. Contrato de sub-fluxo
-        # (origem sem candidatos → nó multi-porta). Pai vazio → não contribui.
+        # to_key without from_key: rename of the parent's output. Sub-workflow contract
+        # (source with no candidates → multi-port node). Empty parent → does not contribute.
         return {e.to_key: _first_value(parent_outputs)} if parent_outputs else {}
 
     return dict(parent_outputs)
@@ -98,15 +98,15 @@ def resolve_edge_schema_inputs(
     edge: "Mapping[str, Any] | Edge",
     parent_fields: List[Mapping[str, Any]],
 ) -> dict:
-    """Espelho de `resolve_edge_inputs` no plano de SCHEMA (simulação/preview).
+    """Mirror of `resolve_edge_inputs` on the SCHEMA plane (simulation/preview).
 
-    `parent_fields`: lista de {name, type} da saída declarada/simulada do pai.
-    Devolve {porta: "<type>"} nas MESMAS portas que o run produziria — mesma
-    semântica strict, mantendo a paridade run × preview:
-      - from_key que É campo declarado → {porta: <tipo>};
-      - from_key que NÃO é campo declarado → a aresta não contribui ({}), igual
-        ao run que não encontra a chave no output. (A validação estática
-        sinaliza o from_key defasado a partir daqui.)
+    `parent_fields`: list of {name, type} of the parent's declared/simulated output.
+    Returns {port: "<type>"} on the SAME ports the run would produce — same
+    strict semantics, keeping run × preview parity:
+      - from_key that IS a declared field → {port: <type>};
+      - from_key that is NOT a declared field → the edge does not contribute ({}), just
+        like the run that does not find the key in the output. (Static validation
+        flags the stale from_key from here.)
     """
     e = edge if isinstance(edge, Edge) else Edge.from_dict(edge)
 

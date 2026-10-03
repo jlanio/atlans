@@ -1,17 +1,17 @@
 # app/core/async_scheduler.py
 """
-AsyncScheduler — substituto do Celery Beat.
+AsyncScheduler — replacement for Celery Beat.
 
-Loop asyncio que verifica schedules ativos no banco a cada DB_RELOAD_INTERVAL
-segundos e dispara WorkflowService.start_analysis() diretamente, sem workers externos.
+An asyncio loop that checks active schedules in the database every DB_RELOAD_INTERVAL
+seconds and calls WorkflowService.start_analysis() directly, with no external workers.
 
-Estratégias suportadas:
+Supported strategies:
   cron     — cron_expression "min hour day month dow" (via croniter)
   interval — interval + unit (seconds/minutes/hours/days)
   rrule    — rrule_expression RFC 5545 (via python-dateutil)
 
-Persistência de estado:
-  next_run_at e last_run_at são salvos na tabela schedules a cada disparo.
+State persistence:
+  next_run_at and last_run_at are saved to the schedules table on every trigger.
 """
 
 import asyncio
@@ -27,19 +27,19 @@ from app.models.models import Schedule, Workflow
 
 logger = get_logger(__name__)
 
-DB_RELOAD_INTERVAL = 30  # segundos entre verificações
-# Teto de schedules processados por tick. Sem ele o tick carregava TODOS os
-# vencidos de uma vez; com o LIMIT + order_by(next_run_at) o backlog é drenado
-# em lotes por ciclo, e o SKIP LOCKED do _process_schedule já impede que dois
-# workers colidam no mesmo lote.
+DB_RELOAD_INTERVAL = 30  # seconds between checks
+# Ceiling on schedules processed per tick. Without it the tick loaded ALL the
+# due ones at once; with the LIMIT + order_by(next_run_at) the backlog is drained
+# in batches per cycle, and the SKIP LOCKED in _process_schedule already keeps two
+# workers from colliding on the same batch.
 TICK_MAX_SCHEDULES = 200
 
 
 class AsyncScheduler:
     """
-    Gerencia agendamentos de workflows sem Celery Beat.
+    Manages workflow schedules without Celery Beat.
 
-    Uso (no lifespan da API):
+    Usage (in the API lifespan):
         scheduler = AsyncScheduler()
         await scheduler.start()
         ...
@@ -78,33 +78,33 @@ class AsyncScheduler:
             await asyncio.sleep(DB_RELOAD_INTERVAL)
 
     async def _tick(self) -> None:
-        """Verifica todos os schedules ativos e dispara os que estão devidos."""
+        """Checks every active schedule and triggers the ones that are due."""
         now = datetime.now(timezone.utc).replace(tzinfo=None)
 
         async with AsyncSessionLocal() as db:
-            # PERF: o corte por horário vai no SQL, não em Python. Antes o tick
-            # carregava TODOS os schedules ativos e descartava os não-vencidos
-            # em `_process_schedule` — depois de já ter aberto uma sessão e
-            # emitido um SELECT ... FOR UPDATE para cada um deles.
+            # PERF: the time cutoff happens in SQL, not in Python. Before, the tick
+            # loaded ALL active schedules and discarded the ones not yet due
+            # in `_process_schedule` — after having already opened a session and
+            # issued a SELECT ... FOR UPDATE for each one of them.
             #
-            # O índice de apoio já existia sem nunca ter sido usado:
-            # `ix_schedules_active_nextrun` em (active, next_run_at ASC), criado
-            # em 20260324_1400_add_performance_indexes.py com o comentário
+            # The supporting index already existed and had never been used:
+            # `ix_schedules_active_nextrun` on (active, next_run_at ASC), created
+            # in 20260324_1400_add_performance_indexes.py with the comment
             # "Scheduler poll a cada 30s: filtra active=true + next_run_at <= now()".
             #
-            # `next_run_at IS NULL` precisa entrar: a coluna é nullable e o
-            # próprio `_process_schedule` usa o NULL como sinal de "schedule
-            # novo, calcular a primeira execução". Filtrar só por `<= now`
-            # deixaria esses schedules parados para sempre.
+            # `next_run_at IS NULL` has to be included: the column is nullable and
+            # `_process_schedule` itself uses NULL as the signal for "new
+            # schedule, compute the first run". Filtering only by `<= now`
+            # would leave those schedules stuck forever.
             #
-            # O JOIN com Workflow é a trava final contra schedule órfão: um
-            # Schedule ativo apontando para workflow desativado (ou soft-deletado)
-            # fazia o tick pegar o lock, abrir sessão e chamar start_analysis só
-            # para colher WorkflowInactiveError — de novo a cada ocorrência do
-            # cron, para sempre. Os caminhos que produziam esse estado foram
-            # fechados (`sync_schedules_with_workflow_state`), mas o scheduler
-            # não deve depender disso: aqui ele simplesmente não enxerga
-            # agendamento de workflow que não pode executar.
+            # The JOIN with Workflow is the final lock against an orphan schedule: an
+            # active Schedule pointing to a deactivated (or soft-deleted) workflow
+            # made the tick take the lock, open a session and call start_analysis only
+            # to reap WorkflowInactiveError — again on every cron occurrence,
+            # forever. The paths that produced that state have been
+            # closed (`sync_schedules_with_workflow_state`), but the scheduler
+            # must not depend on that: here it simply does not see
+            # schedules of workflows that cannot run.
             result = await db.execute(
                 select(Schedule)
                 .join(Workflow, Workflow.id_hash == Schedule.workflow_hash)
@@ -117,10 +117,10 @@ class AsyncScheduler:
                         Schedule.next_run_at <= now,
                     ),
                 )
-                # Drena o backlog em lotes: schedule novo (next_run_at NULL) primeiro
-                # — para ter a primeira ocorrência calculada logo —, depois os mais
-                # atrasados. Sem o LIMIT o tick carregava TODOS os vencidos de uma
-                # vez, abrindo sessão e lock por cada um.
+                # Drains the backlog in batches: new schedules (next_run_at NULL) first
+                # — so their first occurrence gets computed right away —, then the most
+                # overdue. Without the LIMIT the tick loaded ALL the due ones at
+                # once, opening a session and a lock for each.
                 .order_by(Schedule.next_run_at.asc().nulls_first())
                 .limit(TICK_MAX_SCHEDULES)
             )
@@ -137,25 +137,25 @@ class AsyncScheduler:
 
     async def _process_schedule(self, sched: Schedule, now: datetime) -> None:
         async with AsyncSessionLocal() as db:
-            # SELECT FOR NO KEY UPDATE SKIP LOCKED — apenas um worker processa cada
-            # schedule. Se outro worker já travou esta linha, scalar_one_or_none()
-            # retorna None e esta instância simplesmente ignora (sem bloqueio nem
-            # duplicação).
+            # SELECT FOR NO KEY UPDATE SKIP LOCKED — only one worker processes each
+            # schedule. If another worker has already locked this row, scalar_one_or_none()
+            # returns None and this instance simply skips it (no blocking and no
+            # duplication).
             #
-            # `key_share=True` (→ FOR NO KEY UPDATE, não FOR UPDATE) é o que evita
-            # um AUTO-DEADLOCK invisível ao detector do Postgres: este SELECT abre
-            # uma transação e a mantém aberta enquanto `_fire_workflow` roda EM
-            # OUTRA sessão/conexão. Esse disparo insere um `WorkflowRun` com FK
-            # para `schedules.id` (schedule_id), e todo INSERT com FK pede um
-            # `FOR KEY SHARE` na linha referenciada. FOR UPDATE conflita com
-            # FOR KEY SHARE → a conexão do disparo bloqueia esperando a linha que
-            # ESTA transação segura, mas esta transação está `await`-ando o
-            # disparo terminar: trava mútua. Como a conexão de fora fica
-            # idle-in-transaction (não espera lock nenhum no nível do banco), o
-            # detector de deadlock do PG nunca a vê e o tick fica pendurado até o
-            # timeout. FOR NO KEY UPDATE NÃO conflita com FOR KEY SHARE — mantém a
-            # exclusividade de "um worker por schedule" (só bate em outro
-            # FOR/NO KEY/UPDATE) e deixa o INSERT do run passar.
+            # `key_share=True` (→ FOR NO KEY UPDATE, not FOR UPDATE) is what avoids
+            # a SELF-DEADLOCK invisible to the Postgres detector: this SELECT opens
+            # a transaction and keeps it open while `_fire_workflow` runs IN
+            # ANOTHER session/connection. That trigger inserts a `WorkflowRun` with an FK
+            # to `schedules.id` (schedule_id), and every INSERT with an FK requests a
+            # `FOR KEY SHARE` on the referenced row. FOR UPDATE conflicts with
+            # FOR KEY SHARE → the trigger's connection blocks waiting for the row that
+            # THIS transaction holds, but this transaction is `await`-ing the
+            # trigger to finish: mutual lock. Since the outer connection is
+            # idle-in-transaction (it waits on no lock at the database level), the
+            # PG deadlock detector never sees it and the tick hangs until the
+            # timeout. FOR NO KEY UPDATE does NOT conflict with FOR KEY SHARE — it keeps the
+            # "one worker per schedule" exclusivity (it only clashes with another
+            # FOR/NO KEY/UPDATE) and lets the run's INSERT through.
             result = await db.execute(
                 select(Schedule)
                 .where(Schedule.id == sched.id)
@@ -165,13 +165,13 @@ class AsyncScheduler:
             if s is None or not s.active:
                 return
 
-            # Inicializa next_run_at se não estiver definido
+            # Initializes next_run_at if it is not set
             if s.next_run_at is None:
                 s.next_run_at = self._compute_next(s, now)
                 await db.commit()
                 return
 
-            # Ainda não é hora
+            # Not time yet
             if now < s.next_run_at:
                 return
 
@@ -189,21 +189,21 @@ class AsyncScheduler:
                     s.workflow_hash, exc,
                 )
             finally:
-                # Atualiza timestamps e libera o lock (commit encerra a transação FOR UPDATE)
+                # Updates timestamps and releases the lock (commit ends the FOR UPDATE transaction)
                 s.last_run_at = now
                 s.next_run_at = self._compute_next(s, now)
                 await db.commit()
 
-    # ── Disparo de workflow ────────────────────────────────────────────────────
+    # ── Workflow triggering ────────────────────────────────────────────────────
 
     async def _fire_workflow(self, workflow_hash: str, *, schedule_id: int | None = None) -> None:
-        """Dispara start_analysis em sessão própria.
+        """Calls start_analysis in its own session.
 
-        Sem executor disponível (spec §7.4): a ocorrência NÃO some. Fica um
-        `WorkflowRun` `failed` no histórico, com a mensagem da política, e o
-        dono é avisado por transição (1ª falha da janela, lembrete a cada 6 h,
-        recuperação). Antes, a exceção era engolida pelo laço e só o
-        `next_run_at` avançava — um cron com o grupo (ou o pool) fora sumia.
+        No executor available (spec §7.4): the occurrence does NOT vanish. A
+        `failed` `WorkflowRun` stays in the history, with the policy's message, and the
+        owner is notified on transitions (1st failure of the window, reminder every 6 h,
+        recovery). Before, the exception was swallowed by the loop and only
+        `next_run_at` advanced — a cron whose group (or pool) was down vanished.
         """
         from app.core.exceptions import NoExecutorAvailableError
         from app.services import execution_alert_service
@@ -213,20 +213,20 @@ class AsyncScheduler:
             service = WorkflowService(db)
             wf = await service.get_workflow_by_hash(workflow_hash)
             try:
-                # Não há requisição HTTP nenhuma num disparo agendado: exigir o
-                # token do gatilho aqui levantaria 401 ("Request HTTP é necessário")
-                # em todo fluxo que combine agendamento com gatilho de webhook.
+                # There is no HTTP request at all in a scheduled trigger: requiring the
+                # trigger token here would raise 401 ("Request HTTP é necessário")
+                # in every workflow that combines a schedule with a webhook trigger.
                 await service.start_analysis(
                     workflow_hash, inputs={}, autenticar_entrada=False, workflow=wf,
-                    # Rótulo do run: antes o `schedule_id` só chegava ao banco
-                    # quando o agendamento FALHAVA; o caminho feliz ficava
-                    # indistinguível de um disparo manual no Histórico.
+                    # Run label: before, the `schedule_id` only reached the database
+                    # when the schedule FAILED; the happy path was
+                    # indistinguishable from a manual trigger in the History.
                     trigger_source="schedule", schedule_id=schedule_id,
                 )
             except NoExecutorAvailableError as exc:
-                # Se o dispatch já criou (e fechou) um run para esta ocorrência,
-                # ele é o registro — um segundo faria o histórico e o
-                # usage_daily contarem a mesma falha duas vezes.
+                # If the dispatch already created (and closed) a run for this occurrence,
+                # it is the record — a second one would make the history and
+                # usage_daily count the same failure twice.
                 if getattr(exc, "run_id", None) is None:
                     await self._registrar_falha_agendada(
                         db, wf, schedule_id,
@@ -243,14 +243,14 @@ class AsyncScheduler:
                         logger.warning("AsyncScheduler: falha ao alertar sobre '%s': %s", workflow_hash, alerta_exc)
                 raise
             except Exception as exc:
-                # Qualquer OUTRA falha do dispatch agendado (validação, erro de
-                # banco, timeout, ...): antes subia ao laço, só era logada, e o
-                # `finally` de `_process_schedule` avançava `next_run_at` — a
-                # ocorrência sumia sem run nem alerta. Materializa a mesma falha
-                # visível que o caminho sem-executor registra. `internal` é a
-                # única categoria legal (≤16 chars) para um erro genérico. O
-                # `getattr(run_id)` espelha o guard do sem-executor: se o dispatch
-                # já criou o run, não duplica.
+                # Any OTHER failure of the scheduled dispatch (validation, database
+                # error, timeout, ...): before, it bubbled up to the loop, was only logged, and the
+                # `finally` of `_process_schedule` advanced `next_run_at` — the
+                # occurrence vanished with no run and no alert. Materializes the same visible
+                # failure that the no-executor path records. `internal` is the
+                # only legal category (≤16 chars) for a generic error. The
+                # `getattr(run_id)` mirrors the no-executor guard: if the dispatch
+                # already created the run, it does not duplicate it.
                 if getattr(exc, "run_id", None) is None:
                     await self._registrar_falha_agendada(
                         db, wf, schedule_id,
@@ -275,14 +275,14 @@ class AsyncScheduler:
     async def _registrar_falha_agendada(
         self, db, wf, schedule_id, *, category: str, message: str,
     ) -> None:
-        """Materializa uma ocorrência agendada perdida como run `failed` visível.
+        """Materializes a missed scheduled occurrence as a visible `failed` run.
 
-        Um disparo agendado não tem quem veja a exceção (não há requisição HTTP):
-        sem esta linha, a falha não existiria em lugar nenhum — só um log e o
-        `next_run_at` avançando. Cobre a falta de executor (`no_executor`) e
-        qualquer outra falha do `start_analysis` (`internal`). Quando o
-        `_dispatch_job` já criou o run da ocorrência (`exc.run_id`), o chamador
-        NÃO passa por aqui, para não contar a mesma falha duas vezes."""
+        Nobody sees the exception of a scheduled trigger (there is no HTTP request):
+        without this row, the failure would exist nowhere — only a log line and
+        `next_run_at` advancing. Covers the lack of an executor (`no_executor`) and
+        any other `start_analysis` failure (`internal`). When
+        `_dispatch_job` has already created the occurrence's run (`exc.run_id`), the caller
+        does NOT come through here, so the same failure is not counted twice."""
         import uuid
         from datetime import datetime, timezone
 
@@ -315,28 +315,28 @@ class AsyncScheduler:
                 getattr(wf, "id_hash", "?"), reg_exc,
             )
 
-    # ── Cálculo de próxima execução ────────────────────────────────────────────
+    # ── Next run computation ───────────────────────────────────────────────────
 
     def _tz_of(self, sched: Schedule) -> tzinfo:
-        """Fuso configurado no schedule, com fallback para o padrão do produto.
+        """Timezone configured on the schedule, with a fallback to the product default.
 
-        O fallback era **UTC**, e isso não era uma escolha — era o default do
-        `datetime`. Só que todo o resto do produto opera em `America/…` (o nó
-        `ScheduleTrigger` e o schema mandam UTC−4), então um schedule de coluna
-        nula disparava QUATRO HORAS depois do que a tela dizia, sem nada que
-        explicasse a diferença. O caso mais visível: "0 9 * * *" na tela, e a
-        execução às 5h da manhã.
+        The fallback was **UTC**, and that was not a choice — it was the `datetime`
+        default. But the rest of the product operates in `America/…` (the
+        `ScheduleTrigger` node and the schema send UTC−4), so a schedule with a
+        null column fired FOUR HOURS later than the screen said, with nothing to
+        explain the difference. The most visible case: "0 9 * * *" on the screen, and the
+        run at 5 a.m.
 
-        A pergunta que este método responde é uma só — "não sei o fuso deste
-        agendamento; qual uso?" —, então as duas saídas dela (coluna vazia e
-        valor ilegível) dão na mesma constante. O caso ilegível continua
-        avisando no log, porque ali alguém digitou algo e merece saber que não
-        pegou.
+        This method answers a single question — "I don't know this
+        schedule's timezone; which one do I use?" —, so both of its outcomes (empty column and
+        unreadable value) lead to the same constant. The unreadable case still
+        warns in the log, because there someone typed something and deserves to know it
+        didn't take.
 
-        Mudar isto **não recria schedule nenhum**: o fallback não participa do
-        `_mesma_configuracao` (`app/core/scheduling/hooks.py`), que compara o
-        valor GRAVADO com o que o nó envia. Quem tem a coluna preenchida não
-        sente nada.
+        Changing this **recreates no schedule at all**: the fallback does not take part in
+        `_mesma_configuracao` (`app/core/scheduling/hooks.py`), which compares the
+        STORED value with what the node sends. Anyone with the column filled in
+        feels nothing.
         """
         name = (sched.timezone or "").strip()
         if not name:
@@ -354,7 +354,7 @@ class AsyncScheduler:
         if sched.strategy == "cron" and sched.cron_expression:
             return self._cron_next(sched.cron_expression, after, self._tz_of(sched))
         elif sched.strategy == "interval" and sched.interval and sched.unit:
-            # Intervalo e uma soma de delta — independe de fuso.
+            # Interval is a sum of deltas — independent of timezone.
             return self._interval_next(sched.interval, sched.unit, after)
         elif sched.strategy == "rrule" and sched.rrule_expression:
             return self._rrule_next(sched.rrule_expression, after, self._tz_of(sched))
@@ -366,7 +366,7 @@ class AsyncScheduler:
 
     @staticmethod
     def _to_local(after: datetime, tz: tzinfo) -> datetime:
-        """UTC naive (convencao interna do loop) -> aware no fuso do schedule."""
+        """Naive UTC (the loop's internal convention) -> aware in the schedule's timezone."""
         return after.replace(tzinfo=timezone.utc).astimezone(tz)
 
     @staticmethod
@@ -375,12 +375,12 @@ class AsyncScheduler:
         return moment.astimezone(timezone.utc).replace(tzinfo=None)
 
     def _cron_next(self, expression: str, after: datetime, tz: tzinfo) -> datetime | None:
-        """Proxima ocorrencia do cron NO FUSO DO SCHEDULE.
+        """Next cron occurrence IN THE SCHEDULE'S TIMEZONE.
 
-        O calculo era feito direto sobre `after` (UTC naive) e a coluna
-        `timezone` era gravada mas nunca lida: "0 13 * * *" disparava as 13h UTC,
-        ou seja, 9h em America/Cuiaba. Quem configurava o horario via UI nunca
-        via o workflow rodar na hora escolhida.
+        The computation was done directly on `after` (naive UTC) and the
+        `timezone` column was written but never read: "0 13 * * *" fired at 13:00 UTC,
+        that is, 9:00 in America/Cuiaba. Anyone who configured the time via the UI never
+        saw the workflow run at the chosen time.
         """
         try:
             from croniter import croniter
@@ -404,7 +404,7 @@ class AsyncScheduler:
         return after + timedelta(seconds=seconds)
 
     def _rrule_next(self, expression: str, after: datetime, tz: tzinfo) -> datetime | None:
-        """Mesma correção de fuso do cron — BYHOUR também é hora local."""
+        """Same timezone fix as cron — BYHOUR is also local time."""
         try:
             from dateutil.rrule import rrulestr
             after_local = self._to_local(after, tz)
@@ -416,5 +416,5 @@ class AsyncScheduler:
             return None
 
 
-# Singleton — importado pelo lifespan da API
+# Singleton — imported by the API lifespan
 scheduler = AsyncScheduler()

@@ -1,11 +1,11 @@
 # tests/unit/test_conclusao_publicada.py
-"""A conclusão de um run que o SERVIDOR fechou chega ao painel.
+"""The completion of a run that the SERVER closed reaches the panel.
 
-Quem fecha um run sem passar pelo job_result (cancelado antes de chegar ao
-executor, cancelado com o executor fora do ar, órfão, não entregue, perdido na
-reconciliação) não publicava o `__workflow_complete__`: o editor respondia
-"aguardando o executor interromper o job…" e esperava para sempre um evento
-que ninguém mandaria.
+Whoever closed a run without going through job_result (canceled before reaching
+the executor, canceled with the executor offline, orphaned, undelivered, lost in
+reconciliation) did not publish `__workflow_complete__`: the editor answered
+"aguardando o executor interromper o job…" (waiting for the executor to stop
+the job) and waited forever for an event nobody would send.
 """
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -63,8 +63,8 @@ def redis(monkeypatch):
 # ── O publicador ─────────────────────────────────────────────────────────────
 
 async def test_cancelado_sai_no_formato_do_job_result(redis):
-    """Mesmo formato que o job_result publica para um job cancelado: nível
-    `info`, sem taxonomia de erro — um cancelamento não é falha."""
+    """Same format that job_result publishes for a canceled job: level
+    `info`, no error taxonomy — a cancellation is not a failure."""
     await RES.publicar_conclusao(["run-1"], status="cancelled", mensagem="Cancelado antes.")
 
     [comandos] = redis.executados
@@ -73,8 +73,8 @@ async def test_cancelado_sai_no_formato_do_job_result(redis):
     assert comandos[1][2:] == (-MAX_EVENTOS_NO_HISTORICO, -1)
     assert comandos[2][2] == REDIS_TTL_1H
     assert comandos[3][1] == "workflow:run-1:events"
-    # O histórico e o canal recebem o MESMO evento: quem abre o painel depois
-    # reconstrói pelo histórico o que quem estava olhando viu ao vivo.
+    # The history and the channel receive the SAME event: whoever opens the panel
+    # later rebuilds from the history what whoever was watching saw live.
     assert comandos[0][2] == comandos[3][2]
 
     evento = json.loads(comandos[3][2])
@@ -97,8 +97,8 @@ async def test_falha_leva_nivel_de_erro_e_a_taxonomia(redis):
 
 
 async def test_centenas_de_runs_vao_em_blocos(redis):
-    """Um pipeline por bloco: um executor que cai com 201 runs não vira 804
-    idas ao Redis em série, nem um buffer de comandos sem teto."""
+    """One pipeline per batch: an executor that drops with 201 runs does not turn
+    into 804 sequential Redis round trips, nor a command buffer with no ceiling."""
     ids = [f"run-{i}" for i in range(RES._BLOCO_DE_PUBLICACAO + 1)]
 
     await RES.publicar_conclusao(ids, status="failed", mensagem="x")
@@ -115,7 +115,7 @@ async def test_lista_vazia_nao_toca_no_redis(monkeypatch):
 
 
 async def test_orfaos_publicam_falha_repetivel(monkeypatch):
-    """Nenhum run fechado pelo watchdog falhou pelo conteúdo: repetir é seguro."""
+    """No run closed by the watchdog failed because of its content: retrying is safe."""
     from contextlib import asynccontextmanager
 
     from app.api.routers.executor_ws import orfaos as ORF
@@ -146,7 +146,7 @@ async def test_orfaos_publicam_falha_repetivel(monkeypatch):
     )
 
 
-# ── Quem cancela publica ─────────────────────────────────────────────────────
+# ── Whoever cancels publishes ────────────────────────────────────────────────
 
 def _run(status):
     return WorkflowRun(
@@ -202,9 +202,9 @@ async def test_cancelar_com_o_executor_fora_do_ar_publica_a_conclusao():
 
 
 async def test_pedido_entregue_ao_executor_nao_publica():
-    """Quem fecha é o job_result do executor, que publica a conclusão real —
-    publicar aqui também seria um 'cancelado' antes da hora (o job pode terminar
-    no intervalo)."""
+    """The one that closes it is the executor's job_result, which publishes the
+    real completion — publishing here too would be a premature 'canceled' (the
+    job may finish in the meantime)."""
     outcome, publica = await _cancelar(_run("running"), entregue=True)
 
     assert outcome == "requested"
@@ -220,8 +220,8 @@ async def test_perder_a_corrida_para_o_resultado_nao_publica():
 
 
 async def test_redis_fora_nao_desfaz_o_cancelamento():
-    """Best-effort: o run já está fechado no banco; o painel o descobre ao
-    reabrir."""
+    """Best-effort: the run is already closed in the database; the panel finds
+    out when it reopens."""
     outcome, _ = await _cancelar(
         _run("running"), entregue=False, publica=AsyncMock(side_effect=ConnectionError("redis")),
     )
@@ -231,9 +231,9 @@ async def test_redis_fora_nao_desfaz_o_cancelamento():
 
 @pytest.mark.parametrize("presenca", [True, None])
 async def test_envio_que_falha_com_o_executor_vivo_nao_fecha_o_run(presenca):
-    """`send_json` também falha com o executor no ar (chave de assinatura
-    ausente, relay reiniciando, Redis com erro). Fechar o run nesses casos daria
-    "cancelado" com o job rodando — segue sendo 503, como antes."""
+    """`send_json` also fails with the executor online (signing key missing,
+    relay restarting, Redis erroring). Closing the run in those cases would
+    report "cancelado" with the job running — it stays a 503, as before."""
     from app.core.exceptions import NoExecutorAvailableError
 
     run = _run("running")

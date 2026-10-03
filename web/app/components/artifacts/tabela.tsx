@@ -17,11 +17,11 @@ import {
   FormatBadge, RetencaoHint, PortalAtivoBadge, PortalAnteriorBadge, CachePinBadge,
 } from "./badges"
 
-// ── Linha: artefato de execução ───────────────────────────────────────────────
+// ── Row: execution artifact ───────────────────────────────────────────────────
 
-// React.memo: a tabela chega a centenas de linhas e cada uma monta um Checkbox
-// do Radix (estado e contexto próprios). Sem isto, digitar na busca ou marcar
-// UMA linha re-renderizava todas as outras.
+// React.memo: the table reaches hundreds of rows and each one mounts a Radix
+// Checkbox (with its own state and context). Without this, typing in the search
+// or checking ONE row re-rendered all the others.
 const ExecutionRow = React.memo(function ExecutionRow({
   item, selected, onToggle,
 }: {
@@ -34,14 +34,14 @@ const ExecutionRow = React.memo(function ExecutionRow({
   async function handleDownload() {
     setDownloading(true)
     try {
-      // `getArtifactDownload` leva o JWT (Bearer) à plataforma e devolve a URL
-      // pré-assinada do MinIO — o caminho que respeita `item.protected`. Navegar
-      // até ela numa aba nova baixa pelo `Content-Disposition: attachment` que a
-      // assinatura já carrega, SEM puxar o arquivo inteiro para um blob em
-      // memória (o `revokeObjectURL` síncrono abortava downloads grandes no
-      // Firefox/Safari). Não usamos `window.open(getArtifactDownloadUrl)` do
-      // endpoint público: navegação de topo não leva o Bearer, e o artefato
-      // `protected` regrediria para 401.
+      // `getArtifactDownload` carries the JWT (Bearer) to the platform and returns the
+      // MinIO pre-signed URL — the path that respects `item.protected`. Navigating
+      // to it in a new tab downloads via the `Content-Disposition: attachment` the
+      // signature already carries, WITHOUT pulling the whole file into an
+      // in-memory blob (the synchronous `revokeObjectURL` aborted large downloads
+      // on Firefox/Safari). We do not use `window.open(getArtifactDownloadUrl)` of
+      // the public endpoint: top-level navigation does not carry the Bearer, and a
+      // `protected` artifact would regress to 401.
       const res = await GisFlowService.getArtifactDownload(item.id_hash)
       if (res.error) throw new Error(res.error.message ?? `HTTP ${res.status}`)
       const data = res.data
@@ -114,7 +114,7 @@ const ExecutionRow = React.memo(function ExecutionRow({
   )
 })
 
-// ── Linha: artefato de publicação ─────────────────────────────────────────────
+// ── Row: publication artifact ─────────────────────────────────────────────────
 
 const PublicationRow = React.memo(function PublicationRow({
   item, selected, onToggle,
@@ -161,7 +161,7 @@ const PublicationRow = React.memo(function PublicationRow({
   )
 })
 
-// ── Tabela reutilizável ────────────────────────────────────────────────────────
+// ── Reusable table ─────────────────────────────────────────────────────────────
 
 export const ArtifactTable = React.memo(function ArtifactTable({
   items, tab, selected, isOwner, onToggle, onToggleAll,
@@ -169,17 +169,18 @@ export const ArtifactTable = React.memo(function ArtifactTable({
   items: IArtifactItem[]; tab: ArtifactTab; selected: Set<string>
   isOwner: boolean; onToggle: (id: string) => void; onToggleAll: () => void
 }) {
-  // "Todos" é a página carregada, não a coleção inteira — a seleção pode conter
-  // ids de artefatos que já saíram da tela.
+  // "Todos" (all) is the loaded page, not the whole collection — the selection
+  // may contain ids of artifacts that have already left the screen.
   const marcadosAqui = items.filter(i => selected.has(i.id_hash)).length
   const allSelected  = items.length > 0 && marcadosAqui === items.length
   const someSelected = marcadosAqui > 0 && marcadosAqui < items.length
 
   return (
-    // Rolagem própria de `md` para cima: as colunas somam mais que a viewport
-    // e o body contém a rolagem lateral da página — sem isto as últimas
-    // ficariam inalcançáveis em vez de apenas fora de vista. No telefone não há
-    // rolagem porque não há colunas: a linha vira ficha (tabela-empilhada.ts).
+    // Own scrolling from `md` up: the columns add up to more than the viewport
+    // and the body contains the page's horizontal scroll — without this the last
+    // ones would be unreachable instead of merely out of view. On the phone there
+    // is no scrolling because there are no columns: the row becomes a card
+    // (tabela-empilhada.ts).
     <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
       <div className="overflow-x-auto">
         <table className="w-full text-left md:min-w-[640px]">

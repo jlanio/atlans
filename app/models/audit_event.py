@@ -1,6 +1,6 @@
 # app/models/audit_event.py
 """
-Modelo de eventos de auditoria para rastreamento de ações no sistema.
+Audit event model for tracking actions in the system.
 """
 from sqlalchemy import (
     Column, Integer, String, Text, DateTime, JSON, Index, func,
@@ -9,10 +9,10 @@ from app.models.base import Base
 
 
 class AuditEvent(Base):
-    """Registro de auditoria para ações relevantes no sistema."""
+    """Audit record for relevant actions in the system."""
     __tablename__ = "audit_events"
     __table_args__ = (
-        # PERF: índice ASC — PostgreSQL faz backward scan automático quando precisa de DESC.
+        # PERF: ASC index — PostgreSQL does a backward scan automatically when it needs DESC.
         Index("ix_audit_timestamp", "timestamp"),
     )
 

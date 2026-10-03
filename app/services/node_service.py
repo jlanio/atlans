@@ -11,17 +11,17 @@ from app.services.disabled_nodes_service import disabled_names
 
 @lru_cache(maxsize=1)
 def _catalogo_completo() -> List[tuple]:
-    """Catalogo montado UMA vez a partir do NODE_REGISTRY.
+    """Catalog built ONCE from NODE_REGISTRY.
 
-    `cls.description()` e literal/pura (ja chamada no import, em flow/registry.py)
-    e o NODE_REGISTRY nao muda em runtime — remontar os ~64 NodeDefinition e os
-    objetos Pydantic a CADA GET /nodes era trabalho repetido. O overlay de nos
-    desabilitados continua por request (em list_nodes); so o catalogo base, que
-    e o que custa, e cacheado.
+    `cls.description()` is literal/pure (already called at import, in flow/registry.py)
+    and NODE_REGISTRY does not change at runtime — rebuilding the ~64 NodeDefinitions and
+    the Pydantic objects on EVERY GET /nodes was repeated work. The overlay of disabled
+    nodes is still per request (in list_nodes); only the base catalog, which
+    is what costs, is cached.
 
-    Devolve pares (nome_no_registry, NodeDefinition): a chave e o nome do REGISTRY
-    — o mesmo que o filtro de desabilitados usa —, nao o `name` da description.
-    Testes que mexem no NODE_REGISTRY limpam este cache com
+    Returns (registry_name, NodeDefinition) pairs: the key is the REGISTRY name
+    — the same one the disabled filter uses —, not the description's `name`.
+    Tests that touch NODE_REGISTRY clear this cache with
     `_catalogo_completo.cache_clear()`.
     """
     catalogo: List[tuple] = []
@@ -53,11 +53,11 @@ def _catalogo_completo() -> List[tuple]:
         raw_inputs  = info.get('inputs',  []) or []
         inputs  = [NodePort(name=p['name'], type=p.get('type'), description=p.get('description')) for p in raw_inputs]
 
-        # Campos de saída — a fonte única e tipada do contrato (A13): lista
-        # plana com `type` e, quando o campo tem ponto de conexão próprio no
-        # canvas, `port=True`. Chaves internas do protocolo (__response__,
-        # __artifact__) não são saídas que uma aresta possa consumir: o
-        # executor as remove do que o nó entrega (core.py::_actual_keys).
+        # Output fields — the single, typed source of the contract (A13): a flat
+        # list with `type` and, when the field has its own connection point on the
+        # canvas, `port=True`. Internal protocol keys (__response__,
+        # __artifact__) are not outputs an edge can consume: the
+        # executor removes them from what the node delivers (core.py::_actual_keys).
         outputs = [
             NodeOutputField(
                 name=f['name'],
@@ -89,16 +89,16 @@ def _catalogo_completo() -> List[tuple]:
 
 class NodeService:
     """
-    Serviço para listar nodes registrados,
-    lendo suas properties da description().
+    Service to list registered nodes,
+    reading their properties from description().
 
-    Nodes desabilitados pelo admin (via /admin/nodes) sao filtrados aqui —
-    drawer do canvas nao os vê. A entidade canonica continua sendo
-    NODE_REGISTRY; o filtro e overlay via SystemConfig.disabled_nodes.
+    Nodes disabled by the admin (via /admin/nodes) are filtered out here —
+    the canvas drawer does not see them. The canonical entity is still
+    NODE_REGISTRY; the filter is an overlay via SystemConfig.disabled_nodes.
 
-    O catalogo base e montado uma vez (`_catalogo_completo`, cacheado); aqui
-    so aplicamos o overlay de desabilitados, que e leitura barata (ja cacheada
-    em disabled_nodes_service).
+    The base catalog is built once (`_catalogo_completo`, cached); here
+    we only apply the disabled overlay, which is a cheap read (already cached
+    in disabled_nodes_service).
     """
     async def list_nodes(self, db: AsyncSession) -> List[NodeDefinition]:
         disabled = await disabled_names(db)

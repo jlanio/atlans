@@ -1,39 +1,40 @@
 # executor/server_key.py
 """
-Resolução e PINNING da chave pública Ed25519 de assinatura do servidor.
+Resolution and PINNING of the server's Ed25519 public signing key.
 
-MOTIVAÇÃO (achado S8 da auditoria):
-Antes, quando `SERVER_SIGNING_PUBLIC_KEY` não estava no `.env` (o caso padrão —
-nem o enroll nem o setup a gravavam), o executor buscava a chave em
-`GET /executores/server-public-key` **a cada boot**, com `follow_redirects=True`
-e sem persistir nada. Isso torna a camada de assinatura de jobs decorativa: quem
-vencesse o canal em qualquer boot entregava a própria chave e passava a assinar
-jobs arbitrários — que o executor então executa com as credenciais do workspace.
-A assinatura não acrescentava nada sobre o TLS, e o comprometimento se repetia a
-cada reinício sem deixar rastro.
+MOTIVATION (audit finding S8):
+Before, when `SERVER_SIGNING_PUBLIC_KEY` was not in `.env` (the default case —
+neither enroll nor setup wrote it), the executor fetched the key from
+`GET /executores/server-public-key` **on every boot**, with
+`follow_redirects=True` and without persisting anything. That makes the job
+signing layer decorative: whoever won the channel on any boot delivered their
+own key and could then sign arbitrary jobs — which the executor then runs with
+the workspace's credentials. The signature added nothing on top of TLS, and
+the compromise repeated on every restart without leaving a trace.
 
-Ordem de precedência agora:
-  1. `SERVER_SIGNING_PUBLIC_KEY` no ambiente — override explícito do operador.
-  2. Arquivo fixado em `CERT_DIR/server_signing.pub` — gravado no enrollment
-     (sem janela de confiança nenhuma: chega junto do cert, dentro do mesmo
-     bundle autenticado pelo OTP) ou pelo TOFU do passo 3.
-  3. TOFU **uma única vez**: busca sobre mTLS com a CA interna já fixada, com
-     redirect desligado, e PERSISTE. Boots seguintes usam o arquivo do passo 2.
+Order of precedence now:
+  1. `SERVER_SIGNING_PUBLIC_KEY` in the environment — explicit operator override.
+  2. File pinned at `CERT_DIR/server_signing.pub` — written at enrollment
+     (with no trust window at all: it arrives together with the cert, inside
+     the same bundle authenticated by the OTP) or by the TOFU of step 3.
+  3. TOFU **only once**: fetch over mTLS with the internal CA already pinned,
+     with redirects off, and PERSIST. Subsequent boots use the file from step 2.
 
-A diferença que importa: no modelo antigo toda reinicialização era uma nova
-oportunidade de ataque; agora existe no máximo UMA janela, e apenas para
-executores enrolados antes desta mudança. Enrollments novos nunca a têm.
+The difference that matters: in the old model every restart was a new attack
+opportunity; now there is at most ONE window, and only for executors enrolled
+before this change. New enrollments never have it.
 
-Divergência (a chave do servidor mudou) é tratada como ERRO, não como
-atualização silenciosa: rotação de chave de assinatura exige ação do operador
-(re-enroll ou apagar o arquivo fixado conscientemente). Aceitar a chave nova
-automaticamente reabriria exatamente o buraco que o pinning fecha.
+A mismatch (the server key changed) is treated as an ERROR, not as a silent
+update: rotating the signing key requires operator action (re-enroll or
+deliberately deleting the pinned file). Accepting the new key automatically
+would reopen exactly the hole that pinning closes.
 
-E a divergência PARA O BOOT, não só o enroll: `pin_key` registra um marcador
-`server_signing.pub.conflict` e `resolve_server_signing_key` o transforma em
-ServerKeyError. Sem isso o executor subia com o pin obsoleto, conectava, pedia
-jobs e rejeitava 100% deles com "Assinatura Ed25519 inválida" — um modo de falha
-mudo, em que nada no boot menciona chave. Falhar no boot é ruidoso e acionável.
+And the mismatch STOPS THE BOOT, not just the enroll: `pin_key` records a
+`server_signing.pub.conflict` marker and `resolve_server_signing_key` turns it
+into ServerKeyError. Without that the executor started with the stale pin,
+connected, requested jobs and rejected 100% of them with "Assinatura Ed25519
+inválida" (invalid Ed25519 signature) — a silent failure mode, in which nothing
+at boot mentions the key. Failing at boot is loud and actionable.
 """
 from __future__ import annotations
 
@@ -48,16 +49,16 @@ SERVER_SIGNING_CONFLICT_FILE = "server_signing.pub.conflict"
 
 
 class ServerKeyError(RuntimeError):
-    """Falha ao estabelecer confiança na chave de assinatura do servidor."""
+    """Failure to establish trust in the server's signing key."""
 
 
 class ServerKeyPersistError(ServerKeyError):
-    """Não foi possível GRAVAR o pin — mas a chave em si é confiável.
+    """Could not WRITE the pin — but the key itself is trustworthy.
 
-    Subclasse de propósito: enroll/renewal já tratam ServerKeyError e continuam
-    logando o problema. Quem precisa distinguir é o boot, que pode seguir com a
-    chave em memória (ela veio por mTLS verificado) em vez de morrer por causa de
-    um diretório somente-leitura.
+    A subclass on purpose: enroll/renewal already handle ServerKeyError and keep
+    logging the problem. The one that needs to tell them apart is the boot,
+    which can carry on with the key in memory (it came over verified mTLS)
+    instead of dying because of a read-only directory.
     """
 
 
@@ -70,14 +71,14 @@ def conflict_marker_path(cert_dir: str | Path) -> Path:
 
 
 def load_pinned_key(cert_dir: str | Path) -> str | None:
-    """Lê a chave fixada. Devolve None APENAS quando não há pin nenhum.
+    """Reads the pinned key. Returns None ONLY when there is no pin at all.
 
-    Distinção importante: "arquivo ausente" e "arquivo presente mas ilegível/
-    vazio" NÃO podem ter o mesmo desfecho. Tratar os dois como None faria o
-    executor cair no TOFU da rede — ou seja, quem conseguisse corromper ou
-    truncar o arquivo (ou um erro de disco) rebaixaria a confiança fixada de
-    volta para "aceita a primeira resposta que chegar", que é exatamente o que o
-    pinning existe para impedir. Pin quebrado é ERRO, não ausência.
+    Important distinction: "file missing" and "file present but unreadable/
+    empty" must NOT have the same outcome. Treating both as None would make the
+    executor fall back to network TOFU — that is, anyone able to corrupt or
+    truncate the file (or a disk error) would downgrade the pinned trust back
+    to "accept the first response that arrives", which is exactly what
+    pinning exists to prevent. A broken pin is an ERROR, not an absence.
     """
     path = pinned_key_path(cert_dir)
     if not path.exists():
@@ -98,7 +99,7 @@ def load_pinned_key(cert_dir: str | Path) -> str | None:
 
 
 def _validate_key_b64(key_b64: str) -> None:
-    """Confirma que a string é mesmo uma chave pública Ed25519 (32 bytes raw)."""
+    """Confirms that the string really is an Ed25519 public key (32 raw bytes)."""
     import base64
 
     from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -133,8 +134,8 @@ def _divergence_message(path: Path, existing: str, key_b64: str, source: str) ->
 
 
 def _clear_conflict_marker(cert_dir: str | Path) -> None:
-    """Remove o marcador quando o pin volta a ser coerente. Sem isto o executor
-    ficaria travado para sempre depois de o operador já ter resolvido o caso."""
+    """Removes the marker when the pin is consistent again. Without this the executor
+    would stay stuck forever after the operator has already resolved the case."""
     marker = conflict_marker_path(cert_dir)
     try:
         marker.unlink(missing_ok=True)
@@ -143,15 +144,16 @@ def _clear_conflict_marker(cert_dir: str | Path) -> None:
 
 
 def pin_key(cert_dir: str | Path, key_b64: str, *, source: str) -> None:
-    """Fixa a chave em disco.
+    """Pins the key on disk.
 
-    Se já houver uma chave fixada DIFERENTE, grava um marcador de conflito e
-    levanta ServerKeyError em vez de sobrescrever — o marcador é o que faz o
-    boot seguinte PARAR (ver `resolve_server_signing_key`), em vez de carregar o
-    pin obsoleto em silêncio.
+    If there is already a DIFFERENT pinned key, writes a conflict marker and
+    raises ServerKeyError instead of overwriting — the marker is what makes the
+    next boot STOP (see `resolve_server_signing_key`), instead of silently
+    loading the stale pin.
 
-    Falha ao GRAVAR (dir somente-leitura, ENOSPC) vira ServerKeyPersistError, que
-    o boot pode degradar para uso em memória — a chave em si já é confiável.
+    A failure to WRITE (read-only dir, ENOSPC) becomes ServerKeyPersistError,
+    which the boot can degrade to in-memory use — the key itself is already
+    trustworthy.
     """
     key_b64 = (key_b64 or "").strip()
     if not key_b64:
@@ -165,14 +167,14 @@ def pin_key(cert_dir: str | Path, key_b64: str, *, source: str) -> None:
         raise ServerKeyError(_divergence_message(path, existing, key_b64, source))
     if existing == key_b64:
         _clear_conflict_marker(cert_dir)
-        return  # já fixada, nada a fazer
+        return  # already pinned, nothing to do
 
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(key_b64 + "\n", encoding="utf-8")
     except OSError as exc:
-        # Simétrico ao que `load_pinned_key` faz na leitura: erro de IO vira
-        # mensagem acionável, nunca traceback cru no meio do boot.
+        # Symmetric to what `load_pinned_key` does on read: an IO error becomes an
+        # actionable message, never a raw traceback in the middle of the boot.
         raise ServerKeyPersistError(
             f"Não foi possível fixar a chave de assinatura em '{path}': {exc}. "
             "Torne o diretório de certs gravável (o bind `:ro` do compose é a "
@@ -181,17 +183,17 @@ def pin_key(cert_dir: str | Path, key_b64: str, *, source: str) -> None:
     try:
         os.chmod(path, 0o600)
     except (OSError, NotImplementedError):
-        pass  # Windows: o ACL do NTFS já restringe
+        pass  # Windows: the NTFS ACL already restricts it
     _clear_conflict_marker(cert_dir)
     logger.info("Chave de assinatura do servidor fixada em '%s' (origem: %s).", path, source)
 
 
 def _record_conflict(cert_dir: str | Path, existing: str, key_b64: str, source: str) -> None:
-    """Persiste a divergência para o boot seguinte poder abortar com contexto.
+    """Persists the mismatch so the next boot can abort with context.
 
-    Best-effort: se nem o marcador puder ser escrito, o ServerKeyError da
-    divergência ainda é levantado — perder o marcador não pode mascarar o
-    conflito que acabou de ser detectado.
+    Best-effort: if not even the marker can be written, the mismatch's
+    ServerKeyError is still raised — losing the marker must not mask the
+    conflict that was just detected.
     """
     marker = conflict_marker_path(cert_dir)
     try:
@@ -206,18 +208,18 @@ def _record_conflict(cert_dir: str | Path, existing: str, key_b64: str, source: 
 
 
 async def resolve_server_signing_key(cert_dir: str | Path, server_url: str) -> str:
-    """Devolve a chave de assinatura a usar, fixando-a quando necessário.
+    """Returns the signing key to use, pinning it when necessary.
 
-    Levanta ServerKeyError quando não há como estabelecer confiança (incluindo o
-    caso de divergência registrada) — o caller deve abortar o boot. Rodar sem
-    chave confiável significa aceitar jobs de qualquer um que vença o canal.
+    Raises ServerKeyError when trust cannot be established (including the
+    recorded-mismatch case) — the caller must abort the boot. Running without
+    a trusted key means accepting jobs from anyone who wins the channel.
 
-    A única falha que NÃO aborta é a de persistência do pin: a chave já foi
-    obtida por mTLS, então vale mais seguir com ela em memória do que derrubar o
-    executor por causa de um volume somente-leitura.
+    The only failure that does NOT abort is pin persistence: the key was
+    already obtained over mTLS, so it is better to carry on with it in memory
+    than to bring the executor down because of a read-only volume.
     """
-    # 1. Override explícito do operador — é a ação consciente que resolve até um
-    #    conflito registrado, então vence inclusive o marcador (só avisa).
+    # 1. Explicit operator override — it is the deliberate action that resolves
+    #    even a recorded conflict, so it beats even the marker (only warns).
     env_key = (os.getenv("SERVER_SIGNING_PUBLIC_KEY") or "").strip()
     if env_key:
         _validate_key_b64(env_key)
@@ -234,14 +236,14 @@ async def resolve_server_signing_key(cert_dir: str | Path, server_url: str) -> s
     # 1.5. Conflito registrado por um enroll/renewal anterior.
     _assert_no_conflict(cert_dir)
 
-    # 2. Chave já fixada (enrollment ou TOFU anterior).
+    # 2. Key already pinned (enrollment or previous TOFU).
     pinned = load_pinned_key(cert_dir)
     if pinned:
         _validate_key_b64(pinned)
         logger.info("Chave de assinatura do servidor carregada do pin local.")
         return pinned
 
-    # 3. TOFU único, sobre mTLS, e persistido.
+    # 3. One-time TOFU, over mTLS, and persisted.
     logger.warning(
         "Nenhuma chave de assinatura fixada — buscando do servidor UMA VEZ e fixando "
         "em '%s'. Executores enrolados a partir de agora recebem a chave já no bundle "
@@ -252,10 +254,11 @@ async def resolve_server_signing_key(cert_dir: str | Path, server_url: str) -> s
     try:
         pin_key(cert_dir, fetched, source="GET /executores/server-public-key")
     except ServerKeyPersistError as exc:
-        # A chave veio por mTLS com a CA interna já fixada, então ela é confiável
-        # NESTA sessão. Matar o boot por causa de um diretório somente-leitura
-        # trocaria um risco de segurança por indisponibilidade total. O preço é
-        # que a janela de TOFU se repete a cada boot — daí o ERROR, não WARNING.
+        # The key came over mTLS with the internal CA already pinned, so it is
+        # trustworthy IN THIS session. Killing the boot because of a read-only
+        # directory would trade a security risk for total unavailability. The
+        # price is that the TOFU window repeats on every boot — hence ERROR,
+        # not WARNING.
         logger.error(
             "%s\nSeguindo com a chave APENAS EM MEMÓRIA nesta sessão: a janela de "
             "TOFU vai se repetir a cada reinício até o pin conseguir ser gravado.",
@@ -265,12 +268,12 @@ async def resolve_server_signing_key(cert_dir: str | Path, server_url: str) -> s
 
 
 def _assert_no_conflict(cert_dir: str | Path) -> None:
-    """Aborta o boot se um enroll/renewal anterior detectou troca de chave.
+    """Aborts the boot if a previous enroll/renewal detected a key change.
 
-    Este é o elo que faltava: `pin_key` só roda no enroll e no renewal, então
-    sem o marcador a divergência morria numa linha de log e o boot seguinte
-    carregava o pin obsoleto — rejeitando todo job por assinatura inválida, sem
-    nada no boot ligando a falha à chave.
+    This is the missing link: `pin_key` only runs on enroll and renewal, so
+    without the marker the mismatch died in a log line and the next boot
+    loaded the stale pin — rejecting every job for an invalid signature, with
+    nothing at boot tying the failure to the key.
     """
     marker = conflict_marker_path(cert_dir)
     if not marker.exists():
@@ -292,10 +295,10 @@ def _assert_no_conflict(cert_dir: str | Path) -> None:
 
 
 async def _fetch_server_key(server_url: str) -> str:
-    """Busca a chave em `/executores/server-public-key` sobre mTLS.
+    """Fetches the key from `/executores/server-public-key` over mTLS.
 
-    `follow_redirects=False` de propósito: seguir um redirect aqui permitiria a
-    um proxy hostil desviar a requisição para um host que devolve a chave dele.
+    `follow_redirects=False` on purpose: following a redirect here would let a
+    hostile proxy divert the request to a host that returns its own key.
     """
     import httpx
 

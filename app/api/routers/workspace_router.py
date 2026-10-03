@@ -1,7 +1,7 @@
 # app/api/routers/workspace_router.py
 """
-CRUD de Workspaces — isolamento multi-tenant de workflows.
-Inclui gerenciamento de membros (workspaces multi-usuário).
+Workspace CRUD — multi-tenant isolation of workflows.
+Includes member management (multi-user workspaces).
 """
 from app.core.utils.logger import get_logger
 from typing import List, Optional
@@ -72,10 +72,10 @@ _VALID_ROLES = {"viewer", "editor", "operator", "admin"}
 
 
 async def _get_owned_workspace(id_hash: str, db: AsyncSession, current_user: User) -> Workspace:
-    """Retorna workspace vivo que pertence ao usuário (owner), ou lança 403/404.
+    """Returns a live workspace owned by the user (owner), or raises 403/404.
 
-    Workspace na lixeira é invisível aqui — restaurar e purgar são ações de
-    admin, em /admin/workspaces.
+    A workspace in the trash is invisible here — restoring and purging are admin
+    actions, in /admin/workspaces.
     """
     result = await db.execute(
         select(Workspace).where(
@@ -92,7 +92,7 @@ async def _get_owned_workspace(id_hash: str, db: AsyncSession, current_user: Use
 
 
 async def _get_admin_managed_workspace(id_hash: str, db: AsyncSession, current_user: User) -> Workspace:
-    """Aceita owner OU membro com role admin — para convidar/remover membros e definir executor."""
+    """Accepts the owner OR a member with the admin role — to invite/remove members and set the executor."""
     result = await db.execute(
         select(Workspace).where(
             Workspace.id_hash == id_hash,
@@ -112,11 +112,11 @@ async def _get_admin_managed_workspace(id_hash: str, db: AsyncSession, current_u
 async def _get_visible_workspace(
     id_hash: str, db: AsyncSession, current_user: User,
 ) -> tuple[Workspace, str]:
-    """Workspace vivo + role efetivo do usuário. 404 se não existe, 403 se não é membro.
+    """Live workspace + the user's effective role. 404 if it does not exist, 403 if not a member.
 
-    Devolve a entidade, e não um `WorkspaceOut`, porque quem lista membros precisa
-    de `Workspace.owner_id` e `Workspace.created_at` para montar a linha do dono —
-    que não existe em `workspace_members`.
+    Returns the entity, and not a `WorkspaceOut`, because whoever lists members needs
+    `Workspace.owner_id` and `Workspace.created_at` to build the owner's row —
+    which does not exist in `workspace_members`.
     """
     result = await db.execute(
         select(Workspace).where(
@@ -159,7 +159,7 @@ async def list_workspaces(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Retorna workspaces criados pelo usuário + workspaces dos quais é membro."""
+    """Returns workspaces created by the user + workspaces they are a member of."""
     return await listar_workspaces_do_usuario(db, current_user.id_hash)
 
 
@@ -185,11 +185,11 @@ async def delete_workspace(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Move o workspace para a lixeira — a linha permanece, com `deleted_at`.
+    """Moves the workspace to the trash — the row remains, with `deleted_at`.
 
-    Os workflows caem junto (soft delete + schedules desativados). Restaurar e
-    descartar em definitivo são ações de admin, em /admin/workspaces — o dono
-    deleta, mas não desfaz.
+    The workflows go down with it (soft delete + schedules deactivated). Restoring and
+    discarding permanently are admin actions, in /admin/workspaces — the owner
+    deletes, but does not undo.
     """
     ws = await _get_owned_workspace(id_hash, db, current_user)
     if ws.is_default:
@@ -197,32 +197,32 @@ async def delete_workspace(
 
     deleted_at = utc_now_naive()
 
-    # ORDEM IMPORTA. `schedule_workspace_data_expiry` faz um commit interno
-    # (via purge_workspace_storage), entao tudo que precisa cair junto tem de
-    # estar sujo na sessao ANTES dela. Marcar o workspace por ultimo abria uma
-    # janela em que os workflows ja estavam soft-deletados e o workspace ainda
-    # vivo — estado que nao aparece na lixeira (o filtro e deleted_at IS NOT
-    # NULL) e que, portanto, nem o dono nem o admin conseguem desfazer pela UI.
+    # ORDER MATTERS. `schedule_workspace_data_expiry` does an internal commit
+    # (via purge_workspace_storage), so everything that has to go down together must
+    # be dirty in the session BEFORE it. Marking the workspace last opened a
+    # window in which the workflows were already soft-deleted and the workspace still
+    # alive — a state that does not show up in the trash (the filter is deleted_at IS NOT
+    # NULL) and that, therefore, neither the owner nor the admin can undo through the UI.
     ws.deleted_at = deleted_at
 
-    # Desativa os workflows junto. Um workflow cujo workspace sumiu continua
-    # sendo disparado pelo AsyncScheduler (que filtra so por Schedule.active) —
-    # invisivel na UI, rodando no pool default em vez do executor do workspace e
-    # sem a allowlist de webhook. Nenhum workflow sobrevive ao delete do seu
+    # Deactivates the workflows along with it. A workflow whose workspace vanished keeps
+    # being triggered by the AsyncScheduler (which filters only by Schedule.active) —
+    # invisible in the UI, running on the default pool instead of the workspace's executor and
+    # without the webhook allowlist. No workflow survives the deletion of its
     # workspace.
     #
-    # O timestamp e compartilhado com Workspace.deleted_at: e a marca que o
-    # restore usa para saber quais workflows cairam por causa deste delete.
+    # The timestamp is shared with Workspace.deleted_at: it is the mark the
+    # restore uses to know which workflows went down because of this delete.
     from app.services.workflow_service import soft_delete_workspace_workflows
     cascaded = await soft_delete_workspace_workflows(db, id_hash, deleted_at)
 
-    # Storage segue a politica de expiracao imediata: artefatos ganham
-    # expires_at=agora (removidos na proxima passada do purge_expired_artifacts,
-    # que trata MinIO, PortalLayer e retry de S3) e arquivos do Drive, que nao
-    # tem coluna de expiracao, saem na hora. Um restore devolve os workflows,
-    # NAO os arquivos ja purgados.
+    # Storage follows the immediate-expiration policy: artifacts get
+    # expires_at=now (removed on the next pass of purge_expired_artifacts,
+    # which handles MinIO, PortalLayer and S3 retry) and Drive files, which have
+    # no expiration column, go right away. A restore brings back the workflows,
+    # NOT the files already purged.
     #
-    # E aqui que a transacao acima e confirmada, no commit interno do helper.
+    # It is here that the transaction above is committed, in the helper's internal commit.
     from app.services.storage_purge_service import schedule_workspace_data_expiry
     scheduled = await schedule_workspace_data_expiry(db, id_hash)
 
@@ -243,24 +243,24 @@ def _build_member_list(
     ws_created_at,
     member_rows: List[tuple],
 ) -> List[MemberOut]:
-    """Monta a lista de membros com o dono na frente.
+    """Builds the member list with the owner first.
 
-    O dono NAO tem linha em `workspace_members` — `create_workspace` nunca cria
-    uma. Antes disso, quem criou o workspace simplesmente nao aparecia na propria
-    lista de membros, e um admin convidado nao tinha como descobrir com quem falar.
-    A linha do dono e sintetica: role "owner" (que nao esta em `_VALID_ROLES`, logo
-    nao e atribuivel) e `joined_at` = criacao do workspace, que e literalmente
-    quando ele entrou.
+    The owner does NOT have a row in `workspace_members` — `create_workspace` never
+    creates one. Before this, whoever created the workspace simply did not appear in
+    their own member list, and an invited admin had no way to find out whom to talk to.
+    The owner's row is synthetic: role "owner" (which is not in `_VALID_ROLES`, so
+    it is not assignable) and `joined_at` = the workspace's creation, which is literally
+    when they joined.
 
-    Se o dono TAMBEM tiver linha em `workspace_members` — possivel em dados
-    antigos, ja que ate agora nada impedia convidar o proprio dono por e-mail — a
-    linha sintetica vence e a real e descartada. Sem isso ele apareceria duas
-    vezes, com dois roles diferentes.
+    If the owner ALSO has a row in `workspace_members` — possible in old
+    data, since until now nothing prevented inviting the owner themselves by e-mail — the
+    synthetic row wins and the real one is discarded. Without this they would appear twice,
+    with two different roles.
     """
     members: List[MemberOut] = []
 
-    # `owner_id` e nullable e o usuario pode ter sido removido da plataforma;
-    # nos dois casos a lista sai so com os membros, sem uma linha vazia.
+    # `owner_id` is nullable and the user may have been removed from the platform;
+    # in both cases the list comes out with only the members, without an empty row.
     if owner_id and owner_user is not None:
         members.append(MemberOut(
             user_id=owner_id,
@@ -309,15 +309,15 @@ async def list_members(
 
 
 def _conferir_email_do_convidado(user: User, workspace_id: str) -> None:
-    """O convite é pelo e-mail: ele só vale se o e-mail é de quem tem a conta.
+    """The invitation is by e-mail: it is only valid if the e-mail belongs to the account holder.
 
-    Com EXIGIR_EMAIL_VERIFICADO (o padrão), a conta sem e-mail verificado nem
-    entra, e o convite espera a verificação. Sem a exigência, o cadastro aberto
-    deixa qualquer um criar a conta com o e-mail de outra pessoa — e o convite
-    entregaria o workspace a quem se cadastrou primeiro. Havendo transporte, a
-    pessoa consegue verificar (o link chega), então o convite espera por isso.
-    Sem transporte, nada na instalação prova o e-mail: o convite passa, e o
-    aviso fica no log (o risco está descrito no .env.example).
+    With EXIGIR_EMAIL_VERIFICADO (the default), an account without a verified e-mail does
+    not even get in, and the invitation waits for verification. Without the requirement,
+    open sign-up lets anyone create an account with another person's e-mail — and the
+    invitation would hand the workspace to whoever signed up first. If there is a transport,
+    the person can verify (the link arrives), so the invitation waits for that.
+    Without a transport, nothing in the installation proves the e-mail: the invitation goes
+    through, and the warning stays in the log (the risk is described in .env.example).
     """
     if user.email_verified or config.EXIGIR_EMAIL_VERIFICADO:
         return
@@ -343,25 +343,25 @@ async def invite_member(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Admin ou dono do workspace pode convidar membros."""
+    """The workspace admin or owner can invite members."""
     ws = await _get_admin_managed_workspace(id_hash, db, current_user)
 
     if payload.role not in _VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"Role inválido. Opções: {sorted(_VALID_ROLES)}")
 
-    # Busca usuário pelo e-mail
+    # Look up the user by e-mail
     result = await db.execute(select(User).where(User.email == payload.email))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=404, detail=f"Usuário com e-mail '{payload.email}' não encontrado.")
-    # Comparar com o dono, e nao com quem convida: um admin convidando o dono
-    # criava uma linha duplicada em `workspace_members` — e a mensagem antiga
-    # ("Você já é o dono deste workspace") ainda por cima acusava a pessoa errada.
+    # Compare against the owner, not against the inviter: an admin inviting the owner
+    # created a duplicate row in `workspace_members` — and the old message
+    # ("Você já é o dono deste workspace") on top of that accused the wrong person.
     if ws.owner_id and user.id_hash == ws.owner_id:
         raise HTTPException(status_code=400, detail="Este usuário já é o dono do workspace.")
     _conferir_email_do_convidado(user, id_hash)
 
-    # Verifica se já é membro
+    # Check whether already a member
     existing = await db.execute(
         select(WorkspaceMember).where(
             WorkspaceMember.workspace_id == id_hash,
@@ -382,7 +382,7 @@ async def invite_member(
     await db.refresh(member)
     logger.info("Membro adicionado ao workspace: workspace=%s user=%s role=%s", id_hash, user.id_hash, payload.role)
 
-    # Extrai atributos do ORM antes de sair da sessão (evita DetachedInstanceError)
+    # Extract attributes from the ORM before leaving the session (avoids DetachedInstanceError)
     invited_email = user.email
     invited_username = user.username
     ws_name = ws.name
@@ -426,9 +426,9 @@ async def update_member_role(
     if payload.role not in _VALID_ROLES:
         raise HTTPException(status_code=400, detail=f"Role inválido. Opções: {sorted(_VALID_ROLES)}")
 
-    # O dono agora aparece na lista de membros, entao a UI oferece a linha dele
-    # como qualquer outra. Sem esta guarda o PUT cairia no 404 generico abaixo
-    # ("Membro não encontrado"), que nao explica nada.
+    # The owner now appears in the member list, so the UI offers their row
+    # like any other. Without this guard the PUT would fall into the generic 404 below
+    # ("Membro não encontrado"), which explains nothing.
     if ws.owner_id and user_id == ws.owner_id:
         raise HTTPException(status_code=400, detail="O role do dono não pode ser alterado.")
 
@@ -465,7 +465,7 @@ async def remove_member(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Admin/dono pode remover qualquer membro. Membros podem sair por conta própria."""
+    """Admin/owner can remove any member. Members can leave on their own."""
     result = await db.execute(
         select(Workspace).where(
             Workspace.id_hash == id_hash,
@@ -476,17 +476,17 @@ async def remove_member(
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace não encontrado.")
 
-    # Uma guarda, dois casos: admin tentando remover o dono (que agora aparece na
-    # lista) e o proprio dono tentando "sair". Nenhum dos dois pode acontecer — o
-    # dono nao tem linha em `workspace_members`, entao sem isto ambos cairiam num
-    # 404 que parece bug. Sair do proprio workspace nao existe: excluir, sim.
+    # One guard, two cases: an admin trying to remove the owner (who now appears in the
+    # list) and the owner themselves trying to "leave". Neither can happen — the
+    # owner has no row in `workspace_members`, so without this both would fall into a
+    # 404 that looks like a bug. Leaving one's own workspace does not exist: deleting it does.
     if ws.owner_id and user_id == ws.owner_id:
         raise HTTPException(
             status_code=400,
             detail="O dono não pode sair do próprio workspace. Exclua o workspace em vez disso.",
         )
 
-    # Próprio usuário pode sair; admin+ pode remover outros membros
+    # The user can leave on their own; admin+ can remove other members
     if user_id != current_user.id_hash:
         await exigir_papel_no_workspace(
             db, id_hash, current_user.id_hash, ROLE_ADMIN,
@@ -504,9 +504,9 @@ async def remove_member(
         raise HTTPException(status_code=404, detail="Membro não encontrado.")
 
     await db.delete(member)
-    # Auditoria (SEG-98): as credenciais que o ex-membro compartilhou COM ESTE
-    # workspace deixam de valer aqui — senão continuavam sendo resolvidas no
-    # dispatch para quem ficou, mesmo sem o dono ter mais acesso ao workspace.
+    # Audit (SEG-98): the credentials the former member shared WITH THIS
+    # workspace stop being valid here — otherwise they kept being resolved at
+    # dispatch for those who stayed, even though their owner no longer had access to the workspace.
     from app.models.credential import Credential
     from sqlalchemy import update as _sa_update
     desvinc = await db.execute(
@@ -521,7 +521,7 @@ async def remove_member(
     )
 
 
-# ── Executor do workspace ────────────────────────────────────────────────────────
+# ── Workspace executor ───────────────────────────────────────────────────────────
 
 class WorkspaceAgentUpdate(BaseModel):
     target_executor_id: str | None = Field(None, description="id_hash do executor (null para usar o default)")
@@ -535,12 +535,12 @@ async def set_workspace_agent(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Define qual executor será usado para executar workflows deste workspace.
-    Workflows sem override específico herdarão este executor.
+    Sets which executor will be used to run this workspace's workflows.
+    Workflows without a specific override will inherit this executor.
     """
     ws = await _get_admin_managed_workspace(id_hash, db, current_user)
 
-    # Validar que o executor existe e está ativo
+    # Validate that the executor exists and is active
     if payload.target_executor_id:
         from app.models.executor import Executor
         ag_result = await db.execute(
@@ -555,14 +555,14 @@ async def set_workspace_agent(
         if ag.status != "active":
             raise HTTPException(status_code=400, detail=f"Executor '{ag.name}' não está ativo (status: {ag.status}).")
 
-        # Não-admin global só pode vincular executores a que tem acesso (pool padrão,
-        # atribuição direta ou executor de outro workspace seu). Impede apontar o
-        # workspace para o executor dedicado de outro usuário — o que faria o job
-        # (com credenciais injetadas) ser descriptografado no host alheio.
+        # A non-global-admin can only link executors they have access to (default pool,
+        # direct assignment or an executor of another of their workspaces). Prevents pointing the
+        # workspace at another user's dedicated executor — which would make the job
+        # (with injected credentials) be decrypted on someone else's host.
         if current_user.role != "admin":
-            # Auditoria SEG-13: usa a lista de VINCULÁVEIS (dono do workspace do
-            # executor), não a de exibição, para não deixar membro sem posse
-            # vincular executor dedicado alheio.
+            # Audit SEG-13: uses the LINKABLE list (owner of the executor's
+            # workspace), not the display one, so as not to let a member without ownership
+            # link someone else's dedicated executor.
             from app.services.user_executor_service import get_user_bindable_agents
             accessible = await get_user_bindable_agents(db, current_user.id_hash)
             if not any(a["id_hash"] == payload.target_executor_id for a in accessible):
@@ -570,16 +570,16 @@ async def set_workspace_agent(
 
     old_agent_id = ws.target_executor_id
     ws.target_executor_id = payload.target_executor_id
-    # Dual-write na política (spec §8, onda 2): o nível 1 passa a ser
-    # {executor} (ou é limpo). Enquanto EXECUTOR_POLICY_ROUTING=off é este
-    # ponteiro que vale; manter os dois iguais é o que faz a virada não mudar nada.
+    # Dual-write to the policy (spec §8, wave 2): tier 1 becomes
+    # {executor} (or is cleared). While EXECUTOR_POLICY_ROUTING=off it is this
+    # pointer that counts; keeping both equal is what makes the switchover change nothing.
     from app.services import workspace_executor_service as politica
     await politica.replace_primary(db, ws, payload.target_executor_id, actor_id=current_user.id_hash)
     await db.commit()
 
     # Notificar executores afetados
     from app.core.executor_connections import executor_registry
-    # Notificar executor anterior (se existia e é diferente do novo)
+    # Notify the previous executor (if there was one and it differs from the new one)
     if old_agent_id and old_agent_id != payload.target_executor_id:
         try:
             await executor_registry.send_json(old_agent_id, {
@@ -608,22 +608,22 @@ async def get_workspace_agent(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Retorna o executor configurado para o workspace.
+    """Returns the executor configured for the workspace.
 
-    Leitura liberada a qualquer membro — quem opera o workspace precisa saber
-    onde os jobs rodam. `_get_visible_workspace` é o mesmo gate de
-    `list_members`: sem ele, esta rota devolvia o `target_executor_id` de
-    qualquer workspace a qualquer conta autenticada, e ainda distinguia
-    "não existe" (404) de "existe e não é seu" (200) — um oráculo de enumeração
-    de id_hash de workspace.
+    Read open to any member — whoever operates the workspace needs to know
+    where the jobs run. `_get_visible_workspace` is the same gate as
+    `list_members`: without it, this route returned the `target_executor_id` of
+    any workspace to any authenticated account, and also distinguished
+    "does not exist" (404) from "exists and is not yours" (200) — an enumeration
+    oracle for workspace id_hash.
     """
     _ws, _role = await _get_visible_workspace(id_hash, db, current_user)
     return {"workspace_id": id_hash, "target_executor_id": _ws.target_executor_id}
 
 
-# ── Política de execução: níveis, terminal, saúde ─────────────────────────────
-# docs/specs/executor-isolation-routing.md §9. O piso (isolation_floor) é do
-# admin da plataforma e vive em admin_workspaces_router.
+# ── Execution policy: tiers, terminal, health ─────────────────────────────────
+# docs/specs/executor-isolation-routing.md §9. The floor (isolation_floor) belongs to
+# the platform admin and lives in admin_workspaces_router.
 
 class PolicyMemberOut(BaseModel):
     id_hash: str
@@ -631,7 +631,7 @@ class PolicyMemberOut(BaseModel):
     executor_type: str
     status: str
     tier: int
-    online: Optional[bool] = None       # None = presença desconhecida (Redis fora / reconectando)
+    online: Optional[bool] = None       # None = unknown presence (Redis down / reconnecting)
     capacity: Optional[dict] = None
 
 
@@ -651,7 +651,7 @@ class WorkspacePolicyOut(BaseModel):
     available_primary: int
     available_fallback: int
     pool: Optional[PoolHealthOut] = None
-    # A UI não pode prometer uma política que o roteamento ainda não lê.
+    # The UI cannot promise a policy that routing does not read yet.
     policy_routing_enabled: bool
     target_executor_id: Optional[str] = None
 
@@ -703,10 +703,10 @@ async def _policy_out(db: AsyncSession, ws: Workspace) -> WorkspacePolicyOut:
 
 
 async def _accessible_ids_for(db: AsyncSession, current_user: User) -> set[str] | None:
-    """Executores a que o usuário tem acesso; None = admin da plataforma (sem restrição)."""
+    """Executors the user has access to; None = platform admin (no restriction)."""
     if current_user.role == "admin":
         return None
-    # Auditoria SEG-13: escrita de vínculo usa a lista de VINCULÁVEIS.
+    # Audit SEG-13: writing a link uses the LINKABLE list.
     from app.services.user_executor_service import get_user_bindable_agents
     return {a["id_hash"] for a in await get_user_bindable_agents(db, current_user.id_hash)}
 
@@ -774,7 +774,7 @@ async def set_workspace_fallback(
     return await _policy_out(db, ws)
 
 
-# ── Allowlist de notificações ─────────────────────────────────────────────────
+# ── Notification allowlist ────────────────────────────────────────────────────
 
 class NotificationAllowlistUpdate(BaseModel):
     allowlist: List[str] = Field(default_factory=list)
@@ -794,10 +794,10 @@ class WorkspaceNotificationsOut(BaseModel):
 
 
 def _normalize_allowlist(raw: List[str]) -> List[str]:
-    """Normaliza e valida padroes de hostname. Lanca 400 no que o matcher ignoraria.
+    """Normalizes and validates hostname patterns. Raises 400 on what the matcher would ignore.
 
-    A regra mora em `app.core.utils.allowlist.validar_allowlist`, compartilhada
-    com a whitelist global de webhooks do admin.
+    The rule lives in `app.core.utils.allowlist.validar_allowlist`, shared
+    with the admin's global webhook whitelist.
     """
     from app.core.utils.allowlist import validar_allowlist
 
@@ -808,13 +808,13 @@ def _normalize_allowlist(raw: List[str]) -> List[str]:
 
 
 async def _notification_targets(db: AsyncSession, id_hash: str, allowlist: List[str]) -> List[NotificationTargetOut]:
-    """Workflows do workspace que enviam webhook, marcando quais a allowlist barra.
+    """The workspace's workflows that send webhooks, marking which ones the allowlist blocks.
 
-    Usa `hostname_matches_allowlist` — a MESMA funcao que o consumer chama ao
-    disparar a notificacao. Reimplementar aqui faria a tela prometer um resultado
-    diferente do que acontece na execucao. Esta tela trata só da allowlist DO
-    WORKSPACE; a whitelist global do admin (Configurações) também vale no
-    disparo, e é mostrada e editada lá.
+    Uses `hostname_matches_allowlist` — the SAME function the consumer calls when
+    firing the notification. Reimplementing it here would make the screen promise a result
+    different from what happens at run time. This screen covers only the WORKSPACE
+    allowlist; the admin's global whitelist (Settings) also applies at
+    trigger time, and is shown and edited there.
     """
     from urllib.parse import urlparse
     from app.core.utils.allowlist import hostname_matches_allowlist
@@ -842,8 +842,8 @@ async def _notification_targets(db: AsyncSession, id_hash: str, allowlist: List[
             name=name,
             notification_url=url,
             host=host,
-            # Lista vazia = sem politica adicional: tudo que passa no SSRF check
-            # e aceito. Espelha o `if allowlist:` do consumer.
+            # Empty list = no additional policy: everything that passes the SSRF check
+            # is accepted. Mirrors the consumer's `if allowlist:`.
             allowed=True if not allowlist else hostname_matches_allowlist(host, allowlist),
         ))
     return targets
@@ -859,8 +859,8 @@ async def get_workspace_notifications(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """Leitura liberada a qualquer membro: saber POR QUE um webhook não chegou é
-    útil para quem opera o workflow, não só para quem administra o workspace."""
+    """Read open to any member: knowing WHY a webhook did not arrive is
+    useful for whoever operates the workflow, not only for whoever administers the workspace."""
     ws, _ = await _get_visible_workspace(id_hash, db, current_user)
     allowlist = ws.notification_url_allowlist or []
     return WorkspaceNotificationsOut(
@@ -884,14 +884,14 @@ async def update_workspace_notifications(
     normalized = _normalize_allowlist(payload.allowlist)
 
     previous = ws.notification_url_allowlist or []
-    # Lista vazia grava NULL. O consumer trata `None` e `[]` igual (`or []` +
-    # `if allowlist:`), e manter dois valores para o mesmo estado so faria a
-    # coluna mentir sobre existir uma politica.
+    # An empty list is saved as NULL. The consumer treats `None` and `[]` the same (`or []` +
+    # `if allowlist:`), and keeping two values for the same state would only make the
+    # column lie about a policy existing.
     ws.notification_url_allowlist = normalized or None
     await db.commit()
 
-    # E configuracao de seguranca: sem este log, o warning de "webhook bloqueado"
-    # no consumer aparece sem nenhuma pista de quem apertou o parafuso.
+    # This is security configuration: without this log, the "webhook blocked" warning
+    # in the consumer shows up with no clue as to who tightened the screw.
     logger.info(
         "Allowlist de notificação alterada: workspace=%s por=%s de=%s para=%s",
         id_hash, current_user.id_hash, previous, normalized,
@@ -903,7 +903,7 @@ async def update_workspace_notifications(
     )
 
 
-# ── Busca de usuários por e-mail (para convidar membros) ───────────────────────
+# ── User search by e-mail (to invite members) ─────────────────────────────────
 
 @router.get("/users/search", response_model=List[UserSearchOut], summary="Buscar usuário por e-mail")
 async def search_users(
@@ -912,13 +912,13 @@ async def search_users(
     current_user: User = Depends(get_current_user),
 ):
     """
-    Resolve UM usuário ativo pelo e-mail EXATO, para convidar como membro.
+    Resolves ONE active user by EXACT e-mail, to invite as a member.
 
-    Auditoria (SEG-06): a busca por substring (ILIKE) sem escopo permitia
-    coletar os e-mails de toda a base — o termo "___" já casava qualquer conta,
-    e a rota não confere se quem busca administra algum workspace (todo cadastro
-    cria um). Igualdade exata devolve no máximo o usuário digitado (ou nada), o
-    que é o necessário para convidar e remove a enumeração em massa.
+    Audit (SEG-06): the unscoped substring search (ILIKE) allowed
+    harvesting the e-mails of the entire user base — the term "___" already matched any
+    account, and the route does not check whether the searcher administers any workspace
+    (every sign-up creates one). Exact equality returns at most the typed user (or nothing),
+    which is what is needed to invite and removes mass enumeration.
     """
     alvo = email.strip().lower()
     result = await db.execute(

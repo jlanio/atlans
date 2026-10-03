@@ -1,36 +1,37 @@
 // desktop/src/main/state/store.ts
 //
-// Estado vivo mantido pelo main process.
+// Live state kept by the main process.
 //
-// Existe porque a janela pode ser fechada e reaberta a qualquer momento (o app
-// vive no tray), e o executor continua rodando o tempo todo. Sem este cache,
-// uma janela reaberta ficaria em branco ate o proximo tick, e o historico de
-// jobs e as linhas de log ja emitidos estariam perdidos para sempre.
+// It exists because the window can be closed and reopened at any moment (the
+// app lives in the tray), and the executor keeps running the whole time.
+// Without this cache, a reopened window would stay blank until the next tick,
+// and the job history and log lines already emitted would be lost forever.
 //
-// Tudo aqui e limitado: um app que fica dias aberto nao pode crescer sem teto.
+// Everything here is bounded: an app that stays open for days cannot grow
+// without a ceiling.
 //
-// ── Dois canais, e por que ────────────────────────────────────────────────────
+// ── Two channels, and why ─────────────────────────────────────────────────────
 //
-// O log NAO faz parte de `EstadoApp`. A versao anterior o carregava junto, e o
-// custo era desproporcional:
+// The log is NOT part of `EstadoApp`. The previous version carried it along,
+// and the cost was disproportionate:
 //
-//   - `notificar()` entrega o estado inteiro a cada ouvinte, e `difundir` faz
-//     `webContents.send`, que serializa tudo por structured clone POR JANELA.
-//     Com 1000 linhas de log dentro, cada broadcast custava ~150-200 KB.
-//   - `registrarLinhaBruta` notificava POR LINHA. Um workflow que imprime 100
-//     linhas gerava 100 broadcasts de 1000 linhas cada, mais 100 copias do
-//     array inteiro (`[...log, linha]`) — quadratico no volume de log, e
-//     exatamente quando o executor esta mais ocupado.
+//   - `notificar()` delivers the whole state to every listener, and `difundir`
+//     does `webContents.send`, which serializes everything by structured clone
+//     PER WINDOW. With 1000 log lines inside, each broadcast cost ~150-200 KB.
+//   - `registrarLinhaBruta` notified PER LINE. A workflow that prints 100
+//     lines generated 100 broadcasts of 1000 lines each, plus 100 copies of
+//     the whole array (`[...log, linha]`) — quadratic in log volume, and
+//     exactly when the executor is busiest.
 //
-// Agora sao dois fluxos com naturezas diferentes:
+// Now there are two flows of different natures:
 //
-//   ESTADO   pequeno, muda por completo, entregue COALESCIDO (ver JANELA_MS).
-//   LOG      append-only, entregue INCREMENTAL — so as linhas novas, com um
-//            numero de sequencia para o outro lado saber se perdeu alguma.
+//   ESTADO   small, changes wholesale, delivered COALESCED (see JANELA_MS).
+//   LOG      append-only, delivered INCREMENTALLY — only the new lines, with a
+//            sequence number so the other side knows whether it missed any.
 //
-// O `seq` tambem resolve um problema do renderer: e uma chave estavel para as
-// linhas na lista. Com indice de array, aparar o inicio do buffer desloca todos
-// os indices e invalida qualquer memoizacao de linha.
+// `seq` also solves a renderer problem: it is a stable key for the lines in
+// the list. With an array index, trimming the start of the buffer shifts every
+// index and invalidates any per-line memoization.
 import type {
   ExecutorEvent, HelloEvent, JobEvent, Phase, Snapshot,
 } from '../../shared/events.js'
@@ -40,33 +41,34 @@ const MAX_JOBS = 200
 const MAX_LOG = 1000
 
 /**
- * Janela de coalescencia dos broadcasts de estado, em ms.
+ * Coalescing window for state broadcasts, in ms.
  *
- * Curta o bastante para ser imperceptivel (um clique em "Parar" leva mais que
- * isso para virar evento) e longa o bastante para colapsar a rajada de eventos
- * que chega quando um workflow comeca.
+ * Short enough to be imperceptible (a click on "Parar" takes longer than that
+ * to become an event) and long enough to collapse the burst of events that
+ * arrives when a workflow starts.
  */
 const JANELA_MS = 80
 
 export interface LinhaLog {
-  /** Monotonico e global. Chave estavel da linha e cursor do canal incremental. */
+  /** Monotonic and global. Stable key of the line and cursor of the incremental channel. */
   seq: number
   ts: number
   level: string
   alias: string
   msg: string
-  /** Linha bruta que nao veio do canal estruturado (stderr, ou print de um no). */
+  /** Raw line that did not come from the structured channel (stderr, or a node's print). */
   bruta?: boolean
 }
 
-/** Lote entregue pelo canal de log. */
+/** Batch delivered by the log channel. */
 export interface LoteLog {
   linhas: LinhaLog[]
   /**
-   * `seq` da linha mais antiga ainda no buffer do main.
+   * `seq` of the oldest line still in main's buffer.
    *
-   * O renderer usa para detectar que ficou para tras (janela recem-aberta,
-   * rajada maior que o buffer) e recarregar tudo em vez de emendar um buraco.
+   * The renderer uses it to detect that it fell behind (freshly opened window,
+   * burst larger than the buffer) and reload everything instead of patching
+   * over a gap.
    */
   primeiroSeq: number
 }
@@ -91,11 +93,12 @@ export interface EstadoApp {
   snapshot: Snapshot | null
   jobs: JobHistorico[]
   /**
-   * Quantos ERROR ha no buffer de log.
+   * How many ERRORs are in the log buffer.
    *
-   * Vem junto do estado porque a sidebar e a barra de status mostram o
-   * contador, e faze-las depender do log inteiro traria de volta exatamente o
-   * peso que este desenho tirou. Mantido incrementalmente, sem varrer nada.
+   * It comes with the state because the sidebar and the status bar show the
+   * counter, and making them depend on the whole log would bring back exactly
+   * the weight this design removed. Maintained incrementally, without scanning
+   * anything.
    */
   errosNoLog: number
 }
@@ -128,11 +131,11 @@ export class AppStore {
 
   instantaneo(): EstadoApp { return this.estado }
 
-  /** Buffer completo. Usado por uma janela que acabou de abrir. */
+  /** Full buffer. Used by a window that has just opened. */
   logCompleto(): LoteLog {
-    // Cópia: o IPC serializa este objeto num microtask posterior, e devolver o
-    // array vivo apostaria que nada o mutou nesse intervalo. Custa um slice de
-    // 1000 elementos uma vez por janela aberta.
+    // A copy: IPC serializes this object in a later microtask, and returning the
+    // live array would bet that nothing mutated it in that interval. It costs
+    // a slice of 1000 elements once per opened window.
     return { linhas: this.log.slice(), primeiroSeq: this.log[0]?.seq ?? this.proximoSeq }
   }
 
@@ -149,11 +152,12 @@ export class AppStore {
   // ── Entrega ────────────────────────────────────────────────────────────────
 
   /**
-   * Marca que ha o que entregar e agenda o flush.
+   * Marks that there is something to deliver and schedules the flush.
    *
-   * Agendar em vez de entregar na hora e o que colapsa a rajada. O timer NAO e
-   * reiniciado a cada chamada (isso seria debounce, e num executor falante o
-   * flush nunca aconteceria): a janela e fixa a partir da primeira mudanca.
+   * Scheduling instead of delivering immediately is what collapses the burst.
+   * The timer is NOT restarted on each call (that would be debounce, and on a
+   * chatty executor the flush would never happen): the window is fixed from
+   * the first change.
    */
   private agendar(): void {
     if (this.timer) return
@@ -167,7 +171,7 @@ export class AppStore {
     if (this.estadoSujo) {
       this.estadoSujo = false
       for (const fn of this.ouvintes) {
-        try { fn(this.estado) } catch { /* um ouvinte quebrado nao derruba os outros */ }
+        try { fn(this.estado) } catch { /* a broken listener does not take down the others */ }
       }
     }
     if (this.pendentes.length > 0) {
@@ -183,10 +187,10 @@ export class AppStore {
   }
 
   /**
-   * Entrega agora o que estiver pendente.
+   * Delivers whatever is pending now.
    *
-   * Existe para o encerramento: um `state: failed` no ultimo instante de vida
-   * do processo nao pode ficar preso num timer que nunca vai disparar.
+   * Exists for shutdown: a `state: failed` in the last instant of the
+   * process's life must not get stuck in a timer that will never fire.
    */
   descarregar(): void {
     if (this.timer) {
@@ -200,8 +204,8 @@ export class AppStore {
 
   aplicarEstadoSupervisor(estado: EstadoSupervisor, detalhe?: string): void {
     this.estado = { ...this.estado, supervisor: estado, detalheSupervisor: detalhe ?? null }
-    // Um executor parado nao tem snapshot valido; manter o ultimo faria a UI
-    // mostrar "conectado" com o processo morto.
+    // A stopped executor has no valid snapshot; keeping the last one would make
+    // the UI show "connected" with the process dead.
     if (estado === 'stopped' || estado === 'failed') {
       this.estado.snapshot = null
       this.estado.fase = estado === 'failed' ? 'failed' : null
@@ -235,11 +239,12 @@ export class AppStore {
           alias: evt.data.alias, msg: evt.data.msg,
         })
         this.agendar()
-        return   // log nao suja o estado; `errosNoLog` cuida do que ele afeta
+        return   // log does not dirty the state; `errosNoLog` handles what it affects
       default:
-        // ack, sync, conn e warn nao mudam o estado agregado, e nao ha mais
-        // stream cru para o renderer: o que a UI mostra desses eventos ja vem
-        // pelo snapshot (conn_state, contadores de sync) ou pelo log.
+        // ack, sync, conn and warn do not change the aggregate state, and there is
+        // no raw stream to the renderer anymore: what the UI shows of these
+        // events already comes via the snapshot (conn_state, sync counters) or
+        // via the log.
         return
     }
     this.estadoSujo = true
@@ -250,9 +255,10 @@ export class AppStore {
     this.registrarLog({
       seq: 0,
       ts: Date.now() / 1000,
-      // O log humano do stderr ja vem formatado com o nivel embutido; nao ha o
-      // que extrair sem parsear texto — que e exatamente o que este projeto
-      // evita. Fica marcado como bruto e a UI o mostra sem colorir por nivel.
+      // The human log from stderr already comes formatted with the level embedded;
+      // there is nothing to extract without parsing text — which is exactly
+      // what this project avoids. It is marked as raw and the UI shows it
+      // without coloring by level.
       level: 'RAW',
       alias: origem === 'stderr' ? 'LOG' : 'OUT',
       msg: texto,
@@ -281,9 +287,9 @@ export class AppStore {
   private registrarLog(linha: LinhaLog): void {
     linha.seq = this.proximoSeq++
 
-    // `push` e `shift`, e nao `[...log, linha]`: a copia do array inteiro a
-    // cada linha era metade do custo quadratico. Ninguem observa este array por
-    // identidade — o renderer recebe lotes, nao a referencia.
+    // `push` and `shift`, not `[...log, linha]`: copying the whole array on
+    // every line was half of the quadratic cost. Nobody observes this array by
+    // identity — the renderer receives batches, not the reference.
     this.log.push(linha)
     if (linha.level === 'ERROR') this.contarErro(+1)
     while (this.log.length > MAX_LOG) {
@@ -292,16 +298,16 @@ export class AppStore {
     }
 
     this.pendentes.push(linha)
-    // Uma rajada maior que o buffer inteiro dentro de uma janela de 80ms não
-    // deve virar um lote maior que o buffer: o excedente já foi descartado
-    // acima e o renderer o jogaria fora de qualquer forma. `primeiroSeq`
-    // continua denunciando o corte, e o outro lado recarrega.
+    // A burst larger than the whole buffer within an 80ms window must not
+    // become a batch larger than the buffer: the excess was already discarded
+    // above and the renderer would throw it away anyway. `primeiroSeq` still
+    // gives away the cut, and the other side reloads.
     if (this.pendentes.length > MAX_LOG) {
       this.pendentes.splice(0, this.pendentes.length - MAX_LOG)
     }
   }
 
-  /** Mantem `errosNoLog` sem varrer o buffer, e marca o estado para entrega. */
+  /** Maintains `errosNoLog` without scanning the buffer, and marks the state for delivery. */
   private contarErro(delta: number): void {
     this.estado = { ...this.estado, errosNoLog: this.estado.errosNoLog + delta }
     this.estadoSujo = true

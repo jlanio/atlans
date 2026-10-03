@@ -1,5 +1,5 @@
 # app/services/workflow_service.py
-# Fachada que delega para serviços especializados, mantendo a interface pública original.
+# Facade that delegates to specialized services, keeping the original public interface.
 
 from app.core.utils.logger import get_logger
 
@@ -64,11 +64,11 @@ _logger = get_logger(__name__)
 
 
 async def _cleanup_redis_pattern(pattern: str, contexto: str) -> int:
-    """Remove do Redis todas as keys que casam com `pattern`.
+    """Removes from Redis all keys matching `pattern`.
 
-    Idempotente — no-op se nenhuma key existir. Best-effort: falha no Redis
-    apenas loga WARN e nao propaga (nao bloqueia o delete que a disparou).
-    Retorna o numero de keys removidas.
+    Idempotent — no-op if no key exists. Best-effort: a Redis failure only
+    logs a WARN and does not propagate (it does not block the delete that
+    triggered it). Returns the number of keys removed.
     """
     removed = 0
     try:
@@ -96,13 +96,13 @@ async def _cleanup_change_detector_keys(workflow_id_hash: str) -> int:
 
 
 async def _cleanup_change_detector_ws_keys(workspace_id: str) -> int:
-    """Remove keys `change_detector:ws:{workspace_id}:*` do Redis.
+    """Removes the `change_detector:ws:{workspace_id}:*` keys from Redis.
 
-    Chamada no delete do workspace. As chaves de escopo workspace (shared_key)
-    nao pertencem a workflow nenhum, entao o cleanup por workflow nao as
-    alcanca — e com ttl_hours=0 elas viveriam para sempre. Um restore do
-    workspace NAO devolve este estado: a primeira run apos o restore e
-    "primeira execucao", aceitavel para um cache de deteccao de mudanca.
+    Called on workspace delete. Workspace-scoped keys (shared_key) do not
+    belong to any workflow, so the per-workflow cleanup does not reach them —
+    and with ttl_hours=0 they would live forever. A workspace restore does NOT
+    bring this state back: the first run after the restore is a "first
+    execution", acceptable for a change-detection cache.
     """
     return await _cleanup_redis_pattern(
         f"change_detector:ws:{workspace_id}:*",
@@ -113,24 +113,25 @@ async def _cleanup_change_detector_ws_keys(workspace_id: str) -> int:
 async def soft_delete_workspace_workflows(
     db: AsyncSession, workspace_id: str, when: datetime,
 ) -> dict:
-    """Soft-deleta os workflows de um workspace e desativa seus schedules.
+    """Soft-deletes a workspace's workflows and deactivates their schedules.
 
-    Chamada no DELETE do workspace. Sem isto os workflows continuavam ativos e
-    invisiveis: a listagem e sempre por workspace acessivel, entao sumiam da UI,
-    mas o AsyncScheduler seguia disparando seus schedules (o tick filtra apenas
-    por Schedule.active, sem olhar workflow nem workspace). Rodando orfaos eles
-    perdiam o executor dedicado do workspace — _resolve_candidates nao acha a
-    linha e cai no pool default — e a allowlist de webhook, que vira lista vazia
-    e deixa de ser aplicada.
+    Called on workspace DELETE. Without this the workflows stayed active and
+    invisible: the listing is always by accessible workspace, so they vanished
+    from the UI, but the AsyncScheduler kept firing their schedules (the tick
+    filters only by Schedule.active, without looking at workflow or workspace).
+    Running orphaned, they lost the workspace's dedicated executor —
+    _resolve_candidates does not find the row and falls back to the default
+    pool — and the webhook allowlist, which becomes an empty list and stops
+    being enforced.
 
-    `when` e o mesmo timestamp gravado em Workspace.deleted_at: e ele que
-    permite ao restore distinguir os workflows que cairam por causa do delete do
-    workspace daqueles que ja estavam deletados antes.
+    `when` is the same timestamp written to Workspace.deleted_at: it is what
+    lets the restore tell the workflows that went down because of the workspace
+    delete from those that had already been deleted before.
 
-    Nao commita — mas nao conte com isso para atomicidade: o chamador roda
-    `schedule_workspace_data_expiry` logo depois, e ela commita por dentro (via
-    purge_workspace_storage). Por isso o delete_workspace marca
-    Workspace.deleted_at ANTES de chamar esta funcao, e nao depois.
+    Does not commit — but do not count on that for atomicity: the caller runs
+    `schedule_workspace_data_expiry` right after, and it commits internally
+    (via purge_workspace_storage). That is why delete_workspace sets
+    Workspace.deleted_at BEFORE calling this function, not after.
     """
     from app.models.models import Schedule
 
@@ -153,8 +154,8 @@ async def soft_delete_workspace_workflows(
             .values(deleted_at=when, flag_ative=False)
         )
 
-    # Cobre todos os workflows do workspace, nao so os recem-deletados: um
-    # schedule pode ter ficado ativo por caminhos anteriores a este cascade.
+    # Covers all of the workspace's workflows, not just the freshly deleted ones:
+    # a schedule may have stayed active through paths predating this cascade.
     sched_result = await db.execute(
         Schedule.__table__.update()
         .where(Schedule.workflow_hash.in_(all_ids), Schedule.active.is_(True))
@@ -164,9 +165,9 @@ async def soft_delete_workspace_workflows(
     for wf_id in pending_ids:
         await _cleanup_change_detector_keys(wf_id)
 
-    # Chaves de escopo workspace (ws:*) nao pertencem a workflow nenhum — sem
-    # esta linha, um ChangeDetector com shared_key e ttl_hours=0 deixava
-    # estado orfao no Redis para sempre apos o delete do workspace.
+    # Workspace-scoped keys (ws:*) do not belong to any workflow — without this
+    # line, a ChangeDetector with shared_key and ttl_hours=0 left orphaned state
+    # in Redis forever after the workspace delete.
     await _cleanup_change_detector_ws_keys(workspace_id)
 
     return {"workflows": len(pending_ids), "schedules": sched_result.rowcount or 0}
@@ -175,31 +176,32 @@ async def soft_delete_workspace_workflows(
 async def restore_workspace_workflows(
     db: AsyncSession, workspace_id: str, when: datetime,
 ) -> int:
-    """Desfaz o soft delete em cascata de um workspace restaurado.
+    """Undoes the cascading soft delete of a restored workspace.
 
-    Restaura apenas os workflows cujo `deleted_at` bate exatamente com o do
-    workspace — os que ja estavam deletados antes continuam deletados.
+    Restores only the workflows whose `deleted_at` matches the workspace's
+    exactly — those that had already been deleted before stay deleted.
 
-    Devolve os workflows DESATIVADOS (`flag_ative` continua False), pelo mesmo
-    motivo que os schedules nao sao religados: o cascade zera `flag_ative` de
-    todo mundo, entao nao ha como saber quem ja estava desativado de proposito
-    antes do delete. Reativar em bloco ressuscitaria justamente o workflow que o
-    dono tinha desligado — de bom grado, e sem avisar. O dono religa o que ainda
-    fizer sentido.
+    Returns the workflows DEACTIVATED (`flag_ative` stays False), for the same
+    reason the schedules are not turned back on: the cascade zeroes
+    `flag_ative` for everyone, so there is no way to know who was already
+    deactivated on purpose before the delete. Reactivating in bulk would
+    resurrect precisely the workflow the owner had turned off — willingly, and
+    without warning. The owner turns back on whatever still makes sense.
 
-    (`flag_ative` continua sendo a trava de execucao real: portal_router,
-    webhook_router, schedule_service, drive_service e workflow_groups_router
-    filtram por ele sem olhar `deleted_at`. Por isso o cascade precisa zera-lo,
-    e por isso o restore nao pode devolve-lo no palpite.)
+    (`flag_ative` is still the real execution lock: portal_router,
+    webhook_router, schedule_service, drive_service and workflow_groups_router
+    filter by it without looking at `deleted_at`. That is why the cascade has
+    to zero it, and why the restore cannot hand it back on a guess.)
 
-    Nao commita: o chamador fecha a transacao junto com o restore do workspace.
+    Does not commit: the caller closes the transaction together with the
+    workspace restore.
     """
-    # O indice de nome e PARCIAL (so vale entre os vivos), entao um nome que
-    # estava "guardado" por um workflow deste cascade pode ter sido reocupado
-    # enquanto o workspace estava na lixeira. E estreito — workspace na lixeira
-    # nao aparece em listagem —, mas o UPDATE em lote falharia INTEIRO e
-    # derrubaria o restore do workspace junto. Renomear quem volta e melhor que
-    # nao devolver nada.
+    # The name index is PARTIAL (it only applies among the live ones), so a name
+    # that was "held" by a workflow of this cascade may have been taken again
+    # while the workspace was in the trash. It is narrow — a workspace in the
+    # trash does not show up in listings —, but the batch UPDATE would fail
+    # ENTIRELY and bring down the workspace restore with it. Renaming whoever
+    # comes back is better than returning nothing.
     voltando = (await db.execute(
         sa_select(Workflow.id_hash, Workflow.name).where(
             Workflow.workspace_id == workspace_id,
@@ -232,7 +234,7 @@ async def restore_workspace_workflows(
     return result.rowcount or 0
 
 
-# Retrocompatibilidade: re-exporta as exceções para que importadores existentes não quebrem.
+# Backward compatibility: re-exports the exceptions so existing importers don't break.
 __all__ = [
     "WorkflowService",
     "WorkflowNotFoundError",
@@ -248,19 +250,20 @@ __all__ = [
 ]
 
 
-# ── Mescla da listagem (agendamento e autoria) ───────────────────────────────
+# ── Listing merge (schedule and authorship) ──────────────────────────────────
 #
-# A listagem de Projetos sai do CRUD como RowMapping (imutavel) com as colunas
-# leves; o que vem de OUTRAS tabelas — o resumo do agendamento e os nomes de
-# quem criou/alterou — e buscado aqui, em lote por pagina, e mesclado em dicts.
-# Sao 3 queries por listagem, todas por indice; nunca uma por linha.
+# The Projects listing comes out of the CRUD as a RowMapping (immutable) with
+# the light columns; what comes from OTHER tables — the schedule summary and
+# the names of who created/changed it — is fetched here, batched per page, and
+# merged into dicts. That is 3 queries per listing, all indexed; never one per
+# row.
 #
-# Os helpers `_como_utc` e `_nomes_de_usuarios` sao gemeos dos de
-# `app/services/observability/`. Ficam locais de proposito: importar aquele pacote
-# so por duas funcoes de cinco linhas acoplaria a listagem de workflows ao
-# servico de metricas inteiro (e ao seu tempo de import) sem ganho.
+# The helpers `_como_utc` and `_nomes_de_usuarios` are twins of the ones in
+# `app/services/observability/`. They stay local on purpose: importing that
+# package just for two five-line functions would couple the workflow listing to
+# the entire metrics service (and its import time) for no gain.
 
-# Colunas do schedule que a lista mostra — `WorkflowScheduleSummary`.
+# Schedule columns the list shows — `WorkflowScheduleSummary`.
 _SCHEDULE_COLUMNS = (
     Schedule.workflow_hash,
     Schedule.active,
@@ -276,18 +279,20 @@ _SCHEDULE_COLUMNS = (
 
 
 def _como_utc(valor: Optional[datetime]) -> Optional[datetime]:
-    """`next_run_at`/`last_run_at` sao gravados UTC NAIVE (ver `_to_utc_naive`
-    no agendador). Sem o tzinfo, o Pydantic serializa sem offset e a web le a
-    hora como local — "proxima 06:00" viraria "proxima 03:00" em Cuiaba."""
+    """`next_run_at`/`last_run_at` are stored as NAIVE UTC (see `_to_utc_naive`
+    in the scheduler). Without the tzinfo, Pydantic serializes without an offset
+    and the web app reads the time as local — "next 06:00" would become
+    "next 03:00" in Cuiabá."""
     if valor is None or valor.tzinfo is not None:
         return valor
     return valor.replace(tzinfo=timezone.utc)
 
 
 def _ordem_de_preferencia(linha) -> tuple:
-    """Quando um workflow tem mais de um schedule, a lista mostra um so: a
-    ativa com a menor `next_run_at` (e a que vai disparar primeiro); ativa sem
-    proxima calculada depois; sem nenhuma ativa, qualquer uma."""
+    """When a workflow has more than one schedule, the list shows only one: the
+    active one with the smallest `next_run_at` (the one that will fire first);
+    an active one with no computed next run after that; with none active, any
+    of them."""
     return (
         not linha.active,
         linha.next_run_at is None,
@@ -296,7 +301,7 @@ def _ordem_de_preferencia(linha) -> tuple:
 
 
 async def _resumos_de_agendamento(db: AsyncSession, hashes: Iterable[str]) -> dict[str, dict]:
-    """Um resumo por workflow_hash, ja com os instantes em UTC aware."""
+    """One summary per workflow_hash, with the instants already in aware UTC."""
     hashes = [h for h in set(hashes) if isinstance(h, str)]
     if not hashes:
         return {}
@@ -325,10 +330,10 @@ async def _resumos_de_agendamento(db: AsyncSession, hashes: Iterable[str]) -> di
 
 
 async def _nomes_de_usuarios(db: AsyncSession, user_ids: Iterable[Optional[str]]) -> dict[str, str]:
-    """id_hash -> username. Id sem linha em `users` nao aparece no dict (a
-    listagem devolve None e a web mostra so "alterado ha X"). Usuario excluido
-    pelo admin e soft delete: a linha permanece, entao o nome continua saindo —
-    a mesma atribuicao que o Historico mostra."""
+    """id_hash -> username. An id without a row in `users` does not appear in
+    the dict (the listing returns None and the web app shows just "changed X
+    ago"). A user deleted by the admin is a soft delete: the row remains, so
+    the name keeps showing — the same attribution the History shows."""
     ids = [i for i in set(user_ids) if isinstance(i, str)]
     if not ids:
         return {}
@@ -337,8 +342,8 @@ async def _nomes_de_usuarios(db: AsyncSession, user_ids: Iterable[Optional[str]]
 
 
 async def _mesclar_listagem(db: AsyncSession, linhas) -> list[dict]:
-    """Converte as linhas do CRUD em dicts e acrescenta `schedule`,
-    `created_by_username` e `updated_by_username`."""
+    """Converts the CRUD rows into dicts and adds `schedule`,
+    `created_by_username` and `updated_by_username`."""
     itens = [dict(linha) for linha in linhas]
     if not itens:
         return itens
@@ -362,27 +367,28 @@ _MENSAGEM_CREDENCIAL_ALHEIA = (
 async def assert_credenciais_da_definicao(
     db: AsyncSession, definition: object, *, user_id: str, workspace_id: str | None,
 ) -> None:
-    """Recusa gravar uma definition que referencie credencial que o autor não
-    pode acessar (auditoria SEG-12 — confused deputy).
+    """Refuses to save a definition that references a credential the author
+    cannot access (audit SEG-12 — confused deputy).
 
-    Sem isto, um editor inseria num fluxo compartilhado um nó com o
-    `credential_id` PRIVADO de outro membro e uma `url` dele; ao a vítima
-    executar, o dispatch resolvia a credencial (triggered_by = vítima) e mandava
-    o token ao servidor do atacante. Validamos TODOS os nós com `credential_id`
-    (não só os novos): trocar a URL de um nó existente também escaparia.
-    Credencial própria ou compartilhada com o workspace passa; a privada de
-    outro membro, não.
+    Without this, an editor would insert into a shared workflow a node with
+    another member's PRIVATE `credential_id` and a `url` of their own; when the
+    victim ran it, the dispatch resolved the credential (triggered_by = victim)
+    and sent the token to the attacker's server. We validate ALL nodes with a
+    `credential_id` (not just the new ones): changing the URL of an existing
+    node would also slip through. One's own credential or one shared with the
+    workspace passes; another member's private one does not.
 
-    Mora no serviço, e não na borda, porque a borda eram duas: a REST checava e
-    o MCP pulava com `validate_first=False`, ao duplicar e ao restaurar versão.
-    As quatro escritas do `WorkflowService` a chamam contra o autor, que é
-    OBRIGATÓRIO nelas (`created_by_id`, `updated_by_id`, `duplicated_by`,
-    `restored_by`: keyword-only, sem default, e vazio é recusado por
-    `_exigir_autor`) — o autor é quem precisa alcançar as credenciais. Quando o
-    autor era opcional, um chamador que o esquecesse pulava a guarda calado.
+    It lives in the service, not at the edge, because there were two edges: the
+    REST one checked and the MCP one skipped with `validate_first=False`, on
+    duplicate and on version restore. The four writes of `WorkflowService` call
+    it against the author, who is MANDATORY in them (`created_by_id`,
+    `updated_by_id`, `duplicated_by`, `restored_by`: keyword-only, no default,
+    and empty is refused by `_exigir_autor`) — the author is the one who needs
+    to reach the credentials. When the author was optional, a caller that
+    forgot it silently skipped the guard.
 
-    Levanta `CredentialAccessDeniedError` (403 no handler de domínio da REST,
-    `forbidden` no MCP).
+    Raises `CredentialAccessDeniedError` (403 in the REST domain handler,
+    `forbidden` in the MCP).
     """
     if not isinstance(definition, dict):
         return
@@ -396,13 +402,14 @@ async def assert_credenciais_da_definicao(
 
 
 def _exigir_autor(autor: object, parametro: str) -> str:
-    """O autor de uma escrita: um id de usuário, nunca vazio.
+    """The author of a write: a user id, never empty.
 
-    Os quatro parâmetros de autoria já são obrigatórios na assinatura; isto
-    fecha o `None` explícito — um `getattr(user, "id_hash", None)` distraído —,
-    que pularia a guarda do mesmo jeito que o argumento esquecido. Não existe
-    hoje escrita de sistema sem usuário: a que vier terá de decidir contra
-    quem a definition é conferida, e dizê-lo aqui, em vez de passar vazio.
+    The four authorship parameters are already mandatory in the signature;
+    this closes off an explicit `None` — a careless
+    `getattr(user, "id_hash", None)` —, which would skip the guard just like
+    the forgotten argument. There is no system write without a user today: the
+    one that comes will have to decide against whom the definition is checked,
+    and say so here, instead of passing empty.
     """
     if not isinstance(autor, str) or not autor:
         raise TypeError(
@@ -420,28 +427,28 @@ class WorkflowService:
         self, name: str, definition: dict, workspace_id: str | None = None, *,
         created_by_id: str, **extras,
     ):
-        """`extras` são colunas adicionais do Workflow (description, params_schema…).
+        """`extras` are additional Workflow columns (description, params_schema…).
 
-        Existe para a duplicação: a criação pela UI só manda nome e definition,
-        mas copiar um workflow tem de levar junto o que define como ele se
-        comporta — `params_schema`, por exemplo, é o que faz a tela pedir os
-        parâmetros antes de executar.
+        It exists for duplication: creation through the UI only sends name and
+        definition, but copying a workflow has to carry along what defines how
+        it behaves — `params_schema`, for example, is what makes the screen
+        ask for the parameters before running.
 
-        `created_by_id` é obrigatório: é contra ele que a guarda de credenciais
-        (SEG-12) confere a definition.
+        `created_by_id` is mandatory: it is against it that the credential
+        guard (SEG-12) checks the definition.
         """
         autor = _exigir_autor(created_by_id, "created_by_id")
 
-        # 0. Credenciais da definition ao alcance de quem grava (SEG-12). A
-        #    duplicação passa por aqui com `created_by_id` = quem duplicou.
+        # 0. Credentials in the definition within reach of whoever writes (SEG-12).
+        #    Duplication goes through here with `created_by_id` = who duplicated.
         await assert_credenciais_da_definicao(
             self.crud.db, definition, user_id=autor, workspace_id=workspace_id,
         )
 
-        # 1. Criptografa dados sensíveis
+        # 1. Encrypts sensitive data
         secure_definition = encrypt_workflow_connections(definition)
 
-        # 2. Cria o workflow no banco (workspace_id vincula ao workspace ativo)
+        # 2. Creates the workflow in the database (workspace_id binds it to the active workspace)
         kwargs = dict(extras, created_by_id=autor)
         if workspace_id:
             kwargs["workspace_id"] = workspace_id
@@ -450,15 +457,15 @@ class WorkflowService:
         except IntegrityError as exc:
             await self.crud.db.rollback()
             if "uq_workflow_name_workspace" in str(exc.orig):
-                # Cita o nome: a mensagem chega ao usuário como toast, longe do
-                # campo, e "este nome" não diz qual quando quem escolheu o nome
-                # foi o servidor (duplicação).
+                # Quotes the name: the message reaches the user as a toast, far from
+                # the field, and "this name" does not say which one when the
+                # name was chosen by the server (duplication).
                 raise WorkflowNameConflictError(
                     f"Já existe um workflow chamado '{name}' neste workspace."
                 ) from exc
             raise
 
-        # 3. Aplica agendamento, se houver ScheduleTrigger
+        # 3. Applies the schedule, if there is a ScheduleTrigger
         if extract_schedule_node(definition):
             try:
                 await apply_schedule_if_needed(workflow, definition, self.crud.db)
@@ -470,75 +477,79 @@ class WorkflowService:
     async def duplicate_workflow(
         self, id_hash: str, novo_nome: str | None = None, *, duplicated_by: str,
     ) -> Workflow:
-        """Cria uma cópia do workflow no MESMO workspace.
+        """Creates a copy of the workflow in the SAME workspace.
 
-        O que NÃO acompanha a cópia, e por quê:
+        What does NOT come along with the copy, and why:
 
-        - `pinned_outputs`/`pin_metadata` apontam para artefatos de runs do
-          workflow original; herdá-los faria a cópia servir dados que ela nunca
-          produziu, sem nada na tela dizendo isso.
-        - `portal_access` volta a "disabled": publicar uma cópia porque o
-          original estava publicado expõe conteúdo sem ninguém ter pedido.
-        - o histórico de versões começa vazio — as versões do original
-          descrevem edições que não aconteceram nesta cópia.
+        - `pinned_outputs`/`pin_metadata` point to artifacts from runs of the
+          original workflow; inheriting them would make the copy serve data it
+          never produced, with nothing on screen saying so.
+        - `portal_access` goes back to "disabled": publishing a copy because
+          the original was published exposes content without anyone asking.
+        - the version history starts empty — the original's versions describe
+          edits that did not happen in this copy.
 
-        O agendamento acompanha, mas DESLIGADO: duplicar costuma preceder uma
-        edição, e nascer disparando sozinho dobraria a carga e a escrita no
-        Drive em silêncio. Desligar na própria definition (e não só no banco)
-        mantém canvas e schedule coerentes — `apply_schedule_if_needed` lê o
-        `active` do nó, então o que o usuário vê no canvas é o que vale.
+        The schedule comes along, but TURNED OFF: duplicating usually precedes
+        an edit, and being born firing on its own would double the load and
+        the writes to Drive silently. Turning it off in the definition itself
+        (and not just in the database) keeps canvas and schedule consistent —
+        `apply_schedule_if_needed` reads the node's `active`, so what the user
+        sees on the canvas is what counts.
 
-        Fica no mesmo workspace de propósito: `credential_id` na definition só
-        resolve para quem tem acesso ao workspace, e sub-workflows referenciados
-        precisam viver nele. Copiar para outro workspace produziria um workflow
-        que parece íntegro e falha ao executar.
+        It stays in the same workspace on purpose: a `credential_id` in the
+        definition only resolves for those with access to the workspace, and
+        referenced sub-workflows need to live in it. Copying to another
+        workspace would produce a workflow that looks intact and fails when run.
         """
         autor = _exigir_autor(duplicated_by, "duplicated_by")
         original = await self.get_workflow_by_hash(id_hash)
 
-        # Deep copy: `encrypt_workflow_connections` grava no dict recebido, e o
-        # de `original.definition` é o objeto que o SQLAlchemy observa — mutá-lo
-        # marcaria o workflow de origem como sujo.
+        # Deep copy: `encrypt_workflow_connections` writes into the dict it receives,
+        # and the one in `original.definition` is the object SQLAlchemy watches —
+        # mutating it would mark the origin workflow as dirty.
         definition = copy.deepcopy(original.definition or {})
 
         disable_schedule_node(definition)
 
         nome_pedido = novo_nome.strip() if novo_nome and novo_nome.strip() else None
 
-        # Tudo que vem do `original` é lido AGORA, enquanto a sessão está limpa.
+        # Everything that comes from `original` is read NOW, while the session is clean.
         #
-        # Uma colisão de nome faz `create_workflow` chamar `rollback()`, e o
-        # rollback expira todo objeto da sessão — inclusive este `original`, que
-        # nem participou da escrita. Ler qualquer atributo dele depois disso
-        # dispara refresh lazy, e numa AsyncSession isso não é um SELECT extra:
-        # é `MissingGreenlet`. A retentativa abaixo transformaria o 409 em 500 —
-        # exatamente no caminho que existe para nunca falhar.
+        # A name collision makes `create_workflow` call `rollback()`, and the
+        # rollback expires every object in the session — including this
+        # `original`, which did not even take part in the write. Reading any of
+        # its attributes after that triggers a lazy refresh, and in an
+        # AsyncSession that is not an extra SELECT: it is `MissingGreenlet`. The
+        # retry below would turn the 409 into a 500 — exactly on the path that
+        # exists so as never to fail.
         nome_original = original.name
         workspace_id = original.workspace_id
-        # O que define COMO o workflow se comporta acompanha a cópia.
-        # `params_schema` em especial: é ele que faz a tela pedir os parâmetros
-        # antes de executar (ver handleRunClick no front) — sem ele a cópia
-        # dispararia direto, calada, com o schema vazio.
+        # What defines HOW the workflow behaves comes along with the copy.
+        # `params_schema` in particular: it is what makes the screen ask for the
+        # parameters before running (see handleRunClick in the front end) —
+        # without it the copy would fire straight away, silently, with an empty
+        # schema.
         herdado = dict(
             description=original.description,
             params_schema=original.params_schema,
             group_id=original.group_id,
             priority=original.priority,
             notification_url=original.notification_url,
-            # A copia herda a proveniencia do original: duplicar um fluxo do
-            # assistente sem isto criaria uma copia "usuario" que vaza para as
-            # listagens que o assistente devia manter escondidas.
+            # The copy inherits the original's provenance: duplicating an assistant
+            # workflow without this would create a "usuario" (user) copy that
+            # leaks into the listings the assistant was supposed to keep hidden.
             origem=original.origem,
         )
-        # Autoria da CÓPIA é de quem copiou, não do dono do original: a cópia é
-        # um workflow novo, e é a pessoa que clicou quem responde por ele. Sem
-        # isto a cópia nascia sem dono nenhum — `created_by_id` nulo —, e a tela
-        # de Projetos, que mostra autoria, não tinha o que mostrar.
+        # Authorship of the COPY belongs to whoever copied it, not to the original's
+        # owner: the copy is a new workflow, and the person who clicked is the
+        # one accountable for it. Without this the copy was born with no owner
+        # at all — `created_by_id` null —, and the Projects screen, which shows
+        # authorship, had nothing to show.
         #
-        # A tool `duplicate_workflow` do MCP já carimbava (`app/mcp/tools/
-        # acervo.py`); esta era a divergência registrada como dívida no #96.
-        # `duplicated_by` é obrigatório: é também contra ele que
-        # `create_workflow` confere as credenciais da cópia (SEG-12).
+        # The MCP `duplicate_workflow` tool already stamped it (`app/mcp/tools/
+        # acervo.py`); this was the divergence recorded as debt in #96.
+        # `duplicated_by` is mandatory: it is also against it that
+        # `create_workflow` checks the copy's credentials (SEG-12).
         herdado["created_by_id"] = autor
         herdado["updated_by_id"] = autor
 
@@ -547,26 +558,27 @@ class WorkflowService:
                 nome, definition, workspace_id=workspace_id, **herdado,
             )
 
-        # Nome escolhido a dedo pelo usuário: colidir é resposta, não acidente.
-        # Renomear por conta própria criaria "Meu Fluxo (2)" para quem digitou
-        # "Meu Fluxo" — melhor devolver o 409 e deixar a pessoa decidir.
+        # A name hand-picked by the user: a collision is an answer, not an accident.
+        # Renaming on our own would create "Meu Fluxo (2)" for whoever typed
+        # "Meu Fluxo" — better to return the 409 and let the person decide.
         if nome_pedido:
             return await _criar(nome_pedido)
 
-        # Nome derivado: a promessa da duplicação é "clicou, copiou". Colisão
-        # aqui é falha nossa, não escolha do usuário, então resolvemos sozinhos.
+        # Derived name: the promise of duplication is "click, copied". A collision
+        # here is our failure, not the user's choice, so we resolve it ourselves.
         #
-        # `_nome_de_copia` consulta os nomes ocupados e o INSERT vem depois: a
-        # janela entre os dois é real (duas duplicações simultâneas leem o mesmo
-        # conjunto). O `move` já tratava isso — a duplicação não, e o 409 subia
-        # até a tela. Ver workflow_move_service._aplicar.
+        # `_nome_de_copia` queries the taken names and the INSERT comes after:
+        # the window between the two is real (two simultaneous duplications read
+        # the same set). The `move` already handled this — duplication did not,
+        # and the 409 went all the way up to the screen. See
+        # workflow_move_service._aplicar.
         nome = await self._nome_de_copia(nome_original, workspace_id)
         try:
             return await _criar(nome)
         except WorkflowNameConflictError:
-            # `create_workflow` já fez rollback. Recalcular é a primeira aposta:
-            # a nova leitura enxerga o nome que causou a colisão e devolve o
-            # próximo livre — "(2)" continua sendo melhor nome que um hex.
+            # `create_workflow` has already rolled back. Recomputing is the first
+            # bet: the new read sees the name that caused the collision and
+            # returns the next free one — "(2)" is still a better name than a hex.
             _logger.warning(
                 "Colisão de nome ao duplicar o workflow %s (nome '%s'); recalculando.",
                 id_hash, nome,
@@ -575,8 +587,8 @@ class WorkflowService:
             try:
                 return await _criar(nome)
             except WorkflowNameConflictError as exc:
-                # Colidir duas vezes seguidas indica corrida persistente. O
-                # sufixo aleatório não disputa com ninguém.
+                # Colliding twice in a row indicates a persistent race. The
+                # random suffix does not compete with anyone.
                 nome = _com_sufixo(f"Cópia de {nome_original}", uuid4().hex[:6])
                 _logger.warning(
                     "Segunda colisão ao duplicar o workflow %s; usando sufixo único '%s'.",
@@ -598,10 +610,10 @@ class WorkflowService:
         moved_by_id: str | None = None,
         dry_run: bool = False,
     ) -> dict:
-        """Move o workflow para outro workspace (ver workflow_move_service).
+        """Moves the workflow to another workspace (see workflow_move_service).
 
-        A autorização — admin/owner nos DOIS workspaces — fica no router, que é
-        quem tem a identidade do requisitante.
+        Authorization — admin/owner in BOTH workspaces — lives in the router,
+        which is the one holding the requester's identity.
         """
         return await _move_workflow(
             self.crud, id_hash, target_workspace_id,
@@ -609,15 +621,16 @@ class WorkflowService:
         )
 
     async def _nome_de_copia(self, nome_base: str, workspace_id: str | None) -> str:
-        """"Cópia de X", "Cópia de X (2)", ... — o primeiro livre no workspace.
+        """"Cópia de X", "Cópia de X (2)", ... — the first free one in the workspace.
 
-        Existe UniqueConstraint(name, workspace_id): sem desambiguar, duplicar
-        duas vezes o mesmo workflow devolvia 409 e o usuário tinha de inventar
-        um nome antes de ver a cópia.
+        There is a UniqueConstraint(name, workspace_id): without disambiguation,
+        duplicating the same workflow twice returned 409 and the user had to
+        come up with a name before seeing the copy.
         """
-        # Mesma consulta e mesma busca de nome livre usadas pelo move — só muda
-        # a base. Duplicar o critério faria duplicar e mover divergirem quando o
-        # escopo de "nome ocupado" mudar (soft-delete, workflows inativos…).
+        # Same query and same free-name search used by the move — only the base
+        # changes. Duplicating the criterion would make duplicate and move
+        # diverge when the scope of "taken name" changes (soft-delete, inactive
+        # workflows…).
         existentes = await _nomes_no_workspace(self.crud.db, workspace_id)
         return _nome_livre(f"Cópia de {nome_base}", existentes)
 
@@ -651,36 +664,37 @@ class WorkflowService:
         trigger_source: str = "manual",
         schedule_id: int | None = None,
     ) -> DispatchResult:
-        """Despacha uma execução.
+        """Dispatches an execution.
 
-        `autenticar_entrada` diz se o token do gatilho de webhook deve
-        autenticar ESTA chamada. O padrão é `True` de propósito: um chamador
-        novo que esqueça o parâmetro passa a exigir o token (o comportamento de
-        sempre), em vez de abrir o endpoint público sem autenticação. Os
-        caminhos já autenticados por sessão ou pelo agendador passam `False`.
+        `autenticar_entrada` says whether the webhook trigger's token must
+        authenticate THIS call. The default is `True` on purpose: a new caller
+        that forgets the parameter ends up requiring the token (the usual
+        behavior), instead of opening the public endpoint without
+        authentication. Paths already authenticated by session or by the
+        scheduler pass `False`.
 
-        `workflow` é o objeto que o chamador já carregou — ver `_load_workflow`.
-        Os disparos HTTP passam o que a dependency de autorização acabou de
-        buscar; o agendador, que só tem o hash, deixa em None.
+        `workflow` is the object the caller has already loaded — see
+        `_load_workflow`. HTTP triggers pass what the authorization dependency
+        has just fetched; the scheduler, which only has the hash, leaves it None.
 
-        `triggered_by` é o id_hash de QUEM disparou (nas rotas HTTP autenticadas).
-        É a dimensão de dono do escopo de credenciais (ver passo 5): só as
-        credenciais dessa pessoa — ou as compartilhadas com o workspace do
-        workflow — são resolvidas. Cron/webhook não têm usuário e deixam None,
-        alcançando apenas as compartilhadas.
+        `triggered_by` is the id_hash of WHO triggered it (on authenticated HTTP
+        routes). It is the owner dimension of the credential scope (see step 5):
+        only that person's credentials — or those shared with the workflow's
+        workspace — are resolved. Cron/webhook have no user and leave None,
+        reaching only the shared ones.
 
-        `trigger_source` e `schedule_id` são só rótulo do run
+        `trigger_source` and `schedule_id` are just labels on the run
         (docs/specs/metrics-history.md §2): "manual" | "retry" | "webhook"
-        | "schedule" | "mcp". Não entram em nenhuma decisão de despacho — existem para
-        o Histórico distinguir "agendado às 03:00" de "manual · fulano". O
-        default "manual" mantém os chamadores antigos funcionando.
+        | "schedule" | "mcp". They take no part in any dispatch decision — they
+        exist so the History can tell "scheduled at 03:00" from "manual · so-and-so".
+        The "manual" default keeps old callers working.
         """
-        # ── 1. Idempotência ───────────────────────────────────────────────
-        # A chave é por USUÁRIO e por WORKFLOW: antes era global à instalação,
-        # e dois usuários mandando `Idempotency-Key: 1` recebiam o task_id um do
-        # outro (cross-tenant). Chamadores sem usuário (cron/webhook não passam
-        # chave hoje) caem em "-". Chaves antigas no Redis ficam órfãs por até
-        # 24 h — inofensivo.
+        # ── 1. Idempotency ────────────────────────────────────────────────
+        # The key is per USER and per WORKFLOW: it used to be global to the
+        # installation, and two users sending `Idempotency-Key: 1` got each
+        # other's task_id (cross-tenant). Callers without a user (cron/webhook
+        # do not pass a key today) fall into "-". Old keys in Redis stay
+        # orphaned for up to 24 h — harmless.
         cache_key: str | None = None
         if idempotency_key:
             cache_key = f"idempotency:wf_execute:{triggered_by or '-'}:{id_hash}:{idempotency_key}"
@@ -695,7 +709,7 @@ class WorkflowService:
         # ── 2a. Validar inputs contra payload_schema dos triggers ────────
         _validate_trigger_inputs(definition, inputs)
 
-        # ── 2b. Bloquear se workflow usa nodes desabilitados pelo admin ───
+        # ── 2b. Block if the workflow uses nodes disabled by the admin ────
         from app.services.disabled_nodes_service import disabled_names
         from app.services.workflow_execution_service import (
             _validate_no_disabled_nodes,
@@ -707,44 +721,44 @@ class WorkflowService:
         disabled_now = await disabled_names(self.crud.db)
         _validate_no_disabled_nodes(definition, disabled_now)
 
-        # ── 3. Resolver executores candidatos (fail-fast) ─────────────────
-        # Adiantado de propósito: é a ÚNICA verificação daqui em diante que
-        # pode abortar tudo com 503, e ficava por ÚLTIMA. Sem executor online,
-        # o servidor colecionava sub-fluxos e descriptografava credenciais —
-        # vários round-trips ao banco e dezenas de milissegundos de CPU — só
-        # para jogar fora. Continua DEPOIS da checagem de nodes desabilitados
-        # para não trocar a precedência das mensagens de erro: aquela checagem
-        # agora sai do cache e não custa round-trip nenhum.
+        # ── 3. Resolve candidate executors (fail-fast) ────────────────────
+        # Moved earlier on purpose: it is the ONLY check from here on that can
+        # abort everything with 503, and it used to come LAST. With no executor
+        # online, the server collected sub-workflows and decrypted credentials —
+        # several round-trips to the database and tens of milliseconds of CPU —
+        # only to throw it all away. It still comes AFTER the disabled-nodes
+        # check so as not to swap the precedence of the error messages: that
+        # check now comes from the cache and costs no round-trip at all.
         #
-        # SEG: só é adiantado quando quem chamou JÁ está autenticado — execute,
-        # retry e cron passam `autenticar_entrada=False`. Quem autentica o
-        # chamador de um webhook protegido é o passo 5 (o token do
-        # WebhookTrigger); antecipar o 503 também nesse caminho fazia um
-        # chamador ANÔNIMO receber "Nenhum executor disponível (pool padrão
-        # vazio ou todos offline)" antes de qualquer 401/403 — um oráculo sobre
-        # a frota de execução do tenant, que ainda deixava distinguir "infra
-        # fora do ar" de "meu token está errado" sem apresentar credencial
-        # nenhuma. Para o webhook o fail-fast roda logo APÓS a validação do
-        # token, antes do despacho.
+        # SEC: it is only moved earlier when the caller is ALREADY
+        # authenticated — execute, retry and cron pass
+        # `autenticar_entrada=False`. What authenticates the caller of a
+        # protected webhook is step 5 (the WebhookTrigger token); moving the
+        # 503 earlier on that path too made an ANONYMOUS caller receive
+        # "Nenhum executor disponível (pool padrão vazio ou todos offline)" (no
+        # executor available) before any 401/403 — an oracle on the tenant's
+        # execution fleet, which also let one tell "infra down" from "my token
+        # is wrong" without presenting any credential. For the webhook the
+        # fail-fast runs right AFTER the token validation, before the dispatch.
         candidates = None
         if not autenticar_entrada:
             candidates = await self._resolve_candidates(wf)
 
-        # ── 4. Pre-resolver a cadeia de sub-workflows ─────────────────────
-        # Vai no envelope: o executor nao tem acesso ao DB do servidor.
+        # ── 4. Pre-resolve the sub-workflow chain ─────────────────────────
+        # Goes in the envelope: the executor has no access to the server's DB.
         subworkflow_defs = await collect_subworkflow_definitions_recursive(
             definition, self.crud.db, workspace_id=wf.workspace_id,
         )
 
-        # ── 5. Resolver credenciais UMA VEZ (usado por validate + inject) ─
-        # O escopo e o workspace do workflow: so credenciais de quem tem acesso
-        # a ele sao resolvidas. Sem isso, um credential_id copiado da definition
-        # (texto puro, legivel por qualquer membro) funcionava em QUALQUER
-        # workflow, de qualquer workspace. Vale para todos os disparos —
-        # inclusive cron e webhook, que nao tem usuario identificado.
-        # Inclui a cadeia de sub-fluxos: as credenciais deles vao no mesmo
-        # envelope e sao resolvidas com o MESMO escopo de workspace — o coletor
-        # acima ja descarta sub-fluxos de outros workspaces.
+        # ── 5. Resolve credentials ONCE (used by validate + inject) ───────
+        # The scope is the workflow's workspace: only credentials of those with
+        # access to it are resolved. Without this, a credential_id copied from
+        # the definition (plain text, readable by any member) worked in ANY
+        # workflow, of any workspace. Applies to every trigger — including cron
+        # and webhook, which have no identified user.
+        # Includes the sub-workflow chain: their credentials go in the same
+        # envelope and are resolved with the SAME workspace scope — the
+        # collector above already discards sub-workflows from other workspaces.
         all_cred_ids = _collect_credential_ids(definition, *subworkflow_defs.values())
         pre_resolved: dict = {}
         if all_cred_ids:
@@ -753,21 +767,22 @@ class WorkflowService:
                     f"Workflow '{id_hash}' usa credenciais mas não tem workspace — "
                     "não há como autorizar o acesso a elas."
                 )
-            # Escopo D: resolvem-se só as credenciais DE QUEM DISPAROU
-            # (triggered_by) OU explicitamente compartilhadas com o workspace do
-            # workflow. Ser apenas MEMBRO do workspace não basta — senão um
-            # membro usaria a credencial PRIVADA de outro só copiando o
-            # credential_id (texto puro na definition). Disparo sem usuário
-            # (cron/webhook) tem triggered_by=None e alcança apenas as
-            # compartilhadas; se um trigger exigir credencial privada, o
-            # _validate_trigger_credentials_only abaixo devolve 403 claro.
+            # Scope D: only the credentials OF WHOEVER TRIGGERED it are resolved
+            # (triggered_by) OR those explicitly shared with the workflow's
+            # workspace. Being merely a MEMBER of the workspace is not enough —
+            # otherwise a member would use another's PRIVATE credential just by
+            # copying the credential_id (plain text in the definition). A
+            # trigger without a user (cron/webhook) has triggered_by=None and
+            # reaches only the shared ones; if a trigger requires a private
+            # credential, the _validate_trigger_credentials_only below returns
+            # a clear 403.
             pre_resolved = await resolve_credentials_from_ids(
                 all_cred_ids,
                 allowed_owner_ids={triggered_by} if triggered_by else set(),
                 shared_workspace_id=wf.workspace_id,
-                # A sessão do request vai junto: sem ela o resolver abria uma
-                # SEGUNDA conexão do mesmo pool sem soltar a primeira, e sob
-                # concorrência o dispatch travava no pool_timeout.
+                # The request's session goes along: without it the resolver opened a
+                # SECOND connection from the same pool without releasing the
+                # first, and under concurrency the dispatch hung on pool_timeout.
                 db=self.crud.db,
             )
         await _validate_trigger_credentials_only(
@@ -775,15 +790,16 @@ class WorkflowService:
             autenticar_entrada=autenticar_entrada,
         )
 
-        # ── 5b. Fail-fast do webhook (ver passo 3) ────────────────────────
-        # O chamador já se identificou: a partir daqui o 503 não vaza nada que
-        # ele não pudesse descobrir disparando o fluxo.
+        # ── 5b. Webhook fail-fast (see step 3) ────────────────────────────
+        # The caller has already identified itself: from here on the 503 leaks
+        # nothing it could not find out by triggering the workflow.
         if candidates is None:
             candidates = await self._resolve_candidates(wf)
 
-        # ── 6. Despachar job ──────────────────────────────────────────────
-        # disabled_nodes e subworkflow_definitions vao no envelope para o
-        # executor validar/resolver sub-fluxos sem consultar o DB do servidor.
+        # ── 6. Dispatch job ───────────────────────────────────────────────
+        # disabled_nodes and subworkflow_definitions go in the envelope so the
+        # executor can validate/resolve sub-workflows without querying the
+        # server's DB.
         result = await self._dispatch_job(
             wf, definition, candidates, inputs, debug_mode,
             pre_resolved=pre_resolved,
@@ -794,7 +810,7 @@ class WorkflowService:
             schedule_id=schedule_id,
         )
 
-        # ── 7. Registrar idempotência (TTL: 24h) ─────────────────────────
+        # ── 7. Record idempotency (TTL: 24h) ─────────────────────────────
         if cache_key:
             try:
                 _redis = _get_redis()
@@ -804,9 +820,9 @@ class WorkflowService:
 
         return result
 
-    # Wrappers que delegam para as funções do módulo workflow_execution_service.
-    # Existem como métodos para que testes possam substituí-los via
-    # `service._load_workflow = AsyncMock(...)` e patches por instância.
+    # Wrappers that delegate to the functions of the workflow_execution_service module.
+    # They exist as methods so tests can replace them via
+    # `service._load_workflow = AsyncMock(...)` and per-instance patches.
     async def _load_workflow(
         self, id_hash: str, request: Request | None = None,
         *, workflow: Workflow | None = None,
@@ -845,11 +861,11 @@ class WorkflowService:
     async def list_workflows_metadata(
         self, workspace_id: str | None = None, *, incluir_do_assistente: bool = False,
     ) -> list[dict]:
-        """Listagem leve — metadados sem definition, mais o resumo do
-        agendamento e os nomes de autoria (ver `_mesclar_listagem`).
+        """Light listing — metadata without definition, plus the schedule
+        summary and the authorship names (see `_mesclar_listagem`).
 
-        `incluir_do_assistente` repassa o interruptor da tela: por padrao os
-        fluxos do assistente ficam de fora."""
+        `incluir_do_assistente` passes along the screen's toggle: by default
+        the assistant's workflows are left out."""
         linhas = await self.crud.get_all_metadata(
             workspace_id=workspace_id, incluir_do_assistente=incluir_do_assistente,
         )
@@ -858,7 +874,7 @@ class WorkflowService:
     async def list_workflows_metadata_by_ids(
         self, workspace_ids: list[str], *, incluir_do_assistente: bool = False,
     ) -> list[dict]:
-        """Listagem leve por workspace IDs — mesma mescla de `list_workflows_metadata`."""
+        """Light listing by workspace IDs — same merge as `list_workflows_metadata`."""
         linhas = await self.crud.get_all_metadata_by_workspace_ids(
             workspace_ids, incluir_do_assistente=incluir_do_assistente,
         )
@@ -872,7 +888,7 @@ class WorkflowService:
         if not wf:
             raise WorkflowNotFoundError(f"Workflow {id_hash} não existe")
 
-        # Desativa schedules vinculados para não disparar execuções
+        # Deactivates linked schedules so they don't fire executions
         result = await self.crud.db.execute(
             sa_select(Schedule).where(Schedule.workflow_hash == id_hash)
         )
@@ -880,9 +896,9 @@ class WorkflowService:
             sched.active = False
         await self.crud.db.commit()
 
-        # Limpa estado de ChangeDetector — workflow nao executa mais. Se for
-        # restaurado, a primeira run sera "Mudou" (seguro). Best-effort: falha
-        # no Redis nao bloqueia o delete.
+        # Clears ChangeDetector state — the workflow no longer runs. If it is
+        # restored, the first run will be "Mudou" (changed; safe). Best-effort:
+        # a Redis failure does not block the delete.
         await _cleanup_change_detector_keys(id_hash)
 
         return wf
@@ -897,63 +913,65 @@ class WorkflowService:
     ) -> Workflow:
         autor = _exigir_autor(updated_by_id, "updated_by_id")
 
-        # 1. Garante que o workflow existe — usa get_by_hash (sem decrypt) para não
-        #    marcar definition como dirty na sessão SQLAlchemy e evitar que o commit
-        #    subsequente salve a definition descriptografada no banco.
+        # 1. Ensures the workflow exists — uses get_by_hash (no decrypt) so as not to
+        #    mark the definition as dirty in the SQLAlchemy session and keep the
+        #    subsequent commit from saving the decrypted definition to the database.
         wf = await self.crud.get_by_hash(id_hash)
         if not wf:
             raise WorkflowNotFoundError(f"Workflow {id_hash} não existe")
 
-        # 2. Extrai apenas os campos do payload
+        # 2. Extracts only the payload fields
         updates: dict = workflow_in.model_dump(exclude_unset=True)
         flag_ative_anterior = bool(wf.flag_ative)
 
-        # 2a. Autoria vem da identidade autenticada, nunca do corpo — `WorkflowUpdate`
-        #     não expõe mais `updated_by_id` justamente para que o cliente não possa
-        #     forjar quem editou.
+        # 2a. Authorship comes from the authenticated identity, never from the body —
+        #     `WorkflowUpdate` no longer exposes `updated_by_id` precisely so that
+        #     the client cannot forge who edited it.
         updates["updated_by_id"] = autor
 
-        # 2b. Credenciais da nova definition ao alcance de quem edita (SEG-12),
-        #     antes de qualquer escrita — inclusive do snapshot abaixo.
+        # 2b. Credentials of the new definition within reach of the editor (SEG-12),
+        #     before any write — including the snapshot below.
         if "definition" in updates:
             await assert_credenciais_da_definicao(
                 self.crud.db, updates["definition"],
                 user_id=autor, workspace_id=wf.workspace_id,
             )
 
-        # 3. Se a definition vai mudar e houve mudanças substanciais, cria snapshot
+        # 3. If the definition is going to change and there were substantial changes, creates a snapshot
         if "definition" in updates:
-            # A CÓPIA não é zelo: `decrypt_workflow_connections` MUTA o dict que
-            # recebe e devolve o mesmo objeto. Decifrando `wf.definition` direto,
-            # ele saía daqui em texto claro e o snapshot logo abaixo gravava a
-            # credencial legível em `workflow_versions` — um histórico que
-            # ninguém mais reescreve.
+            # The COPY is not overcaution: `decrypt_workflow_connections` MUTATES the
+            # dict it receives and returns the same object. Decrypting
+            # `wf.definition` directly, it would leave here in plain text and the
+            # snapshot right below would write the credential in readable form
+            # to `workflow_versions` — a history nobody ever rewrites.
             old_def = decrypt_workflow_connections(copy.deepcopy(wf.definition))
             if _has_substantial_changes(old_def, workflow_in.definition):
-                # E o `get_by_hash` do passo 1 NÃO basta para o snapshot sair
-                # cifrado. A dependency da rota (`get_accessible_workflow_with_role`)
-                # já chamou `get_workflow_by_hash`, que faz
-                # `wf.definition = decrypt_workflow_connections(...)` — mutação in
-                # place na linha viva. Como a sessão é a mesma, `get_by_hash`
-                # devolve o MESMO objeto Python, já em claro, e copiá-lo só
-                # duplica o texto claro. Cifrar explicitamente é o que fecha:
-                # `encrypt_workflow_connections` é idempotente (pula o que já
-                # começa com `gAAAA`), então cobre os dois estados possíveis da
-                # sessão. Mesmo remédio, e pelo mesmo motivo, de
-                # `workflow_move_service._aplicar`.
+                # And step 1's `get_by_hash` is NOT enough for the snapshot to come
+                # out encrypted. The route's dependency
+                # (`get_accessible_workflow_with_role`) has already called
+                # `get_workflow_by_hash`, which does
+                # `wf.definition = decrypt_workflow_connections(...)` — an
+                # in-place mutation on the live row. Since the session is the
+                # same, `get_by_hash` returns the SAME Python object, already in
+                # plain text, and copying it only duplicates the plain text.
+                # Encrypting explicitly is what closes it:
+                # `encrypt_workflow_connections` is idempotent (it skips what
+                # already starts with `gAAAA`), so it covers both possible
+                # states of the session. Same remedy, and for the same reason,
+                # as `workflow_move_service._aplicar`.
                 #
-                # Esta chamada fica FORA do `try/except IntegrityError` logo
-                # abaixo, e isso é deliberado — mas engana quem lê depressa.
-                # `create_version` só faz `flush()`, então o INSERT sai aqui, e
-                # uma colisão de `version_number` estouraria vinte linhas antes
-                # do `try`. O `except` de baixo é do conflito de NOME, que vem do
-                # `crud.update`.
+                # This call sits OUTSIDE the `try/except IntegrityError` right
+                # below, and that is deliberate — but it fools a hasty reader.
+                # `create_version` only does `flush()`, so the INSERT goes out
+                # here, and a `version_number` collision would blow up twenty
+                # lines before the `try`. The `except` below is for the NAME
+                # conflict, which comes from `crud.update`.
                 #
-                # Não há vazamento porque quem trata a colisão de versão é o
-                # próprio `create_version`, na origem: savepoint e reconvergência.
-                # Se alguém algum dia tirar aquele tratamento, o buraco reabre
-                # AQUI — como um 500 que perde o save do usuário —, e não no
-                # `except` abaixo, que não tem como alcançá-lo.
+                # There is no leak because the version collision is handled by
+                # `create_version` itself, at the source: savepoint and
+                # reconvergence. If someone ever removes that handling, the hole
+                # reopens HERE — as a 500 that loses the user's save —, and not
+                # in the `except` below, which has no way of reaching it.
                 await self.crud.create_version(
                     workflow_hash=id_hash,
                     definition=encrypt_workflow_connections(copy.deepcopy(wf.definition or {})),
@@ -961,13 +979,14 @@ class WorkflowService:
                 )
             updates["definition"] = encrypt_workflow_connections(updates["definition"])
 
-        # 4. Aplica updates no banco
+        # 4. Applies updates to the database
         #
-        # O nome sai do objeto ANTES do commit: `crud.update` faz setattr e
-        # commita, e o `rollback()` do except expira toda a sessão. Ler
-        # `wf.name` depois dispara refresh lazy — que numa AsyncSession não é
-        # um SELECT a mais, é `MissingGreenlet`, ou seja, o 409 desta mensagem
-        # viraria 500 justamente no caminho de erro.
+        # The name is read from the object BEFORE the commit: `crud.update` does
+        # setattr and commits, and the except's `rollback()` expires the whole
+        # session. Reading `wf.name` afterwards triggers a lazy refresh — which
+        # in an AsyncSession is not one more SELECT, it is `MissingGreenlet`,
+        # that is, this message's 409 would become a 500 precisely on the error
+        # path.
         nome_tentado = updates.get("name") or wf.name
         try:
             wf = await self.crud.update(wf, updates)
@@ -979,11 +998,12 @@ class WorkflowService:
                 ) from exc
             raise
 
-        # 5. Sincroniza agendamentos sempre que a definição muda — a função
-        # apply_schedule_if_needed remove schedules antigos e só cria novo se
-        # houver ScheduleTrigger. Sem este sync incondicional, remover o
-        # ScheduleTrigger do workflow deixava o Schedule antigo ativo no banco
-        # e o async_scheduler continuava disparando o workflow em loop.
+        # 5. Syncs schedules whenever the definition changes — the function
+        # apply_schedule_if_needed removes old schedules and only creates a new
+        # one if there is a ScheduleTrigger. Without this unconditional sync,
+        # removing the ScheduleTrigger from the workflow left the old Schedule
+        # active in the database and the async_scheduler kept firing the
+        # workflow in a loop.
         schedule_notices = []
         if "definition" in updates:
             try:
@@ -991,13 +1011,14 @@ class WorkflowService:
             except Exception as exc:
                 _logger.warning("Falha ao sincronizar agendamento para workflow %s: %s", wf.id_hash, exc)
 
-        # 6. O switch "Ativado/Inativo" da lista de projetos manda `flag_ative`
-        # SOZINHO — sem definition, o passo 5 nem roda. Desativar o workflow
-        # deixava o Schedule ativo apontando para ele, e o AsyncScheduler
-        # tentava disparar a cada ocorrência do cron até alguém ler o log.
-        # Roda depois do passo 5 de propósito: `apply_schedule_if_needed` sai
-        # cedo quando o workflow está desativado (preserva a config antiga), e é
-        # este sync que dá a palavra final sobre `active`.
+        # 6. The "Ativado/Inativo" (enabled/inactive) switch in the projects list
+        # sends `flag_ative` ALONE — without a definition, step 5 does not even
+        # run. Deactivating the workflow left the Schedule active pointing at
+        # it, and the AsyncScheduler tried to fire it on every cron occurrence
+        # until someone read the log. Runs after step 5 on purpose:
+        # `apply_schedule_if_needed` returns early when the workflow is
+        # deactivated (it preserves the old config), and it is this sync that
+        # has the final say on `active`.
         if bool(wf.flag_ative) != flag_ative_anterior:
             try:
                 await sync_schedules_with_workflow_state(wf, self.crud.db)
@@ -1007,9 +1028,9 @@ class WorkflowService:
                     wf.id_hash, exc,
                 )
 
-        # Avisos do agendamento viajam na resposta como atributo transiente
-        # (não é coluna): `WorkflowRead.schedule_notices` os lê e o editor os
-        # transforma em toast. Setado sempre — vazio no caso normal.
+        # Schedule notices travel in the response as a transient attribute
+        # (not a column): `WorkflowRead.schedule_notices` reads them and the
+        # editor turns them into a toast. Always set — empty in the normal case.
         wf.schedule_notices = schedule_notices
         return wf
 
@@ -1019,17 +1040,17 @@ class WorkflowService:
     async def restore_version(
         self, id_hash: str, version_number: int, *, restored_by: str,
     ) -> Workflow:
-        """Restaura a versão. Antes confere as credenciais da versão contra
-        `restored_by` (SEG-12): restaurar não pode reintroduzir uma credencial
-        que quem restaura não acessa. Versão inexistente levanta
-        `WorkflowNotFoundError` já aqui — o erro não é engolido para "pular" a
-        guarda."""
+        """Restores the version. First checks the version's credentials against
+        `restored_by` (SEG-12): restoring must not reintroduce a credential
+        that the person restoring cannot access. A nonexistent version raises
+        `WorkflowNotFoundError` right here — the error is not swallowed to
+        "skip" the guard."""
         autor = _exigir_autor(restored_by, "restored_by")
 
-        # A versão CRUA, sem decifrar: `credential_id` não é cifrado, e abrir o
-        # blob faria uma versão com `connectionString` que não decifra mais
-        # (chave rotacionada) falhar aqui — a restauração em si só copia o
-        # blob, sem abri-lo.
+        # The RAW version, without decrypting: `credential_id` is not encrypted, and
+        # opening the blob would make a version with a `connectionString` that
+        # no longer decrypts (rotated key) fail here — the restore itself only
+        # copies the blob, without opening it.
         versao = await self.crud.get_version(id_hash, version_number)
         if not versao:
             raise WorkflowNotFoundError(

@@ -10,14 +10,14 @@ interface Props {
   onPeriodo: (p: Periodo) => void
   carregando: boolean
   onAtualizar: () => void
-  /** Tamanho da janela anterior com que os indicadores se comparam. */
+  /** Size of the previous window the indicators are compared with. */
   comparandoCom: number
 }
 
 /**
- * Cabeçalho do Histórico (spec §4.3): o período mora aqui, uma vez, e o
- * subtítulo diz com o que os indicadores se comparam — na tela antiga o
- * seletor vivia dentro do gráfico e governava oito cards sem dizer isso.
+ * History header (spec §4.3): the period lives here, once, and the subtitle
+ * says what the indicators are compared with — on the old screen the selector
+ * lived inside the chart and governed eight cards without saying so.
  */
 export function CabecalhoDoHistorico({
   periodo, onPeriodo, carregando, onAtualizar, comparandoCom,
@@ -31,8 +31,8 @@ export function CabecalhoDoHistorico({
         </p>
       </div>
       <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-        {/* Atualizar à esquerda, como em /projetos: a ação de recarregar vem
-            primeiro; o seletor de período é filtro, fica depois. */}
+        {/* Refresh on the left, as in /projetos: the reload action comes
+            first; the period selector is a filter, it comes after. */}
         <Button
           variant="ghost"
           size="sm"
@@ -74,7 +74,7 @@ export function CabecalhoDoHistorico({
   )
 }
 
-/** Grão grosso de propósito: um relógio de segundos ao lado do botão só distrai. */
+/** Coarse grain on purpose: a seconds clock next to the button only distracts. */
 export function textoDeFrescor(carimbo: number, agora: number): string {
   const s = Math.max(0, Math.round((agora - carimbo) / 1000))
   if (s < 10) return "atualizado agora"

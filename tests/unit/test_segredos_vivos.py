@@ -1,7 +1,7 @@
 # tests/unit/test_segredos_vivos.py
-"""Enquanto um segredo está em uso, nenhum registro de log do processo o leva —
-venha de que biblioteca vier (o owslib e o urllib3 logam a URL de cada pedido,
-com a chave authkey nela)."""
+"""While a secret is in use, no log record of the process carries it — whatever
+library it comes from (owslib and urllib3 log the URL of every request, with
+the authkey in it)."""
 import logging
 
 from flow.utils import segredos_vivos
@@ -54,8 +54,8 @@ def test_contado_por_uso_um_no_que_termina_nao_libera_o_do_outro(caplog):
 
 
 def test_segredo_curto_demais_nao_mutila_o_log(caplog):
-    # Abaixo de 6 caracteres a troca reescreveria datas, ids e contadores de
-    # todo log do processo ("2024" em "2024-09-25").
+    # Below 6 characters the replacement would rewrite dates, ids and counters in
+    # every log of the process ("2024" in "2024-09-25").
     with caplog.at_level(logging.INFO):
         with segredos_vivos.em_uso("ab"), segredos_vivos.em_uso("2024"):
             logging.getLogger("x").info("job 2024-09-25 iniciado, tabela ab, request_id=ab2024cd")
@@ -63,8 +63,8 @@ def test_segredo_curto_demais_nao_mutila_o_log(caplog):
 
 
 def test_o_registro_mantem_a_forma_msg_e_args_redigidos_um_a_um(caplog):
-    # Há formatadores que leem `record.args` (o de acesso do uvicorn desempacota
-    # cinco campos dele): achatar `args` para None os quebrava e a linha se perdia.
+    # Some formatters read `record.args` (uvicorn's access one unpacks five fields
+    # from it): flattening `args` to None broke them and the line was lost.
     class _ComoOUvicorn(logging.Formatter):
         def format(self, record):
             cliente, metodo, caminho, versao, status = record.args
@@ -81,9 +81,9 @@ def test_o_registro_mantem_a_forma_msg_e_args_redigidos_um_a_um(caplog):
 
 
 def test_formato_que_nao_bate_com_os_argumentos_nao_deixa_o_segredo_passar():
-    # `getMessage()` falha (um %s a mais); antes o registro seguia intacto e o
-    # `handleError` do logging imprimia os argumentos crus no stderr. Um handler
-    # próprio, e não o caplog: o do pytest relança o TypeError ao formatar.
+    # `getMessage()` fails (one %s too many); before, the record went through intact
+    # and logging's `handleError` printed the raw arguments to stderr. A handler of
+    # our own, not caplog: pytest's re-raises the TypeError when formatting.
     class _Guarda(logging.Handler):
         def __init__(self):
             super().__init__()
@@ -118,13 +118,13 @@ def test_a_repr_de_um_objeto_nos_argumentos_e_apanhada_pela_mensagem_pronta(capl
 
 
 def test_stack_info_tambem_sai_sem_a_chave(caplog):
-    def _com_a_chave_na_pilha(segredo_na_pilha):  # o nome do argumento vai ao stack_info? não; o valor não
+    def _com_a_chave_na_pilha(segredo_na_pilha):  # does the argument name go to stack_info? no; the value does not
         logging.getLogger("x").info("com pilha", stack_info=True)
 
     with caplog.at_level(logging.INFO):
         with segredos_vivos.em_uso(CHAVE):
             _com_a_chave_na_pilha(CHAVE)
-            # Uma pilha que carrega a chave (a linha de código com ela).
+            # A stack that carries the key (the line of code containing it).
             registro = caplog.records[-1]
             registro.stack_info = f"Stack:\n  File x, line 1, in f\n    url = 'http://x/ows?authkey={CHAVE}'"
             segredos_vivos._limpar(registro, segredos_vivos._formas)
@@ -132,8 +132,8 @@ def test_stack_info_tambem_sai_sem_a_chave(caplog):
 
 
 def test_a_fabrica_anterior_continua_sendo_chamada(caplog):
-    # Quem instalou uma fábrica antes (um APM, um formatador de contexto) segue
-    # vendo cada registro: a nossa envolve a dele, não a substitui.
+    # Whoever installed a factory before (an APM, a context formatter) still sees
+    # every record: ours wraps theirs, it does not replace it.
     vistos = []
     anterior = logging.getLogRecordFactory()
 
@@ -144,13 +144,13 @@ def test_a_fabrica_anterior_continua_sendo_chamada(caplog):
 
     logging.setLogRecordFactory(_minha)
     try:
-        segredos_vivos._instalada = False  # reinstala por cima da minha
+        segredos_vivos._instalada = False  # reinstalls on top of mine
         with caplog.at_level(logging.INFO):
             with segredos_vivos.em_uso(CHAVE):
                 logging.getLogger("x").info("oi %s", CHAVE)
     finally:
         logging.setLogRecordFactory(anterior)
-        segredos_vivos._instalada = False  # o próximo `em_uso` reinstala por cima da original
+        segredos_vivos._instalada = False  # the next `em_uso` reinstalls on top of the original
     assert vistos == caplog.records and _formatado(caplog) == "oi ***"
 
 
@@ -162,8 +162,8 @@ def test_a_forma_maior_e_trocada_inteira(caplog):
 
 
 def test_o_formatador_de_console_do_executor_mostra_o_traceback_redigido(caplog):
-    # A fábrica entrega o traceback redigido em `exc_text` e anula `exc_info`;
-    # o console do executor só olhava `exc_info` e perdia o traceback inteiro.
+    # The factory delivers the redacted traceback in `exc_text` and nulls `exc_info`;
+    # the executor console only looked at `exc_info` and lost the whole traceback.
     from executor.logging_setup import _ColoredFormatter
     with caplog.at_level(logging.ERROR):
         with segredos_vivos.em_uso(CHAVE):

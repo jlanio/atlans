@@ -1,38 +1,39 @@
 # tests/unit/test_fix_connection.py
-"""Regressoes dos loops de envio e do backoff de reconexao do executor.
+"""Regressions for the executor's send loops and reconnect backoff.
 
-Bugs cobertos:
-  B3 — task_done() so era chamado quando o item NAO era re-enfileirado. Cada
-       falha de envio deslocava _unfinished_tasks +1 permanentemente e o
-       `_event_queue.join()` de main.py (on_execute) nunca mais resolvia: todo
-       job seguinte pagava 30s de timeout ("Timeout ao drenar fila de eventos
-       — 0 evento(s) pendente(s)"). Agravantes: `await put()` numa fila cheia
-       cujo unico consumidor e o proprio loop = deadlock; json.dumps cru no
-       node_event; ausencia de teto de tentativas.
-  B4 — excecao pos-handshake era engolida (logger.debug) e o retorno "limpo"
-       de _connect_and_run zerava o backoff, reconectando sem sleep.
-  P2 — o filtro de 'output' no result_sender_loop virou codigo morto (o descarte
-       acontece na origem, em main.py on_execute).
+Bugs covered:
+  B3 — task_done() was only called when the item was NOT re-enqueued. Every
+       send failure shifted _unfinished_tasks by +1 permanently and the
+       `_event_queue.join()` in main.py (on_execute) never resolved again: every
+       following job paid a 30s timeout ("Timeout ao drenar fila de eventos
+       — 0 evento(s) pendente(s)"). Aggravating factors: `await put()` on a full
+       queue whose only consumer is the loop itself = deadlock; raw json.dumps
+       on node_event; no cap on attempts.
+  B4 — a post-handshake exception was swallowed (logger.debug) and the "clean"
+       return of _connect_and_run reset the backoff, reconnecting without sleep.
+  P2 — the 'output' filter in result_sender_loop became dead code (the discard
+       happens at the source, in main.py on_execute).
 
-Segunda rodada (revisao adversarial das proprias correcoes):
-  R1 — o result loop ficou SEM teto de tentativas (assimetrico com o de
-       eventos): um resultado que falha de forma deterministica girava para
-       sempre e travava o `_result_queue.join()` do shutdown.
-  R2 — cancelamento durante o `ws.send` perdia o item: CancelledError nao e
-       Exception, nao caia em nenhum handler, e o `finally` ja tinha feito
-       task_done() — o join() dava a fila por drenada com o item nunca enviado.
-  R3 — `_safe_dumps` (truncagem modelada para job_result) reaproveitado no
-       node_event: nao reduzia nada, injetava uma chave 'stats' inexistente e
-       logava "job_result descartado" para algo que nao era job_result.
-  R4 — `asyncio.wait` nao cancela o que aguarda: cancelar o conn_task deixava
-       os 5 loops filhos vivos depois do gather do shutdown.
-  R5 — close terminal (4401/4403/4404) se perdia quando um loop auxiliar
-       terminava (limpo, por `break`) antes do _receive_loop.
+Second round (adversarial review of our own fixes):
+  R1 — the result loop was left WITHOUT an attempt cap (asymmetric with the
+       events one): a result that fails deterministically spun forever and
+       froze the shutdown's `_result_queue.join()`.
+  R2 — cancellation during `ws.send` lost the item: CancelledError is not an
+       Exception, fell into no handler, and the `finally` had already called
+       task_done() — join() considered the queue drained with the item never sent.
+  R3 — `_safe_dumps` (truncation modeled for job_result) reused on
+       node_event: it reduced nothing, injected a nonexistent 'stats' key and
+       logged "job_result descartado" (discarded) for something that was not a
+       job_result.
+  R4 — `asyncio.wait` does not cancel what it awaits: canceling conn_task left
+       the 5 child loops alive after the shutdown gather.
+  R5 — a terminal close (4401/4403/4404) got lost when an auxiliary loop
+       finished (cleanly, via `break`) before _receive_loop.
 
-Os testes de B4/R5 rodam o `_connect_and_run` REAL com um `websockets.connect`
-falso. Monkeypatchar `_connect_and_run` — como a primeira versao fazia — anula
-exatamente o codigo sob teste: o teste "de propagacao" so provava que uma
-excecao levantada pelo proprio teste chegava ao classificador.
+The B4/R5 tests run the REAL `_connect_and_run` with a fake `websockets.connect`.
+Monkeypatching `_connect_and_run` — as the first version did — nullifies exactly
+the code under test: the "propagation" test only proved that an exception raised
+by the test itself reached the classifier.
 """
 import asyncio
 import json
@@ -56,7 +57,7 @@ class _WS:
     def __init__(self, raise_exc=None, raise_times=None, send_delay=0.0):
         self.enviadas = []
         self._raise_exc = raise_exc
-        self._restantes = raise_times  # None = sempre
+        self._restantes = raise_times  # None = always
         self._send_delay = send_delay
 
     async def send(self, raw):
@@ -70,11 +71,11 @@ class _WS:
 
 
 class _SessionWS:
-    """WS falso completo o bastante para rodar o `_connect_and_run` REAL.
+    """A fake WS complete enough to run the REAL `_connect_and_run`.
 
-    Precisa ser iteravel (`async for raw in ws` do _receive_loop) e expor
-    `close_code`/`close_reason` — que sao a fonte de verdade consultada quando
-    nenhuma task em `done` trouxe a excecao do close.
+    It must be iterable (`async for raw in ws` in _receive_loop) and expose
+    `close_code`/`close_reason` — which are the source of truth consulted when
+    no task in `done` carried the close exception.
     """
 
     def __init__(self, *, send_exc=None, send_exc_after=1, send_delay=0.0,
@@ -83,9 +84,9 @@ class _SessionWS:
         self.fechado = False
         self.close_code = close_code
         self.close_reason = close_reason
-        # O handshake e o primeiro send: deixa-lo passar e obrigatorio, senao a
-        # excecao subiria de fora do asyncio.wait e o teste passaria pelo
-        # caminho errado.
+        # The handshake is the first send: letting it through is mandatory, otherwise
+        # the exception would be raised outside asyncio.wait and the test would
+        # pass via the wrong path.
         self._send_exc = send_exc
         self._send_restantes_ok = send_exc_after
         self._send_delay = send_delay
@@ -110,7 +111,7 @@ class _SessionWS:
             await asyncio.sleep(self._recv_delay)
         if self._recv_exc is not None:
             raise self._recv_exc
-        # Sem mensagens: dorme ate ser cancelado (simula sessao ociosa).
+        # No messages: sleeps until canceled (simulates an idle session).
         await asyncio.sleep(3600)
         raise StopAsyncIteration
 
@@ -144,25 +145,25 @@ def _conn(results=None, events=None):
 
 
 async def _rodar(coro_fn, timeout=3.0):
-    """Roda um sender_loop em task e cancela quando ele fica ocioso."""
+    """Runs a sender_loop in a task and cancels it when it goes idle."""
     task = asyncio.create_task(coro_fn)
     await asyncio.sleep(0)
     return task
 
 
-# ── B3: saldo do task_done fecha em TODOS os caminhos ────────────────────────
+# ── B3: the task_done balance closes on ALL paths ────────────────────────────
 
 @pytest.mark.asyncio
 async def test_event_join_resolve_apos_falha_de_envio(monkeypatch):
-    """O caso que travava o executor: falha generica no envio de node_event.
+    """The case that froze the executor: a generic failure sending a node_event.
 
-    Antes: put() sem task_done => _unfinished_tasks nunca voltava a zero e o
-    join() de on_execute estourava 30s em todo job subsequente.
+    Before: put() without task_done => _unfinished_tasks never returned to zero
+    and on_execute's join() hit 30s on every subsequent job.
     """
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
     events = asyncio.Queue(maxsize=500)
     c = _conn(events=events)
-    # Falha nas 2 primeiras tentativas, envia na terceira.
+    # Fails on the first 2 attempts, sends on the third.
     ws = _WS(raise_exc=RuntimeError("WS em estado invalido"), raise_times=2)
 
     await events.put({"node": "n1", "status": "running"})
@@ -178,7 +179,7 @@ async def test_event_join_resolve_apos_falha_de_envio(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_event_descartado_apos_teto_de_tentativas(monkeypatch):
-    """Erro deterministico (payload impossivel) nao pode reciclar para sempre."""
+    """A deterministic error (impossible payload) must not recycle forever."""
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
     events = asyncio.Queue(maxsize=500)
     c = _conn(events=events)
@@ -197,7 +198,7 @@ async def test_event_descartado_apos_teto_de_tentativas(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_contador_de_tentativas_nunca_vai_no_payload(monkeypatch):
-    """A chave interna de retry nao pode vazar no protocolo node_event."""
+    """The internal retry key must not leak into the node_event protocol."""
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
     events = asyncio.Queue(maxsize=500)
     c = _conn(events=events)
@@ -220,7 +221,7 @@ async def test_requeue_em_fila_cheia_nao_deadlocka():
     c = _conn(events=events)
     await events.put({"node": "ocupa", "status": "running"})
 
-    # Nao deve bloquear: descarta com log.
+    # Must not block: discards with a log.
     c._requeue_event({"node": "n2", "status": "running"}, 1)
     assert events.qsize() == 1
 
@@ -236,8 +237,8 @@ async def test_connection_closed_no_event_loop_nao_faz_task_done_duplo():
     await events.put({"node": "n1", "status": "running"})
     await asyncio.wait_for(c._event_sender_loop(ws), timeout=3.0)
 
-    # Evento voltou para a fila (sera reenviado apos reconexao) e o saldo
-    # corresponde exatamente a 1 item pendente — nao 2.
+    # The event went back to the queue (will be resent after reconnection) and the
+    # balance matches exactly 1 pending item — not 2.
     assert events.qsize() == 1
     assert events._unfinished_tasks == 1
 
@@ -280,17 +281,17 @@ async def test_connection_closed_no_result_loop_nao_faz_task_done_duplo(monkeypa
     assert results._unfinished_tasks == 1
 
 
-# ── R1: o result loop tambem precisa de teto ─────────────────────────────────
+# ── R1: the result loop also needs a cap ─────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_result_descartado_apos_teto_e_continua_no_outbox(monkeypatch):
-    """Resultado 'imortal' prendia o unico consumidor e o join() do shutdown.
+    """An 'immortal' result held the only consumer and the shutdown's join().
 
-    Cenario real: stats com referencia circular => json.dumps levanta sempre.
-    Sem teto, o item voltava para a fila indefinidamente (1 tentativa/s) e o
-    `_result_queue.join()` de main.py pagava os 30s inteiros de timeout em todo
-    deploy. Com teto, a fila drena — e o resultado NAO e dado como enviado
-    (mark_sent nunca chamado), entao o outbox o reenvia no proximo start.
+    Real scenario: stats with a circular reference => json.dumps always raises.
+    Without a cap, the item went back to the queue indefinitely (1 attempt/s) and
+    `_result_queue.join()` in main.py paid the full 30s timeout on every deploy.
+    With a cap, the queue drains — and the result is NOT considered sent
+    (mark_sent never called), so the outbox resends it on the next start.
     """
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
     from executor import result_store
@@ -339,9 +340,9 @@ async def test_contador_de_tentativas_do_result_nao_vai_no_payload(monkeypatch):
 
 
 async def test_resultado_enviado_fica_lembrado_para_o_inventario(monkeypatch):
-    """O `mark_sent` apaga o outbox assim que o send retorna, mas o servidor pode
-    ainda nem ter processado o resultado. Até lá o inventário segue dizendo que
-    o job terminou aqui — senão o servidor fecharia o run como perdido."""
+    """`mark_sent` deletes the outbox as soon as the send returns, but the server
+    may not even have processed the result yet. Until then the inventory keeps
+    saying the job finished here — otherwise the server would close the run as lost."""
     from executor import result_store
     monkeypatch.setattr(result_store, "mark_sent", lambda *_a: None)
     monkeypatch.setattr(result_store, "job_ids_pendentes", lambda: [])
@@ -360,15 +361,16 @@ async def test_resultado_enviado_fica_lembrado_para_o_inventario(monkeypatch):
     assert c._montar_inventario()["resultados"] == ["j1"]
 
 
-# ── R2: cancelamento durante o ws.send nao pode perder o item ────────────────
+# ── R2: cancellation during ws.send must not lose the item ───────────────────
 
 @pytest.mark.asyncio
 async def test_result_volta_para_a_fila_quando_cancelado_durante_o_send(monkeypatch):
-    """`for task in pending: task.cancel()` roda em TODA queda de sessao.
+    """`for task in pending: task.cancel()` runs on EVERY session drop.
 
-    Se o cancelamento pega o loop dentro do `ws.send`, o resultado ja saiu da
-    fila: sem o handler de CancelledError ele sumia (o `finally` fazia
-    task_done) e o `join()` do shutdown reportava 'drenado' sem log algum.
+    If the cancellation catches the loop inside `ws.send`, the result has
+    already left the queue: without the CancelledError handler it vanished (the
+    `finally` called task_done) and the shutdown's `join()` reported 'drenado'
+    (drained) without any log.
     """
     from executor import result_store
     monkeypatch.setattr(result_store, "mark_sent", lambda *_a: None)
@@ -404,13 +406,13 @@ async def test_event_volta_para_a_fila_quando_cancelado_durante_o_send():
     assert events._unfinished_tasks == 1
 
 
-# ── R3: serializacao de node_event tem teto PROPRIO ──────────────────────────
+# ── R3: node_event serialization has its OWN cap ─────────────────────────────
 
 def test_dumps_event_reduz_evento_gigante_aos_campos_de_controle():
-    """A truncagem de job_result (por 'stats') nao servia para node_event.
+    """The job_result truncation (by 'stats') did not work for node_event.
 
-    Reaproveitada, ela devolvia uma string MAIOR que a entrada, injetava uma
-    chave 'stats' que node_event nunca teve e logava 'job_result descartado'.
+    Reused, it returned a string LARGER than the input, injected a 'stats' key
+    that node_event never had and logged 'job_result descartado' (discarded).
     """
     grande = "x" * (TETO_NODE_EVENT_BYTES + 5_000)
     evento = {
@@ -423,7 +425,7 @@ def test_dumps_event_reduz_evento_gigante_aos_campos_de_controle():
 
     assert len(raw) < TETO_NODE_EVENT_BYTES, "nao reduziu nada"
     payload = json.loads(raw)
-    assert payload["type"] == "node_event"      # sem isso o servidor nao roteia
+    assert payload["type"] == "node_event"      # without this the server does not route
     assert payload["run_id"] == "r1"
     assert payload["node"] == "n1"
     assert payload["status"] == "log"
@@ -441,7 +443,7 @@ def test_dumps_event_nao_mexe_em_evento_normal():
 
 
 def test_dumps_event_coage_campo_de_controle_nao_escalar():
-    """Teto tem que ser garantia: um 'node' gigante nao pode passar inteiro."""
+    """A cap has to be a guarantee: a giant 'node' must not get through whole."""
     evento = {"type": "node_event", "run_id": "r1",
               "node": {"lixo": "y" * (TETO_NODE_EVENT_BYTES + 100)},
               "status": "log"}
@@ -450,7 +452,7 @@ def test_dumps_event_coage_campo_de_controle_nao_escalar():
 
 
 def test_dumps_result_preserva_chaves_de_controle_ao_truncar(monkeypatch):
-    """A truncagem por 'stats' continua viva — no lugar certo (job_result)."""
+    """Truncation by 'stats' is still alive — in the right place (job_result)."""
     monkeypatch.setattr(conn_mod, "_MAX_WS_PAYLOAD", 2_000)
     obj = {"type": "job_result", "job_id": "j1", "status": "success",
            "stats": {"__response__": {"ok": True}, "no1": "z" * 5_000}}
@@ -462,7 +464,7 @@ def test_dumps_result_preserva_chaves_de_controle_ao_truncar(monkeypatch):
     assert "no1" not in payload["stats"]
 
 
-# ── P2: o result vai inteiro; quem descarta 'output' e o main.py ─────────────
+# ── P2: the result goes whole; main.py is the one that discards 'output' ─────
 
 @pytest.mark.asyncio
 async def test_result_enviado_sem_filtro_local(monkeypatch):
@@ -485,17 +487,17 @@ async def test_result_enviado_sem_filtro_local(monkeypatch):
     assert payload["stats"]["__response__"] == {"ok": True}
 
 
-# ── B4: backoff nao pode ser zerado por sessao curta ─────────────────────────
+# ── B4: backoff must not be reset by a short session ─────────────────────────
 
 @pytest.mark.asyncio
 async def test_retorno_limpo_ainda_dorme_antes_de_reconectar(monkeypatch):
-    """Sessao que termina sem excecao continua sendo desconexao: precisa sleep."""
+    """A session that ends without an exception is still a disconnection: it needs a sleep."""
     dormidas = []
     tentativas = {"n": 0}
 
-    # A espera do backoff virou `_esperar_retry` (um wait_for interrompivel pela
-    # tecla 'r' do painel), entao e nele que o teste observa — a intencao segue
-    # a mesma: nao reconectar sem esperar.
+    # The backoff wait became `_esperar_retry` (a wait_for interruptible by the
+    # panel's 'r' key), so that is where the test observes — the intent stays
+    # the same: do not reconnect without waiting.
     async def _fake_espera(self, d):
         dormidas.append(d)
         return False  # timeout normal, ninguem pediu retry antecipado
@@ -504,7 +506,7 @@ async def test_retorno_limpo_ainda_dorme_antes_de_reconectar(monkeypatch):
         tentativas["n"] += 1
         if tentativas["n"] >= 4:
             self._should_reconnect = False  # encerra o teste
-        return  # retorno "limpo", sem excecao
+        return  # "clean" return, without an exception
 
     monkeypatch.setattr(ExecutorConnection, "_esperar_retry", _fake_espera)
     monkeypatch.setattr(ExecutorConnection, "_connect_and_run", _fake_connect)
@@ -513,7 +515,7 @@ async def test_retorno_limpo_ainda_dorme_antes_de_reconectar(monkeypatch):
     await asyncio.wait_for(c.run(), timeout=3.0)
 
     assert len(dormidas) == 3, "reconectou sem sleep em algum ciclo"
-    # Backoff cresce: sessao curta nao reseta delay para 1.
+    # Backoff grows: a short session does not reset the delay to 1.
     assert dormidas[-1] > dormidas[0]
 
 
@@ -522,8 +524,8 @@ async def test_sessao_longa_reseta_o_backoff(monkeypatch):
     relogio = {"t": 0.0}
     dormidas = []
 
-    # Relogio falso apenas para o modulo connection — patchar time.monotonic
-    # global quebraria os timers do proprio event loop (loop.time()).
+    # Fake clock only for the connection module — patching the global
+    # time.monotonic would break the event loop's own timers (loop.time()).
     class _FakeTime:
         @staticmethod
         def monotonic():
@@ -531,7 +533,7 @@ async def test_sessao_longa_reseta_o_backoff(monkeypatch):
 
     monkeypatch.setattr(conn_mod, "time", _FakeTime)
 
-    # Ver a nota do teste anterior: a espera do backoff agora e `_esperar_retry`.
+    # See the note in the previous test: the backoff wait is now `_esperar_retry`.
     async def _fake_espera(self, d):
         dormidas.append(d)
         return False
@@ -560,11 +562,11 @@ async def test_sessao_longa_reseta_o_backoff(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_excecao_do_receive_loop_propaga_e_encerra_por_close_terminal(monkeypatch):
-    """Propagacao ponta a ponta: close 4403 -> first_exc -> classificador.
+    """End-to-end propagation: close 4403 -> first_exc -> classifier.
 
-    Roda o `_connect_and_run` REAL. A versao anterior deste teste substituia
-    `_connect_and_run` por uma funcao que levantava o proprio 4403 — ou seja,
-    testava o `raise` do teste, nao o `raise first_exc` da producao.
+    Runs the REAL `_connect_and_run`. The previous version of this test replaced
+    `_connect_and_run` with a function that raised the 4403 itself — that is, it
+    tested the test's `raise`, not production's `raise first_exc`.
     """
     ws = _SessionWS(recv_exc=_closed(4403, "cert revogado"))
     _patch_connect(monkeypatch, ws)
@@ -573,25 +575,25 @@ async def test_excecao_do_receive_loop_propaga_e_encerra_por_close_terminal(monk
     await asyncio.wait_for(c.run(), timeout=5.0)
 
     assert c._should_reconnect is False, "deny autoritativo tem que encerrar o executor"
-    # O handshake chegou a ser enviado: a sessao caiu DEPOIS do accept.
+    # The handshake did get sent: the session dropped AFTER the accept.
     assert json.loads(ws.enviadas[0])["type"] == "handshake"
 
 
 @pytest.mark.asyncio
 async def test_close_terminal_sobrevive_a_loop_auxiliar_que_termina_primeiro(monkeypatch):
-    """Loop auxiliar que trata ConnectionClosed com `break` termina LIMPO.
+    """An auxiliary loop that handles ConnectionClosed with `break` ends CLEANLY.
 
-    Se ele vence a corrida com o _receive_loop, `done` nao tem excecao alguma e
-    o 4403 morria junto com os `pending` cancelados — o executor reconectava em
-    backoff em vez de mandar refazer o enrollment. O close_code do ws sobrevive
-    ao cancelamento e e a fonte de verdade.
+    If it wins the race against _receive_loop, `done` has no exception at all
+    and the 4403 died along with the canceled `pending` — the executor
+    reconnected with backoff instead of asking to redo the enrollment. The ws
+    close_code survives the cancellation and is the source of truth.
     """
     from executor import result_store
     monkeypatch.setattr(result_store, "mark_sent", lambda *_a: None)
 
     ws = _SessionWS(
-        send_exc=_closed(4403, "cert revogado"),  # o send do resultado falha...
-        recv_delay=3600,                          # ...e o receive nunca acorda
+        send_exc=_closed(4403, "cert revogado"),  # the result send fails...
+        recv_delay=3600,                          # ...and the receive never wakes up
         close_code=4403, close_reason="cert revogado",
     )
     _patch_connect(monkeypatch, ws)
@@ -610,18 +612,19 @@ async def test_close_terminal_sobrevive_a_loop_auxiliar_que_termina_primeiro(mon
 
 @pytest.mark.asyncio
 async def test_cancelar_a_conexao_encerra_todos_os_loops_filhos(monkeypatch):
-    """`asyncio.wait` NAO cancela o que aguarda.
+    """`asyncio.wait` does NOT cancel what it awaits.
 
-    Sem o try/finally, cancelar o conn_task (SIGTERM) fazia o CancelledError
-    subir de dentro do `wait` e os 5 filhos continuavam vivos DEPOIS do gather
-    do shutdown, consumindo das filas que o main ja deu por drenadas.
+    Without the try/finally, canceling conn_task (SIGTERM) made the
+    CancelledError rise from inside the `wait` and the 5 children stayed alive
+    AFTER the shutdown gather, consuming from queues that main had already
+    considered drained.
     """
     ws = _SessionWS(recv_delay=3600)
     _patch_connect(monkeypatch, ws)
 
     c = _conn(events=asyncio.Queue(maxsize=500))
     task = asyncio.create_task(c._connect_and_run())
-    await asyncio.sleep(0.05)  # deixa os filhos nascerem
+    await asyncio.sleep(0.05)  # lets the children be born
 
     nomes = {"heartbeat", "capacity", "receive", "results", "events"}
     filhos = [t for t in asyncio.all_tasks() if t.get_name() in nomes]

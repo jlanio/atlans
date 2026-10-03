@@ -1,11 +1,11 @@
 # app/services/workspace_service.py
 """
-Leitura de workspaces fora de uma request FastAPI.
+Reading workspaces outside a FastAPI request.
 
-A listagem "workspaces do usuário" vivia inline em `workspace_router.py`. Um
-segundo transporte (o servidor MCP, docs/specs/mcp-server.md) precisa da MESMA
-lista — mesma dedup, mesma ordem, mesmo `my_role` — sem passar por `Depends`.
-Este módulo é a única implementação; o router só chama.
+The "user's workspaces" listing used to live inline in `workspace_router.py`. A
+second transport (the MCP server, docs/specs/mcp-server.md) needs the SAME
+list — same dedup, same order, same `my_role` — without going through
+`Depends`. This module is the only implementation; the router just calls it.
 """
 from __future__ import annotations
 
@@ -19,11 +19,11 @@ from app.schemas.workspace import WorkspaceOut
 
 
 async def listar_workspaces_do_usuario(db: AsyncSession, user_id: str) -> list[WorkspaceOut]:
-    """Workspaces criados pelo usuário + workspaces dos quais é membro, fora da lixeira.
+    """Workspaces created by the user + workspaces they are a member of, outside the trash.
 
-    A ordem é a de sempre: primeiro os que ele é dono (por nome), depois os
-    compartilhados (por nome). Dono que também consta como membro aparece uma
-    vez só, com `my_role="owner"` — o papel de membro não rebaixa o dono.
+    The order is the usual one: first the ones they own (by name), then the
+    shared ones (by name). An owner who is also listed as a member appears only
+    once, with `my_role="owner"` — the member role does not demote the owner.
     """
     # Workspaces owned
     owned_result = await db.execute(
@@ -36,7 +36,7 @@ async def listar_workspaces_do_usuario(db: AsyncSession, user_id: str) -> list[W
     )
     owned = owned_result.scalars().all()
 
-    # Workspaces como membro (com role)
+    # Workspaces as member (with role)
     member_result = await db.execute(
         select(WorkspaceMember.workspace_id, WorkspaceMember.role).where(
             WorkspaceMember.user_id == user_id
@@ -58,7 +58,7 @@ async def listar_workspaces_do_usuario(db: AsyncSession, user_id: str) -> list[W
         )
         shared = shared_result.scalars().all()
 
-    # Deduplica (owner pode também ser membro) e ordena
+    # Deduplicates (owner may also be a member) and sorts
     seen: set[str] = set()
     combined: list[WorkspaceOut] = []
     for ws in list(owned) + shared:

@@ -1,20 +1,20 @@
 # tests/unit/test_mcp_catalogo.py
 """
-O catálogo de nós pelo MCP: caber no contexto e não mentir sobre o que existe.
+The node catalog over MCP: fitting in the context and not lying about what exists.
 
-Duas propriedades sustentam as ferramentas de catálogo:
+Two properties underpin the catalog tools:
 
-- **tamanho.** O `description()` de todos os nós registrados passa de 70 KB.
-  Uma conversa que começasse por isso gastaria o orçamento de contexto antes da
-  primeira pergunta. O índice compacto tem de caber com folga — o teto de 16 KB
-  aqui é o alarme que dispara se alguém voltar a enfiar a descrição inteira no
-  índice;
-- **verdade.** Um nó desabilitado pela plataforma não pode aparecer no índice
-  nem ser detalhado: quem montasse um fluxo com ele receberia a recusa só na
-  execução, depois de todo o trabalho.
+- **size.** The `description()` of all registered nodes exceeds 70 KB.
+  A conversation that started with that would spend the context budget before the
+  first question. The compact index has to fit with room to spare — the 16 KB
+  ceiling here is the alarm that goes off if someone goes back to stuffing the whole
+  description into the index;
+- **truth.** A node disabled by the platform must not appear in the index
+  or be described: whoever built a workflow with it would get the refusal only at
+  execution, after all the work.
 
-Os testes correm sobre o registro REAL de nós, e não sobre um catálogo de
-mentira: é o registro que cresce sem ninguém olhar, e é dele que vem o risco.
+The tests run over the REAL node registry, not over a fake catalog: it is the
+registry that grows without anyone watching, and that is where the risk comes from.
 """
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ def corpo(exc: ToolError) -> dict:
 
 @pytest.fixture
 def catalogo(monkeypatch):
-    """Catálogo real, sem banco: a lista de desabilitados é o único ponto de I/O."""
+    """Real catalog, no database: the list of disabled nodes is the only I/O point."""
     desabilitados: set = set()
 
     async def _desabilitados(db):
@@ -56,7 +56,7 @@ def catalogo(monkeypatch):
 
 
 async def definicoes_reais() -> list:
-    """As `NodeDefinition` do registro, com a fixture `catalogo` já aplicada."""
+    """The registry's `NodeDefinition`s, with the `catalogo` fixture already applied."""
     return await NodeService().list_nodes(None)
 
 
@@ -75,7 +75,7 @@ def test_one_line_pega_a_primeira_frase():
 
 
 def test_one_line_nao_devolve_paragrafo():
-    """Descrição de várias linhas vira UMA linha — o índice é lido inteiro."""
+    """A multi-line description becomes ONE line — the index is read whole."""
     linha = one_line({"description": "Primeira frase\n\nParágrafo longo com detalhes."})
     assert linha == "Primeira frase"
 
@@ -86,12 +86,12 @@ def test_one_line_corta_frase_quilometrica():
 
 
 def test_one_line_nao_corta_na_abreviacao():
-    """"Ex." e "etc." terminam em ponto sem terminar a frase.
+    """"Ex." and "etc." end in a period without ending the sentence.
 
-    Cortar ali entregaria um índice de linhas "Ex" e "etc": o cliente teria de
-    chamar `describe_node` em cada nó só para descobrir para que serve — que é
-    exatamente o gasto de contexto que o índice existe para evitar. O segmento
-    curto demais se junta ao próximo, nunca é descartado.
+    Cutting there would deliver an index of "Ex" and "etc" lines: the client would have
+    to call `describe_node` on each node just to find out what it is for — which is
+    exactly the context spending the index exists to avoid. A segment that is too
+    short is joined to the next one, never discarded.
     """
     assert one_line({"description": "Ex. recorta camadas de um GeoJSON. Depois exporta."}) == (
         "Ex. recorta camadas de um GeoJSON"
@@ -102,12 +102,12 @@ def test_one_line_nao_corta_na_abreviacao():
     assert one_line({"description": "p. ex. une camadas vizinhas. Resto."}) == (
         "p. ex. une camadas vizinhas"
     )
-    # Mesmo sem frase nenhuma depois, a abreviação sobra sozinha em vez de sumir.
+    # Even with no sentence at all afterwards, the abbreviation remains alone instead of vanishing.
     assert one_line({"description": "Ex."}) == "Ex"
 
 
 def test_one_line_nao_quebra_um_decimal():
-    """O ponto de "0.5" não é fim de frase — o corte exige o espaço depois."""
+    """The period in "0.5" is not the end of a sentence — the cut requires the space after it."""
     assert one_line({"description": "Aplica um buffer de 0.5 m. Aceita metros."}) == (
         "Aplica um buffer de 0.5 m"
     )
@@ -115,7 +115,7 @@ def test_one_line_nao_quebra_um_decimal():
 
 
 def test_one_line_ainda_corta_na_primeira_frase_de_verdade():
-    """A junção vale só para o segmento curto: frase real continua sendo uma só."""
+    """The joining only applies to the short segment: a real sentence stays a single one."""
     assert one_line({"description": "Recorta camadas. Aceita GeoJSON e SHP."}) == "Recorta camadas"
 
 
@@ -162,7 +162,7 @@ async def test_no_desabilitado_some_do_indice_e_do_detalhe(catalogo):
     assert alvo not in {i["name"] for i in depois["items"]}
     assert depois["total"] == todos["total"] - 1
 
-    # E detalhar responde como um nó inexistente — a diferença só confundiria.
+    # And describing answers as for a nonexistent node — the difference would only confuse.
     with pytest.raises(ToolError) as exc:
         await describe_node(ctx(), name=alvo)
     assert corpo(exc.value)["code"] == "not_found"
@@ -184,7 +184,7 @@ async def test_brief_traz_o_essencial_da_propriedade(catalogo):
     assert ficha["name"] == "DatabaseQuery"
     assert ficha["requires_credential"] is True
     for propriedade in ficha["properties"]:
-        # Rótulo, ajuda e visibilidade condicional são assunto do editor visual.
+        # Label, help and conditional visibility are the visual editor's business.
         assert set(propriedade) <= {
             "name",
             "type",
@@ -199,7 +199,7 @@ async def test_completo_traz_mais_que_o_brief(catalogo):
     breve = await describe_node(ctx(), name="DatabaseQuery", brief=True)
     inteiro = await describe_node(ctx(), name="DatabaseQuery", brief=False)
     assert set(breve) - {"hints"} <= set(inteiro) | {"inputs", "outputs"}
-    # A ficha completa carrega os campos que o resumo corta.
+    # The full sheet carries the fields the summary cuts.
     chaves_de_propriedade = {chave for p in inteiro["properties"] for chave in p}
     assert "label" in chaves_de_propriedade
     assert len(json.dumps(inteiro)) > len(json.dumps(breve))
@@ -211,7 +211,7 @@ async def test_no_que_exige_credencial_diz_como_referencia_la(catalogo):
 
 
 def test_dicas_explicam_o_que_nenhum_campo_diz():
-    """Saída dinâmica e coluna sugerida não têm campo próprio na ficha."""
+    """Dynamic output and suggested column have no field of their own in the sheet."""
     from types import SimpleNamespace
 
     no = SimpleNamespace(
@@ -265,8 +265,8 @@ async def test_guia_devolve_markdown_e_o_uri_do_resource(monkeypatch):
     resposta = await get_authoring_guide(ctx(), topic="overview")
     assert resposta["topic"] == "overview"
     assert resposta["markdown"].startswith("# overview")
-    # Tool e resource entregam o MESMO texto; o URI vai junto para quem preferir
-    # ler pelo caminho de resource.
+    # Tool and resource deliver the SAME text; the URI goes along for whoever prefers
+    # to read through the resource path.
     assert resposta["resource_uri"] == "atlans://guide/authoring/overview"
     assert len(resposta["topics"]) == 9 and "sources" in resposta["topics"]
 
@@ -276,12 +276,12 @@ async def test_topico_desconhecido_e_not_found_com_a_lista(monkeypatch):
         await get_authoring_guide(ctx(), topic="../../etc/passwd")
     detalhe = corpo(exc.value)
     assert detalhe["code"] == "not_found"
-    # A recusa lista os tópicos válidos — e nunca ecoa um caminho de arquivo.
+    # The refusal lists the valid topics — and never echoes a file path.
     assert detalhe["topics"] == list(guia.TOPICOS)
 
 
 async def test_guia_sem_o_arquivo_instalado_nao_vira_erro_interno(monkeypatch):
-    """Falta de arquivo é indisponibilidade, e a mensagem não expõe o caminho."""
+    """A missing file is unavailability, and the message does not expose the path."""
 
     def _sem_arquivo(topic):
         raise FileNotFoundError("/caminho/interno/guia/overview.md")
@@ -295,15 +295,15 @@ async def test_guia_sem_o_arquivo_instalado_nao_vira_erro_interno(monkeypatch):
 
 
 async def test_guia_le_o_arquivo_de_verdade_do_topico():
-    """Sem substituto nenhum: a tool entrega o markdown que está no disco."""
+    """No substitute at all: the tool delivers the markdown that is on disk."""
     resposta = await get_authoring_guide(ctx(), topic="overview")
     assert resposta["markdown"].strip() == guia.ler_topico("overview").strip()
     assert resposta["markdown"].strip() != ""
 
 
 def test_no_que_le_fonte_externa_manda_consultar_o_catalogo():
-    """`source_kind` é o que liga o nó ao catálogo de fontes — a dica é o que
-    faz o modelo chamar `search_sources` em vez de inventar url/typeName."""
+    """`source_kind` is what links the node to the source catalog — the hint is what
+    makes the model call `search_sources` instead of inventing url/typeName."""
     from types import SimpleNamespace
 
     from app.mcp.catalogo import descrever
@@ -326,9 +326,9 @@ async def test_o_catalogo_expoe_o_source_kind_do_wfs(catalogo):
     assert any("search_sources" in dica for dica in ficha["hints"])
 
 
-# ── describe_node em lote ─────────────────────────────────────────────────────
-# `name` aceita uma lista (até 8): as fichas de todos os nós do fluxo numa
-# chamada só, em vez de uma volta do modelo por nó.
+# ── describe_node in batch ────────────────────────────────────────────────────
+# `name` accepts a list (up to 8): the sheets of all the workflow's nodes in a
+# single call, instead of one model round per node.
 
 
 async def test_lista_devolve_as_fichas_na_ordem_e_deduplicada(catalogo):
@@ -344,7 +344,7 @@ async def test_lista_devolve_as_fichas_na_ordem_e_deduplicada(catalogo):
 
 
 async def test_lista_com_desconhecido_nao_derruba_o_lote(catalogo):
-    """O modelo corrige só o nome que errou, sem pagar outra rodada pelos certos."""
+    """The model fixes only the name it got wrong, without paying another round for the right ones."""
     defs = await definicoes_reais()
     a = defs[0].name
 
@@ -386,17 +386,17 @@ async def test_lista_vazia_e_validation(catalogo):
 
 
 async def test_nome_unico_segue_devolvendo_a_ficha_crua(catalogo):
-    """Regressão do contrato: string devolve a ficha direto, sem envelope de lote
-    — é a forma que os clientes MCP externos já consomem."""
+    """Contract regression: a string returns the sheet directly, without a batch envelope
+    — it is the form the external MCP clients already consume."""
     ficha = await describe_node(ctx(), name="DatabaseQuery")
     assert ficha["name"] == "DatabaseQuery"
     assert "nodes" not in ficha
 
 
 async def test_nome_e_apelido_do_mesmo_no_viram_uma_ficha_so(catalogo):
-    """Dedupe por RESOLUÇÃO, não só por grafia: pedir o nó pelo nome E pelo
-    apelido devolve uma ficha — duas iguais só queimariam o contexto que o
-    teto existe para proteger."""
+    """Dedupe by RESOLUTION, not just by spelling: asking for the node by name AND by
+    alias returns one sheet — two identical ones would only burn the context that the
+    ceiling exists to protect."""
     defs = await definicoes_reais()
     com_alias = next((d for d in defs if d.alias), None)
     if com_alias is None:

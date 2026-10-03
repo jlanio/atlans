@@ -1,7 +1,7 @@
 # executor/sync/events.py
 """
-SyncEventEmitter — emite eventos de sync via asyncio.Queue para envio pelo WebSocket.
-Reutiliza a mesma fila de eventos do ExecutorEventPublisher.
+SyncEventEmitter — emits sync events via asyncio.Queue to be sent over the WebSocket.
+Reuses the same event queue as ExecutorEventPublisher.
 """
 import asyncio
 import logging
@@ -11,7 +11,7 @@ logger = logging.getLogger("executor.sync")
 
 
 class SyncEventEmitter:
-    """Emite eventos de sync para o servidor via WebSocket (best-effort)."""
+    """Emits sync events to the server via WebSocket (best-effort)."""
 
     def __init__(self, event_queue: asyncio.Queue | None = None):
         self._queue = event_queue
@@ -20,7 +20,7 @@ class SyncEventEmitter:
             try:
                 self._loop = asyncio.get_running_loop()
             except RuntimeError:
-                pass  # Sem event loop rodando — emissão de eventos será síncrona
+                pass  # No event loop running — event emission will be synchronous
 
     def emit(
         self,

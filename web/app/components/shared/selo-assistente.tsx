@@ -3,19 +3,21 @@ import { TbSparkles } from "react-icons/tb"
 import { cn } from "@/lib/utils"
 
 /**
- * Selo "criado pelo assistente" — o mesmo em toda lista do painel.
+ * "criado pelo assistente" (created by the assistant) badge — the same in every
+ * list of the panel.
  *
- * Os fluxos que o assistente da Home cria são fluxos completos como os
- * outros: aparecem em Projetos, no Dashboard, no Histórico, na paleta e nos
- * seletores. O selo é o que diz de onde vieram, para não se confundirem com o
- * que a pessoa montou no editor — sem ele "passavam despercebidos".
+ * The workflows the Home assistant creates are complete workflows like the
+ * others: they show up in Projects, the Dashboard, History, the palette and the
+ * selectors. The badge is what says where they came from, so they aren't
+ * confused with what the person built in the editor — without it they "went
+ * unnoticed".
  *
- * Mesma faísca dos Agendamentos da Home (o molde), em `primary`; forma e
- * tamanho do selo de sub-fluxo, para os dois conviverem na mesma linha.
+ * Same sparkle as the Home's Schedules (the template), in `primary`; shape and
+ * size of the sub-workflow badge, so the two can coexist on the same row.
  *
- * `compacto` deixa só o ícone, para lugares onde o texto não cabe (linhas de
- * uma tabela densa, item de paleta). O `title`/`aria-label` continuam lá: a
- * informação não pode depender de reconhecer o desenho.
+ * `compacto` leaves only the icon, for places where the text doesn't fit (rows
+ * of a dense table, a palette item). The `title`/`aria-label` remain: the
+ * information can't depend on recognizing the drawing.
  */
 export function SeloAssistente({
   origem, compacto = false, className,

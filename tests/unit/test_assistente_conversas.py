@@ -1,11 +1,11 @@
 # tests/unit/test_assistente_conversas.py
 """
-O servico de conversas do assistente — persistencia, transcrito e replay.
+The assistant's conversation service — persistence, transcript and replay.
 
-O que importa mais aqui: o round-trip dos blocos no formato do projeto. O
-transcrito atravessa o banco como JSON e volta para o modelo; se a persistencia
-perdesse os `reasoning_details` do bloco de raciocinio, o modelo perderia o fio
-na proxima volta — o mesmo defeito cruel do `tool_use` orfao, so que na retomada.
+What matters most here: the round-trip of the blocks in the project's format. The
+transcript crosses the database as JSON and goes back to the model; if persistence
+lost the `reasoning_details` of the reasoning block, the model would lose the thread
+on the next turn — the same cruel defect as the orphaned `tool_use`, only on resume.
 """
 from __future__ import annotations
 
@@ -63,12 +63,12 @@ async def test_titulo_automatico_corta_em_60_e_normaliza_espacos():
     assert svc.titulo_automatico("") == "Nova conversa"
 
 
-# ── Round-trip com os blocos do projeto ──────────────────────────────────────
+# ── Round-trip with the project's blocks ─────────────────────────────────────
 
 
 async def test_transcrito_round_trip_preserva_os_blocos_e_o_raciocinio(sessao):
     conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
-    # Os blocos como o cliente do modelo os remonta e o laco os grava.
+    # The blocks as the model client reassembles them and the loop writes them.
     blocos = [
         {
             "type": "thinking",
@@ -92,12 +92,12 @@ async def test_transcrito_round_trip_preserva_os_blocos_e_o_raciocinio(sessao):
 
     transcrito = await svc.transcrito_de(sessao, conv.id_hash)
 
-    # Serializavel (o Redis/JSON exigem), e o formato que o cliente traduz na ida.
+    # Serializable (Redis/JSON require it), and the format the client translates on the way out.
     json.dumps(transcrito)
     assert transcrito[0] == {"role": "user", "content": "monta um fluxo"}
     saidos = transcrito[1]["content"]
     pensamento = next(b for b in saidos if b["type"] == "thinking")
-    # O raciocinio SOBREVIVEU ao banco, verbatim — e o que volta ao provedor.
+    # The reasoning SURVIVED the database, verbatim — it is what goes back to the provider.
     assert pensamento["reasoning_details"][0]["signature"] == "assin-123"
     assert pensamento["thinking"] == "preciso do catalogo"
 
@@ -153,26 +153,26 @@ async def test_carregar_conversa_alheia_ou_apagada_e_404(sessao):
 
     # A minha carrega.
     assert (await svc.carregar_conversa_da_pessoa(sessao, USUARIO, minha.id_hash)).id_hash == minha.id_hash
-    # A alheia e 404 (nao 403: nao revela que o id existe).
+    # Someone else's is 404 (not 403: it doesn't reveal that the id exists).
     with pytest.raises(HTTPException) as exc:
         await svc.carregar_conversa_da_pessoa(sessao, USUARIO, alheia.id_hash)
     assert exc.value.status_code == 404
-    # Uma apagada some.
+    # A deleted one disappears.
     await svc.apagar_conversa(sessao, USUARIO, minha.id_hash)
     with pytest.raises(HTTPException) as exc2:
         await svc.carregar_conversa_da_pessoa(sessao, USUARIO, minha.id_hash)
     assert exc2.value.status_code == 404
 
 
-# ── Replay reconstroi a camada de `exibir_no_globo` ───────────────────────────
+# ── Replay rebuilds the `exibir_no_globo` layer ───────────────────────────────
 
 
 async def test_replay_reconstroi_a_camada_de_exibir_no_globo(sessao):
-    """Reabrir o chat tem de trazer a camada de volta ao globo.
+    """Reopening the chat has to bring the layer back to the globe.
 
-    O quadro `camada` era emitido inline pelo executor local: aparecia no SSE e
-    sumia no replay, que so reexecuta `quadros_extras`. Agora nasce dos
-    argumentos, e um caminho so serve os dois.
+    The `camada` frame was emitted inline by the local executor: it showed up in
+    the SSE and vanished on replay, which only re-runs `quadros_extras`. Now it is
+    born from the arguments, and a single path serves both.
     """
     conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
     chamada = {
@@ -199,7 +199,7 @@ async def test_replay_reconstroi_a_camada_de_exibir_no_globo(sessao):
     assert camadas[0]["dados"] == {"artifact_id": "art-9", "nome": "Focos", "available": True}
 
 
-# ── Ordem e fecho do transcrito ──────────────────────────────────────────────
+# ── Transcript order and closing ─────────────────────────────────────────────
 
 
 async def test_proxima_ordem_e_max_mais_um(sessao):
@@ -210,12 +210,12 @@ async def test_proxima_ordem_e_max_mais_um(sessao):
     sessao.add(Mensagem(conversa_id=conv.id_hash, ordem=9, papel="user", blocos="b"))
     await sessao.commit()
 
-    # A contagem seria 2 — e colidiria com a ordem 0 ja usada.
+    # The count would be 2 — and would collide with order 0, already used.
     assert await svc.proxima_ordem(sessao, conv.id_hash) == 10
 
 
 async def test_transcrito_fecha_tool_use_orfao_e_pode_persistir_o_fecho(sessao):
-    """Um `tool_use` sem par recusa a conversa inteira na API. Fecha na LEITURA."""
+    """An unpaired `tool_use` makes the API reject the whole conversation. Closed on READ."""
     conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
     await svc.anexar_mensagens(
         sessao,
@@ -234,11 +234,11 @@ async def test_transcrito_fecha_tool_use_orfao_e_pode_persistir_o_fecho(sessao):
     assert somente_leitura[-1]["content"][0]["tool_use_id"] == "tu-orfa"
     assert await svc.proxima_ordem(sessao, conv.id_hash) == 2
 
-    # Para RETOMAR, o fecho precisa ir ao banco: senao a mensagem nova entraria
-    # depois do orfao e a leitura seguinte nao fecharia mais nada.
+    # To RESUME, the closing has to go to the database: otherwise the new message would
+    # land after the orphan and the next read would no longer close anything.
     await svc.transcrito_de(sessao, conv.id_hash, persistir_fecho=True)
     assert await svc.proxima_ordem(sessao, conv.id_hash) == 3
-    # Idempotente: ja fechado, nao grava de novo.
+    # Idempotent: already closed, does not write again.
     await svc.transcrito_de(sessao, conv.id_hash, persistir_fecho=True)
     assert await svc.proxima_ordem(sessao, conv.id_hash) == 3
 
@@ -270,9 +270,9 @@ async def _auditar(sessao, *, workflow_id, workspace_ids, padrao="ws-da-conversa
 
 
 async def test_alvo_fora_do_alcance_nao_escreve_na_trilha_alheia(sessao):
-    """O `workflow_id` vem dos args guardados: resolver o workspace dele sem
-    recorte punha o `AuditEvent` na trilha de um workspace do qual a pessoa nem e
-    membro — e escondia o registro de quem deveria ve-lo."""
+    """The `workflow_id` comes from the stored args: resolving its workspace without
+    scoping put the `AuditEvent` in the trail of a workspace the person isn't even
+    a member of — and hid the record from whoever should see it."""
     await _fluxo(sessao, "wf-alheio", "ws-alheio")
     await _fluxo(sessao, "wf-meu", "ws-b")
     await _fluxo(sessao, "wf-lixeira", "ws-b", deleted_at=svc.utc_now_naive())
@@ -287,11 +287,11 @@ async def test_alvo_fora_do_alcance_nao_escreve_na_trilha_alheia(sessao):
         for e in (await sessao.execute(select(AuditEvent))).scalars().all()
     }
     assert trilhas == {
-        # Fora do alcance: cai no workspace da CONVERSA, nunca no do alvo.
+        # Out of reach: falls back to the CONVERSATION's workspace, never the target's.
         "wf-alheio": "ws-da-conversa",
-        # Dentro do alcance: a trilha do proprio fluxo.
+        # Within reach: the workflow's own trail.
         "wf-meu": "ws-b",
-        # Apagado: nao resolve — o soft delete tambem tira o fluxo daqui.
+        # Deleted: does not resolve — the soft delete also takes the workflow out of here.
         "wf-lixeira": "ws-da-conversa",
     }
 
@@ -307,12 +307,12 @@ async def test_tokens_total_soma_e_ignora_none(sessao):
     assert conv.tokens_total == 1_500
 
 
-# ── Replay reconstroi os chips de `sugerir_respostas` ─────────────────────────
+# ── Replay rebuilds the `sugerir_respostas` chips ─────────────────────────────
 
 
 async def test_replay_reconstroi_as_respostas_rapidas_de_sugerir_respostas(sessao):
-    """Reabrir o chat traz os chips do ultimo turno de volta — pelo MESMO
-    `quadros_extras` do laco, a partir dos argumentos gravados (limpos)."""
+    """Reopening the chat brings back the chips of the last turn — through the SAME
+    `quadros_extras` of the loop, from the stored (cleaned) arguments."""
     conv = await svc.criar_conversa(sessao, user_id=USUARIO, titulo="t")
     chamada = {
         "type": "tool_use", "id": "tu-chips", "name": ag.NOME_DAS_RESPOSTAS,

@@ -1,20 +1,20 @@
 # tests/unit/test_init_schema_bootstrap.py
-"""`scripts/init_schema.sql` tem de ser "DROP ALL + CREATE ALL" de verdade.
+"""`scripts/init_schema.sql` has to be a real "DROP ALL + CREATE ALL".
 
-O script carimba `alembic_version` na head, entao `alembic upgrade head` nunca
-mais executa nada num banco criado por ele: tudo o que faltar aqui fica faltando
-para sempre, sem correcao possivel via alembic. Foi assim que
-`user_executor_assignments` sumiu (500 na primeira atribuicao de executor) e que
-`audit_events` nasceu sem tabela.
+The script stamps `alembic_version` at head, so `alembic upgrade head` never
+again runs anything on a database created by it: whatever is missing here stays
+missing forever, with no possible fix via alembic. That is how
+`user_executor_assignments` disappeared (500 on the first executor assignment) and
+how `audit_events` was born without a table.
 
-E o inverso tambem quebra: uma tabela no CREATE mas fora do bloco de DROP faz o
-reset de um banco existente abortar no meio (com ON_ERROR_STOP, depois de tudo
-ja ter sido dropado) ou preservar silenciosamente os dados antigos.
+The reverse also breaks: a table in the CREATE but outside the DROP block makes
+the reset of an existing database abort halfway (with ON_ERROR_STOP, after
+everything has already been dropped) or silently keep the old data.
 
-As tabelas de uma extensao (`app/extensoes`) moram no `schema.sql` dela, que a
-base zero roda depois do script do nucleo: o banco e a soma dos dois, e e a
-soma que se compara com os models. Sem a extensao, nem o model nem o SQL dela
-estao aqui, e o nucleo tem de fechar sozinho.
+An extension's tables (`app/extensoes`) live in its own `schema.sql`, which the
+from-scratch setup runs after the core script: the database is the sum of the two,
+and it is the sum that is compared with the models. Without the extension, neither
+its model nor its SQL is here, and the core has to be consistent on its own.
 """
 import importlib
 import pkgutil
@@ -27,9 +27,9 @@ import app.models
 from app.extensoes import esquemas
 from app.models.base import Base
 
-# `app.models.__init__` importa so parte dos modulos; para comparar com o script
-# o metadata precisa estar COMPLETO — senao o teste passa justamente quando um
-# model novo foi esquecido, que e o caso que ele existe para pegar.
+# `app.models.__init__` imports only some of the modules; to compare with the
+# script the metadata must be COMPLETE — otherwise the test passes precisely when
+# a new model was forgotten, which is the case it exists to catch.
 for _mod in pkgutil.iter_modules(app.models.__path__):
     importlib.import_module(f"app.models.{_mod.name}")
 
@@ -38,25 +38,25 @@ SQL_DO_NUCLEO = (RAIZ / "scripts" / "init_schema.sql").read_text(encoding="utf-8
 SQL_DAS_EXTENSOES = [p.read_text(encoding="utf-8") for p in esquemas()]
 SQL = "\n".join([SQL_DO_NUCLEO, *SQL_DAS_EXTENSOES])
 
-# `alembic_version` e criada pelo script mas nao e um model.
+# `alembic_version` is created by the script but is not a model.
 _SO_DO_SCRIPT = {"alembic_version"}
 
 _CRIADAS = set(re.findall(r"CREATE TABLE (?:IF NOT EXISTS )?(\w+)", SQL))
 _DROPADAS = set(re.findall(r"DROP TABLE IF EXISTS (\w+) CASCADE", SQL))
 _TABELAS_DOS_MODELS = set(Base.metadata.tables)
 
-# Palavras que abrem uma restricao, nao uma coluna, dentro do CREATE TABLE.
+# Words that open a constraint, not a column, inside the CREATE TABLE.
 _NAO_E_COLUNA = {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT", "EXCLUDE", "LIKE"}
 
 
 def _colunas_do_script() -> dict:
-    """Colunas declaradas em cada `CREATE TABLE` do script.
+    """Columns declared in each `CREATE TABLE` of the script.
 
-    Comparar so NOMES DE TABELA deixa passar o caso mais comum de divergencia
-    entre os tres caminhos de bootstrap: uma COLUNA nova. `workflows.origem`
-    entrou por migracao e por model; se tivesse ficado de fora do script, um
-    banco criado por ele nasceria sem a coluna — e, como o script ja carimba a
-    head do alembic, nenhum `upgrade` posterior a criaria.
+    Comparing only TABLE NAMES lets through the most common case of divergence
+    between the three bootstrap paths: a new COLUMN. `workflows.origem`
+    came in through a migration and the model; had it been left out of the script,
+    a database created by it would be born without the column — and, since the
+    script already stamps the alembic head, no later `upgrade` would create it.
     """
     blocos = re.findall(r"CREATE TABLE (?:IF NOT EXISTS )?(\w+)\s*\((.*?)\n\);", SQL, re.S)
     fora = {}
@@ -93,7 +93,7 @@ def _criadas(sql: str) -> set[str]:
     return set(re.findall(r"CREATE TABLE (?:IF NOT EXISTS )?(\w+)", sql))
 
 
-# As tabelas dos models que moram numa extensão.
+# The tables of the models that live in an extension.
 _TABELAS_DE_EXTENSAO = {
     m.local_table.name for m in Base.registry.mappers
     if m.class_.__module__.startswith("app.extensoes.")
@@ -101,9 +101,9 @@ _TABELAS_DE_EXTENSAO = {
 
 
 def test_tabela_de_extensao_nao_mora_no_script_do_nucleo():
-    """Sem a extensão (a distribuição livre), uma tabela dela no script do núcleo
-    seria uma tabela sem model, criada em toda instalação. Ela mora no
-    `schema.sql` da extensão, com o DROP junto."""
+    """Without the extension (the free distribution), one of its tables in the core
+    script would be a table with no model, created on every installation. It lives
+    in the extension's `schema.sql`, with the DROP alongside."""
     assert not (_criadas(SQL_DO_NUCLEO) & _TABELAS_DE_EXTENSAO)
     das_extensoes = set().union(set(), *(_criadas(sql) for sql in SQL_DAS_EXTENSOES))
     assert _TABELAS_DE_EXTENSAO <= das_extensoes
@@ -114,18 +114,18 @@ def test_tabela_de_extensao_nao_mora_no_script_do_nucleo():
     ["user_executor_assignments", "audit_events", "executor_enrollment_otp"],
 )
 def test_tabelas_que_ja_faltaram(tabela):
-    """Regressoes nominais: as tres que ja quebraram um bootstrap."""
+    """Named regressions: the three that have already broken a bootstrap."""
     assert tabela in _CRIADAS and tabela in _DROPADAS
 
 
 def test_toda_coluna_de_model_existe_no_script():
-    """O buraco que o teste por NOME DE TABELA nao via: coluna nova no model e
-    na migracao, mas esquecida no script — banco novo nasce sem ela, para sempre."""
+    """The hole the TABLE NAME test could not see: a new column in the model and
+    in the migration, but forgotten in the script — a new database is born without it, forever."""
     faltando = {}
     for tabela, obj in Base.metadata.tables.items():
         no_script = _COLUNAS_DO_SCRIPT.get(tabela)
         if no_script is None:
-            continue  # ausencia da TABELA ja e coberta por outro teste
+            continue  # absence of the TABLE is already covered by another test
         ausentes = {c.name.lower() for c in obj.columns} - no_script
         if ausentes:
             faltando[tabela] = sorted(ausentes)
@@ -137,20 +137,20 @@ def test_toda_coluna_de_model_existe_no_script():
     [("workflows", "origem"), ("users", "agent_quota"), ("workflow_runs", "trigger_source")],
 )
 def test_colunas_que_o_teste_por_nome_deixava_passar(tabela, coluna):
-    """Regressoes nominais de COLUNA — o analogo do teste de tabelas acima."""
+    """Named COLUMN regressions — the analogue of the table test above."""
     assert coluna in _COLUNAS_DO_SCRIPT[tabela]
 
 
 def test_nenhum_indice_aponta_para_tabela_inexistente():
-    """`ix_otp_unused` era criado sobre `agent_enrollment_otp`, nome anterior ao
-    rename de 20260716_0001 — o script inteiro estourava na secao 2."""
+    """`ix_otp_unused` was created on `agent_enrollment_otp`, the name before the
+    20260716_0001 rename — the whole script blew up in section 2."""
     alvos = set(re.findall(r"CREATE (?:UNIQUE )?INDEX \w+ ON (\w+)", SQL))
     assert not (alvos - _CRIADAS)
 
 
 def test_carimbo_do_alembic_e_a_head_real():
-    """Um carimbo posterior ao conteudo do script e exatamente o bug que ele ja
-    teve: alembic considera aplicado o que nunca rodou."""
+    """A stamp later than the script's content is exactly the bug it has already
+    had: alembic considers applied what never ran."""
     carimbo = re.search(r"INSERT INTO alembic_version \(version_num\) VALUES \('(\w+)'\)", SQL)
     assert carimbo
 
@@ -158,10 +158,10 @@ def test_carimbo_do_alembic_e_a_head_real():
     revisoes, down = set(), set()
     for arquivo in versoes.glob("*.py"):
         texto = arquivo.read_text(encoding="utf-8")
-        # A anotacao de tipo varia entre migracoes (`: str`, `: Union[str, None]`,
-        # nenhuma); casar so `: str` deixava quase todo `down_revision` de fora,
-        # e "heads" virava o conjunto de TODAS as revisoes — qualquer carimbo
-        # antigo passava.
+        # The type annotation varies between migrations (`: str`, `: Union[str, None]`,
+        # none); matching only `: str` left almost every `down_revision` out,
+        # and "heads" became the set of ALL revisions — any old stamp
+        # passed.
         for m in re.finditer(r'^revision(?::[^=\n]+)?\s*=\s*"(\w+)"', texto, re.M):
             revisoes.add(m.group(1))
         for m in re.finditer(r'^down_revision(?::[^=\n]+)?\s*=\s*"(\w+)"', texto, re.M):
@@ -173,12 +173,12 @@ def test_carimbo_do_alembic_e_a_head_real():
 
 
 def test_system_config_updated_at_e_not_null():
-    """O squash perdeu o NOT NULL que a cadeia antiga criava — e o model exige.
+    """The squash lost the NOT NULL that the old chain created — and the model requires it.
 
-    `docs`/a própria migração prometem "o mesmo DDL que a cadeia produzia"; um
-    banco novo nascia com `system_config.updated_at` anulável enquanto o model
-    declara `nullable=False`. Regressão da revisão adversarial de 2026-09-24 —
-    presa aqui coluna a coluna até a convergência de NULABILIDADE inteira valer.
+    `docs`/the migration itself promise "the same DDL the chain produced"; a
+    new database was born with `system_config.updated_at` nullable while the model
+    declares `nullable=False`. Regression from the 2026-09-24 adversarial review —
+    pinned here column by column until full NULLABILITY convergence holds.
     """
     import re as _re
 

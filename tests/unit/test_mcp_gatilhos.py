@@ -1,15 +1,15 @@
 # tests/unit/test_mcp_gatilhos.py
 """
-As quatro tools de gatilho, e o fuso padrão que elas herdam.
+The four trigger tools, and the default timezone they inherit.
 
-O arquivo tem duas metades com propósitos diferentes:
+The file has two halves with different purposes:
 
-- **O fuso** — a invariante de que a mudança no fallback do agendador NÃO
-  recria schedule nenhum. É dela que a decisão do dono depende: recriar zera o
-  `next_run_at` e pula a ocorrência do dia, e isso aconteceria em cada workflow
-  agendado no primeiro save depois do deploy.
-- **As tools** — as portas (escopo, papel, workspace), o que a descrição promete
-  e o formato da resposta.
+- **The timezone** — the invariant that the change in the scheduler's fallback
+  recreates NO schedule. The owner's decision depends on it: recreating resets
+  `next_run_at` and skips the day's occurrence, and that would happen to every
+  scheduled workflow on the first save after the deploy.
+- **The tools** — the gates (scope, role, workspace), what the description
+  promises and the shape of the response.
 """
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def corpo(exc: ToolError) -> dict:
 
 
 def ctx(**kw):
-    """`ctx` com leitura e gestão de gatilhos sobre o workspace 1."""
+    """`ctx` with trigger read and management over workspace 1."""
     campos = {
         "scopes": {"workflows:read", "triggers:manage"},
         "workspace_ids": {WS_1},
@@ -102,11 +102,11 @@ async def banco(monkeypatch):
 
 
 async def _semear(fabrica, workflow_hash, job_id="job-semeado", **campos):
-    """Um schedule gravado direto, sem passar pelas tools.
+    """A schedule stored directly, without going through the tools.
 
-    Necessário em dois casos que as tools recusam de propósito: fluxo inativo
-    (`create_schedule` responde `workflow_inactive`) e fluxo de outra conta
-    (inalcançável pelo escopo do teste).
+    Needed in two cases the tools refuse on purpose: an inactive workflow
+    (`create_schedule` answers `workflow_inactive`) and another account's
+    workflow (unreachable from the test's scope).
     """
     campos.setdefault("strategy", "cron")
     campos.setdefault("cron_expression", "0 9 * * *")
@@ -128,20 +128,21 @@ async def _job_ids(fabrica, workflow_hash=WF_1):
         return [s.job_id for s in linhas]
 
 
-# ── O fuso: a invariante de que nada é recriado ──────────────────────────────
+# ── The timezone: the invariant that nothing is recreated ────────────────────
 
 
 def test_o_no_e_a_constante_dizem_o_MESMO_fuso():
-    """É a invariante de que a decisão do dono depende, e ela é frágil.
+    """This is the invariant the owner's decision depends on, and it is fragile.
 
-    O nó não pode importar a constante — `flow/` só importa de `app/` dentro de
-    funções, porque o executor empacota `flow/` sem `app/`, e `description()`
-    roda no import. Então o valor está escrito duas vezes, e só este teste
-    impede que divirjam.
+    The node cannot import the constant — `flow/` only imports from `app/`
+    inside functions, because the executor packages `flow/` without `app/`, and
+    `description()` runs at import time. So the value is written twice, and
+    only this test keeps them from diverging.
 
-    Divergir não dá erro: faz o PRÓXIMO SAVE de cada workflow agendado ver
-    `timezone` diferente em `_mesma_configuracao`, recriar o schedule, zerar o
-    `next_run_at` e **pular a ocorrência do dia**. Silenciosamente, em todos.
+    Diverging raises no error: it makes the NEXT SAVE of every scheduled
+    workflow see a different `timezone` in `_mesma_configuracao`, recreate the
+    schedule, reset `next_run_at` and **skip the day's occurrence**. Silently,
+    for all of them.
     """
     from flow.registry import NODE_REGISTRY
 
@@ -152,18 +153,18 @@ def test_o_no_e_a_constante_dizem_o_MESMO_fuso():
 
 
 def test_o_schema_herda_a_mesma_constante():
-    """Era `America/Cuiaba` — mesmo offset, nome diferente. Dois nomes para a
-    mesma intenção foi como o terceiro valor (UTC) passou despercebido."""
+    """It was `America/Cuiaba` — same offset, different name. Two names for the
+    same intent is how the third value (UTC) went unnoticed."""
     assert ScheduleBase.model_fields["timezone"].default == FUSO_PADRAO_DO_AGENDAMENTO
 
 
 def test_mudar_o_fallback_nao_recria_nenhum_schedule():
-    """A prova direta da decisão: `_mesma_configuracao` continua concordando.
+    """The direct proof of the decision: `_mesma_configuracao` still agrees.
 
-    O levantamento em produção (2026-09-15) mediu 10 agendamentos ativos, TODOS
-    com o fuso padrão de então gravado e NENHUM com a coluna nula — então o
-    fallback novo não move disparo nenhum hoje. Este teste é o que garante que
-    continue assim quando alguém mexer na constante.
+    The production survey (2026-09-15) counted 10 active schedules, ALL with
+    the then-default timezone stored and NONE with a null column — so the new
+    fallback moves no trigger today. This test is what ensures it stays that
+    way when someone touches the constant.
     """
     from app.core.scheduling.hooks import _mesma_configuracao
 
@@ -172,7 +173,7 @@ def test_mudar_o_fallback_nao_recria_nenhum_schedule():
         cron_expression="0 9 * * *", interval=None, unit=None,
         rrule_expression=None,
     )
-    # O que o nó envia ao salvar o workflow.
+    # What the node sends when the workflow is saved.
     desejado = ScheduleBase(
         strategy="cron", cron_expression="0 9 * * *",
         interval=60, unit="minutes",
@@ -183,11 +184,12 @@ def test_mudar_o_fallback_nao_recria_nenhum_schedule():
 
 @pytest.mark.parametrize("valor", [None, "", "   ", "Fuso/Inexistente"])
 def test_o_agendador_nao_cai_mais_em_UTC(valor):
-    """Quatro horas de diferença entre o que a tela diz e a hora do disparo.
+    """Four hours of difference between what the screen says and the trigger time.
 
-    A pergunta que `_tz_of` responde é uma só — "não sei o fuso deste
-    agendamento, qual uso?" — e as duas saídas dela (coluna vazia, valor
-    ilegível) davam em UTC, que é o default do `datetime` e não uma escolha.
+    The question `_tz_of` answers is a single one — "I don't know this
+    schedule's timezone, which do I use?" — and both of its exits (empty
+    column, unreadable value) ended in UTC, which is `datetime`'s default and
+    not a choice.
     """
     from app.core.async_scheduler import AsyncScheduler
 
@@ -197,7 +199,7 @@ def test_o_agendador_nao_cai_mais_em_UTC(valor):
 
 
 def test_fuso_valido_e_respeitado():
-    """O fallback não pode ter virado um "sempre o padrão"."""
+    """The fallback must not have turned into "always the default"."""
     from app.core.async_scheduler import AsyncScheduler
 
     tz = AsyncScheduler()._tz_of(SimpleNamespace(timezone="Europe/Lisbon", job_id="j1"))
@@ -217,14 +219,15 @@ async def test_sem_agendamento_a_lista_vem_vazia(banco):
 
 
 async def test_o_fluxo_inativo_e_LISTAVEL_e_nao_um_erro(banco):
-    """Fluxo inativo é exatamente onde alguém pergunta "por que isto parou de
-    rodar". Se a leitura passar pelo guardião de execução das escritas
-    (`ScheduleService._exigir_workflow_ativo`), este teste cai com
+    """An inactive workflow is exactly where someone asks "why did this stop
+    running". If the read goes through the writes' execution guard
+    (`ScheduleService._exigir_workflow_ativo`), this test fails with
     `WorkflowInactiveError`.
 
-    O schedule é semeado direto no banco porque `create_schedule` recusa fluxo
-    inativo — e é justamente essa assimetria que o par de testes prende: LER o
-    agendamento de um fluxo parado tem de funcionar; CRIAR, não.
+    The schedule is seeded directly in the database because `create_schedule`
+    refuses an inactive workflow — and it is precisely that asymmetry the pair
+    of tests pins down: READING the schedule of a stopped workflow has to work;
+    CREATING one, doesn't.
     """
     await _semear(banco, WF_INATIVO)
 
@@ -232,13 +235,13 @@ async def test_o_fluxo_inativo_e_LISTAVEL_e_nao_um_erro(banco):
 
     assert saida["total"] == 1
     assert saida["workflow_active"] is False
-    # E diz POR QUE não vai disparar — a causa mais comum, invisível no item.
+    # And it says WHY it won't trigger — the most common cause, invisible in the item.
     assert "inativo" in saida["hint"]
 
 
 async def test_so_o_campo_da_estrategia_em_uso_sai_na_resposta(banco):
-    """Uma linha antiga pode ter os três preenchidos; devolver os três faria o
-    agente concluir que há três regras concorrendo."""
+    """An old row may have all three filled in; returning all three would make
+    the agent conclude there are three competing rules."""
     await create_schedule(ctx(), WF_1, "interval", interval=30, unit="minutes")
 
     item = (await list_schedules(ctx(), WF_1))["items"][0]
@@ -260,7 +263,7 @@ async def test_criar_cron_grava_e_devolve_o_job_id(banco):
 
 
 async def test_o_fuso_omitido_vira_o_padrao_do_produto(banco):
-    """Um cron sem fuso explícito não é UTC — é o que a descrição promete."""
+    """A cron without an explicit timezone is not UTC — that is what the description promises."""
     saida = await create_schedule(ctx(), WF_1, "cron", cron_expression="0 9 * * *")
 
     assert saida["timezone"] == FUSO_PADRAO_DO_AGENDAMENTO
@@ -272,38 +275,39 @@ async def test_o_fuso_omitido_vira_o_padrao_do_produto(banco):
     ({"strategy": "cron", "cron_expression": ""}, "5 campos", "cron com expressão vazia"),
     ({"strategy": "interval", "interval": 5}, "interval + unit", "interval sem unit"),
     ({"strategy": "rrule"}, "rrule_expression", "rrule sem expressão"),
-    # Estas duas têm receita PRÓPRIA: a tool lista os valores aceitos, coisa
-    # que o núcleo não faz — `InvalidScheduleError` diz "Strategy inválida:
-    # xyz" e para por aí, deixando o agente tentar de novo no escuro.
+    # These two have their OWN recipe: the tool lists the accepted values,
+    # something the core doesn't do — `InvalidScheduleError` says "Strategy
+    # inválida: xyz" and stops there, leaving the agent to retry in the dark.
     ({"strategy": "nao_existe"}, "'cron', 'interval', 'rrule'", "estratégia desconhecida"),
     ({"strategy": "interval", "interval": 5, "unit": "luas"},
      "'seconds', 'minutes', 'hours', 'days'", "unidade inválida"),
 ])
 async def test_config_invalida_vira_validation_COM_a_receita(banco, kwargs, esperado, motivo):
-    """O código sozinho não é o ponto — a MENSAGEM é.
+    """The code alone is not the point — the MESSAGE is.
 
-    Medido por mutação: apagar a guarda de estratégia e a chamada explícita de
-    `validate_schedule_create` NÃO derrubava este teste, porque o núcleo valida
-    de novo lá dentro e o `@ferramenta` mapeia o `InvalidScheduleError` para
-    `validation` do mesmo jeito. Ou seja, as guardas da tool são redundantes
-    quanto a RECUSAR.
+    Measured by mutation: deleting the strategy guard and the explicit call to
+    `validate_schedule_create` did NOT break this test, because the core
+    validates again inside and `@ferramenta` maps `InvalidScheduleError` to
+    `validation` all the same. In other words, the tool's guards are redundant
+    as far as REFUSING goes.
 
-    O que só elas fazem é dizer o que é válido: `InvalidScheduleError` responde
-    "Strategy inválida: xyz" e para por aí, sem listar as três. Um agente lendo
-    isso tenta de novo no escuro. Por isso a asserção é sobre o `hint`.
+    What only they do is say what is valid: `InvalidScheduleError` answers
+    "Strategy inválida: xyz" (invalid strategy) and stops there, without listing
+    the three. An agent reading that retries in the dark. That is why the
+    assertion is about the `hint`.
     """
     with pytest.raises(ToolError) as exc:
         await create_schedule(ctx(), WF_1, **kwargs)
 
     detalhe = corpo(exc.value)
     assert detalhe["code"] == "validation", motivo
-    # A asserção é sobre o CORPO inteiro (mensagem + dica): é ali que mora o
-    # que a tool acrescenta ao núcleo, e é isso que a mutação apaga.
+    # The assertion is about the whole BODY (message + hint): that is where what
+    # the tool adds to the core lives, and that is what the mutation erases.
     assert esperado in json.dumps(detalhe, ensure_ascii=False), motivo
 
 
 async def test_nada_e_gravado_quando_a_config_e_invalida(banco):
-    """A validação roda ANTES do insert — senão sobra linha pela metade."""
+    """Validation runs BEFORE the insert — otherwise a half-written row is left behind."""
     with pytest.raises(ToolError):
         await create_schedule(ctx(), WF_1, "cron", cron_expression="invalido")
 
@@ -311,11 +315,11 @@ async def test_nada_e_gravado_quando_a_config_e_invalida(banco):
 
 
 async def test_criar_em_fluxo_inativo_e_recusado_com_a_saida(banco):
-    """O núcleo já recusava, mas a rota REST convertia num 400 genérico
-    ("Não foi possível criar o agendamento") que não diz o que fazer.
+    """The core already refused, but the REST route turned it into a generic 400
+    ("Não foi possível criar o agendamento") that doesn't say what to do.
 
-    A tool antecipa a recusa e nomeia a saída — o agente precisa saber que o
-    caminho é `set_workflow_active`, não tentar outra expressão.
+    The tool anticipates the refusal and names the way out — the agent needs to
+    know the path is `set_workflow_active`, not trying another expression.
     """
     with pytest.raises(ToolError) as exc:
         await create_schedule(ctx(), WF_INATIVO, "cron", cron_expression="0 9 * * *")
@@ -327,10 +331,10 @@ async def test_criar_em_fluxo_inativo_e_recusado_com_a_saida(banco):
 
 
 async def test_o_cliente_nao_escolhe_o_workspace_do_agendamento(banco):
-    """`ScheduleBase` carrega `workspace_id` e não tinha `extra="forbid"`.
+    """`ScheduleBase` carries `workspace_id` and had no `extra="forbid"`.
 
-    A tool monta o objeto campo a campo, então não há por onde passar. O teste
-    afirma a ausência do parâmetro: acrescentá-lo à assinatura quebra aqui.
+    The tool builds the object field by field, so there is no way through. The
+    test asserts the parameter's absence: adding it to the signature breaks here.
     """
     import inspect
 
@@ -342,7 +346,7 @@ async def test_o_cliente_nao_escolhe_o_workspace_do_agendamento(banco):
 
 
 async def test_pausar_preserva_a_configuracao(banco):
-    """`active=false` é o que se quer quase sempre, e o oposto de apagar."""
+    """`active=false` is what one almost always wants, and the opposite of deleting."""
     criado = await create_schedule(ctx(), WF_1, "cron", cron_expression="0 9 * * *")
 
     saida = await update_schedule(ctx(), WF_1, criado["job_id"], active=False)
@@ -352,10 +356,11 @@ async def test_pausar_preserva_a_configuracao(banco):
 
 
 async def test_religar_pelo_tool_zera_next_run_at(banco):
-    """A mesma correção do PUT REST vale pela tool: religar um agendamento
-    pausado com `next_run_at` no passado zera o horário — senão o agendador o
-    dispararia na hora de virar o interruptor. Semeado direto porque o schedule
-    precisa nascer pausado e com uma próxima parada no passado."""
+    """The same fix as the REST PUT applies through the tool: re-enabling a
+    paused schedule with `next_run_at` in the past resets the time — otherwise
+    the scheduler would fire it the moment the switch is flipped. Seeded
+    directly because the schedule has to be born paused and with a next stop
+    in the past."""
     from datetime import datetime
 
     job = await _semear(
@@ -394,8 +399,9 @@ async def test_update_sem_nenhum_campo_e_recusado(banco):
 
 
 async def test_job_id_de_outro_workflow_responde_not_found(banco):
-    """`not_found` e não `forbidden`: dizer "existe, mas não é seu" já entrega
-    que ele existe. É a mesma regra do service, herdada do conserto de IDOR."""
+    """`not_found` and not `forbidden`: saying "it exists, but it isn't yours"
+    already reveals that it exists. It is the same rule as the service's,
+    inherited from the IDOR fix."""
     doutro = await _semear(banco, WF_2, job_id="job-do-vizinho")
 
     with pytest.raises(ToolError) as exc:
@@ -408,8 +414,8 @@ async def test_job_id_de_outro_workflow_responde_not_found(banco):
 
 
 async def test_sem_confirm_nada_e_apagado_e_a_resposta_descreve_o_alvo(banco):
-    """Apagar não tem desfazer e o sintoma é silencioso: nada falha, a rotina
-    só deixa de acontecer."""
+    """Deleting has no undo and the symptom is silent: nothing fails, the routine
+    just stops happening."""
     criado = await create_schedule(ctx(), WF_1, "cron", cron_expression="0 9 * * *")
 
     saida = await delete_schedule(ctx(), WF_1, criado["job_id"])
@@ -436,8 +442,9 @@ async def test_apagar_o_que_nao_existe_responde_not_found(banco):
 
 
 async def test_o_confirm_nao_pode_vazar_agendamento_alheio(banco):
-    """A posse é conferida ANTES do `confirm`, senão o ramo de descrição vira
-    um oráculo: sem apagar nada, ele contaria a configuração do vizinho."""
+    """Ownership is checked BEFORE `confirm`, otherwise the description branch
+    becomes an oracle: without deleting anything, it would reveal the
+    neighbor's configuration."""
     doutro = await _semear(banco, WF_2, job_id="job-do-vizinho")
 
     with pytest.raises(ToolError) as exc:
@@ -446,12 +453,12 @@ async def test_o_confirm_nao_pode_vazar_agendamento_alheio(banco):
     assert corpo(exc.value)["code"] == "not_found"
 
 
-# ── As portas ────────────────────────────────────────────────────────────────
+# ── The gates ────────────────────────────────────────────────────────────────
 
 
 async def test_ler_agendamento_nao_exige_escopo_de_gestao(banco):
-    """Paridade com `get_run`: quem só acompanha não precisa de poder para
-    mexer. A rota REST também só pede pertencimento para listar."""
+    """Parity with `get_run`: whoever only follows along doesn't need the power to
+    change things. The REST route also only requires membership to list."""
     so_leitura = ctx(scopes={"workflows:read"})
 
     assert (await list_schedules(so_leitura, WF_1))["total"] == 0
@@ -477,9 +484,9 @@ async def test_escrever_exige_triggers_manage(banco, nome):
 
 
 async def test_operator_e_o_piso_para_agendar_e_nao_editor(banco):
-    """AGENDAR É EXECUTAR: um schedule de um minuto dispara o fluxo com as
-    credenciais do dono, indefinidamente. `editor` não basta — é a mesma régua
-    de `run_workflow`, e a mesma que a rota REST aplica."""
+    """SCHEDULING IS EXECUTING: a one-minute schedule fires the workflow with the
+    owner's credentials, indefinitely. `editor` is not enough — it is the same
+    bar as `run_workflow`, and the same one the REST route applies."""
     async with banco() as db:
         db.add(WorkspaceMember(workspace_id=WS_1, user_id="usr-2", role="editor"))
         await db.commit()
@@ -489,9 +496,9 @@ async def test_operator_e_o_piso_para_agendar_e_nao_editor(banco):
         scopes={"workflows:read", "triggers:manage"}, workspace_ids={WS_1},
     ))
 
-    # Ler, pode.
+    # Reading, yes.
     assert (await list_schedules(editor, WF_1))["total"] == 0
-    # Agendar, não.
+    # Scheduling, no.
     with pytest.raises(ToolError) as exc:
         await create_schedule(editor, WF_1, "cron", cron_expression="0 9 * * *")
     assert corpo(exc.value)["code"] == "forbidden"
@@ -517,8 +524,8 @@ async def test_fluxo_de_outra_conta_e_inalcancavel(banco, nome):
 
 
 async def test_nenhuma_resposta_carrega_a_definition_nem_a_credencial(banco):
-    """As quatro carregam o workflow; `decifrar=False` é o que impede o blob
-    cifrado de chegar até aqui."""
+    """All four load the workflow; `decifrar=False` is what keeps the encrypted
+    blob from getting here."""
     criado = await create_schedule(ctx(), WF_1, "cron", cron_expression="0 9 * * *")
     respostas = [
         json.dumps(criado),

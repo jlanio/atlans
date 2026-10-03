@@ -1,6 +1,6 @@
 """
-Monta strings de conexão e estruturas de autenticação a partir dos campos
-individuais fornecidos pelo usuário. Chamado durante create/update de credencial.
+Builds connection strings and authentication structures from the individual
+fields provided by the user. Called during credential create/update.
 """
 
 from typing import Optional
@@ -9,9 +9,9 @@ from urllib.parse import quote_plus
 
 def build_connection_data(cred_type: str, data: dict) -> dict:
     """
-    Dado o tipo de credencial e os campos brutos, retorna o dict enriquecido
-    com connectionString (para tipos de banco) ou outros campos derivados.
-    Não modifica o dict original — retorna uma cópia.
+    Given the credential type and the raw fields, returns the dict enriched
+    with connectionString (for database types) or other derived fields.
+    Does not modify the original dict — returns a copy.
     """
     result = dict(data)
 
@@ -44,18 +44,18 @@ def _build_mysql_dsn(data: dict) -> str:
 
 def validate_required_fields(cred_type: str, data: dict) -> Optional[str]:
     """
-    Valida que todos os campos obrigatórios do schema estejam presentes e não-vazios.
-    Retorna mensagem de erro ou None se OK.
+    Validates that all required fields of the schema are present and non-empty.
+    Returns an error message, or None if OK.
     """
     from app.core.credentials.schemas import CREDENTIAL_TYPE_SCHEMAS
 
     schema = CREDENTIAL_TYPE_SCHEMAS.get(cred_type)
     if schema is None:
-        return None  # tipo livre — sem validação de schema
+        return None  # free-form type — no schema validation
 
-    # `str(... or "")`: a validação também roda sobre o `data` já gravado
-    # (troca de tipo sem `data` no pedido), e um valor legado que não é string
-    # (uma porta numérica) não pode virar um 500.
+    # `str(... or "")`: validation also runs on the already-stored `data`
+    # (a type change without `data` in the request), and a legacy value that is not a string
+    # (a numeric port) must not become a 500.
     missing = [
         f.label
         for f in schema.fields

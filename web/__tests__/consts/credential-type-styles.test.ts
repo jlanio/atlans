@@ -6,11 +6,11 @@ import {
 } from "@/consts/CredentialTypeStyles"
 
 /**
- * Os tipos abaixo espelham CREDENTIAL_TYPE_SCHEMAS em
- * app/core/credentials/schemas.py. Se o backend ganhar um tipo novo e ninguem
- * lembrar do mapa visual, este teste falha e aponta qual ficou de fora — a UI
- * nao quebra (cai no DEFAULT), mas a credencial apareceria com o icone generico
- * sem que ninguem percebesse.
+ * The types below mirror CREDENTIAL_TYPE_SCHEMAS in
+ * app/core/credentials/schemas.py. If the backend gains a new type and nobody
+ * remembers the visual map, this test fails and points out which one was left
+ * out — the UI doesn't break (it falls back to DEFAULT), but the credential would
+ * show up with the generic icon without anyone noticing.
  */
 const TIPOS_DO_BACKEND = [
   "postgresql",
@@ -38,8 +38,8 @@ describe("CredentialTypeStyles", () => {
     (_tipo, style) => {
       expect(style.icon).toBeTypeOf("function")
       expect(style.bg).toMatch(/^bg-/)
-      // A variante dark: e o ponto do contraste — `text-<cor>-600` sozinho fica
-      // abaixo de 4.5:1 sobre `bg-<cor>-500/10` no tema escuro.
+      // The dark: variant is the point of the contrast — `text-<cor>-600` alone falls
+      // below 4.5:1 over `bg-<cor>-500/10` in the dark theme.
       expect(style.fg).toContain("dark:")
     },
   )

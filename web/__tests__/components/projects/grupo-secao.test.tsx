@@ -62,8 +62,8 @@ describe("GrupoSecao", () => {
 
     rerender(<GrupoSecao {...p} recolhido />)
     expect(screen.getByRole("button", { name: /^Hidrologia/ })).toHaveAttribute("aria-expanded", "false")
-    // O corpo continua no DOM (o botão o referencia por aria-controls), só
-    // escondido; as linhas não são montadas quando recolhido.
+    // The body stays in the DOM (the button references it via aria-controls), just
+    // hidden; the rows are not mounted when collapsed.
     const corpoRecolhido = document.getElementById("grupo-g1-corpo")
     expect(corpoRecolhido).not.toBeNull()
     expect(corpoRecolhido).toHaveAttribute("hidden")

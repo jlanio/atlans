@@ -1,12 +1,12 @@
 /**
- * As caixas de auxílio precisam refletir o que foi CONFIGURADO, não o catálogo.
+ * The helper boxes need to reflect what was CONFIGURED, not the catalog.
  *
- * O Script Python declara `dynamic_output`: as saídas de verdade estão em
- * `output_vars`. O painel da direita mostrava sempre "result" — o nome fixo do
- * catálogo — mesmo depois de a pessoa ter renomeado as variáveis do próprio
- * script. E o badge da aresta oferecia esse mesmo "result" como chave, que o
- * executor não encontra no resultado: ele loga um aviso e usa o primeiro valor,
- * então "funciona" por acidente e o painel segue mentindo.
+ * The Python Script declares `dynamic_output`: the real outputs are in
+ * `output_vars`. The right-hand panel always showed "result" — the catalog's
+ * fixed name — even after the person had renamed the script's own variables.
+ * And the edge badge offered that same "result" as a key, which the executor
+ * doesn't find in the result: it logs a warning and uses the first value, so it
+ * "works" by accident and the panel keeps lying.
  */
 import { describe, it, expect } from "vitest"
 
@@ -31,9 +31,9 @@ describe("saidasDoNo", () => {
   })
 
   it("saída dinâmica SEM output_vars cai no catálogo", () => {
-    // ReadGeoJSON e companhia também declaram `dynamic_output` — no sentido de
-    // que a FORMA do dado varia — mas não têm a propriedade. Derivar deles
-    // apagaria as saídas que eles de fato declaram.
+    // ReadGeoJSON and friends also declare `dynamic_output` — in the sense that
+    // the data's SHAPE varies — but don't have the property. Deriving from them
+    // would erase the outputs they actually declare.
     const r = saidasDoNo({ dynamic_output: true, saidas: CATALOGO })
     expect(r.map(f => f.name)).toEqual(["result"])
   })
@@ -46,8 +46,8 @@ describe("saidasDoNo", () => {
   })
 
   it("outputs_from_ports: as saídas são as portas declaradas pelo usuário", () => {
-    // SubWorkflowInput — o catálogo declara [] de propósito. A revisão da F6
-    // pegou o seletor de chave sem candidatos e a aresta nascendo sem from_key.
+    // SubWorkflowInput — the catalog declares [] on purpose. The F6 review
+    // caught the key picker with no candidates and the edge born without from_key.
     const r = saidasDoNo({
       outputs_from_ports: true,
       saidas: [],

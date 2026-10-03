@@ -19,7 +19,7 @@ import { useTextosDaCasca } from "../home/i18n/da-casca"
 interface UserPreferencesDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** A Home passa `home-portal`: o conteúdo é portado ao <body>, fora da paleta dela. */
+  /** The Home passes `home-portal`: the content is portaled to <body>, outside its palette. */
   className?: string
 }
 
@@ -65,7 +65,7 @@ export function UserPreferencesDialog({ open, onOpenChange, className }: UserPre
 
         <Separator />
 
-        {/* ── Aparência ─────────────────────────────────────────────────── */}
+        {/* ── Appearance ────────────────────────────────────────────────── */}
         <section className="space-y-3">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-muted-foreground">
             <TbPalette size={13} />
@@ -130,11 +130,11 @@ export function UserPreferencesDialog({ open, onOpenChange, className }: UserPre
         <Separator />
 
         {/* ── Idioma ────────────────────────────────────────────────────── */}
-        {/* Automático é uma opção de verdade, e não a ausência de escolha: é o
-            único caminho de volta para quem escolheu um idioma e quer que a
-            Home volte a seguir o navegador. Cada idioma aparece no próprio
-            nome ("English", "Español") — é assim que quem não lê português o
-            encontra numa lista. */}
+        {/* Automatic is a real option, not the absence of a choice: it's the
+            only way back for someone who chose a language and wants the
+            Home to follow the browser again. Each language appears in its own
+            name ("English", "Español") — that's how someone who doesn't read
+            Portuguese finds it in a list. */}
         <section className="space-y-3">
           <div
             id="preferencias-idioma"
@@ -183,7 +183,7 @@ function OpcaoDeIdioma({
   onEscolher: () => void
   rotulo: string
   detalhe?: string
-  /** O nome do idioma no próprio idioma: o leitor de tela o pronuncia certo. */
+  /** The language's name in the language itself: the screen reader pronounces it right. */
   lang?: string
 }) {
   return (

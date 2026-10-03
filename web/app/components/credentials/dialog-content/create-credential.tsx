@@ -21,14 +21,14 @@ import { TestResultBanner, type TestResult } from "./test-result-banner"
 
 interface CreateCredentialProps {
   setCreateModalState: Dispatch<SetStateAction<boolean>>
-  /** Quando fornecido, restringe os tipos compatíveis com o nó em uso */
+  /** When provided, restricts the types compatible with the node in use */
   allowedTypes?: string[]
-  /** Tipo pré-selecionado (ex: ao abrir inline de um nó específico) */
+  /** Pre-selected type (e.g. when opening inline from a specific node) */
   defaultType?: string
   /**
-   * Valores iniciais para pré-preencher o formulário — usado ao DUPLICAR uma
-   * credencial. O chamador força remontagem via `key` quando isto muda, então
-   * ler no defaultValues (uma vez) basta.
+   * Initial values to pre-fill the form — used when DUPLICATING a credential.
+   * The caller forces a remount via `key` when this changes, so reading it in
+   * defaultValues (once) is enough.
    */
   initialValues?: {
     name?: string
@@ -41,10 +41,10 @@ interface CreateCredentialProps {
 
 const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, initialValues }: CreateCredentialProps) => {
 
-  // Acesso OPCIONAL de propósito: este modal também é montado dentro do canvas
-  // de workflow (nodes-configuration/fields/credential-field.tsx), onde não há
-  // CredentialsContextProvider. Desestruturar direto aqui quebra esse caminho —
-  // e nenhum teste pega, porque o modal é mockado como () => null.
+  // OPTIONAL access on purpose: this modal is also mounted inside the workflow
+  // canvas (nodes-configuration/fields/credential-field.tsx), where there is no
+  // CredentialsContextProvider. Destructuring directly here breaks that path —
+  // and no test catches it, because the modal is mocked as () => null.
   const credCtx = useCredentialsContext()
   const [credentialTypes, setCredentialTypes] = useState<ICredentialTypeSchema[]>([])
   const [typesError, setTypesError] = useState(false)
@@ -52,8 +52,8 @@ const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, init
   const [testResult, setTestResult] = useState<TestResult | null>(null)
 
   useEffect(() => {
-    // Sem tratamento de erro o Select de tipo ficava vazio sem explicação
-    // nenhuma. O caminho equivalente no canvas já avisava com toast.
+    // Without error handling the type Select stayed empty with no explanation
+    // at all. The equivalent path in the canvas already warned with a toast.
     GisFlowService.getCredentialTypes().then(res => {
       if (res?.data) {
         setCredentialTypes(res.data)
@@ -79,14 +79,14 @@ const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, init
   const selectedType = form.watch("type")
   const activeSchema = credentialTypes.find(t => t.type === selectedType)
 
-  // Reinicia dados ao trocar de tipo para evitar campos órfãos.
+  // Resets the data on type change to avoid orphaned fields.
   //
-  // O tipo anterior precisa vir de um ref. Antes era
-  // `const previousType = form.getValues("type")` no corpo do componente —
-  // recalculado a CADA render, então quando o efeito rodava o valor já era o
-  // novo e `previousType !== selectedType` nunca era verdadeiro. O efeito era
-  // código morto: os campos do tipo antigo seguiam em `data` e iam para a API, e
-  // um "conexão OK" de outro tipo continuava na tela.
+  // The previous type has to come from a ref. Before it was
+  // `const previousType = form.getValues("type")` in the component body —
+  // recomputed on EVERY render, so when the effect ran the value was already the
+  // new one and `previousType !== selectedType` was never true. The effect was
+  // dead code: the old type's fields stayed in `data` and went to the API, and
+  // a "conexão OK" from another type stayed on screen.
   const previousTypeRef = useRef(selectedType)
   useEffect(() => {
     if (previousTypeRef.current !== selectedType) {
@@ -97,12 +97,13 @@ const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, init
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedType])
 
-  // O resultado do teste envelhece assim que qualquer campo muda: sem isto um
-  // "conexão bem-sucedida" continuava verde depois de o usuário trocar a senha.
+  // The test result goes stale as soon as any field changes: without this a
+  // "conexão bem-sucedida" stayed green after the user changed the password.
   //
-  // A dependência é o valor SERIALIZADO, não o objeto: `form.watch` pode
-  // devolver referência nova a cada render, e aí o efeito limparia o resultado
-  // no render seguinte ao próprio teste — nunca daria tempo de lê-lo.
+  // The dependency is the SERIALIZED value, not the object: `form.watch` may
+  // return a new reference on every render, and then the effect would clear the
+  // result on the render right after the test itself — there would never be time
+  // to read it.
   const dataFields = form.watch("data")
   const dataSignature = JSON.stringify(dataFields ?? {})
   useEffect(() => {
@@ -128,8 +129,8 @@ const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, init
     if (respCred?.error)
       return createToast.error("Erro ao criar credencial!", respCred?.error.message)
 
-    // `data` podia ser undefined num 200 sem corpo, e o concat inseria um item
-    // undefined na lista. Só propaga quando há objeto de verdade.
+    // `data` could be undefined on a 200 without a body, and the concat inserted an
+    // undefined item into the list. Only propagates when there is a real object.
     if (credCtx?.setCredentialsContext && respCred.data) {
       const criada = respCred.data
       credCtx.setCredentialsContext(prev => ({
@@ -138,9 +139,9 @@ const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, init
       }))
     }
 
-    // O canvas lê as credenciais do catálogo em memória, com TTL de 5 min.
-    // Sem invalidar aqui, a credencial recém-criada em /credentials não aparecia
-    // no select do nó até o TTL vencer.
+    // The canvas reads credentials from the in-memory catalog, with a 5 min TTL.
+    // Without invalidating here, the credential just created in /credentials did
+    // not show up in the node's select until the TTL expired.
     useWorkflowCatalogStore.getState().invalidarCredenciais()
 
     createToast.success("Credencial criada", data.name)
@@ -148,16 +149,16 @@ const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, init
     setCreateModalState(false)
   }
 
-  // `isSubmitting` do react-hook-form: não era usado em nenhum lugar do repo, e
-  // sem ele um duplo clique em "Criar" criava duas credenciais.
+  // react-hook-form's `isSubmitting`: it was not used anywhere in the repo, and
+  // without it a double click on "Criar" created two credentials.
   const { isSubmitting } = form.formState
   const canTest = !!selectedType && Object.keys(dataFields ?? {}).length > 0
 
   return (
     <DialogContent
-      // Fechar no meio do submit desmonta o componente durante o await e deixa o
-      // usuário sem saber se a credencial foi criada. As três saídas precisam ser
-      // cobertas — bloquear só Esc e clique-fora deixa o X como escape.
+      // Closing mid-submit unmounts the component during the await and leaves the
+      // user not knowing whether the credential was created. All three exits need
+      // to be covered — blocking only Esc and click-outside leaves the X as an escape.
       bloqueado={isSubmitting}
     >
       <DialogHeader>
@@ -184,16 +185,16 @@ const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, init
             allowedTypes={allowedTypes}
           />
 
-          {/* Campos guiados pelo schema ou editor livre como fallback */}
+          {/* Schema-driven fields or the free editor as a fallback */}
           {activeSchema ? (
             <SchemaFieldsInput form={form} schema={activeSchema} />
           ) : selectedType ? (
             <PropsInput form={form} />
           ) : null}
 
-          {/* Metadados opcionais (descrição, tags, expiração, compartilhamento)
-              só aparecem depois que um tipo foi escolhido — antes disso o modal
-              é só nome + tipo. */}
+          {/* Optional metadata (description, tags, expiration, sharing) only
+              appears after a type has been chosen — before that the modal is
+              just name + type. */}
           {selectedType && <MetaInputs form={form} />}
 
           <TestResultBanner result={testResult} />
@@ -202,13 +203,13 @@ const CreateCredential = ({ setCreateModalState, allowedTypes, defaultType, init
             <DialogClose asChild>
               <Button type="button" variant="outline" disabled={isSubmitting} className="max-md:h-10">Cancelar</Button>
             </DialogClose>
-            {/* Sempre renderizado, desabilitado quando não há o que testar: antes
-                ele aparecia e desaparecia conforme os campos eram preenchidos,
-                deslocando os outros botões no meio da digitação e entrando/saindo
-                da ordem de tabulação.
-                Rótulo "Testar credencial", não "Testar conexão": o backend só
-                conecta de fato em postgresql/mysql/s3 — nos outros tipos ele
-                apenas valida os campos, e o botão prometia mais do que entregava. */}
+            {/* Always rendered, disabled when there is nothing to test: before, it
+                appeared and disappeared as the fields were filled in,
+                shifting the other buttons mid-typing and entering/leaving
+                the tab order.
+                Label "Testar credencial", not "Testar conexão": the backend only
+                actually connects for postgresql/mysql/s3 — for the other types it
+                only validates the fields, and the button promised more than it delivered. */}
             <Button
               type="button"
               variant="secondary"

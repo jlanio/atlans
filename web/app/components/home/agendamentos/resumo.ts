@@ -1,16 +1,17 @@
 // web/app/components/home/agendamentos/resumo.ts
 //
-// O resumo de um agendamento na lista da Home ("todo dia às 06:00 · amanhã,
-// 06:00") no idioma de quem lê.
+// The summary of a schedule in the Home list ("todo dia às 06:00 · amanhã,
+// 06:00") in the reader's language.
 //
-// Em português é `resumirAgendamento` de projects/gatilho TAL E QUAL — a mesma
-// função do painel de administração, que segue em português —, e a Home em
-// português não muda um byte. Nos outros idiomas o ESTADO continua vindo de lá
-// (ativo, pausado, calculando e o motivo da pausa são regra de negócio, não
-// texto) e só as frases são refeitas com o dicionário da Home: a cadência pelo
-// MESMO reconhecimento de cron do gatilho (o que ele deixa cru segue cru nos
-// três idiomas — é a expressão que a pessoa escreveu) e a próxima execução
-// pelo `quando` da Home, com "amanhã" nomeado como em `formatarProxima`.
+// In Portuguese it is `resumirAgendamento` from projects/gatilho AS IS — the same
+// function as the administration panel, which stays in Portuguese —, and the
+// Portuguese Home doesn't change a byte. In the other languages the STATE still
+// comes from there (active, paused, calculating and the pause reason are
+// business rules, not text) and only the sentences are rebuilt with the Home's
+// dictionary: the cadence through the SAME cron recognition as the trigger (what
+// it leaves raw stays raw in all three languages — it is the expression the
+// person wrote) and the next run through the Home's `quando`, with "amanhã"
+// (tomorrow) named as in `formatarProxima`.
 
 import { resumirAgendamento, type ResumoDoAgendamento } from "@/app/components/projects/gatilho"
 import { dayjs, fromBackend } from "@/lib/dayjs"
@@ -21,7 +22,7 @@ import { FORMATOS } from "../i18n/formatos"
 
 type Frases = TextosDaCasca["listas"]["agendamentos"]["resumo"]
 
-/** O resumo com o motivo da pausa já no idioma (o gatilho o tipa como o texto em português). */
+/** The summary with the pause reason already in the language (the trigger types it as the Portuguese text). */
 export type ResumoNoIdioma = Omit<ResumoDoAgendamento, "motivoPausa"> & { motivoPausa: string | null }
 
 export function resumirNoIdioma(
@@ -36,8 +37,8 @@ export function resumirNoIdioma(
 }
 
 /**
- * As frases de um resumo do gatilho refeitas num idioma. Exportada para o teste
- * do molde: em português ela devolve exatamente o que o gatilho devolveu.
+ * The sentences of a trigger summary rebuilt in a language. Exported for the
+ * template test: in Portuguese it returns exactly what the trigger returned.
  */
 export function traduzirResumo(
   resumo: ResumoDoAgendamento,
@@ -54,15 +55,15 @@ export function traduzirResumo(
   }
 }
 
-// Um motivo novo no gatilho vira erro de tipo aqui — e não um motivo em
-// português numa tela em inglês.
+// A new reason in the trigger becomes a type error here — and not a
+// Portuguese reason on an English screen.
 const MOTIVO_DA_PAUSA: Record<NonNullable<ResumoDoAgendamento["motivoPausa"]>, (t: Frases) => string> = {
   "workflow inativo": (t) => t.workflowInativo,
 }
 
-// A hora de relógio de cada idioma: o português com os dois dígitos de sempre
-// ("06:00", como o gatilho); inglês e espanhol com as opções do `quando` da
-// Home ("6:00 AM", "6:00" — ver i18n/formatos).
+// The clock time for each language: Portuguese with the usual two digits
+// ("06:00", like the trigger); English and Spanish with the options of the
+// Home's `quando` ("6:00 AM", "6:00" — see i18n/formatos).
 const OPCOES_DA_HORA: Record<Idioma, Intl.DateTimeFormatOptions> = {
   "pt-BR": { hour: "2-digit", minute: "2-digit" },
   en: { hour: "numeric", minute: "2-digit" },
@@ -71,7 +72,7 @@ const OPCOES_DA_HORA: Record<Idioma, Intl.DateTimeFormatOptions> = {
 
 const RELOGIOS = new Map<string, Intl.DateTimeFormat>()
 
-/** No fuso do navegador (a próxima execução) ou em UTC (a hora do cron, que é de relógio e não se converte). */
+/** In the browser's time zone (the next run) or in UTC (the cron time, which is a clock time and isn't converted). */
 function relogio(idioma: Idioma, fuso?: "UTC"): Intl.DateTimeFormat {
   const chave = `${idioma}|${fuso ?? ""}`
   let formato = RELOGIOS.get(chave)
@@ -82,7 +83,7 @@ function relogio(idioma: Idioma, fuso?: "UTC"): Intl.DateTimeFormat {
   return formato
 }
 
-/** "06:00" / "6:00 AM" — a hora que a pessoa escreveu no cron, sem conversão de fuso. */
+/** "06:00" / "6:00 AM" — the time the person wrote in the cron, without time zone conversion. */
 function horaDoCron(idioma: Idioma, h: number, m: number): string {
   return relogio(idioma, "UTC").format(new Date(Date.UTC(2000, 0, 1, h, m)))
 }
@@ -91,8 +92,8 @@ function proximaExecucao(iso: string | null, idioma: Idioma, t: Frases, agora: D
   const d = fromBackend(iso)
   if (!d) return "—"
   if (d.isSame(dayjs(agora).add(1, "day"), "day")) return `${t.amanha}, ${relogio(idioma).format(d.toDate())}`
-  // No futuro o `quando` é o calendário ("hoje, 18:00", "1 out, 08:00") — o
-  // mesmo `formatarInicio` que `formatarProxima` usa em português.
+  // In the future `quando` is the calendar ("hoje, 18:00", "1 out, 08:00") — the
+  // same `formatarInicio` that `formatarProxima` uses in Portuguese.
   return FORMATOS[idioma].quando(iso, agora)
 }
 
@@ -119,10 +120,10 @@ function inteiro(campo: string, min: number, max: number): number | null {
 }
 
 /**
- * As formas que o gatilho traduz (`traduzirCron` em projects/gatilho), na mesma
- * ordem e com as mesmas recusas. Um teste confere que o que o gatilho traduz,
- * esta também traduz; o sentido contrário não tem como aparecer, porque um cron
- * que o gatilho não traduz é mostrado cru antes de chegar aqui. Nulo para o resto.
+ * The forms the trigger translates (`traduzirCron` in projects/gatilho), in the
+ * same order and with the same refusals. A test checks that what the trigger
+ * translates, this one translates too; the reverse can't happen, because a cron
+ * the trigger doesn't translate is shown raw before reaching here. Null for the rest.
  */
 function traduzirCron(expr: string, idioma: Idioma, t: Frases): string | null {
   const partes = expr.trim().split(/\s+/)
@@ -156,7 +157,7 @@ function traduzirCron(expr: string, idioma: Idioma, t: Frases): string | null {
     if (sem === "*") return t.todoDia(as)
     if (sem === "1-5") return t.segASex(as)
     const d = inteiro(sem, 0, 7)
-    // O 7 também é domingo no cron.
+    // 7 is also Sunday in cron.
     if (d != null) return t.naSemana(d % 7, as)
     return null
   }
@@ -167,7 +168,7 @@ function traduzirCron(expr: string, idioma: Idioma, t: Frases): string | null {
   return null
 }
 
-/** O `descreverIntervalo` do gatilho, com as unidades do agendador (`seconds|minutes|hours|days`). */
+/** The trigger's `descreverIntervalo`, with the scheduler's units (`seconds|minutes|hours|days`). */
 function descreverIntervalo(interval: number | null | undefined, unit: string | null | undefined, t: Frases): string {
   if (interval == null || !Number.isFinite(interval) || interval <= 0) return t.intervalo
   const n = Math.round(interval)

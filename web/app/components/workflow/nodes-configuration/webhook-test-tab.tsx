@@ -52,7 +52,7 @@ export default function WebhookTestTab({ workflowId, outputKey, payloadSchema }:
   const fields = useMemo(() => parseSchemaFields(payloadSchema), [payloadSchema])
   const hasFields = fields.length > 0
 
-  // Estado do formulário dinâmico
+  // Dynamic form state
   const [fieldValues, setFieldValues] = useState<Record<string, unknown>>(() =>
     Object.fromEntries(fields.map(f => {
       const def = DEFAULTS[f.type] ?? ""
@@ -62,7 +62,7 @@ export default function WebhookTestTab({ workflowId, outputKey, payloadSchema }:
     }))
   )
 
-  // Estado do textarea (fallback sem schema)
+  // Textarea state (fallback without a schema)
   const jsonTemplate = useMemo(
     () => JSON.stringify(generateSampleFromSchema(outputKey, payloadSchema), null, 2),
     [outputKey, payloadSchema],
@@ -73,7 +73,7 @@ export default function WebhookTestTab({ workflowId, outputKey, payloadSchema }:
   const { executeWorkflow, isExecuting } = useExecuteWorkflow()
   const statusWorkflow = useWorkflowExecutionStore(s => s.statusWorkflow)
 
-  // Monta o payload a partir dos campos ou do textarea
+  // Builds the payload from the fields or from the textarea
   function buildPayload(): Record<string, unknown> | null {
     if (hasFields) {
       const coerced: Record<string, unknown> = {}
@@ -94,8 +94,8 @@ export default function WebhookTestTab({ workflowId, outputKey, payloadSchema }:
           coerced[f.name] = v
         }
       }
-      // Envolve só se payloadField foi configurado pelo usuario; caso contrario
-      // entrega os campos direto (mesma convencao que o webhook HTTP usa).
+      // Wraps only if payloadField was configured by the user; otherwise
+      // delivers the fields directly (same convention the HTTP webhook uses).
       return outputKey ? { [outputKey]: coerced } : coerced
     }
     try {
@@ -117,7 +117,7 @@ export default function WebhookTestTab({ workflowId, outputKey, payloadSchema }:
     setFieldValues(prev => ({ ...prev, [name]: value }))
   }
 
-  // Indicador de status da última execução
+  // Status indicator of the last execution
   const status = statusWorkflow?.status
   const showStatus = status && status !== "idle"
 

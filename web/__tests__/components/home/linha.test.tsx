@@ -4,10 +4,10 @@ import { createRef } from "react"
 import { LinhaDoMeu, GatilhoDeAcoes } from "@/app/components/home/linha"
 
 /**
- * A linha única das três listas do grupo Meu. O contrato que os testes das
- * listas herdam: um flex em que o principal é `min-w-0 flex-1` e o "⋯" é IRMÃO
- * com `shrink-0` — nunca `absolute` sobre o texto (era o `absolute` + `pr-7`
- * reservado à mão que dava folga zero e, no telefone, 16px de sobreposição).
+ * The single row of the three lists in the Meu group. The contract the lists'
+ * tests inherit: a flex in which the main item is `min-w-0 flex-1` and the "⋯" is a SIBLING
+ * with `shrink-0` — never `absolute` over the text (it was the `absolute` + `pr-7`
+ * reserved by hand that gave zero slack and, on the phone, 16px of overlap).
  */
 afterEach(cleanup)
 
@@ -50,7 +50,7 @@ describe("GatilhoDeAcoes", () => {
   })
 
   it("repassa o que o gatilho do menu injeta (ref, data-state, onClick)", () => {
-    // É o que `DropdownMenuTrigger asChild` faz com o filho.
+    // It is what `DropdownMenuTrigger asChild` does with the child.
     const ref = createRef<HTMLButtonElement>()
     let cliques = 0
     render(<GatilhoDeAcoes rotulo="x" ref={ref} data-state="open" onClick={() => { cliques++ }} />)

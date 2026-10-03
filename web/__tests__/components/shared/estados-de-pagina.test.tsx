@@ -1,9 +1,10 @@
 /**
- * Os cartões de estado que moravam inline nas páginas (fora de um
- * `estados.tsx`): o erro de 1ª carga do editor (`/workflow/[id]`) e o mapa sem
- * camadas do portal (`/share`). Mesmo contrato das telas com módulo próprio
- * (screen-patterns.md §3 e §5): o erro anuncia com a mensagem e oferece "Tentar de
- * novo"; o vazio mantém o texto de sempre e não é alerta.
+ * The state cards that lived inline in the pages (outside an `estados.tsx`):
+ * the editor's first-load error (`/workflow/[id]`) and the portal's map with
+ * no layers (`/share`). Same contract as the screens with their own module
+ * (screen-patterns.md §3 and §5): the error announces itself with the message
+ * and offers "Tentar de novo" (try again); the empty state keeps the usual text
+ * and is not an alert.
  */
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
@@ -14,16 +15,16 @@ vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated"
 const getWorkflowById = vi.hoisted(() => vi.fn())
 vi.mock("@/service/GisFlowService", () => ({ GisFlowService: { getWorkflowById } }))
 
-// O canvas é pesado (React Flow, Monaco) e não é o objeto daqui: o erro de 1ª
-// carga toma a tela antes dele existir.
+// The canvas is heavy (React Flow, Monaco) and isn't the subject here: the
+// first-load error takes over the screen before it exists.
 vi.mock("@/app/components/workflow", () => ({ default: () => <div data-testid="canvas" /> }))
 vi.mock("@/context/useFlowContext", () => ({ FlowContextProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
 vi.mock("@xyflow/react", () => ({ ReactFlowProvider: ({ children }: { children: React.ReactNode }) => <>{children}</> }))
-// O CSS do React Flow passaria pelo PostCSS do app, que o vitest não carrega.
+// React Flow's CSS would go through the app's PostCSS, which vitest doesn't load.
 vi.mock("@xyflow/react/dist/style.css", () => ({}))
 
 vi.mock("@/context/ThemeContext", () => ({ useTheme: () => ({ theme: "light", setTheme: () => {} }) }))
-// Sem camadas o mapa nem monta; o dublê só evita carregar o MapLibre.
+// With no layers the map doesn't even mount; the double just avoids loading MapLibre.
 vi.mock("next/dynamic", () => ({ default: () => () => <div data-testid="mapa" /> }))
 
 import WorkFlowCreatePage from "@/app/(dashboard)/workflow/[id]/page"

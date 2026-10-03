@@ -17,9 +17,9 @@ import type { IUserSearchResult, IWorkspaceMember } from "@/service/types"
 import { createToast } from "@/utils/createToast"
 import { ROLE_DESCRIPTIONS, ROLE_LABELS, ROLE_OPTIONS } from "../role-labels"
 
-// A busca resolve pelo e-mail EXATO (o backend não faz mais busca por parte do
-// e-mail — evita coletar a base inteira, auditoria SEG-06). Só dispara quando o
-// texto parece um e-mail completo.
+// The lookup resolves by the EXACT email (the backend no longer searches by
+// part of the email — avoids harvesting the whole user base, audit SEG-06).
+// It only fires when the text looks like a complete email.
 const _RE_EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function pareceEmail(v: string): boolean {
   return _RE_EMAIL.test(v)
@@ -39,9 +39,9 @@ export function InviteMemberDialog({ workspaceId, onClose, onInvited }: Props) {
   const [role, setRole] = useState<string>("editor")
   const [results, setResults] = useState<IUserSearchResult[]>([])
   const [selected, setSelected] = useState<IUserSearchResult | null>(null)
-  // Três estados em vez de um booleano: sem o "idle", a tela dizia "Nenhum
-  // usuário encontrado" assim que o terceiro caractere era digitado — antes de
-  // qualquer busca ter acontecido.
+  // Three states instead of a boolean: without "idle", the screen said "Nenhum
+  // usuário encontrado" (no user found) as soon as the third character was
+  // typed — before any search had happened.
   const [status, setStatus] = useState<"idle" | "searching" | "done">("idle")
   const [inviting, setInviting] = useState(false)
 
@@ -57,8 +57,9 @@ export function InviteMemberDialog({ workspaceId, onClose, onInvited }: Props) {
 
     setStatus("searching")
     let cancelado = false
-    // Debounce: a busca era manual, atrás de um botão. Digitar e não perceber
-    // que ainda faltava clicar em "Buscar" fazia a tela parecer quebrada.
+    // Debounce: the search used to be manual, behind a button. Typing and not
+    // noticing you still had to click "Buscar" (Search) made the screen look
+    // broken.
     const timer = setTimeout(async () => {
       const res = await GisFlowService.searchUsersByEmail(termo)
       if (cancelado) return
@@ -126,8 +127,8 @@ export function InviteMemberDialog({ workspaceId, onClose, onInvited }: Props) {
 
           <AnimatePresence>
             {results.length > 0 && !selected && (
-              // Anima só opacity/y: animar `height` de 0 a auto forçava reflow a
-              // cada frame. A altura agora fica no fluxo natural do layout.
+              // Animates only opacity/y: animating `height` from 0 to auto forced a reflow
+              // on every frame. The height now stays in the layout's natural flow.
               <motion.div
                 className="divide-y overflow-hidden rounded-md border"
                 initial={{ opacity: 0, y: -4 }}

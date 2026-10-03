@@ -3,11 +3,11 @@ import { useCallback, useEffect, useRef, useState } from "react"
 const BOTTOM_TOLERANCE_PX = 40
 
 /**
- * Auto-scroll que só acompanha quem já está no fim.
+ * Auto-scroll that only follows someone already at the end.
  *
- * O painel antigo chamava `scrollIntoView` a cada evento novo, sem checar a
- * posição: rolar para cima e ler qualquer coisa durante a execução era
- * impossível — a lista puxava o usuário de volta uma vez por linha.
+ * The old panel called `scrollIntoView` on every new event, without checking
+ * the position: scrolling up to read anything during the run was impossible —
+ * the list pulled the user back once per line.
  */
 export function useStickyScroll(deps: unknown[], scrollToEnd?: () => void) {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -15,8 +15,8 @@ export function useStickyScroll(deps: unknown[], scrollToEnd?: () => void) {
   const [stuck, setStuck] = useState(true)
   const [showJump, setShowJump] = useState(false)
 
-  // Ref para o callback: o `onScroll` é registrado uma vez, mas o virtualizador
-  // (e portanto `scrollToEnd`) muda a cada render.
+  // Ref to the callback: `onScroll` is registered once, but the virtualizer
+  // (and therefore `scrollToEnd`) changes on every render.
   const scrollToEndRef = useRef(scrollToEnd)
   scrollToEndRef.current = scrollToEnd
 
@@ -28,22 +28,22 @@ export function useStickyScroll(deps: unknown[], scrollToEnd?: () => void) {
       if (!node) return
       const atBottom = node.scrollHeight - node.scrollTop - node.clientHeight <= BOTTOM_TOLERANCE_PX
       setStuck(atBottom)
-      // Autoridade do botão fica aqui: com virtualização, a medição dinâmica
-      // pode tirar o scroll do fim DEPOIS do efeito de auto-scroll rodar (que
-      // não re-dispara num run concluído). Sem isto, o usuário ficava sem o
-      // botão "↓" para voltar ao fim.
+      // The button's authority lives here: with virtualization, dynamic measurement
+      // can move the scroll off the end AFTER the auto-scroll effect runs (which
+      // does not re-fire on a finished run). Without this, the user was left
+      // without the "↓" button to get back to the end.
       setShowJump(!atBottom)
     }
     el.addEventListener("scroll", onScroll, { passive: true })
     return () => el.removeEventListener("scroll", onScroll)
   }, [])
 
-  // `scrollTop = scrollHeight` em vez de `scrollIntoView`: este efeito roda a
-  // cada flush do painel (a cada 120ms num run ao vivo) e o scrollIntoView
-  // media a posição de um elemento no fim de uma lista de milhares de linhas
-  // recém-renderizadas — layout síncrono forçado, oito vezes por segundo. O
-  // ajuste também vai para um único quadro, para dois flushes seguidos não
-  // pagarem o trabalho duas vezes.
+  // `scrollTop = scrollHeight` instead of `scrollIntoView`: this effect runs on
+  // every panel flush (every 120ms in a live run) and scrollIntoView measured
+  // the position of an element at the end of a list of thousands of freshly
+  // rendered rows — forced synchronous layout, eight times per second. The
+  // adjustment also goes into a single frame, so two consecutive flushes do
+  // not pay for the work twice.
   const frameRef = useRef<number | null>(null)
   useEffect(() => {
     if (!stuck) {
@@ -53,9 +53,10 @@ export function useStickyScroll(deps: unknown[], scrollToEnd?: () => void) {
     if (frameRef.current != null) cancelAnimationFrame(frameRef.current)
     frameRef.current = requestAnimationFrame(() => {
       frameRef.current = null
-      // Virtualizado: delega ao virtualizador, cujo loop de reajuste compensa a
-      // medição dinâmica (scrollTop=scrollHeight usaria a altura ESTIMADA e
-      // pararia no meio). Sem virtualização, o scroll cru continua correto.
+      // Virtualized: delegates to the virtualizer, whose readjustment loop
+      // compensates for dynamic measurement (scrollTop=scrollHeight would use the
+      // ESTIMATED height and stop midway). Without virtualization, the raw
+      // scroll is still correct.
       if (scrollToEndRef.current) {
         scrollToEndRef.current()
         return

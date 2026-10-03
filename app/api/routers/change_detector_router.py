@@ -1,24 +1,24 @@
 # app/api/routers/change_detector_router.py
 """
-Endpoint interno para o node `ChangeDetector` (executado em executor remoto)
-trocar o hash da última execução armazenado no Redis do servidor.
+Internal endpoint for the `ChangeDetector` node (executed on a remote executor)
+to swap the last execution's hash stored in the server's Redis.
 
-Por que existe: executores externos rodam `flow/` em ambiente sem acesso a
-`app.core.redis`. Este router serve como bridge HTTP ao Redis do servidor,
-mantendo o estado centralizado entre múltiplos executores que podem executar
-runs do mesmo workflow agendado.
+Why it exists: external executors run `flow/` in an environment without access
+to `app.core.redis`. This router serves as an HTTP bridge to the server's Redis,
+keeping the state centralized across multiple executors that may execute runs
+of the same scheduled workflow.
 
-Auth: reusa o padrao dos endpoints `/drive/executor-*` — agora via cert mTLS
-validado por Traefik e propagado em `X-Forwarded-Tls-Client-Cert-Info`.
-`_auth_agent` do drive_router resolve o executor_id e seus workspace_ids.
+Auth: reuses the pattern of the `/drive/executor-*` endpoints — now via an mTLS
+cert validated by Traefik and propagated in `X-Forwarded-Tls-Client-Cert-Info`.
+The drive_router's `_auth_agent` resolves the executor_id and its workspace_ids.
 
-Layout das chaves no Redis:
-    change_detector:wf:{workflow_hash}:{node_id}            (escopo workflow)
-    change_detector:ws:{workspace_id}:{shared_key}          (escopo workspace)
+Layout of the keys in Redis:
+    change_detector:wf:{workflow_hash}:{node_id}            (workflow scope)
+    change_detector:ws:{workspace_id}:{shared_key}          (workspace scope)
 
-Validação de prefixo: o `key` aceito pelo endpoint deve começar com
-`wf:` ou `ws:`. Bloqueio simples contra um executor comprometido tentar
-manipular outras chaves Redis (ex: idempotency, JWT blacklist, presence).
+Prefix validation: the `key` accepted by the endpoint must start with `wf:` or
+`ws:`. A simple block against a compromised executor trying to manipulate other
+Redis keys (e.g. idempotency, JWT blacklist, presence).
 """
 import re
 
@@ -35,11 +35,11 @@ logger = get_logger(__name__)
 
 router = APIRouter(prefix="/internal/change-detector", tags=["internal"])
 
-# Regex de chave externa (sem o prefixo "change_detector:" — adicionado aqui).
-# Formato aceito: "wf:<scope_id>:<identifier>" ou "ws:<scope_id>:<identifier>".
-# Caracteres permitidos em scope_id e identifier: alfanuméricos + hífen +
-# underscore (UUIDs e shared_keys humanas). Comprimento máximo 200 chars
-# para a chave inteira — Redis aguenta muito mais, mas limita superfície.
+# External key regex (without the "change_detector:" prefix — added here).
+# Accepted format: "wf:<scope_id>:<identifier>" or "ws:<scope_id>:<identifier>".
+# Characters allowed in scope_id and identifier: alphanumerics + hyphen +
+# underscore (UUIDs and human shared_keys). Maximum length 200 chars for the
+# whole key — Redis handles much more, but it limits the surface.
 _KEY_PATTERN = re.compile(r"^(wf|ws):[A-Za-z0-9_\-]{1,80}:[A-Za-z0-9_\-]{1,100}$")
 _HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 _MAX_TTL_SECONDS = 31_536_000  # 1 ano
@@ -56,17 +56,17 @@ def _validate_key(key: str) -> str:
 
 
 async def _authorize_key(key: str, executor, db: AsyncSession) -> str:
-    """Valida o formato E o escopo da chave, devolvendo a chave Redis qualificada.
+    """Validates the key's format AND scope, returning the qualified Redis key.
 
-    SEG: a validação de formato sozinha impedia apenas que o executor tocasse
-    OUTRAS chaves do Redis — não impedia que ele lesse, sobrescrevesse ou
-    apagasse o estado de ChangeDetector de qualquer workflow da plataforma.
-    Um executor comprometido podia congelar execuções agendadas de outro tenant
-    (fixando o hash como "sem mudança") ou forçar reprocessamento em massa.
+    SEC: format validation alone only prevented the executor from touching
+    OTHER Redis keys — it did not prevent it from reading, overwriting or
+    deleting the ChangeDetector state of any workflow on the platform.
+    A compromised executor could freeze another tenant's scheduled executions
+    (pinning the hash as "no change") or force mass reprocessing.
 
-    Escopo:
-      ws:{workspace_id}:...  → workspace tem de estar entre os do executor
-      wf:{workflow_hash}:... → workflow tem de pertencer a um desses workspaces
+    Scope:
+      ws:{workspace_id}:...  → the workspace must be among the executor's
+      wf:{workflow_hash}:... → the workflow must belong to one of those workspaces
     """
     redis_key = _validate_key(key)
     scope, scope_id, _ = key.split(":", 2)
@@ -82,8 +82,8 @@ async def _authorize_key(key: str, executor, db: AsyncSession) -> str:
         )
         target_ws = result.scalar_one_or_none()
         if target_ws is None:
-            # Workflow inexistente: não revela a diferença entre "não existe" e
-            # "não é seu" — mesma resposta dos dois casos.
+            # Nonexistent workflow: does not reveal the difference between "does not
+            # exist" and "is not yours" — same response for both cases.
             raise HTTPException(status_code=403, detail="Acesso negado a esta chave.")
 
     if target_ws not in allowed_ws:
@@ -108,17 +108,17 @@ async def swap_hash(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Grava o hash da execução atual e devolve o ANTERIOR — uma operação.
+    """Writes the current execution's hash and returns the PREVIOUS one — one operation.
 
-    `SET ... GET` atômico no Redis. Substitui o antigo par GET+PUT por duas
-    razões: metade dos round-trips HTTP por nó, e — a importante — sem a
-    janela ler→decidir→gravar em que duas runs simultâneas do mesmo workflow
-    liam o mesmo hash antigo e AMBAS decidiam "Mudou", duplicando o efeito
-    colateral a jusante.
+    Atomic `SET ... GET` in Redis. Replaces the old GET+PUT pair for two
+    reasons: half the HTTP round-trips per node, and — the important one — no
+    read→decide→write window in which two simultaneous runs of the same workflow
+    read the same old hash and BOTH decided "Mudou" (changed), duplicating the
+    downstream side effect.
 
-    `previous_hash: null` = primeira execução (ou TTL vencido — o Redis não
-    distingue chave expirada de chave que nunca existiu).
-    ttl_seconds=0 = sem expiração.
+    `previous_hash: null` = first execution (or expired TTL — Redis does not
+    distinguish an expired key from a key that never existed).
+    ttl_seconds=0 = no expiry.
     """
     executor = await _auth_agent(request, db)
     redis_key = await _authorize_key(key, executor, db)
@@ -133,13 +133,13 @@ async def swap_hash(
     try:
         previous = await rc.set(
             redis_key, body.hash,
-            ex=body.ttl_seconds or None,   # 0 → sem EX (persistente)
+            ex=body.ttl_seconds or None,   # 0 → no EX (persistent)
             get=True,                      # devolve o valor anterior (Redis ≥ 6.2)
         )
     except Exception as exc:
         logger.error("change_detector SWAP %s: Redis indisponível: %s", redis_key, exc)
-        # O executor decide o branch conforme a política `on_backend_error`
-        # configurada no nó; 503 é o sinal de "não consegui nem ler nem gravar".
+        # The executor decides the branch according to the `on_backend_error` policy
+        # configured on the node; 503 is the signal for "could neither read nor write".
         raise HTTPException(status_code=503, detail="Backend de estado indisponível.")
 
     if isinstance(previous, bytes):

@@ -16,13 +16,13 @@ def _write_text(path: str, text: str) -> None:
 
 
 def _montar_envelope_gzip(cabecalho: dict, geojson_str: str) -> tuple[bytes, int]:
-    """Monta o envelope JSON do publish e comprime — feito para rodar em thread.
+    """Builds the publish JSON envelope and compresses it — meant to run in a thread.
 
-    Embute o `geojson_str` (que `to_json` ja serializou) CRU, sem reparsa-lo:
-    elimina o json.loads->json.dumps redundante do geojson inteiro. `cabecalho`
-    tem sempre chaves aqui, entao `json.dumps` termina em '}' e inserir
-    `,"geojson":<str>` antes do fecho produz JSON valido. Devolve
-    (comprimido, tamanho_do_payload) para o log da razao de compressao.
+    Embeds the `geojson_str` (already serialized by `to_json`) RAW, without
+    reparsing it: removes the redundant json.loads->json.dumps of the whole
+    geojson. `cabecalho` always has keys here, so `json.dumps` ends in '}' and
+    inserting `,"geojson":<str>` before the closing brace produces valid JSON.
+    Returns (compressed, payload_size) for logging the compression ratio.
     """
     import gzip
     cabeca = json.dumps(cabecalho, ensure_ascii=False)
@@ -81,10 +81,10 @@ class PublishMap(BaseNode):
                     "name":        "visible_fields",
                     "label":       "Campos visíveis",
                     "type":        "chips",
-                    # Nó de entrada única: '*' e a porta dariam no mesmo.
+                    # Single-input node: '*' and the port would amount to the same thing.
                     "suggest_columns": "*",
-                    # Default "" (e não []): executor com flow/ anterior valida
-                    # como type "string" — lista no default derrubava a run.
+                    # Default "" (and not []): an executor with an older flow/ validates
+                    # it as type "string" — a list in the default brought the run down.
                     "default":     "",
                     "description": (
                         "Campos do GeoDataFrame a exibir no popup do portal. "
@@ -127,8 +127,8 @@ class PublishMap(BaseNode):
         opacity        = self.get_param_float("opacity", 0.5)
         description    = str(self.get_param("description", "")).strip()
         crs            = str(self.get_param("crs", "EPSG:4326")).strip() or "EPSG:4326"
-        # Campo de fichas: aceita lista, JSON-string (o que a tela grava) e o
-        # CSV das definitions antigas.
+        # Tag field: accepts a list, a JSON string (what the screen saves) and the
+        # CSV of old definitions.
         visible_fields = colunas_pedidas(self.get_param("visible_fields", []))
 
         workflow_hash = getattr(self, "_workflow_hash", None)
@@ -138,23 +138,23 @@ class PublishMap(BaseNode):
         if not task_id:
             raise RuntimeError("task_id nao injetado pelo executor.")
 
-        # Publicar E enviar a geometria ao portal — nao ha versao local disto.
-        # Numa maquina que retem os dados, o no falha em vez de publicar: um
-        # workflow nao afrouxa a politica do executor. Antes de qualquer
-        # serializacao, para nao gastar CPU num resultado que sera recusado.
+        # Publishing IS sending the geometry to the portal — there is no local version
+        # of this. On a machine that retains its data, the node fails instead of
+        # publishing: a workflow does not loosen the executor's policy. Before any
+        # serialization, so as not to spend CPU on a result that will be refused.
         exigir_envio_permitido(
             f"PublishMap '{title}'",
             "publicar uma camada exige enviar a geometria ao portal",
         )
 
-        # Busca GeoDataFrame nos inputs (levanta ValueError se ausente ou vazio)
+        # Looks for a GeoDataFrame in the inputs (raises ValueError if missing or empty)
         value = self.get_first_gdf(inputs)
 
         # Reprojeta, normaliza datetime (numa copia) e serializa
         geojson_str = await asyncio.to_thread(gdf_para_geojson, value, crs)
-        # `len(value)` (O(1)) no lugar de `json.loads(geojson_str)` so para
-        # contar: `to_json` emite uma feicao por linha do GDF, entao a contagem
-        # e a mesma — e some o parse do geojson inteiro no event loop.
+        # `len(value)` (O(1)) instead of `json.loads(geojson_str)` just to
+        # count: `to_json` emits one feature per GDF row, so the count is
+        # the same — and the parse of the whole geojson leaves the event loop.
         features_count = len(value)
 
         safe_key = slugify(title)
@@ -193,11 +193,11 @@ class PublishMap(BaseNode):
         if not workspace_id:
             raise RuntimeError("workspace_id nao injetado pelo executor.")
 
-        # `artifacts_root()`, e nao `os.getenv("ARTIFACT_DIR")` direto: o
-        # executor define `EXECUTOR_ARTIFACTS_DIR`, e `ARTIFACT_DIR` so aparece
-        # via `setdefault` em job_executor.py — que nao roda no caminho
-        # in-process. Divergir da raiz unica gravava o arquivo fora do alcance
-        # da purga por retencao e do resolver de leitura.
+        # `artifacts_root()`, and not `os.getenv("ARTIFACT_DIR")` directly: the
+        # executor sets `EXECUTOR_ARTIFACTS_DIR`, and `ARTIFACT_DIR` only shows up
+        # via `setdefault` in job_executor.py — which does not run on the
+        # in-process path. Diverging from the single root wrote the file out of
+        # reach of the retention purge and of the read resolver.
         rel = f"{workspace_id}/{task_id}/{safe_key}.geojson"
         task_dir = os.path.join(artifacts_root(), workspace_id, task_id)
         os.makedirs(task_dir, exist_ok=True)
@@ -209,18 +209,18 @@ class PublishMap(BaseNode):
         meta = self._build_artifact_meta(
             title, safe_key, features_count, publish_config, is_published=False
         )
-        # Sem isto o servidor deriva uma s3_key para um objeto que NUNCA foi
-        # enviado (o portal falhou, foi por isso que caimos aqui) e nasce um
-        # artefato cujo download responde 404.
+        # Without this the server derives an s3_key for an object that was NEVER
+        # uploaded (the portal failed, that is why we ended up here) and an
+        # artifact is born whose download responds 404.
         meta.update({
             "s3_key": None,
             "content_location": "executor",
             "local_path": rel,
             "size_bytes": len(geojson_str.encode("utf-8")),
-            # `content_location` diz ONDE o conteudo esta — e ele esta so aqui,
-            # nao ha objeto no storage e nada vai enviar um depois. `local_fallback`
-            # diz POR QUE — e foi degradacao, o portal recusou. Sao perguntas
-            # diferentes, e marcar False aqui contaria uma falha como politica.
+            # `content_location` says WHERE the content is — and it is only here,
+            # there is no object in storage and nothing will upload one later. `local_fallback`
+            # says WHY — and it was degradation, the portal refused. They are different
+            # questions, and marking False here would count a failure as policy.
             "local_fallback": True,
         })
         return {
@@ -241,8 +241,8 @@ class PublishMap(BaseNode):
         publish_config: dict,
     ) -> str | None:
         """
-        Envia GeoJSON comprimido (gzip) para POST /artifacts/portal/publish.
-        Retorna layer_id em caso de sucesso, None em caso de falha (aciona fallback local).
+        Sends compressed (gzip) GeoJSON to POST /artifacts/portal/publish.
+        Returns layer_id on success, None on failure (triggers the local fallback).
         """
         if not workflow_hash or not workspace_id:
             self.log("Aviso: metadados do workflow ausentes — fallback local.")
@@ -258,9 +258,9 @@ class PublishMap(BaseNode):
             "layer_key":      layer_key,
             "publish_config": publish_config,
         }
-        # Montagem do envelope (json.dumps de varios MB) + gzip.compress vao para
-        # thread: rodavam no event loop do executor e seguravam heartbeat/cancel
-        # do WS. O helper embute o geojson JA serializado cru.
+        # Building the envelope (json.dumps of several MB) + gzip.compress go to a
+        # thread: they ran on the executor's event loop and held up the WS
+        # heartbeat/cancel. The helper embeds the ALREADY serialized geojson raw.
         compressed, tamanho = await asyncio.to_thread(
             _montar_envelope_gzip, cabecalho, geojson_str
         )
@@ -278,12 +278,12 @@ class PublishMap(BaseNode):
             "X-Idempotency-Key": idem_key,
         }
 
-        # Timeout proporcional ao tamanho: assume mínimo 30 KB/s, floor 60s, cap 600s
+        # Timeout proportional to size: assumes a minimum of 30 KB/s, floor 60s, cap 600s
         upload_timeout = max(60, min(600, len(compressed) // 30_000))
 
         try:
             from flow.utils.http_retry import async_request_with_retry
-            # Upload idempotente (X-Idempotency-Key) → retry de transitorios é seguro.
+            # Idempotent upload (X-Idempotency-Key) → retrying transient errors is safe.
             resp = await async_request_with_retry(
                 "POST", url,
                 client_kwargs={"timeout": upload_timeout, "follow_redirects": True, "verify": verify},

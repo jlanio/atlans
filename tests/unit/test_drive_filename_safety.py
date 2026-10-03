@@ -1,13 +1,14 @@
 # tests/unit/test_drive_filename_safety.py
-"""Sanitizacao do nome de arquivo do Drive.
+"""Sanitization of the Drive file name.
 
-Duas funcoes com papeis distintos:
-  - `sanitize_name`      -> slug ASCII estrito, usado na CHAVE S3.
-  - `safe_display_name`  -> basename seguro para `original_name`, o nome que o
-    usuario ve E que e propagado ao executor como destino de escrita no GeoSync.
+Two functions with distinct roles:
+  - `sanitize_name`      -> strict ASCII slug, used in the S3 KEY.
+  - `safe_display_name`  -> safe basename for `original_name`, the name the
+    user sees AND that is propagated to the executor as the write target in GeoSync.
 
-O erro a evitar aqui e usar o slug agressivo no `original_name`: seguraria o
-traversal, mas destruiria acentos e espacos de todo nome legitimo.
+The mistake to avoid here is using the aggressive slug on `original_name`: it
+would stop the traversal, but would destroy accents and spaces in every
+legitimate name.
 """
 from app.services.drive_service import safe_display_name, sanitize_name
 
@@ -37,22 +38,22 @@ def test_separadores_nao_sobrevivem():
 # ── Nomes legitimos preservados ───────────────────────────────────────────────
 
 def test_acentos_e_espacos_sao_preservados():
-    """Regressao: aplicar o slug ASCII aqui transformaria isto em
-    '_rea_de_risco.gpkg' e degradaria a UI sem ganho de seguranca."""
+    """Regression: applying the ASCII slug here would turn this into
+    '_rea_de_risco.gpkg' and degrade the UI with no security gain."""
     assert safe_display_name("área de risco.gpkg") == "área de risco.gpkg"
     assert safe_display_name("Munícipios SP 2024.geojson") == "Munícipios SP 2024.geojson"
 
 
 def test_extensao_preservada_em_nome_com_pontos_iniciais():
-    """'..geojson' nao pode virar 'geojson' — perderia a extensao e o upload
-    seria rejeitado por 'arquivo sem extensao'."""
+    """'..geojson' must not become 'geojson' — it would lose the extension and the
+    upload would be rejected for 'arquivo sem extensao' (file without extension)."""
     assert safe_display_name("..geojson").endswith(".geojson")
 
 
 # ── Content-Disposition ───────────────────────────────────────────────────────
 
 def test_aspas_ponto_e_virgula_e_controle_sao_neutralizados():
-    """Vao para `Content-Disposition: attachment; filename="..."` no presigned GET."""
+    """These go into `Content-Disposition: attachment; filename="..."` in the presigned GET."""
     assert '"' not in safe_display_name('rel"atorio.csv')
     assert ";" not in safe_display_name("rel;atorio.csv")
     assert "\n" not in safe_display_name("rel\natorio.csv")

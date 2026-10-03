@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 @register_node
 class SaveToGeoParquetNode(BaseNode):
     """
-    Salva um GeoDataFrame como GeoParquet e faz upload para o MinIO como artefato.
+    Saves a GeoDataFrame as GeoParquet and uploads it to MinIO as an artifact.
     """
 
     @classmethod
@@ -70,7 +70,7 @@ class SaveToGeoParquetNode(BaseNode):
                     'default': '',
                     'description': 'Token Bearer para proteger o download. Sem credencial, o artefato e publico.',
                     'credential_types': ['webhook_token'],
-                    # Nao ha download a proteger num artefato que fica no executor.
+                    # There is no download to protect on an artifact that stays on the executor.
                     'visibleWhen': {'field': 'localidade', 'in': ['herdar']},
                 },
                 propriedade_localidade(),
@@ -86,11 +86,11 @@ class SaveToGeoParquetNode(BaseNode):
         credential_id = self.get_param('credential_id', '') or None
         localidade, quem = resolver_localidade(self.get_param('localidade', None))
         if localidade == EXECUTOR:
-            # Nao ha download a proteger num artefato que fica no executor.
+            # There is no download to protect on an artifact that stays on the executor.
             credential_id = None
 
-        # Mesma regra de save_geojson: label explicito, senao o basename do
-        # outputPath, senao erro. `BaseNode.derive_label` e o ponto unico.
+        # Same rule as save_geojson: explicit label, otherwise the basename of
+        # outputPath, otherwise an error. `BaseNode.derive_label` is the single point.
         label = self.derive_label(label, output_path)
 
         workspace_id, task_id = self.require_execution_context()
@@ -98,7 +98,7 @@ class SaveToGeoParquetNode(BaseNode):
         # Obtem o GeoDataFrame
         data = self.get_first_gdf(inputs)
 
-        # Reprojeta se necessario
+        # Reprojects if needed
         data = await asyncio.to_thread(ensure_gdf_crs, data, crs)
 
         features = len(data)
@@ -127,10 +127,10 @@ class SaveToGeoParquetNode(BaseNode):
 
             filename = f"{safe_label}.parquet"
 
-            # `persistir_artefato` le o fileobj inteiro nos dois caminhos
-            # (executor e MinIO), entao o ramo `if tamanho > 10MB: fileobj
-            # else: content` que existia aqui produzia exatamente o mesmo
-            # resultado nas duas pontas.
+            # `persistir_artefato` reads the whole fileobj on both paths
+            # (executor and MinIO), so the `if tamanho > 10MB: fileobj
+            # else: content` branch that existed here produced exactly the same
+            # result at both ends.
             with open(tmp_path, 'rb') as f:
                 s3_key, artifact_meta = await asyncio.to_thread(
                     persistir_artefato,

@@ -17,9 +17,9 @@ const AddConnectionHandle = ({ connectionVisible: open, children, label, nodeId,
 
   const setNodesDrawerState = useWorkflowCatalogStore(s => s.setNodesDrawerState)
   const { linkNodeIdParam, linkHandleIdParam, setLinkNodeParam, removeLinkNodeParam } = useLinkNodeParams()
-  // No visualizador de sub-fluxo o "+" criaria um nó no canvas do EDITOR ligado
-  // a um id que só existe dentro do filho. A linha e o rótulo da porta ficam:
-  // são informação, e é o único lugar que nomeia a porta livre.
+  // In the sub-workflow viewer the "+" would create a node on the EDITOR canvas
+  // linked to an id that only exists inside the child. The line and the port
+  // label stay: they're information, and it's the only place that names the free port.
   const somenteLeitura = useSubflowReadOnly()
 
   function handleOpenDrawerState() {
@@ -39,9 +39,9 @@ const AddConnectionHandle = ({ connectionVisible: open, children, label, nodeId,
 
       {children}
 
-      {/* Linha + botão + aparecem apenas quando ainda não há conexão.
-          `data-role` some com o zoom afastado (LOD): o stub ocupa ~56px por
-          porta livre e é a maior fonte de ruído num canvas grande. */}
+      {/* Line + "+" button appear only when there's no connection yet.
+          `data-role` disappears when zoomed out (LOD): the stub takes ~56px per
+          free port and is the largest source of noise on a big canvas. */}
       {open && <div data-role="add-connection" className={cn("port-top absolute flex items-center -right-1.5", className)} style={{ ...style, transform: 'translateY(-50%)' }}>
 
         <div className="absolute flex items-center w-14">
@@ -55,10 +55,10 @@ const AddConnectionHandle = ({ connectionVisible: open, children, label, nodeId,
 
         {!somenteLeitura && <button
           data-active={`${(!handleId && linkNodeIdParam === nodeId) || (handleId === linkHandleIdParam && linkNodeIdParam === nodeId)}`}
-          // O acento da plataforma e o `--primary` (laranja); este botao usava
-          // `blue-500` cru, e por nao ser token precisava de uma escada `dark:`
-          // inteira so para nao ficar ilegivel no tema escuro. Com o token, os
-          // dois temas saem da mesma regra.
+          // The platform accent is `--primary` (orange); this button used raw
+          // `blue-500`, and since it wasn't a token it needed a whole `dark:`
+          // ladder just to stay legible in the dark theme. With the token, both
+          // themes come out of the same rule.
           className={cn(
             "group absolute -right-19 bg-transparent border-2 border-muted-foreground dark:border-foreground rounded-sm p-1 cursor-pointer transition-colors",
             "hover:border-primary hover:bg-primary/10",

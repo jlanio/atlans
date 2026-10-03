@@ -5,29 +5,29 @@ from fastapi import Request, HTTPException
 
 logger = get_logger(__name__)
 
-# ── Registry de validadores por tipo de credencial ─────────────────────────────
-# Para adicionar um novo tipo: basta decorar a função com @register_validator("tipo")
+# ── Registry of validators per credential type ─────────────────────────────────
+# To add a new type: just decorate the function with @register_validator("tipo")
 _VALIDATOR_REGISTRY: Dict[str, Callable] = {}
 
-# Validadores que AUTENTICAM QUEM CHAMOU, em vez de conferir a credencial.
+# Validators that AUTHENTICATE THE CALLER, instead of checking the credential.
 #
-# A distinção existe porque só um deles olha o `request`: o do token de webhook,
-# que compara o header `Authorization` com o token guardado. Os outros apenas
-# verificam se a credencial está completa (tem connectionString, tem chave de
-# acesso) e valem em qualquer caminho.
+# The distinction exists because only one of them looks at the `request`: the webhook
+# token one, which compares the `Authorization` header with the stored token. The others only
+# check whether the credential is complete (has a connectionString, has an access
+# key) and apply on any path.
 #
-# Sem separar os dois, o botão "Executar" do editor caía no validador de
-# webhook: o header existe, mas leva o JWT de sessão do usuário, e a comparação
-# devolvia "Token inválido" — exigindo o token de uma chamada externa de quem já
-# estava autenticado por sessão e com papel de operator.
+# Without separating the two, the editor's "Executar" (Run) button fell into the webhook
+# validator: the header exists, but it carries the user's session JWT, and the comparison
+# returned "Token inválido" (invalid token) — demanding an external call's token from someone
+# already authenticated by session and holding the operator role.
 _AUTENTICAM_A_REQUISICAO: set = set()
 
 
 def register_validator(*ctypes: str, autentica_requisicao: bool = False):
-    """Registra uma função de validação para um ou mais tipos de credencial.
+    """Registers a validation function for one or more credential types.
 
-    `autentica_requisicao=True` marca o validador como autenticação de ENTRADA:
-    ele só faz sentido no endpoint que recebe a chamada externa.
+    `autentica_requisicao=True` marks the validator as INBOUND authentication:
+    it only makes sense on the endpoint that receives the external call.
     """
     def decorator(fn: Callable):
         for ctype in ctypes:
@@ -41,12 +41,12 @@ def register_validator(*ctypes: str, autentica_requisicao: bool = False):
 async def validate_credential_by_type(
     cred: dict, request: Request = None, autenticar_entrada: bool = True,
 ) -> None:
-    """Valida a credencial delegando para o validador registrado pelo tipo.
+    """Validates the credential by delegating to the validator registered for its type.
 
-    `autenticar_entrada=False` pula os validadores que autenticam quem chamou —
-    usado nos disparos já autenticados por outro meio (botão Executar, cron).
-    Os demais validadores continuam rodando: credencial incompleta é problema
-    em qualquer caminho.
+    `autenticar_entrada=False` skips the validators that authenticate the caller —
+    used for triggers already authenticated by other means (Run button, cron).
+    The remaining validators still run: an incomplete credential is a problem
+    on any path.
     """
     ctype = cred.get("type")
     validator = _VALIDATOR_REGISTRY.get(ctype)
@@ -84,9 +84,9 @@ def _validate_webhook_token(cred: dict, request: Request) -> None:
     if not hmac.compare_digest(token_provided, expected_token):
         raise HTTPException(status_code=403, detail="Token inválido")
 
-    # A MESMA regra da resolução (`validade_da_credencial`): antes esta cópia
-    # comparava um `now` com fuso a um `expires_at` gravado sem fuso e dava
-    # TypeError (500) em vez de 403.
+    # The SAME rule as resolution (`validade_da_credencial`): before, this copy
+    # compared a timezone-aware `now` to an `expires_at` stored without timezone and raised
+    # TypeError (500) instead of 403.
     from app.core.authorization.credential_loader import validade_da_credencial
 
     validade = validade_da_credencial(expires_at_str)

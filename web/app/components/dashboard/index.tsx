@@ -20,16 +20,17 @@ import { useDashboardDados } from "./use-dashboard-dados"
 import { useDashboardUrl } from "./use-dashboard-url"
 
 /**
- * Dashboard (docs/specs/dashboard.md §3.1) — visão geral do administrador do
- * sistema (rota restrita ao admin por enquanto; a landing pós-login virou a Home
- * `/`, com o globo). Este arquivo
- * só orquestra: o escopo mora na URL (`useDashboardUrl`) + no `WorkspaceContext`,
- * os dados no hook escopado (`useDashboardDados`), a lógica pura nos módulos ao
- * lado, e cada bloco decide o próprio texto. Reusa `indicadores`, `grafico-por-dia`
- * e `atencao-lista` do Histórico — a mesma família, sem a superfície interativa.
+ * Dashboard (docs/specs/dashboard.md §3.1) — overview for the system
+ * administrator (route restricted to admins for now; the post-login landing
+ * became the Home `/`, with the globe). This file
+ * only orchestrates: the scope lives in the URL (`useDashboardUrl`) + in `WorkspaceContext`,
+ * the data in the scoped hook (`useDashboardDados`), the pure logic in the
+ * neighboring modules, and each block decides its own text. Reuses `indicadores`,
+ * `grafico-por-dia` and `atencao-lista` from History — the same family, without
+ * the interactive surface.
  *
- * O `Suspense` é exigido pelo `useSearchParams` (dentro de `useDashboardUrl`) na
- * build estática, como nas páginas irmãs.
+ * The `Suspense` is required by `useSearchParams` (inside `useDashboardUrl`) in
+ * the static build, as in the sibling pages.
  */
 export default function DashboardView() {
   return (
@@ -44,25 +45,26 @@ function Dashboard() {
   const { current, workspaces, canEdit, loading } = useWorkspace()
   const { escopo, setEscopo, periodo, setPeriodo } = useDashboardUrl()
 
-  // O escopo desce resolvido para o hook: `null` = "todos" (sem `workspace_id`),
-  // senão o id do workspace ativo. Assim o hook recarrega ao trocar o escopo E
-  // ao trocar `current` no escopo ativo, mas não ao trocar `current` no "todos"
-  // (onde `escopoWorkspaceId` é sempre `null`), como a spec pede — sem o hook
-  // conhecer o context.
+  // The scope flows down to the hook already resolved: `null` = "todos" (no
+  // `workspace_id`), otherwise the active workspace's id. So the hook reloads
+  // when the scope changes AND when `current` changes in the active scope, but
+  // not when `current` changes in "todos" (where `escopoWorkspaceId` is always
+  // `null`), as the spec asks — without the hook knowing about the context.
   //
-  // Enquanto a lista de workspaces carrega, o escopo "ativo" ainda não tem id:
-  // `undefined` diz ao hook para NÃO buscar (mantém o skeleton) em vez de buscar
-  // "todos" por um instante e piscar o escopo errado. O gatilho é `loading` (não
-  // `current == null`): um usuário SEM workspace nenhum nunca teria `current`, e
-  // gatilhar por ele deixaria o skeleton para sempre — com `loading`, ao terminar
-  // a carga o escopo "ativo" vira `null` (→ "todos"), que é o que ele pode ver.
+  // While the workspace list is loading, the "ativo" scope has no id yet:
+  // `undefined` tells the hook NOT to fetch (keeps the skeleton) instead of
+  // fetching "todos" for an instant and flashing the wrong scope. The trigger is
+  // `loading` (not `current == null`): a user with NO workspace at all would
+  // never have `current`, and triggering on it would leave the skeleton forever
+  // — with `loading`, once loading ends the "ativo" scope becomes `null`
+  // (→ "todos"), which is what they can see.
   const escopoWorkspaceId = escopo === "todos" ? null : loading ? undefined : (current?.id_hash ?? null)
   const dados = useDashboardDados(escopoWorkspaceId, periodo)
   const { metrics, workflows, runs } = dados
 
-  // ── Atenção + saúde ─────────────────────────────────────────────────────────
-  // A origem do fluxo vem da listagem (as métricas não a carregam): é o que
-  // permite ao alerta dizer que o fluxo é do assistente.
+  // ── Attention + health ──────────────────────────────────────────────────────
+  // The workflow's origin comes from the listing (the metrics don't carry it):
+  // that is what lets the alert say the workflow belongs to the assistant.
   const origemPorWorkflow = useMemo(() => {
     const m = new Map<string, string | null | undefined>()
     for (const wf of workflows) m.set(wf.id_hash, wf.origem)
@@ -81,22 +83,23 @@ function Dashboard() {
   const tom = tomDeSaude(metrics?.now, temAtencao)
   const vazioDaAtencao = useMemo(() => textoDeVazio(metrics), [metrics])
 
-  // Contagem por tipo da lista já montada, para o veredito dizer "2 workflows
-  // falhando"/"1 executor no teto" (§3.4) sem reler `top_failing`. As presas
-  // não entram: têm motivo próprio na saúde e seriam recontadas.
+  // Count per type of the list already built, so the verdict can say "2 workflows
+  // falhando"/"1 executor no teto" (§3.4) without rereading `top_failing`. Stuck
+  // runs are not included: they have their own reason in health and would be
+  // counted twice.
   const resumoDaAtencao = useMemo(() => ({
     falhas: atencao.filter(i => i.tipo === "falhas").length,
     saturado: atencao.filter(i => i.tipo === "saturado").length,
   }), [atencao])
-  // Escopo com workflows mas sem nenhuma execução no período (§3.10): o calmo
-  // vira "nada rodando ainda". O vazio de primeiro uso (sem workflows) é outro.
+  // Scope with workflows but no run at all in the period (§3.10): the calm
+  // state becomes "nada rodando ainda". The first-use empty state (no workflows) is another.
   const semExecucoes = (metrics?.total_runs ?? 0) === 0
 
-  // ── Etiqueta de workspace (só no escopo "todos") ────────────────────────────
-  // O join da spec §3.5/§3.6: `workflow_hash → Workflow.id_hash → workspace_id →
-  // WorkspaceContext`. Montado a partir de `workflows` (já buscado para as
-  // Próximas) e de `now.stuck` (que casa run_id → workflow_hash). Não resolveu →
-  // sem etiqueta, nunca inventa.
+  // ── Workspace label (only in the "todos" scope) ─────────────────────────────
+  // The join from spec §3.5/§3.6: `workflow_hash → Workflow.id_hash → workspace_id →
+  // WorkspaceContext`. Built from `workflows` (already fetched for Upcoming)
+  // and from `now.stuck` (which maps run_id → workflow_hash). Not resolved →
+  // no label, never invents one.
   const nomePorWorkspaceId = useMemo(() => {
     const m = new Map<string, string>()
     for (const w of workspaces) m.set(w.id_hash, w.name)
@@ -115,18 +118,18 @@ function Dashboard() {
     return m
   }, [metrics])
 
-  // Nome do workspace de um workflow, pela cadeia do join. Usado pelas Próximas
-  // (recebe `workspace_id`) diretamente.
+  // Workspace name of a workflow, via the join chain. Used directly by
+  // Upcoming (which receives `workspace_id`).
   const nomeDoWorkspace = useCallback((workspaceId: string | null | undefined): string | null => {
     if (!workspaceId) return null
     return nomePorWorkspaceId.get(workspaceId) ?? null
   }, [nomePorWorkspaceId])
 
-  // No escopo "todos", prefixa o `detalhe` de cada item de atenção com a
-  // etiqueta do workspace (o componente de atenção do Histórico não tem um
-  // slot próprio, e mexer nele seria reinventá-lo). O workflow vem do `acao`:
-  // falhas trazem o `workflowHash`; presa traz o `runId`, que `now.stuck`
-  // resolve para o hash. Executor no teto não tem workflow → sem etiqueta.
+  // In the "todos" scope, prefixes each attention item's `detalhe` with the
+  // workspace label (History's attention component has no slot of its own,
+  // and changing it would mean reinventing it). The workflow comes from
+  // `acao`: failures carry `workflowHash`; a stuck run carries `runId`, which
+  // `now.stuck` resolves to the hash. An executor at its ceiling has no workflow → no label.
   const itensDeAtencao = useMemo<ItemDeAtencao[]>(() => {
     if (escopo !== "todos") return atencao
     return atencao.map(item => {
@@ -138,14 +141,14 @@ function Dashboard() {
     })
   }, [escopo, atencao, workflowHashPorRun, workspaceIdPorWorkflow, nomeDoWorkspace])
 
-  // ── Próximas execuções ──────────────────────────────────────────────────────
+  // ── Upcoming runs ───────────────────────────────────────────────────────────
   const listaProximas = useMemo(() => proximas(workflows), [workflows])
 
-  // ── Roteamento das ações ────────────────────────────────────────────────────
-  // O "&workspace=" só entra quando o painel está escopado a um workspace; no
-  // "todos" as telas irmãs abrem sem recorte. Deriva do MESMO id que o hook
-  // buscou (coage o `undefined` de "carregando" para `null`) — as ações só são
-  // clicáveis no estado de conteúdo, quando o escopo já está resolvido.
+  // ── Action routing ──────────────────────────────────────────────────────────
+  // "&workspace=" is only added when the dashboard is scoped to a workspace; in
+  // "todos" the sibling screens open unsliced. Derives from the SAME id the hook
+  // fetched (coerces the "loading" `undefined` to `null`) — the actions are only
+  // clickable in the content state, when the scope is already resolved.
   const workspaceQuery = escopoWorkspaceId ?? null
   const sufixoWorkspace = workspaceQuery ? `&workspace=${encodeURIComponent(workspaceQuery)}` : ""
 
@@ -163,9 +166,9 @@ function Dashboard() {
         router.push(`/observability/run/${acao.runId}`)
         break
       case "filtrar-workflow":
-        // Visão padrão (execuções) aplica `workflow` + `status`; a visão
-        // "workflows" ignora ambos e cairia numa lista sem filtro. `&workspace=`
-        // preserva o escopo ativo (vazio no "todos").
+        // The default view (runs) applies `workflow` + `status`; the
+        // "workflows" view ignores both and would land on an unfiltered list.
+        // `&workspace=` preserves the active scope (empty in "todos").
         router.push(`/observability?workflow=${encodeURIComponent(acao.workflowHash)}&status=${acao.status}${sufixoWorkspace}`)
         break
       case "abrir-executor":
@@ -178,8 +181,8 @@ function Dashboard() {
     router.push(workspaceQuery ? `/observability?workspace=${encodeURIComponent(workspaceQuery)}` : "/observability")
   }, [router, workspaceQuery])
 
-  // Editor `/workflow/[id]` é a rota mais pesada; aquece no primeiro hover,
-  // como em Projetos. O `Set` evita repetir a chamada na mesma linha.
+  // The `/workflow/[id]` editor is the heaviest route; warm it up on first
+  // hover, as in Projects. The `Set` avoids repeating the call on the same row.
   const abrirWorkflow = useCallback((id: string) => router.push(`/workflow/${id}`), [router])
   const aquecidos = useRef<Set<string>>(new Set())
   const prefetchWorkflow = useCallback((id: string) => {
@@ -192,14 +195,15 @@ function Dashboard() {
   const atualizar = useCallback(() => dados.recarregar({ force: true }), [dados])
   const tentarDeNovo = useCallback(() => dados.recarregar(), [dados])
 
-  // ── Estados da tela (§3.10) ─────────────────────────────────────────────────
+  // ── Screen states (§3.10) ───────────────────────────────────────────────────
   const carregando = dados.carregando
   const comErro = !carregando && dados.erroEspinha != null
-  // Nada rodou ainda: sem workflow, sem execução recente e sem execução no
-  // período. Os três juntos afastam o "0 no período" de um workspace que só
-  // teve execuções antigas. As listas vazias só valem se REALMENTE carregaram:
-  // uma falha em `workflows`/`runs` também as deixa vazias, e sem esta guarda um
-  // erro de rede pintaria o convite de "primeiro uso" para quem já tem projetos.
+  // Nothing has run yet: no workflow, no recent run and no run in the
+  // period. The three together rule out the "0 in the period" of a workspace
+  // that only had old runs. The empty lists only count if they REALLY loaded:
+  // a failure in `workflows`/`runs` also leaves them empty, and without this
+  // guard a network error would paint the "first use" invitation for someone
+  // who already has projects.
   const primeiroUso =
     !carregando && !comErro && workflows.length === 0 && runs.length === 0 && (metrics?.total_runs ?? 0) === 0
     && !dados.falhas.workflows && !dados.falhas.runs
@@ -277,9 +281,9 @@ function Dashboard() {
 }
 
 /**
- * "Resumo do período · últimos N dias" (§3.1): a janela escolhida no cabeçalho
- * (seletor de período), aqui só ecoada no eyebrow. O "Ver no Histórico →" acima
- * dos indicadores e do gráfico reusados — família do Histórico, sem tabela.
+ * "Resumo do período · últimos N dias" (§3.1): the window chosen in the header
+ * (period selector), only echoed in the eyebrow here. The "Ver no Histórico →"
+ * above the reused indicators and chart — History's family, without the table.
  */
 function ResumoDoPeriodo({ children, periodo, onVerNoHistorico }: { children: React.ReactNode; periodo: Periodo; onVerNoHistorico: () => void }) {
   return (

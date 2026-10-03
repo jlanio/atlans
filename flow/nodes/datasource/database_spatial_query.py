@@ -16,24 +16,24 @@ logger = get_logger(__name__)
 
 
 def _batch_to_df(batch) -> pd.DataFrame:
-    """Converte um chunk de Record em DataFrame. Roda em thread (ver execute)."""
+    """Converts a chunk of Records into a DataFrame. Runs in a thread (see execute)."""
     return pd.DataFrame([dict(r) for r in batch])
 
 
 def _montar_gdf(chunks: list, geom_col: str, crs: str) -> gpd.GeoDataFrame:
-    """Concatena os chunks e converte o WKB em geometria. Roda em thread.
+    """Concatenates the chunks and converts the WKB to geometry. Runs in a thread.
 
-    É o trecho mais pesado do nó: `pd.concat` copia o resultado inteiro e o
-    `from_wkb` percorre todas as geometrias. No event loop isso deixava o
-    executor mudo por dezenas de segundos no fim de uma consulta grande.
+    It's the heaviest part of the node: `pd.concat` copies the entire result and
+    `from_wkb` walks all the geometries. On the event loop this left the
+    executor silent for tens of seconds at the end of a large query.
     """
     df = pd.concat(chunks, ignore_index=True)
     if geom_col not in df.columns:
         raise ValueError(f"Coluna '{geom_col}' não encontrada nos resultados.")
 
-    # F3: from_wkb espera bytes/hex. Se o usuario escreveu ST_AsText(...) na
-    # query, chega WKT (texto) e o shapely explode com erro obscuro. Sample
-    # do primeiro nao-nulo detecta o caso e da mensagem acionavel.
+    # F3: from_wkb expects bytes/hex. If the user wrote ST_AsText(...) in the
+    # query, WKT (text) arrives and shapely blows up with an obscure error. Sampling
+    # the first non-null value detects the case and gives an actionable message.
     sample = df[geom_col].dropna()
     if not sample.empty:
         first = sample.iloc[0]
@@ -46,7 +46,7 @@ def _montar_gdf(chunks: list, geom_col: str, crs: str) -> gpd.GeoDataFrame:
                 "no SELECT ou selecione a coluna geometry diretamente para obter WKB."
             )
 
-    # PERF: from_wkb vetorizado aceita arrays, ~10x mais rápido que .apply(wkb.loads)
+    # PERF: vectorized from_wkb accepts arrays, ~10x faster than .apply(wkb.loads)
     df["geometry"] = from_wkb(df[geom_col])
     return gpd.GeoDataFrame(df.drop(columns=[geom_col]), geometry="geometry", crs=crs)
 
@@ -54,8 +54,8 @@ def _montar_gdf(chunks: list, geom_col: str, crs: str) -> gpd.GeoDataFrame:
 @register_node
 class DatabaseSpatialQuery(BaseNode):
     """
-    Executa uma consulta espacial que retorna geometria WKB e converte em GeoDataFrame.
-    Requer que o campo 'connectionString' já esteja resolvido nos parâmetros.
+    Executes a spatial query that returns WKB geometry and converts it into a GeoDataFrame.
+    Requires the 'connectionString' field to already be resolved in the parameters.
     """
 
     @classmethod
@@ -75,21 +75,21 @@ class DatabaseSpatialQuery(BaseNode):
             'properties': [
                 {'name': 'alias',           'type': 'string', 'default': ''},
                 {'name': 'credential_id',   'type': 'string', 'default': '', 'description': 'UUID da credencial de banco de dados'},
-                # Injetada pelo servidor a partir de `credential_id`. Precisa estar
-                # declarada: `validate_node_parameters` reconstroi os parametros a
-                # partir desta lista e descarta o que nao esta nela. O no
-                # funcionava sem a declaracao apenas porque nao chamava
-                # `validate()`. A UI nao desenha campo para ela.
+                # Injected by the server from `credential_id`. It needs to be
+                # declared: `validate_node_parameters` rebuilds the parameters
+                # from this list and discards whatever is not in it. The node
+                # worked without the declaration only because it didn't call
+                # `validate()`. The UI draws no field for it.
                 {'name': 'connectionString', 'type': 'string', 'default': '', 'description': 'DSN de conexao (injetada automaticamente pela credencial)'},
                 {'name': 'query', 'required': True,           'label': 'Consulta SQL', 'type': 'sql', 'default': '', 'description': 'Query SQL (apenas SELECT)'},
                 {'name': 'queryParams',     'label': 'Parâmetros da consulta', 'type': 'object', 'default': {}, 'description': 'Valores para os placeholders nomeados :param'},
                 {'name': 'geometryColumn',  'label': 'Coluna de geometria', 'type': 'string', 'default': 'geom'},
                 {'name': 'crs',             'label': 'CRS de entrada', 'type': 'string', 'default': 'EPSG:4326'},
-                # O `execute` sempre leu este parametro, mas ele nunca foi
-                # declarado: sem entrada aqui a UI nao desenha campo nenhum, e o
-                # unico jeito de mudar o tempo limite era editar o JSON do
-                # workflow na mao. Consulta espacial grande e exatamente o caso
-                # em que 120s nao basta.
+                # `execute` always read this parameter, but it was never
+                # declared: without an entry here the UI draws no field at all, and
+                # the only way to change the time limit was to edit the workflow's
+                # JSON by hand. A large spatial query is exactly the case
+                # where 120s isn't enough.
                 {'name': 'timeout', 'label': 'Tempo limite (s)', 'type': 'integer', 'default': 120,
                  'description': 'Tempo maximo de espera por uma conexao do pool, em segundos.'}
             ],
@@ -105,9 +105,9 @@ class DatabaseSpatialQuery(BaseNode):
         raw_query = self.parameters.get("query")
         query_params = resolver_query_params(inputs, self.parameters)
         crs = self.parameters.get("crs", "EPSG:4326")
-        # F1: usuario pode ter salvo o campo em branco — get(chave, "geom") so
-        # aplica o default se a CHAVE estiver ausente, nao se for "". Trim
-        # remove espacos acidentais na UI.
+        # F1: the user may have saved the field blank — get(chave, "geom") only
+        # applies the default if the KEY is missing, not if it's "". Trim
+        # removes accidental spaces in the UI.
         geom_col = (self.parameters.get("geometryColumn") or "geom").strip()
 
         if not raw_query:
@@ -115,25 +115,26 @@ class DatabaseSpatialQuery(BaseNode):
 
         validate_readonly_sql(raw_query)
 
-        # Substitui :placeholders por $1, $2, ... com valores seguros
-        # Sem o `if`: com params vazio e query SEM placeholder o
-        # `prepare_query` devolve a query intacta, e com placeholder ele levanta
-        # "Parâmetro SQL 'x' não fornecido" — que é o erro certo. O desvio antigo
-        # pulava esse aviso e mandava o `:bairro` literal para o Postgres.
+        # Replaces :placeholders with $1, $2, ... with safe values
+        # Without the `if`: with empty params and a query WITHOUT placeholders,
+        # `prepare_query` returns the query intact, and with a placeholder it raises
+        # "Parâmetro SQL 'x' não fornecido" — which is the right error. The old shortcut
+        # skipped that warning and sent the literal `:bairro` to Postgres.
         prepared_query, values = prepare_query(raw_query, query_params)
 
-        # PERF: timeout configurável (padrão 120s) para queries grandes
+        # PERF: configurable timeout (default 120s) for large queries
         _timeout = int(self.parameters.get("timeout", 120))
         _CHUNK_SIZE = 10_000
 
         pool = await get_asyncpg_pool(conn_str)
         async with pool.acquire(timeout=_timeout) as conn:
             try:
-                # PERF: cursor streaming em chunks — evita materializar milhões de registros de uma vez
-                # SEG: readonly=True impoe SET TRANSACTION READ ONLY no Postgres.
-                # Defesa real no engine — validate_readonly_sql roda antes so para
-                # dar erro acionavel ao usuario e barrar o que a transacao nao pega
-                # (dblink abre outra conexao, onde o READ ONLY local nao vale).
+                # PERF: streaming cursor in chunks — avoids materializing millions of records at once
+                # SEC: readonly=True enforces SET TRANSACTION READ ONLY in Postgres.
+                # The real defense is in the engine — validate_readonly_sql runs first only
+                # to give the user an actionable error and block what the transaction
+                # doesn't catch (dblink opens another connection, where the local READ ONLY
+                # doesn't apply).
                 chunks = []
                 async with conn.transaction(readonly=True):
                     cursor = await conn.cursor(prepared_query, *values)
@@ -141,9 +142,9 @@ class DatabaseSpatialQuery(BaseNode):
                         batch = await cursor.fetch(_CHUNK_SIZE)
                         if not batch:
                             break
-                        # Cada chunk vira DataFrame numa thread: com 10k registros
-                        # por batch, montar no loop bloqueava o WebSocket entre uma
-                        # busca e outra.
+                        # Each chunk becomes a DataFrame in a thread: with 10k records
+                        # per batch, building it on the loop blocked the WebSocket between
+                        # one fetch and the next.
                         chunks.append(await asyncio.to_thread(_batch_to_df, batch))
             except Exception as e:
                 raise RuntimeError(f"Erro ao executar consulta SQL: {e}") from e
@@ -163,7 +164,7 @@ class DatabaseSpatialQuery(BaseNode):
 
         credential_id = parameters.get('credential_id')
         query = parameters.get('query')
-        # F1: mesmo normalize do execute — campo vazio na UI cai no default.
+        # F1: same normalization as execute — an empty field in the UI falls back to the default.
         geom_col = (parameters.get('geometryColumn') or 'geom').strip()
 
         if not credential_id or not query:

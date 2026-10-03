@@ -12,14 +12,14 @@ type DocumentoComTransicao = Document & {
   startViewTransition?: (cb: () => void | Promise<void>) => TransicaoDeVisao
 }
 
-// Teto de espera pelo comite da rota. Rotas já em cache comitam em poucos
-// frames; a do editor (`/workflow/[id]`) baixa React Flow e Monaco e leva
-// segundos — segurar a transição por todo esse tempo deixaria a tela congelada
-// num retrato estático, que é pior que não ter transição alguma.
+// Ceiling on the wait for the route commit. Routes already in cache commit in a
+// few frames; the editor's (`/workflow/[id]`) downloads React Flow and Monaco and
+// takes seconds — holding the transition for all that time would leave the
+// screen frozen on a static snapshot, which is worse than no transition at all.
 const TETO_DE_ESPERA_MS = 200
-// Sondagem por `setTimeout`, e NÃO por `requestAnimationFrame`: enquanto o
-// callback do `startViewTransition` não resolve, o navegador suspende a
-// renderização do documento e os callbacks de rAF param de rodar. Timers não.
+// Polling via `setTimeout`, and NOT via `requestAnimationFrame`: while the
+// `startViewTransition` callback has not resolved, the browser suspends
+// rendering of the document and rAF callbacks stop running. Timers don't.
 const INTERVALO_DA_SONDA_MS = 16
 
 function documentoComTransicao(): DocumentoComTransicao | null {
@@ -29,18 +29,20 @@ function documentoComTransicao(): DocumentoComTransicao | null {
 }
 
 /**
- * Navega envolvendo a troca de rota em `document.startViewTransition`.
+ * Navigates by wrapping the route change in `document.startViewTransition`.
  *
- * O callback devolve uma PROMESSA que só resolve quando a rota comitou de fato.
- * Sem isso — que era o caso — `router.push` do App Router retorna com o DOM
- * ainda inalterado: o navegador tirava o retrato "novo" da MESMA tela e cruzava
- * dois retratos idênticos. O resultado era o efeito exatamente invertido do
- * pretendido: a página inteira piscava e deslizava os 4px do `vt-fade-in` sem
- * trocar de rota, e a troca real, segundos depois, acontecia sem transição
- * nenhuma. Era a "mexida" da listagem de projetos ao abrir um workflow.
+ * The callback returns a PROMISE that only resolves once the route has actually
+ * committed. Without it — which was the case — the App Router's `router.push`
+ * returns with the DOM still unchanged: the browser took the "new" snapshot of
+ * the SAME screen and cross-faded two identical snapshots. The result was the
+ * exact opposite of the intended effect: the whole page flashed and slid the 4px
+ * of `vt-fade-in` without changing route, and the real change, seconds later,
+ * happened with no transition at all. That was the "wobble" of the project
+ * listing when opening a workflow.
  *
- * Se a rota não comitar dentro do teto, `skipTransition()` descarta a animação:
- * sem mudança de DOM não há o que animar, e animar assim mesmo é o bug.
+ * If the route does not commit within the ceiling, `skipTransition()` discards
+ * the animation: with no DOM change there is nothing to animate, and animating
+ * anyway is the bug.
  */
 function navegarComTransicao(navegar: () => void, href: string) {
   const doc = documentoComTransicao()
@@ -49,14 +51,14 @@ function navegarComTransicao(navegar: () => void, href: string) {
     return
   }
 
-  // `location.pathname` é o sinal de comite observável de fora do Next: o App
-  // Router sincroniza o histórico num `useInsertionEffect`, ou seja, na fase de
-  // commit da nova rota e antes do paint.
+  // `location.pathname` is the commit signal observable from outside Next: the App
+  // Router syncs history in a `useInsertionEffect`, that is, in the commit phase
+  // of the new route and before paint.
   const destino = new URL(href, window.location.href).pathname
-  // Objeto-portador em vez de `let`: o callback abaixo lê a transição que o
-  // próprio `startViewTransition` devolve. Ele só é chamado depois que a
-  // atribuição aconteceu, mas escrever a referência direta dentro do
-  // inicializador da própria variável não passa no TS.
+  // A holder object instead of `let`: the callback below reads the transition that
+  // `startViewTransition` itself returns. It is only called after the assignment
+  // has happened, but writing the direct reference inside the variable's own
+  // initializer does not pass TS.
   const transicao: { atual?: TransicaoDeVisao } = {}
 
   transicao.atual = doc.startViewTransition(
@@ -86,15 +88,15 @@ function navegarComTransicao(navegar: () => void, href: string) {
       }),
   )
 
-  // `ready` rejeita com AbortError quando a transição é pulada — sem este
-  // `catch` o descarte deliberado aparece no console como erro não tratado.
+  // `ready` rejects with AbortError when the transition is skipped — without this
+  // `catch` the deliberate discard shows up in the console as an unhandled error.
   transicao.atual?.ready?.catch(() => {})
 }
 
-// Wrapper do `useRouter` do Next.js. Em navegadores sem View Transitions
-// (Firefox, Safari <18) cai no comportamento padrão.
+// Wrapper around Next.js's `useRouter`. In browsers without View Transitions
+// (Firefox, Safari <18) it falls back to the default behavior.
 //
-// Uso:
+// Usage:
 //   const router = useViewTransitionRouter()
 //   router.push("/projects")
 export function useViewTransitionRouter() {
@@ -105,12 +107,12 @@ export function useViewTransitionRouter() {
     [router],
   )
 
-  // `useMemo`: quem consome isto deriva callbacks com `[router]` na dependência
-  // e os entrega a listas memoizadas. Um objeto novo a cada render invalidava
-  // essas dependências sempre, e o `React.memo` dos cards de /projects nunca
-  // acertava — a lista inteira re-renderizava a cada tecla da busca, que é
-  // exatamente o que a memoização de lá diz estar evitando. O `useRouter` do
-  // App Router já devolve instância estável, então só `push` entra.
+  // `useMemo`: consumers derive callbacks with `[router]` in the dependencies
+  // and pass them to memoized lists. A new object on every render invalidated
+  // those dependencies every time, and the `React.memo` of the /projects cards
+  // never hit — the whole list re-rendered on every search keystroke, which is
+  // exactly what the memoization there claims to avoid. The App Router's
+  // `useRouter` already returns a stable instance, so only `push` goes in.
   return useMemo(
     () => ({ push, prefetch: router.prefetch }),
     [push, router],

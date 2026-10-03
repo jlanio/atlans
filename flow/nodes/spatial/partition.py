@@ -13,12 +13,12 @@ logger = get_logger(__name__)
 @register_node
 class PartitionNode(BaseNode):
     """
-    Nó espacial que divide um GeoDataFrame em partições espaciais (tiles de grade)
-    para processamento map-reduce. Computa a bbox total, cria uma grade NxN e
-    recorta o GeoDataFrame em cada célula, retornando apenas as partições não-vazias.
+    Spatial node that splits a GeoDataFrame into spatial partitions (grid tiles)
+    for map-reduce processing. Computes the total bbox, creates an NxN grid and
+    clips the GeoDataFrame to each cell, returning only the non-empty partitions.
 
-    Propriedades:
-      - nPartitions:  número de divisões (N para NxN grid, ex: 2 = 4 tiles, 3 = 9 tiles)
+    Properties:
+      - nPartitions:  number of divisions (N for an NxN grid, e.g. 2 = 4 tiles, 3 = 9 tiles)
     """
 
     @classmethod
@@ -51,7 +51,7 @@ class PartitionNode(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         # -------------------------------------------------------
-        # 1) Validação e extração de parâmetros
+        # 1) Validation and parameter extraction
         # -------------------------------------------------------
         self.validate()
 
@@ -63,7 +63,7 @@ class PartitionNode(BaseNode):
         n = math.ceil(math.sqrt(n_partitions))
 
         # -------------------------------------------------------
-        # 2) Valida e obtém o GeoDataFrame de entrada
+        # 2) Validates and gets the input GeoDataFrame
         # -------------------------------------------------------
         gdf = self.get_first_gdf(inputs)
 
@@ -75,27 +75,27 @@ class PartitionNode(BaseNode):
         )
 
         # -------------------------------------------------------
-        # 3) Cria partições espaciais (em thread separada)
+        # 3) Creates the spatial partitions (in a separate thread)
         # -------------------------------------------------------
         def _partition(df: gpd.GeoDataFrame, grid_n: int) -> List[gpd.GeoDataFrame]:
-            # Calcula bbox total do GeoDataFrame
+            # Computes the total bbox of the GeoDataFrame
             total_bounds = df.total_bounds  # (minx, miny, maxx, maxy)
             minx, miny, maxx, maxy = total_bounds
 
-            # Evita divisão por zero se bbox for degenerada
+            # Avoids division by zero if the bbox is degenerate
             if minx == maxx or miny == maxy:
                 return [df.copy()]
 
-            # Calcula passo de cada célula
+            # Computes the step of each cell
             x_step = (maxx - minx) / grid_n
             y_step = (maxy - miny) / grid_n
 
-            # Índice espacial construído UMA vez. Antes, `df.geometry.intersects(cell)`
-            # por célula era um scan elementwise sobre TODAS as feições — custo
-            # O(feições × tiles). Com o STRtree, cada célula consulta só os
-            # candidatos que tocam seu bbox e depois refina com intersects. A
-            # forma bbox+refino é equivalente ao resultado antigo e independe da
-            # versão do geopandas/shapely (não usa o kwarg predicate=).
+            # Spatial index built ONCE. Before, `df.geometry.intersects(cell)`
+            # per cell was an elementwise scan over ALL features — cost
+            # O(features × tiles). With the STRtree, each cell queries only the
+            # candidates touching its bbox and then refines with intersects. The
+            # bbox+refine form is equivalent to the old result and does not depend
+            # on the geopandas/shapely version (it does not use the predicate= kwarg).
             sindex = df.sindex
 
             partitions = []
@@ -106,10 +106,10 @@ class PartitionNode(BaseNode):
                     cell_miny = miny + j * y_step
                     cell_maxy = miny + (j + 1) * y_step
 
-                    # Cria geometria da célula e recorta o GDF
+                    # Creates the cell geometry and clips the GDF
                     cell_geom = box(cell_minx, cell_miny, cell_maxx, cell_maxy)
                     try:
-                        cand_pos = sindex.query(cell_geom)  # candidatos por bbox
+                        cand_pos = sindex.query(cell_geom)  # candidates by bbox
                         if len(cand_pos) == 0:
                             continue
                         cand = df.iloc[cand_pos]
@@ -118,7 +118,7 @@ class PartitionNode(BaseNode):
                     except Exception:
                         clipped = gpd.GeoDataFrame(columns=df.columns, crs=df.crs)
 
-                    # Inclui apenas partições não-vazias
+                    # Includes only non-empty partitions
                     if not clipped.empty:
                         partitions.append(clipped)
 

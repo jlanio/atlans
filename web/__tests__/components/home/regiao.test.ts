@@ -1,6 +1,6 @@
 /**
- * De onde o globo começa: fuso do navegador > país da conexão > continente do
- * fuso > o Brasil de sempre. E a latitude contida (o hero não abre num polo).
+ * Where the globe starts: browser time zone > connection country > the time zone's
+ * continent > the usual Brazil. And the latitude kept in check (the hero does not open on a pole).
  */
 import { describe, it, expect } from "vitest"
 import { CENTRO_PADRAO_DO_GLOBO, centroDaRegiao } from "@/app/components/home/mapa/regiao"
@@ -31,13 +31,13 @@ describe("centroDaRegiao", () => {
   })
 
   it("o fuso da Islândia dos modos de privacidade não é sinal: vale o país", () => {
-    // Firefox com resistFingerprinting, Tor Browser e Mullvad Browser dizem
-    // "Atlantic/Reykjavik" (e não "UTC") para esconder o fuso.
+    // Firefox with resistFingerprinting, Tor Browser and Mullvad Browser report
+    // "Atlantic/Reykjavik" (and not "UTC") to hide the time zone.
     expect(centroDaRegiao({ fuso: "Atlantic/Reykjavik", pais: "BR" })).toEqual(PAISES.BR)
     expect(centroDaRegiao({ fuso: "Iceland", pais: "JP" })).toEqual(PAISES.JP)
-    // Sem país, o centro neutro — não o Atlântico Norte da Islândia.
+    // No country, the neutral center — not Iceland's North Atlantic.
     expect(centroDaRegiao({ fuso: "Atlantic/Reykjavik" })).toEqual(CENTRO_PADRAO_DO_GLOBO)
-    // Quem está MESMO na Islândia continua lá (com a latitude contida).
+    // Someone REALLY in Iceland stays there (with the latitude kept in check).
     expect(centroDaRegiao({ fuso: "Atlantic/Reykjavik", pais: "is" })).toEqual([FUSOS["Atlantic/Reykjavik"][0], 50])
   })
 

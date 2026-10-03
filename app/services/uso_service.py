@@ -1,21 +1,21 @@
 # app/services/uso_service.py
-"""Gravar o que cada volta do assistente consumiu.
+"""Recording what each assistant round consumed.
 
-**Este módulo existe porque o dado já chegava e era jogado fora.** O provedor
-devolve, a cada resposta, quantos tokens entraram, quantos saíram e quanto
-aquilo custou; o laço somava tudo, escrevia uma linha de log e descartava.
-Nenhuma pergunta de dinheiro — quanto custa cada pessoa, se o que se cobra se
-paga, o que a troca de modelo faria com a conta — tem resposta sem isto.
+**This module exists because the data was already arriving and being thrown away.** The provider
+returns, with each response, how many tokens went in, how many came out and how much
+it cost; the loop added it all up, wrote a log line and discarded it.
+No money question — how much each person costs, whether what is charged pays
+for itself, what a model switch would do to the bill — has an answer without this.
 
-Duas regras que fazem esta gravação ser segura de acrescentar ao laço:
+Two rules that make this recording safe to add to the loop:
 
-1. **Nunca levanta.** Uma falha ao registrar não pode derrubar uma conversa que
-   já aconteceu e que a plataforma já pagou. É o mesmo raciocínio de
-   `cotas.cobrar_tokens_do_assistente`: o lado certo para errar é perder a
-   anotação, nunca o trabalho.
-2. **Sessão própria.** O laço do assistente não tem sessão de request (ele roda
-   dentro de um gerador SSE, ver `assistente_editor_router.py`), então a sessão é aberta
-   aqui e fechada aqui.
+1. **It never raises.** A failure to record cannot bring down a conversation that
+   has already happened and that the platform has already paid for. It is the same reasoning as
+   `cotas.cobrar_tokens_do_assistente`: the right side to err on is losing the
+   note, never the work.
+2. **Its own session.** The assistant loop has no request session (it runs
+   inside an SSE generator, see `assistente_editor_router.py`), so the session is opened
+   here and closed here.
 """
 from __future__ import annotations
 
@@ -39,11 +39,11 @@ async def registrar_volta(
     raciocinio: int = 0,
     custo_usd: float = 0.0,
 ) -> None:
-    """Uma linha por volta. Silencioso no sucesso, silencioso na falha.
+    """One row per round. Silent on success, silent on failure.
 
-    Volta sem token nenhum não vira linha: ela existe quando o provedor
-    respondeu sem consumir nada (recusa imediata, erro antes de gerar), e uma
-    linha de zeros só distorceria a mediana para baixo.
+    A round with no tokens at all does not become a row: it exists when the provider
+    answered without consuming anything (immediate refusal, error before generating), and a
+    row of zeros would only skew the median downward.
     """
     if not user_id or not modelo or (entrada <= 0 and saida <= 0):
         return
@@ -57,13 +57,13 @@ async def registrar_volta(
                 saida=int(saida),
                 cache_leitura=int(cache_leitura),
                 raciocinio=int(raciocinio),
-                # Por string: `Decimal(float)` arrasta o erro binário do float
-                # para dentro do decimal, que é justamente o que a coluna
-                # NUMERIC existe para não ter.
+                # Via string: `Decimal(float)` drags the float's binary error
+                # into the decimal, which is exactly what the NUMERIC
+                # column exists to avoid.
                 custo_usd=Decimal(str(round(float(custo_usd or 0.0), 6))),
             ))
             await db.commit()
-    except Exception as exc:  # pragma: no cover - depende do banco
+    except Exception as exc:  # pragma: no cover - depends on the database
         logger.warning(
             "Uso: falha ao registrar a volta do usuário %s (%s). A conversa segue.",
             user_id, exc.__class__.__name__,

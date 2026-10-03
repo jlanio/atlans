@@ -13,7 +13,7 @@ import { Button } from "@/app/components/ui/button"
 interface SchemaFieldsInputProps {
   form: UseFormReturn<z.infer<typeof formCredentialSchema>>
   schema: ICredentialTypeSchema
-  /** Bloqueia os campos — usado no modal de editar enquanto os segredos carregam. */
+  /** Locks the fields — used in the edit modal while the secrets load. */
   disabled?: boolean
 }
 
@@ -27,9 +27,9 @@ const SchemaFieldsInput = ({ form, schema, disabled }: SchemaFieldsInputProps) =
   return (
     <div className="flex flex-col gap-3">
       {schema.fields
-        // `expires_at` é tratado pelo ExpiryInput universal do modal (com
-        // seletor de data e conversão de fuso), não como campo de texto do
-        // schema — senão apareceria duplicado nos tipos que o declaram.
+        // `expires_at` is handled by the modal's universal ExpiryInput (with a
+        // date picker and time-zone conversion), not as a schema text field —
+        // otherwise it would appear twice in the types that declare it.
         .filter(field => field.key !== "expires_at")
         .map(field => (
           <SchemaField
@@ -79,14 +79,14 @@ const SchemaField = ({ field, form, revealed, onToggleReveal, disabled }: Schema
             )}
           </FormLabel>
 
-          {/* O FormControl precisa envolver o PRÓPRIO controle, não um wrapper.
-              Antes ele envolvia a <div> do grupo (e, no caso select, o Root do
-              Radix, que não renderiza DOM): `id`, `aria-describedby` e
-              `aria-invalid` aterravam na div, e o `htmlFor` do FormLabel apontava
-              para um elemento que não era o input. Resultado: clicar no rótulo não
-              focava o campo e o campo não tinha nome acessível.
-              O `formItemId` é único por FormItem (useId próprio), então isso
-              funciona mesmo com todos os campos compartilhando name="data". */}
+          {/* FormControl has to wrap the control ITSELF, not a wrapper.
+              Before, it wrapped the group's <div> (and, in the select case, Radix's
+              Root, which renders no DOM): `id`, `aria-describedby` and
+              `aria-invalid` landed on the div, and FormLabel's `htmlFor` pointed
+              to an element that was not the input. Result: clicking the label did
+              not focus the field and the field had no accessible name.
+              `formItemId` is unique per FormItem (its own useId), so this
+              works even with all fields sharing name="data". */}
           {isSelect ? (
             <Select value={currentValue} onValueChange={handleChange} disabled={disabled}>
               <FormControl>
@@ -104,9 +104,9 @@ const SchemaField = ({ field, form, revealed, onToggleReveal, disabled }: Schema
             <div className="flex items-center gap-1">
               <FormControl>
                 <Input
-                  // Campo numérico (ex: porta) ganha type="number" + teclado
-                  // numérico no celular. Password revelado vira "text"; senão
-                  // texto comum.
+                  // A numeric field (e.g. port) gets type="number" + a numeric
+                  // keyboard on mobile. A revealed password becomes "text";
+                  // otherwise plain text.
                   type={isPassword && !revealed ? "password" : isNumber ? "number" : "text"}
                   inputMode={isNumber ? "numeric" : undefined}
                   placeholder={field.placeholder ?? ""}
@@ -117,9 +117,9 @@ const SchemaField = ({ field, form, revealed, onToggleReveal, disabled }: Schema
                 />
               </FormControl>
               {isPassword && (
-                // Sem tabIndex={-1}: o botão era inalcançável por teclado, ou seja
-                // quem não usa mouse não conseguia conferir o que digitou.
-                // aria-pressed comunica o estado; o rótulo diz o que a ação FAZ.
+                // No tabIndex={-1}: the button was unreachable by keyboard, that is,
+                // those who do not use a mouse could not check what they typed.
+                // aria-pressed conveys the state; the label says what the action DOES.
                 <Button
                   type="button"
                   variant="ghost"
@@ -139,10 +139,10 @@ const SchemaField = ({ field, form, revealed, onToggleReveal, disabled }: Schema
             </div>
           )}
 
-          {/* FormDescription, não <p> cru: é ele que carrega o `formDescriptionId`
-              já referenciado no aria-describedby montado pelo FormControl. Com o
-              <p> solto, a referência ARIA apontava para um id inexistente e a
-              descrição não era lida. */}
+          {/* FormDescription, not a raw <p>: it is what carries the `formDescriptionId`
+              already referenced in the aria-describedby built by FormControl. With
+              a loose <p>, the ARIA reference pointed to a nonexistent id and the
+              description was not read. */}
           {field.description && (
             <FormDescription className="text-xs">{field.description}</FormDescription>
           )}

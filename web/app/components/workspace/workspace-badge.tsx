@@ -10,17 +10,18 @@ interface Props {
   workspace: Workspace | null
   /** sm: 24px | md: 32px | lg: 40px */
   size?: "sm" | "md" | "lg"
-  /** Mostra nome do workspace ao lado do avatar */
+  /** Shows the workspace name next to the avatar */
   showName?: boolean
-  /** Mostra badge Proprietário/Convidado (requer currentUserId) */
+  /** Shows the Proprietário/Convidado (Owner/Guest) badge (requires currentUserId) */
   showRole?: boolean
   /**
-   * Mostra o avatar de iniciais. Ligado no gatilho do seletor do cabeçalho: a
-   * cor determinística do workspace é o sinal de escopo ativo mais rápido de
-   * ler num relance. Fica desligado só onde repetiria uma marca já visível.
+   * Shows the initials avatar. On in the header picker's trigger: the
+   * workspace's deterministic color is the active-scope signal that is fastest
+   * to read at a glance. It is off only where it would repeat a mark already
+   * visible.
    */
   showAvatar?: boolean
-  /** id_hash do usuário logado — usado pra decidir Proprietário/Convidado */
+  /** id_hash of the logged-in user — used to decide Proprietário/Convidado */
   currentUserId?: string | null
   className?: string
 }
@@ -42,7 +43,7 @@ export function WorkspaceBadge({
 }: Props) {
   const s = SIZE_CLASSES[size]
 
-  // Sem workspace: avatar neutro genérico
+  // No workspace: generic neutral avatar
   if (!workspace) {
     return (
       <div className={cn("flex items-center gap-2", className)}>
@@ -67,11 +68,11 @@ export function WorkspaceBadge({
   }
 
   const identity = getWorkspaceIdentity(workspace)
-  // `my_role` é a resposta do backend e distingue os cinco papéis; comparar
-  // `owner_id` só sabe responder "dono ou não", e todo o resto — admin,
-  // operador, editor — era rotulado "Convidado". No cabeçalho, onde o papel
-  // ficou sendo uma das duas únicas coisas exibidas, isso era simplesmente
-  // errado. A comparação por id fica como reserva para quando `my_role` falta.
+  // `my_role` is the backend's answer and distinguishes the five roles; comparing
+  // `owner_id` can only answer "owner or not", and everything else — admin,
+  // operator, editor — was labeled "Convidado" (Guest). In the header, where the
+  // role became one of only two things displayed, that was simply wrong. The
+  // id comparison remains as a fallback for when `my_role` is missing.
   const isOwner =
     workspace.my_role === "owner" ||
     !!(currentUserId && workspace.owner_id && workspace.owner_id === currentUserId)

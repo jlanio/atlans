@@ -1,19 +1,19 @@
 # app/core/exceptions.py
 """
-Hierarquia de exceções de domínio do Atlas Studio.
+Domain exception hierarchy of Atlas Studio.
 
-Uso nos services:
+Usage in services:
     raise WorkflowNotFoundError("Workflow 'abc' não existe")
 
-Uso nos routers:
-    Não é necessário capturar — o exception handler global converte automaticamente
-    para a resposta HTTP correta.
+Usage in routers:
+    No need to catch — the global exception handler automatically converts
+    to the correct HTTP response.
 """
 from fastapi import status
 
 
 class AtlasBaseError(Exception):
-    """Classe base para todas as exceções de domínio do Atlas Studio."""
+    """Base class for all Atlas Studio domain exceptions."""
     status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
     error_code:  str = "internal_error"
 
@@ -51,22 +51,22 @@ class WorkflowNameConflictError(WorkflowError):
 
 
 class WorkflowVersionConflictError(WorkflowError):
-    """Duas gravações do MESMO workflow disputaram o mesmo `version_number`.
+    """Two saves of the SAME workflow competed for the same `version_number`.
 
-    `create_version` calcula o número lendo o máximo atual e somando 1, e a
-    UNIQUE `uq_workflow_version` é quem decide o empate. O CRUD já reconverge
-    sozinho — relê e tenta o número seguinte. Esta exceção é o que sobra depois
-    de esgotar as tentativas: raro a ponto de indicar outra coisa (uma enxurrada
-    de saves no mesmo fluxo, ou um agente em laço), e aí 409 com "tente de novo"
-    é resposta honesta. Antes disto, a violação subia como erro inesperado e o
-    trabalho de quem salvou era perdido num 500.
+    `create_version` computes the number by reading the current maximum and adding 1, and the
+    UNIQUE `uq_workflow_version` is what breaks the tie. The CRUD already reconverges
+    on its own — it re-reads and tries the next number. This exception is what is left after
+    the attempts run out: rare enough to point to something else (a flood
+    of saves on the same workflow, or an agent in a loop), and then a 409 with "try again"
+    is an honest answer. Before this, the violation bubbled up as an unexpected error and the
+    saver's work was lost in a 500.
     """
     status_code = status.HTTP_409_CONFLICT
     error_code  = "workflow_version_conflict"
 
 
 class WorkflowMoveTargetError(WorkflowError):
-    """Destino inválido para mover o workflow (hoje: já é o workspace atual)."""
+    """Invalid destination for moving the workflow (today: it is already the current workspace)."""
     status_code = status.HTTP_400_BAD_REQUEST
     error_code  = "workflow_move_target_invalid"
 
@@ -83,11 +83,11 @@ class DisabledNodesInWorkflowError(WorkflowError):
 
 
 class DefinicaoInvalidaError(WorkflowError):
-    """Definição que o executor nem consegue construir (nó inexistente, id
-    duplicado, ciclo). `report` é o relatório do lint, que o tradutor de erros
-    do MCP (`app/mcp/erros.py`) devolve higienizado — antes esses casos
-    estouravam no `__init__` do executor e viravam um 500 genérico com a causa
-    mascarada."""
+    """A definition the executor cannot even build (nonexistent node, duplicate
+    id, cycle). `report` is the lint report, which the MCP error translator
+    (`app/mcp/erros.py`) returns sanitized — before, these cases
+    blew up in the executor's `__init__` and became a generic 500 with the cause
+    masked."""
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     error_code  = "invalid_definition"
 
@@ -96,11 +96,11 @@ class DefinicaoInvalidaError(WorkflowError):
         self.report = report or {}
 
 
-# ── Catálogo de fontes ────────────────────────────────────────────────────────
+# ── Source catalog ────────────────────────────────────────────────────────────
 
 class FonteInvalidaError(AtlasBaseError):
-    """A URL (ou a camada) de uma fonte não passa na forma: scheme, tamanho,
-    credencial embutida. 422 como toda entrada malformada."""
+    """A source's URL (or layer) does not pass the shape check: scheme, length,
+    embedded credential. 422 like every malformed input."""
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     error_code  = "fonte_invalida"
 
@@ -135,7 +135,7 @@ class CredentialNotFoundError(CredentialError):
 
 
 class CredentialValidationError(CredentialError):
-    """Campos obrigatórios ausentes/ inválidos ao criar ou editar a credencial."""
+    """Required fields missing/invalid when creating or editing the credential."""
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     error_code  = "credential_validation"
 
@@ -153,20 +153,20 @@ class WorkspaceAccessDeniedError(WorkspaceError):
 
 
 class WorkspacePolicyError(WorkspaceError):
-    """Política de execução inválida: executor do pool num nível dedicado,
-    executor inativo/sem chave, nível 2 sem nível 1, terminal desconhecido."""
+    """Invalid execution policy: a pool executor in a dedicated tier,
+    an inactive/keyless executor, tier 2 without tier 1, an unknown terminal."""
     status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
     error_code  = "workspace_policy_invalid"
 
 
 class WorkspacePolicyFloorError(WorkspaceError):
-    """O admin da plataforma fixou o piso `no_pool`: o dono não pode afrouxar."""
+    """The platform admin set the `no_pool` floor: the owner cannot loosen it."""
     status_code = status.HTTP_403_FORBIDDEN
     error_code  = "workspace_policy_floor"
 
 
 class WorkspacePolicyConflictError(WorkspaceError):
-    """A operação esvaziaria o nível principal de um workspace (sem `force`)."""
+    """The operation would empty a workspace's main tier (without `force`)."""
     status_code = status.HTTP_409_CONFLICT
     error_code  = "workspace_policy_conflict"
 
@@ -188,20 +188,20 @@ class FileNotFoundError(FileError):
 
 
 class FileValidationError(FileError):
-    """Base das recusas de upload pelo arquivo em si. Quem mostra a recusa lê o
-    `error_code` da subclasse — o web escolhe ícone e rótulo por ele, nunca pela
-    frase —, e quem só precisa saber que é recusa captura esta classe."""
+    """Base of the upload refusals caused by the file itself. Whoever shows the refusal reads the
+    subclass's `error_code` — the web picks the icon and label by it, never by the
+    sentence —, and whoever only needs to know it is a refusal catches this class."""
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     error_code  = "file_validation_error"
 
 
 class FileExtensionNotAllowedError(FileValidationError):
-    """Extensão fora da lista que o admin habilitou — inclusive nenhuma."""
+    """Extension outside the list the admin enabled — including none at all."""
     error_code  = "extension_not_allowed"
 
 
 class DangerousInnerExtensionError(FileValidationError):
-    """Dupla extensão com a interna executável (`notas.sh.csv`)."""
+    """Double extension with an executable inner one (`notas.sh.csv`)."""
     error_code  = "dangerous_inner_extension"
 
 
@@ -220,14 +220,14 @@ class InvalidFileOperationError(FileError):
 
 
 class ConteudoNoExecutorError(FileError):
-    """Operacao que exigiria o CONTEUDO de um arquivo que so existe no executor.
+    """Operation that would require the CONTENT of a file that only exists on the executor.
 
-    Vale para o registro de um arquivo catalogado (LGPD): a plataforma conhece a
-    ficha, nunca os bytes. Excluir esse registro nao apagaria nada no disco de
-    quem tem o arquivo — e apagar o arquivo do usuario por ordem do servidor
-    seria destrutivo, porque ele nunca pertenceu a plataforma.
+    Applies to the record of a cataloged file (LGPD): the platform knows the
+    record card, never the bytes. Deleting that record would erase nothing on the disk of
+    whoever has the file — and deleting the user's file on the server's orders
+    would be destructive, because it never belonged to the platform.
 
-    409 e nao 400: nao ha nada de errado no pedido, e sim no ESTADO do recurso.
+    409 and not 400: there is nothing wrong with the request, but with the resource's STATE.
     """
     status_code = status.HTTP_409_CONFLICT
     error_code  = "conteudo_no_executor"
@@ -253,13 +253,13 @@ class ExecutorError(AtlasBaseError):
 
 
 class NoExecutorAvailableError(ExecutorError):
-    """Nenhum executor pôde receber o job.
+    """No executor could receive the job.
 
-    `category` distingue, nas métricas e no histórico, POR QUE não houve
-    executor: `no_dedicated_executor` (workspace isolado com o grupo fora),
-    `no_executor_chain` (dedicados e pool esgotados), `no_pool_executor`
-    (modo pool com o pool fora) ou `isolation_violation` (barreira de §5.3 da
-    spec). O texto continua sendo o que o dono lê.
+    `category` distinguishes, in the metrics and in the history, WHY there was no
+    executor: `no_dedicated_executor` (isolated workspace with the group down),
+    `no_executor_chain` (dedicated ones and pool exhausted), `no_pool_executor`
+    (pool mode with the pool down) or `isolation_violation` (the barrier from §5.3 of the
+    spec). The text is still what the owner reads.
     """
     status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     error_code  = "no_agent_available"
@@ -270,9 +270,9 @@ class NoExecutorAvailableError(ExecutorError):
     ):
         super().__init__(detail)
         self.category = category or "no_executor"
-        # Preenchido quando um run JÁ foi criado e marcado `failed` antes de
-        # levantar (dispatch esgotado, barreira): quem captura não deve
-        # materializar um segundo run para a mesma ocorrência.
+        # Filled in when a run HAS ALREADY been created and marked `failed` before
+        # raising (dispatch exhausted, barrier): whoever catches it must not
+        # materialize a second run for the same occurrence.
         self.run_id = run_id
 
 
@@ -283,7 +283,7 @@ class CredentialAccessDeniedError(CredentialError):
     error_code  = "credential_access_denied"
 
 
-# ── Recursos genéricos ────────────────────────────────────────────────────────
+# ── Generic resources ─────────────────────────────────────────────────────────
 
 class DuplicateResourceError(AtlasBaseError):
     status_code = status.HTTP_409_CONFLICT

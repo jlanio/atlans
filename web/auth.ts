@@ -6,46 +6,46 @@ import Credentials from "next-auth/providers/credentials";
 const API_URL = process.env.API_INTERNA ?? "http://localhost:8000";
 
 /* ────────────────────────────────────────────────────────────────────────────
-   Repasse da sessão do middleware para o SSR
+   Handing the session from the middleware to SSR
 
-   Por que existe: `auth()` chamado dentro de um Server Component monta a Request
-   a partir de `headers()`, e o Next NÃO mescla nesse objeto os cookies que o
-   middleware acabou de gravar (só em `cookies()`). Resultado: com o access_token
-   vencido, o middleware renovava (POST /auth/refresh) e persistia o cookie novo,
-   e logo depois o `auth()` do layout lia o cookie ANTIGO, via o mesmo
-   `access_token_expires_at` vencido e disparava um SEGUNDO POST /auth/refresh —
-   cujo Set-Cookie o próprio next-auth descarta no caminho RSC (`.json()`), então
-   era trabalho 100% perdido.
+   Why this exists: `auth()` called inside a Server Component builds the Request
+   from `headers()`, and Next does NOT merge into that object the cookies the
+   middleware has just written (only into `cookies()`). Result: with the
+   access_token expired, the middleware refreshed it (POST /auth/refresh) and
+   persisted the new cookie, and right after that the layout's `auth()` read the
+   OLD cookie, saw the same expired `access_token_expires_at` and fired a SECOND
+   POST /auth/refresh — whose Set-Cookie next-auth itself discards on the RSC
+   path (`.json()`), so it was 100% wasted work.
 
-   O sintoma: o tráfego de /auth/refresh dobra, e esse endpoint tem rate limit de
-   20/min num balde único para toda a plataforma (o fetch daqui não manda XFF).
-   Ao estourar, o 429 vira `token.error = "RefreshTokenExpired"` e o middleware
-   manda TODO MUNDO para /login de uma vez. Havia ainda o risco de a segunda
-   rotação cair fora da janela de graça do backend e revogar a família de refresh
-   tokens de verdade.
+   The symptom: /auth/refresh traffic doubles, and that endpoint has a rate limit
+   of 20/min in a single bucket for the whole platform (the fetch from here sends
+   no XFF). When it overflows, the 429 becomes `token.error = "RefreshTokenExpired"`
+   and the middleware sends EVERYONE to /login at once. There was also the risk
+   of the second rotation landing outside the backend's grace window and really
+   revoking the refresh token family.
 
-   Correção: o middleware — único ponto que consegue persistir o cookie renovado
-   — deposita a sessão já resolvida neste cabeçalho de request, e o layout do
-   dashboard a consome em vez de chamar `auth()` outra vez.
+   Fix: the middleware — the only place that can persist the refreshed cookie —
+   drops the already-resolved session into this request header, and the
+   dashboard layout consumes it instead of calling `auth()` again.
 
-   Não é um vetor de spoofing: o middleware SEMPRE sobrescreve o valor recebido
-   do cliente (`delete` + `set`), e todas as rotas que renderizam o layout do
-   dashboard estão dentro do `matcher` do middleware.
+   This is not a spoofing vector: the middleware ALWAYS overwrites the value
+   received from the client (`delete` + `set`), and every route that renders the
+   dashboard layout is inside the middleware's `matcher`.
    ──────────────────────────────────────────────────────────────────────────── */
 
-/** Cabeçalho interno onde o middleware entrega a sessão ao SSR. */
+/** Internal header where the middleware hands the session to SSR. */
 export const SESSION_HEADER = "x-atlans-session";
 
-// Teto de segurança: cabeçalho de request muito grande derruba a requisição
-// inteira no proxy/Node. Acima disso o layout cai no fallback de `auth()`.
+// Safety ceiling: a very large request header takes down the whole request
+// in the proxy/Node. Above this, the layout falls back to `auth()`.
 const SESSION_HEADER_MAX_LENGTH = 6144;
 
-/** Serializa a sessão para o cabeçalho. `null` = não cabe / não serializa. */
+/** Serializes the session for the header. `null` = doesn't fit / doesn't serialize. */
 export function encodeSessionHeader(session: unknown): string | null {
   if (!session) return null;
   try {
-    // percent-encoding em vez de JSON cru: username/email com acentos não são
-    // latin-1 e quebrariam a escrita do cabeçalho.
+    // percent-encoding instead of raw JSON: a username/email with accents is not
+    // latin-1 and would break writing the header.
     const encoded = encodeURIComponent(JSON.stringify(session));
     if (encoded.length > SESSION_HEADER_MAX_LENGTH) return null;
     return encoded;
@@ -54,15 +54,15 @@ export function encodeSessionHeader(session: unknown): string | null {
   }
 }
 
-/** Lê o cabeçalho. `null` quando ausente, corrompido ou sem cara de sessão. */
+/** Reads the header. `null` when missing, corrupted or not session-shaped. */
 export function decodeSessionHeader(raw: string | null | undefined): Session | null {
   if (!raw) return null;
   try {
     const parsed: unknown = JSON.parse(decodeURIComponent(raw));
     if (!parsed || typeof parsed !== "object") return null;
     const user = (parsed as { user?: { id_hash?: unknown } }).user;
-    // Sem id_hash não é a sessão desta aplicação: melhor cair no fallback de
-    // `auth()` do que hidratar o SessionProvider com um objeto pela metade.
+    // Without id_hash it is not this application's session: better to fall back
+    // to `auth()` than to hydrate the SessionProvider with a half-built object.
     if (!user || typeof user.id_hash !== "string" || !user.id_hash) return null;
     return parsed as Session;
   } catch {
@@ -70,45 +70,46 @@ export function decodeSessionHeader(raw: string | null | undefined): Session | n
   }
 }
 
-/** Vida útil do access token no JWT do NextAuth: 30 min do backend menos 60s de
- *  margem. Passado este ponto, o callback jwt tenta renovar. */
+/** Lifetime of the access token in the NextAuth JWT: the backend's 30 min minus
+ *  a 60s margin. Past this point, the jwt callback tries to refresh. */
 export const ACCESS_TTL_MS = 29 * 60 * 1000;
 
-/** Após uma falha TRANSITÓRIA de /auth/refresh (rede, 429, 5xx), o token é
- *  mantido e uma nova tentativa é agendada para daqui a pouco — em vez de
- *  deslogar o usuário por um soluço do backend. */
+/** After a TRANSIENT /auth/refresh failure (network, 429, 5xx), the token is
+ *  kept and a new attempt is scheduled for shortly afterwards — instead of
+ *  logging the user out over a backend hiccup. */
 export const REFRESH_BACKOFF_MS = 30 * 1000;
 
-/** Injeção para teste: `fetch` e o relógio. */
+/** Injection for tests: `fetch` and the clock. */
 export interface JwtCallbackDeps {
   fetchFn?: typeof fetch;
   now?: () => number;
 }
 
 /**
- * Renova o access_token quando expira, distinguindo falha TRANSITÓRIA de
- * TERMINAL — a distinção é o coração da correção do bug de logout espúrio.
+ * Refreshes the access_token when it expires, distinguishing a TRANSIENT failure
+ * from a TERMINAL one — that distinction is the heart of the fix for the
+ * spurious logout bug.
  *
- * Antes, `if (!res.ok) throw` tratava QUALQUER resposta não-2xx (429 do rate
- * limit, 5xx, timeout de rede) como refresh token expirado: setava
- * `token.error = "RefreshTokenExpired"`, que o middleware e o SessionSync leem
- * para mandar o usuário ao /login. Um único 429 — e o /auth/refresh tinha um
- * balde de rate limit único para a plataforma (ver o backend) — deslogava. E
- * como o erro nunca era limpo num refresh bem-sucedido, ele grudava: a sessão
- * ficava condenada a deslogar mesmo depois de o backend se recuperar.
+ * Before, `if (!res.ok) throw` treated ANY non-2xx response (rate limit 429,
+ * 5xx, network timeout) as an expired refresh token: it set
+ * `token.error = "RefreshTokenExpired"`, which the middleware and SessionSync
+ * read to send the user to /login. A single 429 — and /auth/refresh had a
+ * single rate-limit bucket for the platform (see the backend) — logged you out.
+ * And since the error was never cleared on a successful refresh, it stuck: the
+ * session was doomed to log out even after the backend recovered.
  *
- * Agora: só um 401 (refresh de fato inválido/expirado/reusado) é terminal.
- * Rede/429/5xx mantêm os tokens atuais e reagendam a tentativa
- * (`REFRESH_BACKOFF_MS`). Todo caminho de sucesso limpa `token.error`.
+ * Now: only a 401 (refresh truly invalid/expired/reused) is terminal.
+ * Network/429/5xx keep the current tokens and reschedule the attempt
+ * (`REFRESH_BACKOFF_MS`). Every success path clears `token.error`.
  *
- * Exportada e pura (com `deps` injetáveis) para ser testável — o callback do
- * NextAuth é um closure e não dá para exercitar em unidade.
+ * Exported and pure (with injectable `deps`) so it is testable — the NextAuth
+ * callback is a closure and cannot be exercised in a unit test.
  */
 export async function jwtCallback(
   { token, user }: { token: JWT; user?: User | null },
   { fetchFn = fetch, now = Date.now }: JwtCallbackDeps = {},
 ): Promise<JWT> {
-  // Primeiro login: popula o token com os dados do usuário.
+  // First login: populates the token with the user's data.
   if (user) {
     token.id_hash = user.id_hash;
     token.username = user.username;
@@ -122,7 +123,7 @@ export async function jwtCallback(
     return token;
   }
 
-  // Ainda dentro da validade — retorna sem renovar.
+  // Still valid — return without refreshing.
   if (now() < token.access_token_expires_at) {
     return token;
   }
@@ -136,19 +137,19 @@ export async function jwtCallback(
       body: JSON.stringify({ refresh_token: token.refresh_token }),
     });
   } catch {
-    // Erro de rede/timeout — TRANSITÓRIO. Mantém a sessão e tenta de novo em
-    // breve; não desloga.
+    // Network error/timeout — TRANSIENT. Keep the session and try again
+    // shortly; do not log out.
     token.access_token_expires_at = now() + REFRESH_BACKOFF_MS;
     return token;
   }
 
-  // 401 = refresh token realmente inválido/expirado/reusado — TERMINAL.
+  // 401 = refresh token really invalid/expired/reused — TERMINAL.
   if (res.status === 401) {
     token.error = "RefreshTokenExpired";
     return token;
   }
 
-  // 429 (rate limit) ou 5xx — TRANSITÓRIO. Não desloga; reagenda a tentativa.
+  // 429 (rate limit) or 5xx — TRANSIENT. Do not log out; reschedule the attempt.
   if (!res.ok) {
     token.access_token_expires_at = now() + REFRESH_BACKOFF_MS;
     return token;
@@ -158,8 +159,8 @@ export async function jwtCallback(
   token.access_token = refreshed.access_token;
   token.refresh_token = refreshed.refresh_token ?? token.refresh_token;
   token.access_token_expires_at = now() + ACCESS_TTL_MS;
-  // Refresh bem-sucedido limpa qualquer erro transitório anterior — sem isto o
-  // erro grudava e a sessão era condenada a deslogar.
+  // A successful refresh clears any earlier transient error — without this the
+  // error stuck and the session was doomed to log out.
   delete token.error;
   return token;
 }
@@ -172,8 +173,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         refresh_token: {},
       },
       async authorize(credentials) {
-        // A página já autenticou em /auth/login e nos repassa os tokens —
-        // aqui apenas validamos buscando os dados do usuário (sem re-logar).
+        // The page has already authenticated at /auth/login and passes us the tokens —
+        // here we only validate them by fetching the user's data (no re-login).
         if (!credentials?.access_token || !credentials?.refresh_token) return null;
 
         const meRes = await fetch(`${API_URL}/auth/me`, {
@@ -200,12 +201,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
 
   callbacks: {
-    // Renova o access_token quando expira. A lógica vive em `jwtCallback`
-    // (exportada e testável); ver lá a distinção transitório × terminal.
+    // Refreshes the access_token when it expires. The logic lives in `jwtCallback`
+    // (exported and testable); see there for the transient × terminal distinction.
     async jwt({ token, user }) {
       return jwtCallback({ token, user: user as User | undefined });
     },
-    // Expõe os campos para useSession() no cliente
+    // Exposes the fields to useSession() on the client
     session({ session, token }) {
       session.user.id_hash = token.id_hash as string;
       session.user.username = token.username as string;
@@ -218,18 +219,19 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
   },
 
-  // V17: ao chamar signOut() no front, garantimos que o refresh_token e o
-  // access_token sao revogados no backend ANTES do cookie de sessao ser
-  // expirado. Sem isso, o backend marcaria revoke mas o cookie continuaria
-  // valido na aba aberta ate expirar naturalmente; pior, se o usuario
-  // fechasse a aba sem signOut, o cookie tambem ficava utilizavel ate o
-  // exp natural do JWT (30 min).
+  // V17: when signOut() is called on the front end, we make sure the
+  // refresh_token and the access_token are revoked on the backend BEFORE the
+  // session cookie expires. Without this, the backend would mark the revoke but
+  // the cookie would stay valid in the open tab until it expired naturally;
+  // worse, if the user closed the tab without signOut, the cookie also stayed
+  // usable until the JWT's natural exp (30 min).
   events: {
     async signOut(message) {
-      // NextAuth v5: message inclui `token` em sessoes JWT.
-      // O backend /auth/logout extrai 'family' do access_token e revoga a
-      // familia inteira de refresh tokens — nao precisa do refresh_token no
-      // body (era ignorado). Mantemos so o Authorization header.
+      // NextAuth v5: message includes `token` in JWT sessions.
+      // The backend /auth/logout extracts 'family' from the access_token and
+      // revokes the whole refresh token family — it does not need the
+      // refresh_token in the body (it was ignored). We keep only the
+      // Authorization header.
       const token = (message as { token?: Record<string, unknown> })?.token;
       const accessToken = token?.access_token as string | undefined;
       if (!accessToken) return;
@@ -242,15 +244,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           },
         });
       } catch {
-        // Best-effort: backend offline durante signOut nao bloqueia o flush
-        // do cookie do lado do cliente.
+        // Best-effort: a backend offline during signOut does not block flushing
+        // the cookie on the client side.
       }
     },
   },
 
-  // Sessao em cookies HttpOnly + SameSite=Lax (default do NextAuth v5).
-  // Em producao, NEXTAUTH_URL com https:// faz o NextAuth setar Secure=true
-  // automaticamente. NAO mudar para useSecureCookies=false em prod.
+  // Session in HttpOnly + SameSite=Lax cookies (the NextAuth v5 default).
+  // In production, NEXTAUTH_URL with https:// makes NextAuth set Secure=true
+  // automatically. DO NOT change to useSecureCookies=false in prod.
   pages: {
     signIn: "/login",
     error: "/login",

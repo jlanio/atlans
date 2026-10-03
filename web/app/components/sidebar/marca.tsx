@@ -7,28 +7,30 @@ import { useNomeNaTela } from "../share/nome-na-tela"
 import TitleSidebar from "./title-sidebar"
 
 /**
- * A marca: glifo de fluxo (dois nós ligados, ecoando o canvas de workflow) +
- * o wordmark — o nome desta instalação (NOME_NA_TELA; «Atlans» sem ela, ver
- * lib/nome-na-tela.ts). Extraída do AppSidebar para o HomeSidebar reusar o
- * MESMO bloco — a casca da Home é "como o Claude Code", com a marca no topo.
+ * The brand: workflow glyph (two connected nodes, echoing the workflow canvas) +
+ * the wordmark — this installation's name (NOME_NA_TELA; "Atlans" without it, see
+ * lib/nome-na-tela.ts). Extracted from AppSidebar so HomeSidebar reuses the
+ * SAME block — the Home's shell is "like Claude Code", with the brand at the top.
  *
- * No modo ícone o bloco some (`group-data-[collapsible=icon]:hidden`): no
- * trilho de 3rem do app só sobra o gatilho de recolher, que centraliza sozinho.
- * Com `glifoNoTrilho` fica o GLIFO e some só o wordmark — em `sr-only`, não
- * `hidden`, porque o glifo é `aria-hidden` e o `<h1>` é o nome do link. A Home
- * usa isso: ali a marca é a única navegação explícita do admin, e recolhida
- * ela sumia inteira, saída incluída. O `tooltip` (só com `href`) diz o destino
- * no trilho, do mesmo jeito que o `SidebarMenuButton` faz com os itens.
+ * In icon mode the block disappears (`group-data-[collapsible=icon]:hidden`): on
+ * the app's 3rem rail only the collapse trigger remains, which centers by itself.
+ * With `glifoNoTrilho` the GLYPH stays and only the wordmark goes — as `sr-only`,
+ * not `hidden`, because the glyph is `aria-hidden` and the `<h1>` is the link's
+ * name. The Home uses this: there the brand is the admin's only explicit
+ * navigation, and collapsed it vanished entirely, exit included. The `tooltip`
+ * (only with `href`) states the destination on the rail, the same way
+ * `SidebarMenuButton` does for the items.
  *
- * `href` — quando presente, a marca inteira vira link. É assim que a Home a usa:
- * ali a marca é a ÚNICA navegação explícita para o resto do app (leva a
- * /projects; o menu de conta não tem atalhos, e o resto se alcança pela paleta
- * Ctrl+K). No app padrão a marca é só rótulo e vai SEM href.
+ * `href` — when present, the whole brand becomes a link. That's how the Home uses
+ * it: there the brand is the ONLY explicit navigation to the rest of the app (it
+ * goes to /projects; the account menu has no shortcuts, and the rest is reached
+ * via the Ctrl+K palette). In the standard app the brand is just a label and goes
+ * WITHOUT href.
  */
 /**
- * Só o glifo (o quadrado terracota com os dois nós ligados), sem o wordmark.
- * Exportado porque o modal de entrada da Home o põe no cabeçalho do card —
- * fora do sidebar, sem `useSidebar`.
+ * Just the glyph (the terracotta square with the two connected nodes), without
+ * the wordmark. Exported because the Home's sign-in modal puts it in the card
+ * header — outside the sidebar, without `useSidebar`.
  */
 export function GlifoDaMarca() {
   return (
@@ -79,8 +81,8 @@ export default function Marca({
   const link = (
     <Link
       href={href}
-      // Alvo clicável discreto: um leve realce no hover diz que é link, sem
-      // caixa permanente competindo com a lista.
+      // Discreet clickable target: a light highlight on hover says it's a link,
+      // without a permanent box competing with the list.
       className={cn(classe, "rounded-md transition-opacity hover:opacity-80")}
     >
       {glifo}
@@ -92,7 +94,7 @@ export default function Marca({
   return (
     <Tooltip>
       <TooltipTrigger asChild>{link}</TooltipTrigger>
-      {/* Só no trilho: expandida, o wordmark já diz tudo; no telefone não há trilho. */}
+      {/* Only on the rail: expanded, the wordmark already says it all; the phone has no rail. */}
       <TooltipContent side="right" align="center" hidden={state !== "collapsed" || isMobile} {...tooltip} />
     </Tooltip>
   )

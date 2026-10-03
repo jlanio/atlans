@@ -1,24 +1,25 @@
 # app/schemas/agent_enrollment.py
 """
-Schemas Pydantic para o fluxo de enrollment + renewal de cert mTLS.
+Pydantic schemas for the mTLS cert enrollment + renewal flow.
 
-Todos com extra='forbid' — bloqueia keys desconhecidos e limita superficie de
-ataque por payload aninhado profundo (D1 do relatorio de seguranca).
+All with extra='forbid' — blocks unknown keys and limits the attack surface of
+deeply nested payloads (D1 of the security report).
 """
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-# ── Admin: gera OTP para executor ja existente ─────────────────────────────────
+# ── Admin: generates an OTP for an existing executor ───────────────────────────
 
 class EnrollmentOTPResponse(BaseModel):
-    """Resposta da geracao de OTP — plaintext aparece UMA UNICA VEZ.
+    """OTP generation response — the plaintext appears ONLY ONCE.
 
-    Leva tambem os enderecos que os comandos de matricula usam, para a tela nao
-    trazer nenhum fixo: `server_url` e o host dos executores (AGENTS_URL, vazio
-    quando a instalacao nao o configurou nem tem dominio para a convencao) e
-    `public_url`, o site (FRONTEND_URL), de onde o install.sh e baixado.
+    It also carries the addresses the enrollment commands use, so the screen
+    does not hard-code any: `server_url` is the executors' host (AGENTS_URL,
+    empty when the installation neither configured it nor has a domain for the
+    convention) and `public_url`, the site (FRONTEND_URL), from where install.sh
+    is downloaded.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -29,13 +30,13 @@ class EnrollmentOTPResponse(BaseModel):
     public_url: str = ""
 
 
-# ── Executor: troca OTP por cert ───────────────────────────────────────────────
+# ── Executor: exchanges the OTP for a cert ─────────────────────────────────────
 
 class EnrollRequest(BaseModel):
     """
-    Corpo do POST /executores/enroll.
+    Body of POST /executores/enroll.
 
-    Autenticacao via Authorization: Bearer {otp} — nao incluido no body.
+    Authentication via Authorization: Bearer {otp} — not included in the body.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -47,7 +48,7 @@ class EnrollRequest(BaseModel):
 
 
 class EnrollResponse(BaseModel):
-    """Cert bundle entregue ao executor apos enrollment ou renewal."""
+    """Cert bundle delivered to the executor after enrollment or renewal."""
     model_config = ConfigDict(extra="forbid")
 
     cert_pem:    str
@@ -57,21 +58,22 @@ class EnrollResponse(BaseModel):
     fingerprint: str
     issued_at:   datetime
     expires_at:  datetime
-    # Chave publica Ed25519 com que o servidor assina jobs e comandos. Entregue
-    # AQUI, dentro do bundle ja autenticado pelo OTP (enroll) ou pelo mTLS
-    # (renew), para que o executor a fixe sem passar por nenhuma janela de TOFU.
-    # Antes o executor a buscava num GET separado a cada boot, sem pinning —
-    # ver executor/server_key.py. Opcional para o caso de EXECUTOR_SIGNING_KEY
-    # nao estar configurada no servidor: o executor trata a ausencia com
-    # mensagem propria em vez de receber um bundle malformado.
+    # Ed25519 public key with which the server signs jobs and commands. Delivered
+    # HERE, inside the bundle already authenticated by the OTP (enroll) or by
+    # mTLS (renew), so the executor pins it without going through any TOFU
+    # window. Before, the executor fetched it with a separate GET on every
+    # boot, without pinning — see executor/server_key.py. Optional for the case
+    # where EXECUTOR_SIGNING_KEY is not configured on the server: the executor
+    # handles its absence with its own message instead of receiving a
+    # malformed bundle.
     server_signing_public_key: str | None = None
 
 
-# ── Executor: renova cert antes do vencimento (autenticado por mTLS) ───────────
+# ── Executor: renews the cert before expiry (authenticated by mTLS) ────────────
 
 class RenewRequest(BaseModel):
     """
-    Corpo do POST /executores/renew-cert. Identidade do executor vem do mTLS.
+    Body of POST /executores/renew-cert. The executor's identity comes from mTLS.
     """
     model_config = ConfigDict(extra="forbid")
 

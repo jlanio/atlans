@@ -12,46 +12,48 @@ import { ESTADO_PADRAO, ORDENS, filtrosAtivos, type EstadoDeProjetos, type Filtr
 
 export interface BarraDeFiltrosProps {
   estado: EstadoDeProjetos
-  /** Recebe só o que mudou; quem compõe a página funde com o resto e grava na URL. */
+  /** Receives only what changed; the page composer merges it with the rest and writes it to the URL. */
   onEstado: (mudanca: Partial<EstadoDeProjetos>) => void
   onLimpar: () => void
-  /** Contagem de cada chip sobre a lista inteira (`contarPorFiltro`). */
+  /** Count of each chip over the whole list (`contarPorFiltro`). */
   contagens: Record<Filtro, number>
-  /** "Recolher todos"/"Expandir todos" só existe com grupos. */
+  /** "Recolher todos"/"Expandir todos" (collapse/expand all) only exists with groups. */
   temGrupos: boolean
   todosRecolhidos: boolean
   onRecolherTodos: () => void
   onExpandirTodos: () => void
 }
 
-// A busca é local (a lista já está na memória), mas cada tecla gravada na
-// URL é um `router.replace`; um respiro curto junta as teclas de uma palavra
-// sem que a pessoa perceba a espera.
+// The search is local (the list is already in memory), but each keystroke
+// written to the URL is a `router.replace`; a short pause gathers the keystrokes
+// of a word without the person noticing the wait.
 const ATRASO_DA_BUSCA_MS = 200
 
 /**
- * Onde a barra troca de assunto: depois de "Inativos" (de estado para natureza
- * e situação) e depois de "Com portal" (o recorte por QUEM criou o fluxo, que
- * não é uma propriedade do fluxo como as outras).
+ * Where the bar changes subject: after "Inativos" (from state to nature
+ * and situation) and after "Com portal" (the slice by WHO created the workflow,
+ * which is not a property of the workflow like the others).
  */
 const SEPARADOR_DEPOIS_DE: Filtro[] = ["inativos", "portal"]
 
 /**
- * Barra de busca, ordenação, recolher e chips (docs/specs/projects.md §3.6).
- * O arquivo não se chama `filtros.tsx` de propósito: ao lado de `filtros.ts`,
- * o mesmo `import "./filtros"` cairia no `.ts` para o tsc e o Vite e no
- * `.tsx` para o webpack do Next — e a página quebraria só no build.
+ * Search, sort, collapse and chips bar (docs/specs/projects.md §3.6).
+ * The file is not called `filtros.tsx` on purpose: next to `filtros.ts`, the
+ * same `import "./filtros"` would resolve to the `.ts` for tsc and Vite and to
+ * the `.tsx` for Next's webpack — and the page would break only in the build.
  *
- * Nada aqui guarda estado de filtro: tudo sobe por `onEstado` e volta pela
- * URL. A única exceção é o texto da busca, que espera um instante parado.
+ * Nothing here holds filter state: everything goes up through `onEstado` and
+ * comes back through the URL. The only exception is the search text, which
+ * waits a moment idle.
  */
 export function BarraDeFiltros({
   estado, onEstado, onLimpar, contagens, temGrupos, todosRecolhidos, onRecolherTodos, onExpandirTodos,
 }: BarraDeFiltrosProps) {
   const ativos = filtrosAtivos(estado)
-  // `pausado` e `nunca` chegam pela faixa de atenção e não têm chip fixo: um
-  // chip provisório, já marcado, mostra o recorte em vigor — senão a faixa
-  // some (quando o número zera) e a lista fica filtrada sem nada dizer por quê.
+  // `pausado` and `nunca` arrive through the attention strip and have no fixed
+  // chip: a provisional chip, already checked, shows the slice in effect —
+  // otherwise the strip disappears (when the number hits zero) and the list
+  // stays filtered with nothing saying why.
   const filtroSemChip = FILTROS_DOS_CHIPS.includes(estado.filtro) ? null : estado.filtro
 
   return (
@@ -82,8 +84,8 @@ export function BarraDeFiltros({
       </div>
 
       <div className="flex items-center gap-2">
-        {/* No telefone os chips rolam na horizontal em vez de quebrar em três
-            linhas; no desktop quebram, porque há largura. */}
+        {/* On the phone the chips scroll horizontally instead of wrapping into three
+            lines; on desktop they wrap, because there is width. */}
         <div
           role="group"
           aria-label="Filtros"
@@ -132,8 +134,8 @@ function Chip({ filtro, ativo, n, onClick }: { filtro: Filtro; ativo: boolean; n
           : "border-border bg-card text-muted-foreground hover:border-foreground/30 hover:text-foreground",
       )}
     >
-      {/* A faísca do chip é a mesma do selo da linha: quem vê uma reconhece a
-          outra sem ler o rótulo. */}
+      {/* The chip's sparkle is the same as the row badge's: whoever sees one
+          recognizes the other without reading the label. */}
       {filtro === "assistente" && <TbSparkles size={13} aria-hidden="true" className="text-primary" />}
       {ROTULO_DO_FILTRO[filtro]}
       {n != null && <b className="font-semibold text-foreground tabular-nums">{formatarInteiro(n)}</b>}
@@ -144,16 +146,16 @@ function Chip({ filtro, ativo, n, onClick }: { filtro: Filtro; ativo: boolean; n
 function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void }) {
   const [texto, setTexto] = useState(valor)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // O que este campo já emitiu: quando a URL muda por fora (Limpar filtros,
-  // link novo), o campo acompanha; quando a URL só ecoa o que ele mandou, não
-  // há nada a fazer — e sobrescrever aqui apagaria o que a pessoa digitou
-  // entre o respiro e a resposta do router.
+  // What this field has already emitted: when the URL changes from outside
+  // (Clear filters, new link), the field follows; when the URL only echoes what
+  // it sent, there is nothing to do — and overwriting here would erase what the
+  // person typed between the pause and the router's response.
   const emitido = useRef(valor)
 
   useEffect(() => {
-    // A URL guarda o texto sem espaços nas pontas: "bacia " volta como
-    // "bacia". Comparar o emitido também sem eles é o que impede o eco da
-    // URL de apagar o espaço que a pessoa acabou de digitar.
+    // The URL stores the text without leading/trailing spaces: "bacia " comes back
+    // as "bacia". Comparing what was emitted also without them is what keeps the
+    // URL echo from erasing the space the person just typed.
     if (valor !== emitido.current.trim()) {
       emitido.current = valor
       setTexto(valor)
@@ -181,7 +183,7 @@ function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void
         placeholder="Buscar workflow ou grupo…"
         value={texto}
         onChange={e => aoDigitar(e.target.value)}
-        // 16px no telefone: abaixo disso o iOS dá zoom ao focar o campo.
+        // 16px on the phone: below that iOS zooms in when the field gets focus.
         className="h-8 pl-8 text-base max-md:h-10 md:text-xs"
       />
     </div>

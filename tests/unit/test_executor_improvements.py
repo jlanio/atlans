@@ -1,13 +1,13 @@
 # tests/unit/test_executor_improvements.py
 """
-Testes unitários para as melhorias de performance e resiliência em flow/executor.py:
+Unit tests for the performance and resilience improvements in flow/executor.py:
 
-  M1 — _spill_to_disk assíncrono (asyncio.shield + to_thread)
-  M2 — Unicidade dos arquivos de spill (sufixo UUID)
-  M3 — Timeouts configuráveis via env vars
-  M4 — Retry com backoff exponencial no upload httpx
-  M5 — _render_node_parameters assíncrono (to_thread)
-  M6 — Temp file em vez de BytesIO em _upload_pin_artifact
+  M1 — async _spill_to_disk (asyncio.shield + to_thread)
+  M2 — Uniqueness of spill files (UUID suffix)
+  M3 — Timeouts configurable via env vars
+  M4 — Retry with exponential backoff in the httpx upload
+  M5 — async _render_node_parameters (to_thread)
+  M6 — Temp file instead of BytesIO in _upload_pin_artifact
 """
 
 import asyncio
@@ -33,8 +33,8 @@ def _make_put_response() -> MagicMock:
 
 
 def _make_executor(params: dict = None):
-    """Cria WorkflowExecutor mínimo com um nó Merge conectado a um trigger.
-    A edge é necessária para que node-1 não seja filtrado por filter_isolated=True."""
+    """Creates a minimal WorkflowExecutor with a Merge node connected to a trigger.
+    The edge is needed so that node-1 is not filtered out by filter_isolated=True."""
     from flow.executor import WorkflowExecutor
 
     definition = {
@@ -64,10 +64,10 @@ def _make_executor(params: dict = None):
     return executor
 
 
-# ── M3: Timeouts configuráveis ────────────────────────────────────────────────
+# ── M3: Configurable timeouts ─────────────────────────────────────────────────
 
 class TestTimeoutConstants:
-    """M3 — Constantes de timeout devem existir e ter os defaults corretos."""
+    """M3 — Timeout constants must exist and have the correct defaults."""
 
     def test_constantes_existem(self):
         import flow.executor.pin as mod
@@ -78,14 +78,14 @@ class TestTimeoutConstants:
 
     def test_defaults(self):
         import flow.executor.pin as mod
-        # Defaults esperados quando env vars não estão definidas
+        # Expected defaults when env vars are not set
         assert mod._PIN_PRESIGN_TIMEOUT == int(os.getenv("PIN_PRESIGN_TIMEOUT", "15"))
         assert mod._PIN_UPLOAD_TIMEOUT == int(os.getenv("PIN_UPLOAD_TIMEOUT", "120"))
         assert mod._PIN_RETRY_COUNT == int(os.getenv("PIN_UPLOAD_MAX_RETRIES", "2"))
         assert mod._PIN_RETRY_MAX_DELAY == int(os.getenv("PIN_UPLOAD_RETRY_MAX_DELAY", "30"))
 
     def test_env_var_lida_no_import(self, monkeypatch):
-        """Após reload com env var customizada, a constante deve refletir o valor."""
+        """After a reload with a custom env var, the constant must reflect the value."""
         import importlib
         import flow.executor.pin as pin_mod
 
@@ -96,19 +96,19 @@ class TestTimeoutConstants:
         assert pin_mod._PIN_PRESIGN_TIMEOUT == 7
         assert pin_mod._PIN_UPLOAD_TIMEOUT == 45
 
-        # Cleanup: restaura defaults para não afetar outros testes
+        # Cleanup: restore defaults so as not to affect other tests
         monkeypatch.delenv("PIN_PRESIGN_TIMEOUT", raising=False)
         monkeypatch.delenv("PIN_UPLOAD_TIMEOUT", raising=False)
         importlib.reload(pin_mod)
 
 
-# ── M2: UUID suffix no nome do arquivo de spill ───────────────────────────────
+# ── M2: UUID suffix in the spill file name ────────────────────────────────────
 
 class TestSpillFileUniqueness:
-    """M2 — Arquivos de spill devem ter sufixo UUID para evitar colisões."""
+    """M2 — Spill files must have a UUID suffix to avoid collisions."""
 
     def test_padrao_do_nome_tem_sufixo_hex(self):
-        """O padrão node_key_<8hex>.parquet deve ser válido."""
+        """The node_key_<8hex>.parquet pattern must be valid."""
         import uuid
         node_id = "nó-abc"
         key = "output"
@@ -119,20 +119,20 @@ class TestSpillFileUniqueness:
         )
 
     def test_dois_sufixos_consecutivos_sao_distintos(self):
-        """Dois UUIDs gerados seguidos devem ser diferentes (probabilidade astronomicamente alta)."""
+        """Two UUIDs generated in a row must differ (astronomically high probability)."""
         import uuid
         s1 = uuid.uuid4().hex[:8]
         s2 = uuid.uuid4().hex[:8]
         assert s1 != s2
 
     def test_spill_gera_paths_unicos_para_mesmo_no(self, tmp_path, monkeypatch):
-        """_spill_to_disk chamado duas vezes para o mesmo nó gera paths distintos."""
+        """_spill_to_disk called twice for the same node generates distinct paths."""
         import geopandas as gpd
         from shapely.geometry import Point
         import flow.executor.spill as spill
 
-        # O patch vai no módulo que LÊ as constantes. Teto ínfimo: qualquer
-        # GeoDataFrame passa dele e é gravado de verdade em tmp_path.
+        # The patch goes on the module that READS the constants. Tiny ceiling: any
+        # GeoDataFrame exceeds it and is actually written to tmp_path.
         monkeypatch.setattr(spill, "_SPILL_BASE_DIR", str(tmp_path))
         monkeypatch.setattr(spill, "_SPILL_THRESHOLD_MB", 1e-9)
 
@@ -152,10 +152,10 @@ class TestSpillFileUniqueness:
             )
 
 
-# ── M4: Retry com backoff exponencial ────────────────────────────────────────
+# ── M4: Retry with exponential backoff ───────────────────────────────────────
 
 class TestUploadPinRetry:
-    """M4 — upload_pin_to_minio deve retentar com backoff exponencial."""
+    """M4 — upload_pin_to_minio must retry with exponential backoff."""
 
     @pytest.fixture(autouse=True)
     def agent_env(self, monkeypatch):
@@ -164,7 +164,7 @@ class TestUploadPinRetry:
         monkeypatch.setenv("EXECUTOR_SERVER_URL", "http://localhost:8000")
 
     def test_sucesso_sem_retry(self):
-        """Upload bem-sucedido na 1ª tentativa não deve chamar time.sleep."""
+        """An upload that succeeds on the 1st attempt must not call time.sleep."""
         from flow.executor import pin
 
         with patch("flow.executor.pin._PIN_RETRY_COUNT", 2), \
@@ -178,7 +178,7 @@ class TestUploadPinRetry:
         mock_sleep.assert_not_called()
 
     def test_retenta_apos_falha_transitoria(self):
-        """Falha na 1ª tentativa do PUT deve disparar retry e ter sucesso na 2ª."""
+        """A failure on the 1st PUT attempt must trigger a retry and succeed on the 2nd."""
         from flow.executor import pin
 
         put_calls = {"n": 0}
@@ -198,16 +198,16 @@ class TestUploadPinRetry:
             pin.upload_pin_to_minio(b"data", "key.json", "application/json")
 
         assert put_calls["n"] == 2
-        # Faixa, e nao valor exato: a espera passou a ser dispersa em 50-100%
-        # (ver flow/utils/backoff.py). Cravar `== 1` aqui era cravar a ausencia
-        # de jitter, que e justamente o defeito — dois executores que falhavam
-        # no mesmo instante retentavam no mesmo instante.
+        # A range, not an exact value: the wait is now spread over 50-100%
+        # (see flow/utils/backoff.py). Pinning `== 1` here meant pinning the
+        # absence of jitter, which is precisely the defect — two executors that
+        # failed at the same instant retried at the same instant.
         mock_sleep.assert_called_once()
         (espera,), _ = mock_sleep.call_args
         assert 0.5 <= espera <= 1.0
 
     def test_levanta_excecao_ao_esgotar_retries(self):
-        """Após esgotar _PIN_RETRY_COUNT tentativas, deve re-lançar a última exceção."""
+        """After exhausting _PIN_RETRY_COUNT attempts, it must re-raise the last exception."""
         from flow.executor import pin
 
         with patch("flow.executor.pin._PIN_RETRY_COUNT", 2), \
@@ -220,7 +220,7 @@ class TestUploadPinRetry:
                 pin.upload_pin_to_minio(b"data", "key.json", "application/json")
 
     def test_backoff_exponencial(self):
-        """A espera deve dobrar a cada tentativa, dentro da faixa do jitter."""
+        """The wait must double on each attempt, within the jitter range."""
         from flow.executor import pin
 
         sleep_delays: list[int] = []
@@ -235,17 +235,17 @@ class TestUploadPinRetry:
             with pytest.raises(Exception):
                 pin.upload_pin_to_minio(b"data", "key.json", "application/json")
 
-        # 3 retries → 3 sleeps. Com jitter proporcional de 50-100%, cada espera
-        # cai na faixa [0,5 x 2^k, 2^k]: [0,5–1], [1–2], [2–4]. As faixas se
-        # tocam mas nao se sobrepoem, entao a sequencia continua nao-decrescente
-        # — o crescimento exponencial segue verificavel sem cravar o valor.
+        # 3 retries → 3 sleeps. With 50-100% proportional jitter, each wait falls
+        # in the range [0.5 x 2^k, 2^k]: [0.5–1], [1–2], [2–4]. The ranges touch
+        # but do not overlap, so the sequence remains non-decreasing — the
+        # exponential growth stays verifiable without pinning the value.
         assert len(sleep_delays) == 3
         for k, espera in enumerate(sleep_delays):
             assert 0.5 * (2 ** k) <= espera <= 2 ** k, (k, espera)
         assert sleep_delays == sorted(sleep_delays)
 
     def test_backoff_respeitado_cap(self):
-        """O delay não deve ultrapassar _PIN_RETRY_MAX_DELAY."""
+        """The delay must not exceed _PIN_RETRY_MAX_DELAY."""
         from flow.executor import pin
 
         sleep_delays: list[int] = []
@@ -265,10 +265,10 @@ class TestUploadPinRetry:
         )
 
 
-# ── M6: Temp file em vez de BytesIO ──────────────────────────────────────────
+# ── M6: Temp file instead of BytesIO ─────────────────────────────────────────
 
 class TestUploadPinWithPath:
-    """M6 — upload_pin_to_minio deve aceitar path de arquivo (str) além de bytes."""
+    """M6 — upload_pin_to_minio must accept a file path (str) as well as bytes."""
 
     @pytest.fixture(autouse=True)
     def agent_env(self, monkeypatch):
@@ -277,7 +277,7 @@ class TestUploadPinWithPath:
         monkeypatch.setenv("EXECUTOR_SERVER_URL", "http://localhost:8000")
 
     def test_path_e_lido_e_bytes_enviados(self, tmp_path):
-        """Quando content é um path (str), os bytes do arquivo devem ser enviados no PUT."""
+        """When content is a path (str), the file's bytes must be sent in the PUT."""
         from flow.executor import pin
 
         expected = b"fake parquet bytes"
@@ -301,7 +301,7 @@ class TestUploadPinWithPath:
         assert captured["content"] == expected
 
     def test_arquivo_temp_removido_apos_upload_agente(self, tmp_path):
-        """O arquivo temporário deve ser deletado após upload no contexto executor."""
+        """The temporary file must be deleted after upload in the executor context."""
         from flow.executor import pin
 
         f = tmp_path / "pin.parquet"
@@ -318,7 +318,7 @@ class TestUploadPinWithPath:
         assert not f.exists(), "Arquivo temporário deve ser removido após upload"
 
     def test_bytes_direto_nao_remove_nada(self, tmp_path):
-        """Quando content é bytes, nenhum arquivo deve ser removido."""
+        """When content is bytes, no file must be removed."""
         from flow.executor import pin
 
         sentinela = tmp_path / "nao_deve_ser_removido.txt"
@@ -335,13 +335,13 @@ class TestUploadPinWithPath:
         assert sentinela.exists()
 
 
-# ── M5: _render_node_parameters assíncrono ───────────────────────────────────
+# ── M5: async _render_node_parameters ────────────────────────────────────────
 
 class TestRenderNodeParameters:
     """M5 — _render_node_parameters deve continuar renderizando corretamente via to_thread."""
 
     def test_jinja2_renderizado(self):
-        """Expressão Jinja2 simples deve ser processada."""
+        """A simple Jinja2 expression must be processed."""
         executor = _make_executor({"msg": "{{ 1 + 1 }}"})
         context = {
             "inputs": {}, "nodes": {}, "named": {},
@@ -353,7 +353,7 @@ class TestRenderNodeParameters:
         assert rendered["msg"] == "2"
 
     def test_sem_jinja2_nao_modifica(self):
-        """Parâmetros sem expressões não devem ser alterados."""
+        """Parameters without expressions must not be changed."""
         executor = _make_executor({"url": "https://example.com", "count": 42})
         context = {
             "inputs": {}, "nodes": {}, "named": {},
@@ -366,7 +366,7 @@ class TestRenderNodeParameters:
         assert rendered["count"] == 42
 
     def test_jinja2_via_asyncio_to_thread(self):
-        """_render_node_parameters deve funcionar corretamente quando chamado via asyncio.to_thread."""
+        """_render_node_parameters must work correctly when called via asyncio.to_thread."""
         executor = _make_executor({"val": "{{ 3 * 7 }}"})
         context = {
             "inputs": {}, "nodes": {}, "named": {},
@@ -382,8 +382,8 @@ class TestRenderNodeParameters:
         assert rendered["val"] == "21"
 
     def test_expressao_invalida_levanta_value_error(self):
-        """Expressão Jinja2 com variável indefinida deve lançar ValueError."""
-        # StrictUndefined faz o Jinja2 lançar UndefinedError → capturado como ValueError
+        """A Jinja2 expression with an undefined variable must raise ValueError."""
+        # StrictUndefined makes Jinja2 raise UndefinedError → caught as ValueError
         executor = _make_executor({"x": "{{ variavel_que_nao_existe_xyz }}"})
         context = {
             "inputs": {}, "nodes": {}, "named": {},
@@ -395,19 +395,19 @@ class TestRenderNodeParameters:
             executor._render_node_parameters("node-1", {}, context)
 
 
-# ── M1: _spill_to_disk assíncrono (comportamento integrado) ──────────────────
+# ── M1: async _spill_to_disk (integrated behavior) ───────────────────────────
 
 class TestSpillToDiskAsync:
-    """M1 — _spill_to_disk deve ser chamado via asyncio.to_thread (não bloquear o event loop)."""
+    """M1 — _spill_to_disk must be called via asyncio.to_thread (not block the event loop)."""
 
-    # Roda como o executor de produção (executor/job_executor.py): `run()` no loop.
+    # Runs like the production executor (executor/job_executor.py): `run()` on the loop.
     _DEFINICAO = {
         "nodes": [{"id": "m1", "type": "control", "name": "Merge", "properties": {}}],
         "edges": [],
     }
 
     def test_executor_completa_sem_erro(self):
-        """Workflow mínimo deve completar sem erros após as alterações async."""
+        """A minimal workflow must complete without errors after the async changes."""
         from flow.executor import WorkflowExecutor
 
         executor = WorkflowExecutor(
@@ -418,7 +418,7 @@ class TestSpillToDiskAsync:
         assert executor.node_stats["m1"]["status"] == "completed"
 
     def test_spill_nao_bloqueia_tarefas_paralelas(self):
-        """O spill do output do nó passa por asyncio.to_thread."""
+        """The spill of the node output goes through asyncio.to_thread."""
         from flow.executor import WorkflowExecutor
 
         spill_foi_chamado = {"via_thread": False}
@@ -434,6 +434,6 @@ class TestSpillToDiskAsync:
             publisher=MagicMock(publish_event=MagicMock()),
         )
         with patch("flow.executor.core.asyncio.to_thread", side_effect=spy_to_thread), \
-             patch("flow.executor.spill._SPILL_THRESHOLD_MB", 0):  # 0 = spill desabilitado, não testa o path real
+             patch("flow.executor.spill._SPILL_THRESHOLD_MB", 0):  # 0 = spill disabled, does not test the real path
             asyncio.run(executor.run(initial_inputs={}))
         assert spill_foi_chamado["via_thread"]

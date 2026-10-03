@@ -1,25 +1,26 @@
 # app/models/api_token.py
 """
-Token pessoal de acesso (PAT) de um usuário — a identidade de um agente.
+A user's personal access token (PAT) — an agent's identity.
 
-Ciclo de vida:
-  1. O usuário cria o token na tela «Tokens de acesso» (POST /auth/tokens):
-     nome, escopos, workspaces alcançados e validade. O segredo (`atl_pat_…`)
-     aparece UMA vez na resposta; aqui fica só o SHA-256 (`token_hash`) e um
-     prefixo curto (`token_prefix`) para ele reconhecer o token na lista.
-  2. Um agente manda `Authorization: Bearer atl_pat_…`; o servidor faz o hash,
-     acha a linha por `token_hash`, exige `revoked_at IS NULL`, `expires_at`
-     no futuro e usuário ativo (api_token_service.resolver).
-  3. `last_used_at` é carimbado best-effort, com throttle de 60 s no Redis.
-  4. Revogação é marcação (`revoked_at` + `revoked_reason`), nunca DELETE:
-     pelo usuário ("user"), por reset de senha ("password_reset") ou em
-     cascata quando a conta é suspensa/excluída ("user_suspended"/"user_deleted").
-     Reativar a conta NÃO desfaz a revogação.
+Lifecycle:
+  1. The user creates the token on the "Tokens de acesso" (access tokens)
+     screen (POST /auth/tokens): name, scopes, workspaces reached and
+     validity. The secret (`atl_pat_…`) appears ONCE in the response; here only
+     the SHA-256 (`token_hash`) is kept, plus a short prefix (`token_prefix`)
+     for the user to recognize the token in the list.
+  2. An agent sends `Authorization: Bearer atl_pat_…`; the server hashes it,
+     finds the row by `token_hash`, requires `revoked_at IS NULL`, `expires_at`
+     in the future and an active user (api_token_service.resolver).
+  3. `last_used_at` is stamped best-effort, throttled to 60 s in Redis.
+  4. Revocation is a marker (`revoked_at` + `revoked_reason`), never DELETE:
+     by the user ("user"), by a password reset ("password_reset") or in
+     cascade when the account is suspended/deleted ("user_suspended"/"user_deleted").
+     Reactivating the account does NOT undo the revocation.
 
-`workspace_ids` NULL significa "todos os workspaces do usuário, inclusive os
-que ele entrar depois" — escolha explícita na tela. `scopes` é a lista de
-escopos (ver app/core/authorization/pat.py); o efetivo é escopo ∩ papel do
-usuário no workspace, aplicado por quem consome o token.
+`workspace_ids` NULL means "all the user's workspaces, including the ones they
+join later" — an explicit choice on the screen. `scopes` is the list of scopes
+(see app/core/authorization/pat.py); the effective one is scope ∩ the user's
+role in the workspace, enforced by whoever consumes the token.
 """
 from uuid import uuid4
 
@@ -33,13 +34,13 @@ class ApiToken(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     id_hash = Column(String(36), unique=True, nullable=False, index=True, default=lambda: str(uuid4()))
-    # User.id_hash do dono. CASCADE só no hard delete do usuário (soft delete
-    # revoga em cascata pelo service).
+    # The owner's User.id_hash. CASCADE only on the user's hard delete (soft
+    # delete revokes in cascade through the service).
     user_id = Column(String(36), ForeignKey("users.id_hash", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String(80), nullable=False)
-    # Os 12 primeiros caracteres do segredo ("atl_pat_" + 4) — para exibir.
+    # The first 12 characters of the secret ("atl_pat_" + 4) — for display.
     token_prefix = Column(String(16), nullable=False)
-    # SHA-256 hex do segredo. Único: é a chave do lookup de autenticação.
+    # Hex SHA-256 of the secret. Unique: it is the authentication lookup key.
     token_hash = Column(String(64), nullable=False, unique=True, index=True)
     scopes = Column(JSON, nullable=False)
     workspace_ids = Column(JSON, nullable=True)

@@ -1,39 +1,39 @@
 /**
- * Transforma requisições do MapLibre para o globo da Home. UMA coisa, e nada
- * além — retornar `undefined` deixa o MapLibre seguir com a requisição crua:
+ * Transforms MapLibre requests for the Home globe. ONE thing, and nothing
+ * else — returning `undefined` lets MapLibre go on with the raw request:
  *
- * Os tiles das camadas do assistente vêm de `/terra/assistente/tiles/…`, o proxy
- * same-origin autenticado por cookie de sessão: basta `credentials:
- * "same-origin"` (o proxy injeta o Bearer do servidor). Nunca Authorization
- * aqui — o navegador não tem o token do servidor.
+ * The tiles of the assistant's layers come from `/terra/assistente/tiles/…`,
+ * the same-origin proxy authenticated by session cookie: `credentials:
+ * "same-origin"` is enough (the proxy injects the server's Bearer). Never
+ * Authorization here — the browser does not have the server's token.
  *
- * O basemap (o servidor de tiles que a instalação configurou) passa cru: não
- * há chave a anexar. A CARTO, que exigia `?key=` no CDN dela, saiu da Home.
+ * The basemap (the tile server the installation configured) passes raw: there
+ * is no key to attach. CARTO, which required `?key=` on its CDN, left the Home.
  */
 
 const PREFIXO_TILES_AGENTE = "/terra/assistente/tiles/";
 
 export interface RequisicaoTransformada {
   url: string;
-  // Restrito ao que o MapLibre aceita (nunca "omit").
+  // Restricted to what MapLibre accepts (never "omit").
   credentials?: "same-origin" | "include";
 }
 
-/** O `transformRequest` do MapLibre, pronto para ir ao construtor. */
+/** MapLibre's `transformRequest`, ready to go into the constructor. */
 export function transformarRequisicao(url: string): RequisicaoTransformada | undefined {
-  // Tiles do assistente (proxy same-origin): manda o cookie de sessão.
+  // Assistant tiles (same-origin proxy): send the session cookie.
   if (ehTileDoAgente(url)) {
     return { url, credentials: "same-origin" };
   }
   return undefined;
 }
 
-/** `true` se a URL é um tile do assistente pelo proxy `/terra`. */
+/** `true` if the URL is an assistant tile through the `/terra` proxy. */
 export function ehTileDoAgente(url: string): boolean {
   try {
     return new URL(url, base()).pathname.startsWith(PREFIXO_TILES_AGENTE);
   } catch {
-    // URL relativa sem base resolvível (ex.: em teste): checa o prefixo cru.
+    // Relative URL with no resolvable base (e.g. in a test): check the raw prefix.
     return url.startsWith(PREFIXO_TILES_AGENTE);
   }
 }

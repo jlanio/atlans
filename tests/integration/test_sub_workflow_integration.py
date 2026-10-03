@@ -1,12 +1,12 @@
 """
-Sub-workflow ponta a ponta, com WorkflowExecutor REAL.
+End-to-end sub-workflow, with a REAL WorkflowExecutor.
 
-Os testes unitarios de sub-workflow mockam `flow.executor.WorkflowExecutor`,
-entao validam o que o node PEDE ao executor — nunca o que o executor FAZ.
-Uma incompatibilidade de assinatura (is_nested, a chamada a run) ou de
-propagacao passaria despercebida por todos eles.
+The sub-workflow unit tests mock `flow.executor.WorkflowExecutor`, so they
+validate what the node ASKS of the executor — never what the executor DOES.
+A signature mismatch (is_nested, the call to run) or a propagation mismatch
+would go unnoticed by all of them.
 
-Aqui o pai e o filho sao definitions reais e o executor roda de verdade.
+Here the parent and the child are real definitions and the executor really runs.
 """
 import asyncio
 
@@ -80,8 +80,8 @@ def test_pai_executa_filho_e_recebe_saida_publica():
 
 
 def test_escopo_chega_aos_nodes_do_filho():
-    """A correcao central: sem task_id/workspace_id no filho, todo node de
-    saida (DataOutput, SaveToS3, SendEmail...) falha em require_scope()."""
+    """The central fix: without task_id/workspace_id in the child, every output
+    node (DataOutput, SaveToS3, SendEmail...) fails in require_scope()."""
     from flow.executor import WorkflowExecutor
 
     capturado = {}
@@ -106,8 +106,8 @@ def test_escopo_chega_aos_nodes_do_filho():
 
 
 def test_eventos_do_filho_chegam_com_namespace():
-    """Sub-fluxo deixou de ser caixa-preta: os eventos internos sobem ao
-    publisher do pai prefixados pelo node que os originou."""
+    """The sub-workflow is no longer a black box: internal events go up to the
+    parent's publisher prefixed by the node that originated them."""
     from unittest.mock import MagicMock
 
     publisher = MagicMock()
@@ -124,7 +124,7 @@ def test_eventos_do_filho_chegam_com_namespace():
 # ── Contrato aplicado em runtime ─────────────────────────────────────────────
 
 def test_ports_de_entrada_filtram_de_verdade():
-    """`ports` na entrada passou a valer em runtime, nao so no save."""
+    """`ports` on the input now takes effect at runtime, not only on save."""
     child = _child(ports_in=["valor"])
     parent = _parent(inputs_mapping={})  # mapping vazio: repassaria tudo
 
@@ -143,7 +143,7 @@ def test_ports_de_saida_filtram_de_verdade():
 
 
 def test_saida_declarada_inexistente_devolve_vazio():
-    """Porta declarada que ninguem alimenta nao inventa dado."""
+    """A declared port that nobody feeds does not make up data."""
     child = _child(ports_out=["nao_existe"])
     executor = _run_parent(_parent(), child, task_id="run-int-6", workspace_id="ws-1")
 
@@ -175,15 +175,15 @@ def test_sem_saida_declarada_falha_com_mensagem_util():
     assert "SubWorkflowOutput" in str(exc.value)
 
 
-# ── Isolamento do spill (regressao da propagacao de task_id) ────────────────
+# ── Spill isolation (regression from task_id propagation) ───────────────────
 
 def test_filho_nao_apaga_spill_do_pai(tmp_path, monkeypatch):
-    """O filho herda o task_id, e o spill vive em /tmp/atlans_spill/<task_id>.
-    Sem is_nested, o fim do sub-fluxo levava junto os dados do pai.
+    """The child inherits the task_id, and the spill lives in /tmp/atlans_spill/<task_id>.
+    Without is_nested, the end of the sub-workflow took the parent's data with it.
 
-    Verificamos DURANTE a execucao: ao final do pai a remocao e correta e
-    esperada, entao checar o arquivo depois de tudo nao provaria nada — foi
-    assim que a primeira versao deste teste falhou por engano proprio.
+    We check DURING execution: at the end of the parent the removal is correct
+    and expected, so checking the file after everything would prove nothing —
+    that is how the first version of this test failed by its own mistake.
     """
     import flow.executor.core as core
 
@@ -200,7 +200,7 @@ def test_filho_nao_apaga_spill_do_pai(tmp_path, monkeypatch):
     real_cleanup = core._cleanup_spill
 
     def _spy(tid, is_nested=False):
-        # No instante em que o FILHO termina, o dado do pai tem de estar la.
+        # At the moment the CHILD finishes, the parent's data must be there.
         chamadas.append({"is_nested": is_nested, "pai_intacto": do_pai.exists()})
         return real_cleanup(tid, is_nested=is_nested)
 
@@ -217,15 +217,15 @@ def test_filho_nao_apaga_spill_do_pai(tmp_path, monkeypatch):
     assert raiz, "o executor raiz continua responsavel por limpar no fim"
 
 
-# ── A entrada do sub-fluxo pode alimentar VARIOS nodes ───────────────────────
+# ── The sub-workflow input can feed SEVERAL nodes ────────────────────────────
 
 def test_entrada_alimenta_varios_ramos():
-    """O editor barrava mais de uma aresta saindo do SubWorkflowInput, por
-    simetria com o Output. O motor nunca precisou disso: cada aresta espalha o
-    dict de entrada no seu proprio destino, sem disputa.
+    """The editor blocked more than one edge leaving SubWorkflowInput, by
+    symmetry with Output. The engine never needed that: each edge spreads the
+    input dict onto its own target, with no contention.
 
-    O efeito da restricao era obrigar um no-funil na entrada de todo sub-fluxo
-    que quisesse ramificar.
+    The effect of the restriction was to force a funnel node at the input of
+    every sub-workflow that wanted to branch.
     """
     filho = {
         "nodes": [
@@ -249,5 +249,5 @@ def test_entrada_alimenta_varios_ramos():
 
     publico = executor.final_outputs.get("p-sub", {}).get("subWorkflowResult", {})
     assert "resultado" in publico, "o sub-fluxo com leque na entrada precisa devolver"
-    # Os DOIS ramos receberam — se um só tivesse chegado, faltaria uma das chaves.
+    # BOTH branches received it — if only one had arrived, one of the keys would be missing.
     assert set(publico["resultado"]) == {"de_a", "de_b"}

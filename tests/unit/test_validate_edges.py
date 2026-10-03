@@ -1,11 +1,12 @@
 # tests/unit/test_validate_edges.py
 """
-Diagnósticos estáticos de aresta no /validate (PR-E) e o guard de schema vazio
-na simulação (F11).
+Static edge diagnostics in /validate (PR-E) and the empty-schema guard in the
+simulation (F11).
 
-O run strict OMITE a porta de um from_key ausente (não derruba o fluxo por causa
-de saída opcional/dinâmica). O enforcement "from_key defasado é erro" mora aqui,
-na validação estática, que tem o schema declarado à mão.
+The strict run OMITS the port of a missing from_key (it does not bring down the
+workflow because of an optional/dynamic output). The "stale from_key is an
+error" enforcement lives here, in static validation, which has the
+hand-declared schema.
 """
 import asyncio
 
@@ -51,7 +52,7 @@ def test_from_key_valido_nao_gera_diagnostico():
 
 def test_spread_de_origem_multi_saida_vira_aviso():
     ex = _executor([_n("a", ntype="action"), _n("b")],
-                   [{"source": "a", "target": "b"}])  # sem from_key/to_key
+                   [{"source": "a", "target": "b"}])  # no from_key/to_key
     ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("x", "y")}}
     diag = ex.validate_edges()
     assert len(diag) == 1 and diag[0]["severity"] == "warning"
@@ -65,7 +66,7 @@ def test_spread_de_origem_unica_saida_nao_avisa():
 
 
 def test_aresta_de_ramo_nao_e_ambigua():
-    # condition bool → é aresta de ramo, não spread ambíguo.
+    # bool condition → it is a branch edge, not an ambiguous spread.
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b", "condition": True}])
     ex.simulated_outputs = {"a": {"status": "ok", "schema": _schema("x", "y")}}
@@ -73,14 +74,14 @@ def test_aresta_de_ramo_nao_e_ambigua():
 
 
 def test_origem_sem_schema_conhecido_nao_diagnostica():
-    # Sem saídas declaradas (dynamic que não simulou) → não dá para acusar typo.
+    # No declared outputs (a dynamic one that did not simulate) → cannot flag a typo.
     ex = _executor([_n("a", ntype="action"), _n("b")],
                    [{"source": "a", "target": "b", "from_key": "qualquer"}])
     ex.simulated_outputs = {"a": {"status": "ok", "schema": []}}
     assert ex.validate_edges() == []
 
 
-# ── F11: schema == [] não cascateia erro no preview ──────────────────────────
+# ── F11: schema == [] does not cascade an error in the preview ───────────────
 
 class _PaiSemSaida(BaseNode):
     @classmethod
@@ -117,8 +118,8 @@ def _registra_nos():
 
 
 def test_schema_vazio_do_pai_nao_cascateia_erro(_registra_nos):
-    # Pai com outputs=[] (como SubWorkflowInput/Output). Antes:
-    # schema[0] em [] → IndexError → filho marcado 'error' e cascata. Agora ok.
+    # Parent with outputs=[] (like SubWorkflowInput/Output). Before:
+    # schema[0] on [] → IndexError → child marked 'error' and a cascade. Now ok.
     ex = _executor(
         [{"id": "p", "type": "action", "name": "PaiSemSaida", "properties": {}},
          {"id": "c", "type": "action", "name": "FilhoDinamico", "properties": {}}],

@@ -95,10 +95,10 @@ describe("Indicadores", () => {
 
   it("sparklines: total e falhas por dia, e a taxa só nos dias com denominador", () => {
     const { container } = render(<Indicadores metrics={metricas()} dias={dias} carregando={false} periodo={30} />)
-    // Três cards têm série (Execuções, Taxa, Falhas); Duração típica não. A
-    // contagem é pelo atributo, e não por seletor: o jsdom 30
-    // (@asamuzakjp/dom-selector 8) não casa `svg[preserveAspectRatio='none']`,
-    // atributo SVG com maiúsculas e valor. O navegador e o jsdom 29 casam.
+    // Three cards have a series (Runs, Rate, Failures); Typical duration doesn't.
+    // The count is by attribute, not by selector: jsdom 30
+    // (@asamuzakjp/dom-selector 8) doesn't match `svg[preserveAspectRatio='none']`,
+    // an SVG attribute with uppercase letters and a value. The browser and jsdom 29 match it.
     const sparklines = [...container.querySelectorAll("svg")].filter((s) => s.getAttribute("preserveAspectRatio") === "none")
     expect(sparklines).toHaveLength(3)
   })

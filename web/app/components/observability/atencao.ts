@@ -3,10 +3,10 @@ import type { IExecutorMetrics, IObservabilityMetrics } from "@/service/types"
 import { formatarDuracao, plural, rotuloDaCategoria } from "@/lib/formatos"
 
 /**
- * "Precisa de atenção" (docs/specs/metrics-history.md §4.3): o que mudaria
- * uma decisão hoje, em até 5 itens, nesta ordem — presas, falhas repetidas,
- * executores no teto. Puro: recebe o que o hook de dados já tem e devolve
- * texto e ação; quem renderiza e quem navega ficam fora daqui.
+ * "Needs attention" (docs/specs/metrics-history.md §4.3): what would change a
+ * decision today, in up to 5 items, in this order — stuck runs, repeated
+ * failures, executors at the ceiling. Pure: takes what the data hook already
+ * has and returns text and action; rendering and navigation stay out of here.
  */
 
 export type AcaoDeAtencao =
@@ -17,24 +17,26 @@ export type AcaoDeAtencao =
 export interface ItemDeAtencao {
   chave: string
   tipo: "presa" | "falhas" | "saturado"
-  /** Quem é o assunto (workflow, executor): a lista o destaca no começo do título. */
+  /** Who the subject is (workflow, executor): the list highlights it at the start of the title. */
   nome: string
-  /** Frase inteira, começando por `nome`. */
+  /** Full sentence, starting with `nome`. */
   titulo: string
   detalhe: string
   acao: AcaoDeAtencao
-  /** Verbo do botão: "Abrir", "Ver falhas", "Ver executor". */
+  /** Button verb: "Abrir", "Ver falhas", "Ver executor" (open, see failures, see executor). */
   rotuloDaAcao: string
   /**
-   * Origem do fluxo do item ("assistente" ganha selo), quando o item TEM um
-   * fluxo e quem compõe soube resolvê-la. Executor no teto não tem.
+   * Origin of the item's workflow ("assistente" gets a badge), when the item
+   * HAS a workflow and the composer managed to resolve it. An executor at the
+   * ceiling has none.
    */
   origem?: string | null
   /**
-   * Assinatura da GRAVIDADE atual, para "dispensar" não cegar o usuário: um item
-   * dispensado só continua oculto enquanto a assinatura não muda. Se o problema
-   * piora — nova execução presa, mais uma falha, a fila do executor cresce — a
-   * assinatura muda e o alerta volta. Ver `atencao-dispensados.ts`.
+   * Signature of the current SEVERITY, so that "dismiss" does not blind the
+   * user: a dismissed item stays hidden only while the signature does not
+   * change. If the problem gets worse — a new stuck run, one more failure, the
+   * executor's queue grows — the signature changes and the alert comes back.
+   * See `atencao-dispensados.ts`.
    */
   assinatura: string
 }
@@ -52,9 +54,10 @@ export function montarAtencao(entrada: {
   metrics: IObservabilityMetrics | null
   executores: IExecutorMetrics[]
   /**
-   * Origem do fluxo por hash, para o selo do assistente. As métricas não a
-   * trazem (o alerta nasce do run, não do inventário), então quem compõe a
-   * tela — que já tem a lista de fluxos — resolve. Ausente → sem selo.
+   * Workflow origin by hash, for the assistant badge. The metrics do not
+   * carry it (the alert is born from the run, not from the inventory), so the
+   * screen composer — which already has the workflow list — resolves it.
+   * Absent → no badge.
    */
   origemDoWorkflow?: (hash: string) => string | null | undefined
 }): ItemDeAtencao[] {
@@ -62,7 +65,7 @@ export function montarAtencao(entrada: {
   const itens: ItemDeAtencao[] = []
   const periodo = metrics?.period_days ?? 30
 
-  // 1. Presas: `now.stuck` já vem ordenado da mais antiga para a mais nova.
+  // 1. Stuck: `now.stuck` already comes sorted from oldest to newest.
   for (const s of metrics?.now?.stuck ?? []) {
     const nome = nomeDoWorkflow(s.workflow_name, s.workflow_hash)
     const onde = s.executor_name || s.agent_host
@@ -78,19 +81,19 @@ export function montarAtencao(entrada: {
       acao: { tipo: "abrir-execucao", runId: s.run_id },
       rotuloDaAcao: "Abrir",
       origem: origemDoWorkflow?.(s.workflow_hash),
-      // A presa é única por execução (o run_id); dispensá-la a esconde enquanto
-      // esta execução seguir presa — outra que emperre tem `chave` própria.
+      // A stuck item is unique per run (the run_id); dismissing it hides it while
+      // this run stays stuck — another that jams has its own `chave`.
       assinatura: s.run_id,
     })
   }
 
-  // 2. Falhas repetidas. O backend já ordena por `failure_count` desc.
+  // 2. Repeated failures. The backend already sorts by `failure_count` desc.
   for (const w of metrics?.top_failing_workflows ?? []) {
     const repetida = w.failure_count >= MINIMO_DE_FALHAS || (w.failure_rate ?? 0) >= MINIMO_DE_TAXA_DE_FALHA
     if (!repetida || w.failure_count <= 0) continue
     const nome = nomeDoWorkflow(w.workflow_name, w.workflow_hash)
-    // Contagem alta fala por si; taxa alta com poucas execuções precisa do
-    // denominador para não parecer pouca coisa ("2 vezes" × "2 de 3").
+    // A high count speaks for itself; a high rate with few runs needs the
+    // denominator so it does not look like little ("2 vezes" × "2 de 3").
     const quanto = w.failure_count >= MINIMO_DE_FALHAS
       ? `falhou ${plural(w.failure_count, "vez", "vezes")} em ${periodo} dias`
       : `falhou em ${w.failure_count} de ${plural(w.total_runs, "execução", "execuções")} em ${periodo} dias`
@@ -110,23 +113,23 @@ export function montarAtencao(entrada: {
       acao: { tipo: "filtrar-workflow", workflowHash: w.workflow_hash, status: "failed" },
       rotuloDaAcao: "Ver falhas",
       origem: origemDoWorkflow?.(w.workflow_hash),
-      // A contagem de falhas só cresce: dispensar esconde o estado atual, e uma
-      // NOVA falha (contagem maior) muda a assinatura e traz o alerta de volta.
+      // The failure count only grows: dismissing hides the current state, and a
+      // NEW failure (higher count) changes the signature and brings the alert back.
       assinatura: String(w.failure_count),
     })
   }
 
-  // 3. Executores no teto: `running ≥ max_concurrent` E fila > 0. Só com
-  // capacidade publicada e host conhecido — a linha "Sem executor" não é um
-  // executor para abrir.
+  // 3. Executors at the ceiling: `running ≥ max_concurrent` AND queue > 0. Only
+  // with published capacity and a known host — the "Sem executor" row is not
+  // an executor to open.
   for (const e of executores) {
     const c = e.capacity
     if (!c || !e.agent_host || e.unassigned) continue
     if (c.max_concurrent <= 0 || c.running < c.max_concurrent || c.queued <= 0) continue
     const nome = e.display_name || e.agent_host
     const p50 = e.p50_seconds ?? null
-    // Espera estimada: a fila avança `max_concurrent` de cada vez, cada leva
-    // durando a mediana. É ordem de grandeza, e o texto diz "cerca de".
+    // Estimated wait: the queue advances `max_concurrent` at a time, each batch
+    // lasting the median. It is an order of magnitude, and the text says "cerca de".
     const espera = p50 != null && p50 > 0
       ? ` · as próximas esperam cerca de ${formatarDuracao(Math.ceil(c.queued / c.max_concurrent) * p50)}`
       : ""
@@ -138,8 +141,8 @@ export function montarAtencao(entrada: {
       detalhe: `${plural(c.queued, "execução", "execuções")} na fila${espera}`,
       acao: { tipo: "abrir-executor", agentHost: e.agent_host },
       rotuloDaAcao: "Ver executor",
-      // A carga do executor muda com o tempo: dispensar esconde o estado atual;
-      // se rodando/fila mudam (piora), a assinatura muda e o alerta volta.
+      // The executor's load changes over time: dismissing hides the current state;
+      // if running/queue change (gets worse), the signature changes and the alert comes back.
       assinatura: `${c.running}:${c.queued}`,
     })
   }
@@ -147,7 +150,7 @@ export function montarAtencao(entrada: {
   return itens.slice(0, MAXIMO_DE_ITENS)
 }
 
-/** "há 12 min", "há 3 h", "há 3 dias" — grão grosso, para uma frase de estado vazio. */
+/** "há 12 min", "há 3 h", "há 3 dias" (ago) — coarse grain, for an empty-state sentence. */
 export function haQuantoTempo(iso: string | null | undefined, agora: Date = new Date()): string {
   const d = fromBackend(iso)
   if (!d) return "—"
@@ -161,10 +164,10 @@ export function haQuantoTempo(iso: string | null | undefined, agora: Date = new 
   return `há ${plural(diasInteiros, "dia")}`
 }
 
-/** Frase da lista vazia: quando foi a última falha, ou que não houve nenhuma. */
+/** Empty-list sentence: when the last failure was, or that there was none. */
 export function textoDeVazio(metrics: IObservabilityMetrics | null, agora: Date = new Date()): string {
-  // A lista vem ordenada por quantidade de falhas: a última falha do período
-  // é a mais recente ENTRE todos os itens, não a do primeiro.
+  // The list comes sorted by number of failures: the period's last failure
+  // is the most recent AMONG all items, not the first item's.
   const ultima = (metrics?.top_failing_workflows ?? [])
     .map(w => w.last_failed_at)
     .filter((d): d is string => !!d)

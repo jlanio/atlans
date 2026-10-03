@@ -1,6 +1,6 @@
 # app/api/routers/executor_drive_router.py
 """
-Drive do EXECUTOR — as rotas executor-* (mTLS/chave de API).
+The EXECUTOR's Drive — the executor-* routes (mTLS/API key).
 """
 import re
 
@@ -19,24 +19,24 @@ from app.services.drive_service import DriveService
 
 from app.api.routers.drive_router import get_drive_service
 
-# Prefixos S3 permitidos para executores — todos têm formato `{prefix}/{workspace_id}/...`
+# S3 prefixes allowed for executors — all have the format `{prefix}/{workspace_id}/...`
 _AGENT_S3_PREFIXES = ("drive/", "pin-cache/", "artifacts/", "webhook-responses/")
 _S3_KEY_RE = re.compile(r"^[A-Za-z0-9_\-./]+$")
 
 
 def _validate_agent_s3_key(s3_key: str, agent_ws_ids: list[str]) -> None:
     """
-    Bloqueia IDOR e path traversal em endpoints que aceitam s3_key arbitrário do executor.
+    Blocks IDOR and path traversal on endpoints that accept an arbitrary s3_key from the executor.
 
-    Garante que:
-    - O valor é uma string (o payload vem de JSON do executor, que pode mandar
-      número, lista ou objeto — sem esta checagem as comparações abaixo
-      levantavam TypeError/AttributeError, que os callers não esperam por
-      capturarem apenas HTTPException, e o erro virava 500 em vez de rejeição).
-    - O s3_key não contém `..`, NUL, nem começa com `/` (sem path traversal).
-    - Apenas chars S3-safe são aceitos.
-    - O prefixo é um dos conhecidos (`drive/`, `pin-cache/`, `artifacts/`, `webhook-responses/`).
-    - O segmento `{workspace_id}` após o prefixo pertence ao executor.
+    Ensures that:
+    - The value is a string (the payload comes from the executor's JSON, which may
+      send a number, list or object — without this check the comparisons below
+      raised TypeError/AttributeError, which the callers do not expect since they
+      only catch HTTPException, and the error became a 500 instead of a rejection).
+    - The s3_key does not contain `..`, NUL, nor start with `/` (no path traversal).
+    - Only S3-safe chars are accepted.
+    - The prefix is one of the known ones (`drive/`, `pin-cache/`, `artifacts/`, `webhook-responses/`).
+    - The `{workspace_id}` segment after the prefix belongs to the executor.
     """
     if not isinstance(s3_key, str):
         raise HTTPException(status_code=400, detail="s3_key invalido.")
@@ -55,10 +55,10 @@ def _validate_agent_s3_key(s3_key: str, agent_ws_ids: list[str]) -> None:
 
 async def _resolve_agent_workspaces(request: Request, db: AsyncSession):
     """
-    Resolve os workspaces do executor autenticado via mTLS.
+    Resolves the workspaces of the executor authenticated via mTLS.
 
-    Wrapper sobre get_agent_from_mtls que adiciona o atributo _resolved_ws_ids
-    para retrocompat com os endpoints existentes deste router.
+    Wrapper over get_agent_from_mtls that adds the _resolved_ws_ids attribute
+    for backward compat with this router's existing endpoints.
     """
     executor = await get_agent_from_mtls(request, db)
     from app.services.user_executor_service import get_agent_workspace_ids
@@ -66,7 +66,7 @@ async def _resolve_agent_workspaces(request: Request, db: AsyncSession):
     return executor
 
 
-# Alias mantido para callers internos que usavam o nome antigo.
+# Alias kept for internal callers that used the old name.
 _auth_agent = _resolve_agent_workspaces
 
 
@@ -95,7 +95,7 @@ async def agent_get_upload_url(
     if ws_id not in executor._resolved_ws_ids:
         raise HTTPException(status_code=403, detail="Acesso negado ao workspace.")
 
-    # Se o executor envia s3_key_override, valida que aponta para o workspace dele
+    # If the executor sends s3_key_override, validates that it points to its own workspace
     if payload.s3_key_override:
         _validate_agent_s3_key(payload.s3_key_override, executor._resolved_ws_ids)
 
@@ -116,15 +116,15 @@ async def agent_register_local_dataset(
     payload: ExecutorRegisterRequest,
     db: AsyncSession = Depends(get_db),
 ):
-    """Registra no Drive um dataset que PERMANECE no disco do executor.
+    """Registers in the Drive a dataset that STAYS on the executor's disk.
 
-    GeoSync em modo catálogo (LGPD): o executor manda só o catálogo — nome,
-    tamanho e metadados espaciais. Nenhum byte do conteúdo trafega, e não há
-    objeto no MinIO.
+    GeoSync in catalog mode (LGPD): the executor sends only the catalog — name,
+    size and spatial metadata. No byte of the content travels, and there is no
+    object in MinIO.
 
-    Idempotente por (workspace, nome, executor): o GeoSync reprocessa o mesmo
-    dataset a cada ciclo em que ele muda, e criar uma linha por ciclo encheria o
-    Drive de duplicatas do mesmo arquivo.
+    Idempotent per (workspace, name, executor): GeoSync reprocesses the same
+    dataset on every cycle in which it changes, and creating one row per cycle
+    would fill the Drive with duplicates of the same file.
     """
     from sqlalchemy import select
 
@@ -156,8 +156,8 @@ async def agent_register_local_dataset(
     if wf is None:
         wf = WorkspaceFile(
             workspace_id=ws_id,
-            # Sem objeto: nao existe key a apontar. Derivar uma faria a UI
-            # oferecer um download que responderia 404 no MinIO.
+            # No object: there is no key to point to. Deriving one would make the UI
+            # offer a download that would answer 404 in MinIO.
             s3_key=None,
             original_name=nome,
             extension=ext,
@@ -195,9 +195,9 @@ async def agent_confirm_upload(
     if wf.workspace_id not in executor._resolved_ws_ids:
         raise HTTPException(status_code=403, detail="Acesso negado.")
 
-    # Corpo OPCIONAL: executor anterior a esta versao confirma sem nada. Um JSON
-    # ausente ou malformado nao pode derrubar a confirmacao de um upload que ja
-    # aconteceu no MinIO — o arquivo ficaria em `pending` para sempre.
+    # OPTIONAL body: an executor older than this version confirms with nothing.
+    # A missing or malformed JSON must not bring down the confirmation of an
+    # upload that already happened in MinIO — the file would stay `pending` forever.
     spatial_metadata = None
     try:
         corpo = await request.json()
@@ -224,18 +224,19 @@ async def agent_delete_file(
     db: AsyncSession = Depends(get_db),
     svc: DriveService = Depends(get_drive_service),
 ):
-    """Remove um arquivo do Drive por ordem do GeoSync (mTLS).
+    """Removes a file from the Drive on GeoSync's order (mTLS).
 
-    O executor chama isto quando detecta que o arquivo saiu da pasta
-    sincronizada. E o UNICO caminho de remocao que um executor tem:
-    `DELETE /drive/{id}` (do usuario) exige JWT, e no host dos executores (`agents.<dominio>`)
-    o Traefik so roteia `/drive/executor-*` para a API — um `/drive/{id}` cru
-    nem chega ao backend, vira 404 no proprio Traefik. Era esse 404, e nao uma
-    remocao pelo web, que o executor vinha tratando como "ja apagado": ele
-    desistia e limpava o manifesto, mas o WorkspaceFile continuava no Drive.
+    The executor calls this when it detects that the file left the synced
+    folder. It is the ONLY removal path an executor has:
+    `DELETE /drive/{id}` (the user's) requires a JWT, and on the executors' host
+    (`agents.<dominio>`) Traefik only routes `/drive/executor-*` to the API — a
+    bare `/drive/{id}` does not even reach the backend, it becomes a 404 in
+    Traefik itself. It was that 404, and not a removal through the web, that the
+    executor had been treating as "already deleted": it gave up and cleared the
+    manifest, but the WorkspaceFile remained in the Drive.
 
-    Idempotente: registro ausente responde 204 — o que ja nao existe ja esta no
-    estado desejado.
+    Idempotent: a missing record answers 204 — what no longer exists is already
+    in the desired state.
     """
     executor = await _auth_agent(request, db)
     try:
@@ -275,10 +276,10 @@ async def agent_download_file(
     if wf.workspace_id not in executor._resolved_ws_ids:
         raise HTTPException(status_code=403, detail="Acesso negado.")
 
-    # Dataset catalogado pelo GeoSync: os bytes nunca sairam do disco de um
-    # executor. Nao ha objeto nem URL a assinar — devolvemos a marcacao e o
-    # executor reencontra o arquivo pelo PROPRIO manifesto de sync, pelo
-    # id_hash. Nenhum caminho de sistema de arquivos trafega aqui.
+    # Dataset cataloged by GeoSync: the bytes never left an executor's disk.
+    # There is no object nor URL to sign — we return the marker and the
+    # executor finds the file again through its OWN sync manifest, by
+    # id_hash. No filesystem path travels here.
     if wf.content_location == "executor":
         return {
             "content_location": "executor",
@@ -302,9 +303,9 @@ async def agent_download_artifact(
     id_hash: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """Leitura de Artefato pelo executor (contexto Artefatos do DataInput).
+    """Artifact read by the executor (DataInput's Artifacts context).
 
-    Espelha /executor-download/{id_hash}, mas resolve na tabela `artifacts`.
+    Mirrors /executor-download/{id_hash}, but resolves in the `artifacts` table.
     """
     import asyncio
     from sqlalchemy import select
@@ -324,14 +325,15 @@ async def agent_download_artifact(
     if not ext and "." in (artifact.filename or ""):
         ext = artifact.filename.rsplit(".", 1)[-1].lower()
 
-    # Artefato que nunca saiu do disco de um executor (LGPD): nao ha objeto no
-    # storage e nao ha URL a assinar. Devolvemos ONDE ele esta e o executor
-    # decide se o arquivo e dele — a checagem de posse fica no lado que tem o
-    # disco, nao aqui, porque so ele sabe o que existe em `EXECUTOR_ARTIFACTS_DIR`.
+    # Artifact that never left an executor's disk (LGPD): there is no object in
+    # storage and no URL to sign. We return WHERE it is and the executor decides
+    # whether the file is its own — the ownership check stays on the side that
+    # has the disk, not here, because only it knows what exists in
+    # `EXECUTOR_ARTIFACTS_DIR`.
     #
-    # `local_path` foi DERIVADO pelo servidor no registro (run_result_consumer),
-    # nunca aceito do executor: ele volta para o executor e um `../` aqui viraria
-    # leitura de arquivo arbitrario na maquina do usuario.
+    # `local_path` was DERIVED by the server at registration (run_result_consumer),
+    # never accepted from the executor: it goes back to the executor and a `../`
+    # here would become an arbitrary file read on the user's machine.
     if artifact.content_location == "executor":
         return {
             "content_location": "executor",
@@ -341,8 +343,9 @@ async def agent_download_artifact(
             "extension": ext,
         }
 
-    # storage.head e boto3 sincrono — sem to_thread bloquearia o event loop do
-    # worker durante o round-trip ao MinIO (mesmo motivo do fix em run_result_consumer).
+    # storage.head is synchronous boto3 — without to_thread it would block the
+    # worker's event loop during the round-trip to MinIO (same reason as the fix
+    # in run_result_consumer).
     head_ok = await asyncio.to_thread(_s3.head, artifact.s3_key) if artifact.s3_key else None
     if not head_ok:
         raise HTTPException(status_code=404, detail="Arquivo do artefato não disponível no storage.")
@@ -363,7 +366,7 @@ async def agent_presign_upload(
     svc: DriveService = Depends(get_drive_service),
 ):
     executor = await _auth_agent(request, db)
-    # A8: valida que o s3_key pertence ao workspace do executor antes de gerar presign
+    # A8: validates that the s3_key belongs to the executor's workspace before generating a presign
     _validate_agent_s3_key(payload.s3_key, executor._resolved_ws_ids)
     return await svc.presign_upload(payload.s3_key, content_type=payload.content_type)
 

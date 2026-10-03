@@ -1,9 +1,9 @@
 // service/GisFlowService.ts
 //
-// A fachada do cliente HTTP: os métodos moram em service/dominios/* (um
-// arquivo por domínio — F5/A12 da simplificação) e este objeto os agrega,
-// então todo call site continua `GisFlowService.metodo()`. O transporte
-// (token, interceptores, dedup de GETs, get/post/…) está em service/http.ts.
+// The HTTP client facade: the methods live in service/dominios/* (one file per
+// domain — F5/A12 of the simplification) and this object aggregates them, so
+// every call site stays `GisFlowService.metodo()`. The transport (token,
+// interceptors, GET dedup, get/post/…) is in service/http.ts.
 
 export { setAuthToken } from "./http"
 

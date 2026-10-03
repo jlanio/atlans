@@ -1,15 +1,15 @@
 /**
- * O envelope de eventos do WebSocket e o buffer por quadro.
+ * The WebSocket event envelope and the per-frame buffer.
  *
- * O servidor manda replay histórico e stream AO VIVO no MESMO formato
- * (`{"type":"events","events":[...],"dropped":N}`), então quem decide se o run
- * acabou é o CONTEÚDO do lote — não o envelope. Enquanto o cliente apostava no
- * envelope, um run que terminasse com a aba em segundo plano ficava preso em
- * "Executando": o `requestAnimationFrame` não roda em documento oculto e é
- * dentro do flush que vivem `completeExecution` e `ws.close()`.
+ * The server sends historical replay and the LIVE stream in the SAME format
+ * (`{"type":"events","events":[...],"dropped":N}`), so what decides whether the run
+ * is over is the batch's CONTENT — not the envelope. While the client relied on the
+ * envelope, a run that finished with the tab in the background stayed stuck on
+ * "Executando": `requestAnimationFrame` does not run in a hidden document, and
+ * `completeExecution` and `ws.close()` live inside the flush.
  *
- * Os testes abaixo congelam o rAF de propósito (é exatamente o que o navegador
- * faz com a aba escondida) e cobram do hook o comportamento correto sem ele.
+ * The tests below freeze rAF on purpose (exactly what the browser does with a
+ * hidden tab) and demand the correct behavior from the hook without it.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
@@ -18,7 +18,7 @@ import { MAX_RUN_EVENTS, useWorkflowExecutionStore } from "@/app/stores/workflow
 const RUN_A = "run-a"
 const RUN_B = "run-b"
 
-// --- Ambiente mínimo em volta do hook -------------------------------------
+// --- Minimal environment around the hook ------------------------------------
 
 let workflowAtual = "wf-a"
 const runsPorWorkflow: Record<string, { run_id: string; status: string }[]> = {}
@@ -62,7 +62,7 @@ vi.mock("@xyflow/react", async (importOriginal) => ({
   useReactFlow: () => ({ getNodes: () => nosDoCanvas }),
 }))
 
-/** Socket falso: guarda os handlers para o teste empurrar frames. */
+/** Fake socket: keeps the handlers so the test can push frames. */
 class SocketFalso {
   static abertos: SocketFalso[] = []
   onopen: (() => void) | null = null
@@ -84,8 +84,8 @@ class SocketFalso {
   }
 }
 
-/** Fila de rAF sob controle do teste — sem callback nenhum rodando, é a aba
- *  oculta; rodando a fila à mão, é a aba visível. */
+/** rAF queue under the test's control — with no callback running, it is the
+ *  hidden tab; running the queue by hand, it is the visible tab. */
 const quadros = new Map<number, FrameRequestCallback>()
 let proximoQuadro = 1
 
@@ -112,7 +112,7 @@ function eventoDeFim(status = "completed") {
   return { node: "__workflow_complete__", status, kind: "lifecycle", level: "info", duration_ms: 1200, timestamp: 1_700_000_001 }
 }
 
-/** Monta o hook já anexado a um run vivo (o caminho de re-anexação). */
+/** Mounts the hook already attached to a live run (the re-attach path). */
 async function anexar(runId: string) {
   const useExecuteWorkflow = await importarHook()
   const view = renderHook(() => useExecuteWorkflow())
@@ -155,7 +155,7 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
       ]))
     })
 
-    // Nenhum quadro rodou — é o cenário da aba em segundo plano.
+    // No frame ran — this is the background-tab scenario.
     const estado = useWorkflowExecutionStore.getState()
     expect(estado.isExecuting).toBe(false)
     expect(estado.statusWorkflow?.status).toBe("completed")
@@ -172,8 +172,8 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
       ws.entregar(frameDeEventos([eventoDeNo("n1", "started")]))
       ws.entregar(frameDeEventos([eventoDeNo("n2", "started")]))
     })
-    // Ainda nada na store: o agrupamento por quadro é o que evita um ciclo de
-    // render do canvas inteiro por mensagem.
+    // Nothing in the store yet: per-frame grouping is what avoids a render
+    // cycle of the whole canvas per message.
     expect(useWorkflowExecutionStore.getState().events).toHaveLength(0)
     expect(quadros.size).toBe(1)
 
@@ -191,8 +191,8 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
       ws.entregar(frameDeEventos([eventoDeNo("n1", "completed")], 5))
     })
 
-    // O descarte do servidor é o que o usuário não tem como perceber sozinho:
-    // sem isto o painel afirma estar completo com 12 linhas a menos.
+    // The server-side drop is what the user has no way to notice alone:
+    // without this the panel claims to be complete with 12 lines missing.
     expect(useWorkflowExecutionStore.getState().droppedEvents).toBe(12)
 
     view.unmount()
@@ -207,8 +207,8 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
       }
     })
 
-    // Nenhum quadro rodou; mesmo assim o lote foi drenado sozinho ao bater no
-    // teto — a rotação da store só age DEPOIS do drain.
+    // No frame ran; even so the batch was drained on its own when it hit the
+    // ceiling — the store's rotation only acts AFTER the drain.
     expect(useWorkflowExecutionStore.getState().events.length).toBeGreaterThan(0)
     expect(useWorkflowExecutionStore.getState().events.length).toBeLessThanOrEqual(MAX_RUN_EVENTS)
 
@@ -227,7 +227,7 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
     })
 
     expect(useWorkflowExecutionStore.getState().events).toHaveLength(1)
-    // O quadro pendente foi cancelado — senão o mesmo lote seria aplicado duas vezes.
+    // The pending frame was canceled — otherwise the same batch would be applied twice.
     expect(quadros.size).toBe(0)
 
     Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true })
@@ -263,7 +263,7 @@ describe("useExecuteWorkflow — isolamento entre runs", () => {
     await waitFor(() => expect(SocketFalso.abertos.length).toBe(1))
     const wsA = SocketFalso.abertos[0]
 
-    // Troca de workflow: /workflow/A → /workflow/B NÃO remonta o componente.
+    // Workflow switch: /workflow/A → /workflow/B does NOT remount the component.
     workflowAtual = "wf-b"
     await act(async () => {
       view.rerender()
@@ -271,9 +271,9 @@ describe("useExecuteWorkflow — isolamento entre runs", () => {
     })
     act(() => { useWorkflowExecutionStore.getState().resetExecution() })
 
-    // Mensagens já enfileiradas no event loop continuam sendo entregues depois
-    // do close(1000) — inclusive o fim do run de A, que fechava o painel de B
-    // com "Concluído · 0 nós" para um workflow que nunca executou.
+    // Messages already queued in the event loop keep being delivered after
+    // close(1000) — including the end of A's run, which closed B's panel
+    // with "Concluído · 0 nós" for a workflow that never ran.
     act(() => {
       wsA.entregar(frameDeEventos([eventoDeNo("n1", "completed"), eventoDeFim()]))
       rodarQuadros()

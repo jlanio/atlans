@@ -1,22 +1,23 @@
 import { NextResponse } from "next/server";
 import { extrairViolacoes } from "@/lib/csp-report";
 
-// Coletor dos relatos da Content-Security-Policy (next.config.ts). O navegador
-// faz o POST sem sessão nem CSRF, por isso a rota fica fora do matcher do
-// middleware. Só loga — com teto de tamanho, porque qualquer um pode chamar.
+// Collector for Content-Security-Policy reports (next.config.ts). The browser
+// makes the POST without session or CSRF, which is why the route stays outside
+// the middleware matcher. It only logs — with a size ceiling, because anyone can
+// call it.
 //
-// 256 KB e não 16: pelo `report-to`, o Chrome junta os relatos de até um
-// minuto num POST só, e cada relato repete a política inteira (~900 bytes).
-// Com 16 KB, uma página com mais de ~18 bloqueios num minuto perdia o lote
-// inteiro num 413 — justo o caso em que o log mais importa. O volume no log
-// segue limitado por `extrairViolacoes` (20 linhas por POST).
+// 256 KB and not 16: via `report-to`, Chrome groups up to a minute of reports
+// into a single POST, and each report repeats the whole policy (~900 bytes).
+// With 16 KB, a page with more than ~18 blocks in a minute lost the whole batch
+// to a 413 — precisely the case where the log matters most. The volume in the
+// log stays limited by `extrairViolacoes` (20 lines per POST).
 const TETO_BYTES = 256 * 1024;
 
-/** O corpo como texto, ou `null` se passar do teto.
+/** The body as text, or `null` if it exceeds the ceiling.
  *
- *  Lido em fluxo, contando bytes: sem `Content-Length` (corpo chunked), o
- *  `req.text()` de antes guardava o corpo INTEIRO na memória antes de qualquer
- *  checagem — 100 MB num POST anônimo somavam ~330 MB ao processo. */
+ *  Read as a stream, counting bytes: without `Content-Length` (chunked body),
+ *  the earlier `req.text()` kept the WHOLE body in memory before any check —
+ *  100 MB in an anonymous POST added ~330 MB to the process. */
 async function lerComTeto(req: Request): Promise<string | null> {
   if (!req.body) return "";
   const leitor = req.body.getReader();

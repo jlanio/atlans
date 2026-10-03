@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 /**
- * A HomeView montada. jsdom não desenha o MapLibre nem faz layout, então o que
- * se confere aqui é o CONTRATO de estado: qual superfície aparece em cada
- * resposta do `/assistente/estado`, o atalho que alterna nos dois sentidos, a fila
- * de camadas do sidebar e o ciclo de vida das camadas na troca de conversa.
+ * The mounted HomeView. jsdom does not draw MapLibre nor do layout, so what
+ * is checked here is the state CONTRACT: which surface shows up for each
+ * `/assistente/estado` response, the shortcut that toggles both ways, the sidebar's
+ * layer queue and the layers' lifecycle when switching conversations.
  */
 const servico = vi.hoisted(() => ({
   estadoDoAgente: vi.fn(),
@@ -22,14 +22,14 @@ vi.mock("@/app/components/share/MapLibreMap", async () => {
   const React = await import("react")
   return {
     default: React.forwardRef(function MapLibreFalso(p: { giroLento?: boolean }) {
-      // `data-giro` expõe o que a HomeView pediu ao globo: girar no hero, parar depois.
+      // `data-giro` exposes what the HomeView asked of the globe: spin in the hero, stop afterward.
       return React.createElement("div", { "data-testid": "maplibre", "data-giro": String(!!p.giroLento) })
     }),
   }
 })
 
-// A sessão é MUTÁVEL: a Home abre sem sessão, e é o status que decide a casca.
-// Padrão "authenticated" — os testes de sempre não mudam.
+// The session is MUTABLE: the Home opens without a session, and it is the status that decides the shell.
+// Default "authenticated" — the usual tests do not change.
 const sessao = vi.hoisted(() => ({
   status: "authenticated" as "authenticated" | "unauthenticated" | "loading",
   data: { user: { id_hash: "u1" } } as Record<string, unknown> | null,
@@ -37,8 +37,8 @@ const sessao = vi.hoisted(() => ({
 vi.mock("next-auth/react", () => ({ useSession: () => ({ data: sessao.data, status: sessao.status }) }))
 const nav = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn() }))
 vi.mock("next/navigation", () => ({ useRouter: () => nav }))
-// O modal de entrada tem teste próprio; aqui é um marcador que expõe o modo
-// pedido e a frase de apoio, e dois botões: fechar sem entrar e "entrou".
+// The sign-in modal has its own test; here it is a marker that exposes the requested
+// mode and the supporting sentence, and two buttons: close without signing in and "entrou".
 vi.mock("@/app/components/home/entrada/modal-de-entrada", () => ({
   default: (p: { modo: string | null; tokenDoLink?: string; comEnvioPendente?: boolean; onFechar: () => void; onEntrou: () => void }) => (
     <div data-testid="modal-de-entrada" data-modo={p.modo ?? ""} data-token={p.tokenDoLink ?? ""} data-pendente={String(!!p.comEnvioPendente)}>
@@ -53,7 +53,7 @@ import { pt } from "@/app/components/home/i18n/secoes/assistente"
 import { useHomeStore } from "@/app/stores/homeStore"
 import { IdiomaProvider, useIdioma } from "@/context/IdiomaContext"
 
-// As frases e os chips do hero em português (o dicionário que a barra lê).
+// The hero's sentences and chips in Portuguese (the dictionary the bar reads).
 const { sugestoes: SUGESTOES, chips: CHIPS } = pt.barra
 
 const ATIVO = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
@@ -78,9 +78,9 @@ beforeEach(() => {
 async function montar() {
   const r = render(<HomeView />)
   await waitFor(() => expect(servico.estadoDoAgente).toHaveBeenCalled())
-  // Chamar não é responder: a Home só sai do esqueleto de carregamento no
-  // `.then` do useAssistente. Sem esperar a resposta ser aplicada, quem lê a
-  // barra logo depois do montar() às vezes pega o esqueleto (runner lento).
+  // Calling is not responding: the Home only leaves the loading skeleton in
+  // useAssistente's `.then`. Without waiting for the response to be applied, whoever reads the
+  // bar right after montar() sometimes catches the skeleton (slow runner).
   await act(async () => { await servico.estadoDoAgente.mock.results[0]?.value })
   return r
 }
@@ -110,8 +110,8 @@ describe("HomeView — o assistente e o /assistente/estado", () => {
   })
 
   it("desligado, em inglês: o aviso do idioma — o motivo do servidor é para quem administra", async () => {
-    // O `motivo` vem em português e fala com quem administra ("defina
-    // OPENROUTER_API_KEY"); fora do português vale o aviso do dicionário.
+    // The `motivo` comes in Portuguese and speaks to whoever administers ("defina
+    // OPENROUTER_API_KEY"); outside Portuguese the dictionary's warning applies.
     servico.estadoDoAgente.mockResolvedValue({
       success: true, data: { ativo: false, motivo: "O assistente está desligado. Defina OPENROUTER_API_KEY." },
     })
@@ -129,9 +129,9 @@ describe("HomeView — o assistente e o /assistente/estado", () => {
     await montar()
     const campo = await screen.findByLabelText(/Mensagem para o assistente/i)
 
-    // O keydown sai DO CAMPO — que é onde o cursor está quando alguém digita —
-    // e sobe até o window. Disparado direto em `window`, o alvo do evento seria
-    // a janela, e o teste passaria mesmo com o atalho ignorando o foco.
+    // The keydown comes FROM THE FIELD — which is where the cursor is when someone types —
+    // and bubbles up to window. Fired directly on `window`, the event target would be
+    // the window, and the test would pass even with the shortcut ignoring focus.
     act(() => {
       fireEvent.change(campo, { target: { value: "buffer de 500 m" } })
       campo.focus()
@@ -139,7 +139,7 @@ describe("HomeView — o assistente e o /assistente/estado", () => {
     })
     expect(useHomeStore.getState().painel).toBe("barra")
 
-    // Recolher DESMONTA o painel: o texto tem de reaparecer na barra.
+    // Collapsing UNMOUNTS the panel: the text has to reappear in the bar.
     const naBarra = screen.getByLabelText(/Mensagem para o assistente/i) as HTMLInputElement
     expect(naBarra.value).toBe("buffer de 500 m")
 
@@ -148,7 +148,7 @@ describe("HomeView — o assistente e o /assistente/estado", () => {
       fireEvent.keyDown(naBarra, { key: "i", ctrlKey: true })
     })
     expect(useHomeStore.getState().painel).toBe("aberto")
-    // A barra ainda está saindo (fade) por um instante; o campo do painel é o textarea.
+    // The bar is still leaving (fade) for an instant; the panel's field is the textarea.
     await waitFor(() => expect(screen.queryByTestId("barra")).toBeNull())
     const deVolta = screen.getByLabelText(/Mensagem para o assistente/i) as HTMLTextAreaElement
     expect(deVolta.value).toBe("buffer de 500 m")
@@ -162,8 +162,8 @@ describe("HomeView — o lang do <html>", () => {
   }
 
   it("segue o idioma da Home e volta ao de antes quando ela sai", async () => {
-    // O do <html> cobre o que o Radix porta para o <body>; o resto do app é
-    // português, então sair da Home devolve o valor de antes.
+    // The one on <html> covers what Radix portals to <body>; the rest of the app is
+    // Portuguese, so leaving the Home restores the previous value.
     document.documentElement.lang = "pt-BR"
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     const { unmount } = render(
@@ -222,10 +222,10 @@ describe("HomeView — camadas", () => {
   })
 
   it("a conversa NOVA que ganha id no stream mantém as camadas que ela mesma pôs — e anuncia a lista", async () => {
-    // O 1º quadro do SSE ensina o id da conversa: o `conversaId` vai de null a
-    // um id sem que a conversa tenha mudado — e as camadas são dela. O anúncio
-    // inteiro (id, título, nova) fica na store para a lista de Chats, que aqui
-    // não está montada: é ela que insere a linha sem F5.
+    // The 1st SSE frame teaches the conversation id: `conversaId` goes from null to
+    // an id without the conversation having changed — and the layers belong to it. The whole
+    // announcement (id, title, new) stays in the store for the Chats list, which is not
+    // mounted here: it is the one that inserts the row without F5.
     const sse = [
       'event: conversa\ndata: {"conversa_id":"c9","titulo":"focos","nova":true}\n\n',
       'event: fim\ndata: {"ok":true}\n\n',
@@ -253,9 +253,9 @@ describe("HomeView — camadas", () => {
   })
 
   it("reabrir pelos Chats a conversa que o stream nomeou também troca o escopo", async () => {
-    // O id anunciado pelo stream vale para UMA troca — a que ele mesmo causou.
-    // Guardado para sempre, ele dizia "esta conversa nunca é outra", e voltar a
-    // ela pelos Chats deixava no globo as camadas do chat anterior.
+    // The id announced by the stream applies to ONE switch — the one it caused itself.
+    // Kept forever, it said "this conversation is never another one", and going back to
+    // it through Chats left the previous chat's layers on the globe.
     const sse = [
       'event: conversa\ndata: {"conversa_id":"c9","nova":true}\n\n',
       'event: fim\ndata: {"ok":true}\n\n',
@@ -271,12 +271,12 @@ describe("HomeView — camadas", () => {
     await act(async () => { fireEvent.submit(campo.closest("form")!) })
     await waitFor(() => expect(useHomeStore.getState().conversaId).toBe("c9"))
 
-    // Outro chat, e uma camada posta LÁ.
+    // Another chat, and a layer put THERE.
     await act(async () => { useHomeStore.getState().selecionarConversa("z") })
     await act(async () => { useHomeStore.getState().pedirCamada("a2", "Outra") })
     await screen.findByText("Outra")
 
-    // De volta a c9 pelos Chats: é outra conversa, e o globo é da conversa.
+    // Back to c9 through Chats: it is another conversation, and the globe belongs to the conversation.
     await act(async () => { useHomeStore.getState().selecionarConversa("c9") })
     await waitFor(() => expect(screen.queryByText("Outra")).toBeNull())
   })
@@ -285,7 +285,7 @@ describe("HomeView — camadas", () => {
 describe("HomeView — o hero do primeiro acesso", () => {
   beforeEach(() => {
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
-    // Todo acesso começa na barra; o painel é sob demanda.
+    // Every visit starts at the bar; the panel is on demand.
     useHomeStore.setState({ painel: "barra" })
   })
 
@@ -301,7 +301,7 @@ describe("HomeView — o hero do primeiro acesso", () => {
     expect(veu()).toBe("true")
     expect(screen.queryByLabelText("Assistente")).toBeNull()
     expect(screen.queryByTestId("pilha")).toBeNull()
-    // O globo gira devagar enquanto o hero está na tela.
+    // The globe spins slowly while the hero is on screen.
     expect(screen.getByTestId("maplibre").dataset.giro).toBe("true")
   })
 
@@ -316,8 +316,8 @@ describe("HomeView — o hero do primeiro acesso", () => {
     await montar()
 
     const campo = await screen.findByLabelText(/Mensagem para o assistente/i)
-    // Dois `act`: dentro de um só, o keyDown veria o render ANTERIOR ao change
-    // (campo vazio → mandaria a sugestão da vez). No navegador são duas tarefas.
+    // Two `act`s: inside a single one, the keyDown would see the render BEFORE the change
+    // (empty field → it would send the current suggestion). In the browser they are two tasks.
     await act(async () => { fireEvent.change(campo, { target: { value: "focos de calor em MT" } }) })
     await act(async () => { fireEvent.keyDown(campo, { key: "Enter" }) })
 
@@ -326,11 +326,11 @@ describe("HomeView — o hero do primeiro acesso", () => {
     expect(pilha.textContent).toContain("Achei 1 284 focos.")
     expect(screen.getByTestId("barra").dataset.variante).toBe("rodape")
     expect(veu()).toBe("false")
-    // O giro para — e o mapa volta ao Brasil (o `center` do Globo).
+    // The spin stops — and the map goes back to Brazil (the Globo's `center`).
     expect(screen.getByTestId("maplibre").dataset.giro).toBe("false")
-    // O título fica no DOM até a transição acabar, já invisível.
+    // The title stays in the DOM until the transition ends, already invisible.
     expect(textoDoHero()).toBe("false")
-    // E o painel continua fechado: a conversa está ao centro.
+    // And the panel stays closed: the conversation is in the center.
     expect(useHomeStore.getState().painel).toBe("barra")
   })
 
@@ -358,7 +358,7 @@ describe("HomeView — o hero do primeiro acesso", () => {
     const chip = await screen.findByRole("button", { name: "Cruzar com o CAR" })
     await act(async () => { fireEvent.click(chip) })
 
-    // O segundo POST leva a frase do chip; e o turno novo tira os chips da tela.
+    // The second POST carries the chip's sentence; and the new turn takes the chips off the screen.
     await waitFor(() => expect(fetchFalso).toHaveBeenCalledTimes(2))
     const corpos = fetchFalso.mock.calls.map((c) => JSON.parse(String((c[1] as RequestInit).body)) as { mensagem: string })
     expect(corpos.map((b) => b.mensagem)).toEqual(["focos de calor em MT", "Cruzar com o CAR"])
@@ -368,7 +368,7 @@ describe("HomeView — o hero do primeiro acesso", () => {
   })
 
   it("enviar encerra o hero na hora — a faixa carrega antes do 1º token — e Esc interrompe", async () => {
-    // Um stream que nunca entrega nada: fica no raciocínio até a pessoa desistir.
+    // A stream that never delivers anything: it stays in reasoning until the person gives up.
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       body: { getReader: () => ({ read: () => new Promise(() => {}), cancel: async () => {} }) },
@@ -376,14 +376,14 @@ describe("HomeView — o hero do primeiro acesso", () => {
     await montar()
 
     const campo = await screen.findByLabelText(/Mensagem para o assistente/i)
-    // Dois `act`: dentro de um só, o keyDown veria o render ANTERIOR ao change
-    // (campo vazio → mandaria a sugestão da vez). No navegador são duas tarefas.
+    // Two `act`s: inside a single one, the keyDown would see the render BEFORE the change
+    // (empty field → it would send the current suggestion). In the browser they are two tasks.
     await act(async () => { fireEvent.change(campo, { target: { value: "focos de calor em MT" } }) })
     await act(async () => { fireEvent.keyDown(campo, { key: "Enter" }) })
 
-    // O ENVIO já desce a barra: a faixa aparece com a pergunta e o indicador de
-    // raciocínio, mesmo SEM nenhum token de texto ainda. É o conserto do bug do
-    // dono — a barra não fica travada no centro durante o raciocínio/ferramentas.
+    // SUBMITTING already moves the bar down: the strip shows up with the question and the reasoning
+    // indicator, even WITHOUT any text token yet. This is the fix for the owner's
+    // bug — the bar does not stay stuck in the center during reasoning/tools.
     const pilha = await screen.findByTestId("pilha")
     expect(pilha.textContent).toContain("focos de calor em MT")
     expect(screen.getByTestId("barra").dataset.variante).toBe("rodape")
@@ -396,8 +396,8 @@ describe("HomeView — o hero do primeiro acesso", () => {
   })
 
   it("no rodapé, a barra mostra o PASSO da vez durante raciocínio e ferramentas — e o esconde na escrita", async () => {
-    // Um corpo SSE que entrega os pedaços SOB DEMANDA: é o único jeito de
-    // assertar o MEIO do stream (o corpoSSE de sempre entrega tudo de uma vez).
+    // An SSE body that delivers the chunks ON DEMAND: it is the only way to
+    // assert the MIDDLE of the stream (the usual corpoSSE delivers everything at once).
     const enc = new TextEncoder()
     let resolver: ((r: { done: boolean; value?: Uint8Array }) => void) | null = null
     const fila: { done: boolean; value?: Uint8Array }[] = []
@@ -420,22 +420,22 @@ describe("HomeView — o hero do primeiro acesso", () => {
     await act(async () => { fireEvent.change(campo, { target: { value: "focos de calor em MT" } }) })
     await act(async () => { fireEvent.keyDown(campo, { key: "Enter" }) })
 
-    // Raciocínio: a barra já desceu e o passo diz "Pensando…".
+    // Reasoning: the bar has already moved down and the step says "Pensando…".
     await act(async () => {
       empurrar('event: conversa\ndata: {"conversa_id":"c1","nova":true}\n\nevent: pensando\ndata: {"texto":"preciso do catálogo"}\n\n')
     })
     await waitFor(() => expect(screen.getByTestId("etapa-da-barra").textContent).toContain("Pensando"))
     expect(screen.getByTestId("barra").dataset.variante).toBe("rodape")
 
-    // Ferramenta em curso: o passo troca para o RÓTULO dela, com o detalhe —
-    // é o "indicar as etapas" que o dono pediu.
+    // Tool in progress: the step switches to its LABEL, with the detail —
+    // it is the "show the stages" the owner asked for.
     await act(async () => {
       empurrar('event: ferramenta\ndata: {"id":"t1","nome":"get_authoring_guide","argumentos":{"topic":"edges"}}\n\n')
     })
     await waitFor(() => expect(screen.getByTestId("etapa-da-barra").textContent).toContain("Consultando o guia"))
     expect(screen.getByTestId("etapa-da-barra").textContent).toContain("edges")
 
-    // Escrevendo: o passo some — a resposta já aparece na faixa.
+    // Writing: the step goes away — the answer already shows up in the strip.
     await act(async () => {
       empurrar('event: texto\ndata: {"texto":"Achei 1 284 focos."}\n\nevent: fim\ndata: {"ok":true}\n\n')
       empurrar(null)
@@ -452,7 +452,7 @@ describe("HomeView — o hero do primeiro acesso", () => {
     expect(useHomeStore.getState().painel).toBe("aberto")
     expect(screen.getByLabelText("Assistente")).toBeTruthy()
     expect(screen.getByTestId("barra").dataset.saindo).toBe("true")
-    // O cursor foi para o campo do painel (o textarea): a barra, saindo, não o rouba.
+    // The cursor went to the panel's field (the textarea): the bar, on its way out, does not steal it.
     expect(document.activeElement?.tagName).toBe("TEXTAREA")
 
     await waitFor(() => expect(screen.queryByTestId("barra")).toBeNull())
@@ -470,8 +470,8 @@ describe("HomeView — o hero do primeiro acesso", () => {
     const barra = screen.getByTestId("barra")
     expect(barra.dataset.saindo).toBe("false")
 
-    // E é o MESMO nó depois do prazo: um timer que sobrevivesse ao cancelamento
-    // desmontaria e remontaria a barra — um piscar, com a entrada de novo.
+    // And it is the SAME node after the timeout: a timer that survived the cancellation
+    // would unmount and remount the bar — a flicker, with the entrance again.
     await act(async () => { await new Promise((r) => setTimeout(r, SAIDA_MS + 50)) })
     expect(screen.getByTestId("barra")).toBe(barra)
     expect(screen.queryByLabelText("Assistente")).toBeNull()
@@ -520,18 +520,18 @@ describe("HomeView — o hero do primeiro acesso", () => {
     await montar()
     expect(screen.getByTestId("barra").dataset.variante).toBe("hero")
 
-    // O mesmo caminho do clique na lista de Artefatos do sidebar.
+    // The same path as clicking in the sidebar's Artifacts list.
     await act(async () => { useHomeStore.getState().pedirCamada("a1", "Focos") })
 
     expect(screen.getByTestId("barra").dataset.variante).toBe("rodape")
     expect(veu()).toBe("false")
     expect(textoDoHero()).toBe("false")
-    // O globo girando contra o enquadramento da camada nova era metade do bug.
+    // The globe spinning against the new layer's framing was half the bug.
     expect(screen.getByTestId("maplibre").dataset.giro).toBe("false")
   })
 })
 
-/** Um corpo de resposta que entrega o SSE em um pedaço só. */
+/** A response body that delivers the SSE in a single chunk. */
 function corpoSSE(texto: string) {
   const bytes = new TextEncoder().encode(texto)
   let entregue = false
@@ -586,7 +586,7 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
     sessao.status = "authenticated"
     sessao.data = { user: { id_hash: "u1" } }
   }
-  /** Monta anônimo e afirma o essencial: a barra está lá e NADA foi consultado. */
+  /** Mounts anonymously and asserts the essentials: the bar is there and NOTHING was queried. */
   async function montarAnonimo(props: React.ComponentProps<typeof HomeView> = {}) {
     semSessao()
     useHomeStore.setState({ painel: "barra" })
@@ -671,7 +671,7 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
     await digitarEEnviar("focos de calor em MT")
     expect(store().entrada).toBe("entrar")
 
-    // O signIn (sem redirect) atualizou a sessão da aba; o modal avisa que entrou.
+    // The signIn (no redirect) updated the tab's session; the modal reports that it signed in.
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     const sse = [
       'event: conversa\ndata: {"conversa_id":"c1","nova":true}\n\n',
@@ -724,10 +724,10 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
   })
 
   it("os painéis do e-mail abrem COM sessão — é o link do e-mail chegando num navegador logado", async () => {
-    // `entrar` e `cadastro` são ignorados com sessão (o teste acima). Estes
-    // não: quem esqueceu a senha, ou ainda não verificou o e-mail, costuma ter
-    // uma sessão velha aberta no mesmo navegador — com o portão de `anonimo`
-    // valendo para todos, o link abria a Home e não fazia NADA.
+    // `entrar` and `cadastro` are ignored with a session (the test above). These
+    // are not: someone who forgot their password, or has not verified their email yet, often has
+    // an old session open in the same browser — with the `anonimo` gate
+    // applying to everyone, the link opened the Home and did NOTHING.
     for (const modo of ["verificar", "recuperar", "redefinir"] as const) {
       cleanup()
       useHomeStore.setState({ entrada: null })

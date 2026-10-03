@@ -1,36 +1,39 @@
 # app/mcp/tools/drive_escrita.py
 """
-Escrita no Drive: pôr arquivo, concluir o envio e apagar.
+Writing to the Drive: putting a file, completing the upload and deleting.
 
-Fecha `drive:write`, o último dos seis escopos que a tela de tokens oferece com
-descrição afirmativa. Com ele, a Fase 2 deixa de prometer o que não cumpre.
+Closes `drive:write`, the last of the six scopes that the tokens screen offers
+with an affirmative description. With it, Phase 2 stops promising what it does
+not deliver.
 
-## O upload são TRÊS chamadas, e isso é desenho, não burocracia
+## The upload is THREE calls, and that is design, not red tape
 
 ```
-create_drive_upload_url  →  PUT direto no storage  →  confirm_drive_upload
-      (a tool)                (quem tem os bytes)          (a tool)
+create_drive_upload_url  →  PUT straight to storage  →  confirm_drive_upload
+      (the tool)              (whoever has the bytes)        (the tool)
 ```
 
-O passo do meio **não passa por aqui**, e é o motivo de o fluxo existir: MCP é
-JSON-RPC, e mandar um arquivo por ele significaria carregá-lo inteiro em base64
-dentro de uma mensagem — um shapefile de 40 MB viraria 54 MB de texto no
-contexto de quem chamou, custando mais do que qualquer análise que ele fosse
-alimentar. A URL pré-assinada põe os bytes no caminho curto.
+The middle step **does not go through here**, and that is the reason the flow
+exists: MCP is JSON-RPC, and sending a file through it would mean carrying it
+whole in base64 inside a message — a 40 MB shapefile would become 54 MB of text
+in the caller's context, costing more than any analysis it was meant to feed.
+The presigned URL puts the bytes on the short path.
 
-A consequência prática, e a tool diz isso: **um agente que não tem o arquivo em
-disco não consegue usar estas tools.** Ele pode pedir a URL e entregá-la a quem
-tem, mas não pode inventar o conteúdo. Fingir o contrário faria o agente
-prometer um upload que nunca aconteceu.
+The practical consequence, and the tool says so: **an agent that does not have
+the file on disk cannot use these tools.** It can ask for the URL and hand it
+to whoever has the file, but it cannot invent the content. Pretending otherwise
+would make the agent promise an upload that never happened.
 
-## Duas coisas que o Drive NÃO tem
+## Two things the Drive does NOT have
 
-**Ele é plano.** Não existe renomear, mover, nem criar pasta — nem na REST, nem
-no modelo. Um arquivo tem nome e workspace, e é só. Está escrito aqui porque a
-alternativa é o agente descobrir tentando, e gastar uma rodada para isso.
+**It is flat.** There is no rename, no move, no create folder — neither in
+REST nor in the model. A file has a name and a workspace, and that is all. It is
+written here because the alternative is the agent finding out by trying, and
+spending a round on it.
 
-**Sobrescrever não é uma operação.** Enviar o mesmo nome cria outro registro.
-Quem quer substituir apaga e envia de novo — e a tool de apagar diz isso.
+**Overwriting is not an operation.** Uploading the same name creates another
+record. Whoever wants to replace deletes and uploads again — and the delete
+tool says so.
 """
 from __future__ import annotations
 
@@ -42,11 +45,12 @@ from mcp.server.mcpserver import Context
 from app.core.authorization.workflow_access import (
     exigir_papel, get_workspace_member_role,
 )
-# `FileNotFoundError` do app SOMBREIA a builtin e nao herda dela — ela estende
-# `FileError`/`AtlasBaseError`. Um `except FileNotFoundError` sem este import
-# pega a builtin e NAO casa, deixando a excecao subir para o `@ferramenta`, que
-# a mapeia pelo `status_code` e devolve a mensagem do servico no lugar da dica
-# da tool. O alias torna a diferenca visivel em vez de depender de quem lembra.
+# The app's `FileNotFoundError` SHADOWS the builtin and does not inherit from it
+# — it extends `FileError`/`AtlasBaseError`. An `except FileNotFoundError`
+# without this import catches the builtin and does NOT match, letting the
+# exception go up to `@ferramenta`, which maps it by `status_code` and returns
+# the service's message instead of the tool's hint. The alias makes the
+# difference visible instead of depending on whoever remembers.
 from app.core.exceptions import FileNotFoundError as ArquivoNaoEncontradoError
 from app.core.rbac import ROLE_EDITOR
 from app.core.storage import _PRESIGN_EXPIRY
@@ -65,38 +69,38 @@ from app.services.drive_service import (
 
 logger = get_logger("app.mcp.tools.drive_escrita")
 
-# Validade da URL de envio: LIDA do storage, não escolhida aqui.
+# Validity of the upload URL: READ from the storage, not chosen here.
 #
-# `DriveService.create_upload_url` assina com o default do módulo
-# (`presigned_put_async` sem `expires`), que é `MINIO_PRESIGN_EXPIRY` — uma
-# hora, configurável por ambiente. Anunciar um número diferente seria mentir
-# sobre um prazo que o cliente usa para decidir se ainda dá tempo de enviar um
-# arquivo grande, e o erro apareceria como "a URL expirou antes do que você
-# disse" no meio de um upload de vinte minutos.
+# `DriveService.create_upload_url` signs with the module's default
+# (`presigned_put_async` without `expires`), which is `MINIO_PRESIGN_EXPIRY` —
+# one hour, configurable per environment. Announcing a different number would be
+# lying about a deadline the client uses to decide whether there is still time
+# to upload a large file, and the error would show up as "the URL expired
+# earlier than you said" in the middle of a twenty-minute upload.
 #
-# É o mesmo cuidado das URLs de download, com uma diferença que explica por que
-# aqui é mais longo: lá o relógio corre até um clique, aqui corre durante a
-# TRANSFERÊNCIA inteira.
+# It is the same care as with the download URLs, with one difference that
+# explains why it is longer here: there the clock runs until a click, here it
+# runs during the ENTIRE TRANSFER.
 VALIDADE_DO_ENVIO_S = _PRESIGN_EXPIRY
 
 _MENSAGEM_PAPEL = "Requer papel 'editor' ou superior neste workspace."
 
 
 async def _exigir_editor(db, escopo, workspace_id: str) -> None:
-    """O par que a rota REST aplica com `exigir_papel_no_workspace(..., ROLE_EDITOR)`.
+    """The pair the REST route applies with `exigir_papel_no_workspace(..., ROLE_EDITOR)`.
 
-    O Drive é por WORKSPACE, não por workflow, então não há
-    `carregar_workflow` para devolver o papel junto: ele é buscado aqui.
-    `resolver_workspace` já garantiu que o workspace está no alcance do token;
-    o que falta é o papel de quem chama DENTRO dele.
+    The Drive is per WORKSPACE, not per workflow, so there is no
+    `carregar_workflow` to return the role along with it: it is fetched here.
+    `resolver_workspace` has already guaranteed the workspace is within the
+    token's reach; what is missing is the caller's role INSIDE it.
     """
     papel = await get_workspace_member_role(db, workspace_id, escopo.user_id)
     exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL)
 
 
 def _erro_de_arquivo(exc: Exception):
-    """`FileValidationError` cobre extensão proibida, dupla extensão e nome sem
-    extensão — todos com a causa já na mensagem."""
+    """`FileValidationError` covers a forbidden extension, a double extension and a
+    name without an extension — all with the cause already in the message."""
     return erro(
         "validation",
         str(exc),
@@ -112,25 +116,26 @@ def _erro_de_arquivo(exc: Exception):
 async def create_drive_upload_url(
     ctx: Context, filename: str, size_bytes: int, workspace_id: Optional[str] = None
 ) -> dict:
-    """Primeiro dos três passos de um upload: pede a URL para enviar os bytes.
+    """First of the three steps of an upload: requests the URL to send the bytes.
 
-    Devolve `upload_url`, que aceita um **PUT** com o conteúdo do arquivo, e
-    `file_id`, que identifica o registro daqui em diante.
+    Returns `upload_url`, which accepts a **PUT** with the file's content, and
+    `file_id`, which identifies the record from here on.
 
-    **Esta tool não envia o arquivo.** Ela não vê os bytes e não pode
-    inventá-los: quem faz o PUT é quem tem o arquivo em disco. Se você não o
-    tem, entregue a URL a quem tem — e não anuncie que o upload aconteceu.
+    **This tool does not send the file.** It does not see the bytes and cannot
+    invent them: the PUT is made by whoever has the file on disk. If you do not
+    have it, hand the URL to whoever does — and do not announce that the upload
+    happened.
 
-    Depois do PUT, chame `confirm_drive_upload(file_id)`. Sem essa terceira
-    chamada o arquivo **não aparece no Drive**: fica um registro pendente que a
-    faxina apaga depois, e os bytes enviados vão junto.
+    After the PUT, call `confirm_drive_upload(file_id)`. Without that third
+    call the file **does not appear in the Drive**: a pending record remains,
+    which the cleanup deletes later, and the uploaded bytes go with it.
 
-    `size_bytes` é conferido aqui contra o teto do workspace, e **de novo no
-    confirm** contra o objeto real — declarar um número pequeno e enviar um
-    arquivo grande é recusado no fim, com o objeto apagado.
+    `size_bytes` is checked here against the workspace's ceiling, and **again
+    on confirm** against the real object — declaring a small number and
+    uploading a large file is refused at the end, with the object deleted.
 
-    A extensão precisa estar na lista que o administrador permite, e nome com
-    extensão interna perigosa (`relatorio.exe.csv`) é recusado.
+    The extension has to be on the list the administrator allows, and a name
+    with a dangerous inner extension (`relatorio.exe.csv`) is refused.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "drive:write")
@@ -185,19 +190,19 @@ async def create_drive_upload_url(
 
 @ferramenta
 async def confirm_drive_upload(ctx: Context, file_id: str) -> dict:
-    """Terceiro passo: conclui o upload e faz o arquivo aparecer no Drive.
+    """Third step: completes the upload and makes the file appear in the Drive.
 
-    Até esta chamada o registro está pendente e invisível na listagem. Aqui o
-    servidor **mede o objeto de verdade** no storage e grava o tamanho real —
-    não o que foi declarado no passo 1.
+    Until this call the record is pending and invisible in the listing. Here
+    the server **measures the real object** in the storage and saves the real
+    size — not the one declared in step 1.
 
-    Se o arquivo real estiver acima do teto do workspace, a confirmação é
-    recusada **e os bytes são apagados**: aceitar um objeto acima do limite
-    porque já está lá seria só uma forma mais lenta de não ter limite.
+    If the real file is above the workspace's ceiling, the confirmation is
+    refused **and the bytes are deleted**: accepting an object above the limit
+    because it is already there would just be a slower way of having no limit.
 
-    `not_found` aqui quase sempre significa que o PUT não chegou a acontecer,
-    ou que a URL do passo 1 expirou antes do envio terminar. Nesse caso, peça
-    outra URL e refaça o envio.
+    `not_found` here almost always means the PUT never happened, or that the
+    step 1 URL expired before the upload finished. In that case, ask for
+    another URL and redo the upload.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "drive:write")
@@ -213,9 +218,9 @@ async def confirm_drive_upload(ctx: Context, file_id: str) -> dict:
                 "o file_id é o que create_drive_upload_url devolveu",
             ) from exc
 
-        # Resolver PELO workspace do arquivo, e não por um parâmetro: um
-        # `workspace_id` vindo do chamador aqui só serviria para ele apontar
-        # para um workspace seu e confirmar o arquivo de outro.
+        # Resolve BY the file's workspace, and not by a parameter: a
+        # `workspace_id` coming from the caller here would only serve to let
+        # it point at a workspace of its own and confirm someone else's file.
         await resolver_workspace(db, escopo, arquivo.workspace_id)
         await _exigir_editor(db, escopo, arquivo.workspace_id)
 
@@ -240,7 +245,7 @@ async def confirm_drive_upload(ctx: Context, file_id: str) -> dict:
             "workspace_id": confirmado.workspace_id,
             "extension": confirmado.extension,
             "mime_type": confirmado.mime_type,
-            # O tamanho MEDIDO, que pode diferir do declarado no passo 1.
+            # The MEASURED size, which may differ from the one declared in step 1.
             "size": confirmado.size,
             "status": confirmado.status,
         }
@@ -254,22 +259,24 @@ async def confirm_drive_upload(ctx: Context, file_id: str) -> dict:
 
 @ferramenta
 async def delete_drive_file(ctx: Context, file_id: str, confirm: bool = False) -> dict:
-    """Apaga um arquivo do Drive, de vez. Exige `confirm=true`.
+    """Deletes a file from the Drive, for good. Requires `confirm=true`.
 
-    Não há lixeira: o registro e os bytes somem juntos e não voltam. E o
-    estrago não para no arquivo — um fluxo que o lê passa a falhar na próxima
-    execução, sem nada ligando uma coisa à outra para quem for investigar.
+    There is no trash: the record and the bytes disappear together and do not
+    come back. And the damage does not stop at the file — a workflow that reads
+    it starts failing on its next run, with nothing linking one thing to the
+    other for whoever investigates.
 
-    Sem `confirm=true` nada é apagado: a resposta descreve o arquivo, para você
-    mostrar a quem pediu antes de repetir a chamada.
+    Without `confirm=true` nothing is deleted: the response describes the file,
+    for you to show to whoever asked before repeating the call.
 
-    **Isto é também como se substitui um arquivo**, porque sobrescrever não é
-    uma operação do Drive: apague e envie de novo com o mesmo nome.
+    **This is also how a file is replaced**, because overwriting is not a Drive
+    operation: delete and upload again with the same name.
 
-    Arquivo cujo conteúdo mora no executor (`content_location: "executor"`) é
-    recusado. A plataforma guarda a ficha, nunca os bytes — apagar o registro
-    não removeria nada do disco de quem tem o arquivo, e mandar o executor
-    apagá-lo seria destruir dado que nunca pertenceu à plataforma.
+    A file whose content lives on the executor (`content_location: "executor"`)
+    is refused. The platform keeps the record, never the bytes — deleting the
+    record would remove nothing from the disk of whoever has the file, and
+    telling the executor to delete it would be destroying data that never
+    belonged to the platform.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "drive:write")
@@ -319,10 +326,11 @@ async def delete_drive_file(ctx: Context, file_id: str, confirm: bool = False) -
                 "quem quer que o arquivo suma apaga o arquivo na máquina do "
                 "executor, ou tira a pasta do GeoSync",
             )
-        except Exception as exc:  # noqa: BLE001 — a falha do storage é do caminho
-            # `delete_file` recusa apagar a linha se o storage falhar, de
-            # propósito: assim a reconciliação tenta de novo e o objeto não
-            # vira órfão. O que não pode é isso subir como erro inesperado.
+        except Exception as exc:  # noqa: BLE001 — the storage failure is part of the path
+            # `delete_file` refuses to delete the row if the storage fails, on
+            # purpose: that way reconciliation retries and the object does not
+            # become an orphan. What must not happen is this going up as an
+            # unexpected error.
             logger.error("delete_drive_file: storage falhou para %s (%s).", file_id, exc)
             raise erro(
                 "unavailable",
@@ -334,7 +342,7 @@ async def delete_drive_file(ctx: Context, file_id: str, confirm: bool = False) -
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="create_drive_upload_url",
         title="Pedir URL de envio",

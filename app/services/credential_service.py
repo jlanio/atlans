@@ -15,21 +15,21 @@ from app.core.credentials.schemas import CREDENTIAL_TYPE_SCHEMAS
 from app.core.utils.encryption import decrypt_credential_data
 from flow.utils.credencial_wfs import autenticacao_wfs
 
-# Os tipos que o nó WFS lê: gravar e "Testar" aplicam as regras DELE.
+# The types the WFS node reads: saving and "Testar" (Test) apply ITS rules.
 _TIPOS_DO_WFS = ("geoserver_authkey", "wfs")
-# Os tipos cuja `connectionString` é DERIVADA dos campos (ver connection_builder).
+# The types whose `connectionString` is DERIVED from the fields (see connection_builder).
 _TIPOS_DE_BANCO = ("postgresql", "mysql")
 
 
 def erro_de_validacao(cred_type: str, data: dict) -> str | None:
-    """Por que a credencial não pode ser gravada — ou None.
+    """Why the credential cannot be saved — or None.
 
-    Campos obrigatórios de um tipo CONHECIDO e, para as do WFS, o que o nó
-    recusaria na execução (chave curta demais para ser protegida nos logs,
-    nome de parâmetro que é do próprio WFS, cabeçalho reservado...): a tela
-    de Credenciais avisa ao gravar e ao Testar, em vez de o fluxo falhar na
-    primeira execução. Tipos fora do catálogo seguem livres (o editor de
-    props é justamente o fallback deles).
+    Required fields of a KNOWN type and, for the WFS ones, what the node would
+    reject at execution (key too short to be protected in the logs, parameter
+    name that belongs to WFS itself, reserved header...): the Credentials
+    screen warns on save and on Test, instead of the workflow failing on its
+    first run. Types outside the catalog remain free-form (the props editor is
+    precisely their fallback).
     """
     erro = validate_required_fields(cred_type, data)
     if erro:
@@ -43,12 +43,12 @@ def erro_de_validacao(cred_type: str, data: dict) -> str | None:
 
 
 def _validate_or_raise(cred_type: str, data: dict) -> None:
-    """Recusa a gravação se faltarem campos obrigatórios de um tipo CONHECIDO.
+    """Rejects the save if required fields of a KNOWN type are missing.
 
-    Antes create/update NUNCA validavam: dava para salvar um postgresql sem
-    senha, e o build_connection_data preenchia os buracos com defaults, gerando
-    `postgresql://:@localhost:5432/` — uma credencial plausível que só falhava
-    na execução do workflow.
+    Before, create/update NEVER validated: you could save a postgresql one with
+    no password, and build_connection_data filled the gaps with defaults,
+    producing `postgresql://:@localhost:5432/` — a plausible credential that only
+    failed when the workflow executed.
     """
     erro = erro_de_validacao(cred_type, data)
     if erro:
@@ -57,7 +57,7 @@ def _validate_or_raise(cred_type: str, data: dict) -> None:
 
 async def create_credential(data: CredentialCreate, db: AsyncSession, owner_id: str | None = None) -> Credential:
     _validate_or_raise(data.type, data.data)
-    # Enriquece os dados com connectionString e outros campos derivados do tipo
+    # Enriches the data with connectionString and other fields derived from the type
     enriched = build_connection_data(data.type, data.data)
     cred = Credential(
         name=data.name,
@@ -78,21 +78,21 @@ async def get_credential_metadata(db: AsyncSession, cred_id: UUID, owner_id: str
     cred = await CredentialCRUD(db).get(cred_id)
     if not cred:
         raise CredentialNotFoundError("Credencial não encontrada")
-    # Verifica propriedade, fail-closed: credencial SEM dono é inacessível a todos.
+    # Checks ownership, fail-closed: a credential with NO owner is inaccessible to all.
     #
-    # Antes a condição exigia `cred.owner_id` verdadeiro, então uma credencial com
-    # owner_id NULL curto-circuitava a checagem e era lida, editada e apagada por
-    # qualquer usuário autenticado — inclusive de outro tenant, bastando o UUID
-    # (que viaja em claro dentro de Workflow.definition, em properties.credential_id).
-    # E órfãs existem de fato: credential_loader já loga "Credencial %s não tem dono
-    # (owner_id nulo)". Como este é o único ponto de autorização de GET/PUT/DELETE
-    # /credentials/{cred_id} e de GET /credentials/{cred_id}/data — que devolve o
-    # segredo descriptografado —, negar é o padrão correto.
+    # Before, the condition required a truthy `cred.owner_id`, so a credential with
+    # a NULL owner_id short-circuited the check and was read, edited and deleted by
+    # any authenticated user — including from another tenant, given just the UUID
+    # (which travels in the clear inside Workflow.definition, in properties.credential_id).
+    # And orphans do exist: credential_loader already logs "Credencial %s não tem dono
+    # (owner_id nulo)". Since this is the only authorization point for GET/PUT/DELETE
+    # /credentials/{cred_id} and for GET /credentials/{cred_id}/data — which returns
+    # the decrypted secret —, denying is the correct default.
     #
-    # ESCOPO desta checagem: propriedade (owner-only). O compartilhamento por
-    # workspace amplia apenas LEITURA de metadados (a listagem) e uso em
-    # execução; a edição, a exclusão e a leitura do SEGREDO (/data) continuam
-    # restritas ao dono.
+    # SCOPE of this check: ownership (owner-only). Sharing by workspace only
+    # widens READ access to metadata (the listing) and use in execution;
+    # editing, deleting and reading the SECRET (/data) remain restricted to the
+    # owner.
     if owner_id and cred.owner_id != owner_id:
         raise CredentialAccessDeniedError("Acesso negado a esta credencial.")
     return cred
@@ -107,11 +107,11 @@ async def delete_credential(db: AsyncSession, cred_id: UUID, owner_id: str | Non
 async def update_credential(cred_id: UUID, update_data: CredentialUpdate, db: AsyncSession, owner_id: str | None = None) -> Credential:
     cred = await get_credential_metadata(db, cred_id, owner_id=owner_id)
 
-    # Semântica PATCH-like para os metadados: só toca no que o cliente ENVIOU.
-    # `model_fields_set` distingue "campo omitido" de "campo enviado como null".
-    # Sem isso, um PUT sem `description` (o frontend legado manda só name/type/
-    # data) zeraria description/tags/workspace_id já gravados. Com isso, omitir
-    # preserva e enviar null limpa — de propósito.
+    # PATCH-like semantics for the metadata: only touches what the client SENT.
+    # `model_fields_set` distinguishes "field omitted" from "field sent as null".
+    # Without it, a PUT without `description` (the legacy frontend sends only
+    # name/type/data) would wipe the description/tags/workspace_id already saved.
+    # With it, omitting preserves and sending null clears — on purpose.
     enviados = update_data.model_fields_set
     tipo_anterior = cred.type
     cred.name = update_data.name
@@ -123,32 +123,32 @@ async def update_credential(cred_id: UUID, update_data: CredentialUpdate, db: As
     if "workspace_id" in enviados:
         cred.workspace_id = update_data.workspace_id
 
-    # Rotação/edição write-only de segredos.
+    # Write-only rotation/editing of secrets.
     #
-    # `data` ausente/vazio ⇒ mantém os segredos atuais intactos (o caso comum de
-    # editar só o nome ou o compartilhamento). `data` presente ⇒ MERGE sobre os
-    # segredos existentes descriptografados: o cliente envia apenas os campos que
-    # mudaram, e o que ele não mandou é preservado.
+    # `data` absent/empty ⇒ keeps the current secrets intact (the common case of
+    # editing only the name or the sharing). `data` present ⇒ MERGE over the
+    # existing decrypted secrets: the client sends only the fields that changed,
+    # and whatever it did not send is preserved.
     #
-    # Isto elimina o antigo caminho destrutivo: encrypt_and_store faz
-    # `self.data = {...}` (substitui o blob inteiro), então um `data` PARCIAL
-    # antes apagava todos os outros segredos. Agora parcial é seguro e vira o
-    # mecanismo de rotação — trocar só a senha manda só a senha.
+    # This removes the old destructive path: encrypt_and_store does
+    # `self.data = {...}` (replaces the whole blob), so a PARTIAL `data` used to
+    # wipe all the other secrets. Now partial is safe and becomes the rotation
+    # mechanism — changing only the password sends only the password.
     #
-    # Trocado o TIPO, o `data` é reescrito mesmo sem `data` no pedido: os
-    # campos do tipo antigo (a DSN de quando era de banco, o `token` de quando
-    # era Bearer) não ficam cifrados no blob de uma credencial de outro tipo —
-    # e o novo tipo precisa ter os obrigatórios dele, senão a troca gravaria
-    # uma credencial que nenhum nó consegue usar.
+    # When the TYPE changes, `data` is rewritten even with no `data` in the
+    # request: the old type's fields (the DSN from when it was a database one,
+    # the `token` from when it was Bearer) do not stay encrypted in the blob of a
+    # credential of another type — and the new type must have its required
+    # fields, otherwise the change would save a credential no node can use.
     mudou_de_tipo = update_data.type != tipo_anterior
     if update_data.data or mudou_de_tipo:
         atuais = decrypt_credential_data(cred.data or {})
-        # Para tipos de banco a connectionString é DERIVADA (recomputada de
-        # host/user/... pelo build_connection_data adiante), então a antiga não
-        # fica — nem numa credencial que DEIXOU de ser de banco, onde a DSN com
-        # a senha de antes seguiria sendo injetada num nó de banco. Para um
-        # tipo livre que sempre foi livre, "connectionString" pode ser um campo
-        # legítimo do usuário: aí NÃO se mexe.
+        # For database types the connectionString is DERIVED (recomputed from
+        # host/user/... by build_connection_data further on), so the old one does
+        # not stay — not even in a credential that STOPPED being a database one,
+        # where the DSN with the old password would keep being injected into a
+        # database node. For a free-form type that was always free-form,
+        # "connectionString" may be a legitimate user field: then it is NOT touched.
         if update_data.type in _TIPOS_DE_BANCO or tipo_anterior in _TIPOS_DE_BANCO:
             atuais.pop("connectionString", None)
         mesclado = {**atuais, **(update_data.data or {})}

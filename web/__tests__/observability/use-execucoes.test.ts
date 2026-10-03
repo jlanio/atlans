@@ -42,7 +42,7 @@ describe("useExecucoes", () => {
       workflow_origem: "assistente", trigger_source: "manual",
     })
 
-    // Desligar o chip refaz a lista da primeira página, sem o recorte.
+    // Turning the chip off redoes the first page's list, without the slice.
     rerender({ e: estado({ assistente: false, origem: "manual" }) })
     await waitFor(() => expect(svc.getObservabilityRuns).toHaveBeenCalledTimes(2))
     const params = svc.getObservabilityRuns.mock.calls[1][0]
@@ -70,14 +70,14 @@ describe("useExecucoes", () => {
     expect(result.current.total).toBe(1)
     expect(result.current.hasMore).toBe(true)
 
-    // Segunda página: acumula, sem with_total, offset avançado.
+    // Second page: accumulates, without with_total, offset advanced.
     svc.getObservabilityRuns.mockResolvedValue(pagina(["b"]))
     act(() => { result.current.carregarMais() })
     await waitFor(() => expect(result.current.runs.map(r => r.run_id)).toEqual(["a", "b"]))
     const segunda = svc.getObservabilityRuns.mock.calls[1][0]
     expect(segunda.offset).toBe(1)
     expect(segunda.with_total).toBeUndefined()
-    // O total da primeira página fica.
+    // The first page's total stays.
     expect(result.current.total).toBe(1)
     expect(result.current.hasMore).toBe(false)
   })
@@ -114,7 +114,7 @@ describe("useExecucoes", () => {
     await waitFor(() => expect(result.current.runs.map(r => r.run_id)).toEqual(["nova"]))
 
     await act(async () => { lenta.resolve(pagina(["velha-1", "velha-2"], { total: 2 })) })
-    // A lenta chegou depois, mas era do filtro anterior: nada muda.
+    // The slow one arrived later, but it was from the previous filter: nothing changes.
     expect(result.current.runs.map(r => r.run_id)).toEqual(["nova"])
     expect(result.current.total).toBe(1)
     expect(result.current.carregando).toBe(false)

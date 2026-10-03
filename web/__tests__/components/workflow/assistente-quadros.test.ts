@@ -1,11 +1,11 @@
 /**
- * Decodificar o stream do assistente e montar a conversa.
+ * Decoding the assistant's stream and assembling the conversation.
  *
- * O teste que justifica este arquivo existir é o do QUADRO PARTIDO AO MEIO: a
- * rede não respeita fronteira de mensagem, e um `JSON.parse` em cima de meio
- * quadro derruba a conversa inteira. É o defeito clássico de quem lê stream, e
- * ele não aparece contra um servidor local rápido — aparece em rede ruim, na
- * casa de quem está usando.
+ * The test that justifies this file's existence is the one for the FRAME SPLIT
+ * IN HALF: the network doesn't respect message boundaries, and a `JSON.parse`
+ * on half a frame brings down the whole conversation. It's the classic defect
+ * of stream readers, and it doesn't show up against a fast local server — it
+ * shows up on a bad network, at the user's home.
  */
 import { describe, it, expect } from "vitest"
 
@@ -29,8 +29,8 @@ describe("criarDecodificador", () => {
   })
 
   it("quadro partido no meio do JSON entre dois read() sai inteiro", () => {
-    // O defeito clássico. Sem a memória do resto, o primeiro pedaço viraria um
-    // `JSON.parse` de `{"texto": "mun` e a conversa morreria aqui.
+    // The classic defect. Without remembering the remainder, the first chunk
+    // would become a `JSON.parse` of `{"texto": "mun` and the conversation would die here.
     const alimentar = criarDecodificador()
     const inteiro = quadro("texto", { texto: "municípios" })
     const corte = inteiro.indexOf("munic") + 3
@@ -42,7 +42,7 @@ describe("criarDecodificador", () => {
   })
 
   it("corte exatamente entre o `\\n` e o `\\n` que fecham o quadro", () => {
-    // O pior lugar para cortar: o quadro está completo mas o terminador não.
+    // The worst place to cut: the frame is complete but the terminator isn't.
     const alimentar = criarDecodificador()
     const inteiro = quadro("fim", { ok: true })
 
@@ -101,8 +101,8 @@ describe("aplicarQuadro", () => {
   })
 
   it("a linha do tempo preserva o que veio antes e depois de cada ferramenta", () => {
-    // É o que impede alguém de aplicar um fluxo sem entender: a explicação mora
-    // entre os passos, não num campo único no fim.
+    // It's what keeps someone from applying a workflow without understanding
+    // it: the explanation lives between the steps, not in a single field at the end.
     const turno = aplicarTodos([
       ["pensando", { texto: "preciso do catálogo" }],
       ["texto", { texto: "Procurando nós…" }],
@@ -138,8 +138,8 @@ describe("aplicarQuadro", () => {
   })
 
   it("progresso com `id` pinta a dona certa, mesmo com duas correndo", () => {
-    // As ferramentas de uma volta rodam em paralelo no backend: duas ficam
-    // "correndo" ao mesmo tempo, e o quadro `progresso` traz o id da dona.
+    // The tools of one round run in parallel on the backend: two are "running"
+    // at the same time, and the `progresso` frame carries its owner's id.
     const turno = aplicarTodos([
       ["ferramenta", { id: "t1", nome: "run_workflow", argumentos: {} }],
       ["ferramenta", { id: "t2", nome: "describe_node", argumentos: {} }],
@@ -150,7 +150,7 @@ describe("aplicarQuadro", () => {
       id: "t1",
       progresso: { concluidos: 3, total: 5, mensagem: "nó 3/5" },
     })
-    // A t2 (a última a "correr", que o critério antigo escolheria) fica limpa.
+    // t2 (the last one to "run", which the old criterion would pick) stays clean.
     expect(turno.blocos[1]).not.toHaveProperty("progresso")
   })
 
@@ -171,7 +171,7 @@ describe("aplicarQuadro", () => {
       ["fim", { ok: true, uso: { total: 10 }, voltas: 1 }],
     ])
     expect(turno.blocos[0]).toMatchObject({ estado: "erro" })
-    // Nenhum bloco de erro da conversa: a falha é só do passo.
+    // No error block in the conversation: the failure belongs to the step only.
     expect(turno.blocos.map(b => b.tipo)).toEqual(["ferramenta"])
   })
 
@@ -187,8 +187,8 @@ describe("aplicarQuadro", () => {
         definicao,
         nos: 1,
         arestas: 0,
-        // Veio de `validate_workflow`: e veredito do que ja esta desenhado, nao
-        // ordem de desenhar.
+        // Came from `validate_workflow`: it's a verdict on what is already drawn,
+        // not an order to draw.
         desenhar: false,
         nota: undefined,
         ok: true,
@@ -199,10 +199,10 @@ describe("aplicarQuadro", () => {
   })
 
   it("a ordem de DESENHAR chega marcada, com a nota do passo", () => {
-    // O quadro serve a dois papeis desde que entregar deixou de ser efeito
-    // colateral de validar. Sem a marca, o painel nao saberia distinguir
-    // "poe isto na tela agora" de "eis o que a validacao achou" — e desenharia
-    // de novo a cada veredito, desfazendo o que a pessoa mexeu no meio.
+    // The frame serves two roles since delivering stopped being a side effect
+    // of validating. Without the flag, the panel couldn't tell "put this on
+    // the screen now" from "here's what validation found" — and would redraw
+    // on every verdict, undoing what the person changed in between.
     const definicao = { nodes: [{ id: "a", name: "Buffer", properties: {} }], edges: [] }
     const turno = aplicarTodos([
       ["proposta", { definicao, nos: 1, arestas: 0, desenhar: true, nota: "liguei o buffer" }],
@@ -213,15 +213,15 @@ describe("aplicarQuadro", () => {
       proposta: {
         desenhar: true,
         nota: "liguei o buffer",
-        // Sem veredito: quem desenha nao valida.
+        // No verdict: whoever draws doesn't validate.
         ok: null,
       },
     })
   })
 
   it("relatório ilegível vira veredito desconhecido, e não 'passou'", () => {
-    // `null` é "não sei", e o cartão desliga o Aplicar por isso. Tratar como
-    // `ok` seria oferecer aplicar um fluxo que ninguém confirmou que valida.
+    // `null` is "don't know", and the card disables Apply because of it. Treating
+    // it as `ok` would offer to apply a workflow nobody confirmed validates.
     const turno = aplicarTodos([
       ["proposta", { definicao: {}, nos: 0, arestas: 0, ok: null, erros: null, avisos: null }],
     ])
@@ -229,9 +229,8 @@ describe("aplicarQuadro", () => {
   })
 
   it("o `fim` fecha ferramenta que ficou girando", () => {
-    // Teto de voltas, modelo fora do ar, aba fechada: o turno pode acabar no
-    // meio de uma chamada. Um passo girando para sempre mentiria sobre o que
-    // aconteceu.
+    // Round ceiling, model down, tab closed: the turn can end in the middle of
+    // a call. A step spinning forever would lie about what happened.
     const turno = aplicarTodos([
       ["ferramenta", { id: "t1", nome: "run_workflow", argumentos: {} }],
       ["erro", { code: "loop_limit", message: "passou das rodadas", hint: "em partes menores" }],
@@ -246,18 +245,19 @@ describe("aplicarQuadro", () => {
   })
 
   it("o `teto` do loop_limit atravessa até o bloco — a frase traduzida o cita", () => {
-    // Em inglês e espanhol a frase é do dicionário e cita o teto ("went past 28
-    // tool rounds"); se o quadro o perdesse, a frase cairia no texto sem número.
+    // In English and Spanish the sentence comes from the dictionary and cites
+    // the ceiling ("went past 28 tool rounds"); if the frame lost it, the
+    // sentence would fall back to the text without a number.
     const turno = aplicarTodos([["erro", { code: "loop_limit", message: "passou de 28 rodadas", teto: 28 }]])
     expect(turno.blocos[0]).toEqual({ tipo: "erro", erro: { code: "loop_limit", message: "passou de 28 rodadas", teto: 28 } })
-    // Teto que não é número não entra (o servidor manda inteiro).
+    // A ceiling that isn't a number doesn't get in (the server sends an integer).
     const semTeto = aplicarTodos([["erro", { code: "loop_limit", message: "…", teto: "28" }]])
     expect(semTeto.blocos[0]).toEqual({ tipo: "erro", erro: { code: "loop_limit", message: "…" } })
   })
 
   it("quadro desconhecido não quebra o painel", () => {
-    // Servidor mais novo que o painel: ignorar mantém a conversa funcionando
-    // em vez de derrubá-la numa atualização.
+    // Server newer than the panel: ignoring keeps the conversation working
+    // instead of bringing it down on an update.
     const turno = aplicarTodos([
       ["texto", { texto: "oi" }],
       ["quadro_do_futuro", { seja_o_que_for: 1 }],
@@ -266,8 +266,8 @@ describe("aplicarQuadro", () => {
   })
 
   it("não muta o turno que recebe", () => {
-    // O painel re-renderiza por identidade: mutar no lugar faria o React não
-    // ver mudança nenhuma num stream inteiro.
+    // The panel re-renders by identity: mutating in place would make React see
+    // no change at all over an entire stream.
     const antes = turnoVazio("t")
     const depois = aplicarQuadro(antes, { evento: "texto", dados: { texto: "oi" } })
     expect(antes.blocos).toEqual([])

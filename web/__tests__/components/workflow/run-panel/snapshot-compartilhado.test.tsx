@@ -1,11 +1,10 @@
 /**
- * O snapshot da execução é único por janela, não um por consumidor.
+ * The run snapshot is one per window, not one per consumer.
  *
- * O painel de execução e o visualizador de sub-fluxo pedem a mesma linha do
- * tempo. Com um timer e uma reconstrução por hook, abrir o visualizador durante
- * um run dobrava o custo: `buildTimeline` percorre a lista inteira de eventos
- * (até 2000) e ordena os nós, oito vezes por segundo, na thread que anima o
- * canvas.
+ * The run panel and the sub-workflow viewer ask for the same timeline. With one
+ * timer and one rebuild per hook, opening the viewer during a run doubled the
+ * cost: `buildTimeline` walks the whole event list (up to 2,000) and sorts the
+ * nodes, eight times per second, on the thread that animates the canvas.
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
@@ -32,8 +31,8 @@ describe("useRunSnapshot", () => {
     const a = renderHook(() => useRunSnapshot())
     const b = renderHook(() => useRunSnapshot())
 
-    // Identidade, não igualdade: provar que a linha do tempo foi construída uma
-    // vez só é o ponto de existir um snapshot compartilhado.
+    // Identity, not equality: proving the timeline was built only once is the
+    // whole point of having a shared snapshot.
     expect(a.result.current).toBe(b.result.current)
 
     a.unmount()
@@ -64,21 +63,21 @@ describe("useRunSnapshot", () => {
     const b = renderHook(() => useRunSnapshot())
 
     a.unmount()
-    // Ainda há consumidor: manter a inscrição viva.
+    // There's still a consumer: keep the subscription alive.
     expect(cancelar).not.toHaveBeenCalled()
 
     b.unmount()
     expect(cancelar).toHaveBeenCalledTimes(1)
 
-    // Sem isto, reabrir o painel depois de fechado deixaria de receber eventos.
+    // Without this, reopening the panel after closing it would stop receiving events.
     const c = renderHook(() => useRunSnapshot())
     expect(subscribe).toHaveBeenCalledTimes(2)
     c.unmount()
   })
 
   it("o primeiro a chegar recolhe o que já existe, sem esperar a janela", () => {
-    // Abrir o painel num run já carregado não pode mostrar tela vazia até o
-    // próximo tique do agregador.
+    // Opening the panel on an already-loaded run must not show an empty screen
+    // until the aggregator's next tick.
     act(() => {
       useWorkflowExecutionStore.getState().appendEvents([evento("a", "completed")])
     })

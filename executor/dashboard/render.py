@@ -1,14 +1,14 @@
 # executor/dashboard/render.py
 """
-Desenho do painel. Funcao pura: Snapshot entra, renderavel do rich sai.
+Dashboard drawing. Pure function: Snapshot in, rich renderable out.
 
-Separado do runtime de proposito — assim da para renderizar um Snapshot
-sintetico num Console de largura fixa dentro de um teste, sem event loop e sem
+Kept separate from the runtime on purpose — that way a synthetic Snapshot can
+be rendered into a fixed-width Console inside a test, with no event loop and no
 terminal.
 
-Todo glifo nao-ASCII passa pelo objeto `Glyphs`. Nao e preciosismo: o conhost
-legado do Windows usa a code page ANSI (cp1252 em pt-BR) e levanta
-UnicodeEncodeError no primeiro '●' — o painel morreria no primeiro quadro.
+Every non-ASCII glyph goes through the `Glyphs` object. This is not fussiness:
+the legacy Windows conhost uses the ANSI code page (cp1252 in pt-BR) and raises
+UnicodeEncodeError on the first '●' — the dashboard would die on the first frame.
 """
 from __future__ import annotations
 
@@ -55,8 +55,8 @@ ASCII = Glyphs(
     caixa=box.ASCII,
 )
 
-# Altura minima do bloco de alertas (1 linha + 2 bordas). Reservada sempre: sem
-# ela o painel esconderia justamente o que precisa ser visto.
+# Minimum height of the alerts block (1 line + 2 borders). Always reserved:
+# without it the dashboard would hide precisely what needs to be seen.
 _ALERTAS_MIN = 3
 # Altura minima util do bloco "em execucao": 1 job + cabecalho + 2 bordas.
 _EXEC_MIN = 4
@@ -75,8 +75,8 @@ _CONN_LABEL = {
 
 
 def _nivel_debug() -> bool:
-    """O root logger esta em DEBUG? Lido na hora, para o indicador do rodape
-    nao poder divergir do estado real do logging."""
+    """Is the root logger at DEBUG? Read on the spot, so the footer indicator
+    cannot diverge from the actual logging state."""
     import logging as _logging
     return _logging.getLogger().level <= _logging.DEBUG
 
@@ -91,7 +91,7 @@ def _conn_symbol(estado: str, g: Glyphs) -> str:
 
 
 def _dur(segundos: float | None, g: Glyphs) -> str:
-    """Duracao legivel. Escala a unidade em vez de mostrar '4821.3s'."""
+    """Human-readable duration. Scales the unit instead of showing '4821.3s'."""
     if segundos is None:
         return g.vazio
     s = float(segundos)
@@ -117,7 +117,7 @@ def _bytes(n: int | None) -> str:
 
 
 def _barra(fracao: float | None, g: Glyphs, largura: int = 10) -> Text:
-    """Barra de proporcao colorida por faixa: verde ate 70%, amarelo ate 90%, vermelho."""
+    """Proportion bar colored by band: green up to 70%, yellow up to 90%, red."""
     if fracao is None:
         return Text(g.vazio, style="dim")
     f = max(0.0, min(1.0, fracao))
@@ -127,7 +127,7 @@ def _barra(fracao: float | None, g: Glyphs, largura: int = 10) -> Text:
 
 
 def _kv() -> Table:
-    """Grade de duas colunas — o formato 'rotulo / valor' dos blocos."""
+    """Two-column grid — the blocks' 'label / value' format."""
     t = Table.grid(padding=(0, 1))
     t.add_column(style="dim", no_wrap=True)
     t.add_column(no_wrap=True)
@@ -135,13 +135,13 @@ def _kv() -> Table:
 
 
 class Bloco(NamedTuple):
-    """Renderavel com a sua altura em linhas.
+    """Renderable along with its height in lines.
 
-    A altura tem que ser conhecida ANTES de desenhar: o `Live` do rich reescreve
-    N linhas para cima a cada quadro, e se N passar da altura do terminal o
-    painel rola sem parar — vira lixo continuo em vez de um quadro estavel.
-    Todo bloco usa colunas `no_wrap`, entao uma linha logica e sempre uma linha
-    fisica e a contagem fecha.
+    The height must be known BEFORE drawing: rich's `Live` rewrites N lines
+    upward on every frame, and if N exceeds the terminal height the dashboard
+    scrolls endlessly — it turns into continuous garbage instead of a stable
+    frame. Every block uses `no_wrap` columns, so one logical line is always one
+    physical line and the count adds up.
     """
     render: RenderableType
     altura: int
@@ -149,7 +149,7 @@ class Bloco(NamedTuple):
 
 def _painel(corpo, titulo: str, g: Glyphs, borda: str = "dim", linhas: int = 0) -> Bloco:
     p = Panel(corpo, title=titulo, title_align="left", border_style=borda, box=g.caixa)
-    return Bloco(p, linhas + 2)  # +2 das bordas superior e inferior
+    return Bloco(p, linhas + 2)  # +2 for the top and bottom borders
 
 
 def _curto(ident: str | None, g: Glyphs) -> str:
@@ -176,8 +176,8 @@ def _bloco_workflows(s: Snapshot, g: Glyphs) -> Panel:
     t.add_row("última hora", hora)
     t.add_row("vazão", f"{s.throughput_per_min:.1f} wf/min")
 
-    # Depois de um 'z', "total 0" pode fazer parecer que o executor acabou de
-    # subir. O titulo diz desde quando as contagens valem.
+    # After a 'z', "total 0" can make it look like the executor just
+    # started. The title says since when the counts are valid.
     titulo = "workflows"
     if s.contando_ha_s + 1 < s.uptime_s:
         titulo += f" {g.sep} zerado há {_dur(s.contando_ha_s, g)}"
@@ -224,9 +224,10 @@ def _bloco_recursos(s: Snapshot, g: Glyphs) -> Panel:
         threads = f" {g.sep} {s.proc_threads} threads" if s.proc_threads else ""
         t.add_row("RAM exec", f"{s.proc_rss_mb:.0f} MB{threads}")
 
-    # "livre > total" acontece de verdade dentro de container: se memory.max
-    # existe mas memory.current nao, o total vem do cgroup e o disponivel cai
-    # no psutil do HOST. Mostrar "34 / 16 GB" seria pior que omitir o total.
+    # "free > total" really happens inside a container: if memory.max
+    # exists but memory.current does not, the total comes from the cgroup and the
+    # available amount falls back to the HOST's psutil. Showing "34 / 16 GB"
+    # would be worse than omitting the total.
     if s.ram_available_gb is not None and s.ram_total_gb and s.ram_available_gb <= s.ram_total_gb:
         t.add_row("RAM livre", Text.assemble(
             f"{s.ram_available_gb:.1f} / {s.ram_total_gb:.1f} GB  ",
@@ -273,8 +274,8 @@ def _bloco_fila(s: Snapshot, g: Glyphs) -> Panel:
     if s.heartbeat_age_s is None:
         t.add_row("heartbeat", g.vazio)
     else:
-        # Sai a cada 30s (connection._HEARTBEAT_INTERVAL); o servidor desiste aos
-        # 90s. Passar muito disso e o primeiro sinal de sessao morta sem aviso.
+        # Sent every 30s (connection._HEARTBEAT_INTERVAL); the server gives up at
+        # 90s. Going well past that is the first sign of a silently dead session.
         estilo = "dim" if s.heartbeat_age_s < 45 else ("yellow" if s.heartbeat_age_s < 90 else "red")
         t.add_row("heartbeat", Text(_dur(s.heartbeat_age_s, g), style=estilo))
 
@@ -288,8 +289,8 @@ def _bloco_fila(s: Snapshot, g: Glyphs) -> Panel:
 
 def _bloco_execucao(s: Snapshot, g: Glyphs, compacto: bool, maximo: int) -> Bloco:
     t = Table(box=None, expand=True, pad_edge=False, show_edge=False)
-    # Larguras fixas nas colunas curtas: sem elas o `expand` reparte a sobra
-    # igualmente e o run_id de 9 chars ganha um terco da linha.
+    # Fixed widths on the short columns: without them `expand` splits the
+    # leftover evenly and the 9-char run_id gets a third of the line.
     t.add_column("run", style="cyan", no_wrap=True, width=12)
     t.add_column("nó atual", overflow="ellipsis", no_wrap=True, ratio=1)
     t.add_column("há", justify="right", no_wrap=True, width=8)
@@ -309,7 +310,7 @@ def _bloco_execucao(s: Snapshot, g: Glyphs, compacto: bool, maximo: int) -> Bloc
     if ocultos > 0:
         # Truncar em silencio faria o painel mentir sobre quantos jobs rodam.
         titulo += f" {g.sep} +{ocultos} sem espaço"
-    return _painel(t, titulo, g, linhas=t.row_count + 1)  # +1 do cabecalho da tabela
+    return _painel(t, titulo, g, linhas=t.row_count + 1)  # +1 for the table header
 
 
 def _bloco_geosync(s: Snapshot, g: Glyphs) -> Bloco:
@@ -336,8 +337,8 @@ def _bloco_alertas(s: Snapshot, g: Glyphs, linhas: int) -> Bloco:
     t.add_column(style="dim", no_wrap=True)
     t.add_column(no_wrap=True)
     t.add_column(style="dim", no_wrap=True)
-    # no_wrap obrigatorio: uma mensagem longa quebrava em 3 linhas fisicas e a
-    # altura calculada nao batia com a desenhada — de novo o Live rolando.
+    # no_wrap is mandatory: a long message wrapped into 3 physical lines and
+    # the computed height did not match the drawn one — the Live scrolling again.
     t.add_column(overflow="ellipsis", no_wrap=True)
     for linha in list(s.log_tail)[-linhas:]:
         cor = "red" if linha.level in ("ERROR", "CRIT") else "yellow"
@@ -352,9 +353,9 @@ def _bloco_alertas(s: Snapshot, g: Glyphs, linhas: int) -> Bloco:
 
 
 def _cabecalho(s: Snapshot, g: Glyphs) -> Bloco:
-    # no_wrap nas duas linhas: em terminal estreito o cabecalho quebrava em 3
-    # linhas e a altura declarada (4) nao batia com a desenhada — o Live
-    # passava a rolar por causa de uma unica linha a mais.
+    # no_wrap on both lines: on a narrow terminal the header wrapped into 3
+    # lines and the declared height (4) did not match the drawn one — the Live
+    # started scrolling because of a single extra line.
     linha1 = Text.assemble(
         (f"Atlans Executor v{s.version}", "bold"),
         (f"  {g.sep}  ", "dim"),
@@ -382,9 +383,9 @@ def _cabecalho(s: Snapshot, g: Glyphs) -> Bloco:
     return Bloco(Panel(Group(linha1, linha2), border_style="cyan", box=g.caixa), 4)
 
 
-# Atalhos na ordem de prioridade do rodape: quando falta largura, os do fim
-# saem primeiro. `l` e o que o usuario mais procura (voltar ao log de sempre) e
-# `?` sempre fica, porque e por ele que se descobre o resto.
+# Shortcuts in the footer's priority order: when width runs short, the ones at
+# the end go first. `l` is the one the user looks for most (back to the usual
+# log) and `?` always stays, because it is how the rest is discovered.
 ATALHOS = (
     ("l", "log/painel"),
     ("a", "alertas"),
@@ -412,11 +413,11 @@ AJUDA = (
 
 def _rodape(log_path: str, largura: int, atalhos: bool, pausado: bool,
             debug: bool) -> Text:
-    """Caminho do log, indicadores de estado e barra de atalhos, numa linha so.
+    """Log path, status indicators and shortcut bar, on a single line.
 
-    O rodape nao pode quebrar em duas: a altura do painel conta 1 linha para
-    ele, e uma a mais faria o `Live` rolar. Quando falta largura, as partes
-    saem nesta ordem: caminho do log, depois os atalhos menos usados.
+    The footer cannot wrap into two: the dashboard height counts 1 line for
+    it, and one more would make the `Live` scroll. When width runs short, the
+    parts go in this order: the log path, then the least-used shortcuts.
     """
     marcas: list[tuple[str, str]] = []
     if debug:
@@ -441,14 +442,14 @@ def _rodape(log_path: str, largura: int, atalhos: bool, pausado: bool,
             barra.append((f" {rotulo}", "dim"))
         return barra, sum(len(t) for t, _ in barra)
 
-    # Vai tirando atalhos do fim ate a barra caber com o caminho encurtado.
+    # Keeps removing shortcuts from the end until the bar fits with the shortened path.
     mostrados = list(ATALHOS)
     while True:
         barra, custo = montar(mostrados)
         folga = largura - len("log: ") - custo_marcas - custo
         if folga >= 10 or len(mostrados) <= len(_ATALHOS_ESSENCIAIS):
             break
-        # Remove o ultimo nao-essencial.
+        # Removes the last non-essential one.
         for i in range(len(mostrados) - 1, -1, -1):
             if mostrados[i][0] not in _ATALHOS_ESSENCIAIS:
                 mostrados.pop(i)
@@ -468,7 +469,7 @@ def _rodape(log_path: str, largura: int, atalhos: bool, pausado: bool,
 
 
 def _overlay_ajuda(g: Glyphs) -> Bloco:
-    """Lista de atalhos, mostrada no lugar do corpo enquanto `?` estiver ativo."""
+    """Shortcut list, shown in place of the body while `?` is active."""
     t = Table.grid(padding=(0, 2))
     t.add_column(style="bold", no_wrap=True)
     t.add_column(no_wrap=True, overflow="ellipsis")
@@ -510,7 +511,7 @@ def _empilhar(blocos: list[Bloco]) -> Bloco:
 
 
 def _lado_a_lado(colunas: list[list[Bloco]]) -> Bloco:
-    """Distribui colunas de blocos lado a lado; a altura e a da coluna mais alta."""
+    """Lays out columns of blocks side by side; the height is the tallest column's."""
     grade = Table.grid(expand=True)
     for _ in colunas:
         grade.add_column(ratio=1)
@@ -520,11 +521,11 @@ def _lado_a_lado(colunas: list[list[Bloco]]) -> Bloco:
 
 
 def _arranjar_corpo(blocos: list[Bloco], largura: int, orcamento: int) -> Bloco:
-    """Escolhe o arranjo mais baixo que a largura comporta e que cabe no orcamento.
+    """Picks the shortest arrangement the width allows that fits in the budget.
 
-    Tenta, em ordem, 4 colunas / 2x2 / 1 coluna — cada um so se a largura der
-    espaco util a cada bloco. Se nenhum couber, descarta blocos do fim da lista
-    (que vem ordenada por prioridade) ate caber.
+    Tries, in order, 4 columns / 2x2 / 1 column — each only if the width gives
+    every block usable space. If none fits, drops blocks from the end of the
+    list (which comes sorted by priority) until it fits.
     """
     def arranjos(bs: list[Bloco]) -> list[Bloco]:
         saida = []
@@ -541,7 +542,7 @@ def _arranjar_corpo(blocos: list[Bloco], largura: int, orcamento: int) -> Bloco:
         cabem = [a for a in arranjos(restantes) if a.altura <= orcamento]
         if cabem:
             return min(cabem, key=lambda a: a.altura)
-        restantes.pop()  # sai o de menor prioridade e tenta de novo
+        restantes.pop()  # drop the lowest-priority one and try again
 
     return Bloco(Text(""), 0)
 
@@ -549,36 +550,36 @@ def _arranjar_corpo(blocos: list[Bloco], largura: int, orcamento: int) -> Bloco:
 def build(s: Snapshot, *, largura: int, altura: int, log_path: str,
           ascii_only: bool = False, atalhos: bool = False,
           pausado: bool = False, overlay: str | None = None) -> RenderableType:
-    """Monta o painel dentro do orcamento de linhas do terminal.
+    """Builds the dashboard within the terminal's line budget.
 
-    O `Live` do rich repinta reescrevendo N linhas para cima. Se o renderavel
-    for mais alto que o terminal, ele rola sem parar e o painel vira lixo — por
-    isso cada bloco declara a sua altura e a montagem respeita o orcamento, em
-    vez de adivinhar por limiares.
+    rich's `Live` repaints by rewriting N lines upward. If the renderable is
+    taller than the terminal, it scrolls endlessly and the dashboard turns into
+    garbage — that is why each block declares its height and the layout respects
+    the budget, instead of guessing with thresholds.
 
-    Prioridade quando falta espaco: cabecalho e rodape sempre; alertas nunca
-    somem (sem eles o painel esconde justamente o que precisa ser visto);
-    "em execucao" e geosync entram se sobrar; e os blocos do corpo caem na
-    ordem inversa da prioridade (recursos primeiro, workflows por ultimo).
+    Priority when space runs short: header and footer always; alerts never
+    disappear (without them the dashboard hides precisely what needs to be seen);
+    "running" and geosync go in if there is room left; and the body blocks drop
+    in reverse priority order (resources first, workflows last).
     """
     g = ASCII if ascii_only else UNICODE
     compacto = largura < 110
 
     cabecalho = _cabecalho(s, g)
-    # `_nivel_debug` sai do proprio logging: assim o indicador nao pode
-    # divergir do estado real, mesmo se o toggle for chamado de outro lugar.
+    # `_nivel_debug` comes from logging itself: that way the indicator cannot
+    # diverge from the actual state, even if the toggle is called from elsewhere.
     rodape = _rodape(log_path, largura, atalhos, pausado, _nivel_debug())
 
-    # Uma linha de alerta e o minimo inegociavel: e o que impede o painel de
-    # esconder um executor em loop de reconexao atras de contadores bonitos.
-    orcamento = altura - cabecalho.altura - 1  # -1 do rodape
+    # One alert line is the non-negotiable minimum: it is what keeps the dashboard
+    # from hiding an executor stuck in a reconnect loop behind pretty counters.
+    orcamento = altura - cabecalho.altura - 1  # -1 for the footer
     if orcamento < 3:
         # Terminal baixo demais ate para o minimo — so cabecalho e rodape.
         return Group(cabecalho.render, rodape)
 
-    # Os overlays entram no LUGAR do corpo, e nao por cima: sobrepor de verdade
-    # exigiria o buffer alternativo do terminal (`screen=True`), que apaga todo
-    # o scrollback do boot — caro demais para uma tela auxiliar.
+    # Overlays go in PLACE of the body, not on top of it: truly overlaying
+    # would require the terminal's alternate buffer (`screen=True`), which wipes
+    # all the boot scrollback — too costly for an auxiliary screen.
     if overlay == "ajuda":
         bloco = _overlay_ajuda(g)
         if bloco.altura <= orcamento:
@@ -588,8 +589,8 @@ def build(s: Snapshot, *, largura: int, altura: int, log_path: str,
         if bloco.altura <= orcamento:
             return Group(cabecalho.render, bloco.render, rodape)
 
-    # Ordem = prioridade. "Esta saudavel?" e "esta saturado?" vem antes de
-    # "quanto consome?".
+    # Order = priority. "Is it healthy?" and "is it saturated?" come before
+    # "how much does it consume?".
     corpo_blocos = [
         _bloco_workflows(s, g),
         _bloco_fila(s, g),
@@ -601,12 +602,13 @@ def build(s: Snapshot, *, largura: int, altura: int, log_path: str,
     partes: list[Bloco] = [corpo] if corpo.altura else []
     sobra = orcamento - corpo.altura
 
-    # `_ALERTAS_MIN` fica reservado o tempo todo: os blocos opcionais so entram
-    # com o que sobrar depois disso.
+    # `_ALERTAS_MIN` stays reserved at all times: the optional blocks only get
+    # whatever is left after that.
     if s.running and sobra >= _ALERTAS_MIN + _EXEC_MIN:
-        # O bloco custa `mostrados + 3` (cabecalho da tabela + 2 bordas), entao o
-        # teto de jobs e `sobra - _ALERTAS_MIN - 3`. Errar essa conta pelo lado
-        # otimista fazia o bloco nunca caber e sumir do painel sem aviso.
+        # The block costs `mostrados + 3` (table header + 2 borders), so the
+        # job ceiling is `sobra - _ALERTAS_MIN - 3`. Getting this math wrong on
+        # the optimistic side made the block never fit and vanish from the
+        # dashboard without warning.
         cabem = sobra - _ALERTAS_MIN - 3
         exec_bloco = _bloco_execucao(s, g, compacto, maximo=max(1, cabem))
         if exec_bloco.altura <= sobra - _ALERTAS_MIN:

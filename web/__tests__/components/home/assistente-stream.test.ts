@@ -1,14 +1,14 @@
 /**
- * A leitura do stream do assistente que a Home e a gaveta do editor dividem
- * (`home/assistente/stream.ts`). O que os hooks testam por fora — cota, turno,
- * parar — não se repete aqui; aqui fica o que é da peça em si.
+ * Reading of the assistant stream that the Home and the editor drawer share
+ * (`home/assistente/stream.ts`). What the hooks test from the outside — quota, turn,
+ * stop — is not repeated here; what stays here is what belongs to the piece itself.
  */
 import { describe, it, expect, vi } from "vitest"
 
 import { erroDaResposta, lerQuadrosSSE, type ErrosDaRota } from "@/app/components/home/assistente/stream"
 import type { QuadroSSE } from "@/app/components/home/assistente/quadros"
 
-/** Um corpo que entrega exatamente os pedaços dados, e anota se foi cancelado. */
+/** A body that delivers exactly the given chunks, and records whether it was canceled. */
 function corpoEmPedacos(pedacos: Uint8Array[]) {
   const estado = { cancelado: false }
   let i = 0
@@ -25,7 +25,7 @@ function corpoEmPedacos(pedacos: Uint8Array[]) {
 describe("lerQuadrosSSE", () => {
   it("um caractere de vários bytes partido entre dois read() chega inteiro", async () => {
     const bytes = new TextEncoder().encode('event: texto\ndata: {"texto":"atenção"}\n\n')
-    // Corta no meio do "ç" (dois bytes em UTF-8).
+    // Cuts in the middle of the "ç" (two bytes in UTF-8).
     const corte = bytes.indexOf(0xc3) + 1
     const { corpo } = corpoEmPedacos([bytes.slice(0, corte), bytes.slice(corte)])
 
@@ -46,8 +46,8 @@ describe("lerQuadrosSSE", () => {
 })
 
 describe("erroDaResposta", () => {
-  // Duas tabelas de mentira, como as das duas rotas: o mesmo status diz coisas
-  // diferentes em cada uma, e é por isso que a tabela entra por parâmetro.
+  // Two fake tables, like those of the two routes: the same status says different
+  // things in each one, and that is why the table comes in as a parameter.
   const HOME: ErrosDaRota = { 409: { code: "expirada", message: "A confirmação expirou." } }
   const EDITOR: ErrosDaRota = { 409: { code: "conversa_em_andamento", message: "Já há uma conversa." } }
   const resposta = (status: number, corpo?: unknown) =>

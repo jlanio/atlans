@@ -1,5 +1,5 @@
 # app/core/drive_events.py
-"""Modulo compartilhado para emissao de eventos Drive via Redis pub/sub."""
+"""Shared module for emitting Drive events via Redis pub/sub."""
 import json
 from app.core.utils.logger import get_logger
 
@@ -15,16 +15,16 @@ async def emit_drive_event(
     exclude_agent_id: str | None = None,
 ) -> None:
     """
-    Publica evento Drive no Redis para executores ativos do workspace.
+    Publishes a Drive event on Redis for the workspace's active executors.
 
-    file_info deve conter ao minimo: id_hash, original_name.
-    Campos opcionais: extension, size, content_md5, source.
+    file_info must contain at least: id_hash, original_name.
+    Optional fields: extension, size, content_md5, source.
     """
     from app.models.workspace import Workspace
     from app.core.db import AsyncSessionLocal
 
-    # Envelope assinado com APP_SECRET — o _drive_event_listener recusa qualquer
-    # mensagem sem HMAC válido antes de encaminhá-la ao WebSocket do executor.
+    # Envelope signed with APP_SECRET — _drive_event_listener refuses any
+    # message without a valid HMAC before forwarding it to the executor's WebSocket.
     from app.core.executor_connections import build_signed_envelope
 
     payload = build_signed_envelope(
@@ -35,9 +35,9 @@ async def emit_drive_event(
     rc = get_redis_pool()
     try:
         async with AsyncSessionLocal() as db:
-            # Executores que servem este workspace: ponteiro legado E membros
-            # de nível da política — todos podem receber jobs dele, então
-            # todos precisam saber que o Drive mudou.
+            # Executors that serve this workspace: the legacy pointer AND the policy's
+            # tier members — all of them may receive its jobs, so
+            # all of them need to know the Drive changed.
             vivo = await db.execute(
                 select(Workspace.id_hash).where(
                     Workspace.id_hash == workspace_id,
@@ -49,7 +49,7 @@ async def emit_drive_event(
                 from app.services.workspace_executor_service import executor_ids_for_workspaces
                 agent_ids |= await executor_ids_for_workspaces(db, [workspace_id])
 
-            # Tambem busca o executor default
+            # Also looks up the default executor
             from app.services.user_executor_service import get_default_agent
             default_ag = await get_default_agent(db)
             if default_ag:

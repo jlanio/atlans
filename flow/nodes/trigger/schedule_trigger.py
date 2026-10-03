@@ -6,9 +6,9 @@ from flow.utils.fuso import fuso_padrao_do_agendamento
 @register_node
 class ScheduleTrigger(BaseNode):
     """
-    Nó de gatilho baseado em agendamento (cron ou intervalo).
-    Este nó não dispara diretamente — ele serve como base para que a API agende
-    execuções futuras com base nos parâmetros definidos.
+    Schedule-based trigger node (cron or interval).
+    This node does not fire directly — it serves as the basis for the API to schedule
+    future runs according to the defined parameters.
     """
 
     @classmethod
@@ -51,22 +51,22 @@ class ScheduleTrigger(BaseNode):
                     "name": "timezone",
                     "label": "Fuso horário",
                     "type": "string",
-                    # No servidor, o MESMO valor que ele usa para agendar
-                    # (`app.core.constants.FUSO_PADRAO_DO_AGENDAMENTO`), lido
-                    # do ambiente em `flow/utils/fuso.py`. Não pode ser um
-                    # import de `app/`: os módulos de `flow/` só importam de
-                    # `app/` DENTRO de funções, porque o executor empacota
-                    # `flow/` sem `app/`, e `description()` roda no import.
+                    # On the server, the SAME value it uses for scheduling
+                    # (`app.core.constants.FUSO_PADRAO_DO_AGENDAMENTO`), read
+                    # from the environment in `flow/utils/fuso.py`. It cannot be an
+                    # import from `app/`: the `flow/` modules only import from
+                    # `app/` INSIDE functions, because the executor packages
+                    # `flow/` without `app/`, and `description()` runs at import.
                     #
-                    # Quem garante que servidor e nó não divirjam é
-                    # `test_mcp_gatilhos.py`: divergir faz o próximo save de
-                    # CADA workflow agendado recriar o schedule, zerando o
-                    # `next_run_at` e pulando a ocorrência do dia.
+                    # What guarantees that server and node do not diverge is
+                    # `test_mcp_gatilhos.py`: diverging makes the next save of
+                    # EVERY scheduled workflow recreate the schedule, resetting
+                    # `next_run_at` and skipping that day's occurrence.
                     #
-                    # No EXECUTOR, que não tem AGENDAMENTO_FUSO_PADRAO, este
-                    # default seria UTC — por isso o servidor preenche o
-                    # `timezone` ao despachar (app/services/fuso_do_agendamento.py),
-                    # e aqui ele só vale para quem monta o nó no próprio servidor.
+                    # On the EXECUTOR, which has no AGENDAMENTO_FUSO_PADRAO, this
+                    # default would be UTC — that is why the server fills in
+                    # `timezone` at dispatch (app/services/fuso_do_agendamento.py),
+                    # and here it only applies to whoever builds the node on the server itself.
                     "default": fuso_padrao_do_agendamento(),
                     "description": "Fuso horário de referência para execução"
                 },
@@ -93,5 +93,5 @@ class ScheduleTrigger(BaseNode):
 
     async def execute(self, inputs):
         self.validate()
-        # Este nó não executa diretamente — apenas serve como metadado para agendamento.
+        # This node does not execute directly — it only serves as metadata for scheduling.
         return {"status": "scheduled", "info": self.parameters}

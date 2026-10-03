@@ -1,23 +1,25 @@
 // desktop/src/shared/geosync.ts
 //
-// Constantes do GeoSync compartilhadas entre main e renderer.
+// GeoSync constants shared between main and renderer.
 //
-// Moram em `shared/` e não em `main/state/config.ts` por um motivo concreto: o
-// renderer roda no Chromium, sem `node:fs` nem `electron`. Importar um VALOR de
-// um módulo do main arrasta essas dependências para o bundle da tela, e a
-// página morre em branco no primeiro load — sem erro visível, porque a janela
-// já pintou o fundo antes do React tentar montar. Tipos podem vir do main (são
-// apagados na compilação); valores, não.
+// They live in `shared/` and not in `main/state/config.ts` for a concrete
+// reason: the renderer runs in Chromium, without `node:fs` or `electron`.
+// Importing a VALUE from a main-process module drags those dependencies into
+// the screen's bundle, and the page dies blank on the first load — with no
+// visible error, because the window has already painted the background before
+// React tries to mount. Types may come from main (they are erased at compile
+// time); values may not.
 
 /**
- * `EXECUTOR_SYNC_INTERVAL` que o app grava a cada salvar do GeoSync — escolha
- * DESTE app, e não o padrão do executor (30 s, que só vale quando a linha falta
- * no `.env`). O `.env.example`, que semeia o `.env` no enrollment, traz o
- * mesmo 10. `limites.test.ts` confere que o executor aceita o valor.
+ * `EXECUTOR_SYNC_INTERVAL` that the app writes on every GeoSync save — a choice
+ * of THIS app, not the executor's default (30 s, which only applies when the
+ * line is missing from `.env`). The `.env.example`, which seeds `.env` at
+ * enrollment, has the same 10. `limites.test.ts` checks that the executor
+ * accepts the value.
  */
 export const INTERVALO_SYNC = 10
 
-/** Direções aceitas por `EXECUTOR_SYNC_MODE`. */
+/** Directions accepted by `EXECUTOR_SYNC_MODE`. */
 export const MODOS_SYNC = ['upload', 'download', 'bidirectional', 'catalog'] as const
 export type ModoSync = (typeof MODOS_SYNC)[number]
 
@@ -26,13 +28,15 @@ export const ESTRATEGIAS = ['local-wins', 'remote-wins', 'keep-both'] as const
 export type EstrategiaConflito = (typeof ESTRATEGIAS)[number]
 
 /**
- * O que o executor faz quando `EXECUTOR_SYNC_MODE` / `_CONFLICT_STRATEGY` faltam
- * no `.env` — os padrões de `executor/config.py` (`limites.test.ts` compara).
+ * What the executor does when `EXECUTOR_SYNC_MODE` / `_CONFLICT_STRATEGY` are
+ * missing from `.env` — the defaults of `executor/config.py` (`limites.test.ts`
+ * compares them).
  *
- * A tela caía em `bidirectional` e mentia: o executor rodava `upload`, e salvar
- * qualquer ajuste do GeoSync gravava o `bidirectional` da tela, passando a
- * baixar do Drive sem ninguém ter escolhido. `upload` é também o padrão
- * seguro: nada que aconteça no Drive apaga ou sobrescreve arquivo local.
+ * The screen fell back to `bidirectional` and lied: the executor ran `upload`,
+ * and saving any GeoSync setting wrote the screen's `bidirectional`, so it
+ * started downloading from the Drive without anyone having chosen to. `upload`
+ * is also the safe default: nothing that happens in the Drive deletes or
+ * overwrites a local file.
  */
 export const PADRAO_SYNC = {
   modo: 'upload',

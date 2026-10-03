@@ -2,27 +2,27 @@ import { create } from 'zustand'
 import { Edge } from '@xyflow/react'
 import { INodeStatusWorkFlow, IStatusWorkflow, StatusNodeStatusWorkFlow, StatusWorkflow } from '@/context/useFlowContext'
 
-/** Origem da linha — separada do ciclo de vida (`status`).
+/** Origin of the line — separate from the lifecycle (`status`).
  *
- * Antes tudo vivia em `status` ("started"/"completed"/"failed" misturados com
- * "debug" e "log"), e o painel precisava filtrar por negação ("tudo que não é
- * erro nem print"). Com `kind` cada aba do painel tem um predicado direto.
+ * Before, everything lived in `status` ("started"/"completed"/"failed" mixed with
+ * "debug" and "log"), and the panel had to filter by negation ("everything that is
+ * neither an error nor a print"). With `kind` each panel tab has a direct predicate.
  */
 export type EventKind = 'lifecycle' | 'stdout' | 'debug'
 
-/** Severidade — independente do ciclo de vida. */
+/** Severity — independent of the lifecycle. */
 export type EventLevel = 'info' | 'warn' | 'error'
 
-/** Evento de execução normalizado, como chega do WebSocket ou do replay HTTP. */
+/** Normalized execution event, as it arrives from the WebSocket or the HTTP replay. */
 export interface RunEvent {
-  /** Ordem de chegada, atribuída pela store. É a `key` das linhas da aba
-   *  "Bruto": chavear pelo índice do array fazia a rotação (que remove stdout
-   *  do MEIO da lista) deslocar o índice de todos os sobreviventes, e o React
-   *  desmontava/remontava milhares de linhas de uma vez. */
+  /** Arrival order, assigned by the store. It is the `key` of the rows in the
+   *  "Bruto" (raw) tab: keying by the array index made rotation (which removes
+   *  stdout from the MIDDLE of the list) shift the index of every survivor, and
+   *  React unmounted/remounted thousands of rows at once. */
   seq: number
-  /** Epoch ms do evento no BACKEND — não a hora de chegada no browser.
-   *  Usar a hora local quebrava a linha do tempo no replay de re-anexação:
-   *  o histórico inteiro ganhava o timestamp do momento da reconexão. */
+  /** Epoch ms of the event in the BACKEND — not the arrival time in the browser.
+   *  Using local time broke the timeline in the re-attach replay: the whole
+   *  history got the timestamp of the moment of reconnection. */
   ts: number
   node?: string
   kind: EventKind
@@ -31,13 +31,13 @@ export interface RunEvent {
   node_name?: string
   node_type?: string
   message?: string | null
-  /** Linhas de `print()` de um evento de stdout AGREGADO (o executor junta a
-   *  saída em janelas de ~200 ms em vez de emitir um evento por linha).
+  /** `print()` lines from an AGGREGATED stdout event (the executor gathers the
+   *  output in ~200 ms windows instead of emitting one event per line).
    *
-   *  É a ÚNICA fonte de verdade da saída: o executor parou de repetir o mesmo
-   *  texto em `message`, porque a duplicação estourava o teto de 64 KB do frame
-   *  e o evento chegava reduzido aos campos de controle — o painel perdia as
-   *  200 linhas do lote de uma vez, em silêncio. */
+   *  It is the ONLY source of truth for the output: the executor stopped repeating
+   *  the same text in `message`, because the duplication blew the frame's 64 KB
+   *  ceiling and the event arrived reduced to the control fields — the panel lost
+   *  the batch's 200 lines at once, silently. */
   lines?: string[] | null
   duration_ms?: number | null
   output_keys?: string[] | null
@@ -48,24 +48,25 @@ export interface RunEvent {
   branch_result?: boolean
   cache_hit?: boolean
   schema_drift?: { missing: string[]; extra: string[] } | null
-  /** Id do nó SubWorkflow do canvas, quando o evento veio de DENTRO de um
-   *  sub-fluxo. Os nós do filho não existem no canvas do pai; sem isto a linha
-   *  aparecia no painel sem dizer de onde veio, e clicar nela não fazia nada. */
+  /** Id of the canvas SubWorkflow node, when the event came from INSIDE a
+   *  sub-workflow. The child's nodes do not exist on the parent's canvas; without
+   *  this the line appeared in the panel without saying where it came from, and
+   *  clicking it did nothing. */
   subworkflow_parent?: string | null
   raw: object
 }
 
 export type WsState = 'idle' | 'connecting' | 'open' | 'closed'
 
-/** Teto de eventos mantidos na memória do painel.
+/** Ceiling on events kept in the panel's memory.
  *
- *  Exportado porque o produtor (o buffer por quadro em `useExecuteWorkflow`)
- *  precisa do MESMO número: com a aba oculta o `requestAnimationFrame` não roda
- *  e o buffer cru cresceria sem limite antes de a rotação daqui ter chance de
- *  agir — um `for i in range(200000): print(i)` enchia centenas de MB. */
+ *  Exported because the producer (the per-frame buffer in `useExecuteWorkflow`)
+ *  needs the SAME number: with the tab hidden `requestAnimationFrame` does not run
+ *  and the raw buffer would grow without limit before the rotation here had a
+ *  chance to act — a `for i in range(200000): print(i)` filled hundreds of MB. */
 export const MAX_RUN_EVENTS = 2000
 
-/** Payload cru do canal de eventos (WS ou histórico HTTP). */
+/** Raw payload from the events channel (WS or HTTP history). */
 export interface RawEvent {
   node?: string
   kind?: string
@@ -93,17 +94,17 @@ export interface RawEvent {
   } | null
 }
 
-/** Normaliza o payload do canal para `RunEvent`.
+/** Normalizes the channel payload into `RunEvent`.
  *
- * `kind`/`level` são derivados de `status` quando ausentes: o histórico no Redis
- * tem TTL de 1h, então logo após um deploy ainda existem eventos publicados pelo
- * schema antigo circulando no replay.
+ * `kind`/`level` are derived from `status` when absent: the history in Redis has
+ * a 1h TTL, so right after a deploy there are still events published with the
+ * old schema circulating in the replay.
  */
-/** Origem da linha, com a derivação do schema antigo num lugar só.
+/** Origin of the line, with the old-schema derivation in a single place.
  *
- *  Quem decide se um evento mexe no canvas usa exatamente esta função — apostar
- *  em `data.kind` cru trataria um `status:"debug"` sem `kind` (histórico do
- *  Redis, até 1h após deploy) como ciclo de vida. */
+ *  Whatever decides whether an event touches the canvas uses exactly this
+ *  function — relying on raw `data.kind` would treat a `status:"debug"` without
+ *  `kind` (Redis history, up to 1h after a deploy) as lifecycle. */
 export function eventKind(data: RawEvent): EventKind {
   if (data.kind) return data.kind as EventKind
   if (data.status === 'log') return 'stdout'
@@ -118,8 +119,8 @@ export function toRunEvent(data: RawEvent): RunEvent {
     (data.level as EventLevel) ?? (status === 'failed' || status === 'error' ? 'error' : 'info')
 
   return {
-    // Substituído por um valor monotônico em `appendEvents`/`loadHistoricalEvents`
-    // — quem normaliza não conhece o contador do run.
+    // Replaced by a monotonic value in `appendEvents`/`loadHistoricalEvents`
+    // — the normalizer does not know the run's counter.
     seq: 0,
     ts: data.timestamp != null ? data.timestamp * 1000 : Date.now(),
     node: data.node,
@@ -144,12 +145,12 @@ export function toRunEvent(data: RawEvent): RunEvent {
   }
 }
 
-/** Adjacência `origem → arestas`, memoizada pela identidade do array.
+/** `source → edges` adjacency, memoized by array identity.
  *
- * Sem índice a BFS abaixo varria TODAS as arestas para cada nó visitado —
- * O(ramos × nós × arestas) a cada mensagem do WebSocket. O array de arestas vem
- * de `useEdges()` e só troca quando a topologia muda, então o WeakMap acerta em
- * praticamente toda chamada e libera a entrada sozinho quando o array morre.
+ * Without an index the BFS below scanned ALL edges for each visited node —
+ * O(branches × nodes × edges) on every WebSocket message. The edges array comes
+ * from `useEdges()` and only changes when the topology changes, so the WeakMap
+ * hits on practically every call and frees the entry by itself when the array dies.
  */
 const adjacenciaPorArestas = new WeakMap<Edge[], Map<string, Edge[]>>()
 
@@ -174,8 +175,8 @@ function computeLosingBranches(statusNodes: INodeStatusWorkFlow[], allEdges: Edg
   for (const node of statusNodes) {
     if (node.branch_result === undefined) continue
     const losingHandle = node.branch_result ? "false" : "true"
-    // Índice de leitura no lugar de `queue.shift()`, que é O(n) em array e
-    // tornava a BFS quadrática em ramos longos.
+    // A read index instead of `queue.shift()`, which is O(n) on an array and
+    // made the BFS quadratic on long branches.
     const queue: string[] = []
     let head = 0
     for (const edge of porOrigem.get(node.id) ?? []) {
@@ -199,7 +200,7 @@ function computeLosingBranches(statusNodes: INodeStatusWorkFlow[], allEdges: Edg
   return { losingNodeIds, losingEdgeIds }
 }
 
-/** Assinatura dos ramos já resolvidos — muda só quando um Conditional decide. */
+/** Signature of the already resolved branches — changes only when a Conditional decides. */
 function assinaturaDeRamos(statusNodes: INodeStatusWorkFlow[]): string {
   let assinatura = ""
   for (const node of statusNodes) {
@@ -209,11 +210,11 @@ function assinaturaDeRamos(statusNodes: INodeStatusWorkFlow[]): string {
   return assinatura
 }
 
-/** Ramos perdedores com curto-circuito por (assinatura, identidade das arestas).
+/** Losing branches, short-circuited by (signature, edges identity).
  *
- * A recomputação não é só cara: devolver Sets NOVOS a cada mensagem re-renderiza
- * todo nó e toda aresta que os assinam, mesmo quando nenhum Conditional decidiu
- * nada. Preservar a identidade é metade do ganho.
+ * The recomputation is not just expensive: returning NEW Sets on every message
+ * re-renders every node and every edge subscribed to them, even when no
+ * Conditional decided anything. Preserving identity is half the gain.
  */
 let ultimaAssinatura: string | null = null
 let ultimasArestas: Edge[] | null = null
@@ -228,11 +229,11 @@ function ramosPerdedores(statusNodes: INodeStatusWorkFlow[], allEdges: Edge[]) {
   return ultimosRamos
 }
 
-/** Índice `id → estado` do canvas.
+/** `id → state` index of the canvas.
  *
- * Cada nó e cada aresta montava o PRÓPRIO Map sobre a lista inteira de nós, a
- * cada mensagem — o custo O(1) prometido pelo comentário multiplicado por N+E.
- * Aqui ele é construído uma vez, e os componentes assinam só a própria entrada.
+ * Each node and each edge built its OWN Map over the whole node list, on every
+ * message — the O(1) cost promised by the comment multiplied by N+E.
+ * Here it is built once, and the components subscribe only to their own entry.
  */
 function indexarPorId(nodes: INodeStatusWorkFlow[]): Map<string, INodeStatusWorkFlow> {
   const index = new Map<string, INodeStatusWorkFlow>()
@@ -240,27 +241,27 @@ function indexarPorId(nodes: INodeStatusWorkFlow[]): Map<string, INodeStatusWork
   return index
 }
 
-/** Desfechos a partir dos quais o run é história: nada mais escreve no canvas.
+/** Outcomes after which the run is history: nothing else writes to the canvas.
  *
- *  O cliente aplica os eventos em LOTE, por quadro de `requestAnimationFrame`.
- *  Com a aba em segundo plano (ou a janela do desktop sem foco) o quadro não
- *  roda, mas o WebSocket continua entregando — então o lote fica pendente por
- *  tempo indeterminado enquanto o run termina e é liquidado. Quando o usuário
- *  volta, o quadro atrasado dispara e reaplica eventos ANTIGOS sobre um run já
- *  encerrado: o nó cujo último evento no lote era `started` volta a girar, e
- *  agora não há mais socket, nem `isExecuting`, nem quem o liquide de novo.
- *  Por isso o desfecho precisa ser definitivo aqui dentro, e não só no
- *  instante em que é decidido. */
+ *  The client applies events in BATCHES, per `requestAnimationFrame` frame.
+ *  With the tab in the background (or the desktop window unfocused) the frame
+ *  does not run, but the WebSocket keeps delivering — so the batch stays pending
+ *  for an indefinite time while the run finishes and is settled. When the user
+ *  comes back, the delayed frame fires and reapplies OLD events over an already
+ *  closed run: the node whose last event in the batch was `started` starts
+ *  spinning again, and now there is no socket, no `isExecuting`, nothing to
+ *  settle it again. That is why the outcome has to be final in here, and not only
+ *  at the instant it is decided. */
 export const RUN_ENCERRADO: ReadonlySet<string> = new Set(['completed', 'failed', 'cancelled'])
 
 const SEM_STATUS: Map<string, INodeStatusWorkFlow> = new Map()
 
-/** Aplica o teto de eventos descartando os `stdout` MAIS ANTIGOS.
+/** Applies the event ceiling by discarding the OLDEST `stdout` events.
  *
- * Eventos de ciclo de vida nunca são as vítimas: são a fonte do estado por nó na
- * aba "Nós", e jogá-los fora fazia um nó já concluído voltar a aparecer como
- * "aguardando" (contradizendo o próprio canvas) em runs que imprimem muito.
- * O corte é em bloco para amortizar o custo desta varredura.
+ * Lifecycle events are never the victims: they are the source of per-node state
+ * in the "Nós" (nodes) tab, and throwing them away made an already completed node
+ * show up again as "aguardando" (waiting) — contradicting the canvas itself — in
+ * runs that print a lot. The cut is done in blocks to amortize the cost of this scan.
  */
 function rotacionar(eventos: RunEvent[]): { events: RunEvent[]; dropped: number } {
   if (eventos.length <= MAX_RUN_EVENTS) return { events: eventos, dropped: 0 }
@@ -276,8 +277,8 @@ function rotacionar(eventos: RunEvent[]): { events: RunEvent[]; dropped: number 
     }
     kept.push(candidate)
   }
-  // Sem stdout suficiente para liberar espaço (workflow gigante, quase tudo
-  // ciclo de vida): cai no descarte cronológico puro.
+  // Not enough stdout to free space (a huge workflow, almost all of it
+  // lifecycle): falls back to pure chronological discard.
   if (kept.length > MAX_RUN_EVENTS) {
     const corte = Math.min(kept.length, kept.length - MAX_RUN_EVENTS + bloco)
     kept.splice(0, corte)
@@ -288,48 +289,48 @@ function rotacionar(eventos: RunEvent[]): { events: RunEvent[]; dropped: number 
 
 interface WorkflowExecutionState {
   statusWorkflow: IStatusWorkflow | null
-  /** Estado por nó, indexado. Os cards e as arestas assinam UMA entrada daqui
-   *  em vez do objeto `statusWorkflow` inteiro — assim só re-renderiza quem de
-   *  fato mudou. Sempre presente (Map vazio antes do primeiro run). */
+  /** Per-node state, indexed. The cards and the edges subscribe to ONE entry here
+   *  instead of the whole `statusWorkflow` object — so only what actually changed
+   *  re-renders. Always present (empty Map before the first run). */
   statusById: Map<string, INodeStatusWorkFlow>
   losingNodeIds: Set<string> | undefined
   losingEdgeIds: Set<string> | undefined
   debugMode: boolean
   isExecuting: boolean
   events: RunEvent[]
-  /** Estado real do socket — o indicador "ao vivo" do painel lê daqui.
-   *  Antes ele lia `isExecuting`, que é um proxy: socket morto continuava verde. */
+  /** The socket's real state — the panel's "live" indicator reads from here.
+   *  Before, it read `isExecuting`, which is a proxy: a dead socket stayed green. */
   wsState: WsState
-  /** Run cujos eventos estão carregados. Pode ser um run histórico (concluído)
-   *  aberto pelo painel, não necessariamente o run em execução. */
+  /** Run whose events are loaded. It may be a historical (finished) run opened
+   *  from the panel, not necessarily the run being executed. */
   viewingRunId: string | null
-  /** true quando os eventos vieram do endpoint HTTP e não de um run ao vivo. */
+  /** true when the events came from the HTTP endpoint and not from a live run. */
   isHistorical: boolean
-  /** Quantas linhas de saída foram descartadas — pela rotação LOCAL e pelo
-   *  back-pressure do SERVIDOR (campo `dropped` do frame de eventos). Exibido na
-   *  aba "Bruto" — truncar em silêncio faz o painel parecer completo quando não
-   *  é, e o descarte do servidor é justamente o que o usuário não tem como
-   *  perceber sozinho. */
+  /** How many output lines were discarded — by LOCAL rotation and by SERVER
+   *  back-pressure (the `dropped` field of the events frame). Shown in the
+   *  "Bruto" tab — truncating silently makes the panel look complete when it is
+   *  not, and the server's discard is precisely what the user has no way of
+   *  noticing on their own. */
   droppedEvents: number
-  /** Epoch ms do primeiro evento do run, fixado na chegada.
-   *  Guardado fora de `events` porque a lista tem rotação: derivar o início do
-   *  primeiro item sobrevivente deslocaria todos os offsets `+Xs` do painel. */
+  /** Epoch ms of the run's first event, fixed on arrival.
+   *  Kept outside `events` because the list rotates: deriving the start from the
+   *  first surviving item would shift all of the panel's `+Xs` offsets. */
   runStartedTs: number | null
-  /** Nós SubWorkflow do canvas que já executaram algo lá dentro.
+  /** Canvas SubWorkflow nodes that have already executed something inside.
    *
-   *  Mantido aqui, e alimentado a O(1) por evento, porque o canvas precisa da
-   *  resposta por nó: varrer `events` num selector custaria uma passada pela
-   *  lista inteira, por nó SubWorkflow, a cada mensagem do WebSocket. Sobrevive
-   *  à rotação de `events` de propósito — o nó não deixa de ter sido executado
-   *  porque o evento mais antigo foi descartado. */
+   *  Kept here, and fed at O(1) per event, because the canvas needs the answer
+   *  per node: scanning `events` in a selector would cost a pass over the whole
+   *  list, per SubWorkflow node, on every WebSocket message. It survives the
+   *  rotation of `events` on purpose — the node does not stop having been
+   *  executed because the oldest event was discarded. */
   subflowRoots: Set<string>
-  /** Contador de `seq`. Zerado junto com a lista de eventos. */
+  /** `seq` counter. Reset together with the events list. */
   eventSeq: number
-  /** Desfecho do run (`__workflow_complete__`), guardado a O(1) na chegada.
+  /** Outcome of the run (`__workflow_complete__`), stored at O(1) on arrival.
    *
-   *  Existe para a barra do painel poder dizer "concluído em 3,2 s" SEM que
-   *  ninguém precise reconstruir a linha do tempo — com o painel fechado essa
-   *  reconstrução era trabalho puro de CPU que nunca chegava à tela. */
+   *  It exists so the panel bar can say "concluído em 3,2 s" (done in 3.2 s)
+   *  WITHOUT anyone having to rebuild the timeline — with the panel closed that
+   *  rebuild was pure CPU work that never reached the screen. */
   runOutcome: RunOutcome | null
 }
 
@@ -341,9 +342,9 @@ export interface RunOutcome {
   retryable: boolean | null
 }
 
-/** Id sintético que o backend usa para sinalizar o fim do run.
- *  Repetido aqui (e não importado de run-panel/timeline) para a store não
- *  depender de um componente. */
+/** Synthetic id the backend uses to signal the end of the run.
+ *  Repeated here (and not imported from run-panel/timeline) so the store does
+ *  not depend on a component. */
 const WF_COMPLETE = "__workflow_complete__"
 
 function desfechoDoEvento(event: RunEvent): RunOutcome | null {
@@ -366,19 +367,19 @@ interface WorkflowExecutionActions {
   resetExecution(): void
   setDebugMode(v: boolean): void
   setWsState(v: WsState): void
-  /** Anexa um LOTE de eventos com uma única cópia do array.
+  /** Appends a BATCH of events with a single copy of the array.
    *
-   *  Um evento por `set()` fazia `[...events, event]` por mensagem — O(H²) no
-   *  acumulado, e no replay de re-anexação (milhares de eventos) isso sozinho
-   *  congelava a aba. O produtor agrupa por quadro e entrega tudo de uma vez. */
+   *  One event per `set()` did `[...events, event]` per message — O(H²)
+   *  cumulatively, and in the re-attach replay (thousands of events) that alone
+   *  froze the tab. The producer groups by frame and delivers everything at once. */
   appendEvents(events: RunEvent[]): void
-  /** Soma ao contador de descarte os eventos que o SERVIDOR jogou fora por
-   *  back-pressure (o buffer de 500 slots do WebSocket evicta o stdout mais
-   *  antigo e informa quantos no campo `dropped` do frame).
+  /** Adds to the discard counter the events the SERVER threw away due to
+   *  back-pressure (the WebSocket's 500-slot buffer evicts the oldest stdout and
+   *  reports how many in the frame's `dropped` field).
    *
-   *  Sem isto o aviso âmbar da aba "Bruto" contava só a rotação local: o painel
-   *  afirmava estar completo enquanto centenas de linhas de `print()` tinham
-   *  sido descartadas no caminho. */
+   *  Without this the amber warning in the "Bruto" tab counted only the local
+   *  rotation: the panel claimed to be complete while hundreds of `print()` lines
+   *  had been discarded along the way. */
   registrarDescartados(quantidade: number): void
   clearEvents(): void
   loadHistoricalEvents(runId: string, events: RunEvent[]): void
@@ -413,7 +414,7 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
       statusById: indexarPorId(iniciais),
       losingNodeIds: undefined,
       losingEdgeIds: undefined,
-      // Zera os eventos da execução anterior — painel deve começar limpo.
+      // Clears the previous execution's events — the panel must start clean.
       events: [],
       droppedEvents: 0,
       runStartedTs: null,
@@ -438,9 +439,9 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
 
   updateNodeStatuses: (nodes, allEdges) => {
     set(state => {
-      // Um run encerrado não volta atrás. Ver `RUN_ENCERRADO`: sem esta guarda,
-      // um lote atrasado devolvia o nó a `started` E o workflow a `running`,
-      // deixando o anel azul girando para sempre num run já concluído.
+      // A closed run does not go back. See `RUN_ENCERRADO`: without this guard,
+      // a late batch returned the node to `started` AND the workflow to `running`,
+      // leaving the blue ring spinning forever on an already finished run.
       if (state.statusWorkflow && RUN_ENCERRADO.has(state.statusWorkflow.status)) {
         return {}
       }
@@ -459,17 +460,18 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
   },
 
   completeExecution: (status, nodes, allEdges) => {
-    // O run acabou: nenhum nó pode continuar em `started`. Antes só o
-    // cancelamento liquidava, e por isso um `completed` de nó perdido no
-    // caminho (o socket cai sem aviso, o servidor evicta sob pressão, o
-    // executor descarta com a fila cheia) deixava aquele nó girando PARA
-    // SEMPRE — com o run já marcado como concluído no painel e no dashboard.
+    // The run ended: no node may stay in `started`. Before, only cancellation
+    // settled them, and so a node `completed` lost along the way (the socket
+    // drops without warning, the server evicts under pressure, the executor
+    // discards with a full queue) left that node spinning FOREVER — with the
+    // run already marked as finished in the panel and in the dashboard.
     //
-    // Os dois desfechos são diferentes e não podem ser confundidos:
-    //   cancelled → o trabalho foi interrompido de fato; volta a `idle`.
-    //   demais    → o nó provavelmente terminou e a notícia é que se perdeu;
-    //               vira `unknown`, que a UI mostra como "resultado não
-    //               recebido". Pintar de verde seria inventar um resultado.
+    // The two outcomes are different and must not be confused:
+    //   cancelled → the work was actually interrupted; goes back to `idle`.
+    //   others    → the node probably finished and it is the news that got lost;
+    //               becomes `unknown`, which the UI shows as "resultado não
+    //               recebido" (result not received). Painting it green would be
+    //               inventing a result.
     const paradoComo: StatusNodeStatusWorkFlow = status === 'cancelled' ? 'idle' : 'unknown'
     const settled = nodes.some(n => n.status === 'started')
       ? nodes.map(n => (n.status === 'started' ? { ...n, status: paradoComo } : n))
@@ -478,8 +480,8 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
     set(state => ({
       statusWorkflow: {
         status,
-        // Preserva o task_id: o painel usa para oferecer "ver na observabilidade"
-        // e para recarregar os eventos deste run depois de concluído.
+        // Preserves the task_id: the panel uses it to offer "ver na observabilidade"
+        // (view in observability) and to reload this run's events after it finishes.
         task_id: state.statusWorkflow?.task_id,
         nodes: settled,
       },
@@ -493,10 +495,10 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
 
   failExecution: () => {
     set(state => {
-      // Mesmo invariante do `completeExecution`: o run fechou, então nenhum nó
-      // sobrevive em `started`. Sem isto, esgotar as reconexões encerrava o
-      // painel mas deixava os nós girando — o sintoma que se queria eliminar,
-      // reintroduzido pelo caminho da desistência.
+      // Same invariant as `completeExecution`: the run closed, so no node
+      // survives in `started`. Without this, exhausting the reconnections closed
+      // the panel but left the nodes spinning — the symptom we wanted to
+      // eliminate, reintroduced through the give-up path.
       const nodes = state.statusWorkflow?.nodes ?? []
       const settled = nodes.some(n => n.status === 'started')
         ? nodes.map(n => (n.status === 'started' ? { ...n, status: 'unknown' as const } : n))
@@ -522,14 +524,14 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
       statusById: SEM_STATUS,
       losingNodeIds: undefined,
       losingEdgeIds: undefined,
-      // `debugMode` NÃO entra aqui: é preferência do usuário, não estado de run.
-      // Como o botão Executar limpa o run anterior antes de disparar o novo,
-      // resetá-lo aqui apagava o toggle amarelo no exato clique em que o debug
-      // deveria valer — o request saía em debug, mas a UI dizia o contrário.
+      // `debugMode` is NOT included here: it is a user preference, not run state.
+      // Since the Executar button clears the previous run before firing the new one,
+      // resetting it here erased the yellow toggle on the very click in which debug
+      // should apply — the request went out in debug, but the UI said otherwise.
       isExecuting: false,
       wsState: 'idle',
-      // Limpa eventos também — sem isso, ao trocar de workflow os logs do
-      // anterior continuavam visíveis no painel até a próxima execução.
+      // Clears events too — without this, when switching workflows the previous
+      // one's logs stayed visible in the panel until the next execution.
       events: [],
       droppedEvents: 0,
       runStartedTs: null,
@@ -555,13 +557,13 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
       let eventSeq = state.eventSeq
       let runStartedTs = state.runStartedTs
       let runOutcome = state.runOutcome
-      // Um Set novo só quando entra alguém: recriá-lo a cada lote faria todo nó
-      // que consulta este conjunto re-renderizar a cada quadro.
+      // A new Set only when someone gets in: recreating it on every batch would make
+      // every node that queries this set re-render on every frame.
       let subflowRoots = state.subflowRoots
       for (const event of lote) {
-        // Os eventos do lote acabaram de sair de `toRunEvent`, nesta mesma
-        // volta do loop de eventos — ninguém mais os viu, numerá-los aqui é a
-        // única forma de o contador ser o da store.
+        // The batch's events just came out of `toRunEvent`, in this same turn of
+        // the event loop — nobody else has seen them, numbering them here is the
+        // only way for the counter to be the store's.
         event.seq = eventSeq++
         runStartedTs ??= event.ts
         const pai = event.subworkflow_parent
@@ -572,7 +574,7 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
         runOutcome = desfechoDoEvento(event) ?? runOutcome
       }
 
-      // Uma cópia por lote — não uma por evento.
+      // One copy per batch — not one per event.
       const { events, dropped } = rotacionar(state.events.concat(lote))
       return {
         events,
@@ -601,9 +603,9 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
       if (event.subworkflow_parent) subflowRoots.add(event.subworkflow_parent)
       runOutcome = desfechoDoEvento(event) ?? runOutcome
     }
-    // O mesmo teto do caminho ao vivo: o endpoint devolve até 5000 eventos e
-    // renderizá-los todos de uma vez travava a aba por segundos — o caminho
-    // histórico não pode ser pior que o ao vivo.
+    // The same ceiling as the live path: the endpoint returns up to 5000 events and
+    // rendering them all at once locked up the tab for seconds — the historical
+    // path cannot be worse than the live one.
     const { events: mantidos, dropped } = rotacionar(events)
     let seq = 0
     for (const event of mantidos) event.seq = seq++

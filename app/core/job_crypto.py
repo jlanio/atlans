@@ -1,16 +1,16 @@
 # app/core/job_crypto.py
 """
-Criptografia de Jobs para Executores.
+Job encryption for Executors.
 
-Esquema:
-  - Cifra:   X25519 (ECDH efêmero) + HKDF-SHA256 + AES-256-GCM
-  - Assina:  Ed25519 (chave estática do servidor)
+Scheme:
+  - Encrypts: X25519 (ephemeral ECDH) + HKDF-SHA256 + AES-256-GCM
+  - Signs:    Ed25519 (static server key)
 
-Forward secrecy por job: cada job usa um par efêmero X25519 descartado após envio.
-O executor só consegue descriptografar com sua chave privada X25519 —
-comprometer a chave estática do executor não expõe jobs anteriores.
+Per-job forward secrecy: each job uses an ephemeral X25519 pair discarded after sending.
+The executor can only decrypt with its X25519 private key —
+compromising the executor's static key does not expose earlier jobs.
 
-Formato da mensagem enviada ao executor:
+Format of the message sent to the executor:
 {
   "envelope": {
     "job_id":          str (UUID4),
@@ -21,9 +21,9 @@ Formato da mensagem enviada ao executor:
     "expires_at":      str (ISO8601),
     "nonce":           str (32 bytes hex)
   },
-  "ephemeral_public":  str (base64 — X25519 pub efêmero do servidor),
+  "ephemeral_public":  str (base64 — server's ephemeral X25519 pub),
   "ciphertext":        str (base64 — AES-256-GCM output: nonce_gcm || tag || ct),
-  "signature":         str (base64 — Ed25519 sobre canonical_bytes)
+  "signature":         str (base64 — Ed25519 over canonical_bytes)
 }
 """
 import base64
@@ -53,26 +53,26 @@ from app.core.config import EXECUTOR_SIGNING_KEY
 
 logger = get_logger(__name__)
 
-# Duração de validade de cada job
-_JOB_TTL_SECONDS = int(os.getenv("EXECUTOR_JOB_TTL_SECONDS", "300"))  # 5 min padrão
+# Validity duration of each job
+_JOB_TTL_SECONDS = int(os.getenv("EXECUTOR_JOB_TTL_SECONDS", "300"))  # 5 min default
 
-# HKDF info — identifica o contexto da derivação de chave
+# HKDF info — identifies the key derivation context
 _HKDF_INFO = b"atlas-executor-job-v1"
 
 
-# ── Chave de assinatura Ed25519 do servidor ───────────────────────────────────
+# ── Server Ed25519 signing key ────────────────────────────────────────────────
 
-# Chaves ja reconstruidas, indexadas pelo valor bruto da variavel de ambiente.
+# Already reconstructed keys, indexed by the raw value of the environment variable.
 _chaves_assinatura: dict[str, Ed25519PrivateKey | None] = {}
 
 
 def _load_signing_key() -> Ed25519PrivateKey | None:
-    """Carrega a chave privada Ed25519 a partir de EXECUTOR_SIGNING_KEY (base64).
+    """Load the Ed25519 private key from EXECUTOR_SIGNING_KEY (base64).
 
-    Memoizada: sem cache, o base64 + a reconstrucao da chave Ed25519 rodavam a
-    cada job — dentro do laco de candidatos do dispatch, no event loop. O cache
-    e por CONTEUDO da variavel (e nao um `lru_cache` sem argumentos) para que
-    trocar a chave, nos testes ou num reload de config, continue valendo.
+    Memoized: without a cache, the base64 + Ed25519 key reconstruction ran for
+    every job — inside the dispatch candidate loop, on the event loop. The cache
+    is keyed by the variable's CONTENT (and not an argument-less `lru_cache`) so
+    that changing the key, in tests or on a config reload, still takes effect.
     """
     if not EXECUTOR_SIGNING_KEY:
         return None
@@ -90,8 +90,8 @@ def _load_signing_key() -> Ed25519PrivateKey | None:
 
 def get_server_signing_public_key_b64() -> str | None:
     """
-    Retorna a chave pública Ed25519 do servidor em base64.
-    Distribuída aos executores no momento do registro para verificação de assinaturas.
+    Return the server's Ed25519 public key in base64.
+    Distributed to executors at registration time for signature verification.
     """
     key = _load_signing_key()
     if key is None:
@@ -100,10 +100,10 @@ def get_server_signing_public_key_b64() -> str | None:
     return base64.b64encode(pub).decode()
 
 
-# ── Helpers de serialização de chave X25519 ──────────────────────────────────
+# ── X25519 key serialization helpers ─────────────────────────────────────────
 
 def x25519_pub_from_pem(pem: str) -> X25519PublicKey:
-    """Carrega chave pública X25519 de PEM (SubjectPublicKeyInfo)."""
+    """Load an X25519 public key from PEM (SubjectPublicKeyInfo)."""
     from cryptography.hazmat.primitives.serialization import load_pem_public_key
     return load_pem_public_key(pem.encode())
 
@@ -119,23 +119,23 @@ def build_job_message(
     job_id: str | None = None,
 ) -> dict:
     """
-    Monta, cifra e assina um Job para envio ao executor.
+    Build, encrypt and sign a Job to send to the executor.
 
-    Parâmetros:
-        executor_id             — id_hash do executor destinatário
-        workspace_id         — workspace_id para auditoria no executor
-        agent_x25519_pub_pem — chave pública X25519 do executor (PEM)
-        job_type             — ex: "run_workflow"
-        payload              — dados sensíveis a serem cifrados. Aceita o dict
-                               ou o JSON já serializado em bytes: no failover a
-                               mesma mensagem é remontada por candidato, e para
-                               um workflow grande cada `json.dumps` custa alguns
-                               milissegundos de event loop parado. Quem chama em
-                               laço serializa uma vez e passa os bytes.
-        job_id               — UUID do job; gerado automaticamente se None
+    Args:
+        executor_id             — id_hash of the recipient executor
+        workspace_id         — workspace_id for auditing on the executor
+        agent_x25519_pub_pem — the executor's X25519 public key (PEM)
+        job_type             — e.g. "run_workflow"
+        payload              — sensitive data to be encrypted. Accepts the dict
+                               or the JSON already serialized to bytes: on failover
+                               the same message is rebuilt per candidate, and for
+                               a large workflow each `json.dumps` costs a few
+                               milliseconds of stalled event loop. Callers in a
+                               loop serialize once and pass the bytes.
+        job_id               — the job's UUID; generated automatically if None
 
-    Retorna o dict pronto para enviar via WebSocket (json.dumps).
-    Lança RuntimeError se EXECUTOR_SIGNING_KEY não estiver configurada.
+    Returns the dict ready to send via WebSocket (json.dumps).
+    Raises RuntimeError if EXECUTOR_SIGNING_KEY is not configured.
     """
     signing_key = _load_signing_key()
     if signing_key is None:
@@ -150,7 +150,7 @@ def build_job_message(
     now = datetime.now(timezone.utc)
     nonce_hex = secrets.token_hex(32)  # 32 bytes = 256 bits
 
-    # ── Envelope (metadados não-cifrados, incluídos na assinatura) ────────────
+    # ── Envelope (unencrypted metadata, included in the signature) ────────────
     envelope = {
         "job_id":          job_id,
         "target_executor_id": executor_id,
@@ -164,7 +164,7 @@ def build_job_message(
     # ── Cifra o payload com X25519 + AES-256-GCM ──────────────────────────────
     agent_pub = x25519_pub_from_pem(agent_x25519_pub_pem)
 
-    # Par efêmero — descartado após esta função retornar (forward secrecy)
+    # Ephemeral pair — discarded after this function returns (forward secrecy)
     ephemeral_priv = X25519PrivateKey.generate()
     ephemeral_pub  = ephemeral_priv.public_key()
     ephemeral_pub_raw = ephemeral_pub.public_bytes(Encoding.Raw, PublicFormat.Raw)
@@ -172,7 +172,7 @@ def build_job_message(
     # ECDH
     shared_secret = ephemeral_priv.exchange(agent_pub)
 
-    # Derivação de chave AES via HKDF — o nonce serve como salt
+    # AES key derivation via HKDF — the nonce serves as the salt
     aes_key = HKDF(
         algorithm=SHA256(),
         length=32,
@@ -204,7 +204,7 @@ def build_job_message(
     ).encode()
     signature_b64 = base64.b64encode(signing_key.sign(canonical)).decode()
 
-    # Limpa material sensível da memória (best-effort em Python)
+    # Clear sensitive material from memory (best-effort in Python)
     del shared_secret, aes_key, plaintext
 
     return {

@@ -1,19 +1,19 @@
 # tests/unit/test_base_zero.py
-"""A base zero (F3 da simplificação): uma revisão, cujo corpo é o init_schema.
+"""The zero baseline (F3 of the simplification): one revision, whose body is init_schema.
 
-O que morre se qualquer um destes falhar:
+What dies if any of these fails:
 
-- Mais de um arquivo em `alembic/versions/` significa que a cadeia voltou a
-  crescer POR CIMA da base zero sem decisão — o caminho novo é editar o
-  `init_schema.sql` (o corpo) enquanto nada está em produção, ou reabrir a
-  discussão de migrações incrementais quando estiver.
-- O filtro de `alembic_version` deixando passar um comando faz o upgrade
-  duplicar o carimbo (o INSERT do arquivo + o do próprio alembic).
-- O carimbo do script divergindo do `revision` faz psql e alembic produzirem
-  bancos que discordam sobre a própria versão.
+- More than one file in `alembic/versions/` means the chain started growing
+  ON TOP of the zero baseline again without a decision — the new path is to edit
+  `init_schema.sql` (the body) while nothing is in production, or to reopen the
+  incremental-migrations discussion when something is.
+- The `alembic_version` filter letting a command through makes the upgrade
+  duplicate the stamp (the file's INSERT + alembic's own).
+- The script's stamp diverging from `revision` makes psql and alembic produce
+  databases that disagree about their own version.
 
-A convergência de CONTEÚDO (tabelas/colunas × models) segue com
-`test_init_schema_bootstrap.py` — aqui é a mecânica da revisão única.
+CONTENT convergence (tables/columns × models) stays with
+`test_init_schema_bootstrap.py` — here it is the mechanics of the single revision.
 """
 import importlib.util
 import re
@@ -28,7 +28,7 @@ SQL = (RAIZ / "scripts" / "init_schema.sql").read_text(encoding="utf-8")
 
 
 def _base_zero():
-    """Importa a migração pelo caminho — `alembic/` não é pacote."""
+    """Imports the migration by path — `alembic/` is not a package."""
     (arquivo,) = [p for p in VERSOES.glob("*.py") if p.name != "__init__.py"]
     spec = importlib.util.spec_from_file_location("base_zero", arquivo)
     mod = importlib.util.module_from_spec(spec)
@@ -52,19 +52,19 @@ def test_o_filtro_tira_todo_comando_sobre_alembic_version():
     assert not re.search(
         r"^\s*(DROP|CREATE|INSERT)[^\n]*alembic_version", filtrado, re.M | re.I
     )
-    # E só isso: o resto do script está lá inteiro.
+    # And only that: the rest of the script is there whole.
     assert "CREATE EXTENSION IF NOT EXISTS postgis" in filtrado
     assert "CREATE TABLE users" in filtrado
     assert "DROP TABLE IF EXISTS users CASCADE" in filtrado
 
 
 def test_o_filtro_nao_engole_o_script_num_regex_guloso():
-    """O `CREATE TABLE alembic_version (...)` é removido com re.S; um regex
-    guloso comeria dali até o ÚLTIMO `);` do arquivo. As tabelas vizinhas
-    (audit_events antes, o INSERT depois) têm de sobreviver.
+    """The `CREATE TABLE alembic_version (...)` is removed with re.S; a greedy
+    regex would eat from there to the LAST `);` of the file. The neighboring
+    tables (audit_events before, the INSERT after) have to survive.
 
-    A contagem ancora em início de linha porque comentários também dizem
-    «CREATE TABLE» — e o filtro remove comentários de propósito."""
+    The count anchors at line start because comments also say
+    "CREATE TABLE" — and the filter removes comments on purpose."""
     mod = _base_zero()
     filtrado = mod._sql_sem_alembic_version(SQL)
     assert "CREATE TABLE audit_events" in filtrado
@@ -84,24 +84,24 @@ def test_o_carimbo_do_script_e_a_propria_revisao():
 
 
 def test_upgrade_recusa_banco_populado_sem_carimbo():
-    """O único caminho destrutivo: tabelas presentes + alembic_version vazia é
-    o único estado em que o alembic chega ao corpo da base zero com dados na
-    frente — e o corpo é DROP ALL. A guarda tem de existir, consultar o banco
-    (to_regclass) e apontar os dois remédios. Provado ao vivo na entrega da
-    F3; aqui o texto prende a guarda contra remoção acidental."""
+    """The only destructive path: tables present + empty alembic_version is
+    the only state in which alembic reaches the zero baseline's body with data in
+    the way — and the body is DROP ALL. The guard has to exist, query the database
+    (to_regclass) and point to the two remedies. Proven live in the F3
+    delivery; here the text pins the guard against accidental removal."""
     (arquivo,) = [p for p in VERSOES.glob("*.py") if p.name != "__init__.py"]
     fonte = arquivo.read_text(encoding="utf-8")
     assert "to_regclass('public.users')" in fonte
     assert "APAGARIA" in fonte
     assert "stamp --purge 9ed006ca1660" in fonte
-    # E a guarda não pode barrar a geração offline (--sql).
+    # And the guard must not block offline generation (--sql).
     assert "is_offline_mode" in fonte
 
 
 def test_upgrade_roda_o_schema_de_cada_extensao_depois_do_nucleo(monkeypatch, tmp_path):
-    """As tabelas de uma extensão (app/extensoes) moram no `schema.sql` dela: a
-    base zero roda o script do núcleo e, depois, cada um — com o mesmo filtro.
-    Sem extensão, só o do núcleo."""
+    """An extension's tables (app/extensoes) live in its `schema.sql`: the
+    zero baseline runs the core script and, after it, each one — with the same filter.
+    Without extensions, only the core one."""
     import app.extensoes
 
     esquema = tmp_path / "schema.sql"
@@ -130,20 +130,21 @@ def test_downgrade_recusa_com_o_caminho_certo():
 
 
 def test_nenhum_resto_de_atlans_drop():
-    """As flags ATLANS_DROP_* eram o opt-in de downgrade destrutivo das
-    migrações antigas; morreram com elas. Uma menção executável que sobre é
-    caminho de código morto voltando."""
+    """The ATLANS_DROP_* flags were the opt-in for destructive downgrade in the
+    old migrations; they died with them. A leftover executable mention is
+    dead code path coming back."""
     for arquivo in VERSOES.glob("*.py"):
         assert "ATLANS_DROP" not in arquivo.read_text(encoding="utf-8")
 
 
 def test_guarda_tambem_no_offline():
-    """O --sql é um script EXECUTÁVEL — e roda longe dos olhos do alembic.
+    """The --sql output is an EXECUTABLE script — and it runs far from alembic's eyes.
 
-    A guarda online (to_regclass) não existe na geração offline; sem o
-    preâmbulo, o script gerado aplicado às cegas num banco populado sem carimbo
-    fazia o DROP ALL sem uma única pergunta (achado da revisão adversarial de
-    2026-09-24). Gerar continua sempre permitido; é a EXECUÇÃO que se recusa.
+    The online guard (to_regclass) doesn't exist in offline generation; without
+    the preamble, the generated script applied blindly to a populated database
+    without a stamp did the DROP ALL without a single question (finding from the
+    adversarial review of 2026-09-24). Generating is still always allowed; it is
+    the EXECUTION that refuses.
     """
     mod = _base_zero()
     assert "DO $guarda_base_zero$" in mod._GUARDA_OFFLINE
@@ -157,13 +158,14 @@ def test_guarda_tambem_no_offline():
 
 
 def test_dockerfile_leva_o_corpo_da_migracao():
-    """A migração lê scripts/init_schema.sql EM RUNTIME (`_RAIZ / "scripts"`).
+    """The migration reads scripts/init_schema.sql AT RUNTIME (`_RAIZ / "scripts"`).
 
-    Sem a cópia no Dockerfile.api o corpo fica FORA da imagem: qualquer
-    `alembic upgrade head` em produção — banco novo, ou um deploy que aplique
-    as migrações sozinho num banco vazio — morre em FileNotFoundError antes
-    de criar o schema. Em produção carimbada ninguém percebe, porque o upgrade
-    nunca roda (achado da revisão adversarial de 2026-09-24).
+    Without the copy in Dockerfile.api the body is left OUT of the image: any
+    `alembic upgrade head` in production — a new database, or a deploy that
+    applies the migrations on its own to an empty database — dies with
+    FileNotFoundError before creating the schema. In stamped production nobody
+    notices, because the upgrade never runs (finding from the adversarial review
+    of 2026-09-24).
     """
     dockerfile = (RAIZ / "Dockerfile.api").read_text(encoding="utf-8")
     assert re.search(

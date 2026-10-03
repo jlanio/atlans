@@ -10,13 +10,13 @@ logger = get_logger(__name__)
 @register_node
 class ValidateGeometryNode(BaseNode):
     """
-    Valida as geometrias de um GeoDataFrame e, dependendo do modo,
-    corrige, remove ou apenas reporta as geometrias inválidas.
+    Validates the geometries of a GeoDataFrame and, depending on the mode,
+    fixes, removes or only reports the invalid geometries.
 
-    Modos:
-      - fix:    Tenta corrigir geometrias inválidas aplicando buffer(0).
-      - remove: Remove as linhas com geometrias inválidas.
-      - report: Não modifica o GeoDataFrame; retorna um dict de estatísticas.
+    Modes:
+      - fix:    Tries to fix invalid geometries by applying buffer(0).
+      - remove: Removes the rows with invalid geometries.
+      - report: Does not modify the GeoDataFrame; returns a dict of statistics.
     """
 
     @classmethod
@@ -53,10 +53,10 @@ class ValidateGeometryNode(BaseNode):
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
 
-        # mode já validado contra as options pelo self.validate().
+        # mode already validated against the options by self.validate().
         mode = self.parameters['mode'].strip().lower()
 
-        # Obtém o GeoDataFrame de entrada via helper da classe base
+        # Gets the input GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
 
         logger.info(
@@ -90,12 +90,12 @@ class ValidateGeometryNode(BaseNode):
                     logger.info(
                         f"Corrigindo {n_invalid} geometrias inválidas via buffer(0)."
                     )
-                    # Aplica buffer(0) apenas em geometrias inválidas (não nulas)
+                    # Applies buffer(0) only to invalid (non-null) geometries
                     fixable = invalid_mask & df.geometry.notnull()
                     result.loc[fixable, result.geometry.name] = (
                         result.loc[fixable, result.geometry.name].buffer(0)
                     )
-                    # Após correção, verifica se ainda há inválidas
+                    # After fixing, checks whether there are still invalid ones
                     still_invalid = int((~result.geometry.is_valid).sum())
                     if still_invalid > 0:
                         logger.warning(
@@ -114,7 +114,7 @@ class ValidateGeometryNode(BaseNode):
                     )
                 return {"output": result, "stats": stats}
 
-            # Não deve chegar aqui por causa da validação prévia
+            # Should not get here because of the prior validation
             raise RuntimeError(f"Modo inesperado: '{mode}'.")
 
         try:

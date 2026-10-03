@@ -3,10 +3,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testi
 import type { IConversaResumo } from "@/service/types"
 
 /**
- * O painel "Meu → Chats" (os "Recentes"): a linha de cada conversa, a ativa, o
- * menu ⋯ (renomear/apagar), os estados da lista e os diálogos na paleta da
- * Home. O hook de dados é um dublê controlável; o menu é passthrough (sem
- * portal/pointer do Radix), então os itens ficam diretamente clicáveis.
+ * The "Meu → Chats" panel (the "Recentes"): each conversation's row, the active one, the
+ * ⋯ menu (rename/delete), the list states and the dialogs in the Home's
+ * palette. The data hook is a controllable double; the menu is a passthrough (no
+ * Radix portal/pointer), so the items are directly clickable.
  */
 
 const H = vi.hoisted(() => ({
@@ -22,9 +22,9 @@ const H = vi.hoisted(() => ({
 
 vi.mock("@/app/hooks/home/useConversas", () => ({ useConversas: () => H.hook }))
 vi.mock("@/utils/createToast", () => ({ createToast: { success: vi.fn(), error: (...a: unknown[]) => H.toastErro(...a) } }))
-// Passthrough do menu: sem portal/pointer, os itens ficam no DOM e clicáveis. O
-// `className` PASSA de propósito — é por ele que os testes de tema (`home-portal`)
-// e de alvo de toque (40px) enxergam o que o componente pediu.
+// Menu passthrough: without portal/pointer, the items stay in the DOM and clickable. The
+// `className` PASSES THROUGH on purpose — it is through it that the theme (`home-portal`)
+// and touch target (40px) tests see what the component asked for.
 vi.mock("@/app/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -85,16 +85,16 @@ describe("ChatsLista — a linha", () => {
   })
 
   it("o principal ocupa o espaço que existe e trunca — o ⋯ é irmão no flex, nunca por cima", () => {
-    // O defeito que isto tranca: o título em `nowrap` num `<button>` sem
-    // largura transbordava a linha inteira até a borda da barra, sem truncar;
-    // e o ⋯ `absolute` com `pr-7` reservado à mão tinha folga zero.
+    // The defect this locks: the `nowrap` title in a `<button>` with no
+    // width overflowed the whole row up to the edge of the bar, without truncating;
+    // and the `absolute` ⋯ with `pr-7` reserved by hand had zero slack.
     montar()
     const botao = screen.getByTitle("Focos em Rondônia")
     for (const c of ["min-w-0", "flex-1", "text-left"]) expect(botao.className).toContain(c)
     expect(botao.querySelector("span")!.className).toContain("truncate")
 
-    // O mock do menu envolve o gatilho num <div>; no DOM real o Radix não põe
-    // wrapper. O que importa: os dois vivem na MESMA linha flex.
+    // The menu mock wraps the trigger in a <div>; in the real DOM Radix adds no
+    // wrapper. What matters: both live in the SAME flex row.
     const gatilho = gatilhoDe("Focos em Rondônia")
     const linha = botao.closest('[data-slot="linha-do-meu"]')!
     expect(gatilho.closest('[data-slot="linha-do-meu"]')).toBe(linha)
@@ -165,8 +165,8 @@ describe("ChatsLista — estados", () => {
   })
 
   it("o 'Tentar de novo' do rodapé refaz o que FALHOU, não a lista inteira", () => {
-    // Depois de um "Ver mais" que caiu, recarregar tudo custava N GETs, não
-    // trazia a página que faltava e ainda devolvia a lista ao teto de 100.
+    // After a failed "Ver mais", reloading everything cost N GETs, did not
+    // bring the missing page and still returned the list to the ceiling of 100.
     Object.assign(H.hook, { erro: "Não foi possível carregar mais conversas.", jaCarregou: true })
     montar()
     fireEvent.click(within(screen.getByRole("status")).getByText("Tentar de novo"))
@@ -184,8 +184,8 @@ describe("ChatsLista — renomear e apagar", () => {
   })
 
   it("Apagar abre o DeleteDialog na paleta da Home; a falha vira toast", async () => {
-    // O `DeleteDialog` é compartilhado pelo app inteiro e nasce sem paleta: a
-    // Home tem de passar `home-portal`, senão ele abria branco sobre #050505.
+    // The `DeleteDialog` is shared by the whole app and is born without a palette: the
+    // Home has to pass `home-portal`, otherwise it opened white over #050505.
     H.hook.apagar.mockResolvedValue({ ok: false, erro: "servidor fora" })
     montar()
     fireEvent.click(within(screen.getAllByTestId("menu")[0]).getByText("Apagar"))
@@ -210,15 +210,15 @@ describe("ChatsLista — o anúncio do stream chega à lista", () => {
   })
 
   it("o que já estava na store ao montar é passado — a carga de montagem traz a verdade", () => {
-    // No telefone a lista remonta a cada abertura da gaveta; reaplicar um
-    // anúncio antigo sobre a lista recém-carregada seria trabalho em dobro.
+    // On the phone the list remounts every time the drawer opens; reapplying an
+    // old announcement over the freshly loaded list would be double work.
     useHomeStore.getState().anunciarConversa(anuncio)
     montar()
     expect(H.hook.anunciar).not.toHaveBeenCalled()
   })
 
   it("com uma carga em voo o anúncio espera, e é aplicado quando ela acaba", () => {
-    // A resposta da carga SUBSTITUI a lista: aplicado no meio, o anúncio sumia.
+    // The load response REPLACES the list: applied in the middle, the announcement vanished.
     Object.assign(H.hook, { carregando: true, jaCarregou: false, conversas: [] })
     const { rerender } = montar()
     act(() => { useHomeStore.getState().anunciarConversa(anuncio) })
@@ -231,7 +231,7 @@ describe("ChatsLista — o anúncio do stream chega à lista", () => {
 })
 
 describe("ChatsLista — apagar a conversa ativa", () => {
-  /** Apaga "c1" pelo menu e espera o diálogo fechar (o desfecho já foi aplicado). */
+  /** Deletes "c1" through the menu and waits for the dialog to close (the outcome has already been applied). */
   async function apagarPrimeira() {
     fireEvent.click(within(screen.getAllByTestId("menu")[0]).getByText("Apagar"))
     const dialogo = await screen.findByRole("dialog")
@@ -241,8 +241,8 @@ describe("ChatsLista — apagar a conversa ativa", () => {
   }
 
   it("apagar a ATIVA limpa a seleção — a Home fica como no botão 'Nova conversa'", async () => {
-    // Sem isto o painel seguia mostrando a conversa morta e a mensagem
-    // seguinte ia com o id apagado: 404.
+    // Without this the panel kept showing the dead conversation and the next
+    // message went out with the deleted id: 404.
     H.hook.apagar.mockResolvedValue({ ok: true })
     useHomeStore.setState({ conversaId: "c1" })
     montar()

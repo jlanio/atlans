@@ -1,11 +1,11 @@
 /**
- * O layout raiz lê os fundos de mapa da instalação (MAPA_*) a cada pedido e os
- * entrega ao provider que o MapLibreMap consulta.
+ * The root layout reads the install's map backgrounds (MAPA_*) on each request and
+ * hands them to the provider that MapLibreMap consults.
  *
- * Achado da revisão do lote D2: nenhum teste quebrava se o layout parasse de
- * montar o provider — o mapa cairia nas ruas do OpenStreetMap em silêncio. E o
- * valor tem de vir do ambiente em tempo de pedido, e não do build: a imagem do
- * web é a mesma para toda instalação.
+ * Finding from the batch D2 review: no test broke if the layout stopped
+ * mounting the provider — the map would silently fall back to OpenStreetMap streets. And the
+ * value has to come from the environment at request time, not from the build: the web
+ * image is the same for every install.
  */
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { isValidElement, type ReactElement, type ReactNode } from "react"
@@ -14,7 +14,7 @@ vi.mock("next/headers", () => ({
   cookies: async () => ({ get: () => undefined }),
 }))
 vi.mock("@/app/fonts/inter", () => ({ inter: { variable: "font-inter" } }))
-// O CSS do Tailwind não é o que se testa aqui, e processá-lo pede o PostCSS.
+// Tailwind's CSS is not what is tested here, and processing it requires PostCSS.
 vi.mock("@/app/globals.css", () => ({}))
 
 import RootLayout from "@/app/layout"

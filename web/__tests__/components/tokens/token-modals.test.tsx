@@ -3,11 +3,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { ApiToken, ApiTokenCreated, IWorkspace } from "@/service/types"
 
 /**
- * Diálogos de token: criar (2 passos) e revogar.
+ * Token dialogs: create (2 steps) and revoke.
  *
- * O ponto mais delicado é o passo 2: o segredo aparece UMA vez, tem que ser
- * copiável, e os snippets de conexão NUNCA podem embutir o segredo real —
- * levam `${ATLANS_TOKEN}`, para que colar um comando num chat não vaze o token.
+ * The most delicate point is step 2: the secret appears ONCE, has to be
+ * copyable, and the connection snippets must NEVER embed the real secret —
+ * they carry `${ATLANS_TOKEN}`, so that pasting a command into a chat doesn't leak the token.
  */
 
 const svc = vi.hoisted(() => ({
@@ -28,7 +28,7 @@ import RevokeToken from "@/app/components/tokens/dialog-content/revoke-token"
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
 const falhou = (message: string, status = 500) => ({ success: false, status, error: { name: "AxiosError", message } })
 
-// Segredo sintético, num ponto só, para o detect-secrets não acusar a fixture.
+// Synthetic secret, in a single place, so detect-secrets doesn't flag the fixture.
 const SEGREDO_FAKE = "atl_teste_0000000000000000000000000000" // pragma: allowlist secret
 
 const WORKSPACES: IWorkspace[] = [
@@ -91,12 +91,12 @@ describe("CreateToken — passo 1 (formulário)", () => {
   it("envia o payload certo: nome aparado, escopos na ordem canônica, workspaces todos marcados, 90 dias", async () => {
     const { dialogo, onCreated } = renderCriar()
     nomear(dialogo, "  Agente de relatórios  ")
-    // Clica fora de ordem de propósito: o payload sai na ordem canônica.
+    // Clicks out of order on purpose: the payload comes out in canonical order.
     const executar = escopo(dialogo, "Executar fluxos")
     fireEvent.click(executar)
     fireEvent.click(escopo(dialogo, "Ler fluxos"))
     expect(executar).toHaveAttribute("aria-pressed", "true")
-    // As caixas de workspace nascem todas marcadas.
+    // The workspace checkboxes all start checked.
     expect(within(dialogo).getByRole("checkbox", { name: "Bacia" })).toHaveAttribute("aria-checked", "true")
     expect(within(dialogo).getByRole("checkbox", { name: "Cadastro" })).toHaveAttribute("aria-checked", "true")
 
@@ -219,11 +219,11 @@ describe("CreateToken — passo 2 (segredo e conexão)", () => {
     await criarBasico(dialogo)
     const grupo = within(dialogo).getByRole("group", { name: "Cliente MCP" })
     const snippet = () => dialogo.querySelector("pre")!.textContent ?? ""
-    // O endereço é o da página aberta, e não um fixo no código.
+    // The address is that of the open page, not one hard-coded.
     const mcp = `${window.location.origin}/mcp`
     expect(urlDoMcp()).toBe(mcp)
 
-    // Claude Code é o padrão.
+    // Claude Code is the default.
     expect(within(grupo).getByRole("button", { name: "Claude Code" })).toHaveAttribute("aria-pressed", "true")
     expect(snippet()).toBe(`claude mcp add --transport http atlans ${mcp} --header "Authorization: Bearer \${ATLANS_TOKEN}"`)
 
@@ -236,15 +236,15 @@ describe("CreateToken — passo 2 (segredo e conexão)", () => {
     expect(snippet()).toBe(`npx mcp-remote ${mcp} --header "Authorization:\${AUTH_HEADER}"`)
     expect(within(dialogo).getByText(/defina AUTH_HEADER="Bearer …" no ambiente/i)).toBeInTheDocument()
 
-    // Nenhum dos três leva o segredo real; todos apontam para o mesmo servidor.
+    // None of the three carries the real secret; all point to the same server.
     for (const c of CLIENTES) {
       expect(c.snippet).not.toContain(SEGREDO_FAKE)
       expect(c.snippet).toContain(URL_DO_MCP)
     }
-    // O servidor ja esta no ar: o rodape manda conectar e aponta a documentacao.
+    // The server is already up: the footer says to connect and points to the docs.
     expect(dialogo).toHaveTextContent(`Conecte pelo comando acima. Limites e detalhes em ${DOCS_MCP}.`)
 
-    // Copiar o comando copia o snippet com o endereço desta instalação, não o segredo.
+    // Copying the command copies the snippet with this installation's address, not the secret.
     fireEvent.click(within(dialogo).getByRole("button", { name: "Copiar comando" }))
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(snippetCom(CLIENTES[2].snippet, mcp)))
   })
@@ -294,7 +294,7 @@ describe("RevokeToken", () => {
     await waitFor(() => expect(createToast.error).toHaveBeenCalledWith("Não foi possível revogar o token", "token não encontrado"))
     expect(onRevoked).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
-    // O botão volta a funcionar depois da falha.
+    // The button works again after the failure.
     await waitFor(() => expect(within(dialogo).getByRole("button", { name: "Revogar" })).not.toBeDisabled())
   })
 })

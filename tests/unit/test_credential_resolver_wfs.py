@@ -1,10 +1,10 @@
 # tests/unit/test_credential_resolver_wfs.py
-"""As credenciais do nó WFS chegam em `http_auth`, como as do HttpRequest.
+"""The WFS node's credentials arrive in `http_auth`, like HttpRequest's.
 
-Antes, a credencial "wfs" era resolvida, tinha o `credential_id` removido e
-sumia sem nada no lugar — o nó saía anônimo. Agora ela e a nova
-`geoserver_authkey` são injetadas, só com os campos que autenticam (a lista
-fechada: nada de `expires_at` atravessando até o executor).
+Before, the "wfs" credential was resolved, had its `credential_id` removed and
+vanished with nothing in its place — the node went out anonymous. Now it and
+the new `geoserver_authkey` are injected, with only the fields that
+authenticate (the closed list: no `expires_at` crossing over to the executor).
 """
 import pytest
 
@@ -30,9 +30,9 @@ async def test_authkey_do_geoserver_vai_em_http_auth():
 
 
 async def test_o_id_em_maiusculas_tambem_e_resolvido():
-    # O resolver devolve o id canônico (minúsculas); gravado em maiúsculas no
-    # nó, ele não casava com nada e a credencial sumia sem aviso — enquanto a
-    # guarda do /validate, que converte para UUID, o aceitava.
+    # The resolver returns the canonical id (lowercase); stored in uppercase on
+    # the node, it matched nothing and the credential vanished without warning —
+    # while the /validate guard, which converts to UUID, accepted it.
     definicao = _definicao()
     definicao["nodes"][0]["properties"]["credential_id"] = CID.upper()
     saida = await inject_credentials(definicao, pre_resolved={CID: {"type": "geoserver_authkey", "token": "K"}})
@@ -49,21 +49,21 @@ async def test_credencial_wfs_basic_deixa_de_sumir():
 async def test_a_definicao_guardada_nao_recebe_o_segredo():
     definicao = _definicao()
     await inject_credentials(definicao, pre_resolved={CID: {"type": "geoserver_authkey", "token": "K"}})
-    assert "http_auth" not in definicao["nodes"][0]["properties"]  # só a cópia do despacho
+    assert "http_auth" not in definicao["nodes"][0]["properties"]  # only the dispatch copy
 
 
 async def test_http_auth_da_credencial_so_para_quem_assina_requisicao():
-    # A de banco vira `connectionString`, não `http_auth`: a listagem do WFS a recusa.
+    # The database one becomes `connectionString`, not `http_auth`: the WFS listing rejects it.
     assert http_auth_da_credencial({"type": "postgresql", "connectionString": "postgresql://h/db"}) is None
     assert http_auth_da_credencial(
         {"type": "geoserver_authkey", "token": "K", "location": "header", "expires_at": "2027-01-01T00:00:00Z"}
     ) == {"type": "geoserver_authkey", "token": "K", "location": "header"}
 
 
-# ── O tipo da credencial contra o que o nó declara ───────────────────────────
-# Só a tela filtra por tipo; pela API e pelo assistente chega qualquer uma.
+# ── The credential type against what the node declares ───────────────────────
+# Only the screen filters by type; via the API and the assistant any type arrives.
 
-import flow.nodes.datasource.wfs  # noqa: E402,F401 — registra o nó WFS
+import flow.nodes.datasource.wfs  # noqa: E402,F401 — registers the WFS node
 
 
 @pytest.mark.parametrize("cred", [
@@ -74,15 +74,16 @@ import flow.nodes.datasource.wfs  # noqa: E402,F401 — registra o nó WFS
 async def test_tipo_que_o_no_nao_aceita_nao_injeta_nada_e_o_id_fica(cred):
     saida = await inject_credentials(_definicao(), pre_resolved={CID: cred})
     props = saida["nodes"][0]["properties"]
-    # O nó recusa por "não pôde ser resolvida" em vez de consultar anônimo — e
-    # a DSN do banco não viaja até um nó WFS.
+    # The node rejects with "não pôde ser resolvida" (could not be resolved)
+    # instead of querying anonymously — and the database DSN does not travel
+    # to a WFS node.
     assert props["credential_id"] == CID
     assert "connectionString" not in props and "http_auth" not in props
 
 
 async def test_o_tipo_decide_nao_a_dsn_esquecida_no_data():
-    # Credencial que já foi de banco e virou authkey: a edição trocou o tipo e
-    # manteve os campos, e a `connectionString` antiga ganhava.
+    # A credential that used to be a database one and became an authkey: the edit
+    # changed the type and kept the fields, and the old `connectionString` won.
     resolvido = {CID: {"type": "geoserver_authkey", "token": "K",
                        "connectionString": "postgresql://leitor:senha@h/db"}}  # pragma: allowlist secret
     props = (await inject_credentials(_definicao(), pre_resolved=resolvido))["nodes"][0]["properties"]
@@ -91,7 +92,7 @@ async def test_o_tipo_decide_nao_a_dsn_esquecida_no_data():
 
 
 async def test_no_de_banco_com_credencial_authkey_nao_recebe_nada_e_o_id_fica():
-    import flow.nodes.datasource.database_spatial_query  # noqa: F401 — registra o nó
+    import flow.nodes.datasource.database_spatial_query  # noqa: F401 — registers the node
     definicao = {"nodes": [{"id": "n1", "name": "DatabaseSpatialQuery", "type": "datasource",
                             "properties": {"credential_id": CID, "query": "SELECT 1"}}]}
     saida = await inject_credentials(definicao, pre_resolved={CID: {"type": "geoserver_authkey", "token": "K"}})
@@ -100,7 +101,7 @@ async def test_no_de_banco_com_credencial_authkey_nao_recebe_nada_e_o_id_fica():
 
 
 async def test_o_nome_do_no_so_em_data_tambem_e_conferido():
-    # O editor grava nome e propriedades em `data`; o tipo é conferido do mesmo jeito.
+    # The editor stores name and properties in `data`; the type is checked the same way.
     definicao = {"nodes": [{"id": "n1", "type": "datasource",
                             "data": {"name": "WFS", "properties": {"url": "https://geo.x/ows", "credential_id": CID}}}]}
     saida = await inject_credentials(definicao, pre_resolved={CID: {"type": "postgresql", "connectionString": "postgresql://h/db"}})
@@ -109,8 +110,9 @@ async def test_o_nome_do_no_so_em_data_tambem_e_conferido():
 
 
 async def test_so_os_campos_do_tipo_viajam():
-    # Credencial que já foi Basic e virou authkey ainda carrega usuário e senha
-    # no `data`: só o que o catálogo declara para o tipo vai ao executor.
+    # A credential that used to be Basic and became an authkey still carries user
+    # and password in `data`: only what the catalog declares for the type goes
+    # to the executor.
     resolvido = {CID: {"type": "geoserver_authkey", "token": "K", "username": "u", "password": "p", "location": "header"}}
     props = (await inject_credentials(_definicao(), pre_resolved=resolvido))["nodes"][0]["properties"]
     assert props["http_auth"] == {"type": "geoserver_authkey", "token": "K", "location": "header"}
@@ -121,9 +123,10 @@ async def test_so_os_campos_do_tipo_viajam():
 
 
 async def test_no_que_nao_declara_a_propriedade_nao_recebe_a_credencial(monkeypatch):
-    # Um nó que aceita o tipo mas não declara `http_auth`: `validate()` descarta
-    # o que não está no descriptor, e o nó perdia a credencial E o id — saía
-    # anônimo sem ninguém avisar. Com o id no lugar, ele recusa.
+    # A node that accepts the type but does not declare `http_auth`: `validate()`
+    # discards what is not in the descriptor, and the node lost the credential
+    # AND the id — it went out anonymous with no one warning. With the id in
+    # place, it rejects.
     from flow.registry import NODE_REGISTRY
 
     class _SemHttpAuth:
@@ -140,10 +143,11 @@ async def test_no_que_nao_declara_a_propriedade_nao_recebe_a_credencial(monkeypa
 
 
 async def test_o_dataoutput_nao_publico_continua_com_o_id_da_credencial():
-    # O webhook_token não vira DSN nem autenticação HTTP: o DataOutput usa o
-    # PRÓPRIO id para proteger o artefato. Removê-lo fazia o nó recusar por
-    # "exige uma credencial" com a credencial escolhida.
-    import flow.nodes.outputs.data_output  # noqa: F401 — registra o nó
+    # The webhook_token does not become a DSN nor HTTP authentication: DataOutput
+    # uses the id ITSELF to protect the artifact. Removing it made the node
+    # reject with "exige uma credencial" (requires a credential) with the
+    # credential chosen.
+    import flow.nodes.outputs.data_output  # noqa: F401 — registers the node
     definicao = {"nodes": [{"id": "n1", "name": "DataOutput", "type": "output",
                             "properties": {"isPublic": False, "credential_id": CID}}]}
     saida = await inject_credentials(definicao, pre_resolved={CID: {"type": "webhook_token", "token": "T"}})

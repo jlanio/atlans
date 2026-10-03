@@ -1,23 +1,22 @@
 # flow/nodes/trigger/sub_workflow_input.py
 """
-SubWorkflowInput — entry point de um workflow chamado como sub-fluxo.
+SubWorkflowInput — entry point of a workflow called as a sub-workflow.
 
-Espelho do SubWorkflowOutput: define a "API publica de entrada". Quando A
-chama B via SubWorkflow, o `inputsMapping` de A mapeia chaves para o
-initial_inputs do executor de B. O SubWorkflowInput recebe esses
-initial_inputs e os expoe como outputs nomeados — utilizaveis nas edges
-seguintes do canvas de B.
+Mirror of SubWorkflowOutput: defines the "public input API". When A calls
+B via SubWorkflow, A's `inputsMapping` maps keys to the initial_inputs of
+B's executor. SubWorkflowInput receives those initial_inputs and exposes
+them as named outputs — usable on the following edges of B's canvas.
 
-Diferenca do WebhookTrigger:
-  - WebhookTrigger e para entrada HTTP externa (payload com schema, etc).
-  - SubWorkflowInput e para entrada de outro workflow interno (chaves ja
-    vem nomeadas via inputsMapping do caller).
+Difference from WebhookTrigger:
+  - WebhookTrigger is for external HTTP input (payload with a schema, etc).
+  - SubWorkflowInput is for input from another internal workflow (keys
+    already arrive named via the caller's inputsMapping).
 
-Exemplo no canvas de B:
+Example on B's canvas:
     SubWorkflowInput  ─[from_key="focos", to_key="data"]──► PythonScript
                       ─[from_key="bbox",  to_key="region"]──► ...
 
-Workflow A chamando B:
+Workflow A calling B:
     SubWorkflow(B, inputsMapping={"focos": "minha_camada", "bbox": "regiao"})
 """
 from typing import Any, Dict
@@ -32,7 +31,7 @@ logger = get_logger(__name__)
 
 @register_node
 class SubWorkflowInput(BaseNode):
-    """Entry point para workflow usado como sub-fluxo."""
+    """Entry point for a workflow used as a sub-workflow."""
 
     @classmethod
     def description(cls) -> Dict[str, Any]:
@@ -59,37 +58,37 @@ class SubWorkflowInput(BaseNode):
                     ),
                 },
             ],
-            # As SAIDAS deste trigger SAO as `ports` declaradas: cada porta vira
-            # um ponto de conexao de saida no canvas, e a edge que sai dela leva
-            # `from_key` = nome da porta, entao o proximo node recebe SO aquela
-            # chave (ex: [from_key="focos"] -> {"focos": ...}). E o simetrico do
-            # `dynamic_inputs` do SubWorkflowOutput, no lado da entrada.
-            # Sem esta flag o trigger tinha um unico ponto de saida anonimo e cada
-            # edge espalhava o dict inteiro — impossivel escolher o que passar.
-            # `ports` vazio/1 porta mantem o ponto anonimo (modo passthrough).
+            # This trigger's OUTPUTS ARE the declared `ports`: each port becomes
+            # an output connection point on the canvas, and the edge leaving it carries
+            # `from_key` = port name, so the next node receives ONLY that
+            # key (e.g. [from_key="focos"] -> {"focos": ...}). It is the counterpart of
+            # SubWorkflowOutput's `dynamic_inputs`, on the input side.
+            # Without this flag the trigger had a single anonymous output point and each
+            # edge spread the whole dict — impossible to choose what to pass.
+            # Empty `ports`/1 port keeps the anonymous point (passthrough mode).
             "outputs_from_ports": True,
             "outputs": [
             ],
         }
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        # Filtra metadados internos do executor (chaves comecando com __)
-        # — initial_inputs nao deveria carregar isso, mas defesa em profundidade.
+        # Filters out the executor's internal metadata (keys starting with __)
+        # — initial_inputs should not carry that, but defense in depth.
         raw = {k: v for k, v in (inputs or {}).items() if not k.startswith("__")}
 
-        # `ports` declarado = allowlist estrita, simetrica ao SubWorkflowOutput.
-        # Antes o filtro so existia na saida: o contrato de entrada valia no save
-        # e era ignorado em runtime, entao o filho recebia o namespace inteiro do
-        # pai — inclusive chaves fora do contrato.
-        # `ports` vazio mantem o passthrough (modo "aceita tudo").
+        # Declared `ports` = strict allowlist, symmetric to SubWorkflowOutput.
+        # Before, the filter only existed on the output: the input contract applied on
+        # save and was ignored at runtime, so the child received the parent's whole
+        # namespace — including keys outside the contract.
+        # Empty `ports` keeps the passthrough ("accept everything" mode).
         declared = _parse_ports(self.parameters.get("ports"))
         if not declared:
             return raw
 
         public = {k: v for k, v in raw.items() if k in declared}
 
-        # Descarte nunca e silencioso: sem este aviso, o operador que mapeia uma
-        # chave nao declarada ve o sub-fluxo rodar "com sucesso" e sem o dado.
+        # A drop is never silent: without this warning, the operator who maps an
+        # undeclared key sees the sub-workflow run "successfully" and without the data.
         dropped = sorted(set(raw) - set(public))
         if dropped:
             logger.warning(

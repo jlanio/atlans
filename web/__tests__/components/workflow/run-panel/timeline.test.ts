@@ -20,9 +20,9 @@ function lifecycle(node: string, status: string, atMs: number, extra: Partial<Ru
   }
 }
 
-/** Evento de stdout como o executor emite hoje: o texto vive SÓ em `lines`.
- *  `message` deixou de repetir o mesmo conteúdo — a duplicação estourava o teto
- *  de 64 KB do evento e o lote inteiro chegava sem saída nenhuma. */
+/** A stdout event as the executor emits it today: the text lives ONLY in `lines`.
+ *  `message` stopped repeating the same content — the duplication blew the
+ *  event's 64 KB ceiling and the whole batch arrived with no output at all. */
 function stdout(node: string, atMs: number, ...lines: string[]): RunEvent {
   return { seq: 0, ts: T0 + atMs, node, kind: "stdout", level: "info", status: "log", lines, raw: {} }
 }
@@ -55,8 +55,8 @@ describe("buildTimeline", () => {
   })
 
   it("mantém os offsets corretos quando o começo da lista foi descartado", () => {
-    // A store fixa `runStartedTs` na chegada do primeiro evento justamente para
-    // este caso: derivar de events[0] deslocaria tudo após a rotação.
+    // The store pins `runStartedTs` on the arrival of the first event precisely
+    // for this case: deriving it from events[0] would shift everything after rotation.
     const rotated = [lifecycle("b", "started", 4000), lifecycle("b", "completed", 4200, { duration_ms: 200 })]
     const timeline = buildTimeline(rotated, [], T0)
     expect(timeline.nodes[0].startOffsetMs).toBe(4000)
@@ -73,9 +73,9 @@ describe("buildTimeline", () => {
   })
 
   it("confia no canvas quando os eventos do nó foram descartados", () => {
-    // Cenário do run que imprime muito: o `completed` de 'a' sumiu da lista,
-    // mas o canvas acumulou o estado. Sem reconciliação, 'a' voltaria a
-    // aparecer como "aguardando" — contradizendo o próprio grafo.
+    // Scenario of the run that prints a lot: the `completed` of 'a' dropped off the
+    // list, but the canvas accumulated the state. Without reconciliation, 'a'
+    // would show up again as "aguardando" (waiting) — contradicting the graph itself.
     const timeline = buildTimeline(
       [stdout("b", 900, "linha")],
       [canvasNode("a", "completed", { duration: 320, output_keys: ["out"] }), canvasNode("b", "started")],
@@ -108,8 +108,8 @@ describe("buildTimeline", () => {
   })
 
   it("desdobra o stdout agregado: uma linha de painel por item de `lines`", () => {
-    // O executor deixou de emitir um evento por print() — agrega em janelas de
-    // ~200ms. Sem desdobrar, três prints viravam UMA linha com \n no meio.
+    // The executor stopped emitting one event per print() — it aggregates in
+    // ~200ms windows. Without unfolding, three prints became ONE row with \n in the middle.
     const timeline = buildTimeline(
       [
         lifecycle("a", "started", 0),
@@ -124,10 +124,10 @@ describe("buildTimeline", () => {
   })
 
   it("`lines` é a única fonte da saída — `message` não vira print", () => {
-    // Fonte única: com as duas chaves, o mesmo texto viajava DUPLICADO no evento
-    // e o lote de 200 linhas passava do teto de 64 KB, chegando aqui reduzido aos
-    // campos de controle. Se `message` voltasse a alimentar prints, um evento de
-    // schema misto duplicaria toda a saída na aba "Nós".
+    // Single source: with both keys, the same text traveled DUPLICATED in the
+    // event and the 200-line batch went over the 64 KB ceiling, arriving here
+    // stripped down to the control fields. If `message` fed prints again, a
+    // mixed-schema event would duplicate the whole output in the "Nós" tab.
     const timeline = buildTimeline(
       [{
         seq: 0, ts: T0 + 100, node: "a", kind: "stdout", level: "info", status: "log",
@@ -193,7 +193,7 @@ describe("buildTimeline", () => {
     expect(timeline.workflow.status).toBe("failed")
     expect(timeline.workflow.durationMs).toBe(200)
     expect(timeline.workflow.category).toBe("transient")
-    // O nó sintético do fim do run não vira uma linha da lista.
+    // The synthetic end-of-run node doesn't become a row in the list.
     expect(timeline.nodes.every(n => n.nodeId !== WF_COMPLETE)).toBe(true)
   })
 

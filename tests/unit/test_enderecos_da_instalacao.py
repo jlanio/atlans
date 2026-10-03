@@ -1,17 +1,18 @@
 # tests/unit/test_enderecos_da_instalacao.py
 """
-Nenhum endereço de uma instalação específica no código: cada um vem do ambiente.
+No address of a specific installation in the code: each one comes from the environment.
 
-O mesmo código roda na instalação de qualquer pessoa. Antes, a tela de
-matrícula mandava rodar `curl https://<site do dono>/executores/install | bash`,
-o install.sh trazia o servidor e o repositório do dono como padrão, o MCP só
-aceitava o host do dono e o painel buscava o instalador desktop nas releases
-dele, em qualquer instalação.
+The same code runs on anyone's installation. Before, the enrollment screen told
+you to run `curl https://<site do dono>/executores/install | bash` (the owner's
+site), install.sh
+carried the owner's server and repository as defaults, the MCP only accepted
+the owner's host and the panel fetched the desktop installer from the owner's
+releases, on any installation.
 
-  CONVENÇÃO   o que deriva do FRONTEND_URL (host dos executores, MCP, remetente)
-  MATRÍCULA   o OTP volta com os endereços desta instalação
-  INSTALADOR  o install.sh servido traz os padrões do servidor que o serve
-  DESKTOP     sem DESKTOP_RELEASES_REPO, o painel não oferece o app
+  CONVENTION  what derives from FRONTEND_URL (executor host, MCP, sender)
+  ENROLLMENT  the OTP comes back with this installation's addresses
+  INSTALLER   the served install.sh carries the defaults of the server serving it
+  DESKTOP     without DESKTOP_RELEASES_REPO, the panel does not offer the app
 """
 from __future__ import annotations
 
@@ -32,14 +33,14 @@ RAIZ = Path(__file__).resolve().parents[2]
 INSTALL_SH = RAIZ / "static" / "install.sh"
 
 
-# ── CONVENÇÃO ────────────────────────────────────────────────────────────────
+# ── CONVENTION ───────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("site, agents", [
     ("https://atlans.example.org", "https://agents.atlans.example.org"),
     ("https://Atlans.Example.org:8443/", "https://agents.atlans.example.org"),
-    # Sem https não há convenção: o host dos executores é sempre mTLS.
+    # Without https there is no convention: the executor host is always mTLS.
     ("http://atlans.example.org", ""),
-    # Sem domínio também não: dev local, IP de rede interna.
+    # Without a domain, none either: local dev, internal network IP.
     ("http://localhost:3000", ""),
     ("https://app.localhost", ""),
     ("https://10.0.0.5", ""),
@@ -54,7 +55,7 @@ def test_hosts_do_mcp_partem_do_site():
     assert config.hosts_mcp_padrao("https://atlans.example.org") == [
         "atlans.example.org", "atlans.example.org:*", "localhost:*", "127.0.0.1:*",
     ]
-    # Sem domínio, só o dev local — nenhum host de outra instalação.
+    # Without a domain, only local dev — no host from another installation.
     assert config.hosts_mcp_padrao("http://localhost:3000") == ["localhost:*", "127.0.0.1:*"]
 
 
@@ -66,7 +67,7 @@ def test_remetente_parte_do_site():
 @pytest.mark.parametrize("valor, normalizado", [
     (" https://atlans.example.org/ ", "https://atlans.example.org"),
     ("https://atlans.example.org/sub/", "https://atlans.example.org/sub"),
-    # O header Host chega em punycode, e o install.sh só aceita ASCII.
+    # The Host header arrives in punycode, and install.sh only accepts ASCII.
     ("https://Exemplo-Ção.br:8443/", "https://xn--exemplo-o-s2a7b.br:8443"),
     ("http://localhost:3000", "http://localhost:3000"),
 ])
@@ -82,8 +83,8 @@ def test_dominio_com_acento_vira_punycode_nas_convencoes():
 
 
 def test_espaco_no_valor_do_ambiente_nao_estraga_os_derivados():
-    """Um espaço colado no secret fazia o MCP responder 421 a tudo e o
-    install.sh sair sem o host dos executores."""
+    """A space stuck to the secret made the MCP answer 421 to everything and
+    install.sh exit without the executor host."""
     codigo = """
 import app.core.config as c
 assert c.FRONTEND_URL == "https://atlans.example.org", repr(c.FRONTEND_URL)
@@ -94,7 +95,7 @@ assert c.MCP_ALLOWED_HOSTS[:2] == ["atlans.example.org", "atlans.example.org:*"]
 
 
 def test_valores_explicitos_vencem_a_convencao():
-    """Cada derivação só preenche o que o ambiente deixou vazio."""
+    """Each derivation only fills in what the environment left empty."""
     codigo = """
 import app.core.config as c
 assert c.AGENTS_URL == "https://executores.outro.org", c.AGENTS_URL
@@ -117,7 +118,7 @@ def test_repositorio_do_desktop_fora_do_formato_desliga_a_oferta():
 
 
 def _rodar_com_ambiente(codigo: str, ambiente: dict[str, str]) -> None:
-    """O config é lido no import: cada combinação roda num processo próprio."""
+    """The config is read at import: each combination runs in its own process."""
     import os
     import sys
 
@@ -130,7 +131,7 @@ def _rodar_com_ambiente(codigo: str, ambiente: dict[str, str]) -> None:
     assert r.returncode == 0, r.stderr[-2000:]
 
 
-# ── MATRÍCULA ────────────────────────────────────────────────────────────────
+# ── ENROLLMENT ───────────────────────────────────────────────────────────────
 
 @pytest.fixture
 def api_de_matricula(client, mock_current_user):
@@ -169,7 +170,7 @@ async def test_o_otp_volta_com_os_enderecos_desta_instalacao(api_de_matricula, m
 
 
 async def test_sem_host_dos_executores_o_otp_diz_que_nao_sabe(api_de_matricula, monkeypatch):
-    """A tela troca o vazio por um marcador e avisa; nunca por um endereço alheio."""
+    """The screen replaces the empty value with a placeholder and warns; never with someone else's address."""
     monkeypatch.setattr(config, "AGENTS_URL", "")
     monkeypatch.setattr(config, "FRONTEND_URL", "http://localhost:3000")
 
@@ -189,9 +190,9 @@ def test_o_script_do_repositorio_nao_aponta_para_instalacao_nenhuma():
     script = _script()
     for linha in ('SERVER=""', 'PUBLIC_SERVER=""', 'REPO_URL=""'):
         assert len(re.findall(rf"^{re.escape(linha)}$", script, re.MULTILINE)) == 1, linha
-    # As únicas URLs com host de verdade são as páginas de instalação das
-    # ferramentas; o resto é placeholder (`https://<site>`, `wss://agents.<domínio>`),
-    # que o regex não casa: um host precisa de rótulos completos dos dois lados do ponto.
+    # The only URLs with a real host are the tools' installation pages; the rest
+    # are placeholders (`https://<site>`, `wss://agents.<domínio>`), which the
+    # regex does not match: a host needs complete labels on both sides of the dot.
     hosts = set(re.findall(r"(?:https?|wss?)://([a-z0-9-]+(?:\.[a-z0-9-]+)+)(?![a-z0-9.<-])", script))
     assert hosts <= {"docs.docker.com", "git-scm.com"}, hosts
 
@@ -203,7 +204,7 @@ def test_o_servidor_preenche_os_padroes_com_os_enderecos_dele(monkeypatch):
 
     saida = R._injetar_enderecos(_script())
 
-    # O executor abre WebSocket: o host dos executores vai como wss://.
+    # The executor opens a WebSocket: the executor host goes as wss://.
     assert re.search(r'^SERVER="wss://agents\.atlans\.example\.org"$', saida, re.MULTILINE)
     assert re.search(r'^PUBLIC_SERVER="https://atlans\.example\.org"$', saida, re.MULTILINE)
     assert re.search(r'^REPO_URL="https://git\.example\.org/atlans\.git"$', saida, re.MULTILINE)
@@ -217,7 +218,7 @@ def test_o_servidor_preenche_os_padroes_com_os_enderecos_dele(monkeypatch):
     "ftp://x.org",
 ])
 def test_valor_fora_do_formato_de_url_nao_entra_no_script(monkeypatch, valor):
-    """O valor vai entre aspas num script que o operador roda com bash."""
+    """The value goes in quotes in a script the operator runs with bash."""
     monkeypatch.setattr(config, "AGENTS_URL", "")
     monkeypatch.setattr(config, "FRONTEND_URL", "")
     monkeypatch.setattr(config, "EXECUTOR_REPO_URL", valor)
@@ -242,7 +243,7 @@ def test_sem_configuracao_o_script_sai_sem_padroes(monkeypatch):
     ("REPO_URL", "--repo="),
 ])
 def test_sem_padrao_nem_flag_o_script_para_e_pede_a_flag(tmp_path, faltando, mensagem):
-    """Melhor parar antes do clone do que matricular contra um endereço vazio."""
+    """Better to stop before the clone than to enroll against an empty address."""
     preenchido = {
         "SERVER": "wss://agents.atlans.example.org",
         "PUBLIC_SERVER": "https://atlans.example.org",
@@ -265,9 +266,9 @@ def test_sem_padrao_nem_flag_o_script_para_e_pede_a_flag(tmp_path, faltando, men
 
 
 def test_reinstalacao_nao_pede_o_repositorio(tmp_path):
-    """Com o diretório já clonado, o script atualiza com `git pull`: a URL do
-    repositório não faz falta, e um servidor sem EXECUTOR_REPO_URL não pode
-    barrar a reinstalação."""
+    """With the directory already cloned, the script updates with `git pull`: the
+    repository URL is not needed, and a server without EXECUTOR_REPO_URL must not
+    block the reinstall."""
     import os
 
     script = _script()
@@ -277,8 +278,8 @@ def test_reinstalacao_nao_pede_o_repositorio(tmp_path):
     arquivo.write_text(script, encoding="utf-8")
     instalacao = tmp_path / "atlans-executor"
     (instalacao / ".git").mkdir(parents=True)
-    # Um docker de mentira, que falha na primeira conferência: o teste só quer
-    # passar da validação das flags, sem instalar nada.
+    # A fake docker that fails on the first check: the test only wants to get
+    # past the flag validation, without installing anything.
     bin_ = tmp_path / "bin"
     bin_.mkdir()
     (bin_ / "docker").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
@@ -340,9 +341,9 @@ def env_do_executor(tmp_path, monkeypatch):
 
 
 def test_o_bootstrap_da_ca_le_o_servidor_do_env_do_executor(env_do_executor):
-    """O bootstrap roda antes de o executor carregar o .env: um executor nativo
-    (systemd, terminal) com o servidor só no arquivo era dado como «sem servidor»
-    e não montava o trust store."""
+    """The bootstrap runs before the executor loads the .env: a native executor
+    (systemd, terminal) with the server only in the file was treated as "no server"
+    and did not build the trust store."""
     from executor import _ca_bootstrap
 
     env_do_executor.write_text('EXECUTOR_SERVER_URL="wss://agents.atlans.example.org"\n', encoding="utf-8")
@@ -365,8 +366,8 @@ def test_sem_servidor_em_lugar_nenhum_nada_e_baixado(env_do_executor):
 
 
 def test_status_sem_servidor_e_erro_de_configuracao(monkeypatch, capsys):
-    """Sem servidor não há a quem perguntar: antes saía `rede`, com o erro do
-    httpx sobre um protocolo vazio."""
+    """Without a server there is no one to ask: before, it returned `rede`, with
+    httpx's error about an empty protocol."""
     import json
 
     from executor import config as cfg
@@ -380,8 +381,8 @@ def test_status_sem_servidor_e_erro_de_configuracao(monkeypatch, capsys):
 
 
 def test_hosts_do_mcp_aceitam_o_site_por_ip():
-    # Uma instalação por IP (sem domínio) respondia 421 em /mcp até alguém
-    # definir MCP_ALLOWED_HOSTS; as outras convenções continuam sem o IP.
+    # An IP-based installation (no domain) answered 421 on /mcp until someone
+    # set MCP_ALLOWED_HOSTS; the other conventions still leave out the IP.
     assert config.hosts_mcp_padrao("https://10.0.0.5")[:2] == ["10.0.0.5", "10.0.0.5:*"]
     assert config.hosts_mcp_padrao("http://10.0.0.5:8000") == ["10.0.0.5", "10.0.0.5:*", "localhost:*", "127.0.0.1:*"]
     assert config.agents_por_convencao("https://10.0.0.5") == ""
@@ -390,9 +391,9 @@ def test_hosts_do_mcp_aceitam_o_site_por_ip():
 
 @pytest.mark.parametrize("valor", ["atlans.example.org", "www.atlans.example.org/", "ftp://atlans.example.org"])
 def test_frontend_url_sem_esquema_impede_a_api_de_subir(valor):
-    # Sem o esquema, a URL passava por todos os portões e desligava as
-    # convenções em silêncio (remetente noreply@localhost, MCP sem o host do
-    # site, tela de matrícula sem o host dos executores).
+    # Without the scheme, the URL passed every gate and silently disabled the
+    # conventions (sender noreply@localhost, MCP without the site's host,
+    # enrollment screen without the executor host).
     env = {k: v for k, v in os.environ.items() if k != "FRONTEND_URL"}
     env["FRONTEND_URL"] = valor
     r = subprocess.run([sys.executable, "-c", "import app.core.config"], cwd=RAIZ, env=env, capture_output=True, text=True)

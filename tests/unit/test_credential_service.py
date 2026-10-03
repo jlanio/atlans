@@ -1,14 +1,14 @@
 # tests/unit/test_credential_service.py
-"""Semântica de create/update/list de credenciais.
+"""Semantics of credential create/update/list.
 
-Cobre o que antes não tinha teste nenhum e passou a valer nesta rodada:
-- validação de campos obrigatórios na ESCRITA (antes create/update nunca
-  validavam — dava para salvar postgresql sem senha);
-- rotação write-only: `data` parcial faz MERGE em vez de apagar os outros
-  segredos, e `data` ausente mantém tudo;
-- metadados com semântica PATCH (omitir preserva, null limpa);
-- escopo de listagem (dono ∪ compartilhadas);
-- a property expires_at derivada de data['expires_at'].
+Covers what previously had no test at all and started to hold in this round:
+- validation of required fields on WRITE (before, create/update never
+  validated — you could save postgresql without a password);
+- write-only rotation: a partial `data` MERGES instead of wiping the other
+  secrets, and an absent `data` keeps everything;
+- metadata with PATCH semantics (omitting preserves, null clears);
+- listing scope (owner ∪ shared);
+- the expires_at property derived from data['expires_at'].
 """
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -32,9 +32,9 @@ def _db():
     return db
 
 
-# Encriptação simulada: reversível e inspecionável (ENC(x) <-> x). O modelo
-# importa encrypt_string no seu próprio namespace; o service importa
-# decrypt_credential_data no dele.
+# Simulated encryption: reversible and inspectable (ENC(x) <-> x). The model
+# imports encrypt_string into its own namespace; the service imports
+# decrypt_credential_data into its own.
 def _enc(v):
     return "ENC(" + v + ")"
 
@@ -66,7 +66,7 @@ def _patch_get(cred):
     return patch.object(CredentialCRUD, "get", _get)
 
 
-# ── create: validação ────────────────────────────────────────────────────────
+# ── create: validation ───────────────────────────────────────────────────────
 
 async def test_create_recusa_campo_obrigatorio_ausente():
     with _patch_cripto()[0], _patch_cripto()[1]:
@@ -79,7 +79,7 @@ async def test_create_recusa_campo_obrigatorio_ausente():
 
 
 async def test_create_tipo_livre_nao_valida():
-    """Tipo fora do catálogo segue livre — é o fallback do editor de props."""
+    """A type outside the catalog stays free-form — it is the props editor's fallback."""
     with _patch_cripto()[0], _patch_cripto()[1]:
         cred = await svc.create_credential(
             CredentialCreate(name="c", type="tipo_custom", data={"qualquer": "coisa"}),
@@ -102,10 +102,10 @@ async def test_create_grava_metadados_e_dono():
     assert cred.owner_id == "owner-1"
     assert cred.workspace_id == "ws-1"
     assert cred.description == "nota"
-    assert cred.tags == ["x", "y"]           # dedupe da schema
+    assert cred.tags == ["x", "y"]           # schema dedupe
 
 
-# ── update: rotação write-only ────────────────────────────────────────────────
+# ── update: write-only rotation ───────────────────────────────────────────────
 
 def _cred_pg():
     c = Credential(name="old", type="postgresql", owner_id="owner-1")
@@ -117,7 +117,7 @@ def _cred_pg():
 
 
 async def test_update_merge_parcial_preserva_e_reconstroi_dsn():
-    """Enviar só a senha muda só a senha; host/user ficam, e a DSN é recomputada."""
+    """Sending only the password changes only the password; host/user stay, and the DSN is recomputed."""
     cred = _cred_pg()
     with _patch_get(cred), _patch_cripto()[0], _patch_cripto()[1]:
         out = await svc.update_credential(
@@ -146,7 +146,7 @@ async def test_update_sem_data_mantem_segredos():
 
 
 async def test_update_data_vazio_tambem_mantem():
-    """`data={}` (dict vazio) é tratado como 'sem mudança de segredo', não wipe."""
+    """`data={}` (empty dict) is treated as 'no secret change', not a wipe."""
     cred = Credential(name="old", type="s3", owner_id="owner-1")
     cred.data = {"access_key_id": "ENC(a)", "secret_access_key": "ENC(s)", "region": "ENC(r)"}
     snapshot = dict(cred.data)
@@ -161,8 +161,8 @@ async def test_update_data_vazio_tambem_mantem():
 
 
 async def test_update_tipo_livre_preserva_chave_connectionstring():
-    """Tipo livre pode ter uma chave literal 'connectionString' — o merge não a
-    descarta (só tipos de banco a tratam como derivada)."""
+    """A free-form type can have a literal 'connectionString' key — the merge does
+    not discard it (only database types treat it as derived)."""
     cred = Credential(name="c", type="tipo_custom", owner_id="owner-1")
     cred.data = {"connectionString": "ENC(algo-do-usuario)", "outro": "ENC(v)"}
     with _patch_get(cred), _patch_cripto()[0], _patch_cripto()[1]:
@@ -176,7 +176,7 @@ async def test_update_tipo_livre_preserva_chave_connectionstring():
 
 
 async def test_update_merge_invalido_e_recusado():
-    """Se o merge deixar um obrigatório vazio, o update é recusado (422)."""
+    """If the merge leaves a required field empty, the update is rejected (422)."""
     cred = _cred_pg()
     with _patch_get(cred), _patch_cripto()[0], _patch_cripto()[1]:
         with pytest.raises(CredentialValidationError, match="Senha"):
@@ -187,9 +187,9 @@ async def test_update_merge_invalido_e_recusado():
 
 
 async def test_update_que_troca_o_tipo_deixa_so_os_campos_do_novo():
-    """De postgresql para authkey: host/user/password e a DSN antiga não ficam
-    cifrados no blob de uma credencial de outro tipo (o resolver tinha de
-    aprender a ignorá-los)."""
+    """From postgresql to authkey: host/user/password and the old DSN do not stay
+    encrypted in the blob of a credential of another type (the resolver would
+    have had to learn to ignore them)."""
     cred = _cred_pg()
     with _patch_get(cred), _patch_cripto()[0], _patch_cripto()[1]:
         out = await svc.update_credential(
@@ -200,9 +200,9 @@ async def test_update_que_troca_o_tipo_deixa_so_os_campos_do_novo():
 
 
 async def test_update_que_deixa_de_ser_de_banco_nao_arrasta_a_dsn():
-    """postgresql → tipo livre: a DSN derivada (com a senha) não fica no blob,
-    senão um nó de banco ainda a receberia; os outros campos ficam (um tipo
-    livre não tem esquema para dizer quais valem)."""
+    """postgresql → free-form type: the derived DSN (with the password) does not
+    stay in the blob, otherwise a database node would still receive it; the
+    other fields stay (a free-form type has no schema to say which ones count)."""
     cred = _cred_pg()
     with _patch_get(cred), _patch_cripto()[0], _patch_cripto()[1]:
         out = await svc.update_credential(
@@ -213,15 +213,15 @@ async def test_update_que_deixa_de_ser_de_banco_nao_arrasta_a_dsn():
 
 
 async def test_valor_gravado_que_nao_e_string_nao_derruba_a_validacao():
-    # A troca de tipo valida o `data` já gravado; uma porta numérica legada
-    # não pode virar 500.
+    # The type change validates the `data` already stored; a legacy numeric port
+    # must not turn into a 500.
     assert svc.erro_de_validacao("postgresql", {"host": "h", "port": 5432, "database": "d", "user": "u", "password": "p"}) is None
     assert svc.erro_de_validacao("postgresql", {"host": 0, "database": "d", "user": "u", "password": "p"}) == "Campos obrigatórios ausentes: Host"
 
 
 async def test_update_que_troca_o_tipo_sem_data_exige_os_campos_do_novo():
-    """Trocar só o tipo, sem mandar os campos dele, gravaria uma credencial
-    que nenhum nó consegue usar."""
+    """Changing only the type, without sending its fields, would store a
+    credential that no node can use."""
     cred = _cred_pg()
     with _patch_get(cred), _patch_cripto()[0], _patch_cripto()[1]:
         with pytest.raises(CredentialValidationError, match="Chave"):
@@ -230,7 +230,7 @@ async def test_update_que_troca_o_tipo_sem_data_exige_os_campos_do_novo():
             )
 
 
-# ── as regras do nó WFS valem ao gravar e ao Testar ──────────────────────────
+# ── the WFS node's rules apply on save and on Test ───────────────────────────
 
 async def test_create_recusa_o_que_o_no_wfs_recusaria():
     with _patch_cripto()[0], _patch_cripto()[1]:
@@ -282,7 +282,7 @@ async def test_update_null_explicito_limpa():
             _db(), owner_id="o",
         )
     assert out.description is None and out.workspace_id is None
-    assert out.tags == ["a"]   # tags foi omitido → preservado
+    assert out.tags == ["a"]   # tags was omitted → preserved
 
 
 # ── list: escopo ──────────────────────────────────────────────────────────────
@@ -322,18 +322,19 @@ def test_credential_out_preenche_expires_at_via_property():
 
 
 def test_encrypt_and_store_sempre_cifra_valor_com_prefixo_gaaaa():
-    """Auditoria SEG-19: um valor que o cliente envia começando com 'gAAAA'
-    (o ciphertext de outra pessoa) NÃO pode ser gravado em claro — senão o
-    GET /data o decifraria com a chave da plataforma (oráculo). Agora é sempre
-    cifrado, e decifrar devolve a própria string 'gAAAA…', nunca um segredo."""
+    """Audit SEG-19: a value the client sends starting with 'gAAAA' (someone
+    else's ciphertext) must NOT be stored in the clear — otherwise GET /data
+    would decrypt it with the platform key (an oracle). Now it is always
+    encrypted, and decrypting returns the 'gAAAA…' string itself, never a
+    secret."""
     from app.models.credential import Credential
     from app.core.utils.encryption import decrypt_credential_data
 
     falso_ciphertext = "gAAAAA-conteudo-cifrado-de-outra-pessoa"
     cred = Credential(type="http_bearer", name="x")
     cred.encrypt_and_store({"token": falso_ciphertext})
-    # Foi cifrado (não ficou igual ao que entrou).
+    # It was encrypted (did not stay the same as what came in).
     assert cred.data["token"] != falso_ciphertext
     assert cred.data["token"].startswith("gAAAA")
-    # E decifrar devolve a string original, não um segredo alheio.
+    # And decrypting returns the original string, not someone else's secret.
     assert decrypt_credential_data(cred.data)["token"] == falso_ciphertext

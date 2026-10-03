@@ -3,15 +3,15 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { ApiToken, ApiTokenCreated, IWorkspace } from "@/service/types"
 
 /**
- * Comportamento da LISTA de tokens de acesso (/settings/tokens):
- * - precedência dos estados: skeleton → erro (só na 1ª carga) → primeiro uso → lista;
- * - selos sempre traduzidos, com o aviso «Expira em N dias» perto do fim;
- * - escopos como chips, workspaces com nomes resolvidos, último uso e criação;
- * - revogar troca a linha no lugar (o token continua, como «Revogado»);
- * - criar pelo cabeçalho põe o token novo no topo, sem guardar o segredo.
+ * Behavior of the access token LIST (/settings/tokens):
+ * - state precedence: skeleton → error (only on first load) → first use → list;
+ * - badges always translated, with the "Expira em N dias" (expires in N days) warning near the end;
+ * - scopes as chips, workspaces with resolved names, last use and creation;
+ * - revoking swaps the row in place (the token stays, as "Revogado");
+ * - creating from the header puts the new token at the top, without keeping the secret.
  */
 
-// ── Dublês ───────────────────────────────────────────────────────────────────
+// ── Doubles ──────────────────────────────────────────────────────────────────
 const svc = vi.hoisted(() => ({
   listApiTokens: vi.fn(),
   listWorkspaces: vi.fn(),
@@ -39,7 +39,7 @@ const falhou = (message = "boom", status = 500) => ({ success: false, status, er
 const DIA = 86_400_000
 const emDias = (n: number) => new Date(Date.now() + n * DIA).toISOString()
 
-// Segredo sintético, num ponto só, para o detect-secrets não acusar a fixture.
+// Synthetic secret, in a single place, so detect-secrets doesn't flag the fixture.
 const SEGREDO_FAKE = "atl_teste_0000000000000000000000000000" // pragma: allowlist secret
 
 function token(extra: Partial<ApiToken> & Pick<ApiToken, "id" | "name">): ApiToken {
@@ -76,7 +76,7 @@ beforeEach(() => {
 })
 afterEach(cleanup)
 
-/** A linha (li de topo) de um token, pelo nome. */
+/** A token's row (top-level li), by name. */
 function linha(nome: string) {
   return screen.getByText(nome).closest("li[data-token-status]") as HTMLElement
 }
@@ -91,7 +91,7 @@ describe("Tokens de acesso — lista", () => {
     await screen.findByText("agente de relatórios")
     expect(screen.queryByRole("status", { name: /carregando/i })).toBeNull()
 
-    // Selos: sempre em português, valor cru só em data-status.
+    // Badges: always in Portuguese, raw value only in data-status.
     expect(screen.getByText("Ativo")).toHaveAttribute("data-status", "active")
     expect(screen.getByText("Expira em 5 dias")).toHaveAttribute("data-status", "active")
     expect(screen.getByText("Expirado")).toHaveAttribute("data-status", "expired")
@@ -99,10 +99,10 @@ describe("Tokens de acesso — lista", () => {
     expect(screen.queryByText("active")).toBeNull()
     expect(screen.queryByText("revoked")).toBeNull()
 
-    // Subtítulo de escopo com a contagem na frente (o zero some).
+    // Scope subtitle with the count in front (zero disappears).
     expect(screen.getByText("4 tokens · 2 ativos — valem só para o que a sua conta já pode fazer")).toBeInTheDocument()
 
-    // Só listou e traduziu ids em nomes — nada mais.
+    // It only listed and translated ids into names — nothing else.
     expect(svc.listApiTokens).toHaveBeenCalledTimes(1)
     expect(svc.listWorkspaces).toHaveBeenCalledTimes(1)
   })
@@ -111,7 +111,7 @@ describe("Tokens de acesso — lista", () => {
     render(<TokensDeAcesso />)
     const t1 = await waitFor(() => linha("agente de relatórios"))
     expect(t1).toHaveTextContent("atl_ab12cd…")
-    // Chips na ordem canônica, não na ordem em que o backend mandou.
+    // Chips in canonical order, not in the order the backend sent.
     const chips = within(within(t1).getByRole("list", { name: "Escopos" })).getAllByRole("listitem").map(li => li.textContent)
     expect(chips).toEqual(["Ler fluxos", "Executar fluxos"])
     expect(t1).toHaveTextContent("Todos os workspaces")
@@ -124,7 +124,7 @@ describe("Tokens de acesso — lista", () => {
 
     expect(linha("antigo")).toHaveTextContent("Workspace: Bacia")
 
-    // Revogar só para quem ainda não foi revogado.
+    // Revoke only for tokens not yet revoked.
     expect(screen.getByRole("button", { name: "Revogar o token agente de relatórios" })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Revogar o token antigo" })).toBeInTheDocument()
     expect(screen.queryByRole("button", { name: "Revogar o token vazado" })).toBeNull()
@@ -188,7 +188,7 @@ describe("Tokens de acesso — revogar", () => {
     fireEvent.click(within(dialogo).getByRole("button", { name: "Revogar" }))
     await waitFor(() => expect(svc.revokeApiToken).toHaveBeenCalledWith("t1"))
 
-    // Não some da lista: o botão some, o selo muda e a contagem acompanha.
+    // It doesn't disappear from the list: the button goes away, the badge changes and the count follows.
     await waitFor(() => expect(screen.queryByRole("button", { name: "Revogar o token agente de relatórios" })).toBeNull())
     expect(linha("agente de relatórios")).toHaveAttribute("data-token-status", "revoked")
     expect(screen.getByText("agente de relatórios")).toBeInTheDocument()
@@ -208,8 +208,8 @@ describe("Tokens de acesso — revogar", () => {
 
     await waitFor(() => expect(createToast.error).toHaveBeenCalledWith("Não foi possível revogar o token", "sem permissão"))
     expect(linha("agente de relatórios")).toHaveAttribute("data-token-status", "active")
-    // O diálogo segue aberto (a falha não fecha), então a página atrás está
-    // aria-hidden — `hidden: true` para enxergar o botão que continua lá.
+    // The dialog stays open (the failure doesn't close it), so the page behind
+    // is aria-hidden — `hidden: true` to see the button that is still there.
     expect(screen.getByRole("button", { name: "Revogar o token agente de relatórios", hidden: true })).toBeInTheDocument()
     expect(screen.getByRole("dialog")).toBeInTheDocument()
   })
@@ -236,7 +236,7 @@ describe("Tokens de acesso — criar pelo cabeçalho", () => {
     }))
     expect(await within(dialogo).findByLabelText("Segredo do token")).toHaveTextContent(SEGREDO_FAKE)
 
-    // Atrás do diálogo a lista já tem o token novo — no topo, e sem o segredo.
+    // Behind the dialog the list already has the new token — at the top, and without the secret.
     const linhas = document.querySelectorAll("li[data-token-status]")
     expect(linhas).toHaveLength(5)
     expect(linhas[0]).toHaveTextContent("agente novo")

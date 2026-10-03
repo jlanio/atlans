@@ -1,11 +1,11 @@
-"""Workspace sem dono (`owner_id` nulo: dado antigo ou editado à mão) com membros.
+"""Workspace with no owner (null `owner_id`: old or hand-edited data) with members.
 
-`get_workspace_member_role` sai cedo sem dono, e as rotas `/workflows/{id}`
-passaram todas por ele com a guarda única (`workflow_com_papel`). As três de
-leitura ("basta pertencer": o workflow, o contrato e as versões) usavam antes
-o pertencimento de `listar_workspace_ids`, dono OU membro, e o membro de um
-workspace sem dono as lia. Continua lendo; e toda rota com papel mínimo o
-recusa com o mesmo 403 de antes.
+`get_workspace_member_role` returns early with no owner, and the `/workflows/{id}`
+routes all went through it with the single guard (`workflow_com_papel`). The three read
+routes ("belonging is enough": the workflow, the contract and the versions) previously used
+the membership from `listar_workspace_ids`, owner OR member, and a member of a
+workspace with no owner could read them. They still can; and every route with a minimum role
+refuses them with the same 403 as before.
 """
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ async def api_sem_dono(client, monkeypatch):
     anteriores = dict(app.dependency_overrides)
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_current_user] = _quem
-    # O pertencimento de verdade (`listar_workspace_ids`), não a lista fixa do conftest.
+    # The real membership (`listar_workspace_ids`), not the conftest's fixed list.
     app.dependency_overrides.pop(get_user_workspace_ids, None)
     monkeypatch.setattr(limiter, "enabled", False)
     try:
@@ -87,8 +87,8 @@ async def test_membro_de_workspace_sem_dono_le_o_workflow(api_sem_dono, usuario)
 
 
 async def test_membro_de_workspace_sem_dono_nao_age_nem_como_admin(api_sem_dono):
-    """Sem papel, nenhuma rota com mínimo passa, com o 403 de quem não está no
-    workspace: a mesma resposta de antes da guarda única."""
+    """With no role, no route with a minimum passes, with the 403 for someone not in the
+    workspace: the same response as before the single guard."""
     cabecalho = {"x-usuario": "u-admin"}
     pins = await api_sem_dono.get("/workflows/wf-n/pins", headers=cabecalho)
     renomear = await api_sem_dono.put("/workflows/wf-n", json={"name": "G"}, headers=cabecalho)

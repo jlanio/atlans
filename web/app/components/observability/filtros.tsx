@@ -14,27 +14,27 @@ export type ContagensPorStatus = Partial<IObservabilityMetrics["by_status"]>
 
 interface Props {
   estado: EstadoDoHistorico
-  /** Recebe só o que mudou; quem compõe a página funde com o resto e grava na URL. */
+  /** Receives only what changed; the page composer merges it with the rest and writes it to the URL. */
   onEstado: (mudanca: Partial<EstadoDoHistorico>) => void
-  /** `by_status` das métricas; sem ele os chips vêm sem número. */
+  /** The metrics' `by_status`; without it the chips come without a number. */
   contagens?: ContagensPorStatus | null
   workspaces?: { id: string; name: string }[]
   workflows?: IWorkflowMetricsRow[]
-  /** A linha "Sem executor" (`unassigned`) não entra: não é um host filtrável. */
+  /** The "Sem executor" row (`unassigned`) is excluded: it is not a filterable host. */
   executores?: IExecutorMetrics[]
-  /** Só quando o usuário tem mais de um workspace, ou é admin. */
+  /** Only when the user has more than one workspace, or is an admin. */
   mostrarWorkspace?: boolean
 }
 
-/** Sentinela dos selects: o Radix não aceita `""` como valor de item. */
+/** Sentinel for the selects: Radix does not accept `""` as an item value. */
 const TODOS = "__todos__"
 const ATRASO_DA_BUSCA_MS = 300
 
 const CHIPS: { status: StatusFiltro | null; rotulo: string; contar: (c: ContagensPorStatus) => number | null }[] = [
   { status: null, rotulo: "Todas", contar: c => somaTotal(c) },
   { status: "failed", rotulo: "Falhas", contar: c => c.failed ?? null },
-  // O filtro `status=running` do backend devolve só `running`; `pending` fica
-  // fora do chip para o número bater com a lista que ele abre.
+  // The backend's `status=running` filter returns only `running`; `pending` stays
+  // out of the chip so the number matches the list it opens.
   { status: "running", rotulo: "Em andamento", contar: c => c.running ?? null },
   { status: "success", rotulo: "Concluídas", contar: c => c.success ?? null },
   { status: "cancelled", rotulo: "Canceladas", contar: c => c.cancelled ?? null },
@@ -45,15 +45,16 @@ function somaTotal(c: ContagensPorStatus): number | null {
   return partes.length === 0 ? null : partes.reduce((a, b) => a + b, 0)
 }
 
-/** Ordem de exibição do seletor; a composição tem de bater com `ORIGENS` de
- *  `historico-url.ts` (a URL descarta origem desconhecida — teste garante). */
+/** Display order of the selector; the set must match `ORIGENS` in
+ *  `historico-url.ts` (the URL discards an unknown origin — a test guarantees it). */
 export const ORIGENS_DA_UI: OrigemFiltro[] = ["manual", "schedule", "webhook", "retry", "mcp"]
 
 /**
- * Filtros da tabela (spec §4.3). Nada aqui guarda estado de filtro: tudo sobe
- * por `onEstado` e volta pela URL — F5 e link colado reabrem a mesma visão. A
- * única exceção é o texto da busca, que espera 300 ms parado antes de subir,
- * senão cada tecla seria uma consulta com `ILIKE` no servidor.
+ * Table filters (spec §4.3). Nothing here holds filter state: everything goes
+ * up through `onEstado` and comes back through the URL — F5 and a pasted link
+ * reopen the same view. The only exception is the search text, which waits
+ * 300 ms idle before going up, otherwise every keystroke would be a query with
+ * `ILIKE` on the server.
  */
 export function Filtros({
   estado, onEstado, contagens, workspaces = [], workflows = [], executores = [], mostrarWorkspace = false,
@@ -87,9 +88,9 @@ export function Filtros({
             )
           })}
           <span aria-hidden="true" className="mx-0.5 h-4 w-px shrink-0 bg-border" />
-          {/* Alternador independente: combina com o status ("Falhas" +
-              "Assistente"). Sem número de propósito — a contagem que temos é
-              de FLUXOS, e ao lado de chips que contam EXECUÇÕES ela mentiria. */}
+          {/* Independent toggle: combines with the status ("Falhas" +
+              "Assistente"). No number on purpose — the count we have is of
+              WORKFLOWS, and next to chips that count RUNS it would lie. */}
           <Chip
             rotulo="Assistente"
             ativo={estado.assistente}
@@ -151,7 +152,7 @@ function Chip({ rotulo, ativo, n, icone = false, onClick }: {
   rotulo: string
   ativo: boolean
   n: number | null
-  /** A faísca do assistente, a mesma do selo das linhas. */
+  /** The assistant sparkle, the same as the rows' badge. */
   icone?: boolean
   onClick: () => void
 }) {
@@ -180,12 +181,12 @@ function Seletor({ rotulo, todosRotulo = "todos", valor, onValor, opcoes }: {
   todosRotulo?: string
   valor: string | null
   onValor: (v: string | null) => void
-  /** `origem` só existe no seletor de workflow, para a faísca do assistente. */
+  /** `origem` exists only in the workflow selector, for the assistant sparkle. */
   opcoes: { valor: string; rotulo: string; origem?: string | null }[]
 }) {
-  // Um valor da URL que não está na lista (workflow de outro workspace, host
-  // que saiu da frota) ainda precisa aparecer no gatilho — senão o select
-  // mostra "todos" enquanto a tabela está filtrada.
+  // A URL value that is not in the list (workflow from another workspace, host
+  // that left the fleet) still needs to show in the trigger — otherwise the
+  // select shows "all" while the table is filtered.
   const lista = valor && !opcoes.some(o => o.valor === valor)
     ? [...opcoes, { valor, rotulo: valor }]
     : opcoes
@@ -213,16 +214,16 @@ function Seletor({ rotulo, todosRotulo = "todos", valor, onValor, opcoes }: {
 function Busca({ valor, onValor }: { valor: string; onValor: (q: string) => void }) {
   const [texto, setTexto] = useState(valor)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  // O que este campo já emitiu: quando a URL muda por fora (Limpar filtros,
-  // link novo), o campo acompanha; quando a URL só ecoa o que ele mandou, não
-  // há nada a fazer — e sobrescrever aqui apagaria o que a pessoa digitou
-  // entre o debounce e a resposta do router.
+  // What this field has already emitted: when the URL changes from outside
+  // (Clear filters, new link), the field follows; when the URL only echoes what
+  // it sent, there is nothing to do — and overwriting here would erase what the
+  // person typed between the debounce and the router's response.
   const emitido = useRef(valor)
 
   useEffect(() => {
-    // A URL guarda o texto sem espaços nas pontas: "timeout " volta como
-    // "timeout". Comparar o que foi emitido também sem eles é o que impede o
-    // eco da URL de apagar o espaço que a pessoa acabou de digitar.
+    // The URL stores the text without leading/trailing spaces: "timeout " comes
+    // back as "timeout". Comparing what was emitted also without them is what
+    // keeps the URL echo from erasing the space the person just typed.
     if (valor !== emitido.current.trim()) {
       emitido.current = valor
       setTexto(valor)

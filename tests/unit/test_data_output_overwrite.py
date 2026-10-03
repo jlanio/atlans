@@ -1,8 +1,8 @@
-"""Opção "sobrescrever" do DataOutput no Drive.
+"""DataOutput's "overwrite" option on the Drive.
 
-Sem ela, um DataOutput agendado acumulava uma cópia por execução — todas com o
-mesmo nome no Drive, e quem consumia o arquivo por id continuava lendo a
-primeira versão.
+Without it, a scheduled DataOutput piled up one copy per run — all with the
+same name on the Drive, and whoever consumed the file by id kept reading the
+first version.
 """
 from unittest.mock import patch
 
@@ -40,7 +40,7 @@ async def test_overwrite_propagado_no_contexto_drive():
 
 @pytest.mark.asyncio
 async def test_overwrite_desligado_por_padrao():
-    """Default conservador: quem não configurar nada mantém o comportamento antigo."""
+    """Conservative default: whoever configures nothing keeps the old behavior."""
     captured = await _run({"label": "resultado", "context": "drive"})
 
     assert captured["overwrite"] is False
@@ -48,7 +48,7 @@ async def test_overwrite_desligado_por_padrao():
 
 @pytest.mark.asyncio
 async def test_overwrite_ignorado_em_artefatos():
-    """Artefato já tem s3_key própria por execução (inclui task_id) — não colide."""
+    """An artifact already has its own s3_key per run (includes task_id) — no collision."""
     captured = await _run({"label": "resultado", "context": "artifacts", "overwrite": True})
 
     assert captured["create_drive_entry"] is False
@@ -57,10 +57,10 @@ async def test_overwrite_ignorado_em_artefatos():
 
 @pytest.mark.asyncio
 async def test_overwrite_como_string_e_rejeitado_na_validacao():
-    """type=boolean exige bool de verdade — string não passa pelo validate().
+    """type=boolean requires a real bool — a string does not pass validate().
 
-    Documenta por que o nó não coage "true"/"false": o parâmetro nunca chega
-    como string até aqui.
+    Documents why the node does not coerce "true"/"false": the parameter never
+    arrives here as a string.
     """
     with pytest.raises(ValueError, match="booleano"):
         await _run({"label": "resultado", "context": "drive", "overwrite": "true"})

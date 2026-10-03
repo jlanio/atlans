@@ -1,17 +1,17 @@
 # tests/unit/test_alias_expressions.py
-"""Alias de no em expressoes: registro no contexto e sintaxe `$Alias.campo`.
+"""Node alias in expressions: registration in the context and `$Alias.campo` syntax.
 
-Duas regras precisam concordar, e nao concordavam:
+Two rules need to agree, and they did not:
 
-- `_resolve_alias` (flow/executor/core.py) decide sob QUAL nome o no entra no
-  contexto. Aceita `str.isidentifier()`, que em Python 3 e Unicode — "Area"
-  com acento vale.
-- `_ALIAS_PATTERN` (flow/utils/expression_service.py) decide o que conta como
-  `$Alias` no texto do parametro. Abria com `[A-Za-z_]`, ASCII puro.
+- `_resolve_alias` (flow/executor/core.py) decides under WHICH name the node
+  enters the context. It accepts `str.isidentifier()`, which in Python 3 is
+  Unicode — "Area" with an accent is valid.
+- `_ALIAS_PATTERN` (flow/utils/expression_service.py) decides what counts as
+  `$Alias` in the parameter text. It started with `[A-Za-z_]`, pure ASCII.
 
-O alias acentuado passava pela primeira e falhava na segunda: o `$` sobrevivia
-ao pre-processamento e o Jinja estourava erro de sintaxe. O front tambem sugeria
-o alias — o modal de configuracao aceita Unicode desde sempre.
+The accented alias passed the first and failed the second: the `$` survived
+the preprocessing and Jinja blew up with a syntax error. The frontend also
+suggested the alias — the configuration modal has always accepted Unicode.
 """
 import pytest
 
@@ -24,14 +24,14 @@ def svc():
     return ExpressionService()
 
 
-# ── Registro no contexto ─────────────────────────────────────────────────────
+# ── Registration in the context ──────────────────────────────────────────────
 
 def test_alias_customizado_valido_e_usado():
     assert _resolve_alias({"alias": "Caixa", "name": "ComputeBoundingBox"}) == "Caixa"
 
 
 def test_rotulo_do_catalogo_cai_no_name():
-    """"Caixa Delimitadora" tem espaco — nao e identificador."""
+    """"Caixa Delimitadora" has a space — it is not an identifier."""
     node = {"alias": "Caixa Delimitadora", "name": "ComputeBoundingBox"}
 
     assert _resolve_alias(node) == "ComputeBoundingBox"
@@ -46,7 +46,7 @@ def test_alias_acentuado_e_aceito_no_registro():
 
 
 def test_alias_em_properties_so_vale_com_alias_vazio():
-    """O `or` do _resolve_alias escolhe por veracidade, nao por validade."""
+    """_resolve_alias's `or` picks by truthiness, not by validity."""
     preenchido = {"alias": "Caixa Delimitadora",
                   "properties": {"alias": "Caixa"}, "name": "ComputeBoundingBox"}
     vazio = {"alias": "", "properties": {"alias": "Caixa"}, "name": "ComputeBoundingBox"}
@@ -55,7 +55,7 @@ def test_alias_em_properties_so_vale_com_alias_vazio():
     assert _resolve_alias(vazio) == "Caixa"
 
 
-# ── Sintaxe $Alias no texto ──────────────────────────────────────────────────
+# ── $Alias syntax in the text ────────────────────────────────────────────────
 
 def test_renderiza_alias_ascii(svc):
     ctx = {"ComputeBoundingBox": {"bbox_string": "-63,-13,-60,-10"}}
@@ -96,13 +96,13 @@ def test_alias_interpolado_no_meio_do_texto(svc):
 
 
 def test_cifrao_seguido_de_digito_nao_e_alias(svc):
-    """`R$100` e texto comum — nao pode virar variavel."""
+    """`R$100` is ordinary text — it must not become a variable."""
     assert svc.find_alias("preço R$100") is None
     assert svc.render("preço R$100", {}) == "preço R$100"
 
 
 def test_alias_ausente_no_contexto_levanta(svc):
-    """StrictUndefined: erro explicito em vez de string vazia silenciosa."""
+    """StrictUndefined: an explicit error instead of a silent empty string."""
     with pytest.raises(Exception):
         svc.render("{{$NaoExiste.campo}}", {})
 
@@ -115,8 +115,8 @@ def test_find_alias_captura_o_caminho_completo(svc):
 
 
 def test_alias_registrado_e_renderizavel(svc):
-    """As duas regras precisam concordar: o que _resolve_alias registra,
-    _ALIAS_PATTERN tem de reconhecer no texto."""
+    """The two rules need to agree: what _resolve_alias registers,
+    _ALIAS_PATTERN has to recognize in the text."""
     for custom in ("Caixa", "Área", "Bifurcação", "_interno", "no2"):
         alias = _resolve_alias({"alias": custom, "name": "QualquerNo"})
         assert alias == custom, f"{custom} deveria ser registrado como si mesmo"
@@ -126,12 +126,12 @@ def test_alias_registrado_e_renderizavel(svc):
         assert m.group("alias").split(".")[0] == alias
 
 
-# ── `$Alias` fora de um bloco Jinja ─────────────────────────────────────────
+# ── `$Alias` outside a Jinja block ──────────────────────────────────────────
 #
-# O pré-processamento tirava o `$` do texto inteiro e, se não houvesse nenhum
-# `{{`, embrulhava a STRING INTEIRA em `{{ }}`. Isso só funciona quando o
-# template é um alias sozinho; nos outros casos dava em três desfechos, e dois
-# eram silenciosos.
+# The preprocessing stripped the `$` from the whole text and, if there was no
+# `{{`, wrapped the WHOLE STRING in `{{ }}`. That only works when the template
+# is a lone alias; in the other cases it led to three outcomes, and two of them
+# were silent.
 
 import json as _json
 
@@ -151,8 +151,8 @@ def test_alias_sozinho_continua_igual():
 
 
 def test_alias_no_meio_da_url():
-    """Antes: TemplateSyntaxError "expected token 'end of print statement',
-    got ':'" — quem escreveu uma URL recebia um erro de parser de template."""
+    """Before: TemplateSyntaxError "expected token 'end of print statement',
+    got ':'" — whoever wrote a URL got a template parser error."""
     assert _r("https://api.org/v1/$Pedido.id/dados") == "https://api.org/v1/42/dados"
 
 
@@ -161,21 +161,21 @@ def test_alias_no_meio_do_texto():
 
 
 def test_corpo_json_continua_json():
-    """O pior dos três, e silencioso: a string inteira era avaliada como
-    expressão Python, o corpo virava repr de dict (aspas simples, JSON
-    inválido) e o alias entre aspas virava TEXTO literal — sem erro nenhum."""
+    """The worst of the three, and silent: the whole string was evaluated as a
+    Python expression, the body became a dict repr (single quotes, invalid
+    JSON) and the quoted alias became literal TEXT — with no error at all."""
     saida = _r('{"id": $Pedido.id, "n": "$Pedido.nome"}')
     assert _json.loads(saida) == {"id": 42, "n": "Centro"}
 
 
 def test_alias_dentro_de_bloco_jinja_nao_e_embrulhado_de_novo():
-    """Dentro de `{{ }}` já se está numa expressão: virar `{{ {{ x }} }}`
-    quebraria tudo."""
+    """Inside `{{ }}` you are already in an expression: turning it into
+    `{{ {{ x }} }}` would break everything."""
     assert _r("{{ $Pedido.id }}") == "42"
 
 
 def test_misturar_as_duas_sintaxes_funciona():
-    """Antes o `$Alias` virava texto literal, também em silêncio."""
+    """Before, the `$Alias` became literal text, also silently."""
     assert _r("https://api.org/{{ Pedido.id }}/b/$Pedido.nome") == "https://api.org/42/b/Centro"
 
 
@@ -188,13 +188,13 @@ def test_alias_repetido_no_mesmo_texto():
 
 
 def test_alias_desconhecido_falha_alto():
-    """StrictUndefined: melhor que o erro de parser que vinha antes."""
+    """StrictUndefined: better than the parser error that came before."""
     with _pytest.raises(Exception):
         _r("https://api.org/$Outro.id/x")
 
 
 def test_tipo_nativo_sobrevive_ao_novo_preprocessamento():
-    """`render_native` compartilha o mesmo pré-processamento — um alias sozinho
-    tem de continuar devolvendo o valor, não o texto."""
+    """`render_native` shares the same preprocessing — a lone alias must keep
+    returning the value, not the text."""
     assert _ES().render_native("$Pedido.id", dict(_CTX)) == 42
     assert _ES().render_native("id-$Pedido.id", dict(_CTX)) == "id-42"

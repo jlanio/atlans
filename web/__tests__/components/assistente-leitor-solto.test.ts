@@ -1,12 +1,12 @@
 /**
- * Os dois consumidores do stream do assistente soltam o leitor quando a leitura
- * acaba — inclusive quando o "Parar" a corta no meio.
+ * Both consumers of the assistant stream release the reader when reading
+ * ends — including when "Parar" (stop) cuts it off in the middle.
  *
- * `useAssistente` (Home) nasceu como fork de `useAssistenteEditor` (gaveta do
- * editor), e as cópias do laço de leitura divergiram: a da Home chamava
- * `leitor.cancel()` no `finally` e documentava que, sem isso, a conexão fica
- * pendurada até o servidor desistir sozinho; a do editor não chamava. Agora as
- * duas leem pela mesma peça, e este teste roda contra as duas.
+ * `useAssistente` (Home) was born as a fork of `useAssistenteEditor` (the editor
+ * drawer), and the copies of the read loop diverged: the Home's called
+ * `leitor.cancel()` in the `finally` and documented that, without it, the connection stays
+ * hanging until the server gives up on its own; the editor's did not call it. Now the
+ * two read through the same piece, and this test runs against both.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
@@ -24,7 +24,7 @@ import { useAssistenteEditor } from "@/app/hooks/workflow/useAssistenteEditor"
 
 const ATIVO = { ativo: true, motivo: null, cota: null }
 
-/** O pedaço da interface que os dois hooks têm em comum e este teste usa. */
+/** The piece of the interface the two hooks have in common and this test uses. */
 interface ConsumidorDoStream {
   correndo: boolean
   enviar: (mensagem: string) => Promise<void>
@@ -54,7 +54,7 @@ describe.each(HOOKS)("o leitor do stream — %s", (_nome, usar) => {
       status: 200,
       body: {
         getReader: () => ({
-          // Um stream que nunca termina sozinho: só o abort corta a leitura.
+          // A stream that never ends on its own: only the abort cuts the read off.
           read: () => new Promise((_resolver, rejeitar) => {
             init.signal?.addEventListener("abort", () => rejeitar(new DOMException("Aborted", "AbortError")))
           }),

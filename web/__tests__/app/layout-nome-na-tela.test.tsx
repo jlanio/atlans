@@ -1,8 +1,8 @@
 /**
- * O layout raiz lê NOME_NA_TELA a cada pedido e a entrega ao provider que a
- * marca e a tela de entrada consultam; o título da aba sai do mesmo valor. Sem
- * a variável, «Atlans»: a forma com o domínio é da instalação do titular
- * (TRADEMARKS.md) e não vai no código.
+ * The root layout reads NOME_NA_TELA on each request and hands it to the provider that the
+ * brand mark and the sign-in screen consult; the tab title comes from the same value. Without
+ * the variable, "Atlans": the form with the domain belongs to the holder's install
+ * (TRADEMARKS.md) and does not go into the code.
  */
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { isValidElement, type ReactElement, type ReactNode } from "react"
@@ -56,7 +56,7 @@ describe("o layout raiz e o nome na tela", () => {
     expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "Minha Instalação" })).toBe("Minha Instalação")
     expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "a".repeat(41) })).toBe("Atlans")
     expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "<b>x</b>" })).toBe("Atlans")
-    // Espaços e quebras de linha viram um espaço; um caractere de controle não passa.
+    // Spaces and line breaks become one space; a control character does not get through.
     expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "linha\nquebrada" })).toBe("linha quebrada")
     expect(lerNomeNaTelaDoAmbiente({ NOME_NA_TELA: "nome\u0007ruim" })).toBe("Atlans")
     expect(lerNomeNaTelaDoAmbiente({})).toBe("Atlans")

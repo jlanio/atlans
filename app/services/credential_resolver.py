@@ -1,5 +1,5 @@
 # app/services/credential_resolver.py
-# Resolução e injeção de credenciais em definições de workflow.
+# Resolution and injection of credentials into workflow definitions.
 
 import copy
 from typing import Collection
@@ -7,43 +7,46 @@ from uuid import UUID
 
 from app.core.authorization.credential_loader import resolve_credentials_from_ids
 
-# Credenciais que não descrevem uma conexão, e sim como assinar uma requisição
-# HTTP. Vão para o nó em `http_auth` em vez de `connectionString`: o nó monta a
-# autenticação a partir daí — o `Authorization` do HttpRequest, a chave authkey
-# (parâmetro ou cabeçalho) e o Basic do nó WFS.
+# Credentials that do not describe a connection, but rather how to sign an HTTP
+# request. They go to the node in `http_auth` instead of `connectionString`: the
+# node builds the authentication from there — the HttpRequest's `Authorization`,
+# the authkey key (parameter or header) and the WFS node's Basic.
 #
-# SEGURANÇA — "usar" um segredo destes ≡ "poder extraí-lo". O nó de requisição
-# HTTP monta `Authorization: Bearer/Basic <segredo>` e envia para a URL que o
-# AUTOR do nó escolhe; o SSRF-guard barra alvo interno, não exfiltração para um
-# host público. Portanto, quem tem permissão de USAR uma credencial HTTP (hoje:
-# qualquer membro do workspace do workflow) consegue lê-la apontando um nó para
-# um servidor próprio. Diferente das credenciais de banco, cujo destino é
-# embutido no DSN e não é parâmetro do autor — essas são usáveis sem serem
-# extraíveis. Consequência de produto: compartilhar uma credencial HTTP com o
-# workspace é, na prática, confiar o token aos membros (a UI avisa disso). Se
-# um dia for preciso "usar sem poder extrair" para tipos HTTP, a mitigação é no
-# nó/egress (allowlist de destino quando há credencial), não aqui. O mesmo vale
-# para as do WFS: a URL do nó também é do autor.
+# SECURITY — "using" one of these secrets ≡ "being able to extract it". The HTTP
+# request node builds `Authorization: Bearer/Basic <segredo>` and sends it to the
+# URL the node's AUTHOR chooses; the SSRF guard blocks internal targets, not
+# exfiltration to a public host. Therefore, whoever has permission to USE an HTTP
+# credential (today: any member of the workflow's workspace) can read it by
+# pointing a node at their own server. Unlike database credentials, whose
+# destination is embedded in the DSN and is not an author parameter — those are
+# usable without being extractable. Product consequence: sharing an HTTP
+# credential with the workspace is, in practice, entrusting the token to the
+# members (the UI warns about this). If some day "use without being able to
+# extract" is needed for HTTP types, the mitigation belongs in the node/egress
+# (destination allowlist when there is a credential), not here. The same goes
+# for the WFS ones: the node's URL is also the author's.
 _TIPOS_AUTH_HTTP = ("http_bearer", "http_basic", "wfs", "geoserver_authkey")
 
-# Campos que podem compor a autenticação. Lista fechada de propósito: a
-# credencial descriptografada carrega outras chaves (`expires_at`, `type`) que
-# não têm por que atravessar até o executor. Por TIPO, valem só os que o
-# catálogo de credenciais declara para ele (`_campos_de_autenticacao`): uma
-# credencial que já foi de outro tipo carrega campos a mais no `data`, e o
-# `password` de quando era Basic não deve viajar junto com a chave authkey.
+# Fields that can make up the authentication. A closed list on purpose: the
+# decrypted credential carries other keys (`expires_at`, `type`) that have no
+# reason to travel all the way to the executor. Per TYPE, only the ones the
+# credential catalog declares for it count (`_campos_de_autenticacao`): a
+# credential that used to be of another type carries extra fields in `data`,
+# and the `password` from when it was Basic must not travel along with the
+# authkey key.
 _CAMPOS_AUTH_HTTP = ("token", "username", "password", "parameter", "location")
 
 
-# A credencial `s3` entra no nó em `s3_auth`, com os campos do catálogo e nada
-# mais (lista fechada pelo mesmo motivo de `_CAMPOS_AUTH_HTTP`). O nó monta o
-# cliente com `flow.utils.s3_cliente.cliente_s3` — o mesmo do teste de conexão.
+# The `s3` credential goes into the node in `s3_auth`, with the catalog's fields
+# and nothing else (closed list for the same reason as `_CAMPOS_AUTH_HTTP`). The
+# node builds the client with `flow.utils.s3_cliente.cliente_s3` — the same one
+# as the connection test.
 _CAMPOS_S3 = ("access_key_id", "secret_access_key", "region", "bucket", "endpoint_url")
 
 
 def s3_auth_da_credencial(cred: dict) -> dict | None:
-    """O `s3_auth` que o nó recebe de uma credencial resolvida — ou None, se ela
-    não é do tipo `s3`."""
+    """The `s3_auth` the node receives from a resolved credential — or None, if it
+    is not of type `s3`."""
     if cred.get("type") != "s3":
         return None
     return {campo: cred[campo] for campo in _CAMPOS_S3 if cred.get(campo) not in (None, "")}
@@ -59,11 +62,11 @@ def _campos_de_autenticacao(tipo: str) -> tuple[str, ...]:
 
 
 def http_auth_da_credencial(cred: dict) -> dict | None:
-    """O `http_auth` que o nó recebe de uma credencial resolvida — ou None, se
-    ela não assina requisição HTTP (as de banco viram `connectionString`).
+    """The `http_auth` the node receives from a resolved credential — or None, if
+    it does not sign HTTP requests (database ones become `connectionString`).
 
-    Também é o que a listagem de camadas do WFS no editor usa, para listar com a
-    MESMA autenticação que a execução vai usar.
+    It is also what the WFS layer listing in the editor uses, to list with the
+    SAME authentication the execution will use.
     """
     tipo = cred.get("type")
     if tipo not in _TIPOS_AUTH_HTTP:
@@ -75,10 +78,10 @@ def http_auth_da_credencial(cred: dict) -> dict | None:
 
 
 def _id_canonico(cid) -> str:
-    """O id como o resolver o devolve (UUID em minúsculas). Gravado em
-    maiúsculas no nó, ele não casava com nada e a credencial sumia sem aviso —
-    enquanto a guarda (`assert_credentials_accessible`), que converte para
-    UUID, o aceitava."""
+    """The id as the resolver returns it (lowercase UUID). Written in
+    uppercase on the node, it matched nothing and the credential vanished
+    without warning — while the guard (`assert_credentials_accessible`), which
+    converts to UUID, accepted it."""
     try:
         return str(UUID(str(cid)))
     except (ValueError, AttributeError, TypeError):
@@ -86,10 +89,10 @@ def _id_canonico(cid) -> str:
 
 
 def propriedade_que_recebe(tipo: str) -> str | None:
-    """Onde uma credencial deste tipo entra no nó: `http_auth` (as que assinam
-    requisição HTTP), `s3_auth` (a do S3), `connectionString` (as de banco) — ou
-    None (as que o nó usa pelo próprio id, como `webhook_token`, e os tipos
-    livres)."""
+    """Where a credential of this type goes into the node: `http_auth` (the ones
+    that sign HTTP requests), `s3_auth` (the S3 one), `connectionString` (the
+    database ones) — or None (the ones the node uses by their own id, like
+    `webhook_token`, and the free-form types)."""
     if tipo in _TIPOS_AUTH_HTTP:
         return "http_auth"
     if tipo == "s3":
@@ -100,8 +103,8 @@ def propriedade_que_recebe(tipo: str) -> str | None:
 
 
 def tipos_aceitos_do_descriptor(descriptor: dict) -> frozenset | None:
-    """Os tipos de credencial que o `credential_id` do descriptor aceita — ou
-    None quando o campo não existe ou não traz a lista."""
+    """The credential types the descriptor's `credential_id` accepts — or
+    None when the field does not exist or does not carry the list."""
     for prop in descriptor.get("properties") or []:
         if isinstance(prop, dict) and prop.get("name") == "credential_id" and prop.get("credential_types"):
             return frozenset(prop["credential_types"])
@@ -109,15 +112,16 @@ def tipos_aceitos_do_descriptor(descriptor: dict) -> frozenset | None:
 
 
 def _contrato_do_no(node: dict) -> tuple[frozenset | None, frozenset | None]:
-    """(tipos de credencial que o nó aceita, propriedades que ele declara) —
-    cada um None quando não dá para saber (nó fora do registro, descriptor
-    quebrado, campo sem a lista): aí vale o de sempre, sem filtro.
+    """(credential types the node accepts, properties it declares) —
+    each one None when it cannot be known (node outside the registry, broken
+    descriptor, field without the list): then the usual applies, no filter.
 
-    Só a tela filtra a credencial pelo tipo; pela API e pelo assistente chega
-    qualquer uma. É aqui, com o que o nó declara, que o servidor confere. E o
-    que se injeta tem de ser uma propriedade DECLARADA: `validate()` reconstrói
-    os parâmetros a partir da lista do descriptor e descartaria o resto — o nó
-    perderia a credencial E o id, e sairia anônimo sem ninguém avisar.
+    Only the screen filters the credential by type; through the API and the
+    assistant any credential arrives. It is here, with what the node declares,
+    that the server checks. And what gets injected has to be a DECLARED
+    property: `validate()` rebuilds the parameters from the descriptor's list and
+    would discard the rest — the node would lose the credential AND the id, and
+    would go out anonymous without anyone warning.
     """
     from flow.registry import NODE_REGISTRY
 
@@ -126,7 +130,7 @@ def _contrato_do_no(node: dict) -> tuple[frozenset | None, frozenset | None]:
         return None, None
     try:
         descriptor = cls.description()
-    except Exception:  # descriptor quebrado não derruba o disparo
+    except Exception:  # a broken descriptor does not bring down the trigger
         return None, None
     declaradas = frozenset(
         p.get("name") for p in descriptor.get("properties") or [] if isinstance(p, dict) and p.get("name")
@@ -140,29 +144,30 @@ async def inject_credentials(
     *,
     allowed_owner_ids: Collection[str] | None = None,
 ) -> dict:
-    """Injeta credenciais resolvidas nos nós da definição (sem salvar no banco).
+    """Injects resolved credentials into the definition's nodes (without saving to the database).
 
-    Retorna uma cópia profunda da definition com a credencial injetada
-    (`connectionString`, `http_auth` ou `s3_auth`) e `credential_id` removido — só dos nós
-    em que houve O QUE injetar. Credencial de um tipo que o nó não declara, ou
-    que não vira nem DSN nem autenticação HTTP (`webhook_token` de um
-    DataOutput, por exemplo), deixa o id onde está: o nó que precisa do segredo
-    recusa por não tê-lo, e o que usa o próprio id (o DataOutput protege o
-    artefato com ele) continua o tendo. Antes o id sumia sem nada no lugar — o
-    WFS consultava anônimo, e um DataOutput não-público recusava por "exige uma
-    credencial" com a credencial escolhida.
+    Returns a deep copy of the definition with the credential injected
+    (`connectionString`, `http_auth` or `s3_auth`) and `credential_id` removed — only
+    from the nodes where there was SOMETHING to inject. A credential of a type the
+    node does not declare, or that becomes neither a DSN nor HTTP authentication
+    (a DataOutput's `webhook_token`, for example), leaves the id where it is: the
+    node that needs the secret refuses for not having it, and the one that uses
+    its own id (DataOutput protects the artifact with it) still has it. Before,
+    the id vanished with nothing in its place — the WFS queried anonymously, and
+    a non-public DataOutput refused with "exige uma credencial" (requires a
+    credential) with the credential chosen.
 
-    Se pre_resolved for fornecido, pula a chamada ao banco — útil quando
-    start_analysis já resolveu credenciais para a validação de triggers. Só o
-    caminho sem pre_resolved precisa de `allowed_owner_ids`, que delimita de
-    quem as credenciais podem ser (ver credential_loader).
+    If pre_resolved is provided, it skips the database call — useful when
+    start_analysis has already resolved credentials for trigger validation. Only
+    the path without pre_resolved needs `allowed_owner_ids`, which delimits whose
+    credentials they may be (see credential_loader).
 
-    Sem nenhum `credential_id` a definition volta SEM cópia. O `copy.deepcopy`
-    era pago incondicionalmente — ~16 ms para uma definition de 1,7 MB, uma vez
-    pela raiz e mais uma por sub-fluxo — para produzir um clone que ninguém ia
-    escrever, travando o event loop do worker a cada disparo. O laço abaixo é o
-    único escritor, e ele não roda quando `cred_ids` está vazio; o retorno segue
-    direto para o envelope do job, que apenas o serializa.
+    With no `credential_id` at all, the definition comes back WITHOUT a copy. The
+    `copy.deepcopy` was paid unconditionally — ~16 ms for a 1.7 MB definition,
+    once for the root and once more per sub-workflow — to produce a clone nobody
+    was going to write to, blocking the worker's event loop on every trigger. The
+    loop below is the only writer, and it does not run when `cred_ids` is empty;
+    the return goes straight into the job envelope, which only serializes it.
     """
     nodes = definition.get("nodes", [])
 
@@ -191,26 +196,28 @@ async def inject_credentials(
         cred = resolved[cid]
         aceitos, declaradas = _contrato_do_no(node)
         if aceitos is not None and cred.get("type") not in aceitos:
-            # Nada viaja: nem a DSN de um banco até um nó WFS, nem a chave de
-            # um GeoServer até um nó de banco.
+            # Nothing travels: neither a database's DSN to a WFS node, nor a
+            # GeoServer's key to a database node.
             continue
         if (http_auth := http_auth_da_credencial(cred)) is not None:
-            # Sem esta cláusula, uma credencial HTTP era resolvida, tinha o
-            # `credential_id` removido logo abaixo e sumia sem deixar rastro:
-            # o nó recebia a definição já sem o id e sem nada no lugar, e a
-            # requisição saía anônima. Como só `connectionString` era injetada,
-            # os tipos `http_bearer`/`http_basic` — que existem desde sempre e
-            # são declarados para nós de ação — não tinham consumidor.
+            # Without this clause, an HTTP credential was resolved, had its
+            # `credential_id` removed right below and vanished without a trace:
+            # the node received the definition already without the id and with
+            # nothing in its place, and the request went out anonymous. Since
+            # only `connectionString` was injected, the `http_bearer`/`http_basic`
+            # types — which have always existed and are declared for action
+            # nodes — had no consumer.
             #
-            # O TIPO decide, e antes da DSN: uma credencial que já foi de banco
-            # e virou HTTP ainda carrega a `connectionString` antiga no `data`
-            # (a edição trocava o tipo e mantinha os campos), e ela ganharia.
+            # The TYPE decides, and before the DSN: a credential that used to be
+            # a database one and became HTTP still carries the old
+            # `connectionString` in `data` (editing changed the type and kept
+            # the fields), and it would win.
             if declaradas is not None and "http_auth" not in declaradas:
-                continue  # sem onde receber: o id fica, e o nó recusa por não ter o segredo
+                continue  # nowhere to receive it: the id stays, and the node refuses for not having the secret
             props["http_auth"] = http_auth
         elif (s3_auth := s3_auth_da_credencial(cred)) is not None:
-            # O tipo `s3` existia no cofre (com teste de conexão) sem consumidor:
-            # o SaveToS3 pedia a chave secreta digitada no nó, em texto puro.
+            # The `s3` type existed in the vault (with a connection test) with no
+            # consumer: SaveToS3 asked for the secret key typed into the node, in plain text.
             if declaradas is not None and "s3_auth" not in declaradas:
                 continue
             props["s3_auth"] = s3_auth
@@ -222,13 +229,14 @@ async def inject_credentials(
             declaradas is not None and "s3_auth" in declaradas
             and props.get("registerArtifact") not in (True, "true", "True", 1, "1")
         ):
-            # SaveToS3 com o Webhook Token do uso antigo e sem cópia registrada:
-            # o token não protege nada. Deixá-lo faria o nó recusar como
-            # "credencial S3 não resolvida" (um id que sobra sem `s3_auth` e
-            # sem cópia é o sinal disso) — um fluxo que rodava pararia.
+            # SaveToS3 with the Webhook Token from the old usage and no registered
+            # copy: the token protects nothing. Leaving it would make the node
+            # refuse with "credencial S3 não resolvida" (S3 credential not
+            # resolved; an id left over with no `s3_auth` and no copy is the
+            # sign of that) — a workflow that used to run would stop.
             pass
         else:
-            continue  # nada a injetar: o id fica (ver a docstring)
+            continue  # nothing to inject: the id stays (see the docstring)
         props.pop("credential_id", None)
 
     return enriched

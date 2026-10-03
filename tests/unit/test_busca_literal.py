@@ -1,12 +1,12 @@
-"""Busca por substring: o termo do usuário é LITERAL, em todas as telas.
+"""Substring search: the user's term is LITERAL, on every screen.
 
-O escape de `%` e `_` era copiado à mão em quatro serviços (artefatos, Drive,
-fontes, execuções) e esquecido no quinto: a busca de usuários do admin montava
-`f"%{search}%"` cru. Lá o `_` do termo virava curinga — procurar "a_b"
-devolvia também "aXb", e "___" casava qualquer conta —, o mesmo defeito que o
-comentário de `artifact_service._filtros` descreve e que as outras cópias já
-tinham consertado. Banco de verdade (SQLite), como em
-`test_drive_busca_escape.py`: o que importa é o comportamento do LIKE.
+The escaping of `%` and `_` was copied by hand into four services (artifacts,
+Drive, sources, runs) and forgotten in the fifth: the admin's user search built
+a raw `f"%{search}%"`. There the term's `_` became a wildcard — searching for
+"a_b" also returned "aXb", and "___" matched any account —, the same defect the
+comment in `artifact_service._filtros` describes and that the other copies had
+already fixed. Real database (SQLite), as in `test_drive_busca_escape.py`: what
+matters is the behavior of LIKE.
 """
 from pathlib import Path
 
@@ -47,7 +47,7 @@ async def _semear(db, *nomes):
 
 
 async def test_sublinhado_na_busca_de_usuarios_e_literal(db):
-    # `aXb` casa o PADRÃO `a_b` se o `_` for curinga, e não casa se for literal.
+    # `aXb` matches the PATTERN `a_b` if `_` is a wildcard, and does not if it is literal.
     await _semear(db, "aXb", "a_b")
 
     usuarios, total = await admin_user_service.list_users(db, search="a_b")
@@ -74,7 +74,7 @@ async def test_sublinhados_sozinhos_nao_listam_a_base_inteira(db):
 
 
 async def test_busca_de_usuarios_segue_sem_diferenciar_caixa(db):
-    """O escape não pode custar o ILIKE: "ANA" continua achando "ana"."""
+    """Escaping must not cost the ILIKE: "ANA" still finds "ana"."""
     await _semear(db, "ana", "bia")
 
     usuarios, total = await admin_user_service.list_users(db, search="ANA")
@@ -82,11 +82,11 @@ async def test_busca_de_usuarios_segue_sem_diferenciar_caixa(db):
     assert total == 1 and usuarios[0].username == "ana"
 
 
-# ── A peça única ─────────────────────────────────────────────────────────────
+# ── The single piece ─────────────────────────────────────────────────────────
 
 def test_escape_cobre_a_barra_antes_dos_curingas():
-    # A `\` do usuário é escapada primeiro: senão "a\_b" viraria "a\\_b", e o
-    # `_` voltaria a ser curinga depois de uma barra literal.
+    # The user's `\` is escaped first: otherwise "a\_b" would become "a\\_b", and
+    # the `_` would be a wildcard again after a literal backslash.
     assert escapar_like("a\\_b%") == "a\\\\\\_b\\%"
 
 
@@ -98,7 +98,7 @@ def test_contem_e_ilike_com_escape_explicito():
 
 
 def test_contem_sem_ignorar_caixa_e_like_simples():
-    """A coluna `busca` das fontes é gravada normalizada: LIKE basta."""
+    """The sources' `busca` column is stored normalized: LIKE is enough."""
     sql = str(contem(column("busca"), "saude", ignorar_caixa=False).compile(dialect=postgresql.dialect()))
 
     assert " LIKE " in sql and "ILIKE" not in sql
@@ -106,8 +106,8 @@ def test_contem_sem_ignorar_caixa_e_like_simples():
 
 
 def test_o_escape_do_like_mora_num_lugar_so():
-    """Cada cópia do escape era uma chance de esquecê-lo — e a busca de
-    usuários esqueceu. Toda busca por substring passa por `contem`."""
+    """Each copy of the escaping was a chance to forget it — and the user search
+    forgot. Every substring search goes through `contem`."""
     copias = []
     for caminho in sorted((RAIZ / "app").rglob("*.py")):
         rel = caminho.relative_to(RAIZ).as_posix()

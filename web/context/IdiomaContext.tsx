@@ -6,13 +6,13 @@ import Cookies from "js-cookie";
 import { COOKIE_DO_IDIOMA, IDIOMA_PADRAO, type Idioma, type IdiomaResolvido } from "@/lib/idioma";
 
 interface EstadoDoIdioma extends IdiomaResolvido {
-  /** Grava a escolha (cookie de 365 dias, como o tema); `null` volta ao automático. */
+  /** Stores the choice (365-day cookie, like the theme); `null` goes back to automatic. */
   escolher: (idioma: Idioma | null) => void;
 }
 
-// Sem provider (testes de componente, o portal /share) vale o português: é o
-// idioma em que a Home foi escrita, e os testes que conferem texto continuam
-// conferindo o mesmo texto.
+// Without a provider (component tests, the /share portal) Portuguese applies:
+// it is the language the Home was written in, and the tests that check text
+// keep checking the same text.
 const IdiomaContext = createContext<EstadoDoIdioma>({
   idioma: IDIOMA_PADRAO,
   detectado: IDIOMA_PADRAO,
@@ -23,10 +23,10 @@ const IdiomaContext = createContext<EstadoDoIdioma>({
 export const useIdioma = () => useContext(IdiomaContext);
 
 /**
- * Nasce com o idioma que o servidor resolveu (`resolverIdioma` no layout do
- * dashboard) — a primeira pintura já sai no idioma certo. Trocar nas
- * Preferências re-renderiza na hora, sem recarregar: o cookie é para a PRÓXIMA
- * requisição, o estado é para esta tela.
+ * Starts with the language the server resolved (`resolverIdioma` in the
+ * dashboard layout) — the first paint already comes out in the right language.
+ * Changing it in Preferences re-renders right away, without reloading: the
+ * cookie is for the NEXT request, the state is for this screen.
  */
 export function IdiomaProvider({
   inicial,
@@ -36,11 +36,11 @@ export function IdiomaProvider({
   children: React.ReactNode;
 }) {
   const [escolhido, setEscolhido] = useState<Idioma | null>(inicial.escolhido);
-  // O layout resolve de novo a cada `router.refresh()`, e o cookie pode ter
-  // mudado noutra aba. Sem isto, o provider (que não remonta) ficava com a
-  // escolha velha enquanto o `detectado` já vinha novo: a tela, o cookie e as
-  // Preferências discordavam até o próximo F5. Uma escolha feita NESTA aba
-  // não se perde: o refresh devolve o mesmo valor que ela gravou.
+  // The layout resolves again on every `router.refresh()`, and the cookie may
+  // have changed in another tab. Without this, the provider (which does not
+  // remount) kept the old choice while `detectado` was already new: the screen,
+  // the cookie and Preferences disagreed until the next F5. A choice made in
+  // THIS tab is not lost: the refresh returns the same value it stored.
   const [escolhidoDoServidor, setEscolhidoDoServidor] = useState(inicial.escolhido);
   if (escolhidoDoServidor !== inicial.escolhido) {
     setEscolhidoDoServidor(inicial.escolhido);
@@ -61,18 +61,18 @@ export function IdiomaProvider({
   return <IdiomaContext.Provider value={value}>{children}</IdiomaContext.Provider>;
 }
 
-// ── Onde a tela segue o idioma ────────────────────────────────────────────────
-// Só a HOME é traduzida; a administração (editor, projetos, admin) continua em
-// português. Sem este escopo, um componente compartilhado — o menu da conta, a
-// conversa do assistente do editor — trocaria de idioma dentro da área de
-// administração e a deixaria metade em cada língua. O padrão é `true` porque os
-// testes de componente montam pedaços da Home sem layout; quem decide de
-// verdade é o `EscopoPelaRota` do layout do dashboard.
+// ── Where the screen follows the language ─────────────────────────────────────
+// Only the HOME is translated; the administration (editor, projects, admin)
+// stays in Portuguese. Without this scope, a shared component — the account
+// menu, the editor's assistant conversation — would switch language inside the
+// administration area and leave it half in each language. The default is
+// `true` because component tests mount pieces of the Home without a layout;
+// what really decides is the dashboard layout's `EscopoPelaRota`.
 const NaHome = createContext(true);
 
 export const useNaHome = () => useContext(NaHome);
 
-/** O mesmo critério do `ShellSidebar`: a Home é a rota `/` exata. */
+/** The same criterion as `ShellSidebar`: the Home is the exact `/` route. */
 export function EscopoPelaRota({ children }: { children: React.ReactNode }) {
   const naHome = usePathname() === "/";
   return <NaHome.Provider value={naHome}>{children}</NaHome.Provider>;

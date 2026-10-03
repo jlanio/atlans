@@ -9,16 +9,16 @@ import type { IWorkflow } from "@/service/types"
 type Alvo = Pick<IWorkflow, "name" | "has_schedule_trigger" | "has_webhook_trigger">
 
 interface Props<T extends Alvo> {
-  /** Nulo fecha o diálogo. */
+  /** Null closes the dialog. */
   workflow: T | null
   onConfirm: (workflow: T) => void
   onCancel: () => void
 }
 
 /**
- * O que desativar pausa, dito antes de pausar: com agendamento ou webhook a
- * consequência é o gatilho parar de disparar; sem eles, é o workflow sumir
- * dos gatilhos e não poder ser executado.
+ * What deactivating pauses, said before pausing: with a schedule or webhook
+ * the consequence is the trigger stops firing; without them, it is the
+ * workflow disappearing from the triggers and not being runnable.
  */
 export function textoDeDesativar(wf: Alvo): string {
   return wf.has_schedule_trigger || wf.has_webhook_trigger
@@ -27,10 +27,10 @@ export function textoDeDesativar(wf: Alvo): string {
 }
 
 /**
- * Confirmação de "Desativar…" (docs/specs/projects.md §3.9). O interruptor
- * saiu do card porque a ação arriscada morava no lugar mais visível, sem
- * confirmação; aqui ela diz o que pausa. A troca em si é otimista, com
- * reversão, em quem compõe a página.
+ * Confirmation of "Desativar…" (deactivate, docs/specs/projects.md §3.9). The
+ * switch left the card because the risky action lived in the most visible
+ * place, with no confirmation; here it says what it pauses. The toggle itself
+ * is optimistic, with rollback, in the page composer.
  */
 export function ConfirmarDesativar<T extends Alvo>({ workflow, onConfirm, onCancel }: Props<T>) {
   return (

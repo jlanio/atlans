@@ -1,12 +1,13 @@
 # tests/unit/test_artifacts_busca_por_workflow.py
-"""A busca de /artifacts tem de casar com o NOME DO WORKFLOW.
+"""The /artifacts search has to match the WORKFLOW NAME.
 
-Quando a busca era no cliente, ela varria `workflow_name`, `output_key` e
-`filename`. Ao empurra-la para o SQL (necessario: a pagina deixou de baixar a
-colecao inteira) o nome do fluxo ficou de fora — e ele e a coluna mais visivel
-da tabela. Digitar 'Cadastro Ambiental' devolvia "Nenhum artefato encontrado"
-com as linhas daquele fluxo visiveis um segundo antes, e sem colecao local nao
-sobra nada para casar no cliente.
+When the search ran on the client, it scanned `workflow_name`, `output_key` and
+`filename`. When pushing it down to SQL (necessary: the page stopped downloading
+the whole collection) the workflow name was left out — and it is the most visible
+column of the table. Typing 'Cadastro Ambiental' returned "Nenhum artefato
+encontrado" (no artifact found) with that workflow's rows visible a second
+before, and without a local collection there is nothing left to match on the
+client.
 """
 from unittest.mock import AsyncMock, MagicMock
 
@@ -24,8 +25,8 @@ def _db():
 
 
 async def _listar(**kwargs):
-    """Chama a rota direto. Os defaults declarados como `Query(...)` nao sao
-    resolvidos fora do FastAPI, entao precisam vir explicitos."""
+    """Calls the route directly. Defaults declared as `Query(...)` are not
+    resolved outside FastAPI, so they have to be passed explicitly."""
     db = _db()
     await list_artifacts(
         db=db, workspace_ids=["ws-1"], kind=None, limit=50, offset=0, **kwargs
@@ -45,9 +46,9 @@ async def test_busca_cobre_nome_do_workflow_alem_de_filename_e_output_key():
 
 @pytest.mark.asyncio
 async def test_contagem_faz_o_mesmo_join_da_pagina():
-    """Sem o join na contagem, o `total` seria calculado sobre um filtro que
-    referencia `workflows.name` sem a tabela na query — erro de SQL — ou, pior,
-    um total incoerente com a pagina exibida."""
+    """Without the join in the count, `total` would be computed over a filter that
+    references `workflows.name` without the table in the query — an SQL error — or,
+    worse, a total inconsistent with the page shown."""
     _, (sql_count, _) = await _listar(search="Cadastro")
 
     assert "JOIN workflows" in sql_count
@@ -55,8 +56,8 @@ async def test_contagem_faz_o_mesmo_join_da_pagina():
 
 @pytest.mark.asyncio
 async def test_sem_busca_a_contagem_nao_paga_o_join():
-    """O join existe para a busca; a contagem do caso comum (sem `search`) nao
-    deve arrastar `workflows` junto."""
+    """The join exists for the search; the count in the common case (no `search`)
+    must not drag `workflows` along."""
     _, (sql_count, _) = await _listar(search=None)
 
     assert "workflows" not in sql_count
@@ -64,8 +65,8 @@ async def test_sem_busca_a_contagem_nao_paga_o_join():
 
 @pytest.mark.asyncio
 async def test_curingas_do_usuario_continuam_escapados():
-    """`%` e `_` sao literais: sem escape, buscar por '_' varreria tudo."""
+    """`%` and `_` are literals: without escaping, searching for '_' would match everything."""
     _, (sql_count, _) = await _listar(search="a_b%c")
 
-    parametros = sql_count  # o termo vai como bind; o ESCAPE fica no SQL
+    parametros = sql_count  # the term goes as a bind; the ESCAPE stays in the SQL
     assert "ESCAPE" in parametros.upper()

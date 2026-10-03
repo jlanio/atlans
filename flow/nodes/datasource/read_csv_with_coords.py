@@ -28,8 +28,8 @@ def _read_csv_as_geodataframe(file_path: str, lat_col: str, lon_col: str, crs: s
 @register_node
 class ReadCSVWithCoordsNode(BaseNode):
     """
-    Le um arquivo CSV do Drive do Workspace com colunas de latitude e longitude
-    e converte em GeoDataFrame com geometria de pontos.
+    Reads a CSV file from the Workspace Drive with latitude and longitude columns
+    and converts it into a GeoDataFrame with point geometry.
     """
 
     @classmethod

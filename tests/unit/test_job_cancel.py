@@ -1,10 +1,10 @@
 """
-Cancelamento de job no executor (ExecutorJobQueue.cancel).
+Job cancellation on the executor (ExecutorJobQueue.cancel).
 
-Até então um workflow disparado só terminava sozinho ou por timeout — não havia
-como interromper um job caro ou travado. O ponto delicado é o aviso de volta:
-a task interrompida nunca produz resultado, então sem `on_cancelled` o run
-ficaria "running" para sempre no servidor.
+Until now a triggered workflow only ended on its own or by timeout — there was
+no way to interrupt an expensive or stuck job. The delicate point is the notice
+back: the interrupted task never produces a result, so without `on_cancelled` the run
+would stay "running" forever on the server.
 """
 import asyncio
 
@@ -18,7 +18,7 @@ def _job(job_id: str, priority: int = 5) -> dict:
 
 
 async def _drain(queue: ExecutorJobQueue, timeout: float = 2.0):
-    """Espera a fila esvaziar sem depender de sleeps fixos."""
+    """Waits for the queue to drain without relying on fixed sleeps."""
     async def _wait():
         while queue.get_capacity()["queued"] > 0 or queue.get_capacity()["running"] > 0:
             await asyncio.sleep(0.01)
@@ -26,11 +26,11 @@ async def _drain(queue: ExecutorJobQueue, timeout: float = 2.0):
 
 
 async def _eventually(pred, timeout: float = 2.0):
-    """Aguarda uma condição virar verdadeira.
+    """Waits for a condition to become true.
 
-    `_drain` sozinho não serve para observar o descarte: ele só olha fila e
-    contador de execução, e um job cancelado já saiu da fila enquanto o worker
-    ainda processa o aviso.
+    `_drain` alone is not enough to observe the discard: it only looks at the queue
+    and the execution counter, and a cancelled job has already left the queue while
+    the worker is still processing the notice.
     """
     async def _wait():
         while not pred():
@@ -45,7 +45,7 @@ async def test_cancela_job_em_execucao_e_avisa():
 
     async def on_execute(message):
         started.set()
-        await asyncio.sleep(30)  # job longo — seria impossível parar antes
+        await asyncio.sleep(30)  # long job — it would be impossible to stop beforehand
 
     async def on_cancelled(message):
         cancelled.append(message["envelope"]["job_id"])
@@ -68,7 +68,7 @@ async def test_cancela_job_em_execucao_e_avisa():
 
 @pytest.mark.asyncio
 async def test_worker_continua_vivo_apos_cancelamento():
-    """Cancelar um job não pode derrubar o worker que o executava."""
+    """Cancelling a job must not bring down the worker that was executing it."""
     started = asyncio.Event()
     executados: list[str] = []
 
@@ -97,7 +97,7 @@ async def test_worker_continua_vivo_apos_cancelamento():
 
 @pytest.mark.asyncio
 async def test_cancela_job_ainda_na_fila():
-    """Não dá para remover do meio de uma PriorityQueue: o worker descarta."""
+    """You cannot remove from the middle of a PriorityQueue: the worker discards it."""
     liberar = asyncio.Event()
     executados: list[str] = []
     cancelled: list[str] = []
@@ -123,18 +123,18 @@ async def test_cancela_job_ainda_na_fila():
         liberar.set()
         await _eventually(lambda: cancelled == ["na-fila"])
 
-        assert executados == ["bloqueia"]  # o cancelado nunca executou
+        assert executados == ["bloqueia"]  # the cancelled one never executed
     finally:
         await queue.shutdown(timeout=2)
 
 
 @pytest.mark.asyncio
 async def test_cancelamento_durante_espera_pelo_semaforo_nao_se_perde():
-    """Executor saturado: o job já saiu da fila mas ainda espera vaga.
+    """Saturated executor: the job has already left the queue but is still waiting for a slot.
 
-    Nessa janela `cancel()` não acha task ativa e marca para descarte; sem a
-    re-checagem depois do semáforo o worker já teria passado da primeira e o job
-    rodaria até o fim enquanto a UI dizia "cancelamento solicitado".
+    In that window `cancel()` finds no active task and marks it for discard; without the
+    re-check after the semaphore the worker would already be past the first one and the job
+    would run to the end while the UI said "cancelamento solicitado" (cancellation requested).
     """
     ocupando = asyncio.Event()
     liberar = asyncio.Event()
@@ -151,8 +151,8 @@ async def test_cancelamento_durante_espera_pelo_semaforo_nao_se_perde():
     async def on_cancelled(message):
         cancelled.append(message["envelope"]["job_id"])
 
-    # 1 slot de concorrência e 2 workers: o segundo worker tira "alvo" da fila e
-    # fica preso no semáforo enquanto "ocupa" segura a única vaga.
+    # 1 concurrency slot and 2 workers: the second worker takes "alvo" off the queue and
+    # gets stuck on the semaphore while "ocupa" holds the only slot.
     queue = ExecutorJobQueue(on_execute=on_execute, max_concurrent=1,
                              max_queue_size=10, on_cancelled=on_cancelled)
     await queue.start(n_workers=2)
@@ -161,7 +161,7 @@ async def test_cancelamento_durante_espera_pelo_semaforo_nao_se_perde():
         await asyncio.wait_for(ocupando.wait(), timeout=2.0)
 
         await queue.enqueue(_job("alvo", priority=1))
-        await asyncio.sleep(0.05)   # o 2º worker pega "alvo" e trava no semáforo
+        await asyncio.sleep(0.05)   # the 2nd worker picks up "alvo" and blocks on the semaphore
 
         assert queue.cancel("alvo") == "queued"
         liberar.set()
@@ -174,7 +174,7 @@ async def test_cancelamento_durante_espera_pelo_semaforo_nao_se_perde():
 
 @pytest.mark.asyncio
 async def test_shutdown_nao_deixa_job_orfao_rodando():
-    """Cancelar `await task` não cancela a task — o job vazaria após o shutdown."""
+    """Cancelling `await task` does not cancel the task — the job would leak after shutdown."""
     started = asyncio.Event()
     concluiu = False
 
@@ -192,7 +192,7 @@ async def test_shutdown_nao_deixa_job_orfao_rodando():
     await queue.enqueue(_job("longo"))
     await asyncio.wait_for(started.wait(), timeout=2.0)
 
-    # timeout=0 força o caminho de abandono: cancela os workers com job em curso.
+    # timeout=0 forces the abandon path: cancels the workers with a job in progress.
     await queue.shutdown(timeout=0)
     await asyncio.sleep(0.05)
 

@@ -25,7 +25,7 @@ describe("workflowSaveStore — janela de autocorreção do snapshot", () => {
 
   it("absorve a remedição do ReactFlow logo depois da hidratação", () => {
     save().initSnapshot([no("a")], [], "wf")
-    vi.advanceTimersByTime(300) // o detector é debounced em 300ms
+    vi.advanceTimersByTime(300) // the detector is debounced at 300ms
 
     expect(save().isDirty([no("a", 1)], [], "wf")).toBe(true)
     expect(save().autocorrigirSnapshot([no("a", 1)], [], "wf")).toBe(true)
@@ -34,10 +34,10 @@ describe("workflowSaveStore — janela de autocorreção do snapshot", () => {
   })
 
   it("NÃO absorve a primeira edição do usuário feita depois da janela", () => {
-    // Regressão que este teste tranca: com o detect-dirty debounced, a primeira
-    // comparação só acontece quando o usuário para de arrastar. Uma flag de uso
-    // único engolia a edição inteira — sem "Não salvo", com Ctrl+S virando
-    // no-op e o Executar disparando a definição antiga.
+    // Regression this test locks down: with detect-dirty debounced, the first
+    // comparison only happens when the user stops dragging. A single-use flag
+    // swallowed the whole edit — no "Não salvo" (unsaved), with Ctrl+S turning
+    // into a no-op and Run firing the old definition.
     save().initSnapshot([no("a")], [], "wf")
     vi.advanceTimersByTime(5_000)
 
@@ -48,13 +48,14 @@ describe("workflowSaveStore — janela de autocorreção do snapshot", () => {
   it("a autocorreção vale uma vez só por hidratação", () => {
     save().initSnapshot([no("a")], [], "wf")
     expect(save().autocorrigirSnapshot([no("a", 1)], [], "wf")).toBe(true)
-    // Segunda diferença, ainda dentro do 1s: já é edição do usuário.
+    // Second difference, still within the 1s: it is already a user edit.
     expect(save().autocorrigirSnapshot([no("a", 2)], [], "wf")).toBe(false)
   })
 
   it("um save fecha a janela — edição pós-save nunca é absorvida", () => {
-    // O rótulo "Salvo" some 3s depois e o status volta a 'idle'; sem fechar a
-    // janela no completeSave, uma edição feita nesse instante seria engolida.
+    // The "Salvo" label disappears 3s later and the status goes back to 'idle';
+    // without closing the window in completeSave, an edit made at that instant
+    // would be swallowed.
     save().initSnapshot([no("a")], [], "wf")
     save().completeSave(JSON.stringify({ name: "wf", nodes: [no("a")], edges: [] }))
     expect(save().snapshotIniciadoEm).toBeNull()
@@ -98,14 +99,14 @@ describe("workflowSaveStore — estados do feedback de salvamento", () => {
     expect(save().lastError).toBeNull()
 
     vi.advanceTimersByTime(3_000)
-    // Repouso: o chip passa a mostrar "Salvo há N min" a partir de lastSavedAt.
+    // At rest: the chip starts showing "Salvo há N min" (saved N min ago) from lastSavedAt.
     expect(save().saveStatus).toBe("idle")
     expect(save().lastSavedAt).toBe(Date.parse("2026-09-05T14:32:00Z"))
   })
 
   it("falha vira 'error' com a mensagem — não 'unsaved'", () => {
-    // O grafo continua diferente do snapshot, mas o que o usuário precisa ver é
-    // que a tentativa falhou, com o retry no mesmo lugar.
+    // The graph is still different from the snapshot, but what the user needs to
+    // see is that the attempt failed, with the retry in the same place.
     save().startSaving()
     save().failSave("Sem permissão para editar este workflow")
 
@@ -115,8 +116,8 @@ describe("workflowSaveStore — estados do feedback de salvamento", () => {
   })
 
   it("flashSaved pisca 'Salvo' sem PUT e sem mexer em lastSavedAt", () => {
-    // Ctrl+S sem nada a salvar: confirma que está tudo gravado, mas o "salvo
-    // às" continua sendo o do save de verdade.
+    // Ctrl+S with nothing to save: confirms everything is stored, but the "salvo
+    // às" (saved at) is still that of the real save.
     useWorkflowSaveStore.setState({ lastSavedAt: 1_000 })
     save().flashSaved()
 

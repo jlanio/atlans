@@ -5,16 +5,16 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
 
 /**
- * Estados da tela de Credenciais (contrato screen-patterns.md §3): carregando,
- * erro de carga, primeiro uso e sem resultado. Cada um diz o que aconteceu e o
- * que fazer a seguir. Aqui ficam o skeleton e as frases da tela; a moldura de
- * cada estado é a de `shared/estados.tsx`.
+ * States of the Credentials screen (contract screen-patterns.md §3): loading,
+ * load error, first use and no results. Each one says what happened and what
+ * to do next. The skeleton and the screen's sentences live here; each state's
+ * frame is the one from `shared/estados.tsx`.
  */
 
 /**
- * Primeira carga: o cabeçalho real fica por cima (o `index` sempre o renderiza,
- * com o subtítulo em esqueleto), e aqui vai o desenho da toolbar e das linhas —
- * com as mesmas alturas da lista de verdade, para a troca não pular.
+ * First load: the real header sits on top (`index` always renders it, with
+ * the subtitle as a skeleton), and here goes the outline of the toolbar and
+ * rows — with the same heights as the real list, so the swap doesn't jump.
  */
 export function SkeletonDeCredenciais() {
   return (
@@ -24,7 +24,7 @@ export function SkeletonDeCredenciais() {
       aria-label="Carregando as credenciais"
       className="flex flex-col gap-4"
     >
-      {/* Fantasma da barra de busca/filtro/ordenar/agrupar. */}
+      {/* Ghost of the search/filter/sort/group bar. */}
       <div className="flex flex-wrap items-center gap-2">
         <Skeleton className="h-9 min-w-[12rem] flex-1 rounded-md max-md:h-10" />
         <Skeleton className="h-9 w-36 rounded-md max-md:h-10" />
@@ -39,8 +39,8 @@ export function SkeletonDeCredenciais() {
 }
 
 /**
- * Mais alta no telefone: ali o EntityCard empilha os selos numa segunda linha,
- * e um esqueleto baixo encolhia a lista no instante em que os dados chegavam.
+ * Taller on phones: there the EntityCard stacks the badges on a second line,
+ * and a short skeleton made the list shrink the instant the data arrived.
  */
 function LinhaFantasma() {
   return (
@@ -57,10 +57,10 @@ function LinhaFantasma() {
 }
 
 /**
- * A fonte-espinha (a listagem) caiu na 1ª carga. Só toma a tela quando nunca
- * houve carga aceita — recarga que falha sobre lista pronta mantém o que havia
- * e avisa por toast (ver `index`). `mensagem` é a do servidor; sem ela, a
- * orientação de sempre.
+ * The spine source (the listing) failed on the 1st load. It only takes over the
+ * screen when there was never an accepted load — a reload that fails over a
+ * ready list keeps what was there and warns via toast (see `index`). `mensagem`
+ * is the server's; without it, the usual guidance.
  */
 export function ErroDeCarga({ mensagem, onTentar }: { mensagem?: string | null; onTentar: () => void }) {
   return (
@@ -73,9 +73,9 @@ export function ErroDeCarga({ mensagem, onTentar }: { mensagem?: string | null; 
 }
 
 /**
- * Sem nenhuma credencial: a tela ensina o que é uma credencial e por onde
- * começar. Criar é uma ação pessoal (owner-only por natureza), então o CTA
- * aparece para quem pode; o fallback existe por contrato.
+ * No credentials at all: the screen teaches what a credential is and where to
+ * start. Creating is a personal action (owner-only by nature), so the CTA
+ * appears for whoever can; the fallback exists by contract.
  */
 export function VazioPrimeiroUso({ canEdit, onCriar }: { canEdit: boolean; onCriar: () => void }) {
   return (
@@ -95,7 +95,7 @@ export function VazioPrimeiroUso({ canEdit, onCriar }: { canEdit: boolean; onCri
   )
 }
 
-/** «Nenhuma credencial com «q»» / «…com este filtro» / «…com «q» e este filtro». */
+/** "Nenhuma credencial com "q"" / "…com este filtro" / "…com "q" e este filtro". */
 export function textoDeSemResultado(q: string, comFiltro: boolean): string {
   return Estado.textoDeSemResultado({
     nada: "Nenhuma credencial",
@@ -105,7 +105,7 @@ export function textoDeSemResultado(q: string, comFiltro: boolean): string {
   })
 }
 
-/** Busca ou filtro de tipo sem nenhuma linha: a saída óbvia é limpar o recorte. */
+/** Search or type filter with no rows: the obvious way out is to clear the slice. */
 export function SemResultado({ q, comFiltro, onLimpar }: {
   q: string
   comFiltro: boolean

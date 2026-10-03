@@ -9,9 +9,9 @@ vi.mock("@/service/GisFlowService", () => ({
     retryRun: vi.fn(),
   },
 }))
-// O StatusBadge em português é colateral de outra frente (spec §4.4); aqui
-// ele é dublado com o mesmo contrato (rotuloDoStatus) para o teste não
-// depender da ordem de integração.
+// The Portuguese StatusBadge is a side effect of another workstream (spec
+// §4.4); here it's doubled with the same contract (rotuloDoStatus) so the test
+// doesn't depend on the integration order.
 vi.mock("@/app/components/shared/StatusBadge", async () => {
   const { rotuloDoStatus } = await import("@/app/components/shared/status-rotulos")
   return { StatusBadge: ({ status }: { status: string }) => <span>{rotuloDoStatus(status)}</span> }
@@ -88,13 +88,13 @@ describe("PainelExecucao", () => {
     expect(painel).toHaveTextContent("tempo esgotado")
     // Erro inteiro
     expect(within(painel).getByText(/TimeoutError: consulta ao WFS/)).toBeInTheDocument()
-    // Nós: os "__" ficam de fora, o que falhou fica marcado
+    // Nodes: the "__" ones are left out, the one that failed is marked
     expect(painel).toHaveTextContent("2 executados")
     expect(painel).toHaveTextContent("Buscar imóveis SICAR")
-    // Duração na escala do resto da página ("30 s"), não "30.10s".
+    // Duration on the same scale as the rest of the page ("30 s"), not "30.10s".
     expect(painel).toHaveTextContent("30 s · falhou")
     expect(painel).not.toHaveTextContent("meta")
-    // Ações
+    // Actions
     expect(within(painel).getByRole("button", { name: /Executar de novo/ })).toBeInTheDocument()
     expect(within(painel).getByRole("link", { name: "Abrir workflow" })).toHaveAttribute("href", "/workflow/wf-1")
     expect(within(painel).getByRole("link", { name: /Abrir em página/ })).toHaveAttribute("href", "/observability/run/run-7f3a")
@@ -157,12 +157,12 @@ describe("PainelExecucao", () => {
     const painel = await screen.findByRole("dialog")
     await within(painel).findByText("Integração SICAR")
     fireEvent.click(within(painel).getByRole("button", { name: /Ver log/ }))
-    // Em português, com o nome do nó: `kind` lifecycle não aparece; `status` sim.
-    // A lista do log só renderiza depois de getRunEvents resolver. Espera por um
-    // texto que SÓ existe nela — o formato "nome · falhou · erro" (a seção "Nós"
-    // acima usa outro layout). O findByText(/Ler limites municipais/) anterior
-    // casava na seção "Nós" (renderiza antes) e deixava as asserções síncronas
-    // rodarem antes de a lista existir — flake em runner mais lento (CI).
+    // In Portuguese, with the node name: lifecycle `kind` doesn't appear; `status` does.
+    // The log list only renders after getRunEvents resolves. It waits for a
+    // text that ONLY exists in it — the "nome · falhou · erro" format (the "Nós"
+    // section above uses another layout). The previous findByText(/Ler limites municipais/)
+    // matched in the "Nós" section (rendered earlier) and let the synchronous
+    // assertions run before the list existed — flaky on a slower runner (CI).
     await waitFor(() => expect(painel).toHaveTextContent("Buscar imóveis SICAR · falhou · TimeoutError"))
     expect(painel).toHaveTextContent("(800ms)")
     expect(painel).not.toHaveTextContent("node_end")

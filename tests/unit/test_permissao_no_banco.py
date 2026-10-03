@@ -1,7 +1,7 @@
 # tests/unit/test_permissao_no_banco.py
-"""Permissão negada no PostgreSQL vira uma mensagem que diz o que conceder —
-"Unexpected error occurred" escondia a causa (foi o que aconteceu com
-`audit_events` na primeira semana da política de execução)."""
+"""Permission denied in PostgreSQL becomes a message that says what to grant —
+"Unexpected error occurred" hid the cause (that is what happened with
+`audit_events` in the first week of the execution policy)."""
 import json
 from unittest.mock import MagicMock
 

@@ -11,34 +11,34 @@ import { reancorarArestasDoNo } from "@/app/components/workflow/utils/node-ports
 const DEBOUNCE_MS = 300
 
 /**
- * Sincroniza portas (inputs/outputs) dinamicas dos nodes SubWorkflow com o
- * contrato declarado pelo workflow alvo (SubWorkflowInput + SubWorkflowOutput).
+ * Syncs the dynamic ports (inputs/outputs) of SubWorkflow nodes with the
+ * contract declared by the target workflow (SubWorkflowInput + SubWorkflowOutput).
  *
- * Por que: o catalogo /nodes nao tem como prever as chaves de cada
- * sub-fluxo. Renderizamos handles dinamicos no canvas buscando o contract
- * por workflowHash configurado em cada node SubWorkflow.
+ * Why: the /nodes catalog has no way to predict the keys of each
+ * sub-workflow. We render dynamic handles on the canvas by fetching the contract
+ * by the workflowHash configured in each SubWorkflow node.
  *
- * Estrategia anti-loop:
- *   - cache em memoria por hash (evita re-fetch entre re-renders)
- *   - comparacao de portas atual vs nova antes de setNodes (evita
- *     re-render desnecessario do ReactFlow)
+ * Anti-loop strategy:
+ *   - in-memory cache per hash (avoids re-fetching between re-renders)
+ *   - comparison of current vs new ports before setNodes (avoids an
+ *     unnecessary ReactFlow re-render)
  */
 export function useSubWorkflowContractSync(nodes: INodeContext[]) {
   const { setNodes, setEdges } = useReactFlow<INodeContext, Edge>()
   const cacheRef = useRef<Map<string, IWorkflowContract | null>>(new Map())
   const inflightRef = useRef<Set<string>>(new Set())
 
-  // Chave estavel para o dep array: re-roda apenas quando hashes mudam
-  // (add/remove de SubWorkflow ou edicao de workflowHash). Memoizada porque no
-  // corpo do hook a varredura rodava a cada render do canvas — o canvas passa
-  // uma projecao de `nodes` que ignora mudanca de posicao.
+  // Stable key for the dep array: re-runs only when hashes change
+  // (add/remove of a SubWorkflow or an edit of workflowHash). Memoized because in
+  // the hook body the scan ran on every canvas render — the canvas passes a
+  // projection of `nodes` that ignores position changes.
   const subworkflowSignature = useMemo(() => nodes
     .filter((n) => (n.data as { name?: string })?.name === "SubWorkflow")
     .map((n) => `${n.id}:${((n.data?.properties ?? {}) as { workflowHash?: string }).workflowHash ?? ""}`)
     .join("|"), [nodes])
 
-  // Debounce: operador digitando hash caractere-por-caractere nao deve
-  // disparar uma request por keystroke. Aguarda 300ms de inatividade.
+  // Debounce: an operator typing a hash character by character should not
+  // fire one request per keystroke. Waits for 300ms of inactivity.
   const [debouncedSignature, setDebouncedSignature] = useState(subworkflowSignature)
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSignature(subworkflowSignature), DEBOUNCE_MS)
@@ -57,11 +57,12 @@ export function useSubWorkflowContractSync(nodes: INodeContext[]) {
       String(((node.data?.properties ?? {}) as Record<string, unknown>).workflowHash ?? "").trim()
 
     async function syncAll() {
-      // Busca os contratos em PARALELO. Antes era um `await` por nó dentro do
-      // laço — um waterfall de N requisições, cada uma esperando a anterior.
-      // Coleta os hashes ainda não cacheados nem em voo, marca em voo, e resolve
-      // todos juntos; só então aplica as portas por nó, lendo o cache. A ordem
-      // entre nós não importa (cada applyPorts mira um id disjunto e é idempotente).
+      // Fetches the contracts in PARALLEL. Before, it was one `await` per node inside
+      // the loop — a waterfall of N requests, each waiting for the previous one.
+      // Collects the hashes not yet cached nor in flight, marks them in flight, and
+      // resolves them all together; only then applies the ports per node, reading
+      // the cache. Order across nodes does not matter (each applyPorts targets a
+      // disjoint id and is idempotent).
       const aBuscar = new Set<string>()
       for (const node of subworkflowNodes) {
         const hash = hashDoNo(node)
@@ -89,8 +90,8 @@ export function useSubWorkflowContractSync(nodes: INodeContext[]) {
 
       for (const node of subworkflowNodes) {
         const hash = hashDoNo(node)
-        // Sem hash: limpa portas dinâmicas. Hash em voo de uma rodada anterior
-        // (ainda não cacheado): `?? null` aplica portas vazias, como antes.
+        // No hash: clears dynamic ports. A hash in flight from a previous round
+        // (not cached yet): `?? null` applies empty ports, as before.
         const contract = hash ? (cacheRef.current.get(hash) ?? null) : null
         const inputs = (contract?.inputs ?? []).map((p) => ({
           name: p.name,
@@ -128,10 +129,10 @@ export function useSubWorkflowContractSync(nodes: INodeContext[]) {
         }),
       )
 
-      // Re-ancora as arestas cujo handle se perdeu no load, agora que as portas
-      // do contrato chegaram — corrige o colapso "tudo na primeira entrada" ao
-      // dar F5. A lógica é pura (`reancorarArestasDoNo`) e idempotente: devolve o
-      // MESMO array quando nada muda, para não realimentar `useEdgesState`.
+      // Re-anchors the edges whose handle was lost on load, now that the contract's
+      // ports have arrived — fixes the "everything on the first input" collapse on
+      // F5. The logic is pure (`reancorarArestasDoNo`) and idempotent: it returns
+      // the SAME array when nothing changes, so as not to feed back into `useEdgesState`.
       setEdges((eds) =>
         reancorarArestasDoNo(
           eds,
@@ -147,8 +148,8 @@ export function useSubWorkflowContractSync(nodes: INodeContext[]) {
     return () => {
       cancelled = true
     }
-    // Re-roda apenas quando a assinatura debounced muda — opera deixou de
-    // digitar por DEBOUNCE_MS.
+    // Re-runs only when the debounced signature changes — the operator stopped
+    // typing for DEBOUNCE_MS.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSignature])
 }

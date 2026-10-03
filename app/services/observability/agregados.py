@@ -1,6 +1,6 @@
 # app/services/observability/agregados.py
-# Lógica de negócio e consultas de observabilidade extraídas do router.
-# Contrato com a web: docs/specs/metrics-history.md (§3).
+# Business logic and observability queries extracted from the router.
+# Contract with the web app: docs/specs/metrics-history.md (§3).
 
 from datetime import datetime, timedelta
 from typing import Optional
@@ -11,20 +11,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.models import WorkflowRun
 
 
-# Criterio de execucao presa (spec §3.1): mais que
-# 3x a mediana do workflow, nunca menos que 15 min; sem mediana, 1 h. O piso
-# existe porque um workflow de 10 s "preso" ha 40 s ainda pode ser so a fila.
+# Stuck-run criterion (spec §3.1): more than
+# 3x the workflow's median, never less than 15 min; with no median, 1 h. The floor
+# exists because a 10 s workflow "stuck" for 40 s may still just be the queue.
 _PRESA_MULTIPLO_P50 = 3
 _PRESA_MINIMO_SEGUNDOS = 900
 _PRESA_SEM_P50_SEGUNDOS = 3600
-# Quantas execucoes ativas antigas o calculo de "presas" olha. Como nenhuma
-# execucao pode estar presa antes do piso de 900 s, a consulta ja corta por
-# `start_time <= now - 900 s`; o teto e so uma trava contra uma fila
-# patologica de milhares de pendentes — nesse caso `stuck_count` satura.
+# How many old active runs the "stuck" calculation looks at. Since no
+# run can be stuck before the 900 s floor, the query already cuts by
+# `start_time <= now - 900 s`; the ceiling is only a guard against a
+# pathological queue of thousands of pending ones — in that case `stuck_count` saturates.
 _PRESA_TETO_CANDIDATAS = 500
 
-# Status que contam como "em andamento" no instante da consulta e no balde
-# `running` do grafico por dia (spec §3.2).
+# Statuses that count as "in progress" at query time and in the
+# `running` bucket of the per-day chart (spec §3.2).
 _STATUS_ATIVOS = ("running", "pending")
 
 
@@ -33,12 +33,12 @@ from app.services.observability.estatisticas import _p50_por_workflow, _resumir_
 from app.services.observability.frota import _confirmacoes_atrasadas, _executor_id_do_host, _executores_do_escopo, _nomes_de_executores, _presenca
 from app.services.observability.runs import _resolve_workflow_meta
 
-# ── Helpers que dependem do servico (abaixo para leitura de cima para baixo) ─
+# ── Helpers that depend on the service (below, for top-down reading) ─────────
 
 def _parse_iso(texto: str) -> datetime:
-    """`datetime.fromisoformat` so aceita o sufixo `Z` a partir do Python 3.11,
-    e a web manda `toISOString()` (`…T22:05:13.123Z`). Escrito quando a API
-    rodava em 3.10; no 3.12 a troca e inofensiva."""
+    """`datetime.fromisoformat` only accepts the `Z` suffix from Python 3.11 on,
+    and the web app sends `toISOString()` (`…T22:05:13.123Z`). Written when the API
+    ran on 3.10; on 3.12 the replacement is harmless."""
     return datetime.fromisoformat(texto.strip().replace("Z", "+00:00"))
 
 
@@ -51,9 +51,9 @@ def _balde_do_status(status: Optional[str]) -> str:
 
 
 async def _top_falhas(db: AsyncSession, run_f: list, since: datetime) -> list[dict]:
-    """Top 5 workflows por falhas na janela, com taxa (falhas ÷ total DO
-    WORKFLOW na janela) e o ultimo erro. Tres consultas fixas: a agregacao,
-    a ultima falha de cada um (funcao de janela) e os nomes."""
+    """Top 5 workflows by failures in the window, with rate (failures ÷ total OF THE
+    WORKFLOW in the window) and the last error. Three fixed queries: the aggregation,
+    each one's last failure (window function) and the names."""
     falhas = func.count(WorkflowRun.id).filter(WorkflowRun.status == "failed")
     result = await db.execute(
         select(
@@ -96,11 +96,11 @@ async def _top_falhas(db: AsyncSession, run_f: list, since: datetime) -> list[di
 
 
 async def _execucoes_presas(db: AsyncSession, run_f: list, now: datetime) -> tuple[int, list[dict]]:
-    """Execucoes ativas ha mais tempo do que o workflow costuma levar.
+    """Active runs running longer than the workflow usually takes.
 
-    A consulta so traz candidatas que ja passaram do piso (900 s) — nada
-    abaixo dele pode estar preso — e o limiar de cada uma vem da mediana do
-    seu workflow em 90 dias. Devolve `(quantas, as 5 mais antigas)`.
+    The query only brings candidates already past the floor (900 s) — nothing
+    below it can be stuck — and each one's threshold comes from the median of
+    its workflow over 90 days. Returns `(how many, the 5 oldest)`.
     """
     limite = now - timedelta(seconds=_PRESA_MINIMO_SEGUNDOS)
     result = await db.execute(
@@ -153,11 +153,11 @@ async def _execucoes_presas(db: AsyncSession, run_f: list, now: datetime) -> tup
 async def _bloco_agora(
     db: AsyncSession, user, run_f: list, now: datetime, *, como_admin: bool = False,
 ) -> dict:
-    """O bloco `now` da spec §3.1: o instante da consulta, SEM janela. O que
-    esta em andamento nao depende do periodo escolhido no cabecalho.
+    """The `now` block of spec §3.1: the moment of the query, with NO window. What
+    is in progress does not depend on the period chosen in the header.
 
-    `como_admin` decide a frota (toda a ativa × a acessivel) e se os ACKs
-    atrasados sao contados — nao e deduzido do `user` (ver `e_admin_global`)."""
+    `como_admin` decides the fleet (all active × the accessible ones) and whether late
+    ACKs are counted — it is not inferred from `user` (see `e_admin_global`)."""
     ativos = (await db.execute(
         select(
             func.count(WorkflowRun.id).filter(WorkflowRun.status == "running").label("running"),
@@ -169,8 +169,8 @@ async def _bloco_agora(
 
     frota = await _executores_do_escopo(db, user, como_admin=como_admin)
     online, capacidade = await _presenca([e["id_hash"] for e in frota])
-    # Fila somada so de quem publica capacidade: `null` distingue "ninguem
-    # publica" de "fila vazia", que a tela mostra de forma diferente.
+    # Queue summed only over those that publish capacity: `null` distinguishes "nobody
+    # publishes" from "empty queue", which the screen shows differently.
     filas = [
         cap["queued"] for eid, cap in capacidade.items()
         if online.get(eid) and cap is not None and cap.get("queued") is not None

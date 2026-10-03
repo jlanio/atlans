@@ -1,12 +1,12 @@
-# O contexto do build é `web/`, então o .dockerignore da raiz NÃO vale aqui.
-# Sem este arquivo, um build local mandava node_modules (1,1 GB) e .next
-# (1,4 GB) para o daemon antes de a primeira camada começar.
+# The build context is `web/`, so the root .dockerignore does NOT apply here.
+# Without this file, a local build sent node_modules (1.1 GB) and .next
+# (1.4 GB) to the daemon before the first layer started.
 node_modules
 .next
 coverage
 .git
-# Gerados no build (npm run build → scripts/copiar-monaco.mjs e
-# copiar-maplibre.mjs). Uma cópia velha do dev local não entra no contexto; o
-# estágio builder copia a da versão instalada.
+# Generated at build time (npm run build → scripts/copiar-monaco.mjs and
+# copiar-maplibre.mjs). A stale copy from local dev does not get into the context; the
+# builder stage copies the one from the installed version.
 public/monaco
 public/maplibre

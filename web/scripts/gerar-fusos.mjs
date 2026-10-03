@@ -1,19 +1,19 @@
 #!/usr/bin/env node
 // web/scripts/gerar-fusos.mjs
 //
-// Gera `app/components/home/mapa/fusos.gerado.ts` a partir da base IANA de
-// fusos horários do sistema (pacote tzdata): de onde o globo da Home começa,
-// sem pedir permissão de localização a ninguém.
+// Generates `app/components/home/mapa/fusos.gerado.ts` from the system's IANA
+// time zone database (tzdata package): where the Home's globe starts, without
+// asking anyone for location permission.
 //
-//   FUSOS  — fuso → [lon, lat] da cidade de referência do fuso (zone.tab, e
-//            zone1970.tab para o que faltar), mais os nomes ANTIGOS que alguns
-//            navegadores ainda devolvem (Asia/Calcutta, America/Buenos_Aires…),
-//            resolvidos pelos links do tzdata.zi;
-//   PAISES — país (ISO 3166 alfa-2) → centro dos fusos daquele país, a reserva
-//            quando o navegador não diz o fuso (ex.: "UTC" dos modos de
-//            privacidade) mas a conexão diz o país.
+//   FUSOS  — time zone → [lon, lat] of the zone's reference city (zone.tab, and
+//            zone1970.tab for what is missing), plus the OLD names some
+//            browsers still return (Asia/Calcutta, America/Buenos_Aires…),
+//            resolved through the links in tzdata.zi;
+//   PAISES — country (ISO 3166 alpha-2) → center of that country's time zones,
+//            the fallback when the browser does not report the time zone (e.g.
+//            "UTC" in privacy modes) but the connection reports the country.
 //
-// Uso: node scripts/gerar-fusos.mjs [diretório do zoneinfo]  (padrão /usr/share/zoneinfo)
+// Usage: node scripts/gerar-fusos.mjs [zoneinfo directory]  (default /usr/share/zoneinfo)
 
 import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
@@ -43,7 +43,7 @@ function linhas(arquivo) {
 const fusos = new Map()
 const porPais = new Map()
 
-// zone.tab primeiro: uma linha por (país, fuso), com as coordenadas do próprio fuso.
+// zone.tab first: one line per (country, time zone), with the zone's own coordinates.
 for (const [pais, iso, fuso] of linhas("zone.tab")) {
   const c = coordenadas(iso)
   if (!fusos.has(fuso)) fusos.set(fuso, c)
@@ -54,8 +54,8 @@ for (const [pais, iso, fuso] of linhas("zone.tab")) {
 for (const [, iso, fuso] of linhas("zone1970.tab")) {
   if (!fusos.has(fuso)) fusos.set(fuso, coordenadas(iso))
 }
-// Os links (nomes antigos e aliases): "L ALVO NOME". Repete até estabilizar,
-// porque um link pode apontar para outro link.
+// The links (old names and aliases): "L TARGET NAME". Repeats until stable,
+// because a link can point to another link.
 const links = readFileSync(join(ZONEINFO, "tzdata.zi"), "utf-8")
   .split("\n")
   .filter((l) => l.startsWith("L "))
@@ -71,7 +71,7 @@ while (mudou) {
   }
 }
 
-/** Média no espaço 3D: um país que cruza o antimeridiano (Fiji, Kiribati) não cai no meio do mundo. */
+/** Average in 3D space: a country that crosses the antimeridian (Fiji, Kiribati) does not land in the middle of the world. */
 function centro(pontos) {
   let x = 0, y = 0, z = 0
   for (const [lon, lat] of pontos) {
@@ -86,9 +86,9 @@ function centro(pontos) {
 }
 
 const par = ([lon, lat]) => `[${lon}, ${lat}]`
-// Ordenação com idioma FIXO: sem ele o `localeCompare` usa o da máquina, e o
-// arquivo gerado mudava de ordem conforme quem rodasse (em tcheco, Anchorage e
-// Chicago trocam de lugar).
+// Sorting with a FIXED locale: without it `localeCompare` uses the machine's,
+// and the generated file changed order depending on who ran it (in Czech,
+// Anchorage and Chicago swap places).
 const ordem = (a, b) => a.localeCompare(b, "en")
 const corpoFusos = [...fusos.entries()]
   .sort(([a], [b]) => ordem(a, b))
@@ -99,8 +99,8 @@ const corpoPaises = [...porPais.entries()]
   .map(([pais, pontos]) => `  ${pais}: ${par(arredonda(centro(pontos)))},`)
   .join("\n")
 
-// A versão do tzdata vai no cabeçalho: o mesmo script em outra versão da base
-// gera outro arquivo, e o diff precisa dizer por quê.
+// The tzdata version goes in the header: the same script on another version of
+// the database generates a different file, and the diff needs to say why.
 const versao = /^# version (\S+)/m.exec(readFileSync(join(ZONEINFO, "tzdata.zi"), "utf-8"))?.[1] ?? "desconhecida"
 
 const ts = `// web/app/components/home/mapa/fusos.gerado.ts

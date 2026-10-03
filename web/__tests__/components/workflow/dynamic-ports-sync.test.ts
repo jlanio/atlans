@@ -1,15 +1,16 @@
 /**
- * `data.inputs` acompanha a propriedade `ports`.
+ * `data.inputs` follows the `ports` property.
  *
- * Quem monta os pontos de conexão a partir de `ports` é o `loadNodes` (ao abrir
- * o fluxo) e o `addNode` (ao criar o nó). Mas o "Aplicar" do painel grava
- * `data.properties` e NÃO recalcula `data.inputs` — sem este sincronismo a
- * pessoa definiria as portas, aplicaria, e o nó continuaria com um único ponto
- * de conexão anônimo até recarregar a página.
+ * What builds the connection points from `ports` is `loadNodes` (when opening
+ * the workflow) and `addNode` (when creating the node). But the panel's
+ * "Aplicar" (Apply) writes `data.properties` and does NOT recompute
+ * `data.inputs` — without this sync the person would define the ports, apply,
+ * and the node would keep a single anonymous connection point until the page
+ * was reloaded.
  *
- * O que se testa aqui é a REGRA de reconciliação, não o hook do React: dado o
- * estado dos nós, quais precisam mudar e quais precisam ficar intocados. A
- * segunda metade é o que impede o efeito de se realimentar a cada render.
+ * What's tested here is the reconciliation RULE, not the React hook: given the
+ * state of the nodes, which ones need to change and which must stay untouched.
+ * The second half is what keeps the effect from feeding itself on every render.
  */
 import { describe, it, expect } from "vitest"
 
@@ -49,9 +50,9 @@ describe("reconciliação das portas", () => {
 
 describe("não mexe no que já está certo", () => {
   it("nó já sincronizado não é recriado", () => {
-    // Identidade referencial: devolver um objeto novo faria o ReactFlow
-    // re-renderizar o nó a cada passagem do efeito, e o efeito depende do
-    // estado dos nós — é o laço que a comparação evita.
+    // Referential identity: returning a new object would make ReactFlow
+    // re-render the node on every pass of the effect, and the effect depends
+    // on the nodes' state — it's the loop the comparison avoids.
     const antes = [dinamico("n1", ["a"], [{ name: "a" }])]
     const nos = reconciliarPortas(antes)
     expect(nos).toBe(antes)

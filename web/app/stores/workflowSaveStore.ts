@@ -8,22 +8,23 @@ interface WorkflowSaveState {
   isSaving: boolean
   saveStatus: SaveStatus
   lastSavedSnapshot: string | null
-  /** Momento (epoch ms) do último save confirmado: o `updated_at` do servidor
-   *  na hidratação, o relógio do navegador depois de um PUT/POST bem-sucedido.
-   *  `null` = nada salvo que se conheça (workflow novo, ou backend sem a data).
-   *  É o que o chip mostra em repouso ("Salvo há 5 min"). */
+  /** Moment (epoch ms) of the last confirmed save: the server's `updated_at` on
+   *  hydration, the browser clock after a successful PUT/POST.
+   *  `null` = nothing known to be saved (new workflow, or a backend without the date).
+   *  It is what the chip shows at rest ("Salvo há 5 min", saved 5 min ago). */
   lastSavedAt: number | null
-  /** Mensagem do último save que falhou; `null` fora do status 'error'. */
+  /** Message of the last save that failed; `null` outside the 'error' status. */
   lastError: string | null
-  /** Zoom e posição gravados no último save (ou carregados com o workflow).
-   *  Pan/zoom NÃO é edição — não marca "não salvo" —, mas é parte do que se
-   *  salva: quem pede o save quer reabrir onde estava. Comparado no save
-   *  explícito para decidir se vale um PUT quando o grafo não mudou. */
+  /** Zoom and position written on the last save (or loaded with the workflow).
+   *  Pan/zoom is NOT an edit — it does not mark "unsaved" —, but it is part of
+   *  what gets saved: whoever asks for the save wants to reopen where they were.
+   *  Compared on an explicit save to decide whether a PUT is worth it when the
+   *  graph did not change. */
   lastSavedViewport: Viewport | null
   workflowName: string
   flagActive: boolean
-  /** Momento (epoch ms) em que o snapshot de referência foi tirado na hidratação.
-   *  `null` = não há janela de autocorreção aberta. Ver `autocorrigirSnapshot`. */
+  /** Moment (epoch ms) at which the reference snapshot was taken on hydration.
+   *  `null` = no self-correction window is open. See `autocorrigirSnapshot`. */
   snapshotIniciadoEm: number | null
 }
 
@@ -32,47 +33,48 @@ interface WorkflowSaveActions {
   setFlagActive(v: boolean): void
   startSaving(): void
   completeSave(snapshot: string, viewport?: Viewport | null): void
-  /** Save que não chegou ao fim. O status vira 'error', e não 'unsaved': o grafo
-   *  continua diferente do snapshot, mas o que o usuário precisa saber é que a
-   *  tentativa falhou — e ter onde tentar de novo. */
+  /** A save that did not reach the end. The status becomes 'error', not 'unsaved':
+   *  the graph is still different from the snapshot, but what the user needs to
+   *  know is that the attempt failed — and to have a place to try again. */
   failSave(mensagem?: string): void
-  /** Salvar sem nada a salvar: pisca "Salvo" sem PUT e sem mexer em
-   *  `lastSavedAt`. Antes o Ctrl+S nessa situação não respondia nada, e não
-   *  havia como distinguir "já estava salvo" de "o atalho não funcionou". */
+  /** Saving with nothing to save: flashes "Salvo" with no PUT and without touching
+   *  `lastSavedAt`. Before, Ctrl+S in this situation gave no response at all, and
+   *  there was no way to tell "it was already saved" from "the shortcut didn't work". */
   flashSaved(): void
   setStatus(status: SaveStatus): void
-  /** `savedAt` é o `updated_at` do servidor na hidratação e `viewport` o que
-   *  veio na `definition`; omitidos, mantêm o valor atual (o reset ao trocar
-   *  de workflow é quem zera). */
+  /** `savedAt` is the server's `updated_at` on hydration and `viewport` is what
+   *  came in the `definition`; when omitted, they keep the current value (the
+   *  reset on workflow switch is what clears them). */
   initSnapshot(nodes: INodesDefinition[], edges: IEdgeDefinition[], name: string, savedAt?: number | null, viewport?: Viewport | null): void
   isDirty(nodes: INodesDefinition[], edges: IEdgeDefinition[], name: string): boolean
   /**
-   * Absorve em silêncio uma diferença que apareceu na JANELA de hidratação —
-   * o ReactFlow ainda medindo dimensões/posições logo após o mount. Devolve
-   * `true` quando absorveu; `false` quando a janela já fechou, e aí quem chamou
-   * precisa marcar 'unsaved', porque a diferença é edição real do usuário.
+   * Silently absorbs a difference that appeared within the hydration WINDOW —
+   * ReactFlow still measuring dimensions/positions right after mount. Returns
+   * `true` when it absorbed it; `false` when the window has already closed, and
+   * then the caller needs to mark 'unsaved', because the difference is a real
+   * user edit.
    *
-   * A janela é de TEMPO, e não "a primeira diferença que aparecer": com o
-   * detector de alterações debounced, a primeira comparação acontece só depois
-   * que o usuário para de editar — então uma flag de "usar uma vez" engolia a
-   * primeira edição INTEIRA (sem "Não salvo", com Ctrl+S virando no-op e o
-   * Executar disparando a definição antiga).
+   * The window is one of TIME, not "the first difference that shows up": with the
+   * debounced change detector, the first comparison only happens after the user
+   * stops editing — so a "use once" flag swallowed the ENTIRE first edit (no
+   * "Não salvo", with Ctrl+S becoming a no-op and Executar firing the old
+   * definition).
    */
   autocorrigirSnapshot(nodes: INodesDefinition[], edges: IEdgeDefinition[], name: string): boolean
 }
 
-/** Quanto tempo o rótulo "Salvo" (verde) fica antes de virar o repouso
- *  ("Salvo há N min", em tom neutro). */
+/** How long the "Salvo" label (green) stays before turning into the resting state
+ *  ("Salvo há N min", in a neutral tone). */
 const TEMPO_DO_ROTULO_SALVO_MS = 3000
 
-/** Por quanto tempo, após o snapshot de hidratação, uma diferença ainda pode ser
- *  creditada à remedição do ReactFlow em vez de ao usuário. */
+/** For how long, after the hydration snapshot, a difference can still be
+ *  credited to ReactFlow's re-measuring instead of to the user. */
 const JANELA_DE_AUTOCORRECAO_MS = 1000
 
-// O timer de 'saved' → 'idle' mora aqui, e não no componente que salvou, porque
-// quem precisa neutralizá-lo é o detector de alterações — que vive em OUTRO
-// componente. Antes, uma edição feita dentro da janela de 3s marcava "Não
-// salvo" e o timer antigo apagava o aviso logo depois.
+// The 'saved' → 'idle' timer lives here, and not in the component that saved,
+// because what needs to neutralize it is the change detector — which lives in
+// ANOTHER component. Before, an edit made within the 3s window marked "Não
+// salvo" and the old timer erased the warning right after.
 let timerDoRotuloSalvo: ReturnType<typeof setTimeout> | null = null
 
 export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActions>((set, get) => {
@@ -81,9 +83,9 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
     if (timerDoRotuloSalvo) clearTimeout(timerDoRotuloSalvo)
     timerDoRotuloSalvo = setTimeout(() => {
       timerDoRotuloSalvo = null
-      // Só apaga o rótulo se ninguém mexeu no status no meio tempo: se o
-      // usuário editou o canvas nesses 3s, o status já é 'unsaved' e voltar
-      // para 'idle' esconderia o aviso.
+      // Only clears the label if nobody touched the status in the meantime: if the
+      // user edited the canvas in those 3s, the status is already 'unsaved' and
+      // going back to 'idle' would hide the warning.
       if (get().saveStatus === 'saved') set({ saveStatus: 'idle' })
     }, TEMPO_DO_ROTULO_SALVO_MS)
   }
@@ -112,9 +114,9 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
     },
 
     completeSave: (snapshot, viewport) => {
-      // Fecha a janela de autocorreção: depois de um save bem-sucedido não existe
-      // mais "medição pendente do ReactFlow" a absorver — toda diferença dali em
-      // diante é edição do usuário e precisa virar "Não salvo".
+      // Closes the self-correction window: after a successful save there is no
+      // longer any "pending ReactFlow measurement" to absorb — every difference
+      // from then on is a user edit and must become "Não salvo".
       set({
         isSaving: false,
         lastSavedSnapshot: snapshot,
@@ -142,8 +144,8 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
 
     initSnapshot: (nodes, edges, name, savedAt, viewport) => {
       const snapshot = JSON.stringify({ name, nodes, edges })
-      // Abre a janela de autocorreção junto com o snapshot: é este instante que o
-      // detector de alterações usa como referência.
+      // Opens the self-correction window along with the snapshot: this instant is
+      // what the change detector uses as reference.
       set({
         lastSavedSnapshot: snapshot,
         snapshotIniciadoEm: Date.now(),
@@ -164,8 +166,8 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
       if (Date.now() - snapshotIniciadoEm >= JANELA_DE_AUTOCORRECAO_MS) return false
       set({
         lastSavedSnapshot: JSON.stringify({ name, nodes, edges }),
-        // Vale uma vez por hidratação: re-abrir a janela aqui a esticaria
-        // indefinidamente enquanto diferenças continuassem aparecendo.
+        // Holds once per hydration: reopening the window here would stretch it
+        // indefinitely while differences kept showing up.
         snapshotIniciadoEm: null,
       })
       return true

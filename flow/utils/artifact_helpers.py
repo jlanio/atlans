@@ -1,14 +1,14 @@
 # flow/utils/artifact_helpers.py
 """
-Helper compartilhado para upload de artefatos ao MinIO.
+Shared helper for uploading artifacts to MinIO.
 
-Upload via pre-signed URL obtida do servidor (o executor nao tem credenciais
-do MinIO). Fallback: salvar localmente se o upload falhar.
+Upload via a pre-signed URL obtained from the server (the executor has no MinIO
+credentials). Fallback: save locally if the upload fails.
 
-Tambem define a LOCALIDADE DOS DADOS (LGPD) — se o resultado de um no de saida
-sai da maquina ou nao. O vocabulario vive aqui, e nao em cada no, porque a
-escolha precisa significar a mesma coisa em todos eles: tres nomes para o mesmo
-conceito foi exatamente o problema que esta unificacao resolve.
+Also defines DATA LOCALITY (LGPD) — whether the result of an output node
+leaves the machine or not. The vocabulary lives here, and not in each node, because
+the choice must mean the same thing in all of them: three names for the same
+concept was exactly the problem this unification solves.
 """
 import logging
 import os
@@ -17,7 +17,7 @@ from typing import BinaryIO
 logger = logging.getLogger(__name__)
 
 
-# ── Localidade dos dados (LGPD) ───────────────────────────────────────────────
+# ── Data locality (LGPD) ──────────────────────────────────────────────────────
 
 HERDAR = "herdar"
 SERVIDOR = "servidor"
@@ -25,42 +25,44 @@ EXECUTOR = "executor"
 
 
 class EnvioBloqueadoError(RuntimeError):
-    """O executor retem os dados e o no so funciona enviando.
+    """The executor retains the data and the node only works by sending.
 
-    Excecao propria, e nao um `ValueError`, porque nao e erro de configuracao do
-    no: o workflow esta correto e a MAQUINA e que nao permite. Quem le o log
-    precisa distinguir "voce montou errado" de "aqui nao pode".
+    Its own exception, and not a `ValueError`, because it is not a node
+    configuration error: the workflow is correct and it is the MACHINE that does
+    not allow it. Whoever reads the log needs to tell "you built it wrong" apart
+    from "not allowed here".
     """
 
 
 def localidade_padrao() -> str:
-    """Politica DESTA maquina: `servidor` ou `executor`.
+    """THIS machine's policy: `servidor` or `executor`.
 
-    Lida de `EXECUTOR_SYNC_MODE == "catalog"`, que e a MESMA variavel que a tela
-    de GeoSync do app desktop ja grava sob o rotulo "Localidade dos dados →
-    Manter apenas no executor". Reusa-la, em vez de criar outra, e o que faz o
-    rotulo passar a valer para tudo que sai daqui — ate agora ele protegia a
-    pasta sincronizada e deixava os workflows enviando o que quisessem.
+    Read from `EXECUTOR_SYNC_MODE == "catalog"`, which is the SAME variable the
+    desktop app's GeoSync screen already writes under the label "Localidade dos
+    dados → Manter apenas no executor" (Data locality → Keep only on the
+    executor). Reusing it, instead of creating another, is what makes the label
+    apply to everything that leaves here — until now it protected the synced
+    folder and let workflows send whatever they wanted.
 
-    Lida do ambiente pelo mesmo motivo de `artifacts_root()`: `flow/` roda tanto
-    dentro do executor quanto in-process no servidor, e importar
-    `executor/config.py` daqui inverteria a dependencia. No servidor a variavel
-    nao existe, e a politica e `servidor` — que e o correto: o conteudo ja esta
-    la.
+    Read from the environment for the same reason as `artifacts_root()`: `flow/`
+    runs both inside the executor and in-process on the server, and importing
+    `executor/config.py` from here would invert the dependency. On the server the
+    variable does not exist, and the policy is `servidor` — which is correct: the
+    content is already there.
     """
     modo = (os.getenv("EXECUTOR_SYNC_MODE") or "").strip().lower()
     return EXECUTOR if modo == "catalog" else SERVIDOR
 
 
 def resolver_localidade(escolha: str | None) -> tuple[str, str]:
-    """Traduz a escolha do no em (localidade efetiva, quem decidiu).
+    """Translates the node's choice into (effective locality, who decided).
 
-    A politica da maquina e uma PROIBICAO, nao um padrao: o workflow pode
-    apertar, nunca afrouxar. Por isso a regra e um `or` — basta um dos dois pedir
-    para o conteudo ficar.
+    The machine's policy is a PROHIBITION, not a default: the workflow can
+    tighten it, never loosen it. That is why the rule is an `or` — it is enough
+    for one of the two to ask for the content to stay.
 
-    `quem` e 'executor' ou 'nó', para o log dizer a verdade em vez de "herdado"
-    quando os dois coincidiram.
+    `quem` is 'executor' or 'nó', so the log tells the truth instead of
+    "herdado" (inherited) when the two coincided.
     """
     pediu_local = (escolha or HERDAR).strip().lower() == EXECUTOR
     if localidade_padrao() == EXECUTOR:
@@ -69,28 +71,30 @@ def resolver_localidade(escolha: str | None) -> tuple[str, str]:
 
 
 def descrever_localidade(efetiva: str, quem: str) -> str:
-    """Frase para o log do run. E o UNICO lugar onde quem montou o fluxo ve o
-    que "Herdar do executor" virou — o editor nao conhece a maquina de destino."""
+    """Sentence for the run log. It is the ONLY place where whoever built the
+    workflow sees what "Herdar do executor" (inherit from the executor) became —
+    the editor does not know the destination machine."""
     onde = "fica apenas neste executor" if efetiva == EXECUTOR else "vai para o servidor"
     return f"Localidade dos dados: o conteúdo {onde} (definido pelo {quem})."
 
 
 def exigir_envio_permitido(no: str, o_que_exige: str) -> None:
-    """Barra um no que SO funciona enviando, quando a maquina retem os dados.
+    """Blocks a node that ONLY works by sending, when the machine retains the data.
 
-    Ponto unico da recusa: a mensagem mora aqui, e um no novo que dependa de
-    enviar tem uma linha para chamar em vez de reescrever a explicacao.
+    Single point of refusal: the message lives here, and a new node that depends
+    on sending has one line to call instead of rewriting the explanation.
 
-    Falha em vez de pular. Um no que se omite deixa o run verde e ninguem
-    descobre que a camada nunca foi publicada nem que o e-mail saiu sem anexo —
-    e o pior dos desfechos, porque nao produz nenhum sinal.
+    Fails instead of skipping. A node that leaves itself out keeps the run green
+    and nobody finds out that the layer was never published or that the e-mail
+    went out without an attachment — it is the worst of outcomes, because it
+    produces no signal at all.
     """
     if localidade_padrao() != EXECUTOR:
         return
-    # Sem seta (U+2192) nem qualquer caractere fora do latin-1: esta mensagem
-    # atravessa o log do executor, que pode acabar num console cp1252 — e um
-    # UnicodeEncodeError ao EXPLICAR uma recusa trocaria a explicacao por um
-    # traceback.
+    # No arrow (U+2192) nor any character outside latin-1: this message
+    # travels through the executor's log, which may end up on a cp1252 console —
+    # and a UnicodeEncodeError while EXPLAINING a refusal would replace the
+    # explanation with a traceback.
     raise EnvioBloqueadoError(
         f"{no} não foi executado.\n\n"
         "Este executor está configurado para manter os dados apenas nele "
@@ -102,21 +106,21 @@ def exigir_envio_permitido(no: str, o_que_exige: str) -> None:
 
 
 def propriedade_localidade(visible_when=None) -> dict:
-    """Fragmento de schema do campo `localidade`, identico em todo no de saida.
+    """Schema fragment for the `localidade` field, identical in every output node.
 
-    Copiar o dict em cada no faria os rotulos divergirem com o tempo.
+    Copying the dict into each node would make the labels diverge over time.
 
-    SEM `description`: o painel de configuracao a renderiza como um paragrafo
-    logo abaixo do campo, e o texto que explicava a politica inteira ocupava
-    mais espaco que todos os outros campos do no somados. Os dois rotulos ja
-    dizem o que cada opcao faz, e o log do run informa a localidade efetiva a
-    cada execucao — que e onde a informacao importa de fato, porque so ali se
-    sabe em que maquina o fluxo rodou.
+    NO `description`: the configuration panel renders it as a paragraph right
+    below the field, and the text that explained the whole policy took up more
+    space than all the node's other fields combined. The two labels already
+    say what each option does, and the run log reports the effective locality
+    on every run — which is where the information actually matters, because
+    only there is it known on which machine the workflow ran.
 
-    NAO existe a opcao "enviar para o servidor". Seria a unica escolha capaz de
-    contrariar a politica da maquina, e uma opcao que o executor ignora em
-    silencio e pior que opcao nenhuma: a pessoa marca, acredita, e o
-    comportamento e outro.
+    There is NO "send to the server" option. It would be the only choice able
+    to go against the machine's policy, and an option the executor silently
+    ignores is worse than no option at all: the person ticks it, believes it,
+    and the behavior is something else.
     """
     prop = {
         "name":    "localidade",
@@ -138,17 +142,17 @@ def _upload_via_presigned_url(content: bytes, filename: str, content_type: str,
                                create_drive_entry: bool = False,
                                overwrite: bool = False) -> tuple[str, str | None, bool]:
     """
-    Upload via pre-signed URL (fluxo do executor).
+    Upload via a pre-signed URL (executor flow).
 
-    create_drive_entry=True  → POST /drive/executor-upload-url (cria WorkspaceFile no Drive)
-    create_drive_entry=False → POST /drive/executor-presign-upload (apenas sobe ao MinIO)
+    create_drive_entry=True  → POST /drive/executor-upload-url (creates a WorkspaceFile in Drive)
+    create_drive_entry=False → POST /drive/executor-presign-upload (only uploads to MinIO)
 
-    `overwrite` so tem efeito no fluxo do Drive: o servidor reaproveita o
-    arquivo de mesmo nome em vez de criar outro.
+    `overwrite` only has an effect in the Drive flow: the server reuses the
+    file with the same name instead of creating another.
 
-    Retorna (s3_key, drive_file_id | None, reused). `reused` e o que o SERVIDOR
-    fez — nao o que se pediu. Um servidor antigo nao devolve o campo; nesse caso
-    fica False e o chamador nao afirma o que nao pode verificar.
+    Returns (s3_key, drive_file_id | None, reused). `reused` is what the SERVER
+    did — not what was asked. An old server does not return the field; in that
+    case it stays False and the caller does not claim what it cannot verify.
     """
     import httpx
     from flow.utils.executor_http import get_agent_http_config
@@ -159,10 +163,10 @@ def _upload_via_presigned_url(content: bytes, filename: str, content_type: str,
     s3_key = f"artifacts/{workspace_id}/{task_id}/{filename}"
 
     if create_drive_entry:
-        # Fluxo completo: cria WorkspaceFile + upload + confirmação.
-        # NAO envolvemos o POST executor-upload-url em retry — ele cria um
-        # WorkspaceFile e re-tentar poderia duplicar a entrada no Drive.
-        # Só o PUT (upload ao MinIO) é idempotente (sobrescreve o objeto).
+        # Full flow: creates WorkspaceFile + upload + confirmation.
+        # We do NOT wrap the executor-upload-url POST in a retry — it creates a
+        # WorkspaceFile and retrying could duplicate the Drive entry.
+        # Only the PUT (upload to MinIO) is idempotent (overwrites the object).
         resp = httpx.post(
             f"{base_url}/drive/executor-upload-url",
             json={"filename": filename, "size": len(content), "workspace_id": workspace_id, "s3_key_override": s3_key, "content_type": content_type, "overwrite": overwrite},
@@ -195,9 +199,9 @@ def _upload_via_presigned_url(content: bytes, filename: str, content_type: str,
         )
         return s3_key, file_id, reused
     else:
-        # Fluxo simples: apenas sobe ao MinIO (sem WorkspaceFile). Presign + PUT
-        # sao idempotentes (s3_key fixo) → retry do bloco inteiro é seguro;
-        # re-obtem a presign URL a cada tentativa (TTL curto).
+        # Simple flow: only uploads to MinIO (no WorkspaceFile). Presign + PUT
+        # are idempotent (fixed s3_key) → retrying the whole block is safe;
+        # gets the presign URL again on each attempt (short TTL).
         def _presign_and_put() -> None:
             resp = httpx.post(
                 f"{base_url}/drive/executor-presign-upload",
@@ -218,27 +222,27 @@ def _upload_via_presigned_url(content: bytes, filename: str, content_type: str,
 
 
 def artifacts_root() -> str:
-    """Raiz dos artefatos no disco do executor.
+    """Root of the artifacts on the executor's disk.
 
-    Ponto unico: a resolucao de um artefato local (flow/utils/drive_resolver.py)
-    e a limpeza por retencao (executor/artifact_purge.py) precisam chegar
-    exatamente ao mesmo diretorio que a escrita usou.
+    Single point: resolving a local artifact (flow/utils/drive_resolver.py)
+    and the retention cleanup (executor/artifact_purge.py) must reach
+    exactly the same directory the write used.
     """
     return os.getenv("EXECUTOR_ARTIFACTS_DIR", os.getenv("ARTIFACT_DIR", "./artifacts"))
 
 
 def local_relative_path(workspace_id: str, task_id: str, filename: str) -> str:
-    """Caminho do artefato RELATIVO a `artifacts_root()`, com barras normais.
+    """The artifact's path RELATIVE to `artifacts_root()`, with forward slashes.
 
-    Relativo, e nao absoluto, porque este valor viaja ate o servidor e volta: um
-    caminho absoluto vazaria a estrutura de diretorios da maquina do usuario e
-    quebraria se o `EXECUTOR_ARTIFACTS_DIR` mudasse entre execucoes.
+    Relative, and not absolute, because this value travels to the server and back:
+    an absolute path would leak the directory structure of the user's machine and
+    would break if `EXECUTOR_ARTIFACTS_DIR` changed between runs.
     """
     return f"{workspace_id}/{task_id}/{filename}"
 
 
 def _write_local(content: bytes, workspace_id: str, task_id: str, filename: str) -> str:
-    """Grava o artefato no disco do executor. Retorna o caminho absoluto."""
+    """Writes the artifact to the executor's disk. Returns the absolute path."""
     task_dir = os.path.join(artifacts_root(), workspace_id, task_id)
     os.makedirs(task_dir, exist_ok=True)
     file_path = os.path.join(task_dir, filename)
@@ -254,11 +258,11 @@ def _save_local_fallback(
     task_id: str,
     filename: str,
 ) -> str:
-    """Salva o artefato localmente porque o UPLOAD FALHOU. Retorna o caminho.
+    """Saves the artifact locally because the UPLOAD FAILED. Returns the path.
 
-    Nao confundir com `save_artifact_local`: aqui o local e degradacao, la e
-    politica. Os dois gravam no mesmo lugar, mas significam coisas opostas para
-    quem le o log e para o registro no servidor.
+    Not to be confused with `save_artifact_local`: here local is degradation,
+    there it is policy. Both write to the same place, but they mean opposite
+    things to whoever reads the log and to the record on the server.
     """
     file_path = _write_local(content, workspace_id, task_id, filename)
     logger.info("Artefato salvo localmente (fallback): %s", file_path)
@@ -277,18 +281,18 @@ def save_artifact_local(
     credential_id: str | None = None,
 ) -> tuple[str, dict]:
     """
-    Grava o artefato APENAS no disco do executor. Nenhum byte sai da maquina.
+    Writes the artifact ONLY to the executor's disk. Not a single byte leaves the machine.
 
-    Existe para dado pessoal (LGPD): o servidor recebe so o catalogo — nome,
-    formato, tamanho, contagem de feicoes — e o registro de qual executor tem o
-    arquivo. O conteudo nunca chega ao MinIO nem trafega pela rede.
+    Exists for personal data (LGPD): the server receives only the catalog entry —
+    name, format, size, feature count — and the record of which executor has the
+    file. The content never reaches MinIO nor travels over the network.
 
-    Mesma assinatura e mesmo retorno de `upload_artifact_to_minio`, para que o
-    no de saida escolha entre os dois sem tratar cada um de um jeito.
+    Same signature and same return value as `upload_artifact_to_minio`, so the
+    output node can choose between the two without handling each one differently.
 
-    NAO ha fallback aqui, e isso e deliberado: se a gravacao local falhar, a
-    excecao sobe e o no falha. Cair para o upload seria enviar para a nuvem
-    justamente o dado que foi marcado para nao sair.
+    There is NO fallback here, and that is deliberate: if the local write fails,
+    the exception propagates and the node fails. Falling back to the upload would
+    send to the cloud precisely the data that was marked not to leave.
     """
     if not filename:
         raise ValueError("filename é obrigatório para salvar artefato.")
@@ -312,13 +316,13 @@ def save_artifact_local(
         "features": features,
         "filename": filename,
         "credential_id": credential_id,
-        # Sem s3_key: nao ha objeto. O servidor NAO deve derivar uma — ver
-        # _register_artifacts em app/core/run_result_consumer.py.
+        # No s3_key: there is no object. The server must NOT derive one — see
+        # _register_artifacts in app/core/run_result_consumer.py.
         "s3_key": None,
         "content_location": "executor",
         "local_path": rel,
         "size_bytes": len(content),
-        # Distinto de `local_fallback`: aqui o local foi pedido, nao foi falha.
+        # Distinct from `local_fallback`: here local was requested, it was not a failure.
         "local_fallback": False,
         "drive_file_id": None,
         "drive_reused": False,
@@ -338,16 +342,16 @@ def persistir_artefato(
     features: int | None = None,
     credential_id: str | None = None,
 ) -> tuple[str, dict]:
-    """Grava o artefato onde a localidade JA RESOLVIDA mandar.
+    """Writes the artifact wherever the ALREADY RESOLVED locality says.
 
-    Existe para que os nos de saida nao repitam o `if` — que e o ponto exato
-    onde dado pessoal vaza se alguem esquecer de copia-lo num no novo.
-    `save_artifact_local` e `upload_artifact_to_minio` tem assinatura e retorno
-    identicos justamente para isto.
+    Exists so the output nodes do not repeat the `if` — which is the exact point
+    where personal data leaks if someone forgets to copy it into a new node.
+    `save_artifact_local` and `upload_artifact_to_minio` have identical signatures
+    and return values precisely for this.
 
-    Recebe a localidade ja resolvida, e nao a escolha crua, porque quem chama
-    precisa dela de todo jeito para logar (ver `descrever_localidade`) —
-    resolver duas vezes abriria espaco para as duas divergirem.
+    Receives the already resolved locality, and not the raw choice, because the
+    caller needs it anyway for logging (see `descrever_localidade`) —
+    resolving twice would leave room for the two to diverge.
     """
     if localidade == EXECUTOR:
         return save_artifact_local(
@@ -363,28 +367,29 @@ def persistir_artefato(
 
 
 def pasta_do_geosync() -> str | None:
-    """Primeira pasta de `EXECUTOR_SYNC_DIRS`, ou None.
+    """First folder of `EXECUTOR_SYNC_DIRS`, or None.
 
-    So a primeira: o GeoSync sincroniza tudo contra UM workspace, e o app
-    desktop ja restringe a configuracao a uma pasta.
+    Only the first: GeoSync syncs everything against ONE workspace, and the
+    desktop app already restricts the configuration to one folder.
     """
     pastas = [p.strip() for p in (os.getenv("EXECUTOR_SYNC_DIRS") or "").split(",") if p.strip()]
     return pastas[0] if pastas else None
 
 
 def _publicar_com_retry(temporario: str, destino: str, tentativas: int = 4) -> None:
-    """`os.replace` com retry curto, por causa do Windows.
+    """`os.replace` with a short retry, because of Windows.
 
-    O scanner do GeoSync roda numa THREAD deste mesmo processo e abre os
-    arquivos da pasta para calcular MD5. No Windows, `os.replace` sobre um
-    arquivo que outro handle mantem aberto falha com PermissionError — o POSIX
-    permite, o Windows nao. A janela e pequena, mas a colisao acontece
-    exatamente no caso comum: um workflow recorrente reescrevendo o mesmo
-    arquivo numa pasta varrida a cada 10 s.
+    The GeoSync scanner runs in a THREAD of this same process and opens the
+    files in the folder to compute MD5. On Windows, `os.replace` over a file
+    that another handle keeps open fails with PermissionError — POSIX allows
+    it, Windows does not. The window is small, but the collision happens
+    precisely in the common case: a recurring workflow rewriting the same
+    file in a folder scanned every 10 s.
 
-    Sem isto, o sintoma seria o run falhando com "[WinError 5] Acesso negado",
-    que nao diz nada a quem le. Quatro tentativas cobrem de sobra o tempo de um
-    hash; se ainda assim falhar, a excecao sobe — o problema nao e transitorio.
+    Without this, the symptom would be the run failing with "[WinError 5] Acesso
+    negado" (access denied), which tells the reader nothing. Four attempts amply
+    cover the time of one hash; if it still fails, the exception propagates —
+    the problem is not transient.
     """
     import time
 
@@ -405,29 +410,29 @@ def _publicar_com_retry(temporario: str, destino: str, tentativas: int = 4) -> N
 def salvar_na_pasta_do_geosync(
     content: bytes, filename: str, workspace_id: str, overwrite: bool = False,
 ) -> str:
-    """Grava um arquivo do Drive na pasta sincronizada. Retorna o caminho.
+    """Writes a Drive file into the synced folder. Returns the path.
 
-    O GeoSync o cataloga na varredura seguinte (`uploader.register` →
-    `POST /drive/executor-register`), e a partir dai ele e um arquivo do Drive
-    como qualquer outro catalogado: aparece com o selo, nao tem download, e e
-    resolvido pelo manifesto de sync. Nada disso precisou ser escrito — ja
-    existia para o modo catalogo, e reusar foi o que dispensou coluna nova,
-    migration e endpoint.
+    GeoSync catalogs it on the next scan (`uploader.register` →
+    `POST /drive/executor-register`), and from then on it is a Drive file like
+    any other cataloged one: it shows up with the badge, has no download, and is
+    resolved by the sync manifest. None of that had to be written — it already
+    existed for catalog mode, and reusing it is what spared a new column,
+    migration and endpoint.
 
-    ⚠️ Escrita ATOMICA. O scanner varre a pasta a cada 10 s e reconhece o
-    arquivo por tamanho e mtime; pego no meio da escrita, ele seria catalogado
-    pela metade. Grava-se num nome iniciado por ponto — que o scanner ignora
-    (`executor/sync/scanner.py`) — e faz-se `os.replace`, que e atomico no mesmo
-    sistema de arquivos.
+    ⚠️ ATOMIC write. The scanner sweeps the folder every 10 s and recognizes the
+    file by size and mtime; caught mid-write, it would be cataloged half-done.
+    We write to a name starting with a dot — which the scanner ignores
+    (`executor/sync/scanner.py`) — and do an `os.replace`, which is atomic on the
+    same file system.
     """
     import uuid
 
-    # ⚠️ SÓ em modo catálogo. Esta e a guarda que impede o oposto exato do que a
-    # opcao promete: em `upload` ou `bidirectional`, o GeoSync varre a pasta a
-    # cada 10 s e ENVIA os bytes de tudo que encontra (`_upload_dataset` so
-    # chama `register` quando o modo e `catalog`). Gravar aqui numa maquina
-    # assim publicaria no MinIO, em segundos, o arquivo que alguem acabou de
-    # marcar para nao sair — e sem nenhum sinal de que isso aconteceu.
+    # ⚠️ ONLY in catalog mode. This is the guard that prevents the exact opposite of
+    # what the option promises: in `upload` or `bidirectional`, GeoSync sweeps the
+    # folder every 10 s and SENDS the bytes of everything it finds (`_upload_dataset`
+    # only calls `register` when the mode is `catalog`). Writing here on such a
+    # machine would publish to MinIO, within seconds, the file someone had just
+    # marked not to leave — and with no sign at all that it happened.
     if localidade_padrao() != EXECUTOR:
         raise ValueError(
             "Não é possível manter um arquivo do Drive apenas neste executor "
@@ -450,10 +455,10 @@ def salvar_na_pasta_do_geosync(
     if not os.path.isdir(pasta):
         raise ValueError(f"A pasta do GeoSync não existe mais neste computador: {pasta}")
 
-    # O GeoSync sincroniza contra UM workspace. Se ele foi fixado no `.env` e nao
-    # e o do run, gravar aqui publicaria o arquivo no Drive ERRADO — de outro
-    # cliente, possivelmente. Vazio significa auto-deteccao, que so acontece
-    # quando ha um workspace acessivel (executor/main.py) e portanto coincide.
+    # GeoSync syncs against ONE workspace. If it was pinned in `.env` and is not
+    # the run's, writing here would publish the file to the WRONG Drive — another
+    # customer's, possibly. Empty means auto-detection, which only happens
+    # when there is an accessible workspace (executor/main.py) and therefore matches.
     ws_sync = (os.getenv("EXECUTOR_WORKSPACE_ID") or "").strip()
     if ws_sync and ws_sync != workspace_id:
         raise ValueError(
@@ -476,8 +481,8 @@ def salvar_na_pasta_do_geosync(
             fh.write(content)
         _publicar_com_retry(temporario, destino)
     except BaseException:
-        # Um temporario orfao seria invisivel ao usuario (comeca com ponto) e ao
-        # scanner, e ficaria ocupando disco para sempre.
+        # An orphaned temp file would be invisible to the user (starts with a dot) and
+        # to the scanner, and would take up disk space forever.
         try:
             os.unlink(temporario)
         except OSError:
@@ -503,19 +508,19 @@ def upload_artifact_to_minio(
     overwrite: bool = False,
 ) -> tuple[str, dict]:
     """
-    Upload de artefato para o MinIO via pre-signed URL obtida do servidor.
-    Se o upload falhar, salva localmente (disco do executor) como fallback.
+    Uploads an artifact to MinIO via a pre-signed URL obtained from the server.
+    If the upload fails, saves it locally (executor disk) as a fallback.
 
-    `overwrite` so vale com create_drive_entry=True — ver _upload_via_presigned_url.
+    `overwrite` only applies with create_drive_entry=True — see _upload_via_presigned_url.
     """
     if not filename:
         raise ValueError("filename é obrigatório para upload de artefato.")
     if not workspace_id or not task_id:
         raise ValueError("workspace_id e task_id são obrigatórios.")
 
-    # Converter fileobj para bytes se necessário. Validado antes do try para que
-    # erro de programacao (nenhum conteudo) nao caia no fallback local gravando
-    # arquivo vazio.
+    # Convert fileobj to bytes if needed. Validated before the try so that a
+    # programming error (no content) does not fall into the local fallback
+    # writing an empty file.
     if content is None and fileobj is not None:
         pos = fileobj.tell()
         content = fileobj.read()
@@ -546,20 +551,20 @@ def upload_artifact_to_minio(
         "filename": filename,
         "credential_id": credential_id,
         "s3_key": s3_key,
-        # Sempre 'minio' nesta rota, INCLUSIVE quando o upload falhou e o
-        # conteudo ficou em disco: o fallback e um estado a corrigir, nao uma
-        # politica de localidade. Tratar os dois como iguais faria uma queda de
-        # rede virar "dado protegido" no registro do servidor.
+        # Always 'minio' on this route, EVEN when the upload failed and the
+        # content stayed on disk: the fallback is a state to fix, not a
+        # locality policy. Treating the two as equal would turn a network
+        # outage into "protected data" in the server's record.
         "content_location": "minio",
         "local_fallback": local_fallback,
-        # Tamanho do conteudo, ja em maos. So e usado pelo servidor quando o
-        # artefato acaba registrado como local (keepLocal OU fallback) — la nao
-        # ha objeto para um HEAD medir. Sem isto, um artefato que caiu no
-        # fallback aparecia no Drive/Artefatos com tamanho desconhecido.
+        # Size of the content, already at hand. Only used by the server when the
+        # artifact ends up registered as local (keepLocal OR fallback) — there,
+        # there is no object for a HEAD to measure. Without this, an artifact that
+        # fell into the fallback showed up in Drive/Artifacts with an unknown size.
         "size_bytes": len(content),
         "drive_file_id": drive_file_id,
-        # True quando o servidor reaproveitou o WorkspaceFile existente. Sempre
-        # False fora do fluxo do Drive e quando o upload caiu no fallback local.
+        # True when the server reused the existing WorkspaceFile. Always
+        # False outside the Drive flow and when the upload fell into the local fallback.
         "drive_reused": drive_reused,
     }
 

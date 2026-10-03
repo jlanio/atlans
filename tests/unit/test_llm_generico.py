@@ -1,19 +1,19 @@
 # tests/unit/test_llm_generico.py
 """
-O assistente fala com qualquer API compatível com a da OpenAI, e não só com o
-OpenRouter — e só se identifica se a instalação quiser.
+The assistant talks to any API compatible with OpenAI's, not only to
+OpenRouter — and only identifies itself if the installation wants it to.
 
-Antes, a chave e a base tinham o nome do OpenRouter, todo pedido levava
-`X-Title: Atlans` e o `FRONTEND_URL` como referer (o que põe a instalação no
-ranking público de apps dele), o catálogo nunca levava a chave (um gateway ou
-um vLLM com chave recusavam) e o id do modelo tinha de ser `fornecedor/nome` —
-o `qwen3:14b` do Ollama era recusado.
+Before, the key and the base had OpenRouter's name, every request carried
+`X-Title: Atlans` and the `FRONTEND_URL` as referer (which puts the installation on
+its public app ranking), the catalog never carried the key (a gateway or
+a vLLM with a key refused) and the model id had to be `provider/name` —
+Ollama's `qwen3:14b` was rejected.
 
-  NOMES       LLM_API_KEY e LLM_BASE_URL; os nomes antigos continuam valendo
-  ATRIBUIÇÃO  desligada por padrão; ASSISTENTE_ATRIBUICAO liga nos três caminhos
-  CATÁLOGO    da base configurada, com a chave quando há
-  ID          o nome no catálogo de qualquer provedor; URL e espaço, não
-  PEDIDO      fora do OpenRouter, só o formato da API da OpenAI — e o uso vem
+  NOMES       (names) LLM_API_KEY and LLM_BASE_URL; the old names still work
+  ATRIBUIÇÃO  (attribution) off by default; ASSISTENTE_ATRIBUICAO turns it on in all three paths
+  CATÁLOGO    (catalog) from the configured base, with the key when there is one
+  ID          the name in any provider's catalog; a URL or a space, no
+  PEDIDO      (request) outside OpenRouter, only the OpenAI API format — and the usage comes
 """
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ CHAVE_LOCAL = "local"  # pragma: allowlist secret
 # ── NOMES ────────────────────────────────────────────────────────────────────
 
 def _config_com(ambiente: dict[str, str]) -> list[str]:
-    """O config é lido no import: cada combinação roda num processo próprio."""
+    """The config is read at import: each combination runs in its own process."""
     codigo = (
         "import app.core.config as c\n"
         "print(c.OPENROUTER_API_KEY); print(c.OPENROUTER_BASE_URL); print(c.ASSISTENTE_ATRIBUICAO)\n"
@@ -64,7 +64,7 @@ def test_os_nomes_antigos_continuam_valendo():
 
 
 def test_os_nomes_genericos_vencem_os_antigos():
-    # O compose passa as quatro; uma vazia não apaga a outra.
+    # Compose passes all four; an empty one does not erase the other.
     assert _config_com({
         "LLM_API_KEY": CHAVE_LOCAL, "LLM_BASE_URL": "http://ollama:11434/v1",
         "OPENROUTER_API_KEY": CHAVE_ANTIGA, "OPENROUTER_BASE_URL": "",
@@ -80,7 +80,7 @@ def test_atribuicao_so_com_valor_explicito(valor, ligada):
     assert _config_com({"ASSISTENTE_ATRIBUICAO": valor})[2] == ligada
 
 
-# ── ATRIBUIÇÃO ───────────────────────────────────────────────────────────────
+# ── ATRIBUIÇÃO (attribution) ─────────────────────────────────────────────────
 
 def test_o_cliente_sem_titulo_nem_referer_nao_se_identifica():
     cabecalhos = openrouter.ClienteOpenRouter("k")._cabecalhos()
@@ -139,14 +139,14 @@ async def test_a_sonda_so_se_identifica_com_a_atribuicao(monkeypatch, atribuicao
         assert (visto["titulo"], visto["referer"]) == (None, None)
 
 
-# ── CATÁLOGO ─────────────────────────────────────────────────────────────────
+# ── CATÁLOGO (catalog) ───────────────────────────────────────────────────────
 
 async def _pedido_do_catalogo(**kw) -> httpx.Request:
     pedidos: list[httpx.Request] = []
 
     def handler(pedido: httpx.Request) -> httpx.Response:
         pedidos.append(pedido)
-        # O formato do Ollama: sem nome, sem preço, sem contexto.
+        # Ollama's format: no name, no price, no context.
         return httpx.Response(200, json={"object": "list", "data": [
             {"id": "qwen3:14b", "object": "model", "owned_by": "library"},
         ]})
@@ -178,11 +178,11 @@ async def test_o_catalogo_sem_chave_nao_manda_authorization():
 
 @pytest.mark.parametrize("modelo", [
     "anthropic/claude-opus-5",          # OpenRouter
-    "openai/gpt-5:online",              # OpenRouter, com variante
+    "openai/gpt-5:online",              # OpenRouter, with a variant
     "qwen3:14b",                        # Ollama
-    "llama3.1",                         # Ollama, sem etiqueta
+    "llama3.1",                         # Ollama, without a tag
     "meta-llama/Llama-3.1-8B-Instruct",  # vLLM (o id do Hugging Face)
-    "org/grupo/modelo",                 # caminho com mais de uma barra
+    "org/grupo/modelo",                 # path with more than one slash
 ])
 def test_id_de_qualquer_provedor_e_aceito(modelo):
     assert formato_valido(modelo)
@@ -197,12 +197,12 @@ def test_colagem_errada_e_recusada(modelo):
     assert not formato_valido(modelo)
 
 
-# ── PEDIDO ───────────────────────────────────────────────────────────────────
+# ── PEDIDO (request) ─────────────────────────────────────────────────────────
 #
-# `usage`, `reasoning` e `cache_control` são parâmetros do OpenRouter. A API da
-# OpenAI (e o vLLM, o LiteLLM, o Ollama) só manda o `usage` no stream com
-# `stream_options.include_usage` — sem ele, a cota diária não contava nada num
-# gateway pago. E a própria OpenAI recusa campo que não conhece.
+# `usage`, `reasoning` and `cache_control` are OpenRouter parameters. The OpenAI
+# API (and vLLM, LiteLLM, Ollama) only sends `usage` in the stream with
+# `stream_options.include_usage` — without it, the daily quota counted nothing on a
+# paid gateway. And OpenAI itself rejects fields it does not know.
 
 SISTEMA = [
     {"type": "text", "text": "política"},
@@ -284,7 +284,7 @@ async def _conversa(base_url: str, corpo_da_resposta: bytes):
 
 
 async def test_o_cliente_decide_pela_base_e_a_cota_conta_o_uso_da_openai():
-    """O último quadro da API da OpenAI traz o `usage` com `choices` vazio."""
+    """The last frame of the OpenAI API carries `usage` with empty `choices`."""
     resposta = _sse(
         _quadro({"content": "ok"}),
         _quadro(parada="stop"),
@@ -301,8 +301,8 @@ async def test_o_cliente_decide_pela_base_e_a_cota_conta_o_uso_da_openai():
 
 
 async def test_sem_uso_na_resposta_o_log_avisa_uma_vez(monkeypatch, caplog):
-    """Um servidor que ignora `include_usage` deixa a cota sem contar: é o
-    que o operador precisa saber — uma vez, não a cada turno."""
+    """A server that ignores `include_usage` leaves the quota uncounted: that is
+    what the operator needs to know — once, not on every turn."""
     monkeypatch.setattr(openrouter, "_avisou_sem_uso", False)
     resposta = _sse(_quadro({"content": "ok"}), _quadro(parada="stop"))
     with caplog.at_level(logging.WARNING, logger="app.assistente.openrouter"):

@@ -1,16 +1,16 @@
 # app/api/routers/admin_assistente_router.py
-"""Trocar o modelo do assistente — com o catálogo do provedor na frente.
+"""Switching the assistant's model — with the provider's catalog up front.
 
-O `GET` devolve o modelo em uso e o catálogo do provedor (com o preço de cada
-modelo, quando ele informa); o `PUT` troca o modelo, depois de sondá-lo.
+`GET` returns the model in use and the provider's catalog (with each model's
+price, when the provider reports it); `PUT` switches the model, after probing it.
 
-Uma extensão pode somar campos ao painel (`Registro.painel_do_modelo`, em
-`app/extensoes`): os planos pagos somam a cota de cada plano e o custo de cada
-opção, porque ali trocar de modelo muda a economia dos planos. Os parâmetros da
-URL que o núcleo não conhece chegam a ela intactos.
+An extension can add fields to the panel (`Registro.painel_do_modelo`, in
+`app/extensoes`): the paid plans add each plan's quota and each option's cost,
+because there switching models changes the plans' economics. URL parameters
+the core does not know reach it intact.
 
-Só admin (`require_admin` no router inteiro), e a página que consome isto é
-`/dashboard/admin/settings` — a rota do painel, que quem administra alcança.
+Admin only (`require_admin` on the whole router), and the page that consumes this is
+`/dashboard/admin/settings` — the dashboard route, which administrators can reach.
 """
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ router = APIRouter(
 class ModeloDoCatalogo(BaseModel):
     id: str
     nome: str
-    # `None`, e nunca 0: um modelo sem preço conhecido não pode aparecer como
-    # gratuito numa tabela de custo — é a leitura que faria escolher errado.
+    # `None`, and never 0: a model with no known price cannot show up as
+    # free in a cost table — that is the reading that would lead to a wrong choice.
     entrada_por_milhao: Optional[float] = None
     saida_por_milhao: Optional[float] = None
     contexto: Optional[int] = None
@@ -57,8 +57,8 @@ class SituacaoDoModelo(BaseModel):
 
 
 class PainelDoModelo(BaseModel):
-    # `allow`: os campos que uma extensão soma ao painel (os planos somam
-    # `cota`, `custos`, `fatia_de_saida`, `dias_da_janela` e `dias_de_lastro`).
+    # `allow`: the fields an extension adds to the panel (the plans add
+    # `cota`, `custos`, `fatia_de_saida`, `dias_da_janela` and `dias_de_lastro`).
     model_config = ConfigDict(extra="allow")
 
     atual: SituacaoDoModelo
@@ -71,23 +71,23 @@ class PainelDoModelo(BaseModel):
 
 
 class TrocaDeModelo(BaseModel):
-    """`extra=forbid`: nada além do id entra por aqui. Preço e teto são do
-    servidor, e aceitar um campo desconhecido em silêncio é o primeiro passo
-    para alguém tentar mandar um deles."""
+    """`extra=forbid`: nothing but the id gets in through here. Price and ceiling belong
+    to the server, and silently accepting an unknown field is the first step
+    toward someone trying to send one of them."""
 
     model_config = ConfigDict(extra="forbid")
 
-    # `None` volta ao padrão do ambiente — é o «voltar ao padrão» da tela.
+    # `None` goes back to the environment default — it is the screen's "back to default".
     modelo: Optional[str] = None
 
 
 async def montar_painel(
     db: AsyncSession, *, simular: str | None, consulta: Mapping[str, str],
 ) -> PainelDoModelo:
-    """O painel: o modelo em uso e o catálogo, mais o que cada extensão soma.
+    """The panel: the model in use and the catalog, plus whatever each extension adds.
 
-    `consulta` são os parâmetros da URL; o núcleo só lê `simular`, e o resto é
-    das extensões.
+    `consulta` is the URL parameters; the core only reads `simular`, and the rest
+    belongs to the extensions.
     """
     atual = await config_svc.situacao(db=db)
 
@@ -97,8 +97,8 @@ async def montar_painel(
         try:
             catalogo = await openrouter.listar_modelos(base_url=OPENROUTER_BASE_URL, chave=OPENROUTER_API_KEY)
         except Exception as exc:
-            # Provedor fora do ar não pode derrubar a tela: o admin ainda
-            # precisa ver o que está em uso e poder voltar ao padrão.
+            # A provider being down must not take down the screen: the admin still
+            # needs to see what is in use and be able to go back to the default.
             logger.warning("Assistente: falha ao listar modelos (%s).", exc.__class__.__name__)
             falha = exc.__class__.__name__
     else:
@@ -131,36 +131,35 @@ async def painel(
 
 
 async def _sondar_ou_400(modelo: str | None) -> None:
-    """Uma chamada real ao provedor antes de gravar a escolha.
+    """A real call to the provider before saving the choice.
 
-    **O catálogo lista o que EXISTE, não o que serve.** Entre as centenas de
-    modelos do provedor há variantes que o endpoint de conversa recusa por
-    inteiro (as `:batch`), modelos sem ferramentas — e o assistente manda as 42
-    em toda chamada — e modelos cujo teto de saída é menor que o nosso. Salvar
-    um deles derrubava o assistente para TODOS os usuários com um genérico
-    «não consegui falar com o modelo», enquanto quem trocou não via nada. Era
-    a tela oferecendo escolhas que não podiam funcionar.
+    **The catalog lists what EXISTS, not what works.** Among the provider's hundreds
+    of models there are variants the chat endpoint rejects outright (the `:batch`
+    ones), models without tools — and the assistant sends all 42 on every call —
+    and models whose output ceiling is lower than ours. Saving one of them took the
+    assistant down for ALL users with a generic "não consegui falar com o modelo"
+    (couldn't reach the model), while whoever made the switch saw nothing. It was
+    the screen offering choices that could not work.
 
-    A sonda tem a forma do pedido real, então a recusa do provedor chega a
-    quem está trocando, com as palavras dele, no momento do clique.
+    The probe has the shape of the real request, so the provider's refusal reaches
+    whoever is switching, in the provider's own words, at the moment of the click.
 
-    **`None` não é sondado**, e isso é deliberado: é o «voltar ao padrão do
-    ambiente», a saída de emergência. Se o provedor estiver fora do ar, essa
-    saída tem de continuar aberta — sondá-la trancaria a porta justamente na
-    hora em que ela é necessária.
+    **`None` is not probed**, and that is deliberate: it is "back to the environment
+    default", the emergency exit. If the provider is down, that exit has to stay
+    open — probing it would lock the door precisely when it is needed.
 
-    Qualquer falha da sonda BLOQUEIA a troca, inclusive um tempo esgotado. O
-    erro caro é o outro: deixar passar um modelo não verificado quebra o
-    produto para todo mundo, enquanto barrar uma troca legítima durante uma
-    instabilidade custa tentar de novo daqui a pouco. A mensagem separa os dois
-    casos para o admin saber qual é.
+    Any probe failure BLOCKS the switch, including a timeout. The expensive error
+    is the other one: letting an unverified model through breaks the product for
+    everyone, while blocking a legitimate switch during an outage costs trying
+    again a bit later. The message distinguishes the two cases so the admin knows
+    which one it is.
     """
     if modelo is None:
         return
     if not OPENROUTER_API_KEY:
-        # Sem credencial não há o que sondar — e a tela já anuncia que o
-        # catálogo não veio. Barrar aqui impediria de configurar o modelo antes
-        # da chave, que é uma ordem legítima de instalação.
+        # Without a credential there is nothing to probe — and the screen already announces
+        # that the catalog did not arrive. Blocking here would prevent configuring the
+        # model before the key, which is a legitimate installation order.
         return
     from app.core.config import ASSISTENTE_ATRIBUICAO, FRONTEND_URL
     from app.services.assistente_service import ESFORCO_DO_RACIOCINIO, MAX_TOKENS
@@ -202,13 +201,13 @@ async def trocar(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """A troca vale da PRÓXIMA conversa em diante.
+    """The switch applies from the NEXT conversation on.
 
-    As que já estão em curso terminam no modelo em que começaram — o laço
-    resolve o modelo uma vez, no início. Trocar entre duas voltas do mesmo
-    raciocínio mudaria o comportamento no meio do caminho.
+    Those already in progress finish on the model they started with — the loop
+    resolves the model once, at the start. Switching between two rounds of the same
+    reasoning would change the behavior midway.
 
-    **Antes de salvar, o modelo é SONDADO** — ver `_sondar_ou_400`.
+    **Before saving, the model is PROBED** — see `_sondar_ou_400`.
     """
     await _sondar_ou_400(payload.modelo)
     try:

@@ -1,15 +1,15 @@
 # tests/unit/test_email_transporte.py
 """
-E-mail por qualquer transporte: Resend, SMTP ou só o log.
+E-mail over any transport: Resend, SMTP or just the log.
 
-Antes só havia a Resend: sem a chave, nenhum e-mail saía — e o login, que
-exige o e-mail verificado, só deixava entrar o admin criado pela CLI.
+Before, there was only Resend: without the key, no e-mail went out — and login,
+which requires a verified e-mail, only let in the admin created by the CLI.
 
-  ESCOLHA     EMAIL_BACKEND, ou o que estiver configurado; valor errado para a API
-  SMTP        STARTTLS, SSL ou sem TLS; cabeçalho sem injeção
-  DESTINOS    um endereço por item: o teto de destinatários do SendEmail vale
-  CAMINHOS    os e-mails do servidor e o do nó SendEmail usam o transporte
-  LOGIN       EXIGIR_EMAIL_VERIFICADO=false deixa entrar sem verificar
+  CHOICE      EMAIL_BACKEND, or whatever is configured; a wrong value stops the API
+  SMTP        STARTTLS, SSL or no TLS; header without injection
+  RECIPIENTS  one address per item: the SendEmail recipient ceiling holds
+  PATHS       the server's e-mails and the SendEmail node's use the transport
+  LOGIN       EXIGIR_EMAIL_VERIFICADO=false lets people in without verifying
 """
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def test_a_escolha_explicita_vence(sem_transporte, monkeypatch):
 
 
 def _arranque_com(ambiente: dict[str, str]):
-    """O config é lido no import: cada combinação roda num processo próprio."""
+    """The config is read at import: each combination runs in its own process."""
     import os
     import subprocess
     import sys
@@ -71,16 +71,16 @@ def _arranque_com(ambiente: dict[str, str]):
 
 
 @pytest.mark.parametrize("ambiente, pedaco", [
-    # Antes, um nome errado caía no transporte configurado, só com um log.
+    # Before, a wrong name fell back to the configured transport, with just a log.
     ({"EMAIL_BACKEND": "sendgrid", "SMTP_HOST": "smtp.example.org"}, "EMAIL_BACKEND='sendgrid'"),
-    # Antes, um modo de TLS desconhecido virava STARTTLS sem aviso.
+    # Before, an unknown TLS mode silently became STARTTLS.
     ({"SMTP_HOST": "smtp.example.org", "SMTP_SEGURANCA": "tls"}, "SMTP_SEGURANCA='tls'"),
-    # Antes, cada envio falhava com "please run connect() first".
+    # Before, every send failed with "please run connect() first".
     ({"EMAIL_BACKEND": "smtp"}, "sem SMTP_HOST"),
     ({"EMAIL_BACKEND": "resend"}, "sem RESEND_API_KEY"),
-    # Antes, era o único erro de e-mail que passava: LOGIN em claro na porta 25.
+    # Before, it was the only e-mail error that got through: plaintext LOGIN on port 25.
     ({"SMTP_HOST": "smtp.example.org", "SMTP_SEGURANCA": "nenhuma", "SMTP_USERNAME": "fulana"}, "em claro"),
-    # A senha de exemplo do .env.example subia um MinIO publicado com ela.
+    # The example password from .env.example brought up a published MinIO with it.
     ({"MINIO_ROOT_PASSWORD": "change-me-strong-password"}, "MINIO_ROOT_PASSWORD"),  # pragma: allowlist secret
     ({"REDIS_PASSWORD": "troque-me-por-uma-senha-forte"}, "REDIS_PASSWORD"),  # pragma: allowlist secret
 ])
@@ -93,7 +93,7 @@ def test_configuracao_errada_impede_a_api_de_subir(ambiente, pedaco):
 def test_configuracao_certa_sobe():
     for ambiente in ({}, {"EMAIL_BACKEND": "log"}, {"EMAIL_BACKEND": "smtp", "SMTP_HOST": "smtp.example.org",
                                                   "SMTP_SEGURANCA": "SSL"},
-                     # Relay local sem autenticação: o caso para o qual `nenhuma` existe.
+                     # Local relay without authentication: the case `nenhuma` exists for.
                      {"SMTP_HOST": "127.0.0.1", "SMTP_SEGURANCA": "nenhuma"}):
         r = _arranque_com(ambiente)
         assert r.returncode == 0, r.stderr[-1500:]
@@ -107,7 +107,7 @@ def test_enviar_sem_transporte_levanta(sem_transporte):
 # ── SMTP ─────────────────────────────────────────────────────────────────────
 
 class _SMTPFalso:
-    """Registra o que o transporte faz com a conexão."""
+    """Records what the transport does with the connection."""
 
     instancias: list["_SMTPFalso"] = []
 
@@ -158,7 +158,7 @@ def test_smtp_starttls_com_login(smtp_falso, monkeypatch):
     assert (conexao.host, conexao.porta) == ("smtp.example.org", 587)
     assert conexao.kw["timeout"] == T.TEMPO_LIMITE_SMTP_S
     assert conexao.passos == ["starttls", "login:atlans", "send", "quit"]
-    # Os destinatários vão explícitos: o smtplib não os relê do cabeçalho.
+    # The recipients go explicitly: smtplib does not re-read them from the header.
     assert conexao.destinos == ["a@example.org", "b@example.org"]
     m = conexao.mensagem
     assert m["From"] == "Atlans <noreply@atlans.example.org>"
@@ -210,9 +210,9 @@ def test_a_porta_padrao_segue_o_modo():
 
 
 def test_o_prazo_do_smtp_cabe_no_do_no_sendemail():
-    """O nó espera 30 s pela resposta inteira. Com 30 s por operação, um
-    servidor lento estourava o prazo do nó com o e-mail ainda saindo — e o nó
-    falhava com o e-mail enviado."""
+    """The node waits 30 s for the whole response. With 30 s per operation, a
+    slow server blew the node's deadline with the e-mail still going out — and
+    the node failed with the e-mail sent."""
     assert T.TEMPO_LIMITE_SMTP_S * 2 < 30
 
 
@@ -228,11 +228,11 @@ def test_um_endereco_por_item(item, puro):
 
 
 @pytest.mark.parametrize("item", [
-    "a@example.org, b@example.org",          # vírgula: dois destinatários
+    "a@example.org, b@example.org",          # comma: two recipients
     "lista: a@example.org, b@example.org;",  # grupo
-    "lista: a@example.org",                  # grupo sem fecho
+    "lista: a@example.org",                  # unclosed group
     "a@example.org; b@example.org",
-    "a@example.org\r\nBcc: c@example.org",   # injeção de cabeçalho
+    "a@example.org\r\nBcc: c@example.org",   # header injection
     "a b@example.org", "a@", "@example.org", "<>", "", "   ",
     "a@example.org <b@example.org>",
 ])
@@ -242,9 +242,9 @@ def test_item_que_nao_e_um_endereco_e_recusado(item):
 
 
 def test_o_smtp_nao_multiplica_destinatarios(smtp_falso, monkeypatch):
-    """O ataque da revisão: um item com 120 endereços passava pelo teto de 50
-    (contava um) e virava 120 `RCPT TO` — o smtplib tirava os destinatários
-    do cabeçalho `To`."""
+    """The review's attack: an item with 120 addresses got past the ceiling of 50
+    (it counted as one) and became 120 `RCPT TO` — smtplib took the recipients
+    from the `To` header."""
     monkeypatch.setattr(config, "SMTP_SEGURANCA", "nenhuma")
     lote = ", ".join(f"v{i}@example.org" for i in range(120))
     with pytest.raises(ValueError):
@@ -402,12 +402,12 @@ async def test_sem_a_exigencia_o_login_entra_sem_verificar(login_de_quem_nao_ver
     assert r.json()["access_token"]
 
 
-# ── CONVITE ──────────────────────────────────────────────────────────────────
+# ── INVITATION ───────────────────────────────────────────────────────────────
 #
-# Sem a exigência de e-mail verificado, o cadastro aberto não prova que o
-# e-mail é de quem criou a conta. O convite é por e-mail: sem cuidado, ele
-# entregava o workspace a quem se cadastrou primeiro com o endereço de outra
-# pessoa.
+# Without the verified e-mail requirement, open sign-up does not prove the
+# e-mail belongs to whoever created the account. The invitation is by e-mail:
+# without care, it handed the workspace to whoever signed up first with someone
+# else's address.
 
 @pytest.fixture
 def convite(client, mock_current_user, monkeypatch):
@@ -428,7 +428,7 @@ def convite(client, mock_current_user, monkeypatch):
         achou.scalar_one_or_none = MagicMock(side_effect=lambda: estado["convidado"])
         nenhum = MagicMock()
         nenhum.scalar_one_or_none = MagicMock(return_value=None)
-        # 1ª consulta: a pessoa pelo e-mail; 2ª: se já é membro.
+        # 1st query: the person by e-mail; 2nd: whether they are already a member.
         db.execute = AsyncMock(side_effect=[achou, nenhum])
         db.add = MagicMock()
         db.commit = AsyncMock()
@@ -463,8 +463,8 @@ async def test_sem_exigencia_e_com_transporte_o_convite_espera_a_verificacao(con
 
 
 async def test_sem_exigencia_e_sem_transporte_o_convite_passa_com_aviso(convite, monkeypatch, caplog):
-    """Sem transporte, nada na instalação prova o e-mail: recusar tornaria o
-    convite impossível. Passa, e o aviso fica no log."""
+    """Without a transport, nothing in the installation proves the e-mail: rejecting
+    would make invitations impossible. It passes, and the warning goes to the log."""
     monkeypatch.setattr(config, "EXIGIR_EMAIL_VERIFICADO", False)
     monkeypatch.setattr(config, "EMAIL_BACKEND", "log")
     with caplog.at_level("WARNING"):
@@ -475,8 +475,8 @@ async def test_sem_exigencia_e_sem_transporte_o_convite_passa_com_aviso(convite,
 
 @pytest.mark.parametrize("exigir, verificado", [(True, False), (True, True), (False, True)])
 async def test_nos_outros_casos_o_convite_segue_como_antes(convite, monkeypatch, exigir, verificado):
-    """Com a exigência ligada (o padrão), a conta sem verificação nem entra; o
-    convite espera por ela, como sempre esperou."""
+    """With the requirement on (the default), the unverified account cannot even
+    log in; the invitation waits for it, as it always did."""
     monkeypatch.setattr(config, "EXIGIR_EMAIL_VERIFICADO", exigir)
     monkeypatch.setattr(config, "EMAIL_BACKEND", "smtp")
     monkeypatch.setattr(config, "SMTP_HOST", "smtp.example.org")

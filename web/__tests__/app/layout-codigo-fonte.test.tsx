@@ -1,8 +1,8 @@
 /**
- * O layout raiz lê CODIGO_FONTE_URL a cada pedido e a entrega ao provider que
- * a tela de entrada e o menu da conta consultam (AGPL §13: quem usa a
- * instalação pela rede acha o código-fonte dela). Sem a variável, o provider
- * recebe null e nenhum link aparece: o código não traz endereço nenhum.
+ * The root layout reads CODIGO_FONTE_URL on each request and hands it to the provider that
+ * the sign-in screen and the account menu consult (AGPL §13: whoever uses the
+ * install over the network finds its source code). Without the variable, the provider
+ * receives null and no link shows up: the code carries no address at all.
  */
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { isValidElement, type ReactElement, type ReactNode } from "react"

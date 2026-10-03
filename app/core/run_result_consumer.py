@@ -1,25 +1,25 @@
 # app/core/run_result_consumer.py
 """
-Consumer assíncrono da fila Redis run_results.
+Asynchronous consumer of the run_results Redis queue.
 
-Fluxo:
+Flow:
   Worker  →  LPUSH run_results  { task_id, status, error_message, stats, end_time, duration_seconds }
-  API     ←  BRPOP run_results  →  atualiza WorkflowRun no PostgreSQL
+  API     ←  BRPOP run_results  →  updates WorkflowRun in PostgreSQL
 
-O run e criado SINCRONAMENTE no endpoint POST /execute (via _dispatch_job
-em workflow_execution_service) com status='pending', atualizado para
-'running' apos send_job, e finalmente atualizado pelo consumer com o
-resultado real (status=ok/error + stats + metricas + artefatos).
+The run is created SYNCHRONOUSLY in the POST /execute endpoint (via _dispatch_job
+in workflow_execution_service) with status='pending', updated to
+'running' after send_job, and finally updated by the consumer with the
+actual result (status=ok/error + stats + metrics + artifacts).
 
-Antes existia tambem uma fila run_creates onde o consumer criava o run.
-Isso causava 4404 no WS quando o run_create demorava (consumer ocupado
-ou Redis lento). Migrado para criacao sincrona no dispatch para eliminar
-o race entre POST /execute e processamento do consumer.
+There used to also be a run_creates queue where the consumer created the run.
+That caused 4404 on the WS when run_create was slow (busy consumer
+or slow Redis). Migrated to synchronous creation at dispatch to eliminate
+the race between POST /execute and consumer processing.
 
-Itens nao processaveis vao para run_dead_letter para analise manual — assim como
-os processados PELA METADE (status gravado mas alguma fase acessoria perdida),
-que vao anotados com '_phases_failed'. A fila e forense: ninguem a consome
-automaticamente, entao ela e o unico registro de perda alem do log.
+Unprocessable items go to run_dead_letter for manual analysis — as do
+the ones processed HALFWAY (status written but some auxiliary phase lost),
+which go annotated with '_phases_failed'. The queue is forensic: nobody consumes
+it automatically, so it is the only record of loss besides the log.
 """
 
 import asyncio
@@ -57,41 +57,41 @@ logger = get_logger(__name__)
 QUEUE_RESULTS     = "run_results"
 QUEUE_DEAD_LETTER = "run_dead_letter"
 
-# Acima deste tamanho de payload, o json.loads sai do event loop (espelha o
-# limiar do dumps no produtor). Abaixo, o overhead do to_thread não compensa.
+# Above this payload size, json.loads leaves the event loop (mirrors the
+# dumps threshold in the producer). Below it, the to_thread overhead does not pay off.
 _JSON_OFFLOAD_THRESHOLD = 256 * 1024
 
-# Máximo de tentativas para run_results cujo run ainda não foi criado
+# Maximum attempts for run_results whose run has not been created yet
 _MAX_RESULT_RETRIES = 20
 
 
-_NOTIFY_DELAYS = [5, 30, 120]  # segundos entre tentativas
+_NOTIFY_DELAYS = [5, 30, 120]  # seconds between attempts
 
 
 class PhaseFailure(Exception):
-    """Uma ou mais fases pos-fechamento do run falharam.
+    """One or more post-close phases of the run failed.
 
-    O status do run JA foi gravado por _update_run_status; o que ficou faltando
-    sao efeitos acessorios (uso, metricas, artefatos, pins, webhook). Levantada
-    por _process_result para que _consume_one mande o payload para
-    run_dead_letter — sem isso o unico rastro da perda era uma linha de log.
+    The run's status WAS already written by _update_run_status; what is missing
+    are auxiliary effects (usage, metrics, artifacts, pins, webhook). Raised
+    by _process_result so that _consume_one sends the payload to
+    run_dead_letter — without it the only trace of the loss was a log line.
     """
 
     def __init__(self, task_id: str, labels: list[str]):
         super().__init__(f"run {task_id}: fase(s) nao concluida(s): {', '.join(labels)}")
         self.labels = labels
 
-# Set de tasks em background para webhook notifications — evita que o GC
-# colete-as enquanto rodam e permite rastreamento em shutdown se necessário.
-# Referência em: https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
+# Set of background tasks for webhook notifications — prevents the GC from
+# collecting them while they run and allows tracking at shutdown if needed.
+# Reference: https://docs.python.org/3/library/asyncio-task.html#asyncio.create_task
 _webhook_tasks: set[asyncio.Task] = set()
 
 
 
-# Vocabulario de `workflow_runs.error_category` (docs/specs/metrics-history.md
-# §2): a taxonomia do flow mais as categorias do servidor. Um valor fora dele
-# nao e gravado — cortado em 16 caracteres viraria "no_executor_chai", uma
-# categoria que ninguem mapeia e que a tela agruparia como se fosse outra.
+# Vocabulary of `workflow_runs.error_category` (docs/specs/metrics-history.md
+# §2): the flow taxonomy plus the server categories. A value outside it is
+# not written — cut at 16 characters it would become "no_executor_chai", a
+# category nobody maps and that the screen would group as if it were another.
 _CATEGORIAS_DE_ERRO = frozenset({
     "user", "validation", "timeout", "resource", "transient", "internal",
     "no_executor", "executor_lost", "isolation", "dispatch",
@@ -107,10 +107,10 @@ def _categoria_conhecida(valor) -> "str | None":
 
 
 def _schedule_webhook_notification(url: str, body: dict) -> None:
-    """Cria task de notificação e a registra para não virar órfã."""
+    """Create a notification task and register it so it does not become orphaned."""
     task = asyncio.create_task(_send_notification_with_retry(url, body))
     _webhook_tasks.add(task)
-    # Log exceções silenciosas e limpa do set quando termina.
+    # Log silent exceptions and remove from the set when done.
     def _done(t: asyncio.Task) -> None:
         _webhook_tasks.discard(t)
         exc = t.exception()
@@ -120,15 +120,15 @@ def _schedule_webhook_notification(url: str, body: dict) -> None:
 
 
 async def _send_notification_with_retry(url: str, body: dict) -> None:
-    """Dispara webhook POST de conclusão de run com até 3 tentativas e backoff.
+    """Fire the run-completion webhook POST with up to 3 attempts and backoff.
 
-    Usa safe_httpx_request: pin de IP apos validacao SSRF, previne DNS
-    rebinding entre validacao e POST. follow_redirects=False evita que
-    servidor responda 302 para URL interna (proxy attack).
+    Uses safe_httpx_request: IP pinning after SSRF validation, prevents DNS
+    rebinding between validation and POST. follow_redirects=False prevents the
+    server from answering 302 to an internal URL (proxy attack).
     """
     from flow.utils.geo_helpers import safe_httpx_request
 
-    # Serializa uma vez e assina com HMAC para que o receptor possa validar
+    # Serialize once and sign with HMAC so the receiver can validate
     payload_bytes = json.dumps(body, sort_keys=True).encode()
     timestamp = str(int(_time.time()))
     signature = hmac.new(
@@ -174,16 +174,17 @@ async def _send_notification_with_retry(url: str, body: dict) -> None:
 
 
 async def _recover_session(db, run: WorkflowRun, task_id: str) -> bool:
-    """Recupera a sessao apos uma fase falhar. Retorna False se nao der.
+    """Recover the session after a phase fails. Returns False if it cannot.
 
-    O rollback e OBRIGATORIO: sem ele a AsyncSession fica em estado de erro e
-    todas as fases seguintes estouram PendingRollbackError antes mesmo de tocar
-    o banco (era exatamente esse o efeito do except silencioso de _persist_metrics
-    — o run terminava "concluido" sem artefatos, sem pins e sem webhook).
+    The rollback is MANDATORY: without it the AsyncSession stays in an error state
+    and every following phase blows up with PendingRollbackError before even
+    touching the database (that was exactly the effect of the silent except in
+    _persist_metrics — the run ended "completed" with no artifacts, no pins and
+    no webhook).
 
-    Como o rollback EXPIRA os objetos ja carregados, precisamos re-hidratar o
-    `run`: caso contrario o proximo acesso a run.status dispararia IO lazy
-    (MissingGreenlet) dentro do loop async.
+    Since the rollback EXPIRES the already loaded objects, we need to re-hydrate
+    `run`: otherwise the next access to run.status would trigger lazy IO
+    (MissingGreenlet) inside the async loop.
     """
     try:
         await db.rollback()
@@ -195,22 +196,23 @@ async def _recover_session(db, run: WorkflowRun, task_id: str) -> bool:
 
 
 PHASE_OK     = "ok"      # fase concluiu
-PHASE_FAILED = "failed"  # fase estourou, mas a sessao voltou — pode continuar
-PHASE_FATAL  = "fatal"   # sessao irrecuperavel — nada mais roda
+PHASE_FAILED = "failed"  # phase blew up, but the session came back — can continue
+PHASE_FATAL  = "fatal"   # unrecoverable session — nothing else runs
 
 
 async def _run_phase(db, run: WorkflowRun, task_id: str, label: str, fn, *args) -> str:
-    """Executa uma fase do pipeline isolando a falha das demais.
+    """Run one pipeline phase, isolating its failure from the others.
 
-    Antes, qualquer excecao aqui abortava o payload INTEIRO e o run ficava sem
-    artefatos/pins/notificacao. Agora a falha e logada, a sessao e recuperada e
-    as fases seguintes continuam.
+    Previously, any exception here aborted the WHOLE payload and the run was left
+    without artifacts/pins/notification. Now the failure is logged, the session
+    is recovered and the following phases continue.
 
-    Devolve PHASE_FATAL quando a sessao ficou irrecuperavel — nesse caso o
-    chamador INTERROMPE o pipeline, porque toda fase seguinte estouraria
-    PendingRollbackError. O retorno distingue PHASE_FAILED de PHASE_OK porque
-    quem registra a perda e _process_result, que levanta PhaseFailure no fim:
-    log sozinho nao da ao operador nada para reprocessar.
+    Returns PHASE_FATAL when the session became unrecoverable — in that case the
+    caller STOPS the pipeline, because every following phase would blow up with
+    PendingRollbackError. The return value distinguishes PHASE_FAILED from
+    PHASE_OK because the one that records the loss is _process_result, which
+    raises PhaseFailure at the end: a log alone gives the operator nothing to
+    reprocess.
     """
     try:
         await fn(*args)
@@ -222,23 +224,23 @@ async def _run_phase(db, run: WorkflowRun, task_id: str, label: str, fn, *args) 
 
 async def _process_result(db, payload: dict) -> bool:
     """
-    Pipeline de processamento de resultado de execução.
+    Execution result processing pipeline.
 
-    Retorna False se o run ainda nao existe — agora improvavel porque
-    _dispatch_job cria o run SINCRONAMENTE antes de despachar. Pode
-    ocorrer em cenarios degradados: payload manual via redis-cli, run
-    apagado, ou crash da API entre _dispatch_job e commit. _consume_one
-    faz retry com backoff antes de descartar.
+    Returns False if the run does not exist yet — now unlikely because
+    _dispatch_job creates the run SYNCHRONOUSLY before dispatching. It can
+    happen in degraded scenarios: a manual payload via redis-cli, a deleted
+    run, or an API crash between _dispatch_job and commit. _consume_one
+    retries with backoff before discarding.
 
-    Levanta PhaseFailure quando o status foi gravado mas alguma fase acessoria
-    falhou: o item vai para run_dead_letter anotado com as fases perdidas. Antes
-    de B11 a excecao subia crua e produzia o mesmo dead-letter; o isolamento por
-    fase nao pode custar a observabilidade da perda.
+    Raises PhaseFailure when the status was written but some auxiliary phase
+    failed: the item goes to run_dead_letter annotated with the lost phases.
+    Before B11 the exception propagated raw and produced the same dead letter;
+    per-phase isolation must not cost the observability of the loss.
     """
     task_id = payload["task_id"]
-    # FOR UPDATE: dois workers com resultados do MESMO run (o verdadeiro e um
-    # tardio) liam os dois 'running', os dois contavam o uso e o ultimo a gravar
-    # vencia. Com a trava o segundo espera o commit do primeiro e ve o desfecho.
+    # FOR UPDATE: two workers with results for the SAME run (the real one and a
+    # late one) both read 'running', both counted the usage and the last to write
+    # won. With the lock the second waits for the first's commit and sees the outcome.
     result = await db.execute(
         select(WorkflowRun).where(WorkflowRun.task_id == task_id).with_for_update()
     )
@@ -248,9 +250,9 @@ async def _process_result(db, payload: dict) -> bool:
 
     stats = payload.get("stats") or {}
 
-    # Snapshot ANTES do update: guarda de idempotencia do agregado de uso.
-    # Se o run ja estava terminal, este payload e uma reentrega (dead letter
-    # reprocessado, replay do outbox do executor) e nao pode contar duas vezes.
+    # Snapshot BEFORE the update: idempotence guard for the usage aggregate.
+    # If the run was already terminal, this payload is a redelivery (reprocessed
+    # dead letter, replay of the executor's outbox) and must not count twice.
     first_close = run.status in ("pending", "running")
 
     if (
@@ -258,15 +260,15 @@ async def _process_result(db, payload: dict) -> bool:
         and payload.get("status") != run.status
         and not _desfecho_inferido_pelo_servidor(run)
     ):
-        # Um desfecho DIFERENTE para um run ja fechado: o resultado passou pela
-        # checagem de idempotencia do WS antes de o primeiro ser gravado (os dois
-        # estavam na fila ao mesmo tempo). O primeiro desfecho vale — a mesma
-        # regra do WS: um 'cancelled' tardio nao apaga um sucesso, nem o
-        # contrario, nem um cancelamento pedido pelo usuario. A excecao e o
-        # desfecho que o proprio servidor DEDUZIU (executor sumiu, run perdido
-        # na reconciliacao): o resultado de verdade que ja estava na fila corrige
-        # o palpite, como sempre corrigiu. Reentrega do MESMO desfecho segue
-        # abaixo (dead letter).
+        # A DIFFERENT outcome for a run already closed: the result passed the WS
+        # idempotence check before the first one was written (both were in the
+        # queue at the same time). The first outcome stands — the same rule as
+        # the WS: a late 'cancelled' does not erase a success, nor the reverse,
+        # nor a cancellation requested by the user. The exception is the outcome
+        # the server itself INFERRED (executor vanished, run lost in
+        # reconciliation): the real result already in the queue corrects the
+        # guess, as it always did. Redelivery of the SAME outcome continues
+        # below (dead letter).
         logger.warning(
             "run %s: ja fechado como '%s' — resultado '%s' que chegou depois ignorado.",
             task_id, run.status, payload.get("status"),
@@ -276,16 +278,16 @@ async def _process_result(db, payload: dict) -> bool:
 
     await _update_run_status(db, run, payload)
 
-    # Contabilizacao de uso vem PRIMEIRO: e o unico dado de billing e nao pode
-    # depender de metricas (que o caminho de erro pode nao produzir).
+    # Usage accounting comes FIRST: it is the only billing data and must not
+    # depend on metrics (which the error path may not produce).
     phases = (
         ("uso diario",  _upsert_usage_daily,                (db, run, stats, first_close)),
         ("metricas",    _persist_metrics_if_present,        (db, run, stats, payload)),
         ("artefatos",   _register_artifacts_if_present,     (db, run, stats)),
         ("pins",        _persist_pinned_outputs_if_present, (db, run, stats)),
-        # O catalogo de fontes aprende com a execucao: os nos WFS que leram com
-        # sucesso viram (ou atualizam) fontes do workspace. Depois das metricas
-        # (le o esquema que elas trazem) e antes da notificacao (que e o fim).
+        # The source catalog learns from the execution: WFS nodes that read
+        # successfully become (or update) workspace sources. After the metrics
+        # (it reads the schema they carry) and before the notification (which is the end).
         ("fontes",      _aprender_fontes_if_present,        (db, run, stats, first_close)),
         ("notificacao", _fire_notification_if_configured,   (db, run)),
     )
@@ -293,8 +295,8 @@ async def _process_result(db, payload: dict) -> bool:
     for idx, (label, fn, args) in enumerate(phases):
         outcome = await _run_phase(db, run, task_id, label, fn, *args)
         if outcome == PHASE_FATAL:
-            # Sessao irrecuperavel: as fases restantes nem chegam a rodar, entao
-            # TODAS elas entram no relato de perda que vai para o dead letter.
+            # Unrecoverable session: the remaining phases never even run, so
+            # ALL of them go into the loss report sent to the dead letter.
             failed.extend(p[0] for p in phases[idx:])
             break
         if outcome == PHASE_FAILED:
@@ -306,18 +308,18 @@ async def _process_result(db, payload: dict) -> bool:
 
 
 def _json_seguro(valor):
-    """Troca NaN/Infinity por None, recursivamente.
+    """Replace NaN/Infinity with None, recursively.
 
-    `json.dumps` do Python emite NaN e Infinity — extensão que a spec JSON não
-    tem — e `json.loads` os aceita de volta, então eles atravessam a fila Redis
-    intactos. Ao chegarem numa coluna JSONB o Postgres recusa o INSERT, a
-    exceção sobe antes do commit e o run inteiro vai para run_dead_letter com o
-    status preso em 'running', mesmo tendo concluído.
+    Python's `json.dumps` emits NaN and Infinity — an extension the JSON spec
+    does not have — and `json.loads` accepts them back, so they cross the Redis
+    queue intact. When they reach a JSONB column Postgres rejects the INSERT,
+    the exception propagates before the commit and the whole run goes to
+    run_dead_letter with its status stuck at 'running', even though it finished.
 
-    A origem conhecida era o bbox de GeoDataFrame vazio (ver
-    flow/metrics/collector._bbox_finito), mas a fila é um contrato externo:
-    sanear aqui é o que impede um NaN de qualquer outra métrica derrubar a
-    gravação do resultado.
+    The known source was the bbox of an empty GeoDataFrame (see
+    flow/metrics/collector._bbox_finito), but the queue is an external contract:
+    sanitizing here is what keeps a NaN from any other metric from breaking the
+    write of the result.
     """
     if isinstance(valor, float):
         return valor if math.isfinite(valor) else None
@@ -328,10 +330,10 @@ def _json_seguro(valor):
     return valor
 
 
-# Categorias de um 'failed' que o SERVIDOR deduziu sem resultado do executor:
-# `executor_lost` (desconectou, ou a reconciliacao nao achou o job) e `dispatch`
-# (o envio nunca foi confirmado). Um resultado verdadeiro que chegue depois
-# substitui esse desfecho — ver `_process_result`.
+# Categories of a 'failed' that the SERVER inferred without a result from the executor:
+# `executor_lost` (disconnected, or reconciliation did not find the job) and `dispatch`
+# (the send was never confirmed). A real result arriving later
+# replaces that outcome — see `_process_result`.
 _CATEGORIAS_INFERIDAS = frozenset({"executor_lost", "dispatch"})
 
 
@@ -340,12 +342,12 @@ def _desfecho_inferido_pelo_servidor(run: WorkflowRun) -> bool:
 
 
 def _numero_finito(valor):
-    """O número, ou 0 se não for um número finito.
+    """The number, or 0 if it is not a finite number.
 
-    Para os incrementos do usage_daily, onde o `_json_seguro` não basta: o
-    None que ele devolve para NaN viraria NULL na soma do SQL (`coluna + NULL`
-    zera a linha do dia), e o NaN cru pior — `NaN or 0` é NaN, e NaN + x = NaN
-    contamina o agregado do workspace para sempre.
+    For the usage_daily increments, where `_json_seguro` is not enough: the
+    None it returns for NaN would become NULL in the SQL sum (`coluna + NULL`
+    nulls out the day's row), and raw NaN is worse — `NaN or 0` is NaN, and
+    NaN + x = NaN contaminates the workspace aggregate forever.
     """
     if isinstance(valor, int):
         return valor
@@ -355,19 +357,20 @@ def _numero_finito(valor):
 
 
 def _stats_para_coluna(stats: dict) -> dict:
-    """Fica so com o que a coluna node_stats existe para guardar.
+    """Keep only what the node_stats column exists to store.
 
-    O executor manda, dentro de `stats`, chaves de controle que NAO sao
-    estatistica por no: `__metrics__` (ja normalizado em workflow_run_metrics e
-    node_run_metrics), `__artifacts__` (ja em artifacts), `__response__` (o body
-    inline do ResponseNode, que o webhook le do Redis) e
-    `__updated_pinned_outputs__` (consumido aqui mesmo, a partir do payload da
-    fila, e persistido em workflows.pinned_outputs).
+    The executor sends, inside `stats`, control keys that are NOT per-node
+    statistics: `__metrics__` (already normalized in workflow_run_metrics and
+    node_run_metrics), `__artifacts__` (already in artifacts), `__response__`
+    (the inline body of the ResponseNode, which the webhook reads from Redis) and
+    `__updated_pinned_outputs__` (consumed right here, from the queue payload,
+    and persisted in workflows.pinned_outputs).
 
-    Gravar tudo isso de volta no JSON inflava a coluna em uma ordem de grandeza
-    — o executor so trunca o payload acima de 16 MB — e o preco era cobrado em
-    TODA listagem de execucoes, que trazia a linha inteira do Postgres para ler
-    um unico inteiro. Sobra `__run_meta__`, que so existe aqui.
+    Writing all of that back into the JSON inflated the column by an order of
+    magnitude — the executor only truncates the payload above 16 MB — and the
+    price was paid on EVERY run listing, which brought the whole row from
+    Postgres to read a single integer. What remains is `__run_meta__`, which
+    only exists here.
     """
     return {
         k: v for k, v in stats.items()
@@ -378,27 +381,27 @@ def _stats_para_coluna(stats: dict) -> dict:
 async def _update_run_status(db, run: WorkflowRun, payload: dict) -> None:
     run.status           = payload["status"]
     run.error_message    = payload.get("error_message")
-    # So no desfecho 'failed': o WS router ja zera a categoria em sucesso e
-    # cancelamento, mas a fila e contrato externo — um payload antigo (ou
-    # forjado) nao pode carimbar categoria num run que deu certo. Corte em 16
-    # por ser o tamanho da coluna: um executor que mande algo fora da taxonomia
-    # nao pode derrubar o commit do fechamento inteiro.
+    # Only on the 'failed' outcome: the WS router already clears the category on
+    # success and cancellation, but the queue is an external contract — an old
+    # (or forged) payload must not stamp a category on a run that succeeded.
+    # Cut at 16 because that is the column size: an executor sending something
+    # outside the taxonomy must not break the commit of the whole close.
     _categoria = payload.get("error_category")
     run.error_category   = (
         _categoria_conhecida(_categoria) if run.status == "failed" and _categoria else None
     )
-    # node_stats so e sobrescrito quando vem conteudo. No caminho de erro,
-    # timeout ou cancelamento o executor pode mandar stats vazio/ausente —
-    # gravar {} apagaria os stats parciais ja acumulados no run e o painel
-    # perderia o historico dos nos que chegaram a rodar.
+    # node_stats is only overwritten when content comes in. On the error,
+    # timeout or cancellation path the executor may send empty/missing stats —
+    # writing {} would erase the partial stats already accumulated on the run and
+    # the panel would lose the history of the nodes that did run.
     stats = payload.get("stats") or {}
     if stats:
         run.node_stats = _json_seguro(_stats_para_coluna(stats))
-    # end_time chega da fila e vai para uma coluna timestamptz. Um valor naive
-    # seria interpretado pelo Postgres no fuso da sessao (TZ dos containers) e
-    # gravado deslocado — 4h no futuro em America/Cuiaba. O produtor ja manda
-    # aware, mas payloads antigos podem estar na fila e a fila e um contrato
-    # externo: assumir UTC quando o offset nao vier.
+    # end_time comes from the queue and goes into a timestamptz column. A naive
+    # value would be interpreted by Postgres in the session's time zone (the
+    # containers' TZ) and stored shifted — 4h into the future in America/Cuiaba.
+    # The producer already sends it aware, but old payloads may be in the queue
+    # and the queue is an external contract: assume UTC when no offset comes.
     _end = datetime.fromisoformat(payload["end_time"])
     if _end.tzinfo is None:
         _end = _end.replace(tzinfo=timezone.utc)
@@ -420,24 +423,24 @@ async def _register_artifacts_if_present(db, run: WorkflowRun, stats: dict) -> N
         await _register_artifacts(db, run, artifacts_meta)
 
 
-# ── Derivacao de s3_key no servidor (SEG cross-tenant) ───────────────────────
+# ── Server-side s3_key derivation (cross-tenant SEC) ─────────────────────────
 #
-# O executor manda 's3_key' / '__pin_s3_key__' junto com os metadados, mas esses
-# campos sao ATACAVEIS: um executor comprometido apontava para
-# 'artifacts/<outro-workspace>/...' e o consumer gravava a linha Artifact com
-# credential_id=None — download PUBLICO, sem token, de um objeto de outro tenant.
-# No caso do pin era pior: /workflows/{id}/pin/{node} deleta o objeto apontado
-# pelo '__pin_s3_key__' salvo, entao a key forjada virava delete cross-tenant.
+# The executor sends 's3_key' / '__pin_s3_key__' along with the metadata, but these
+# fields are ATTACKABLE: a compromised executor pointed to
+# 'artifacts/<another-workspace>/...' and the consumer wrote the Artifact row with
+# credential_id=None — a PUBLIC download, with no token, of another tenant's object.
+# The pin case was worse: /workflows/{id}/pin/{node} deletes the object pointed to
+# by the saved '__pin_s3_key__', so the forged key became a cross-tenant delete.
 #
-# Todo endpoint HTTP equivalente ja passa por `_validate_agent_s3_key`; o caminho
-# WS -> fila run_results nao passava por nada. Aqui invertemos o fluxo: o SERVIDOR
-# deriva a key a partir de (prefixo, workspace do run, task_id, nome do arquivo) —
-# exatamente o formato que o executor usa em flow/utils/artifact_helpers.py e
-# flow/executor/pin.py — e ainda revalida com o mesmo guard dos endpoints HTTP,
-# restrito ao workspace do run.
+# Every equivalent HTTP endpoint already goes through `_validate_agent_s3_key`; the
+# WS -> run_results queue path went through nothing. Here we invert the flow: the
+# SERVER derives the key from (prefix, the run's workspace, task_id, file name) —
+# exactly the format the executor uses in flow/utils/artifact_helpers.py and
+# flow/executor/pin.py — and still revalidates it with the same guard as the HTTP
+# endpoints, restricted to the run's workspace.
 _PIN_FORMATS = ("json", "geojson", "parquet")
 
-# Charset de _S3_KEY_RE (drive_router) menos a barra: tudo que sobrar vira '_'.
+# The _S3_KEY_RE (drive_router) charset minus the slash: anything left over becomes '_'.
 _UNSAFE_NAME_CHARS = re.compile(r"[^A-Za-z0-9_.-]")
 _DOT_RUN = re.compile(r"\.{2,}")
 _MAX_STEM_LEN = 160
@@ -445,17 +448,18 @@ _MAX_EXT_LEN = 16
 
 
 def _sanitize_filename(filename: str) -> str:
-    """Reduz o nome recebido do executor a um basename S3-safe.
+    """Reduce the name received from the executor to an S3-safe basename.
 
-    NORMALIZA em vez de rejeitar. O nome sai de `slugify_label` no executor, que
-    usa `str.isalnum()` — Unicode-aware, portanto PRESERVA acento. Num produto
-    pt-BR o label do no ('Relatorio 2026', 'Area Util') e a fonte do nome, entao
-    o caso acentuado e o comum, nao a excecao: rejeitar fazia `_derive_s3_key`
-    devolver None e o artefato sumia da UI deixando so um WARNING no servidor.
+    NORMALIZES instead of rejecting. The name comes from `slugify_label` on the
+    executor, which uses `str.isalnum()` — Unicode-aware, so it PRESERVES accents.
+    In a pt-BR product the node label ('Relatorio 2026', 'Area Util') is the
+    source of the name, so the accented case is the common one, not the exception:
+    rejecting made `_derive_s3_key` return None and the artifact vanished from the
+    UI leaving only a WARNING on the server.
 
-    NFKD + descarte de combinantes converte 'ó'→'o'; o que sobrar fora do
-    charset (espaco, 'ç' isolado, ':') vira '_'. Sequencias de ponto sao
-    colapsadas porque `_validate_agent_s3_key` recusa qualquer key com '..'.
+    NFKD + dropping combining marks converts 'ó'→'o'; whatever remains outside
+    the charset (space, a lone 'ç', ':') becomes '_'. Runs of dots are
+    collapsed because `_validate_agent_s3_key` rejects any key with '..'.
     """
     name = (filename or "").replace("\\", "/").split("/")[-1].strip()
     if name in ("", ".", ".."):
@@ -468,8 +472,8 @@ def _sanitize_filename(filename: str) -> str:
     if not name:
         return ""
 
-    # S3 limita a key a 1024 bytes e nomes patologicos chegam do executor sem
-    # limite; corta o stem preservando a extensao (o mime do Drive vem dela).
+    # S3 limits the key to 1024 bytes and pathological names arrive from the executor
+    # with no limit; cut the stem preserving the extension (the Drive mime comes from it).
     stem, dot, ext = name.rpartition(".")
     if not dot:
         return name[:_MAX_STEM_LEN]
@@ -477,11 +481,11 @@ def _sanitize_filename(filename: str) -> str:
 
 
 def _derive_s3_key(prefix: str, workspace_id: str, task_id: str, filename: str) -> str | None:
-    """Monta a key canonica e a valida com o mesmo guard dos endpoints HTTP.
+    """Build the canonical key and validate it with the same guard as the HTTP endpoints.
 
-    Retorna None so quando nao sobra nome nenhum apos o saneamento ou quando
-    falta workspace/task — o charset ja foi normalizado por _sanitize_filename,
-    entao a rejeicao aqui e a rede de seguranca, nao o caminho comum.
+    Returns None only when no name is left after sanitizing or when the
+    workspace/task is missing — the charset was already normalized by
+    _sanitize_filename, so rejection here is the safety net, not the common path.
     """
     from fastapi import HTTPException
     from app.api.routers.executor_drive_router import _validate_agent_s3_key
@@ -500,12 +504,12 @@ def _derive_s3_key(prefix: str, workspace_id: str, task_id: str, filename: str) 
 
 
 def _safe_pin_ref(run: WorkflowRun, nid: str, ref: dict) -> dict | None:
-    """Reescreve a referencia de pin com a s3_key derivada pelo servidor.
+    """Rewrite the pin reference with the server-derived s3_key.
 
-    O executor monta o nome como '{node_id}_pin.{fmt}' e a key como
+    The executor builds the name as '{node_id}_pin.{fmt}' and the key as
     'pin-cache/{workspace_id or "default"}/{task_id or "no-task"}/{nome}'
-    (flow/executor/pin.py) — reproduzimos isso aqui para nao quebrar o caminho
-    legitimo, ignorando o que veio no payload.
+    (flow/executor/pin.py) — we reproduce that here so as not to break the
+    legitimate path, ignoring what came in the payload.
     """
     fmt = ref.get("__pin_format__") or "json"
     if fmt not in _PIN_FORMATS:
@@ -529,14 +533,14 @@ def _safe_pin_ref(run: WorkflowRun, nid: str, ref: dict) -> dict | None:
 
 
 async def _aprender_fontes_if_present(db, run: WorkflowRun, stats: dict, first_close: bool) -> None:
-    """Fase "fontes": registra no catalogo as fontes WFS que esta execucao leu.
+    """The "fontes" phase: register in the catalog the WFS sources this execution read.
 
-    So execucao `success`, so nos `WFS` com status `completed` (quem falhou nao
-    ensina nada), e so quando a flag esta ligada. A definition vem do Workflow
-    ATUAL — a mesma limitacao aceita pelos pins: url/typeName ficam em claro
-    (`encrypt_workflow_connections` so cifra `connectionString`). `first_close`
-    e a guarda de reentrega: uma reentrega nao conta o uso duas vezes, e o
-    upsert por chave nao duplica a linha.
+    Only a `success` execution, only `WFS` nodes with status `completed` (one that
+    failed teaches nothing), and only when the flag is on. The definition comes
+    from the CURRENT Workflow — the same limitation accepted for pins: url/typeName
+    are in the clear (`encrypt_workflow_connections` only encrypts
+    `connectionString`). `first_close` is the redelivery guard: a redelivery does
+    not count the usage twice, and the upsert by key does not duplicate the row.
     """
     from app.core.config import FONTES_APRENDER_DAS_EXECUCOES
 
@@ -576,15 +580,16 @@ async def _persist_pinned_outputs_if_present(db, run: WorkflowRun, stats: dict) 
     if not wf_obj:
         return
 
-    # SEG: o workflow pode ter sido movido de workspace enquanto este run corria
-    # (POST /workflows/{id}/move). As s3_keys sao derivadas de `run.workspace_id`
-    # — o workspace de ORIGEM —, entao grava-las agora deixaria o workflow, ja no
-    # destino, com pins apontando para pin-cache/{ws_origem}/. Na proxima
-    # execucao o executor pediria esses objetos e, sendo o executor default (que
-    # enxerga todos os workspaces), leria dados do tenant antigo.
+    # SEC: the workflow may have been moved to another workspace while this run was
+    # going (POST /workflows/{id}/move). The s3_keys are derived from
+    # `run.workspace_id` — the SOURCE workspace —, so writing them now would leave
+    # the workflow, already in the destination, with pins pointing to
+    # pin-cache/{ws_origem}/. On the next execution the executor would request
+    # those objects and, being the default executor (which sees every workspace),
+    # would read the old tenant's data.
     #
-    # Descartar e o lado seguro: o pin e cache, nao dado primario, e a proxima
-    # execucao no destino o recria sob o prefixo correto.
+    # Discarding is the safe side: the pin is a cache, not primary data, and the
+    # next execution in the destination recreates it under the correct prefix.
     if run.workspace_id != wf_obj.workspace_id:
         logger.warning(
             "run %s: auto-pin descartado — o workflow %s mudou do workspace '%s' "
@@ -593,17 +598,17 @@ async def _persist_pinned_outputs_if_present(db, run: WorkflowRun, stats: dict) 
         )
         return
 
-    # Sanitiza ANTES de gravar: o que entra em pinned_outputs e reenviado ao
-    # executor no proximo dispatch e alimenta o delete do unpin.
+    # Sanitize BEFORE writing: what goes into pinned_outputs is sent back to the
+    # executor on the next dispatch and feeds the unpin delete.
     #
-    # So refs DESTA run: `_safe_pin_ref` deriva a s3_key com o task_id atual,
-    # entao aceitar uma ref que o executor apenas repassou (gravada numa run
-    # antiga) a repontaria para um objeto que nunca foi enviado — 404 permanente
-    # no pin. Executores atualizados ja mandam apenas o que regravaram
-    # (updated_pin_refs); este filtro protege contra executores antigos, que
-    # reportavam pinned_outputs inteiro. A chave declarada e atacavel, mas
-    # usa-la para DESCARTAR e fail-safe: mentir o task_id atual so leva a ref
-    # a mesma derivacao canonica que ela ja teria.
+    # Only refs of THIS run: `_safe_pin_ref` derives the s3_key with the current
+    # task_id, so accepting a ref the executor merely passed along (written in an
+    # old run) would repoint it to an object that was never uploaded — a permanent
+    # 404 on the pin. Updated executors already send only what they rewrote
+    # (updated_pin_refs); this filter protects against old executors, which
+    # reported the whole pinned_outputs. The declared key is attackable, but
+    # using it to DISCARD is fail-safe: lying about the current task_id only leads
+    # the ref to the same canonical derivation it would already have.
     task_atual = run.task_id or "no-task"
     accepted: dict[str, dict] = {}
     for nid, ref in updated_pins.items():
@@ -640,29 +645,29 @@ async def _persist_pinned_outputs_if_present(db, run: WorkflowRun, stats: dict) 
 
 
 async def _upsert_pin_artifact(db, run: WorkflowRun, wf_obj, nid: str, ref: dict) -> None:
-    # ref ja passou por _safe_pin_ref — s3_key/format/filename sao do servidor.
+    # ref already went through _safe_pin_ref — s3_key/format/filename come from the server.
     s3_key = ref["__pin_s3_key__"]
     fmt = ref["__pin_format__"]
     filename = ref["__pin_filename__"]
 
-    # `scalar_one_or_none()` aqui levantava `MultipleResultsFound` com duas
-    # linhas — e é ESTA função que cria a segunda: `artifacts` não tem
-    # constraint única em (workflow_hash, node_id, is_pinned)
-    # (`models/artifact.py`), então dois runs do mesmo fluxo terminando juntos
-    # não acham nada, cada um insere a sua, e a partir daí toda leitura
-    # levantava. Numa rota isso é um 500; aqui é pior — este caminho é o do
-    # `job_result`, e a exceção pendura a persistência do resultado da execução.
+    # `scalar_one_or_none()` here raised `MultipleResultsFound` with two
+    # rows — and it is THIS function that creates the second: `artifacts` has no
+    # unique constraint on (workflow_hash, node_id, is_pinned)
+    # (`models/artifact.py`), so two runs of the same workflow finishing together
+    # find nothing, each inserts its own, and from then on every read
+    # raised. In a route that is a 500; here it is worse — this path is the one of
+    # `job_result`, and the exception hangs the persistence of the execution result.
     #
-    # A mais nova vence e as LINHAS extras são apagadas, o que limpa o dado com
-    # o uso. Os objetos delas ficam para o reconcile: apagar no storage aqui
-    # seria uma ida à rede no caminho quente do `job_result`, e um órfão no
-    # MinIO custa bytes, não correção.
+    # The newest one wins and the extra ROWS are deleted, which cleans the data
+    # through use. Their objects are left to reconcile: deleting from storage here
+    # would be a network round trip on the hot path of `job_result`, and an orphan
+    # in MinIO costs bytes, not correctness.
     #
-    # O colapso continua aqui mesmo depois do índice único parcial
-    # (`uq_artifact_pin_por_no`, migração de 2026-09-15): ele é o que limpa uma
-    # base que ainda não migrou, e é o caminho do SQLite dos testes, que nasce
-    # do `create_all`. Com o índice, a corrida deixa de criar a duplicata e
-    # passa a levantar no INSERT — tratado no SAVEPOINT abaixo.
+    # The collapse stays here even after the partial unique index
+    # (`uq_artifact_pin_por_no`, migration of 2026-09-15): it is what cleans a
+    # database that has not migrated yet, and it is the path of the tests' SQLite,
+    # which is born from `create_all`. With the index, the race no longer creates
+    # the duplicate and instead raises on INSERT — handled in the SAVEPOINT below.
     existing = await db.execute(
         select(Artifact)
         .where(
@@ -685,16 +690,16 @@ async def _upsert_pin_artifact(db, run: WorkflowRun, wf_obj, nid: str, ref: dict
         old_art.filename = filename
         old_art.format = fmt
         old_art.run_id = run.task_id
-        # O workspace acompanha a s3_key. A busca acima e por
-        # (workflow_hash, node_id) e nao filtra tenant, entao uma linha remanescente
-        # de antes de um move seria repontada para um objeto do workspace novo
-        # mantendo o `workspace_id` antigo — e o download usa a s3_key literal,
-        # servindo dados do destino a quem so tem acesso a origem.
+        # The workspace follows the s3_key. The lookup above is by
+        # (workflow_hash, node_id) and does not filter by tenant, so a leftover row
+        # from before a move would be repointed to an object of the new workspace
+        # while keeping the old `workspace_id` — and the download uses the literal
+        # s3_key, serving destination data to someone who only has access to the source.
         old_art.workspace_id = run.workspace_id or wf_obj.workspace_id or ""
     else:
         novo = Artifact(
-            # Mesmo workspace usado para derivar a s3_key — o registro nunca pode
-            # apontar para um tenant diferente do dono do objeto.
+            # Same workspace used to derive the s3_key — the record can never
+            # point to a tenant different from the object's owner.
             workspace_id=run.workspace_id or wf_obj.workspace_id or "",
             workflow_hash=run.workflow_hash,
             run_id=run.task_id,
@@ -705,20 +710,21 @@ async def _upsert_pin_artifact(db, run: WorkflowRun, wf_obj, nid: str, ref: dict
             s3_key=s3_key,
             is_pinned=True,
         )
-        # SAVEPOINT, e não um `try` solto: com o índice único parcial, dois runs
-        # do mesmo fluxo terminando juntos leem "não existe" ao mesmo tempo e o
-        # segundo INSERT viola a constraint. No Postgres um erro assim envenena
-        # a transação inteira — e esta é a transação que persiste o RESULTADO da
-        # execução, no caminho do `job_result`. O savepoint isola a falha; o
-        # padrão é o de `api_token_service.marcar_uso` e `credential_loader`.
+        # SAVEPOINT, and not a loose `try`: with the partial unique index, two runs
+        # of the same workflow finishing together read "does not exist" at the same
+        # time and the second INSERT violates the constraint. In Postgres an error
+        # like that poisons the whole transaction — and this is the transaction that
+        # persists the execution RESULT, on the `job_result` path. The savepoint
+        # isolates the failure; the pattern is the one of
+        # `api_token_service.marcar_uso` and `credential_loader`.
         try:
             async with db.begin_nested():
                 db.add(novo)
                 await db.flush()
         except IntegrityError:
-            # O outro run ganhou a corrida. A linha dele é a verdade; esta
-            # chamada só a repontou para o objeto mais novo, que é exatamente o
-            # que o ramo de cima faz.
+            # The other run won the race. Its row is the truth; this
+            # call only repointed it to the newest object, which is exactly
+            # what the branch above does.
             logger.info(
                 "run %s: outro run criou a linha de pin-cache do node '%s' primeiro; "
                 "repontando a existente.",
@@ -733,7 +739,7 @@ async def _upsert_pin_artifact(db, run: WorkflowRun, wf_obj, nid: str, ref: dict
                 )
                 .order_by(Artifact.id.desc())
             )).scalars().first()
-            if vencedora is None:  # pragma: no cover - só se a linha sumir no meio
+            if vencedora is None:  # pragma: no cover - only if the row vanishes midway
                 raise
             vencedora.s3_key = s3_key
             vencedora.filename = filename
@@ -763,12 +769,12 @@ async def _fire_notification_if_configured(db, run: WorkflowRun) -> None:
     except Exception:
         target_host = ""
 
-    # Whitelist GLOBAL (admin → Configurações). Era gravada e exibida — a tela
-    # avisa quando está vazia —, mas nenhum disparo a consultava: a restrição
-    # que o admin configurava não restringia nada. Vazia = sem restrição; com
-    # itens, o host precisa estar nela E na allowlist do workspace (abaixo).
-    # O que foi gravado antes desta regra (um `*`, uma URL com caminho) passa
-    # pela mesma validação da gravação: o que o matcher não casaria é ignorado.
+    # GLOBAL whitelist (admin → Configurações (Settings)). It was saved and displayed
+    # — the screen warns when it is empty —, but no firing consulted it: the
+    # restriction the admin configured restricted nothing. Empty = no restriction;
+    # with items, the host must be in it AND in the workspace allowlist (below).
+    # What was saved before this rule (a `*`, a URL with a path) goes through
+    # the same validation as saving: what the matcher would not match is ignored.
     from app.core.system_config import get_config
     from app.core.utils.allowlist import padroes_validos
 
@@ -780,9 +786,9 @@ async def _fire_notification_if_configured(db, run: WorkflowRun) -> None:
         )
         return
 
-    # V13: allowlist de hosts por workspace. Sem essa lista, qualquer URL que
-    # passe no SSRF check e aceita — incluindo intranet do operador que
-    # configurou o webhook, vazando resultado de runs entre tenants.
+    # V13: per-workspace host allowlist. Without this list, any URL that
+    # passes the SSRF check is accepted — including the intranet of the operator
+    # who configured the webhook, leaking run results across tenants.
     if workspace_id:
         ws_result = await db.execute(
             select(Workspace.notification_url_allowlist).where(
@@ -810,7 +816,7 @@ async def _fire_notification_if_configured(db, run: WorkflowRun) -> None:
 
 
 async def _get_retention_days(db) -> int | None:
-    """Lê dias de retenção de artefatos da configuração do sistema. None = sem expiração."""
+    """Read artifact retention days from the system settings. None = no expiration."""
     try:
         result = await db.execute(
             select(SystemConfig).where(SystemConfig.key == "artifact_retention_days")
@@ -820,8 +826,8 @@ async def _get_retention_days(db) -> int | None:
             return int(cfg.value)
     except Exception as exc:
         logger.warning("Falha ao ler artifact_retention_days: %s", exc)
-        # Um SELECT que falha tambem invalida a sessao — sem o rollback o INSERT
-        # dos artefatos logo abaixo estouraria PendingRollbackError.
+        # A failing SELECT also invalidates the session — without the rollback the
+        # artifacts INSERT right below would blow up with PendingRollbackError.
         try:
             await db.rollback()
         except Exception as rb_exc:
@@ -829,23 +835,23 @@ async def _get_retention_days(db) -> int | None:
     return None
 
 
-# Quantos HEAD simultaneos ao MinIO. `storage.head` e boto3 sincrono, entao
-# cada um ocupa uma thread do executor padrao do asyncio (default: 32); 8 da
-# vazao suficiente para um run com dezenas de saidas sem monopolizar o pool,
-# que e compartilhado com o resto da API neste worker.
+# How many simultaneous HEADs to MinIO. `storage.head` is synchronous boto3, so
+# each one takes a thread of asyncio's default executor (default: 32); 8 gives
+# enough throughput for a run with dozens of outputs without monopolizing the pool,
+# which is shared with the rest of the API on this worker.
 _HEAD_CONCURRENCY = 8
 
 
 async def _head_sizes(keys: list[str]) -> dict[str, int]:
-    """Consulta o tamanho de varias keys no storage de uma vez.
+    """Query the size of several keys in storage at once.
 
-    Era um HEAD por artefato, em serie, dentro do laco de registro: um run com
-    20 saidas pagava 20 round-trips de rede enfileirados com o consumer parado,
-    e a fila inteira atrasava atras dele.
+    It used to be one HEAD per artifact, serially, inside the registration loop:
+    a run with 20 outputs paid 20 queued network round trips with the consumer
+    stalled, and the whole queue fell behind it.
 
-    `return_exceptions=True` preserva o comportamento antigo de falha parcial —
-    uma key que falha vira um WARNING e fica sem tamanho, sem derrubar as
-    demais.
+    `return_exceptions=True` preserves the old partial-failure behavior —
+    a key that fails becomes a WARNING and is left without a size, without
+    bringing down the others.
     """
     if not keys:
         return {}
@@ -856,9 +862,9 @@ async def _head_sizes(keys: list[str]) -> dict[str, int]:
 
     async def _one(key: str):
         async with sem:
-            # storage.head e boto3 sincrono. Este consumer roda como UNICA task
-            # de background no event loop — sem to_thread, cada HEAD congelava
-            # TODO o trafego da API neste worker durante o round-trip.
+            # storage.head is synchronous boto3. This consumer runs as the ONLY
+            # background task on the event loop — without to_thread, each HEAD froze
+            # ALL the API traffic on this worker during the round trip.
             return await asyncio.to_thread(_s3.head, key)
 
     resultados = await asyncio.gather(*(_one(k) for k in keys), return_exceptions=True)
@@ -875,32 +881,32 @@ async def _head_sizes(keys: list[str]) -> dict[str, int]:
 
 @dataclass(frozen=True)
 class _Resolucao:
-    """O destino de cada item saneado, decidido ANTES de ir ao storage (fase 2)."""
+    """The destination of each sanitized item, decided BEFORE going to storage (phase 2)."""
 
     a_criar: list[dict]             # vira linha nova: Artifact ou WorkspaceFile
     drive_existentes: list[tuple]   # (WorkspaceFile, acao): a linha ja existe, so avisar
-    tamanhos: dict[str, int]        # HEAD de quem vira linha e tem objeto no storage
+    tamanhos: dict[str, int]        # HEAD of the items that become rows and have an object in storage
 
 
 async def _register_artifacts(db, run: WorkflowRun, artifacts_meta: dict) -> None:
     """
-    Registra artefatos produzidos no run.
+    Register artifacts produced in the run.
 
-    - context="artifacts" (padrao): cria registro na tabela Artifact.
-    - context="drive": cria registro na tabela WorkspaceFile (Drive),
-      permitindo sincronizacao automatica com executores. Nao duplica no Artifact.
+    - context="artifacts" (default): creates a record in the Artifact table.
+    - context="drive": creates a record in the WorkspaceFile (Drive) table,
+      allowing automatic synchronization with executors. Does not duplicate in Artifact.
 
     artifacts_meta: { node_id: [ {output_key, format, features, filename, ...} ] }
 
-    SEG: o campo 's3_key' enviado pelo executor e IGNORADO — a key e derivada
-    aqui a partir do workspace/task do run (ver _derive_s3_key).
+    SEC: the 's3_key' field sent by the executor is IGNORED — the key is derived
+    here from the run's workspace/task (see _derive_s3_key).
 
-    Estruturado em tres fases sem IO dentro do laco: (1) saneia o payload
-    (`_sanear_artefatos`), (2) resolve banco e storage EM LOTE
-    (`_resolver_em_lote`), (3) monta as linhas e persiste com um commit
-    (`_persistir_artefatos`) — e so entao avisa o Drive (`_avisar_drive`). A
-    versao anterior fazia duas queries por item de Drive (N+1) e um HEAD
-    serial por artefato, tudo no processamento de um unico item da fila.
+    Structured in three phases with no IO inside the loop: (1) sanitizes the payload
+    (`_sanear_artefatos`), (2) resolves database and storage IN BATCH
+    (`_resolver_em_lote`), (3) builds the rows and persists with one commit
+    (`_persistir_artefatos`) — and only then notifies the Drive (`_avisar_drive`).
+    The previous version made two queries per Drive item (N+1) and one serial
+    HEAD per artifact, all while processing a single queue item.
     """
     if not run.workspace_id:
         logger.warning(
@@ -910,7 +916,7 @@ async def _register_artifacts(db, run: WorkflowRun, artifacts_meta: dict) -> Non
         return
 
     retention_days = await _get_retention_days(db)
-    # Coluna expires_at é TIMESTAMP WITHOUT TIME ZONE — usar datetime naive (UTC)
+    # The expires_at column is TIMESTAMP WITHOUT TIME ZONE — use a naive datetime (UTC)
     expires_at = (utc_now_naive() + timedelta(days=retention_days)) if retention_days else None
 
     executor_id = None
@@ -926,8 +932,8 @@ async def _register_artifacts(db, run: WorkflowRun, artifacts_meta: dict) -> Non
     novos_no_drive = await _persistir_artefatos(
         db, run, resolucao, expires_at=expires_at, executor_id=executor_id,
     )
-    # O arquivo que ja existia e avisado antes do novo: e a ordem em que cada
-    # destino foi decidido (fase 2, depois fase 3).
+    # The file that already existed is notified before the new one: that is the order
+    # in which each destination was decided (phase 2, then phase 3).
     drive_files = resolucao.drive_existentes + novos_no_drive
 
     logger.debug("run %s: %d artefato(s) registrado(s) (%d no Drive).",
@@ -937,17 +943,17 @@ async def _register_artifacts(db, run: WorkflowRun, artifacts_meta: dict) -> Non
 
 
 async def _artefatos_ja_registrados(db, run: WorkflowRun) -> set[tuple]:
-    """Pares (node_id, filename) que este run ja gravou em Artifact.
+    """(node_id, filename) pairs this run already wrote to Artifact.
 
-    Idempotencia: se este payload for reentregue (dead letter reprocessado,
-    replay do outbox) nao queremos duplicar linhas.
+    Idempotence: if this payload is redelivered (reprocessed dead letter,
+    outbox replay) we do not want to duplicate rows.
 
-    Chave de dedup ESTAVEL (node_id, filename) no run, NAO a s3_key: artefato
-    local grava s3_key=None (keepLocal / local_fallback), entao a s3_key
-    derivada nunca casava com known e a reentrega recriava a linha. filename e
-    node_id existem em toda linha, local ou nao. Dentro de um run (ws/task
-    fixos) a s3_key derivada e 1:1 com o filename, entao a granularidade de
-    dedup do caso NAO-local nao muda.
+    STABLE dedup key (node_id, filename) within the run, NOT the s3_key: a local
+    artifact writes s3_key=None (keepLocal / local_fallback), so the derived
+    s3_key never matched known and the redelivery recreated the row. filename and
+    node_id exist on every row, local or not. Within a run (ws/task
+    fixed) the derived s3_key is 1:1 with the filename, so the dedup granularity
+    of the NON-local case does not change.
     """
     known_result = await db.execute(
         select(Artifact.node_id, Artifact.filename).where(Artifact.run_id == run.task_id)
@@ -956,13 +962,14 @@ async def _artefatos_ja_registrados(db, run: WorkflowRun) -> set[tuple]:
 
 
 def _sanear_artefatos(run: WorkflowRun, artifacts_meta: dict, known: set[tuple]) -> list[dict]:
-    """Fase 1: saneia o payload. Nenhum IO aqui.
+    """Phase 1: sanitize the payload. No IO here.
 
-    Devolve um dict por item que vira registro — node_id, item cru, s3_key
-    DERIVADA, filename saneado, se e local e o contexto —, sem o que nao e
-    objeto, sem nome invalido e sem repetido (no proprio lote ou ja em `known`).
+    Returns one dict per item that becomes a record — node_id, raw item, DERIVED
+    s3_key, sanitized filename, whether it is local and the context —, without
+    what is not an object, without invalid names and without repeats (within the
+    batch itself or already in `known`).
     """
-    # Copia: o lote tambem deduplica contra si mesmo, e `known` e de quem chama.
+    # Copy: the batch also deduplicates against itself, and `known` belongs to the caller.
     known = set(known)
     pendentes: list[dict] = []
     for node_id, items in artifacts_meta.items():
@@ -970,33 +977,33 @@ def _sanear_artefatos(run: WorkflowRun, artifacts_meta: dict, known: set[tuple])
             if not isinstance(item, dict):
                 continue
 
-            # Artefato mantido no disco do executor. Dois caminhos chegam aqui:
-            #   * keepLocal (no de saida com localidade=executor): politica LGPD,
+            # Artifact kept on the executor's disk. Two paths arrive here:
+            #   * keepLocal (output node with localidade=executor): LGPD policy,
             #     content_location='executor';
-            #   * local_fallback: o upload ao MinIO FALHOU e o fallback gravou os
-            #     bytes no MESMO lugar de um keepLocal
-            #     (artifacts_root()/{ws}/{task}/{arquivo}). O executor reporta
-            #     content_location='minio' de proposito (o destino ERA a nuvem),
-            #     mas o objeto nunca chegou la — registrar como 'minio' com a
-            #     s3_key derivada dava um download que respondia 404 para sempre.
-            #     Os bytes estao no executor, entao e como executor-local que este
-            #     artefato e servido (o download da plataforma nao busca conteudo
-            #     local — a UI mostra "Sem download", que e honesto, em vez de um
-            #     botao que quebra).
+            #   * local_fallback: the upload to MinIO FAILED and the fallback wrote
+            #     the bytes in the SAME place as a keepLocal
+            #     (artifacts_root()/{ws}/{task}/{arquivo}). The executor reports
+            #     content_location='minio' on purpose (the destination WAS the cloud),
+            #     but the object never got there — registering it as 'minio' with the
+            #     derived s3_key gave a download that answered 404 forever.
+            #     The bytes are on the executor, so this artifact is served as
+            #     executor-local (the platform download does not fetch local
+            #     content — the UI shows "Sem download" (no download), which is
+            #     honest, instead of a button that breaks).
             #
-            # Nao ha objeto no storage em nenhum dos dois: nada de derivar s3_key
-            # nem de HEAD.
+            # There is no object in storage in either of them: no s3_key derivation
+            # and no HEAD.
             #
-            # A FLAG e aceita do executor, mas o CAMINHO nao. Como a s3_key, o
-            # `local_path` e derivado aqui a partir de (workspace do run, task do
-            # run, nome saneado) — um caminho vindo pela rede voltaria depois
-            # para o executor na ordem de limpeza por retencao, e um `../` ali
-            # transformaria a retencao em delete arbitrario no disco do usuario.
+            # The FLAG is accepted from the executor, but the PATH is not. Like the
+            # s3_key, `local_path` is derived here from (the run's workspace, the
+            # run's task, sanitized name) — a path coming over the network would later
+            # go back to the executor in the retention cleanup order, and a `../`
+            # there would turn retention into an arbitrary delete on the user's disk.
             #
-            # Aceitar a flag em si e seguro: um executor comprometido que mentisse
-            # 'executor' apenas deixaria um objeto orfao no storage, e mentindo
-            # 'minio' geraria um download quebrado. Nenhum dos dois expoe dado de
-            # outro tenant, que e o que _derive_s3_key existe para impedir.
+            # Accepting the flag itself is safe: a compromised executor lying with
+            # 'executor' would only leave an orphan object in storage, and lying with
+            # 'minio' would produce a broken download. Neither exposes another
+            # tenant's data, which is what _derive_s3_key exists to prevent.
             local = (
                 item.get("content_location") == "executor"
                 or bool(item.get("local_fallback"))
@@ -1011,9 +1018,9 @@ def _sanear_artefatos(run: WorkflowRun, artifacts_meta: dict, known: set[tuple])
                     run.task_id, node_id, item.get("filename", ""),
                 )
                 continue
-            # O nome exibido tem de ser o MESMO do ultimo segmento da key: se
-            # o saneamento trocou algo, mostrar o nome cru faria a UI prometer
-            # um download que nao existe com aquele nome.
+            # The displayed name must be the SAME as the key's last segment: if
+            # sanitizing changed something, showing the raw name would make the UI
+            # promise a download that does not exist under that name.
             filename = s3_key.rsplit("/", 1)[-1]
             if (node_id, filename) in known:
                 continue
@@ -1031,20 +1038,20 @@ def _sanear_artefatos(run: WorkflowRun, artifacts_meta: dict, known: set[tuple])
 
 
 async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Resolucao:
-    """Fase 2: resolve banco e storage em lote.
+    """Phase 2: resolve database and storage in batch.
 
-    O executor devolve o id_hash da linha que /drive/executor-upload-url criou
-    OU reaproveitou. Ele e a guarda confiavel; a busca por s3_key nao serve
-    para o caso de sobrescrita.
+    The executor returns the id_hash of the row that /drive/executor-upload-url
+    created OR reused. It is the reliable guard; the lookup by s3_key does not
+    work for the overwrite case.
 
-    A key usada aqui e DERIVADA do task_id do run (ver _derive_s3_key, e o SEG
-    na docstring de _register_artifacts: a key vinda do executor e ignorada de
-    proposito). Quando o upload sobrescreveu um arquivo existente, a linha
-    manteve a s3_key ORIGINAL — de um run antigo — e a derivada nao casa com
-    ela. A guarda entao nao encontrava nada e nascia uma linha nova a cada
-    execucao, apontando para uma key onde o PUT nunca escreveu. No run seguinte
-    essa orfa era a mais recente do workspace, virava alvo da sobrescrita, e o
-    ciclo se repetia.
+    The key used here is DERIVED from the run's task_id (see _derive_s3_key, and
+    the SEC note in the _register_artifacts docstring: the key coming from the
+    executor is ignored on purpose). When the upload overwrote an existing file,
+    the row kept the ORIGINAL s3_key — from an old run — and the derived one does
+    not match it. The guard then found nothing and a new row was born on every
+    execution, pointing to a key where the PUT never wrote. On the following run
+    that orphan was the newest in the workspace, became the overwrite target,
+    and the cycle repeated.
     """
     from app.models.workspace_file import WorkspaceFile
 
@@ -1058,9 +1065,9 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
         res = await db.execute(
             select(WorkspaceFile).where(
                 WorkspaceFile.id_hash.in_(drive_ids),
-                # Confirma no BANCO que a linha existe e e deste workspace: o id
-                # vem do executor, entao nao vale por si so. Se nao casar, segue
-                # o fluxo normal.
+                # Confirm in the DATABASE that the row exists and belongs to this workspace:
+                # the id comes from the executor, so it is not valid on its own. If it
+                # does not match, follow the normal flow.
                 WorkspaceFile.workspace_id == run.workspace_id,
             )
         )
@@ -1068,7 +1075,7 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
 
     keys_ja_no_drive: set[str] = set()
     if drive_pendentes:
-        # Rede para caminhos que nao passaram pelo executor-upload-url.
+        # Safety net for paths that did not go through executor-upload-url.
         res = await db.execute(
             select(WorkspaceFile.s3_key).where(
                 WorkspaceFile.s3_key.in_([p["s3_key"] for p in drive_pendentes])
@@ -1076,8 +1083,8 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
         )
         keys_ja_no_drive = set(res.scalars().all())
 
-    # Decide o destino de cada item ANTES de ir ao storage: assim os HEADs so
-    # acontecem para o que de fato vira linha nova.
+    # Decide each item's destination BEFORE going to storage: that way the HEADs
+    # only happen for what actually becomes a new row.
     a_criar: list[dict] = []
     # (linha, acao) — a acao distingue arquivo novo de sobrescrita.
     drive_existentes: list[tuple[WorkspaceFile, str]] = []
@@ -1087,21 +1094,21 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
             continue
         linha = linhas_por_id.get(p["item"].get("drive_file_id"))
         if linha is not None:
-            # A linha ja existe, mas o executor ainda precisa ser avisado:
-            # `agent_confirm_upload` emite o evento com exclude_agent_id=<executor
-            # que subiu>, e ha um unico target_executor_id por workspace —
-            # normalmente o mesmo. O evento morre ali. Isso e correto para o
-            # GeoSync, que sobe o que ja tem em disco (uploader.py usa o MESMO
-            # endpoint, entao o servidor nao distingue as origens), mas nao para
-            # um artefato de run: o DataOutput produziu o arquivo em memoria e o
-            # executor nao o tem localmente. Sem esta emissao, um workspace com
-            # SYNC_MODE download/bidirectional deixa de receber o arquivo.
+            # The row already exists, but the executor still needs to be notified:
+            # `agent_confirm_upload` emits the event with exclude_agent_id=<executor
+            # that uploaded>, and there is a single target_executor_id per workspace —
+            # usually the same one. The event dies there. That is correct for
+            # GeoSync, which uploads what it already has on disk (uploader.py uses the
+            # SAME endpoint, so the server does not tell the origins apart), but not
+            # for a run artifact: the DataOutput produced the file in memory and the
+            # executor does not have it locally. Without this emission, a workspace
+            # with SYNC_MODE download/bidirectional stops receiving the file.
             drive_existentes.append(
                 (linha, "file_updated" if p["item"].get("drive_reused") else "file_created")
             )
             continue
         if p["s3_key"] in keys_ja_no_drive:
-            continue  # Já registrado pelo executor-upload-url/confirm
+            continue  # Already registered by executor-upload-url/confirm
         a_criar.append(p)
 
     tamanhos = await _head_sizes([p["s3_key"] for p in a_criar if not p["local"]])
@@ -1111,10 +1118,10 @@ async def _resolver_em_lote(db, run: WorkflowRun, pendentes: list[dict]) -> _Res
 async def _persistir_artefatos(
     db, run: WorkflowRun, resolucao: _Resolucao, *, expires_at, executor_id: str | None,
 ) -> list[tuple]:
-    """Fase 3: monta as linhas e persiste com um unico commit.
+    """Phase 3: build the rows and persist with a single commit.
 
-    Devolve os arquivos NOVOS do Drive que tem objeto no storage, como
-    (WorkspaceFile, "file_created"), para o aviso aos executores.
+    Returns the NEW Drive files that have an object in storage, as
+    (WorkspaceFile, "file_created"), for the notification to the executors.
     """
     from app.models.workspace_file import WorkspaceFile
 
@@ -1123,27 +1130,28 @@ async def _persistir_artefatos(
         item, s3_key, filename = p["item"], p["s3_key"], p["filename"]
 
         if p["local"]:
-            # O executor informa o tamanho: nao ha objeto para consultar, e um
-            # HEAD aqui falharia a cada artefato local, poluindo o log com um
-            # WARNING por execucao.
+            # The executor reports the size: there is no object to query, and a
+            # HEAD here would fail for every local artifact, polluting the log with
+            # one WARNING per execution.
             bruto = item.get("size_bytes")
             size_bytes = bruto if isinstance(bruto, int) and bruto >= 0 else None
         else:
             size_bytes = resolucao.tamanhos.get(s3_key)
 
         if p["context"] == "drive":
-            # Destino: Drive do Workspace (sincroniza com executores)
+            # Destination: Workspace Drive (syncs with executors)
             ext = filename.rsplit(".", 1)[-1] if "." in filename else ""
             mime = "application/geo+json" if ext == "geojson" else "application/json"
             if p["local"]:
-                # Upload ao Drive falhou e caiu no fallback local: os bytes estao
-                # no disco do executor, nunca chegaram ao MinIO. Um WorkspaceFile
-                # 'confirmed' com a s3_key derivada daria um download 404 — e o
-                # size_bytes o faria parecer ainda mais real. Registra-se como
-                # CATALOGO (content_location='executor', sem s3_key), a mesma
-                # representacao de /drive/executor-register: aparece no Drive com
-                # o selo local e sem download, em vez de um botao que quebra. NAO
-                # entra nos avisos — nao ha objeto para outro executor baixar.
+                # The upload to the Drive failed and fell back to local: the bytes are
+                # on the executor's disk and never reached MinIO. A 'confirmed'
+                # WorkspaceFile with the derived s3_key would give a 404 download — and
+                # size_bytes would make it look even more real. It is registered as
+                # a CATALOG entry (content_location='executor', no s3_key), the same
+                # representation as /drive/executor-register: it shows up in the Drive
+                # with the local badge and no download, instead of a button that
+                # breaks. It does NOT go into the notifications — there is no object
+                # for another executor to download.
                 wf = WorkspaceFile(
                     workspace_id        = run.workspace_id,
                     s3_key              = None,
@@ -1182,11 +1190,11 @@ async def _persistir_artefatos(
                 format           = item.get("format"),
                 size_bytes       = size_bytes,
                 features         = item.get("features"),
-                # Artefato local nao tem objeto: gravar a key derivada faria
-                # a UI oferecer um download que responderia 404 no MinIO.
+                # A local artifact has no object: writing the derived key would make
+                # the UI offer a download that would answer 404 from MinIO.
                 s3_key           = None if p["local"] else s3_key,
                 content_location = "executor" if p["local"] else "minio",
-                # Derivado, nunca o que o executor mandou — ver a nota acima.
+                # Derived, never what the executor sent — see the note above.
                 local_path       = (
                     f"{run.workspace_id}/{run.task_id}/{filename}" if p["local"] else None
                 ),
@@ -1197,18 +1205,18 @@ async def _persistir_artefatos(
                 expires_at       = expires_at,
             ))
 
-    # Sem linha nova nao ha o que commitar — o caso da reentrega, em que tudo ja
-    # estava registrado, deixa de pagar uma transacao a toa.
+    # No new row means nothing to commit — the redelivery case, where everything
+    # was already registered, no longer pays for a pointless transaction.
     if resolucao.a_criar:
         await db.commit()
     return novos_no_drive
 
 
 async def _avisar_drive(drive_files: list[tuple]) -> None:
-    """Notifica executores sobre arquivos adicionados ao Drive.
+    """Notify executors about files added to the Drive.
 
-    Roda depois do commit: um aviso que falha vira WARNING e nao impede os
-    seguintes — as linhas ja estao gravadas.
+    Runs after the commit: a notification that fails becomes a WARNING and does
+    not prevent the following ones — the rows are already written.
     """
     from app.core.drive_events import emit_drive_event
 
@@ -1222,8 +1230,8 @@ async def _avisar_drive(drive_files: list[tuple]) -> None:
                     "original_name": wf.original_name,
                     "extension": wf.extension,
                     "size": wf.size or 0,
-                    # O GeoSync usa o md5 para decidir se precisa rebaixar o
-                    # arquivo; sem ele, toda sobrescrita forca um download.
+                    # GeoSync uses the md5 to decide whether it needs to re-download the
+                    # file; without it, every overwrite forces a download.
                     "content_md5": wf.content_md5,
                 },
             )
@@ -1234,20 +1242,20 @@ async def _avisar_drive(drive_files: list[tuple]) -> None:
 async def account_terminal_run(
     db, run: WorkflowRun, stats: dict | None = None, *, first_close: bool = True
 ) -> None:
-    """Contabiliza no usage_daily um run fechado FORA do consumer.
+    """Account in usage_daily for a run closed OUTSIDE the consumer.
 
-    A fila run_results e alimentada por um unico ponto (`_handle_job_result` no
-    WS router), mas ha caminhos que gravam status terminal direto no Postgres e
-    nunca passam por ela: falha de despacho, run cancelado antes de chegar a um
-    executor e o watchdog de executor desconectado. Sem este helper esses runs
-    ficavam fora de `total_runs`/`failed_runs` — o dashboard mostrava o
-    workspace mais saudavel do que ele e, e o billing subfaturava.
+    The run_results queue is fed by a single point (`_handle_job_result` in the
+    WS router), but there are paths that write a terminal status directly to
+    Postgres and never go through it: dispatch failure, a run cancelled before
+    reaching an executor and the disconnected-executor watchdog. Without this
+    helper those runs were left out of `total_runs`/`failed_runs` — the dashboard
+    showed the workspace healthier than it is, and billing undercharged.
 
-    Chame DEPOIS de gravar o status terminal (a classificacao le `run.status`) e
-    so quando a transicao foi mesmo pending/running -> terminal. Falhar aqui nao
-    pode derrubar o chamador: o fechamento do run e mais importante que o
-    agregado, e engolir a excecao aqui evita mascarar o erro original que levou
-    o run a ser fechado.
+    Call it AFTER writing the terminal status (the classification reads
+    `run.status`) and only when the transition really was pending/running ->
+    terminal. Failing here must not bring down the caller: closing the run is
+    more important than the aggregate, and swallowing the exception here avoids
+    masking the original error that led to the run being closed.
     """
     try:
         await _upsert_usage_daily(db, run, stats or {}, first_close)
@@ -1263,21 +1271,21 @@ async def account_terminal_run(
 
 
 async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bool) -> None:
-    """Contabiliza o run no agregado diario de uso do workspace.
+    """Account for the run in the workspace's daily usage aggregate.
 
-    Antes este upsert vivia DENTRO de _persist_metrics, que so roda quando o
-    executor manda '__metrics__'. Como o caminho de falha nao produzia metricas,
-    NENHUMA falha era contabilizada e o dashboard mostrava 0% de erro para
-    sempre. Agora roda para todo item da fila run_results, com o status real do
-    run (success/failed/cancelled), mesmo sem metricas — nesse caso os
-    contadores de recurso entram zerados, mas o run aparece no total e na taxa
-    de erro.
+    This upsert used to live INSIDE _persist_metrics, which only runs when the
+    executor sends '__metrics__'. Since the failure path produced no metrics,
+    NO failure was ever counted and the dashboard showed a 0% error rate
+    forever. Now it runs for every item of the run_results queue, with the run's
+    actual status (success/failed/cancelled), even without metrics — in that case
+    the resource counters go in as zero, but the run shows up in the total and in
+    the error rate.
 
-    Fila NAO e sinonimo de "todo run que termina": os fechamentos feitos direto
-    no Postgres entram por `account_terminal_run`, nao por aqui.
+    The queue is NOT a synonym for "every run that finishes": closes done directly
+    in Postgres come in through `account_terminal_run`, not through here.
 
-    `first_close` e a guarda de idempotencia: so contabiliza na primeira
-    transicao pending/running -> terminal. Reentregas nao inflam o billing.
+    `first_close` is the idempotence guard: it only counts on the first
+    pending/running -> terminal transition. Redeliveries do not inflate billing.
     """
     from app.models.run_metrics import UsageDaily
     from sqlalchemy import update as sa_update
@@ -1286,8 +1294,8 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
         logger.debug("run %s: resultado reentregue — usage_daily nao recontado.", run.task_id)
         return
     if not run.workspace_id:
-        # usage_daily.workspace_id e NOT NULL — run sem workspace nao tem a quem
-        # ser atribuido no agregado.
+        # usage_daily.workspace_id is NOT NULL — a run without a workspace has nobody
+        # to be attributed to in the aggregate.
         return
 
     run_data = ((stats or {}).get("__metrics__") or {}).get("run") or {}
@@ -1300,18 +1308,18 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
     mem_avg = _numero_finito(run_data.get("mem_avg_mb"))
     duration_s = duration_ms / 1000
 
-    # Um run cancelado pelo usuário não é sucesso nem falha: contá-lo como
-    # falha inflaria a taxa de erro do workspace com uma decisão deliberada.
+    # A run cancelled by the user is neither a success nor a failure: counting it as
+    # a failure would inflate the workspace's error rate with a deliberate decision.
     _success = run.status == "success"
     _cancelled = run.status == "cancelled"
 
-    # A data em UTC, como o resto do pipeline (`run.end_time`, métricas). Antes
-    # `date.today()` usava o fuso local do container, deslocando a contagem para o
-    # dia errado perto da meia-noite.
+    # The date in UTC, like the rest of the pipeline (`run.end_time`, metrics).
+    # Previously `date.today()` used the container's local time zone, shifting the
+    # count to the wrong day near midnight.
     today = utc_now_naive().date()
 
-    # A contribuição deste run, como um mapa coluna -> incremento. Serve tanto ao
-    # UPDATE atômico (soma no SQL) quanto aos valores da 1ª linha (INSERT).
+    # This run's contribution, as a column -> increment map. It serves both the
+    # atomic UPDATE (sum in SQL) and the values of the first row (INSERT).
     incrementos = {
         "total_runs": 1,
         "successful_runs": 1 if _success else 0,
@@ -1326,10 +1334,10 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
     }
 
     async def _incrementar() -> int:
-        # UPDATE atômico (`coluna = coluna + delta` no SQL), não o
-        # ler-modificar-gravar em Python de antes: o incremento não se perde
-        # quando o consumer e um `account_terminal_run` concorrente (sessões
-        # separadas) fecham runs do mesmo workspace/dia ao mesmo tempo.
+        # Atomic UPDATE (`coluna = coluna + delta` in SQL), not the earlier
+        # read-modify-write in Python: the increment is not lost when the
+        # consumer and a concurrent `account_terminal_run` (separate sessions)
+        # close runs of the same workspace/day at the same time.
         result = await db.execute(
             sa_update(UsageDaily)
             .where(
@@ -1344,18 +1352,18 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
         return result.rowcount or 0
 
     if await _incrementar() == 0:
-        # A linha do dia ainda não existe: cria. SAVEPOINT (não um `try` solto):
-        # com a UniqueConstraint(date, workspace_id), duas sessões leem "não
-        # existe" ao mesmo tempo e o 2º INSERT viola a constraint — no Postgres
-        # isso envenenaria a transação inteira. O savepoint isola a falha (mesmo
-        # padrão de `_upsert_pin_artifact`); quem perde a corrida do INSERT
-        # re-tenta o UPDATE atômico sobre a linha que o vencedor criou.
+        # The day's row does not exist yet: create it. SAVEPOINT (not a loose `try`):
+        # with UniqueConstraint(date, workspace_id), two sessions read "does not
+        # exist" at the same time and the second INSERT violates the constraint — in
+        # Postgres that would poison the whole transaction. The savepoint isolates
+        # the failure (same pattern as `_upsert_pin_artifact`); whoever loses the
+        # INSERT race retries the atomic UPDATE on the row the winner created.
         try:
             async with db.begin_nested():
                 db.add(UsageDaily(date=today, workspace_id=run.workspace_id, **incrementos))
                 await db.flush()
         except IntegrityError:
-            if await _incrementar() == 0:  # pragma: no cover - a linha vencedora sumiu no meio
+            if await _incrementar() == 0:  # pragma: no cover - the winning row vanished midway
                 raise
 
     await db.commit()
@@ -1363,18 +1371,18 @@ async def _upsert_usage_daily(db, run: WorkflowRun, stats: dict, first_close: bo
 
 
 def _ip_do_payload(payload: dict) -> str | None:
-    """`executor_ip` do resultado, só se for um IP que cabe na coluna (45)."""
+    """The result's `executor_ip`, only if it is an IP that fits the column (45)."""
     return _ip_valido(payload.get("executor_ip"))
 
 
 def _ip_valido(valor) -> str | None:
-    """IP na forma canônica, ou None.
+    """The IP in canonical form, or None.
 
-    A fila `run_results` também recebe payloads de fora do WebSocket (dead
-    letter reprocessado, redis-cli): o que não for IP vira None. IPv6 com
-    zona (`fe80::1%eth0`) também: a zona é texto livre, de qualquer tamanho,
-    e estouraria o VARCHAR(45) — o INSERT falharia e o run perderia as
-    métricas.
+    The `run_results` queue also receives payloads from outside the WebSocket
+    (reprocessed dead letter, redis-cli): anything that is not an IP becomes None.
+    So does IPv6 with a zone (`fe80::1%eth0`): the zone is free text, of any
+    length, and would overflow the VARCHAR(45) — the INSERT would fail and the
+    run would lose its metrics.
     """
     if not isinstance(valor, str):
         return None
@@ -1389,23 +1397,23 @@ def _ip_valido(valor) -> str | None:
 
 
 async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -> None:
-    """Persiste metricas de execucao nas tabelas workflow_run_metrics e node_run_metrics.
+    """Persist execution metrics in the workflow_run_metrics and node_run_metrics tables.
 
-    O agregado usage_daily NAO e escrito aqui — foi extraido para
-    _upsert_usage_daily, que roda sempre (com ou sem metricas).
+    The usage_daily aggregate is NOT written here — it was extracted into
+    _upsert_usage_daily, which always runs (with or without metrics).
 
-    Excecoes sobem para _run_phase, que loga e faz o rollback: engoli-las aqui
-    (como era antes) deixava a sessao invalida e derrubava artefatos, pins e
-    webhook em cascata.
+    Exceptions propagate to _run_phase, which logs and rolls back: swallowing them
+    here (as before) left the session invalid and took down artifacts, pins and
+    webhook in cascade.
     """
     from app.models.run_metrics import WorkflowRunMetrics, NodeRunMetrics
 
-    # O mesmo saneamento do node_stats, agora no dicionário inteiro: o bbox de
-    # node_run_metrics e o spatial_summary/operation_types de
-    # workflow_run_metrics são colunas JSON, e um NaN vindo de QUALQUER métrica
-    # fazia o Postgres recusar o INSERT ("Token NaN is invalid") — 37 resultados
-    # foram parar na fila morta por isso antes do `_bbox_finito` do collector.
-    # Aqui não depende de o executor estar atualizado.
+    # The same sanitizing as node_stats, now on the whole dictionary: the bbox of
+    # node_run_metrics and the spatial_summary/operation_types of
+    # workflow_run_metrics are JSON columns, and a NaN coming from ANY metric
+    # made Postgres reject the INSERT ("Token NaN is invalid") — 37 results
+    # ended up in the dead-letter queue because of it before the collector's
+    # `_bbox_finito`. Here it does not depend on the executor being up to date.
     metrics = _json_seguro(metrics or {})
     run_data = metrics.get("run", {})
     nodes_data = metrics.get("nodes", {})
@@ -1416,8 +1424,8 @@ async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -
         logger.warning("run %s sem workspace_id — metricas nao persistidas.", run.task_id)
         return
 
-    # Idempotencia: run_id tem UNIQUE em workflow_run_metrics; uma reentrega
-    # estouraria IntegrityError e mataria as fases seguintes.
+    # Idempotence: run_id is UNIQUE in workflow_run_metrics; a redelivery
+    # would raise IntegrityError and kill the following phases.
     exists = await db.execute(
         select(WorkflowRunMetrics.id).where(WorkflowRunMetrics.run_id == run.task_id)
     )
@@ -1435,11 +1443,11 @@ async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -
             select(Executor.name).where(Executor.id_hash == _agent_id)
         )
         _agent_name = _ag_result.scalar_one_or_none()
-        # O IP vem no payload, escrito pelo worker que segura o WebSocket.
-        # Este consumer roda em qualquer um dos quatro workers: o registro
-        # local só serve quando o payload não traz um IP válido (resultado
-        # enfileirado antes deste campo existir, dead letter reprocessado) —
-        # e só acerta quando este worker segura a conexão do executor.
+        # The IP comes in the payload, written by the worker holding the WebSocket.
+        # This consumer runs on any of the four workers: the local registry
+        # is only used when the payload does not carry a valid IP (result
+        # queued before this field existed, reprocessed dead letter) —
+        # and it is only right when this worker holds the executor's connection.
         _agent_ip = _ip_do_payload(payload)
         if _agent_ip is None:
             try:
@@ -1448,7 +1456,7 @@ async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -
                 if _conn:
                     _agent_ip = _ip_valido(_conn.executor_ip)
             except Exception as exc:
-                # Registro em memoria: falhar aqui nao justifica perder a metrica.
+                # In-memory registry: failing here does not justify losing the metric.
                 logger.warning("Falha ao obter IP do executor '%s': %s", _agent_id, exc)
 
     # ── workflow_run_metrics ─────────────────────────────────────────────────
@@ -1476,9 +1484,9 @@ async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -
         operation_types=run_data.get("operation_types"),
         spatial_summary=spatial_summary,
         status=run.status,
-        # error_category vem da taxonomia de erro do flow (publicada pelo WS
-        # router). O codigo anterior gravava type(str).__name__ — sempre "str",
-        # o que tornava a coluna inutil para agrupar falhas.
+        # error_category comes from the flow error taxonomy (published by the WS
+        # router). The previous code wrote type(str).__name__ — always "str",
+        # which made the column useless for grouping failures.
         error_type=payload.get("error_category") or ("error" if run.error_message else None),
     )
     db.add(wrm)
@@ -1512,16 +1520,16 @@ async def _persist_metrics(db, run: WorkflowRun, metrics: dict, payload: dict) -
 
 
 async def _consume_one(r: aioredis.Redis, queue: str, handler) -> None:
-    """Lê um item da fila e chama o handler. Gerencia retry e dead letter."""
+    """Read one item from the queue and call the handler. Manages retry and dead letter."""
     item = await r.brpop(queue, timeout=2)
     if not item:
         return
 
     raw = item[1]
     try:
-        # `stats` do job_result vai até ~4MB; o dumps já é offloadado no
-        # produtor, e o loads de um payload grande também congela o event loop
-        # (o consumer roda no mesmo loop do worker). Acima do limiar, para thread.
+        # The job_result `stats` goes up to ~4MB; the dumps is already offloaded in the
+        # producer, and the loads of a large payload also freezes the event loop
+        # (the consumer runs on the worker's same loop). Above the threshold, to a thread.
         if len(raw) > _JSON_OFFLOAD_THRESHOLD:
             payload = await asyncio.to_thread(json.loads, raw)
         else:
@@ -1536,7 +1544,7 @@ async def _consume_one(r: aioredis.Redis, queue: str, handler) -> None:
             ok = await handler(db, payload)
 
         if ok is False:
-            # run_result chegou antes do run_create ser processado
+            # run_result arrived before run_create was processed
             retries = payload.get("_retry", 0) + 1
             if retries > _MAX_RESULT_RETRIES:
                 logger.error(
@@ -1550,12 +1558,12 @@ async def _consume_one(r: aioredis.Redis, queue: str, handler) -> None:
                 await r.lpush(queue, json.dumps(payload))
 
     except PhaseFailure as exc:
-        # O run principal ja foi fechado; o que faltou foram efeitos acessorios.
-        # Nao ha o que re-tentar automaticamente (o status ja e terminal), mas o
-        # payload anotado precisa sobrar em algum lugar: e a unica pista de que
-        # aquele run ficou sem artefato/metrica/webhook. O reprocesso manual e
-        # seguro — usage_daily tem a guarda first_close e as demais fases sao
-        # idempotentes por chave.
+        # The main run was already closed; what was missing were auxiliary effects.
+        # There is nothing to retry automatically (the status is already terminal),
+        # but the annotated payload needs to remain somewhere: it is the only clue
+        # that the run was left without artifact/metric/webhook. Manual reprocessing
+        # is safe — usage_daily has the first_close guard and the other phases are
+        # idempotent by key.
         logger.error("Item da fila %s parcialmente processado: %s", queue, exc)
         await r.lpush(
             QUEUE_DEAD_LETTER,
@@ -1570,26 +1578,26 @@ async def _consume_one(r: aioredis.Redis, queue: str, handler) -> None:
         await r.lpush(QUEUE_DEAD_LETTER, raw)
 
 
-# Backoff exponencial para reconnect ao Redis: 1s, 2s, 4s, 8s, 16s, 30s (cap)
+# Exponential backoff for reconnecting to Redis: 1s, 2s, 4s, 8s, 16s, 30s (cap)
 _RECONNECT_DELAYS = [1, 2, 4, 8, 16, 30]
 
 
 async def run_consumer_loop() -> None:
     """
-    Loop principal — iniciado como background task no lifespan da API.
-    Processa run_results (fila run_creates foi eliminada — runs sao criados
-    sincronamente no _dispatch_job).
+    Main loop — started as a background task in the API lifespan.
+    Processes run_results (the run_creates queue was eliminated — runs are created
+    synchronously in _dispatch_job).
 
-    Resiliencia a falhas de Redis: se a conexao cai, faz reconnect com
-    backoff exponencial em vez de morrer e exigir restart manual da API.
-    Cancelamento propaga normalmente via CancelledError.
+    Resilience to Redis failures: if the connection drops, it reconnects with
+    exponential backoff instead of dying and requiring a manual API restart.
+    Cancellation propagates normally via CancelledError.
     """
     attempt = 0
     while True:
         r = None
         try:
             r = aioredis.from_url(REDIS_URL, decode_responses=True)
-            # Ping para validar conexao antes de logar 'iniciado'
+            # Ping to validate the connection before logging 'iniciado' (started)
             await r.ping()
             logger.info("Consumer run_results iniciado." if attempt == 0
                         else "Consumer run_results reconectado (tentativa %d)." % attempt)
@@ -1597,7 +1605,7 @@ async def run_consumer_loop() -> None:
             while True:
                 await _consume_one(r, QUEUE_RESULTS, _process_result)
         except asyncio.CancelledError:
-            # Shutdown da API — propaga sem reconectar
+            # API shutdown — propagate without reconnecting
             logger.info("Consumer run_results encerrado (cancelado).")
             return
         except RedisConnectionError as exc:

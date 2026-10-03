@@ -4,19 +4,21 @@ import { cn } from "@/lib/utils"
 import { useTextosDaCasca } from "./i18n/da-casca"
 
 /**
- * A linha das três listas do grupo Meus (Chats, Agendamentos, Artefatos) — UMA
- * só, para as três falarem a mesma língua. O desenho é o que Artefatos já
- * tinha: um flex em que o principal (botão ou `<div>`) é `min-w-0 flex-1` e o
- * "⋯" é IRMÃO com `shrink-0`. Nunca `absolute`: um "⋯" absoluto com o espaço
- * reservado à mão (`pr-7`) dava folga ZERO no desktop (28px = right-1 + size-6)
- * e, no telefone, 16px de texto por baixo do botão de 40px. Irmão no flex ele
- * ocupa espaço de verdade, e no telefone só empurra o texto.
+ * The row of the three lists in the Mine group (Chats, Schedules, Artifacts) —
+ * ONE row only, so the three speak the same language. The design is what
+ * Artifacts already had: a flex in which the main element (button or `<div>`)
+ * is `min-w-0 flex-1` and the "⋯" is a SIBLING with `shrink-0`. Never
+ * `absolute`: an absolute "⋯" with the space reserved by hand (`pr-7`) left
+ * ZERO slack on desktop (28px = right-1 + size-6) and, on the phone, 16px of
+ * text under the 40px button. As a flex sibling it takes real space, and on the
+ * phone it just pushes the text.
  *
- * É `<div>`, não `<li>`: nas listas comuns vai dentro de `SidebarMenuSubItem`;
- * Artefatos o reusa dentro do `div[role=listitem]` da lista virtual.
+ * It is a `<div>`, not an `<li>`: in the regular lists it goes inside
+ * `SidebarMenuSubItem`; Artifacts reuses it inside the virtual list's
+ * `div[role=listitem]`.
  *
- * `ativa` pinta o fundo pelo `data-active`. O `aria-current` fica no BOTÃO da
- * lista (o focável que o leitor de tela anuncia), não aqui.
+ * `ativa` paints the background via `data-active`. The `aria-current` stays on
+ * the list's BUTTON (the focusable element the screen reader announces), not here.
  */
 export function LinhaDoMeu({
   ativa = false,
@@ -37,12 +39,12 @@ export function LinhaDoMeu({
 }
 
 /**
- * O "⋯" da linha, filho de `DropdownMenuTrigger asChild` — o `ref` e os
- * atributos do gatilho chegam em `props`, como qualquer prop no React 19. Some
- * até o hover da LINHA (`group-hover/linha`), ao foco, no toque (`coarse:`, onde
- * não há hover para revelar) e enquanto o menu está aberto. 40px no telefone
- * (§5 do padrão de telas): ocupando espaço no flex, o alvo maior empurra o
- * texto em vez de cobri-lo.
+ * The row's "⋯", child of `DropdownMenuTrigger asChild` — the `ref` and the
+ * trigger attributes arrive in `props`, like any prop in React 19. Hidden
+ * until the ROW is hovered (`group-hover/linha`), on focus, on touch (`coarse:`,
+ * where there is no hover to reveal it) and while the menu is open. 40px on the
+ * phone (§5 of the screen patterns): taking space in the flex, the bigger
+ * target pushes the text instead of covering it.
  */
 export function GatilhoDeAcoes({
   rotulo,

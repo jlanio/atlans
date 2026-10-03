@@ -1,21 +1,23 @@
 "use client"
 
 /**
- * Visibilidade global de execuções em andamento.
+ * Global visibility of runs in progress.
  *
- * Faz polling de /observability/runs?status=running (leve — só runs vivos, e o
- * backend já escopa pelo usuário) e, cruzando com os workflows do workspace atual,
- * expõe quais estão "rodando agora". Um único mecanismo alimenta três coisas:
- *   - o pill ao vivo no card de cada workflow (runningHashes)
- *   - o indicador "N execuções" no sidebar (runningRuns / runningCount)
- *   - a notificação ao concluir em background
+ * Polls /observability/runs?status=running (lightweight — only live runs, and
+ * the backend already scopes by user) and, crossing that with the workflows of
+ * the current workspace, exposes which ones are "running now". A single
+ * mechanism feeds three things:
+ *   - the live pill on each workflow's card (runningHashes)
+ *   - the "N runs" indicator in the sidebar (runningRuns / runningCount)
+ *   - the notification when a run finishes in the background
  *
- * Conclusão é detectada quando um run some do conjunto "running"; o status final
- * (sucesso/falha) vem de um getRunDetail pontual (só nesse momento, raro), evitando
- * baixar centenas de registros a cada tick só para achar terminais.
+ * Completion is detected when a run drops out of the "running" set; the final
+ * status (success/failure) comes from a one-off getRunDetail (only at that
+ * moment, which is rare), avoiding downloading hundreds of records every tick
+ * just to find terminal ones.
  *
- * O workflow_name é admin-only em /observability/runs, por isso cruzamos com
- * getWorkflows para ter os nomes (e para escopar ao workspace atual).
+ * workflow_name is admin-only in /observability/runs, so we cross with
+ * getWorkflows to get the names (and to scope to the current workspace).
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -26,38 +28,38 @@ export interface RunningRun {
   runId: string
   workflowHash: string
   name: string
-  /** ISO de `started_at`; nulo enquanto o run está na fila. */
+  /** ISO `started_at`; null while the run is in the queue. */
   startedAt: string | null
   /** `trigger_source` do run (manual, schedule, webhook, retry). */
   triggerSource: string | null
-  /** Nome amigável do executor; nulo sem host. */
+  /** Friendly name of the executor; null without a host. */
   executorName: string | null
 }
 
-// O que se guarda de cada run vivo entre um poll e outro. Além do nome, os
-// três campos que a lista de Projetos mostra na linha "em execução" (spec
-// projetos §2.3) — `/observability/runs` já os devolve, então custam zero.
+// What is kept of each live run between one poll and the next. Besides the
+// name, the three fields the Projects list shows on the "running" row (projects
+// spec §2.3) — `/observability/runs` already returns them, so they cost nothing.
 type RunVivo = Pick<RunningRun, "name" | "startedAt" | "triggerSource" | "executorName"> & { hash: string }
 
 interface ActiveRunsValue {
-  /** Set de id_hash dos workflows com run vivo no workspace. */
+  /** Set of id_hash of the workflows with a live run in the workspace. */
   runningHashes: Set<string>
-  /** Runs vivos do workspace atual, com nome resolvido. */
+  /** Live runs of the current workspace, with the name resolved. */
   runningRuns: RunningRun[]
-  /** Nº de execuções em andamento. */
+  /** Number of runs in progress. */
   runningCount: number
-  /** Força um poll imediato (ex.: logo após um disparo rápido na lista). */
+  /** Forces an immediate poll (e.g. right after a quick trigger from the list). */
   refresh: () => void
 }
 
 const ActiveRunsContext = createContext<ActiveRunsValue | undefined>(undefined)
 
-// Cadência com a aba em foco e algum run vivo — é quando o usuário está de fato
-// esperando o resultado aparecer.
+// Cadence with the tab focused and some run alive — that is when the user is
+// actually waiting for the result to show up.
 const POLL_MS = 10_000
-// Cadência quando não há run algum rodando, que é o caso comum. Este provider
-// vive no layout do dashboard, então roda em TODAS as telas: sem o degrau, uma
-// aba ociosa esquecida gerava ~8.600 requests/dia sozinha.
+// Cadence when no run at all is running, which is the common case. This
+// provider lives in the dashboard layout, so it runs on EVERY screen: without
+// the step down, a forgotten idle tab generated ~8,600 requests/day on its own.
 const IDLE_POLL_MS = 30_000
 const LIMIT = 200
 const TERMINAL = new Set(["success", "failed"])
@@ -70,7 +72,7 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
   const [runningHashes, setRunningHashes] = useState<Set<string>>(new Set())
   const [runningRuns, setRunningRuns] = useState<RunningRun[]>([])
 
-  // Poll manual sem esperar o intervalo (setado dentro do efeito).
+  // Manual poll without waiting for the interval (set inside the effect).
   const pollRef = useRef<() => void>(() => {})
 
   useEffect(() => {
@@ -83,44 +85,48 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
     let alive = true
     let timer: ReturnType<typeof setTimeout> | null = null
     let namesByHash = new Map<string, string>()
-    // Hashes que já tentamos resolver e continuam ausentes de namesByHash. O
-    // poll traz runs de TODOS os workspaces do usuário (o backend escopa por
-    // usuário), mas namesByHash só tem os workflows do workspace ATIVO — então
-    // um run vivo de OUTRO workspace nunca entra no mapa e, sem esta memória,
-    // forçava um getWorkflows() completo a cada tick enquanto vivesse.
+    // Hashes we have already tried to resolve and are still missing from
+    // namesByHash. The poll brings runs from ALL of the user's workspaces (the
+    // backend scopes by user), but namesByHash only has the workflows of the
+    // ACTIVE workspace — so a live run from ANOTHER workspace never enters the
+    // map and, without this memory, forced a full getWorkflows() on every tick
+    // for as long as it lived.
     //
-    // `hash -> instante da tentativa`, com TTL (não `Set` permanente): um
-    // workflow recém-criado pode ainda não constar no getWorkflows (consistência
-    // eventual). Sem expirar, ele ficaria sem nome pelo resto da sessão; com o
-    // TTL, um tick posterior re-tenta e o nome aparece assim que o backend o lista.
+    // `hash -> time of the attempt`, with a TTL (not a permanent `Set`): a
+    // freshly created workflow may not yet show up in getWorkflows (eventual
+    // consistency). Without expiry, it would stay nameless for the rest of the
+    // session; with the TTL, a later tick retries and the name appears as soon
+    // as the backend lists it.
     const tentados = new Map<string, number>()
     const TENTADO_TTL_MS = 60_000
-    // run_id -> {hash, name} dos runs vivos no ÚLTIMO poll. Reconstruído a cada
-    // tick → tamanho limitado ao nº de runs vivos (não cresce indefinidamente).
+    // run_id -> {hash, name} of the live runs in the LAST poll. Rebuilt every
+    // tick → size bounded by the number of live runs (does not grow forever).
     let prevLive = new Map<string, RunVivo>()
-    // O primeiro poll apenas semeia prevLive (não notifica runs que já haviam
-    // terminado antes do app abrir / antes de trocar de workspace).
+    // The first poll only seeds prevLive (it does not notify about runs that had
+    // already finished before the app opened / before switching workspace).
     let seeded = false
-    // Assinatura do conjunto vivo — evita re-render dos consumidores quando nada muda.
+    // Signature of the live set — avoids re-rendering consumers when nothing changes.
     let sig = ""
 
     async function loadNames(): Promise<boolean> {
-      // Inclui os fluxos do assistente: um run vivo de um fluxo do assistente
-      // (escondido das listagens por padrão) precisa do NOME para o pill, senão
-      // aparece sem rótulo. Aqui é resolução de nome, não a lista que o dono vê.
+      // Includes the assistant's workflows: a live run of an assistant workflow
+      // (hidden from listings by default) needs the NAME for the pill, otherwise
+      // it shows up unlabeled. This is name resolution, not the list the owner
+      // sees.
       const res = await GisFlowService.getWorkflows(workspaceId, { incluirDoAssistente: true })
       if (!alive) return false
-      // Erro transitório NÃO zera os nomes já resolvidos: sobrescrever com um
-      // mapa vazio faria todo pill perder o nome até a próxima carga bem-sucedida
-      // — que, com o hash já dado como "tentado", nem chegaria a acontecer.
+      // A transient error does NOT wipe the names already resolved: overwriting
+      // with an empty map would make every pill lose its name until the next
+      // successful load — which, with the hash already marked as "tried",
+      // would never even happen.
       if (!res.data) return false
       namesByHash = new Map(res.data.map((w) => [w.id_hash, w.name]))
       return true
     }
 
     async function notifyIfCompleted(runId: string, name: string) {
-      // Confirma o estado terminal antes de notificar — evita falso-positivo se o
-      // run saiu do conjunto por outro motivo que não conclusão.
+      // Confirms the terminal state before notifying — avoids a false positive if
+      // the run left the set for some reason other than completion.
       const detail = await GisFlowService.getRunDetail(runId)
       if (!alive || !detail.data) return
       const st = detail.data.status
@@ -134,12 +140,12 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
 
     async function poll() {
       const resp = await GisFlowService.getObservabilityRuns({ status: "running", limit: LIMIT })
-      if (!alive || !resp.data) return   // erro transitório → mantém estado (sem piscar)
+      if (!alive || !resp.data) return   // transient error → keep state (no flicker)
 
       const raw = resp.data.runs ?? []
-      // Workflow recém-criado ainda não está no mapa de nomes → recarrega uma
-      // vez por hash inédito. Runs de outro workspace ficam em `tentados` (com
-      // TTL) e não voltam a disparar loadNames() nos ticks seguintes.
+      // A freshly created workflow is not in the name map yet → reload once
+      // per unseen hash. Runs from another workspace stay in `tentados` (with
+      // a TTL) and do not trigger loadNames() again on the following ticks.
       const agora = Date.now()
       const inéditos = raw.filter((r) =>
         r.workflow_hash
@@ -149,9 +155,10 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
       if (inéditos.length > 0) {
         const ok = await loadNames()
         if (!alive) return
-        // Só marca "já tentei e não achei" quando a carga SUCEDEU e o hash ainda
-        // assim não veio (outro workspace, ou ainda não replicado). Uma falha de
-        // rede não condena o hash: o próximo tick tenta de novo.
+        // Only mark "already tried and didn't find it" when the load SUCCEEDED and
+        // the hash still did not come (another workspace, or not replicated
+        // yet). A network failure does not condemn the hash: the next tick
+        // tries again.
         if (ok) {
           for (const r of inéditos) {
             if (!namesByHash.has(r.workflow_hash!)) tentados.set(r.workflow_hash!, agora)
@@ -159,7 +166,7 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      // Escopa ao workspace atual (só workflows que ele conhece).
+      // Scopes to the current workspace (only workflows it knows about).
       const nextLive = new Map<string, RunVivo>()
       for (const r of raw) {
         const hash = r.workflow_hash
@@ -173,7 +180,7 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
         })
       }
 
-      // Conclusões: run que estava vivo antes e sumiu agora.
+      // Completions: a run that was alive before and is gone now.
       if (seeded) {
         for (const [runId, info] of prevLive) {
           if (!nextLive.has(runId)) void notifyIfCompleted(runId, info.name)
@@ -182,7 +189,7 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
       prevLive = nextLive
       seeded = true
 
-      // Atualiza o estado só quando o conjunto vivo muda (evita re-render a cada 10s).
+      // Updates state only when the live set changes (avoids a re-render every 10s).
       const nextSig = [...nextLive.keys()].sort().join(",")
       if (nextSig !== sig) {
         sig = nextSig
@@ -194,8 +201,9 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
       }
     }
 
-    // Serializa as chamadas: há três gatilhos (tick agendado, retorno de foco e
-    // refresh manual via pollRef) e nada impedia que se sobrepusessem.
+    // Serializes the calls: there are three triggers (scheduled tick, focus
+    // return and manual refresh via pollRef) and nothing stopped them from
+    // overlapping.
     let inFlight = false
     const pollOnce = async () => {
       if (inFlight) return
@@ -203,7 +211,7 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
       try {
         await poll()
       } catch {
-        // rede intermitente — mantém o estado anterior; próximo tick tenta de novo
+        // intermittent network — keep the previous state; the next tick tries again
       } finally {
         inFlight = false
       }
@@ -211,16 +219,16 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
 
     pollRef.current = () => { void pollOnce() }
 
-    // Agenda o próximo tick em vez de usar setInterval de período fixo: assim a
-    // cadência acompanha o estado (aba oculta = não consulta; nada rodando =
-    // consulta menos). Com setInterval a decisão só poderia ser "pular o tick",
-    // o que mantém o timer acordando à toa a cada 10s.
+    // Schedule the next tick instead of using a fixed-period setInterval: this
+    // way the cadence follows the state (hidden tab = no queries; nothing
+    // running = fewer queries). With setInterval the only option would be
+    // "skip the tick", which keeps the timer waking up for nothing every 10s.
     const scheduleNext = () => {
       if (!alive) return
       const intervalo = prevLive.size > 0 ? POLL_MS : IDLE_POLL_MS
       timer = setTimeout(async () => {
-        // Aba oculta não precisa de dado fresco: ninguém está olhando, e o
-        // `visibilitychange` abaixo dispara um poll imediato ao voltar o foco.
+        // A hidden tab does not need fresh data: nobody is looking, and the
+        // `visibilitychange` below fires an immediate poll when focus returns.
         if (document.visibilityState === "visible") {
           await pollOnce()
         }
@@ -228,13 +236,13 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
       }, intervalo)
     }
 
-    // Ao voltar para a aba, atualiza na hora — sem isso o usuário encararia
-    // dado velho por até IDLE_POLL_MS depois de retomar o foco.
+    // When coming back to the tab, update right away — without this the user
+    // would stare at stale data for up to IDLE_POLL_MS after regaining focus.
     //
-    // A trava de in-flight importa aqui: alternar abas em sequência dispara um
-    // `visibilitychange` por alternância, e sem ela cada alt-tab viraria um
-    // request — trabalhando contra o objetivo de reduzir carga. O tick agendado
-    // e o refresh manual (pollRef) passam pela mesma trava.
+    // The in-flight lock matters here: switching tabs in quick succession fires
+    // one `visibilitychange` per switch, and without it every alt-tab would
+    // become a request — working against the goal of reducing load. The
+    // scheduled tick and the manual refresh (pollRef) go through the same lock.
     const onVisibility = () => {
       if (document.visibilityState === "visible") void pollOnce()
     }
@@ -244,7 +252,7 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
       try {
         await loadNames()
       } catch {
-        // sem os nomes o poll ainda funciona (filtra pelo que conhece); tenta de novo no tick
+        // without the names the poll still works (filters by what it knows); retry on the tick
       }
       if (!alive) return
       await pollOnce()
@@ -260,10 +268,11 @@ export function ActiveRunsProvider({ children }: { children: ReactNode }) {
     }
   }, [workspaceId, addNotification])
 
-  // O refresh atravessa o ref, então é estável de propósito: o valor do context
-  // só muda quando o conjunto de runs vivos muda. Antes, cada render deste
-  // provider (que fica na raiz do dashboard) criava um objeto novo e propagava
-  // re-render para todas as telas abaixo, mesmo com o poll sem novidade.
+  // The refresh goes through the ref, so it is stable on purpose: the context
+  // value only changes when the set of live runs changes. Before, every render
+  // of this provider (which sits at the dashboard root) created a new object
+  // and propagated a re-render to every screen below, even when the poll had
+  // nothing new.
   const refresh = useCallback(() => { pollRef.current() }, [])
 
   const value = useMemo<ActiveRunsValue>(

@@ -1,14 +1,14 @@
 # tests/unit/test_declared_schema.py
-"""Nó com `dynamic_output` e sem `simulate()` não some mais do /validate.
+"""A node with `dynamic_output` and no `simulate()` no longer vanishes from /validate.
 
-Oito nós do catálogo (PythonScript, Switch, ReadGeoJSON, WFS, DataInput...)
-caíam num `continue` mudo: sem schema no painel e sem diagnóstico de aresta.
-As saídas estão escritas na própria definição (`output_vars`, `rules`/
-`fallback_output`, `ports`) ou nos `outputs` do catálogo; agora o simulate_runner as
-devolve com `schema_source` dizendo de onde vieram — e `unknown` quando não
-há nada a afirmar, em vez de omitir o nó.
+Eight catalog nodes (PythonScript, Switch, ReadGeoJSON, WFS, DataInput...)
+fell into a silent `continue`: no schema in the panel and no edge diagnostics.
+The outputs are written in the definition itself (`output_vars`, `rules`/
+`fallback_output`, `ports`) or in the catalog's `outputs`; now simulate_runner
+returns them with `schema_source` saying where they came from — and `unknown`
+when there is nothing to assert, instead of omitting the node.
 
-Registry real + WorkflowExecutor, no molde de test_simulate_runner.py.
+Real registry + WorkflowExecutor, modeled on test_simulate_runner.py.
 """
 from __future__ import annotations
 
@@ -36,12 +36,12 @@ class NoDinamicoTeste(BaseNode):
     async def simulate(cls, parameters: dict, simulated_inputs: dict = None) -> list:
         return [{"fields": [{"name": "col", "type": "string"}]}]
 
-    async def execute(self, inputs):  # pragma: no cover - simulação não executa
+    async def execute(self, inputs):  # pragma: no cover - simulation does not execute
         return {}
 
 
 class NoDinamicoSemSchema(BaseNode):
-    """dynamic_output=True, sem simulate() e sem outputs: nada a afirmar."""
+    """dynamic_output=True, no simulate() and no outputs: nothing to assert."""
 
     @classmethod
     def description(cls):
@@ -77,7 +77,7 @@ def _merge(nid: str = "m") -> dict:
     return {"id": nid, "name": "Merge", "type": "control", "parameters": {"strategy": "first"}}
 
 
-# ── Saídas declaradas na definição ───────────────────────────────────────────
+# ── Outputs declared in the definition ───────────────────────────────────────
 
 async def test_python_script_declara_as_saidas_por_output_vars():
     ex = _executor({"id": "ps", "name": "PythonScript", "type": "action",
@@ -99,8 +99,8 @@ async def test_python_script_sem_output_vars_usa_o_default_result():
 
 
 async def test_output_vars_vazio_vira_erro_com_a_frase_do_run(caplog):
-    """Antes: schema `[{"fields": []}]` com `ok` — e sem saídas conhecidas o
-    diagnóstico de aresta se desligava. O run recusa com esta frase."""
+    """Before: schema `[{"fields": []}]` with `ok` — and with no known outputs the
+    edge diagnostics switched off. The run rejects with this sentence."""
     ex = _executor({"id": "ps", "name": "PythonScript", "type": "action",
                     "parameters": {"code": "x = 1", "output_vars": " , "}})
 
@@ -160,8 +160,9 @@ async def test_switch_sem_fallback_output_usa_output_0():
 
 
 async def test_switch_fallback_output_vazio_emite_a_porta_vazia():
-    """Espelha o run: `parameters.get("fallback_output", "output_0")` só cai no
-    default com a chave AUSENTE; presente e vazia, a porta emitida é ''."""
+    """Mirrors the run: `parameters.get("fallback_output", "output_0")` only falls
+    back to the default when the key is ABSENT; present and empty, the emitted
+    port is ''."""
     ex = _executor({"id": "sw", "name": "Switch", "type": "control",
                     "parameters": {"rules": [], "fallback_output": ""}})
 
@@ -200,8 +201,8 @@ async def test_dinamico_sem_simulate_cai_nos_outputs_do_catalogo():
 
 
 async def test_dinamico_sem_simulate_e_sem_outputs_fica_como_unknown():
-    """Nada a afirmar não é motivo para sumir: o nó fica na resposta e a
-    origem diz que o schema é desconhecido."""
+    """Nothing to assert is no reason to vanish: the node stays in the response
+    and the source says the schema is unknown."""
     ex = _executor({"id": "n1", "name": "NoDinamicoSemSchema", "type": "datasource",
                     "parameters": {}})
 
@@ -240,7 +241,7 @@ async def test_no_estatico_ganha_schema_source_static():
     assert _nomes(out["m"]) == ["output"]
 
 
-# ── validate_edges enxerga a saída declarada ─────────────────────────────────
+# ── validate_edges sees the declared output ──────────────────────────────────
 
 async def test_from_key_fora_de_output_vars_e_erro_de_aresta():
     ex = _executor(
@@ -270,11 +271,11 @@ async def test_from_key_dentro_de_output_vars_passa():
     assert ex.validate_edges() == []
 
 
-# ── Campos do catálogo na simulação ──────────────────────────────────────────
+# ── Catalog fields in the simulation ─────────────────────────────────────────
 
 async def test_campos_do_catalogo_entram_na_simulacao():
-    """ChangeDetector declara os campos em `outputs` (e roteia por `branches`):
-    todos os campos aparecem no schema simulado."""
+    """ChangeDetector declares its fields in `outputs` (and routes by `branches`):
+    all fields appear in the simulated schema."""
     ex = _executor({"id": "cd", "name": "ChangeDetector", "type": "control", "parameters": {}})
 
     out = await ex.simulate_runner()
@@ -284,7 +285,7 @@ async def test_campos_do_catalogo_entram_na_simulacao():
 
 
 async def test_chaves_internas_do_protocolo_nao_viram_saida():
-    """Response só declara `__response__` em `outputs`; o executor o remove."""
+    """Response only declares `__response__` in `outputs`; the executor removes it."""
     ex = _executor({"id": "r", "name": "Response", "type": "output", "parameters": {}})
 
     out = await ex.simulate_runner()

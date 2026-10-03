@@ -21,10 +21,11 @@ import {
 type Tab = ArtifactTab
 
 /**
- * Frase de escopo do cabeçalho: quantos artefatos a aba aberta tem. O zero só
- * vira "Nenhum … ainda" (primeiro uso) quando NÃO há recorte — sob um filtro
- * ativo que zera, dizer "ainda" mentiria (o workspace tem artefatos, nenhum
- * casa), então usamos uma frase de filtro. Com contagem, "N … de execução".
+ * Header scope sentence: how many artifacts the open tab has. Zero only
+ * becomes "Nenhum … ainda" (first use) when there is NO slice — under an
+ * active filter that zeroes it, saying "ainda" (yet) would lie (the workspace
+ * has artifacts, none match), so we use a filter sentence. With a count,
+ * "N … de execução".
  */
 function textoDoSubtitulo(tab: Tab, total: number, temRecorte: boolean): string {
   if (total === 0) {
@@ -44,9 +45,9 @@ export default function ArtifactsPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const { current: workspace, canEdit: podeEditar, loading: workspaceLoading } = useWorkspace()
 
-  // A busca vai ao SERVIDOR com debounce. Antes cada tecla refiltrava a coleção
-  // inteira em memória (e a coleção inteira era literalmente tudo o que o
-  // usuário já produziu), o que congelava o caret.
+  // The search goes to the SERVER with debounce. Before, every keystroke
+  // re-filtered the whole collection in memory (and the whole collection was
+  // literally everything the user ever produced), which froze the caret.
   const [debouncedSearch, setDebouncedSearch] = useState("")
   useEffect(() => {
     const id = setTimeout(() => setDebouncedSearch(search.trim()), 300)
@@ -63,35 +64,35 @@ export default function ArtifactsPage() {
     enabled:     !workspaceLoading,
   })
 
-  // ── Seleção ─────────────────────────────────────────────────────────────────
+  // ── Selection ───────────────────────────────────────────────────────────────
 
-  // Identidade estável (atualização funcional, sem deps): é o que faz o
-  // React.memo das linhas valer alguma coisa.
-  // `toggleAll` precisa da lista atual sem depender dela — senão volta a ser um
-  // callback novo a cada resposta do servidor, e o memo das linhas não acerta.
+  // Stable identity (functional update, no deps): it is what makes the rows'
+  // React.memo worth anything.
+  // `toggleAll` needs the current list without depending on it — otherwise it
+  // becomes a new callback on every server response again, and the rows' memo misses.
   const itemsRef = useRef<IArtifactItem[]>([])
   itemsRef.current = items
 
-  // A tela é escopada por workspace, e trocar de workspace no seletor do
-  // cabeçalho não remonta nada: sem este reset a seleção do workspace A
-  // sobrevivia à troca, o botão continuava dizendo "Excluir 10" com NENHUMA
-  // linha marcada na tela, e confirmar apagava (de verdade, inclusive no MinIO)
-  // 10 artefatos de outro workspace. Busca/formato/aba entram junto pelo mesmo
-  // motivo, em versão menos grave: contariam o que saiu da tela.
+  // The screen is scoped by workspace, and switching workspace in the header
+  // selector remounts nothing: without this reset, workspace A's selection
+  // survived the switch, the button kept saying "Excluir 10" with NO row
+  // checked on screen, and confirming deleted (for real, including in MinIO)
+  // 10 artifacts from another workspace. Search/format/tab come in too for the
+  // same reason, in a less severe form: they would count what left the screen.
   useEffect(() => {
     setSelected(prev => (prev.size > 0 ? new Set() : prev))
   }, [workspace?.id_hash, debouncedSearch, formatFilter, tab])
 
-  /** O que o botão vermelho e o diálogo prometem apagar: a interseção da
-   *  seleção com o que está CARREGADO. Assim o rótulo nunca fala de artefatos
-   *  que o usuário não está vendo, e a exclusão nunca alcança o que sumiu da
-   *  tela por uma troca de escopo. */
+  /** What the red button and the dialog promise to delete: the intersection of
+   *  the selection with what is LOADED. That way the label never talks about
+   *  artifacts the user is not seeing, and the deletion never reaches what
+   *  left the screen through a scope change. */
   const idsParaExcluir = useMemo(
     () => idsSelecionadosVisiveis(items, selected),
     [items, selected],
   )
 
-  // Nome do único alvo, para o diálogo mostrá-lo entre aspas angulares.
+  // Name of the single target, so the dialog shows it in angle quotes.
   const nomeUnico = useMemo(() => {
     if (idsParaExcluir.length !== 1) return null
     return items.find(i => i.id_hash === idsParaExcluir[0])?.filename ?? null
@@ -106,8 +107,8 @@ export default function ArtifactsPage() {
     })
   }, [])
 
-  /** Marca/desmarca o que está CARREGADO — com paginação não existe mais um
-   *  "todos" que caiba na tela. O botão de excluir conta o Set inteiro. */
+  /** Checks/unchecks what is LOADED — with pagination there is no longer an
+   *  "all" that fits on screen. The delete button counts the whole Set. */
   const toggleAll = useCallback(() => {
     setSelected(prev => {
       const idsNaTela = itemsRef.current.map(i => i.id_hash)
@@ -135,19 +136,19 @@ export default function ArtifactsPage() {
     setFormatFilter("all")
   }
 
-  // ── Exclusão ──────────────────────────────────────────────────────────────
-  // O `DeleteDialog` compartilhado carrega a trava de "excluindo" por dentro:
-  // este handler é async, ele aguarda, e a página só fecha o diálogo no sucesso
-  // (no erro o diálogo fica aberto para tentar de novo).
+  // ── Deletion ──────────────────────────────────────────────────────────────
+  // The shared `DeleteDialog` carries the "deleting" lock inside: this handler
+  // is async, it awaits, and the page only closes the dialog on success
+  // (on error the dialog stays open to try again).
   async function handleBatchDelete() {
     const alvos = idsParaExcluir
     if (alvos.length === 0) return
     try {
-      // `deleteArtifact`/`batchDeleteArtifacts` NÃO lançam: como todo método do
-      // GisFlowService, capturam por dentro e devolvem `IResponse` com `error`.
-      // Um `catch` sozinho era inalcançável para falha HTTP, então um 403/500
-      // caía no caminho de sucesso: toast de "excluídos" e um reload que
-      // trazia os artefatos de volta.
+      // `deleteArtifact`/`batchDeleteArtifacts` do NOT throw: like every
+      // GisFlowService method, they catch internally and return `IResponse`
+      // with `error`. A lone `catch` was unreachable for an HTTP failure, so a
+      // 403/500 fell into the success path: a "deleted" toast and a reload that
+      // brought the artifacts back.
       const res = alvos.length === 1
         ? await GisFlowService.deleteArtifact(alvos[0])
         : await GisFlowService.batchDeleteArtifacts(alvos)
@@ -162,15 +163,15 @@ export default function ArtifactsPage() {
       setDeleteOpen(false)
       reload()
     } catch {
-      // Rede caindo no meio do await ainda pode lançar.
+      // The network dropping mid-await can still throw.
       createToast.error("Falha ao excluir artefatos.")
     }
   }
 
-  // ── Formatos disponíveis ──────────────────────────────────────────────────
-  // Acumulados a partir do que já foi carregado: derivá-los da página atual
-  // faria os chips sumirem justamente depois de escolher um formato (o servidor
-  // devolve só ele), prendendo o filtro sem volta.
+  // ── Available formats ─────────────────────────────────────────────────────
+  // Accumulated from what has already been loaded: deriving them from the
+  // current page would make the chips vanish right after picking a format (the
+  // server returns only that one), trapping the filter with no way back.
   const [availableFormats, setAvailableFormats] = useState<string[]>([])
   useEffect(() => { setAvailableFormats([]) }, [tab, workspace?.id_hash])
   useEffect(() => {
@@ -183,9 +184,9 @@ export default function ArtifactsPage() {
     })
   }, [items])
 
-  // ── Precedência de estados (contrato §3) ────────────────────────────────────
-  // carregando → erro (só se nunca houve carga) → conteúdo. `atualizadoEm` é o
-  // gate: enquanto null, nenhuma carga vingou.
+  // ── State precedence (contract §3) ──────────────────────────────────────────
+  // loading → error (only if there was never a load) → content. `atualizadoEm`
+  // is the gate: while null, no load has succeeded.
   const primeiraCarga = loading && atualizadoEm == null
   const erroDeEspinha = !!erro && atualizadoEm == null
   const temRecorte = debouncedSearch.length > 0 || formatFilter !== "all"
@@ -193,10 +194,10 @@ export default function ArtifactsPage() {
   return (
     <PageRoot>
       <CabecalhoDeArtefatos
-        // Durante QUALQUER carga (`loading`) o subtítulo vira esqueleto em vez de
-        // um número obsoleto/zerado — a troca de filtro/aba zera `total` antes da
-        // resposta chegar, e mostrar "Nenhum artefato ainda" nesse intervalo
-        // enganava (contrato §3: carregando tem precedência).
+        // During ANY load (`loading`) the subtitle becomes a skeleton instead of
+        // a stale/zeroed number — switching filter/tab zeroes `total` before the
+        // response arrives, and showing "Nenhum artefato ainda" in that interval
+        // was misleading (contract §3: loading takes precedence).
         subtitulo={(atualizadoEm == null || loading) ? null : textoDoSubtitulo(tab, total, temRecorte)}
         atualizando={loading}
         aExcluir={idsParaExcluir.length}
@@ -205,8 +206,8 @@ export default function ArtifactsPage() {
         onExcluir={() => setDeleteOpen(true)}
       />
 
-      {/* Abas + busca + formato. As abas ficam sempre visíveis; os filtros e a
-          contagem só quando já há uma lista para filtrar. */}
+      {/* Tabs + search + format. The tabs are always visible; the filters and the
+          count only once there is a list to filter. */}
       <div className="flex flex-col gap-3">
         <AbasDeArtefatos tab={tab} total={total} onTab={switchTab} />
         {!primeiraCarga && !erroDeEspinha && (
@@ -222,12 +223,13 @@ export default function ArtifactsPage() {
         )}
       </div>
 
-      {/* Precedência do contrato §3: carregando → erro (só na 1ª carga) →
-          conteúdo. `loading` cobre a 1ª carga E as recargas (troca de aba/filtro/
-          busca, que zeram a lista): nesse intervalo mostramos o skeleton, nunca os
-          estados vazios — senão «sem resultado»/«primeiro uso» piscariam durante o
-          carregamento. Uma recarga que falha sobre a lista pronta (botão Atualizar/
-          Ver mais) cai no ramo de conteúdo com o aviso âmbar, sem apagar a tabela. */}
+      {/* Contract §3 precedence: loading → error (only on the 1st load) →
+          content. `loading` covers the 1st load AND reloads (tab/filter/search
+          change, which zero the list): in that interval we show the skeleton, never
+          the empty states — otherwise "no result"/"first use" would flash during
+          loading. A reload that fails over the ready list (Refresh/See more
+          button) falls into the content branch with the amber notice, without
+          erasing the table. */}
       {loading ? (
         <SkeletonDeArtefatos />
       ) : erroDeEspinha ? (
@@ -253,7 +255,7 @@ export default function ArtifactsPage() {
             />
           )}
 
-          {/* Ver mais — uma página por clique, em vez da coleção inteira. */}
+          {/* See more — one page per click, instead of the whole collection. */}
           {hasMore && (
             <div className="flex justify-center">
               <Button variant="outline" size="sm" onClick={loadMore} disabled={loadingMore} className="max-md:h-10">

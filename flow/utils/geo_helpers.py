@@ -1,4 +1,4 @@
-"""Funções auxiliares reutilizáveis para nós de saída e credenciais."""
+"""Reusable helper functions for output nodes and credentials."""
 
 import ipaddress
 import os
@@ -7,42 +7,42 @@ import socket
 from urllib.parse import urlparse
 
 
-# ── Validação de caminhos de arquivo (Path Traversal) ─────────────────────────
+# ── File path validation (Path Traversal) ─────────────────────────────────────
 
-# Diretórios base permitidos para leitura/escrita de arquivos.
-# Configure via ALLOWED_FILE_DIRS (separado por vírgula). Default: /data, /tmp
+# Base directories allowed for reading/writing files.
+# Configure via ALLOWED_FILE_DIRS (comma-separated). Default: /data, /tmp
 _ALLOWED_DIRS_RAW = os.getenv("ALLOWED_FILE_DIRS", "/data,/tmp")
 ALLOWED_FILE_DIRS = [pathlib.Path(d.strip()).resolve() for d in _ALLOWED_DIRS_RAW.split(",") if d.strip()]
 
 
 def validate_file_path(file_path: str, *, write: bool = False) -> pathlib.Path:
     """
-    Valida que o caminho de arquivo está dentro dos diretórios permitidos.
-    Previne path traversal (../../etc/passwd) e acesso a diretórios não autorizados.
+    Validates that the file path is inside the allowed directories.
+    Prevents path traversal (../../etc/passwd) and access to unauthorized directories.
 
     Args:
-        file_path: Caminho informado pelo usuário.
-        write: Se True, cria o diretório pai se necessário (dentro do diretório permitido).
+        file_path: Path provided by the user.
+        write: If True, creates the parent directory if needed (inside the allowed directory).
 
     Returns:
-        pathlib.Path resolvido e validado.
+        Resolved and validated pathlib.Path.
 
     Raises:
-        ValueError: Se o caminho não está dentro dos diretórios permitidos.
+        ValueError: If the path is not inside the allowed directories.
     """
     if not file_path or not file_path.strip():
         raise ValueError("Caminho de arquivo não pode ser vazio.")
 
     resolved = pathlib.Path(file_path).resolve()
 
-    # Verifica se está DENTRO de algum diretório permitido, comparando a
-    # hierarquia de caminho — não o prefixo textual.
+    # Checks whether it is INSIDE some allowed directory, comparing the
+    # path hierarchy — not the textual prefix.
     #
-    # `str(resolved).startswith(str(allowed_dir))` deixava passar qualquer
-    # diretório IRMÃO cujo nome começasse igual: com `/data` permitido,
-    # `/data-secreto/x.shp` e `/datax/y.shp` eram aceitos, porque a comparação
-    # era de string e não de caminho. `is_relative_to` exige que o diretório
-    # permitido seja de fato um ancestral.
+    # `str(resolved).startswith(str(allowed_dir))` let through any SIBLING
+    # directory whose name started the same: with `/data` allowed,
+    # `/data-secreto/x.shp` and `/datax/y.shp` were accepted, because the
+    # comparison was on strings, not paths. `is_relative_to` requires the
+    # allowed directory to actually be an ancestor.
     is_allowed = any(
         resolved.is_relative_to(allowed_dir)
         for allowed_dir in ALLOWED_FILE_DIRS
@@ -61,51 +61,51 @@ def validate_file_path(file_path: str, *, write: bool = False) -> pathlib.Path:
 
 
 def normalize_ows_endpoint_url(url: str) -> str:
-    """Extrai o endpoint base de uma URL OWS (WFS/WMS/WMTS).
+    """Extracts the base endpoint of an OWS URL (WFS/WMS/WMTS).
 
-    Servidores geoespaciais (GeoServer, MapServer, etc) expoem operacoes em um
-    endpoint e diferenciam a operacao por query params (`service=WFS`,
-    `request=GetCapabilities`, `version=2.0.0`). O codigo cliente (owslib,
-    httpx) precisa receber so o endpoint base e adicionar seus proprios params
-    — duplicar gera conflito (ex: `version=1.3.0` no input + `version=2.0.0`
-    do cliente quebra a negociacao).
+    Geospatial servers (GeoServer, MapServer, etc) expose operations on one
+    endpoint and distinguish the operation by query params (`service=WFS`,
+    `request=GetCapabilities`, `version=2.0.0`). Client code (owslib,
+    httpx) must receive only the base endpoint and add its own params
+    — duplicating them causes conflicts (e.g. `version=1.3.0` in the input +
+    `version=2.0.0` from the client breaks the negotiation).
 
-    Exemplos:
+    Examples:
         https://host/geoserver/PGGM/ows?service=wms&version=1.3.0&request=GetCapabilities
             -> https://host/geoserver/PGGM/ows
         https://host/geoserver/wfs/  -> https://host/geoserver/wfs
         https://host:8080/path?x=1#frag -> https://host:8080/path
-        ""          -> ""    (deixa validacao downstream falhar)
-        "naourl"    -> "naourl"  (sem scheme; validate_url_ssrf rejeita)
+        ""          -> ""    (lets downstream validation fail)
+        "naourl"    -> "naourl"  (no scheme; validate_url_ssrf rejects it)
     """
     if not url or not isinstance(url, str):
         return url or ""
     url = url.strip()
     parsed = urlparse(url)
-    # Sem scheme/netloc nao temos uma URL parseavel — devolve original para
-    # a validacao downstream produzir mensagem clara.
+    # Without scheme/netloc we don't have a parseable URL — return the original so
+    # downstream validation produces a clear message.
     if not parsed.scheme or not parsed.netloc:
         return url
     path = parsed.path.rstrip("/") or ""
     return f"{parsed.scheme}://{parsed.netloc}{path}"
 
 
-# ── Erros de verificação TLS ─────────────────────────────────────────────────
+# ── TLS verification errors ───────────────────────────────────────────────────
 
 _TLS_VERIFY_MARKERS = ("CERTIFICATE_VERIFY_FAILED", "SSLCertVerificationError")
 
 
 def is_tls_verify_error(exc: BaseException | None) -> bool:
-    """True se `exc` — ou alguma causa dela — é falha de validação de cadeia TLS.
+    """True if `exc` — or one of its causes — is a TLS chain validation failure.
 
-    Nós que falam HTTPS com servidor de terceiro recebem esse erro embrulhado
-    várias vezes (`requests.exceptions.SSLError` → `urllib3.MaxRetryError` →
-    `ssl.SSLCertVerificationError`), e as camadas intermediárias não preservam o
-    tipo original — por isso checamos tipo E texto, mesmo padrão já usado em
-    `executor/connection.py` para cert expirado.
+    Nodes that talk HTTPS to a third-party server receive this error wrapped
+    several times (`requests.exceptions.SSLError` → `urllib3.MaxRetryError` →
+    `ssl.SSLCertVerificationError`), and the intermediate layers do not preserve
+    the original type — so we check type AND text, the same pattern already used in
+    `executor/connection.py` for an expired cert.
 
-    Distinguir importa porque cadeia inválida não é falha transiente: retentar
-    só multiplica a espera antes do mesmo erro.
+    The distinction matters because an invalid chain is not a transient failure:
+    retrying only multiplies the wait before the same error.
     """
     import ssl
 
@@ -121,7 +121,7 @@ def is_tls_verify_error(exc: BaseException | None) -> bool:
 
 
 def tls_verify_error_message(url: str, exc: BaseException) -> str:
-    """Mensagem acionável para falha de validação de certificado num nó."""
+    """Actionable message for a certificate validation failure in a node."""
     host = urlparse(url).hostname or url
     return (
         f"Não foi possível validar o certificado TLS de '{host}'. "
@@ -146,24 +146,24 @@ async def safe_httpx_request(
     params: dict | None = None,
     max_response_bytes: int | None = None,
 ):
-    """Faz request HTTP com IP pinning para prevenir DNS rebinding.
+    """Makes an HTTP request with IP pinning to prevent DNS rebinding.
 
-    Fluxo:
-      1. validate_url_ssrf: resolve hostname → IP, rejeita IPs internos.
-      2. Reescreve URL trocando hostname por IP literal — httpx conecta no IP
-         resolvido independente do DNS no momento do request.
-      3. Header Host: hostname original (para virtualhost no servidor).
-      4. SNI hostname original via extensions (HTTPS valida cert pelo nome).
+    Flow:
+      1. validate_url_ssrf: resolves hostname → IP, rejects internal IPs.
+      2. Rewrites the URL replacing the hostname with the literal IP — httpx connects
+         to the resolved IP regardless of DNS at request time.
+      3. Host header: original hostname (for virtual hosts on the server).
+      4. SNI original hostname via extensions (HTTPS validates the cert by name).
 
-    Sem isso, o atacante com DNS TTL=0 podia:
-      - validate_url_ssrf resolve evil.com → 1.2.3.4 (publico) PASS
-      - httpx.get(url) resolve evil.com → 169.254.169.254 (metadata) FAIL
+    Without this, an attacker with DNS TTL=0 could:
+      - validate_url_ssrf resolves evil.com → 1.2.3.4 (public) PASS
+      - httpx.get(url) resolves evil.com → 169.254.169.254 (metadata) FAIL
 
-    Bloqueia redirects por default (follow_redirects=False): se servidor
-    responde 302 para URL interna, sem reavaliacao SSRF, viramos proxy.
-    Caller que precisa de redirect deve revalidar manualmente.
+    Blocks redirects by default (follow_redirects=False): if the server
+    answers 302 to an internal URL, without SSRF re-evaluation we become a proxy.
+    A caller that needs redirects must revalidate manually.
 
-    max_response_bytes: limita corpo lido (defesa contra resposta gigante).
+    max_response_bytes: limits the body read (defense against a huge response).
     """
     import httpx as _httpx
     import asyncio as _asyncio
@@ -173,17 +173,17 @@ async def safe_httpx_request(
 
     # Reescreve URL: troca hostname por IP, preserva porta + path + query.
     port = parsed.port or (443 if parsed.scheme == "https" else 80)
-    # IPv6 precisa de colchetes na URL.
+    # IPv6 needs brackets in the URL.
     ip_in_url = f"[{resolved_ip}]" if ":" in resolved_ip else resolved_ip
     new_netloc = f"{ip_in_url}:{port}"
     pinned_url = parsed._replace(netloc=new_netloc).geturl()
 
-    # Host header com nome original (servidor pode hospedar varios virtualhosts).
+    # Host header with the original name (the server may host several virtual hosts).
     req_headers = dict(headers or {})
     req_headers["Host"] = hostname if not parsed.port else f"{hostname}:{port}"
 
-    # Extensions: sni_hostname garante que TLS handshake apresente o nome
-    # correto para validacao de cert do servidor.
+    # Extensions: sni_hostname ensures the TLS handshake presents the correct
+    # name for validating the server's cert.
     extensions = {"sni_hostname": hostname} if parsed.scheme == "https" else None
 
     async with _httpx.AsyncClient(
@@ -198,12 +198,12 @@ async def safe_httpx_request(
         try:
             response = await client.send(request)
         except Exception as exc:
-            # Cadeia TLS invalida chega como httpx.ConnectError carregando a
-            # mensagem crua do OpenSSL. Traduzir aqui cobre de uma vez todo no
-            # que fala HTTPS por este helper (HttpRequest, WFS,
-            # webhook) em vez de repetir o tratamento em cada um. Usa `url`, nao
-            # `pinned_url`: a mensagem tem de citar o hostname que o usuario
-            # digitou, nao o IP em que fizemos o pin.
+            # An invalid TLS chain arrives as httpx.ConnectError carrying the raw
+            # OpenSSL message. Translating it here covers at once every node
+            # that talks HTTPS through this helper (HttpRequest, WFS,
+            # webhook) instead of repeating the handling in each. Uses `url`, not
+            # `pinned_url`: the message must cite the hostname the user
+            # typed, not the IP we pinned.
             if is_tls_verify_error(exc):
                 raise RuntimeError(tls_verify_error_message(url, exc)) from exc
             raise
@@ -219,13 +219,13 @@ async def safe_httpx_request(
         return response
 
 
-# CGNAT (RFC 6598) não é marcada como `is_private` em todas as versões de Python;
-# de dentro de uma nuvem, 100.64/10 alcança serviços internos do provedor.
+# CGNAT (RFC 6598) is not flagged as `is_private` in every Python version;
+# from inside a cloud, 100.64/10 reaches the provider's internal services.
 _CGNAT = ipaddress.ip_network("100.64.0.0/10")
 
 
 def _endereco_perigoso(ip) -> bool:
-    """True para IP que não deve ser alvo de request de saída (SSRF)."""
+    """True for an IP that must not be the target of an outbound request (SSRF)."""
     if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped is not None:
         ip = ip.ipv4_mapped  # ::ffff:169.254.169.254 → o IPv4 embutido
     return (
@@ -237,10 +237,10 @@ def _endereco_perigoso(ip) -> bool:
 
 def validate_url_ssrf(url: str) -> tuple[str, str]:
     """
-    Bloqueia URLs com scheme inválido ou que resolvam para endereços internos/privados.
-    Retorna (resolved_ip, hostname) para uso direto no request (previne DNS rebinding).
-    Lança ValueError se a URL for considerada insegura (SSRF).
-    Função síncrona — use asyncio.to_thread() em contextos async.
+    Blocks URLs with an invalid scheme or that resolve to internal/private addresses.
+    Returns (resolved_ip, hostname) for direct use in the request (prevents DNS rebinding).
+    Raises ValueError if the URL is considered unsafe (SSRF).
+    Synchronous function — use asyncio.to_thread() in async contexts.
     """
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
@@ -249,15 +249,15 @@ def validate_url_ssrf(url: str) -> tuple[str, str]:
     if not hostname:
         raise ValueError("URL sem hostname válido.")
 
-    # Bloqueia hostnames que já são IP interno. Auditoria (SEG-81): antes, o
-    # `raise` deste bloco caía no `except ValueError` logo abaixo (o mesmo tipo
-    # usado para "não é um IP literal") e era ENGOLIDO — a checagem direta virava
-    # letra morta. Agora usa `_endereco_perigoso`, sem try/except em volta do
-    # raise.
+    # Blocks hostnames that are already an internal IP. Audit (SEG-81): before, the
+    # `raise` in this block fell into the `except ValueError` just below (the same
+    # type used for "not a literal IP") and was SWALLOWED — the direct check became
+    # a dead letter. Now it uses `_endereco_perigoso`, with no try/except around
+    # the raise.
     try:
         direct_ip = ipaddress.ip_address(hostname)
     except ValueError:
-        direct_ip = None  # hostname não é um IP literal — ok, vamos resolver
+        direct_ip = None  # hostname is not a literal IP — ok, let's resolve it
     if direct_ip is not None and _endereco_perigoso(direct_ip):
         raise ValueError(
             f"Requisições para endereços internos/privados não são permitidas ({hostname})."
@@ -268,9 +268,9 @@ def validate_url_ssrf(url: str) -> tuple[str, str]:
     except socket.gaierror:
         raise ValueError(f"Não foi possível resolver o hostname '{hostname}'.")
 
-    # Confere TODOS os endereços resolvidos, não só o primeiro: um servidor DNS
-    # malicioso devolve um IP público seguido de 169.254.169.254/10.x — checar
-    # só o [0] deixava o segundo passar (DNS rebinding / multi-registro).
+    # Checks ALL resolved addresses, not just the first: a malicious DNS server
+    # returns a public IP followed by 169.254.169.254/10.x — checking
+    # only [0] let the second one through (DNS rebinding / multi-record).
     resolved_ip = infos[0][4][0]
     for info in infos:
         candidato = info[4][0]
@@ -283,7 +283,7 @@ def validate_url_ssrf(url: str) -> tuple[str, str]:
 
 
 def ensure_extension(path: str, ext: str) -> str:
-    """Garante que `path` termine com a extensão `ext` (ex: '.shp', '.parquet')."""
+    """Ensures `path` ends with the extension `ext` (e.g. '.shp', '.parquet')."""
     if not ext.startswith("."):
         ext = f".{ext}"
     if not path.lower().endswith(ext.lower()):
@@ -294,14 +294,14 @@ def ensure_extension(path: str, ext: str) -> str:
 # ── Helpers GeoDataFrame ─────────────────────────────────────────────────────
 
 def ensure_gdf_crs(gdf, target_crs: str):
-    """Garante que o GeoDataFrame esteja no CRS alvo.
+    """Ensures the GeoDataFrame is in the target CRS.
 
-    - Se o GDF já tem CRS diferente do alvo, reprojeta.
-    - Se o GDF não tem CRS, atribui o alvo.
-    - Se target_crs é vazio/None, retorna sem alteração.
+    - If the GDF already has a CRS different from the target, reprojects.
+    - If the GDF has no CRS, assigns the target.
+    - If target_crs is empty/None, returns unchanged.
 
-    Retorna o GeoDataFrame (pode ser novo objeto após reprojeção).
-    Função síncrona — use asyncio.to_thread() em contextos async.
+    Returns the GeoDataFrame (may be a new object after reprojection).
+    Synchronous function — use asyncio.to_thread() in async contexts.
     """
     if not target_crs:
         return gdf
@@ -313,28 +313,28 @@ def ensure_gdf_crs(gdf, target_crs: str):
 
 
 def gdf_para_geojson(gdf, crs: str | None = None, *, nat_como_nulo: bool = False) -> str:
-    """Serializa um GeoDataFrame como texto GeoJSON — o ponto único de todo nó
-    que grava ou envia GeoJSON.
+    """Serializes a GeoDataFrame as GeoJSON text — the single entry point for every
+    node that writes or sends GeoJSON.
 
-    - `crs`: reprojeta antes, com a regra do `ensure_gdf_crs` (sem CRS, o de
-      destino é atribuído). Vazio/None serializa no CRS em que o GDF está.
-    - Colunas datetime viram texto (`astype(str)`), porque `to_json` não as
-      serializa ("Object of type Timestamp is not JSON serializable").
-    - `nat_como_nulo`: a data ausente (NaT) sai `null` em vez de "NaT". Os nós
-      que serializavam com o `to_json` cru (SaveToS3, SendWebhook, HttpRequest,
-      o fallback do pin) já entregavam `null` numa coluna de data toda vazia —
-      um `dt_cancelamento` sem valor em nenhuma feição —, e é o que continuam
-      entregando. Os que passavam por `astype(str)` (SaveGeoJSON, DataOutput,
-      PublishMap, SendEmail) sempre gravaram "NaT", e seguem igual.
+    - `crs`: reprojects first, with the `ensure_gdf_crs` rule (without a CRS, the
+      target one is assigned). Empty/None serializes in the CRS the GDF is in.
+    - Datetime columns become text (`astype(str)`), because `to_json` does not
+      serialize them ("Object of type Timestamp is not JSON serializable").
+    - `nat_como_nulo`: a missing date (NaT) comes out as `null` instead of "NaT". The
+      nodes that serialized with raw `to_json` (SaveToS3, SendWebhook, HttpRequest,
+      the pin fallback) already delivered `null` in an all-empty date column —
+      a `dt_cancelamento` with no value in any feature —, and that is what they keep
+      delivering. Those that went through `astype(str)` (SaveGeoJSON, DataOutput,
+      PublishMap, SendEmail) always wrote "NaT", and stay the same.
 
-    A conversão é feita numa CÓPIA, e só quando há coluna datetime. O GDF que
-    chega é o output do nó anterior (`get_first_gdf` devolve o do pai, e
-    `ensure_gdf_crs` devolve o mesmo objeto quando o CRS já bate), que irmãos do
-    mesmo batch — rodando em paralelo, em threads — e expressões `$Alias`
-    continuam lendo. Converter in-place fazia todos eles verem as datas como
-    string.
+    The conversion is done on a COPY, and only when there is a datetime column. The
+    incoming GDF is the previous node's output (`get_first_gdf` returns the
+    parent's, and `ensure_gdf_crs` returns the same object when the CRS already
+    matches), which siblings in the same batch — running in parallel, in threads —
+    and `$Alias` expressions keep reading. Converting in place made all of them see
+    the dates as strings.
 
-    Função síncrona — use asyncio.to_thread() em contextos async.
+    Synchronous function — use asyncio.to_thread() in async contexts.
     """
     gdf = ensure_gdf_crs(gdf, crs)
     colunas_data = gdf.select_dtypes(include=["datetime", "datetimetz"]).columns
@@ -349,17 +349,17 @@ def gdf_para_geojson(gdf, crs: str | None = None, *, nat_como_nulo: bool = False
 
 
 def slugify_label(label: str) -> str:
-    """Gera nome de arquivo seguro a partir de um label.
+    """Generates a safe file name from a label.
 
-    Transliterar acentos é obrigatório, não cosmético: `str.isalnum()` devolve
-    True para 'Á', então a versão anterior produzia 'Áreas_Urbanas' — que não
-    casa com o charset exigido pelo validador de s3_key ([A-Za-z0-9_-./]). Num
-    produto pt-BR isso é o caso comum, e o efeito era o upload do artefato ser
-    recusado com 400 e o run terminar "com sucesso" sem artefato nenhum.
+    Transliterating accents is mandatory, not cosmetic: `str.isalnum()` returns
+    True for 'Á', so the previous version produced 'Áreas_Urbanas' — which does
+    not match the charset required by the s3_key validator ([A-Za-z0-9_-./]). In a
+    pt-BR product that is the common case, and the effect was the artifact upload
+    being rejected with 400 and the run finishing "successfully" with no artifact.
 
-    NFKD separa o caractere base do diacrítico; descartar os combinantes
-    (categoria Mn) deixa o ASCII equivalente. O que ainda sobrar fora do
-    conjunto seguro vira '_'.
+    NFKD separates the base character from the diacritic; discarding the combining
+    marks (category Mn) leaves the ASCII equivalent. Whatever is still outside
+    the safe set becomes '_'.
     """
     import unicodedata
 
@@ -369,19 +369,19 @@ def slugify_label(label: str) -> str:
         c if (c.isascii() and c.isalnum()) or c in "-_" else "_"
         for c in ascii_only
     )
-    # Nome vazio geraria uma key terminando em '/', que o validador recusa.
+    # An empty name would generate a key ending in '/', which the validator rejects.
     return slug or "arquivo"
 
 
-# ── Validações geométricas compartilhadas pelos nós spatial ───────────────────
-# Antes reimplementadas inline em ~12 nós (intersection, union, difference, etc.).
-# Nos nós binários (A, B), quem as aplica é `BaseNode.get_pair`.
+# ── Geometric validations shared by the spatial nodes ─────────────────────────
+# Previously reimplemented inline in ~12 nodes (intersection, union, difference, etc.).
+# In binary nodes (A, B), `BaseNode.get_pair` is what applies them.
 
 _UNSUPPORTED_GEOM_TYPES = {"GeometryCollection", "None"}
 
 
 def require_crs(gdf, *, name: str = "camada") -> None:
-    """Levanta ValueError se o GeoDataFrame não tem CRS definido."""
+    """Raises ValueError if the GeoDataFrame has no CRS defined."""
     if gdf.crs is None:
         raise ValueError(
             f"A {name} de entrada não possui CRS definido. "
@@ -390,7 +390,7 @@ def require_crs(gdf, *, name: str = "camada") -> None:
 
 
 def require_same_crs(gdf_a, gdf_b, *, operation: str = "operação") -> None:
-    """Levanta ValueError se as duas camadas têm CRS diferentes."""
+    """Raises ValueError if the two layers have different CRSs."""
     if gdf_a.crs != gdf_b.crs:
         raise ValueError(
             "As camadas possuem CRS diferentes. Adicione um nó de reprojeção "
@@ -399,7 +399,7 @@ def require_same_crs(gdf_a, gdf_b, *, operation: str = "operação") -> None:
 
 
 def reject_unsupported_geom_types(*gdfs, operation: str = "operação") -> None:
-    """Levanta TypeError se alguma camada contém GeometryCollection/geometria nula."""
+    """Raises TypeError if any layer contains a GeometryCollection/null geometry."""
     present: set[str] = set()
     for gdf in gdfs:
         present |= set(gdf.geometry.geom_type.unique())
@@ -411,19 +411,19 @@ def reject_unsupported_geom_types(*gdfs, operation: str = "operação") -> None:
 
 
 def align_crs(target, other):
-    """Reprojeta `other` para o CRS de `target` se diferirem; retorna `other`."""
+    """Reprojects `other` to the CRS of `target` if they differ; returns `other`."""
     if target.crs is not None and other.crs is not None and target.crs != other.crs:
         return other.to_crs(target.crs)
     return other
 
 
-# ── Unidade de distância vs unidade do CRS ───────────────────────────────────
+# ── Distance unit vs CRS unit ─────────────────────────────────────────────────
 
 _METRE_UNIT_NAMES = {"metre", "meter", "metres", "meters", "m"}
 
 
 def crs_is_metric(crs) -> bool:
-    """True se o CRS é projetado e sua unidade linear é o metro."""
+    """True if the CRS is projected and its linear unit is the meter."""
     if crs is None or crs.is_geographic:
         return False
     try:
@@ -433,14 +433,14 @@ def crs_is_metric(crs) -> bool:
 
 
 def working_crs_for_unit(gdf, unit: str):
-    """CRS no qual uma distância expressa em `unit` é válida.
+    """CRS in which a distance expressed in `unit` is valid.
 
-    - unit='meters'  → CRS projetado em metros (UTM estimado, se o atual não serve)
-    - unit='degrees' → CRS geográfico (o geodetic_crs do atual, ou EPSG:4326)
+    - unit='meters'  → projected CRS in meters (estimated UTM, if the current one doesn't fit)
+    - unit='degrees' → geographic CRS (the current one's geodetic_crs, or EPSG:4326)
 
-    Retorna None quando o CRS atual já atende (nenhuma reprojeção necessária).
-    Função síncrona — use asyncio.to_thread() em contextos async, pois
-    estimate_utm_crs() percorre total_bounds.
+    Returns None when the current CRS already fits (no reprojection needed).
+    Synchronous function — use asyncio.to_thread() in async contexts, since
+    estimate_utm_crs() walks total_bounds.
     """
     crs = gdf.crs
     if unit == "meters":
@@ -455,28 +455,28 @@ def working_crs_for_unit(gdf, unit: str):
 
 
 def para_crs_metrico(*gdfs):
-    """Leva as camadas para UM CRS projetado comum, onde área faz sentido.
+    """Brings the layers to ONE common projected CRS, where area makes sense.
 
-    O CRS comum vem da primeira camada com CRS: é o dela, quando já é projetado
-    (na unidade dele — nada é reprojetado à toa), ou a UTM estimada pela
-    extensão DELA, quando é geográfico. As demais camadas vão para esse CRS.
-    Estimar a UTM de cada camada em separado punha A e B em zonas diferentes
-    quando os centros caíam em lados opostos de um meridiano de zona — e o
-    overlay entre CRSs diferentes só AVISA: o percentual de sobreposição saía
-    errado, sem erro.
+    The common CRS comes from the first layer with a CRS: its own, when already
+    projected (in its unit — nothing is reprojected needlessly), or the UTM
+    estimated from ITS extent, when geographic. The other layers go to that CRS.
+    Estimating the UTM of each layer separately put A and B in different zones
+    when their centers fell on opposite sides of a zone meridian — and an
+    overlay between different CRSs only WARNS: the overlap percentage came out
+    wrong, with no error.
 
-    A UTM sai só da primeira camada, e não da extensão conjunta: é a mesma que
-    ela sempre teve (ComputeArea e Bifurcação medem igual; no
-    OverlapPercentage a saída continua no CRS de A, e uma camada B já projetada
-    na zona certa não troca de zona), e uma B sem geometria válida não atrapalha
-    a estimativa. A sem geometria válida levanta o ValueError do
-    `estimate_utm_crs` ("NaN or None values are not allowed."), como antes.
+    The UTM comes only from the first layer, not from the combined extent: it is
+    the same one it always had (ComputeArea and Bifurcação measure the same; in
+    OverlapPercentage the output stays in A's CRS, and a B layer already projected
+    in the right zone does not change zone), and a B with no valid geometry does
+    not disturb the estimate. An A with no valid geometry raises the ValueError from
+    `estimate_utm_crs` ("NaN or None values are not allowed."), as before.
 
-    Camada sem CRS volta como está (não há de onde reprojetar).
+    A layer without a CRS comes back as is (there is nothing to reproject from).
 
-    Devolve uma tupla na ordem recebida. Função síncrona — use
-    asyncio.to_thread() em contextos async (estimate_utm_crs percorre
-    total_bounds e to_crs é O(n)).
+    Returns a tuple in the order received. Synchronous function — use
+    asyncio.to_thread() in async contexts (estimate_utm_crs walks
+    total_bounds and to_crs is O(n)).
     """
     com_crs = [gdf for gdf in gdfs if gdf.crs is not None]
     if not com_crs:

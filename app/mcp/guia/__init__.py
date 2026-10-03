@@ -1,21 +1,21 @@
 # app/mcp/guia/__init__.py
 """
-O guia de autoria, fatiado por tópico.
+The authoring guide, sliced by topic.
 
-Uma fonte só para dois consumidores: a tool `get_authoring_guide(topic=…)` e o
-resource `atlans://guide/authoring/{topic}`. Guardar o texto em arquivos `.md`
-ao lado deste módulo (e não em constantes Python) é o que permite revisar o
-conteúdo como texto, com diff legível — e o que garante que tool e resource
-nunca divirjam, porque leem o mesmo arquivo.
+A single source for two consumers: the `get_authoring_guide(topic=…)` tool and
+the `atlans://guide/authoring/{topic}` resource. Keeping the text in `.md` files
+next to this module (and not in Python constants) is what lets the content be
+reviewed as text, with a readable diff — and what guarantees that tool and
+resource never diverge, because they read the same file.
 """
 from __future__ import annotations
 
 from pathlib import Path
 
-# A ordem é a de leitura recomendada: o que é um fluxo, como ligar os nós, como
-# referenciar credenciais, como escrever expressões, como receber entradas, de
-# onde vêm as fontes externas (o catálogo), SQL, armadilhas conhecidas e, por
-# fim, receitas prontas.
+# The order is the recommended reading order: what a workflow is, how to wire
+# nodes, how to reference credentials, how to write expressions, how to receive
+# inputs, where external sources come from (the catalog), SQL, known pitfalls
+# and, finally, ready-made recipes.
 TOPICOS: tuple[str, ...] = (
     "overview",
     "edges",
@@ -30,11 +30,11 @@ TOPICOS: tuple[str, ...] = (
 
 
 def ler_topico(topic: str) -> str:
-    """O markdown de um tópico.
+    """The markdown of a topic.
 
-    Tópico fora da lista levanta `ValueError` — nunca um caminho de arquivo: o
-    nome vem do cliente, e montar `Path` com texto arbitrário seria travessia de
-    diretório.
+    A topic outside the list raises `ValueError` — never a file path: the name
+    comes from the client, and building a `Path` from arbitrary text would be
+    directory traversal.
     """
     if topic not in TOPICOS:
         raise ValueError(

@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 
 /**
- * O ShellSidebar troca a casca pela rota: HomeSidebar SÓ em `/` (casamento
- * exato), AppSidebar em todo o resto. Um `startsWith("/")` casaria tudo.
+ * ShellSidebar swaps the shell by route: HomeSidebar ONLY on `/` (exact match),
+ * AppSidebar everywhere else. A `startsWith("/")` would match everything.
  */
 const nav = vi.hoisted(() => ({ pathname: "/" }))
 vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }))

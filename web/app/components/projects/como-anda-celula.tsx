@@ -6,15 +6,16 @@ import { formatarDuracaoGrossa, plural } from "@/lib/formatos"
 import { JANELA_EM_DIAS, type ComoAnda } from "./como-anda"
 
 /**
- * Coluna "como anda" da linha (docs/specs/projects.md §3.5). O arquivo não se
- * chama `como-anda.tsx` de propósito: ao lado de `como-anda.ts`, o mesmo
- * `import "./como-anda"` cairia no `.ts` para o tsc e o Vite e no `.tsx` para
- * o webpack do Next, que prefere `.tsx` — e a página quebraria só no build.
+ * The row's "como anda" (how it is going) column (docs/specs/projects.md §3.5).
+ * The file is not called `como-anda.tsx` on purpose: next to `como-anda.ts`,
+ * the same `import "./como-anda"` would resolve to the `.ts` for tsc and Vite
+ * and to the `.tsx` for Next's webpack, which prefers `.tsx` — and the page
+ * would break only in the build.
  *
- * Duas linhas: a primeira com o status e o quando, a segunda com o contexto
- * que muda uma decisão — quantas rodaram e quantas falharam na janela, ou o
- * erro inteiro quando a última falhou. As cores são as do `StatusBadge`, para
- * quem lê o Histórico reconhecer o mesmo verde/vermelho/azul aqui.
+ * Two lines: the first with the status and the when, the second with the
+ * context that changes a decision — how many ran and how many failed in the
+ * window, or the whole error when the last one failed. The colors are those of
+ * `StatusBadge`, so whoever reads History recognizes the same green/red/blue here.
  */
 
 interface Props {
@@ -22,7 +23,7 @@ interface Props {
   className?: string
 }
 
-/** "61 execuções em 30 d · 3 falhas · mediana 3 min" — "nenhuma falha" no zero; a mediana some quando não há. */
+/** "61 execuções em 30 d · 3 falhas · mediana 3 min" — "nenhuma falha" at zero; the median disappears when there is none. */
 export function textoDaContagem(c: { total: number; falhas: number; mediana: number | null }): string {
   const partes = [
     `${plural(c.total, "execução", "execuções")} em ${JANELA_EM_DIAS} d`,
@@ -32,7 +33,7 @@ export function textoDaContagem(c: { total: number; falhas: number; mediana: num
   return partes.join(" · ")
 }
 
-/** "agendado · em geo-01 · costuma levar 7 min" — só o que se sabe do run vivo; nulo quando não se sabe nada. */
+/** "agendado · em geo-01 · costuma levar 7 min" — only what is known of the live run; null when nothing is known. */
 export function textoDaExecucao(c: { origem: string | null; executor: string | null; tipica: number | null }): string | null {
   const partes = [
     c.origem,
@@ -47,7 +48,7 @@ type Leitura = {
   tom: string
   primeira: string
   segunda: string | null
-  /** A segunda linha em vermelho (erro) em vez de cinza. */
+  /** The second line in red (error) instead of gray. */
   segundaEmAlerta: boolean
 }
 
@@ -70,8 +71,8 @@ function ler(c: ComoAnda): Leitura {
         segundaEmAlerta: false,
       }
     case "falhou":
-      // Sem texto de erro (o backend registrou a falha sem mensagem), a
-      // contagem ainda diz algo; um espaço vazio não diria nada.
+      // With no error text (the backend recorded the failure without a message), the
+      // count still says something; an empty space would say nothing.
       return {
         marcador: <Ponto className="bg-red-500" />,
         tom: "text-red-600 dark:text-red-400",
@@ -125,8 +126,8 @@ export function ComoAndaCelula({ comoAnda, className }: Props) {
       {l.segunda && (
         <span
           className={cn("truncate text-xs", l.segundaEmAlerta ? "text-red-600 dark:text-red-400" : "text-muted-foreground")}
-          // O erro inteiro fica no `title`: a coluna tem 260px e a mensagem
-          // costuma ter mais que isso.
+          // The whole error stays in the `title`: the column is 260px and the message
+          // is usually longer than that.
           title={l.segundaEmAlerta ? l.segunda : undefined}
         >
           {l.segunda}
@@ -140,7 +141,7 @@ function Ponto({ className }: { className: string }) {
   return <span aria-hidden="true" className={cn("inline-block size-2 shrink-0 rounded-full", className)} />
 }
 
-/** Azul com o mesmo ping do `StatusBadge` em andamento — sob `motion-safe`. */
+/** Blue with the same ping as the in-progress `StatusBadge` — under `motion-safe`. */
 function PontoVivo() {
   return (
     <span aria-hidden="true" className="relative flex size-2 shrink-0">
@@ -150,7 +151,7 @@ function PontoVivo() {
   )
 }
 
-/** Ponto vazado: "não há execução" é diferente de "acabou em cinza". */
+/** Hollow dot: "there is no run" is different from "ended in gray". */
 function PontoVazio() {
   return <span aria-hidden="true" className="inline-block size-2 shrink-0 rounded-full border border-muted-foreground/60" />
 }

@@ -1,10 +1,10 @@
 """
-Engine SQLAlchemy com cache TTL (dispose no evict) + utilitários de schema.
+SQLAlchemy engine with a TTL cache (dispose on evict) + schema utilities.
 
-Compartilhado por SaveToPostGIS e SaveToPostgres, que antes reimplementavam o
-mesmo _EngineCache/_get_engine/_ensure_schema. Cada nó mantém a SUA instância de
-EngineCache (via make_engine_cache) para não competirem por slots do TTLCache
-quando rodam concorrentes no mesmo executor.
+Shared by SaveToPostGIS and SaveToPostgres, which used to reimplement the
+same _EngineCache/_get_engine/_ensure_schema. Each node keeps ITS OWN EngineCache
+instance (via make_engine_cache) so they don't compete for TTLCache slots
+when running concurrently on the same executor.
 """
 import sqlalchemy
 from cachetools import TTLCache
@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 
 class EngineCache(TTLCache):
-    """TTLCache que chama engine.dispose() ao evicionar/remover entradas."""
+    """TTLCache that calls engine.dispose() when evicting/removing entries."""
 
     def __init__(self, maxsize: int = 20, ttl: int = 600, *, label: str = "SQL"):
         super().__init__(maxsize=maxsize, ttl=ttl)
@@ -58,24 +58,24 @@ def get_engine(cache: EngineCache, conn_str: str, *, label: str = "SQL") -> sqla
     return cache[conn_str]
 
 
-# Limite de parâmetros de bind por instrução no protocolo do Postgres. O
-# `method="multi"` do pandas monta UM `INSERT ... VALUES (...), (...), ...` com
-# um parâmetro por célula, então `linhas × colunas` não pode passar disto.
+# Limit of bind parameters per statement in the Postgres protocol. pandas'
+# `method="multi"` builds ONE `INSERT ... VALUES (...), (...), ...` with
+# one parameter per cell, so `linhas × colunas` (rows × columns) cannot exceed this.
 _MAX_PARAMETROS_POR_INSTRUCAO = 65535
 
 
 def lote_seguro(n_colunas: int, escolhido: int | None) -> int:
-    """Quantas linhas cabem numa instrução, respeitando o teto do protocolo.
+    """How many rows fit in one statement, respecting the protocol's ceiling.
 
-    Sem isto, gravar uma tabela de 10 colunas com mais de ~6.500 linhas monta
-    uma instrução com mais de 65.535 parâmetros e o driver recusa — num nó cujo
-    campo de lote vem com 0 de fábrica e cuja ajuda diz "0 = todas de uma vez".
-    Ou seja: o padrão era o valor que quebra, e a interface o apresentava como
-    normal.
+    Without this, writing a 10-column table with more than ~6,500 rows builds
+    a statement with more than 65,535 parameters and the driver rejects it — in a
+    node whose batch field ships as 0 and whose help says "0 = todas de uma vez"
+    (0 = all at once). In other words: the default was the value that breaks, and
+    the interface presented it as normal.
 
-    Um lote escolhido pelo usuário é respeitado até o teto e cortado acima
-    dele: quantas linhas vão por instrução é ajuste de desempenho, e nenhum
-    valor de desempenho justifica montar uma instrução que o banco recusa.
+    A batch chosen by the user is respected up to the ceiling and cut above
+    it: how many rows go per statement is performance tuning, and no
+    performance value justifies building a statement the database rejects.
     """
     teto = max(1, _MAX_PARAMETROS_POR_INSTRUCAO // max(1, n_colunas))
     if not escolhido or escolhido <= 0:
@@ -84,12 +84,12 @@ def lote_seguro(n_colunas: int, escolhido: int | None) -> int:
 
 
 def ensure_schema(conn, schema: str | None) -> None:
-    """CREATE SCHEMA IF NOT EXISTS. No-op se `schema` vazio ('public' sempre
-    existe). O nome vem do usuário → quotado via identifier_preparer (anti
-    SQL-injection). to_postgis/to_sql não criam o schema sozinhos.
+    """CREATE SCHEMA IF NOT EXISTS. No-op if `schema` is empty ('public' always
+    exists). The name comes from the user → quoted via identifier_preparer (anti
+    SQL-injection). to_postgis/to_sql do not create the schema on their own.
 
-    Recebe uma CONEXÃO, não a engine: quem chama abre a transação e grava
-    dentro dela (ver truncate_table).
+    Receives a CONNECTION, not the engine: the caller opens the transaction and
+    writes inside it (see truncate_table).
     """
     if not schema:
         return
@@ -98,22 +98,22 @@ def ensure_schema(conn, schema: str | None) -> None:
 
 
 def truncate_table(conn, schema: str | None, table: str) -> bool:
-    """TRUNCATE na tabela, se ela já existir. Retorna True se esvaziou algo.
+    """TRUNCATE on the table, if it already exists. Returns True if it emptied something.
 
-    Diferente do `if_exists='replace'` do to_postgis/to_sql (que faz DROP +
-    CREATE), preserva a estrutura da tabela: tipos das colunas, SRID da
-    geometria, índices, constraints, defaults, triggers e GRANTs. Depois disso
-    o node grava com if_exists='append'.
+    Unlike to_postgis/to_sql's `if_exists='replace'` (which does DROP +
+    CREATE), it preserves the table's structure: column types, geometry SRID,
+    indexes, constraints, defaults, triggers and GRANTs. After that
+    the node writes with if_exists='append'.
 
-    Se a tabela não existe, é no-op (o append subsequente a cria).
-    Nomes vêm do usuário → quotados via identifier_preparer (anti SQL-injection).
+    If the table doesn't exist, it is a no-op (the subsequent append creates it).
+    Names come from the user → quoted via identifier_preparer (anti SQL-injection).
 
-    Recebe uma CONEXÃO, e não a engine, porque o esvaziamento e a gravação
-    precisam ser a MESMA transação. Enquanto cada um abria a sua, o TRUNCATE
-    commitava sozinho e uma falha na gravação seguinte — tipo incompatível,
-    queda de rede, qualquer coisa — deixava a tabela VAZIA: o dado velho já
-    tinha ido embora e o novo nunca chegou. Numa opção chamada "limpar e
-    gravar", perder as duas pontas é o pior desfecho possível.
+    Receives a CONNECTION, not the engine, because emptying and writing
+    must be the SAME transaction. While each opened its own, the TRUNCATE
+    committed on its own and a failure in the following write — incompatible type,
+    network drop, anything — left the table EMPTY: the old data was already
+    gone and the new never arrived. In an option called "Limpar e
+    gravar" (clear and write), losing both ends is the worst possible outcome.
     """
     if not sqlalchemy.inspect(conn).has_table(table, schema=schema or None):
         return False

@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
 import { destinoDaEntrada } from "@/lib/entrada";
 
-// A tela de "Esqueceu a senha?" virou um painel do modal de entrada da Home
-// (`components/home/entrada/painel-recuperar.tsx`). Esta rota fica pelos links
-// antigos — e-mails já enviados, favoritos, o "Solicitar novo link" de
-// qualquer página velha em cache: ela manda para a Home com o painel aberto.
+// The "Esqueceu a senha?" (forgot password) screen became a panel of the Home's
+// sign-in modal (`components/home/entrada/painel-recuperar.tsx`). This route stays
+// for old links — emails already sent, bookmarks, the "Solicitar novo link" of
+// any old cached page: it sends to the Home with the panel open.
 export default function ForgotPasswordPage() {
   redirect(destinoDaEntrada("recuperar"));
 }

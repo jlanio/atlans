@@ -1,12 +1,12 @@
 # flow/utils/workflow_contract.py
 """
-Extrai o contrato (API publica) de um workflow para uso como sub-fluxo.
+Extracts a workflow's contract (public API) for use as a sub-workflow.
 
-Contrato declarado via property `ports` (lista de strings) nos nodes
-SubWorkflowInput e SubWorkflowOutput. As edges saindo do Input e chegando
-no Output nao precisam ter `from_key`/`to_key` definidos — a unica edge
-permitida em cada lado roteia o dict inteiro via `inputs.update(...)` no
-executor (caminho "sem chave" em flow/executor/core.py).
+The contract is declared via the `ports` property (list of strings) on the
+SubWorkflowInput and SubWorkflowOutput nodes. Edges leaving the Input and arriving
+at the Output don't need `from_key`/`to_key` defined — the only edge
+allowed on each side routes the whole dict via `inputs.update(...)` in the
+executor (the "no key" path in flow/executor/core.py).
 """
 from __future__ import annotations
 
@@ -20,8 +20,8 @@ _PORTS_PROP = "ports"
 
 
 def _node_properties(node: Dict[str, Any]) -> Dict[str, Any]:
-    """Retorna properties do node aceitando ambos os formatos do canvas:
-    `node["properties"]` ou `node["data"]["properties"]`."""
+    """Returns the node's properties accepting both canvas formats:
+    `node["properties"]` or `node["data"]["properties"]`."""
     props = node.get("properties")
     if isinstance(props, dict):
         return props
@@ -30,9 +30,9 @@ def _node_properties(node: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _parse_ports(raw: Any) -> list[str]:
-    """Normaliza `ports` para list[str]. Aceita lista nativa ou JSON serializado
-    (helper UI armazena via JSON.stringify para compatibilidade com setNodeField).
-    Filtra valores vazios e nao-strings."""
+    """Normalizes `ports` to list[str]. Accepts a native list or serialized JSON
+    (the UI helper stores it via JSON.stringify for compatibility with setNodeField).
+    Filters out empty values and non-strings."""
     if isinstance(raw, str):
         try:
             raw = json.loads(raw)
@@ -54,18 +54,18 @@ def _parse_ports(raw: Any) -> list[str]:
 
 
 def extract_contract(definition: Dict[str, Any]) -> Dict[str, list]:
-    """Retorna {"inputs": [{name, ...}], "outputs": [...], "has_input_node", "has_output_node"}.
+    """Returns {"inputs": [{name, ...}], "outputs": [...], "has_input_node", "has_output_node"}.
 
-    Inputs/outputs sao lidos da property `ports` dos nodes SubWorkflowInput
-    e SubWorkflowOutput. Quando o workflow nao tem esses nodes, retorna
-    listas vazias e flags has_*_node False — caller decide o que fazer.
+    Inputs/outputs are read from the `ports` property of the SubWorkflowInput
+    and SubWorkflowOutput nodes. When the workflow doesn't have these nodes, returns
+    empty lists and has_*_node flags False — the caller decides what to do.
     """
     nodes = definition.get("nodes") or []
 
     input_nodes = [n for n in nodes if n.get("name") == _INPUT_NODE_NAME]
     output_nodes = [n for n in nodes if n.get("name") == _OUTPUT_NODE_NAME]
 
-    # Une portas de todos os nodes do tipo (raro ter mais de 1, mas defensivo).
+    # Merges ports from all nodes of the type (rare to have more than 1, but defensive).
     input_keys: list[str] = []
     seen_in: set[str] = set()
     for n in input_nodes:
@@ -87,8 +87,8 @@ def extract_contract(definition: Dict[str, Any]) -> Dict[str, list]:
         "outputs": [{"name": k, "type": "any", "description": None} for k in output_keys],
         "has_input_node": bool(input_nodes),
         "has_output_node": bool(output_nodes),
-        # Contagens: mais de um node de contrato torna o retorno ambíguo
-        # (collect_subworkflow_output devolve só o primeiro).
+        # Counts: more than one contract node makes the return value ambiguous
+        # (collect_subworkflow_output returns only the first).
         "input_node_count": len(input_nodes),
         "output_node_count": len(output_nodes),
     }
@@ -97,19 +97,19 @@ def extract_contract(definition: Dict[str, Any]) -> Dict[str, list]:
 def validate_inputs_mapping(
     inputs_mapping: Dict[str, Any], contract: Dict[str, list]
 ) -> list[str]:
-    """Retorna lista de mensagens de erro para chaves invalidas.
+    """Returns a list of error messages for invalid keys.
 
-    Compara as chaves de `inputs_mapping` (que sao chaves do sub-fluxo) com
-    as chaves declaradas em `contract["inputs"]`. Aceita mapping parcial
-    (sub-fluxo pode receber subset).
+    Compares the keys of `inputs_mapping` (which are sub-workflow keys) with
+    the keys declared in `contract["inputs"]`. Accepts a partial mapping
+    (a sub-workflow may receive a subset).
 
-    Returns lista vazia se OK; lista de mensagens caso contrario.
+    Returns an empty list if OK; a list of messages otherwise.
     """
     if not isinstance(inputs_mapping, dict):
         return []
     declared = {p["name"] for p in (contract.get("inputs") or [])}
     if not declared:
-        # Sub-fluxo sem inputs declarados; nao temos como validar
+        # Sub-workflow with no declared inputs; we have no way to validate
         return []
     errors: list[str] = []
     for key in inputs_mapping.keys():
@@ -122,8 +122,8 @@ def validate_inputs_mapping(
 
 
 def collect_subworkflow_references(definition: Dict[str, Any]) -> list[Dict[str, Any]]:
-    """Lista todos os nodes SubWorkflow na definicao com seus workflowHash
-    + inputsMapping. Usado para validacao cross-workflow ao salvar."""
+    """Lists all SubWorkflow nodes in the definition with their workflowHash
+    + inputsMapping. Used for cross-workflow validation on save."""
     refs: list[Dict[str, Any]] = []
     for n in (definition.get("nodes") or []):
         if n.get("name") != "SubWorkflow":
@@ -141,9 +141,9 @@ def collect_subworkflow_references(definition: Dict[str, Any]) -> list[Dict[str,
     return refs
 
 
-# Profundidade maxima da cadeia de sub-fluxos. O SubWorkflowNode importa daqui
-# para poder EXPLICAR o estouro: sem a constante compartilhada, exceder o limite
-# chegava ao operador como "workflow nao encontrado".
+# Maximum depth of the sub-workflow chain. SubWorkflowNode imports it from here
+# so it can EXPLAIN the overflow: without the shared constant, exceeding the limit
+# reached the operator as "workflow nao encontrado" (workflow not found).
 MAX_PROFUNDIDADE = 10
 
 
@@ -153,18 +153,18 @@ async def collect_subworkflow_definitions_recursive(
     workspace_id: str | None = None,
     max_depth: int = MAX_PROFUNDIDADE,
 ) -> Dict[str, Dict[str, Any]]:
-    """Coleta recursivamente as definitions dos sub-workflows referenciados.
+    """Recursively collects the definitions of the referenced sub-workflows.
 
-    Usado pelo servidor ao montar o envelope do job: o executor nao tem acesso
-    ao DB, entao precisa receber tudo no payload. Inclui A -> B -> C -> D
-    em uma unica passagem.
+    Used by the server when building the job envelope: the executor has no access
+    to the DB, so it must receive everything in the payload. Includes A -> B -> C -> D
+    in a single pass.
 
-    Limita profundidade para evitar payloads gigantes em caso de cadeia
-    excessiva (default 10 niveis — generoso para uso real).
+    Limits depth to avoid huge payloads in case of an excessive
+    chain (default 10 levels — generous for real use).
 
-    Returns {hash: definition_decifrada}. Hashes nao encontrados ou de
-    outros workspaces sao silenciosamente ignorados — `validate_subworkflow_
-    references_against_db` ja bloqueou esses casos no save.
+    Returns {hash: definition_decifrada}. Hashes not found or from
+    other workspaces are silently ignored — `validate_subworkflow_
+    references_against_db` already blocked those cases on save.
     """
     from sqlalchemy import select
     from app.models.models import Workflow
@@ -208,20 +208,20 @@ async def validate_subworkflow_references_against_db(
     db,
     workspace_id: str | None = None,
 ) -> list[str]:
-    """Valida que cada SubWorkflow na `definition` referencia um workflow
-    que (a) existe, (b) esta ativo, (c) tem contrato (SubWorkflowInput +
-    SubWorkflowOutput), (d) `inputsMapping` so usa chaves declaradas.
+    """Validates that each SubWorkflow in `definition` references a workflow
+    that (a) exists, (b) is active, (c) has a contract (SubWorkflowInput +
+    SubWorkflowOutput), (d) `inputsMapping` only uses declared keys.
 
-    Retorna lista de mensagens de erro (vazia se OK). Pensada para ser
-    chamada antes de salvar workflow A (POST/PUT) — bloqueia o save com
-    422 se houver violacoes.
+    Returns a list of error messages (empty if OK). Meant to be
+    called before saving workflow A (POST/PUT) — blocks the save with
+    422 if there are violations.
 
-    Cross-workspace: se `workspace_id` for fornecido, a query já filtra pelo
-    workspace do pai — um alvo de outro workspace é "nao existe", igual a um
-    hash inventado. Distinguir "existe mas e de outro" de "nao existe" (ou de
-    "esta desativado") seria um oraculo de existencia e estado de workflows
-    alheios para qualquer membro (o hash e uuid4, mas o chamador pode ser um
-    workspace criado so para consultar).
+    Cross-workspace: if `workspace_id` is provided, the query already filters by
+    the parent's workspace — a target from another workspace "doesn't exist", just
+    like a made-up hash. Distinguishing "exists but belongs to another" from "doesn't
+    exist" (or from "is deactivated") would be an oracle of the existence and state
+    of other people's workflows for any member (the hash is uuid4, but the caller
+    may be a workspace created just to probe).
     """
     refs = collect_subworkflow_references(definition)
     if not refs:
@@ -231,8 +231,8 @@ async def validate_subworkflow_references_against_db(
     from app.models.models import Workflow
     from app.core.utils.encryption import decrypt_workflow_connections
 
-    # Carrega TODOS os alvos numa unica query (evita N+1 quando o workflow A
-    # tem multiplos SubWorkflows).
+    # Loads ALL targets in a single query (avoids N+1 when workflow A
+    # has multiple SubWorkflows).
     hashes = {ref["workflow_hash"] for ref in refs}
     stmt = select(Workflow).where(Workflow.id_hash.in_(hashes))
     if workspace_id:
@@ -246,9 +246,9 @@ async def validate_subworkflow_references_against_db(
         node_id = ref["node_id"]
         target = targets_by_hash.get(wh)
 
-        # A query ja filtrou por workspace; a segunda condicao e cinto e
-        # suspensorio (uma sessao que devolva linhas de fora) e le como
-        # inexistente ANTES de olhar o estado, para nao vazar nem isso.
+        # The query already filtered by workspace; the second condition is belt and
+        # suspenders (a session that returns rows from outside) and reads as
+        # nonexistent BEFORE looking at the state, so as not to leak even that.
         if target is None or (workspace_id and target.workspace_id != workspace_id):
             errors.append(
                 f"Node SubWorkflow '{node_id}' aponta para workflow '{wh}' "
@@ -269,9 +269,9 @@ async def validate_subworkflow_references_against_db(
 
         contract = extract_contract(target_def)
 
-        # Só SubWorkflowOutput é obrigatório — define o valor de retorno.
-        # SubWorkflowInput é opcional (sub-fluxo pode não receber nada) e
-        # `ports` vazio significa passthrough, não ausência de contrato.
+        # Only SubWorkflowOutput is mandatory — it defines the return value.
+        # SubWorkflowInput is optional (a sub-workflow may receive nothing) and
+        # empty `ports` means passthrough, not absence of a contract.
         if not contract.get("has_output_node"):
             errors.append(
                 f"Node SubWorkflow '{node_id}' aponta para workflow '{wh}' "
@@ -287,8 +287,8 @@ async def validate_subworkflow_references_against_db(
             )
             continue
 
-        # Pai envia mapeamento para filho que não tem entry point: os dados
-        # seriam silenciosamente ignorados em runtime.
+        # Parent sends a mapping to a child that has no entry point: the data
+        # would be silently ignored at runtime.
         if ref["inputs_mapping"] and not contract.get("has_input_node"):
             errors.append(
                 f"Node SubWorkflow '{node_id}' mapeia entradas para o workflow "

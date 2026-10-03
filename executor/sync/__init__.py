@@ -1,1 +1,1 @@
-# executor/sync — GeoSync: sincronizacao de dados espaciais com o Drive do Workspace
+# executor/sync — GeoSync: synchronization of spatial data with the Workspace Drive

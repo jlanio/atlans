@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 /**
- * Seção «Notificações»: o «Atualizar» traz a allowlist e os workflows atuais,
- * mas NÃO apaga em silêncio uma edição em andamento. Sem edição, o rascunho
- * acompanha o que o servidor devolveu; com edição, ele sobrevive à recarga.
+ * "Notificações" (notifications) section: "Atualizar" (refresh) brings the
+ * allowlist and the current workflows, but does NOT silently erase an edit in
+ * progress. With no edit, the draft follows what the server returned; with an
+ * edit, it survives the reload.
  */
 
 const svc = vi.hoisted(() => ({ getWorkspaceNotifications: vi.fn(), updateWorkspaceNotificationAllowlist: vi.fn() }))

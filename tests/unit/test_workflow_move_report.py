@@ -1,9 +1,9 @@
 # tests/unit/test_workflow_move_report.py
-"""Relatorio de impacto da movimentacao de workflow.
+"""Impact report for moving a workflow.
 
-Como o move nunca bloqueia, o relatorio e a UNICA coisa que informa o usuario do
-que vai quebrar. Um aviso que nao aparece e pior do que nenhum relatorio: passa
-a impressao de que esta tudo certo.
+Since move never blocks, the report is the ONLY thing that tells the user what
+is going to break. A warning that does not show up is worse than no report: it
+gives the impression that everything is fine.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -39,11 +39,11 @@ def _codes(avisos):
     return {a["code"] for a in avisos}
 
 
-# ── Coletor de propriedades ──────────────────────────────────────────────────
+# ── Property collector ───────────────────────────────────────────────────────
 
 def test_coletor_le_data_properties_e_properties():
-    """O canvas grava em data.properties; ler so `properties` produziria
-    falso-negativo justamente no formato mais comum."""
+    """The canvas writes to data.properties; reading only `properties` would
+    produce a false negative precisely in the most common format."""
     definition = {"nodes": [
         _node("n1", "DataInput", {"driveFileId": "f-1"}),
         _node("n2", "DataInput", {"driveFileId": "f-2"}, em_data=True),
@@ -55,8 +55,8 @@ def test_coletor_le_data_properties_e_properties():
 
 
 def test_coletor_de_subworkflow_usa_a_mesma_cadeia():
-    """`collect_subworkflow_references` do flow/ le so `properties` — por isso o
-    relatorio tem coletor proprio."""
+    """flow/'s `collect_subworkflow_references` reads only `properties` — which is
+    why the report has its own collector."""
     definition = {"nodes": [
         _node("s1", "SubWorkflow", {"workflowHash": "wf-b"}, ntype="control", em_data=True),
     ]}
@@ -88,8 +88,8 @@ def _db_com(linhas_por_chamada):
 
 @pytest.mark.asyncio
 async def test_avisa_credencial_cujo_dono_nao_alcanca_o_destino():
-    """O escopo de credenciais vem dos membros do workspace do workflow. Sem
-    aviso, o sintoma em runtime e so um WARNING no log do servidor."""
+    """The credential scope comes from the members of the workflow's workspace.
+    Without a warning, the symptom at runtime is just a WARNING in the server log."""
     definition = {"nodes": [_node("n1", "WFS", {"credential_id": "11111111-1111-1111-1111-111111111111"})]}
     db = _db_com([[("11111111-1111-1111-1111-111111111111", "Banco Prod", "usr-alheio")]])
 
@@ -114,8 +114,8 @@ async def test_nao_avisa_quando_o_dono_e_membro_do_destino():
 
 @pytest.mark.asyncio
 async def test_credencial_em_trigger_e_marcada():
-    """Em trigger o efeito e ruidoso (403 no disparo), nao silencioso — a
-    mensagem precisa dizer isso."""
+    """In a trigger the effect is noisy (403 on trigger), not silent — the
+    message needs to say so."""
     definition = {"nodes": [
         _node("t1", "WebhookTrigger", {"credential_id": "11111111-1111-1111-1111-111111111111"}, ntype="trigger"),
     ]}
@@ -171,7 +171,7 @@ async def test_nao_avisa_subworkflow_que_ja_esta_no_destino():
 
 @pytest.mark.asyncio
 async def test_avisa_dependente_reverso():
-    """Colateral que nao esta na definition do workflow movido, e sim na dos outros."""
+    """Collateral that is not in the moved workflow's definition, but in the others'."""
     dependente_def = {"nodes": [_node("s1", "SubWorkflow", {"workflowHash": "wf-1"}, ntype="control")]}
     db = _db_com([[("wf-a", "Relatório mensal", dependente_def)]])
 
@@ -183,7 +183,7 @@ async def test_avisa_dependente_reverso():
 
 @pytest.mark.asyncio
 async def test_pre_filtro_com_falso_positivo_e_descartado():
-    """O LIKE no JSON pode casar o hash noutro campo; a confirmacao e em Python."""
+    """The LIKE on the JSON may match the hash in another field; the confirmation is done in Python."""
     outro_def = {"nodes": [_node("n1", "DataInput", {"driveFileId": "wf-1"})]}
     db = _db_com([[("wf-a", "Outro", outro_def)]])
 
@@ -221,7 +221,7 @@ async def test_nao_avisa_arquivo_ja_no_destino():
     assert await rep._avisar_arquivos(db, definition, DESTINO) == []
 
 
-# ── Configuracao de workspace ────────────────────────────────────────────────
+# ── Workspace configuration ──────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_avisa_troca_de_executor():
@@ -272,7 +272,7 @@ async def test_avisa_notification_url_fora_da_allowlist():
 
 @pytest.mark.asyncio
 async def test_allowlist_vazia_nao_gera_aviso():
-    """Sem allowlist vale so o SSRF check default — nada muda com o move."""
+    """Without an allowlist only the default SSRF check applies — nothing changes with the move."""
     db = _db_com([[
         (ORIGEM, "Origem", "exec-a", None),
         (DESTINO, "Destino", "exec-a", []),
@@ -297,13 +297,13 @@ async def test_url_permitida_pela_allowlist_nao_gera_aviso():
 
 @pytest.mark.asyncio
 async def test_active_runs_reporta_o_total_e_nao_o_tamanho_da_amostra():
-    """A amostra de run_ids e limitada a 5; contar o resultado dela faria a
-    mensagem dizer '5' para qualquer numero acima disso."""
+    """The run_ids sample is capped at 5; counting its result would make the
+    message say '5' for any number above that."""
     db = _db_com([
-        12,                              # COUNT de runs em andamento
+        12,                              # COUNT of runs in progress
         ["r1", "r2", "r3", "r4", "r5"],  # amostra (limit 5)
         0,                               # total de runs (history_left_behind)
-        0,                               # camadas de portal
+        0,                               # portal layers
     ])
 
     avisos = await rep._avisar_estado(db, _wf(), {"nodes": []})
@@ -327,8 +327,8 @@ async def test_sem_runs_em_andamento_nao_gera_aviso():
 
 @pytest.mark.asyncio
 async def test_falha_no_relatorio_nao_derruba_o_move():
-    """O contrato do recurso e que a movimentacao nao falha. Um relatorio vazio
-    seria lido como 'sem impacto' — por isso o codigo explicito."""
+    """The feature's contract is that moving does not fail. An empty report would
+    be read as 'no impact' — hence the explicit code."""
     db = MagicMock(execute=AsyncMock(side_effect=RuntimeError("banco fora do ar")))
 
     avisos = await rep.collect_warnings(db, _wf(), {"nodes": []}, ORIGEM, DESTINO)
@@ -338,7 +338,7 @@ async def test_falha_no_relatorio_nao_derruba_o_move():
 
 @pytest.mark.asyncio
 async def test_warnings_vem_antes_dos_infos():
-    """Na tela, o que quebra precisa aparecer primeiro."""
+    """On screen, what breaks needs to show up first."""
     avisos = [
         {"code": "a", "severity": "info", "message": "", "details": {}},
         {"code": "b", "severity": "warning", "message": "", "details": {}},

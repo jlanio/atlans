@@ -1,34 +1,35 @@
 # flow/nodes/outputs/sub_workflow_output.py
 """
-SubWorkflowOutput — declara a "API publica" de um workflow filho.
+SubWorkflowOutput — declares the "public API" of a child workflow.
 
-Quando um workflow B e usado como sub-fluxo (via SubWorkflowNode em A),
-historicamente o pai recebia `final_outputs` indexado por UUIDs aleatorios
-dos nodes do filho — totalmente nao-utilizavel no canvas.
+When a workflow B is used as a sub-workflow (via SubWorkflowNode in A),
+historically the parent received `final_outputs` keyed by the random UUIDs
+of the child's nodes — completely unusable on the canvas.
 
-Este node resolve isso: o operador de B conecta ao SubWorkflowOutput o que
-quer expor, e o SubWorkflowNode em A detecta `__subworkflow_output__` e
-retorna esse dict como outputs nomeados.
+This node solves that: B's operator connects to SubWorkflowOutput whatever
+they want to expose, and the SubWorkflowNode in A detects `__subworkflow_output__`
+and returns that dict as named outputs.
 
-`ports` tem DOIS papeis, que sao o mesmo papel visto de dois lados:
+`ports` has TWO roles, which are the same role seen from two sides:
 
-  - com DUAS ou mais portas, cada uma vira um ponto de conexao proprio no
-    canvas. O editor preenche o `to_key` da edge com o nome da porta, entao
-    cada origem cai na SUA chave — varios nodes podem alimentar a saida ao
-    mesmo tempo, um por chave;
-  - a lista tambem e a allowlist do que sai para o pai.
+  - with TWO or more ports, each becomes its own connection point on the
+    canvas. The editor fills the edge's `to_key` with the port name, so
+    each source lands in ITS OWN key — several nodes can feed the output at
+    the same time, one per key;
+  - the list is also the allowlist of what goes out to the parent.
 
-Exemplo no canvas de B (duas portas declaradas: focos, mapa):
+Example on B's canvas (two declared ports: focos, mapa):
     WFS        ──────►  ( focos )  SubWorkflowOutput
     RenderMap  ──────►  ( mapa  )
 
-Resultado no canvas de A apos SubWorkflowNode(B):
+Result on A's canvas after SubWorkflowNode(B):
     outputs = {"subWorkflowResult": {...}, "focos": <gdf>, "mapa": <bytes>}
 
-Com `ports` VAZIO o node volta ao modo passthrough: um unico ponto de conexao
-anonimo, uma unica edge, e tudo que chega e devolvido. Duas edges nesse modo
-espalhariam os dois dicts nas mesmas chaves e a ultima venceria — por isso o
-editor so libera varias conexoes a partir de duas portas declaradas.
+With `ports` EMPTY the node goes back to passthrough mode: a single anonymous
+connection point, a single edge, and everything that arrives is returned. Two
+edges in that mode would spread both dicts onto the same keys and the last
+would win — that is why the editor only allows several connections from two
+declared ports on.
 """
 from typing import Any, Dict
 
@@ -42,7 +43,7 @@ logger = get_logger(__name__)
 
 @register_node
 class SubWorkflowOutput(BaseNode):
-    """Define a saída publica de um workflow para uso como sub-fluxo."""
+    """Defines a workflow's public output for use as a sub-workflow."""
 
     @classmethod
     def description(cls) -> Dict[str, Any]:
@@ -69,27 +70,27 @@ class SubWorkflowOutput(BaseNode):
                     ),
                 },
             ],
-            # Entradas DECLARADAS PELO USUARIO, via a propriedade `ports` — o
-            # mesmo mecanismo do PythonScript. E o que permite a mais de um node
-            # alimentar a saida publica: com duas ou mais portas o editor
-            # preenche o `to_key` de cada edge, e o executor entrega
-            # `inputs[to_key]` em vez de sobrescrever tudo na mesma chave.
+            # Inputs DECLARED BY THE USER, via the `ports` property — the
+            # same mechanism as PythonScript. This is what lets more than one node
+            # feed the public output: with two or more ports the editor
+            # fills each edge's `to_key`, and the executor delivers
+            # `inputs[to_key]` instead of overwriting everything on the same key.
             "dynamic_inputs": True,
             "outputs": [
             ],
         }
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        # Filtra metadados internos do executor (chaves comecando com __)
-        # e tambem chaves nao declaradas em ports (se houver lista).
+        # Filters out the executor's internal metadata (keys starting with __)
+        # and also keys not declared in ports (if there is a list).
         declared_set = set(_parse_ports(self.parameters.get("ports")))
 
         raw = {k: v for k, v in (inputs or {}).items() if not k.startswith("__")}
         if declared_set:
             public = {k: v for k, v in raw.items() if k in declared_set}
-            # Descarte com aviso: antes, conectar RenderMap -> Output com
-            # to_key="mapa" e esquecer de declarar "mapa" fazia o dado sumir
-            # sem erro, sem log e sem sinal no canvas.
+            # Drop with a warning: before, connecting RenderMap -> Output with
+            # to_key="mapa" and forgetting to declare "mapa" made the data vanish
+            # with no error, no log and no sign on the canvas.
             dropped = sorted(set(raw) - set(public))
             if dropped:
                 logger.warning(

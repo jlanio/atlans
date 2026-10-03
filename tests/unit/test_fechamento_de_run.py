@@ -1,16 +1,16 @@
-"""Fechar um run pelo servidor: um compare-and-swap só, para os oito caminhos.
+"""Closing a run from the server: a single compare-and-swap, for all eight paths.
 
-Os fechamentos do servidor (vigias de órfãos, cancelamento) gravam o desfecho
-com UPDATE condicional no status: quem chega depois de um desfecho já gravado
-perde a corrida e não conta o uso de novo. Os caminhos do despacho não: o
-"nenhum executor aceitou", a barreira de isolamento e a rede de segurança das
-exceções atribuíam `run.status` e gravavam por PK — o segundo escritor. Entre o
-INSERT do run e esse fechamento passam segundos (credenciais, cifra, envio a
-cada candidato) com o run já na tela, e um cancelamento do usuário nessa janela
-virava "falhou": o 'cancelled' confirmado pela API era apagado e o uso contado
-duas vezes. Esses caminhos também não publicavam o `__workflow_complete__`.
+The server's closings (orphan watchers, cancellation) write the outcome with a
+conditional UPDATE on the status: whoever arrives after an outcome was already
+written loses the race and does not count the usage again. The dispatch paths
+did not: "no executor accepted", the isolation barrier and the exception safety
+net assigned `run.status` and wrote by PK — the second writer. Between the
+run's INSERT and that closing, seconds go by (credentials, encryption, sending
+to each candidate) with the run already on screen, and a user cancellation in
+that window became "failed": the 'cancelled' confirmed by the API was erased and
+the usage counted twice. These paths also did not publish `__workflow_complete__`.
 
-Banco de verdade (SQLite): a corrida só existe entre duas sessões.
+Real database (SQLite): the race only exists between two sessions.
 """
 from __future__ import annotations
 
@@ -57,7 +57,7 @@ _DEFINICAO = {"nodes": [{"id": "t", "name": "WebhookTrigger"}], "edges": []}
 
 @pytest.fixture
 def efeitos(monkeypatch):
-    """Contabilização e publicação, contadas por run."""
+    """Accounting and publication, counted per run."""
     feito = {"contabilizados": [], "publicados": []}
 
     async def _contabiliza(db, run, *a, **k):
@@ -73,7 +73,7 @@ def efeitos(monkeypatch):
 
 
 async def _cancelar_pela_api(Sessao) -> None:
-    """O que `cancel_run` faz com um run ainda 'pending', noutra sessão."""
+    """What `cancel_run` does to a run still 'pending', in another session."""
     async with Sessao() as outra:
         await outra.execute(
             update(WorkflowRun).where(WorkflowRun.status == "pending")
@@ -87,13 +87,13 @@ async def _o_run(Sessao) -> WorkflowRun:
         return (await db.execute(select(WorkflowRun))).scalar_one()
 
 
-# ── O cancelamento no meio do despacho vence ─────────────────────────────────
+# ── Cancellation in the middle of dispatch wins ──────────────────────────────
 
 @pytest.mark.asyncio
 async def test_nenhum_executor_aceitou_nao_apaga_o_cancelamento(efeitos, monkeypatch):
     async with _banco() as Sessao:
         async def _envio(executor_id, job):
-            await _cancelar_pela_api(Sessao)    # o usuário cancela enquanto o candidato responde
+            await _cancelar_pela_api(Sessao)    # the user cancels while the candidate responds
             return False                        # ...e o candidato recusa
 
         monkeypatch.setattr(wes, "inject_credentials", AsyncMock(side_effect=lambda d, **k: d))
@@ -105,8 +105,8 @@ async def test_nenhum_executor_aceitou_nao_apaga_o_cancelamento(efeitos, monkeyp
 
         run = await _o_run(Sessao)
 
-    assert run.status == "cancelled"            # antes: 'failed', por cima do cancelamento
-    assert efeitos["contabilizados"] == []      # quem fechou (o cancelamento) já contou
+    assert run.status == "cancelled"            # before: 'failed', on top of the cancellation
+    assert efeitos["contabilizados"] == []      # whoever closed it (the cancellation) already counted
 
 
 @pytest.mark.asyncio
@@ -151,12 +151,12 @@ async def test_excecao_no_despacho_nao_apaga_o_cancelamento(efeitos, monkeypatch
     assert efeitos["contabilizados"] == []
 
 
-# ── Sem corrida: fecha, conta e publica UMA vez ──────────────────────────────
+# ── No race: closes, counts and publishes ONCE ───────────────────────────────
 
 @pytest.mark.asyncio
 async def test_despacho_esgotado_fecha_conta_e_publica_uma_vez(efeitos, monkeypatch):
-    """O `raise` do caminho (4) passa pela rede de segurança do `except`: ela não
-    pode fechar de novo, nem contar, nem publicar outra conclusão."""
+    """The `raise` of path (4) goes through the `except` safety net: it must not
+    close again, nor count, nor publish another completion."""
     async with _banco() as Sessao:
         monkeypatch.setattr(wes, "inject_credentials", AsyncMock(side_effect=lambda d, **k: d))
         monkeypatch.setattr(wes, "executor_registry", MagicMock(send_job=AsyncMock(return_value=False)))
@@ -169,7 +169,7 @@ async def test_despacho_esgotado_fecha_conta_e_publica_uma_vez(efeitos, monkeypa
 
     assert (run.status, run.error_category) == ("failed", "no_executor")
     assert efeitos["contabilizados"] == [(run.task_id, "failed")]
-    # O painel aberto recebe a conclusão, como nos outros fechamentos do servidor.
+    # The open panel receives the completion, as in the server's other closings.
     assert efeitos["publicados"] == [(run.task_id, "failed")]
 
 
@@ -197,7 +197,7 @@ async def test_fechar_runs_so_fecha_o_que_ainda_esta_aberto(efeitos):
         async with Sessao() as db:
             gravado = dict((await db.execute(select(WorkflowRun.task_id, WorkflowRun.status))).all())
 
-    # 'b' já terminou (o desfecho do executor vale) e 'c' é de outro executor.
+    # 'b' already finished (the executor's outcome stands) and 'c' belongs to another executor.
     assert gravado == {"a": "failed", "b": "success", "c": "pending"}
     assert efeitos["contabilizados"] == [("a", "failed")]
     assert efeitos["publicados"] == [("a", "failed")]
@@ -223,10 +223,10 @@ async def test_barreira_fecha_conta_e_publica_uma_vez(efeitos, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_falha_na_contabilizacao_nao_perde_os_outros_runs_nem_a_conclusao(monkeypatch):
-    """`account_terminal_run` engole a falha do usage_daily com um rollback, e o
-    rollback expira os objetos da sessão: o run seguinte era contado com
-    atributos expirados, a conclusão não era publicada e quem chama não lia mais
-    `run.host` (o cancel ao host não saía)."""
+    """`account_terminal_run` swallows the usage_daily failure with a rollback, and
+    the rollback expires the session's objects: the next run was counted with
+    expired attributes, the completion was not published and the caller could no
+    longer read `run.host` (the cancel to the host did not go out)."""
     from app.core import run_result_consumer as rrc
     from app.services.fechamento_de_run import fechar_runs
 
@@ -238,7 +238,7 @@ async def test_falha_na_contabilizacao_nao_perde_os_outros_runs_nem_a_conclusao(
     contados: list[tuple] = []
 
     async def _upsert(db, run, stats, first_close):
-        await db.execute(select(WorkflowRun.task_id))    # abre a transação, como o upsert real
+        await db.execute(select(WorkflowRun.task_id))    # opens the transaction, like the real upsert
         if run.task_id == "a":
             raise RuntimeError("usage_daily fora do ar")
         contados.append((run.task_id, run.status))

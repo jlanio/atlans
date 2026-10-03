@@ -3,8 +3,8 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { AtencaoLista } from "@/app/components/observability/atencao-lista"
 import type { ItemDeAtencao } from "@/app/components/observability/atencao"
 
-// As dispensas vivem no localStorage (conveniência por navegador). Limpo entre
-// os casos para um não herdar as dispensas do outro.
+// Dismissals live in localStorage (a per-browser convenience). Cleared between
+// cases so one doesn't inherit the other's dismissals.
 afterEach(() => {
   cleanup()
   try { localStorage.clear() } catch { /* jsdom sem storage: nada a limpar */ }
@@ -31,7 +31,7 @@ const itens: ItemDeAtencao[] = [
   },
 ]
 
-/** Botão de ação principal de um item (pelo título no aria-label), não o × de dispensar. */
+/** An item's main action button (by the title in the aria-label), not the dismiss ×. */
 const acaoDe = (regex: RegExp) => screen.getByRole("button", { name: regex })
 
 describe("AtencaoLista", () => {
@@ -69,7 +69,7 @@ describe("AtencaoLista", () => {
 
     expect(screen.getByText("tudo dispensado")).toBeInTheDocument()
     expect(screen.getByText("3 alertas dispensados.")).toBeInTheDocument()
-    // Não é o vazio verde de "nada pede atenção".
+    // It's not the green empty state of "nothing needs attention".
     expect(screen.queryByText("Nenhuma falha no período.")).toBeNull()
     expect(screen.queryByRole("button", { name: /está em andamento|falhou|está no teto/ })).toBeNull()
 

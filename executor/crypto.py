@@ -1,13 +1,13 @@
 # executor/crypto.py
 """
-Operações criptográficas do executor:
-  - Carga da chave privada X25519 gerada no enrollment
-  - Descriptografia de jobs (X25519 ECDH + HKDF + AES-256-GCM)
-  - Verificação de assinatura Ed25519 do servidor
+Executor cryptographic operations:
+  - Loading of the X25519 private key generated at enrollment
+  - Decryption of jobs (X25519 ECDH + HKDF + AES-256-GCM)
+  - Verification of the server's Ed25519 signature
 
-A GERAÇÃO da chave X25519 NÃO mora aqui: ela acontece uma única vez em
-`executor/enrollment.py::enroll`, junto com o envio da pública ao servidor.
-Ver `PrivateKeyMissingError` para o porquê.
+The GENERATION of the X25519 key does NOT live here: it happens exactly once in
+`executor/enrollment.py::enroll`, together with sending the public key to the server.
+See `PrivateKeyMissingError` for why.
 """
 import base64
 import json
@@ -26,32 +26,32 @@ logger = logging.getLogger(__name__)
 _HKDF_INFO = b"atlas-executor-job-v1"
 
 
-# ── Carga da chave X25519 ─────────────────────────────────────────────────────
+# ── Loading the X25519 key ────────────────────────────────────────────────────
 
 class PrivateKeyMissingError(RuntimeError):
     """
-    Chave privada X25519 ausente ou ilegível.
+    X25519 private key missing or unreadable.
 
-    Levantada em vez de gerar uma chave nova. Gerar era o comportamento antigo e
-    era SEMPRE errado depois do enrollment: a pública registrada no servidor
-    passava a não casar com a privada local, o executor subia e aparecia
-    "online", e 100% dos jobs morriam em `decrypt_job_payload` com uma mensagem
-    que sugeria "ciphertext corrompido" — mandando o operador investigar rede /
-    servidor quando o problema era a chave local. Falhar alto aqui troca um bug
-    silencioso e enganoso por uma instrução clara: refazer o enrollment.
+    Raised instead of generating a new key. Generating was the old behavior and
+    was ALWAYS wrong after enrollment: the public key registered on the server
+    no longer matched the local private key, the executor came up and showed as
+    "online", and 100% of jobs died in `decrypt_job_payload` with a message
+    that suggested "corrupted ciphertext" — sending the operator to investigate network /
+    server when the problem was the local key. Failing loudly here trades a silent,
+    misleading bug for a clear instruction: redo the enrollment.
     """
 
 
 def load_private_key(key_b64: str | None, key_path: str) -> X25519PrivateKey:
     """
-    Carrega a chave privada X25519 do executor. NUNCA gera uma chave nova.
+    Loads the executor's X25519 private key. NEVER generates a new key.
 
-    Ordem:
-      1. EXECUTOR_PRIVATE_KEY (base64 dos 32 bytes raw), se fornecida
-      2. Arquivo PEM (PKCS8) em `key_path`, gravado pelo enroll
+    Order:
+      1. EXECUTOR_PRIVATE_KEY (base64 of the 32 raw bytes), if provided
+      2. PEM file (PKCS8) at `key_path`, written by enroll
 
-    Levanta PrivateKeyMissingError se nenhuma das duas existir ou se o material
-    for inválido.
+    Raises PrivateKeyMissingError if neither exists or if the material
+    is invalid.
     """
     if key_b64:
         try:
@@ -92,12 +92,12 @@ def load_private_key(key_b64: str | None, key_path: str) -> X25519PrivateKey:
     return key
 
 
-# ── Verificação de assinatura Ed25519 ────────────────────────────────────────
+# ── Ed25519 signature verification ───────────────────────────────────────────
 
 def verify_signature(message: dict, server_pub_b64: str) -> bool:
     """
-    Verifica a assinatura Ed25519 do envelope do job.
-    Retorna True se válida. Não lança exceção.
+    Verifies the Ed25519 signature of the job envelope.
+    Returns True if valid. Does not raise.
 
     Canonical bytes = json(envelope, sort_keys) + "|" + ephemeral_public + "|" + ciphertext
     """
@@ -105,12 +105,12 @@ def verify_signature(message: dict, server_pub_b64: str) -> bool:
         pub_raw = base64.b64decode(server_pub_b64)
         pub_key = Ed25519PublicKey.from_public_bytes(pub_raw)
 
-        # Junta os pedacos JA CODIFICADOS em vez de concatenar strings e codificar
-        # o resultado: a versao anterior criava uma str do tamanho total (o
-        # ciphertext em base64 de um workflow grande tem alguns MB) e logo em
-        # seguida um bytes do mesmo tamanho. Os bytes finais sao identicos —
-        # UTF-8 de uma concatenacao e a concatenacao dos UTF-8, e o separador
-        # '|' e ASCII —, entao a assinatura do servidor continua batendo.
+        # Joins the ALREADY ENCODED pieces instead of concatenating strings and encoding
+        # the result: the previous version created a str of the total size (the
+        # base64 ciphertext of a large workflow is a few MB) and right
+        # after a bytes of the same size. The final bytes are identical —
+        # the UTF-8 of a concatenation is the concatenation of the UTF-8s, and the
+        # '|' separator is ASCII —, so the server's signature still matches.
         canonical = b"|".join((
             json.dumps(message["envelope"], sort_keys=True, ensure_ascii=False).encode(),
             message["ephemeral_public"].encode(),
@@ -124,26 +124,26 @@ def verify_signature(message: dict, server_pub_b64: str) -> bool:
         return False
 
 
-# ── Descriptografia do payload ────────────────────────────────────────────────
+# ── Payload decryption ────────────────────────────────────────────────────────
 
 def decrypt_job_payload(message: dict, agent_priv: X25519PrivateKey) -> dict:
     """
-    Descriptografa o payload cifrado de um job.
+    Decrypts the encrypted payload of a job.
 
-    Fluxo:
-      1. Extrai a chave pública efêmera do servidor (X25519)
+    Flow:
+      1. Extracts the server's ephemeral public key (X25519)
       2. ECDH: shared_secret = X25519(agent_priv, ephemeral_pub)
       3. HKDF-SHA256(shared_secret, salt=nonce_hex, info=_HKDF_INFO) → aes_key
-      4. AES-256-GCM decrypt (gcm_nonce nos primeiros 12 bytes do ciphertext)
-      5. json.loads → dict em memória
+      4. AES-256-GCM decrypt (gcm_nonce in the first 12 bytes of the ciphertext)
+      5. json.loads → in-memory dict
 
-    Lança ValueError se descriptografia falhar (ciphertext corrompido / chave errada).
+    Raises ValueError if decryption fails (corrupted ciphertext / wrong key).
     """
     try:
         envelope = message["envelope"]
         nonce_hex = envelope["nonce"]
 
-        # Chave pública efêmera do servidor
+        # Server's ephemeral public key
         ephemeral_pub_raw = base64.b64decode(message["ephemeral_public"])
         from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey as _X
         ephemeral_pub = _X.from_public_bytes(ephemeral_pub_raw)
@@ -151,7 +151,7 @@ def decrypt_job_payload(message: dict, agent_priv: X25519PrivateKey) -> dict:
         # ECDH
         shared_secret = agent_priv.exchange(ephemeral_pub)
 
-        # Derivação de chave AES
+        # AES key derivation
         aes_key = HKDF(
             algorithm=SHA256(),
             length=32,
@@ -173,7 +173,7 @@ def decrypt_job_payload(message: dict, agent_priv: X25519PrivateKey) -> dict:
     except Exception as exc:
         raise ValueError(f"Falha ao descriptografar payload do job: {exc}") from exc
     finally:
-        # Best-effort: apaga variáveis sensíveis da memória
+        # Best-effort: wipes sensitive variables from memory
         try:
             del shared_secret, aes_key, plaintext  # type: ignore[name-defined]
         except Exception as exc:

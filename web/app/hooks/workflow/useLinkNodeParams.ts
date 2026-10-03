@@ -12,7 +12,7 @@ export const useLinkNodeParams = () => {
     const params = new URLSearchParams(searchParams.toString())
     params.set('ndid', nodeId)
     if (handleNodeId) params.set('ndhid', handleNodeId)
-    // `replace`, nao `push`: param efemero de UI (drawer de conexao). Ver useUrlParam.
+    // `replace`, not `push`: ephemeral UI param (connection drawer). See useUrlParam.
     router.replace(`${pathname}/?${params.toString()}`)
   }
 
@@ -20,7 +20,7 @@ export const useLinkNodeParams = () => {
     const params = new URLSearchParams(searchParams.toString())
     params.delete('ndid')
     params.delete('ndhid')
-    // `replace`, nao `push`: param efemero de UI (drawer de conexao). Ver useUrlParam.
+    // `replace`, not `push`: ephemeral UI param (connection drawer). See useUrlParam.
     router.replace(`${pathname}/?${params.toString()}`)
   }
 

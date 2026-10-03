@@ -1,9 +1,9 @@
 "use client"
 
-// O formulário de cadastro do modal de entrada. A lógica é a da antiga página
-// /register, movida para cá: no sucesso não há toast nem navegação — o modal
-// troca para o painel "Verifique seu e-mail" (o cadastro exige verificar o
-// e-mail antes do primeiro login).
+// The sign-up form of the sign-in modal. The logic is that of the old
+// /register page, moved here: on success there is no toast or navigation — the
+// modal switches to the "Verifique seu e-mail" panel (sign-up requires verifying
+// the e-mail before the first login).
 
 import { useState } from "react"
 import axios, { AxiosError } from "axios"
@@ -20,16 +20,16 @@ import { ehRecusaDoServidor } from "./recusas"
 
 interface Props {
   onEnviando: (enviando: boolean) => void
-  /** A conta foi criada: leva o e-mail, para o reenvio já sair preenchido. */
+  /** The account was created: carries the e-mail, so the resend comes prefilled. */
   onCadastrou: (email: string) => void
-  /** "Já tem conta? Entrar": troca para o painel de login. */
+  /** "Já tem conta? Entrar": switches to the login panel. */
   onEntrar: () => void
 }
 
 export function FormularioDeCadastro({ onEnviando, onCadastrou, onEntrar }: Props) {
   const t = useTextos().entrada.formularioDeCadastro
-  // Em português a recusa do servidor como veio; nos outros, o texto do idioma
-  // (ver ./recusas).
+  // In Portuguese the server's rejection as it came; in the others, the language's
+  // text (see ./recusas).
   const traduzir = useIdiomaDaTela() !== "pt-BR"
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
@@ -58,8 +58,8 @@ export function FormularioDeCadastro({ onEnviando, onCadastrou, onEntrar }: Prop
       const axiosErr = err as AxiosError<{ error?: string; message?: string; details?: { msg: string }[] }>
       const status = axiosErr.response?.status
       const data = axiosErr.response?.data
-      // O erro é um bloco inline persistente (role="alert"), não um toast
-      // efêmero — a pessoa lê no ritmo dela e corrige o campo.
+      // The error is a persistent inline block (role="alert"), not an ephemeral
+      // toast — the person reads at their own pace and fixes the field.
       if (!axiosErr.response) {
         setError({ message: t.semConexao })
       } else if (status === 429) {
@@ -67,10 +67,10 @@ export function FormularioDeCadastro({ onEnviando, onCadastrou, onEntrar }: Prop
       } else if (data?.error === "validation_error" && Array.isArray(data.details)) {
         setError({ message: data.details.map((d) => d.msg).join(" • ") || t.dadosInvalidos })
       } else if (traduzir && !ehRecusaDoServidor(data)) {
-        // O proxy fora do ar, um 500 inesperado, a página de erro de uma CDN.
+        // The proxy down, an unexpected 500, a CDN's error page.
         setError({ message: t.erroAoCriarConta })
       } else if (traduzir && status === 400) {
-        // O único 400 do cadastro (a mesma frase para usuário e e-mail).
+        // The only 400 from sign-up (the same sentence for username and e-mail).
         setError({ message: t.jaEmUso })
       } else {
         setError({ message: data?.message ?? t.erroAoCriarConta })

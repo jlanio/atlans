@@ -1,9 +1,9 @@
 # app/services/email_service.py
 """
-Serviço de envio de email do próprio servidor (verificação, senha, alertas).
+The server's own email sending service (verification, password, alerts).
 
-O envio sai pelo transporte configurado (`email_transporte.py`: Resend, SMTP
-ou log), em thread pool. Sem transporte (desenvolvimento), loga o conteúdo.
+Sending goes out through the configured transport (`email_transporte.py`: Resend,
+SMTP or log), in a thread pool. With no transport (development), it logs the content.
 """
 import asyncio
 import re
@@ -20,9 +20,9 @@ _template_env: Environment | None = None
 
 
 def _ambiente() -> Environment:
-    """Jinja2 — templates em app/templates/email/ e nas pastas das extensões
-    (`Registro.templates`), nessa ordem. Montado no primeiro uso: as pastas das
-    extensões só se conhecem depois do registro."""
+    """Jinja2 — templates in app/templates/email/ and in the extensions' folders
+    (`Registro.templates`), in that order. Built on first use: the extensions'
+    folders are only known after registration."""
     global _template_env
     if _template_env is None:
         pastas = ["app/templates/email", *(str(pasta) for pasta in registro().templates)]
@@ -37,8 +37,8 @@ _CHAVE_SENSIVEL = re.compile(r"token|url|link|senha|password|otp", re.IGNORECASE
 
 
 def _contexto_sem_segredos(context: dict) -> dict:
-    """O contexto do e-mail como pode ir para o log: links, tokens e senhas
-    viram «***» (o nome do campo fica, para se saber o que o e-mail levava)."""
+    """The email context as it can go to the log: links, tokens and passwords
+    become "***" (the field name stays, so one knows what the email carried)."""
     return {chave: ("***" if _CHAVE_SENSIVEL.search(str(chave)) else valor) for chave, valor in context.items()}
 
 
@@ -47,12 +47,12 @@ async def send_email(to: str, subject: str, template: str, context: dict) -> Non
     html = _ambiente().get_template(template).render(**context)
 
     if not email_transporte.ativo():
-        # Sem transporte, o e-mail inteiro ia para o log — com o link de
-        # redefinição de senha e o token de verificação. Quem lê o log (um
-        # agregador, um `docker logs` colado numa issue) tomaria qualquer
-        # conta pedindo um reset. O WARNING mostra os campos com os links e
-        # tokens mascarados; o contexto completo só sai em DEBUG (LOG_LEVEL),
-        # que é o que o desenvolvimento local usa para clicar no link.
+        # With no transport, the whole email went to the log — with the password
+        # reset link and the verification token. Whoever reads the log (an
+        # aggregator, a `docker logs` pasted into an issue) could take over any
+        # account by requesting a reset. The WARNING shows the fields with the
+        # links and tokens masked; the full context only goes out at DEBUG
+        # (LOG_LEVEL), which is what local development uses to click the link.
         logger.warning(
             "[EMAIL-DEV] Nenhum transporte de e-mail configurado. Email NÃO enviado.\n"
             "  Para: %s\n  Assunto: %s\n  Contexto: %s",

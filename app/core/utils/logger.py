@@ -3,9 +3,9 @@ from logging.handlers import RotatingFileHandler
 import os
 
 # ── Secret scrubbing ─────────────────────────────────────────────────────────
-# Os padrões e o filtro moram em `flow/utils/redacao_log.py` — o flow está nas
-# três imagens, e o executor precisa da MESMA lista. Reexportados com os nomes
-# de sempre para os chamadores do app.
+# The patterns and the filter live in `flow/utils/redacao_log.py` — flow is in
+# all three images, and the executor needs the SAME list. Re-exported under the
+# usual names for the app's callers.
 from flow.utils.redacao_log import (  # noqa: F401
     _REDACTED,
     _SCRUB_PATTERNS,
@@ -17,86 +17,86 @@ from flow.utils.redacao_log import (  # noqa: F401
 
 _secret_filter = SecretScrubFilter()
 
-# Configurações baseadas em variáveis de ambiente
-# LOG_LEVEL define o nível mínimo de log para toda a aplicação
-# Pode ser 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
+# Settings based on environment variables
+# LOG_LEVEL sets the minimum log level for the whole application
+# Can be 'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 LOG_FILE = os.getenv("LOG_FILE", "app.log")
-# Define o tamanho máximo do arquivo de log antes de rotacionar (10MB)
+# Sets the maximum log file size before rotating (10MB)
 MAX_LOG_BYTES = 10 * 1024 * 1024
 # Define quantos arquivos de backup manter
 BACKUP_COUNT = 5
 
-# Formato do log: timestamp, nível, nome do logger/módulo, mensagem e, opcionalmente, traceback de exceções
+# Log format: timestamp, level, logger/module name, message and, optionally, exception tracebacks
 LOG_FORMAT = "%(asctime)s — %(levelname)s — %(name)s — %(message)s"
-# Um formato mais detalhado que inclui o traceback para níveis de erro e crítico
+# A more detailed format that includes the traceback for error and critical levels
 LOG_FORMAT_DETAILED = "%(asctime)s — %(levelname)s — %(name)s — %(message)s%(exc_info)s"
 
 
 def get_logger(name: str) -> logging.Logger:
     """
-    Cria ou retorna um Logger configurado com handlers de console e arquivo.
+    Creates or returns a Logger configured with console and file handlers.
 
     Args:
-        name: O nome do logger (geralmente __name__ do módulo).
+        name: The logger name (usually the module's __name__).
     Returns:
-        Uma instância do logger configurada.
+        A configured logger instance.
     """
-    # Obtém um logger existente ou cria um novo com o nome especificado
+    # Gets an existing logger or creates a new one with the given name
     logger = logging.getLogger(name)
 
-    # Se o logger já possui handlers, significa que já foi configurado
-    # e podemos retorná-lo para evitar duplicação de handlers.
+    # If the logger already has handlers, it has already been configured
+    # and we can return it to avoid duplicate handlers.
     if logger.handlers:
-        # Garante que o scrub filter esta presente mesmo em loggers
-        # ja configurados (defesa em profundidade — nao duplica).
+        # Ensures the scrub filter is present even on loggers
+        # already configured (defense in depth — does not duplicate).
         if _secret_filter not in logger.filters:
             logger.addFilter(_secret_filter)
         return logger
 
-    # O nível é o global, definido pela variável de ambiente LOG_LEVEL.
+    # The level is the global one, set by the LOG_LEVEL environment variable.
     logger.setLevel(LOG_LEVEL)
 
-    # Anexa filtro de scrub antes de qualquer handler processar registros —
-    # garante que mesmo se o log propagar pro root, o record ja esta redigido.
+    # Attaches the scrub filter before any handler processes records —
+    # ensures that even if the log propagates to root, the record is already redacted.
     logger.addFilter(_secret_filter)
 
-    # Se o root logger já tem handlers configurados (ex: ao rodar no executor,
-    # que configura o root em executor/main.py), propaga para ele em vez de criar
-    # um handler de console próprio — evita formato duplicado/inconsistente.
+    # If the root logger already has handlers configured (e.g., when running in the
+    # executor, which configures root in executor/main.py), propagates to it instead
+    # of creating its own console handler — avoids duplicate/inconsistent format.
     root = logging.getLogger()
     if root.handlers:
         logger.propagate = True
         return logger
 
-    logger.propagate = False  # evita duplicação quando o root não está configurado
+    logger.propagate = False  # avoids duplication when root is not configured
 
-    # --- Configuração do Handler de Console (para exibir logs no terminal) ---
+    # --- Console Handler setup (to show logs in the terminal) ---
     ch = logging.StreamHandler()
-    # O nível do handler determina quais logs ele irá processar *depois* que o logger os filtrou
+    # The handler's level determines which logs it will process *after* the logger has filtered them
     ch.setLevel(LOG_LEVEL)
     # Define o formato para o console
     ch.setFormatter(logging.Formatter(LOG_FORMAT))
     logger.addHandler(ch)
 
-    # --- Configuração do Handler de Arquivo Rotativo (para salvar logs em arquivo) ---
-    # Cria o diretório para o arquivo de log se ele não existir
+    # --- Rotating File Handler setup (to save logs to a file) ---
+    # Creates the directory for the log file if it does not exist
     log_dir = os.path.dirname(LOG_FILE)
     if log_dir and not os.path.exists(log_dir):
         os.makedirs(log_dir)
 
     fh = RotatingFileHandler(LOG_FILE, maxBytes=MAX_LOG_BYTES, backupCount=BACKUP_COUNT)
-    # O nível do handler de arquivo também segue o nível do logger
+    # The file handler's level also follows the logger's level
     fh.setLevel(LOG_LEVEL)
-    # Define o formato para o arquivo. Usamos o formato detalhado para incluir exceções no arquivo.
+    # Sets the format for the file. We use the detailed format to include exceptions in the file.
     fh.setFormatter(logging.Formatter(LOG_FORMAT_DETAILED))
     logger.addHandler(fh)
 
-    # Mensagem de configuração inicial
+    # Initial setup message
     if logger.level <= logging.DEBUG:
         logger.info(f"Logger '{name}' configured with level {logging.getLevelName(logger.level)}")
 
-    # Reduz verbosidade de SQLAlchemy
+    # Reduces SQLAlchemy verbosity
     logging.getLogger("sqlalchemy.engine.Engine").setLevel(logging.WARNING)
     logging.getLogger("sqlalchemy.pool").setLevel(logging.WARNING)
 

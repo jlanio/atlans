@@ -40,7 +40,7 @@ describe("formatarDuracao", () => {
 })
 
 describe("formatarInicio", () => {
-  const agora = new Date(2026, 8, 6, 19, 43) // 6 de setembro de 2026, 19:43 local
+  const agora = new Date(2026, 8, 6, 19, 43) // 2026-09-06, 19:43 local
   const iso = (d: Date) => d.toISOString()
   it("relativo na última hora", () => {
     expect(formatarInicio(iso(new Date(2026, 8, 6, 19, 41)), agora)).toBe("há 2 min")
@@ -134,13 +134,13 @@ describe("formatadores grossos (coluna 'como anda' de Projetos)", () => {
   })
 
   it("formatarQuando: relativo dentro de 24 h mesmo atravessando a meia-noite, calendário depois", () => {
-    // Instantes em UTC e horas conferidas por regex: o fuso do ambiente de
-    // teste não é o do usuário, e o que importa aqui é a regra, não a hora.
+    // Instants in UTC and times checked by regex: the test environment's time
+    // zone isn't the user's, and what matters here is the rule, not the time.
     const agora = new Date("2026-09-07T23:40:00Z")
     expect(formatarQuando("2026-09-07T23:00:00Z", agora)).toBe("há 40 min")
     expect(formatarQuando("2026-09-07T20:40:00Z", agora)).toBe("há 3 h")
     expect(formatarQuando("2026-09-07T00:10:00Z", agora)).toBe("há 23 h")
-    // 29 h atrás: já é calendário, e "ontem" porque o dia civil é o anterior.
+    // 29 h ago: already calendar format, and "ontem" (yesterday) because the civil day is the previous one.
     expect(formatarQuando("2026-09-06T18:12:00Z", agora)).toMatch(/^ontem, \d\d:\d\d$/)
     expect(formatarQuando("2026-09-01T11:04:00Z", agora)).toMatch(/^1 set, \d\d:\d\d$/)
     expect(formatarQuando(null, agora)).toBe("—")
@@ -154,7 +154,7 @@ describe("formatarDolar", () => {
   it("escreve o dólar em pt-BR e o desconhecido como ausência, nunca zero", () => {
     expect(formatarDolar(12.34)).toBe("US$ 12,34")
     expect(formatarDolar(0)).toBe("US$ 0,00")
-    // Preço desconhecido não vira zero: zero leria como «de graça».
+    // An unknown price doesn't become zero: zero would read as "free".
     expect(formatarDolar(null)).toBe("—")
     expect(formatarDolar(undefined)).toBe("—")
   })

@@ -1,18 +1,20 @@
 # tests/unit/test_workflow_move_permissions.py
-"""Autorizacao da rota de mover workflow entre workspaces.
+"""Authorization of the route that moves a workflow between workspaces.
 
-Mover atravessa a fronteira de tenant: leva a definition — que traz
-`credential_id` em texto puro e ids de arquivos do Drive — para dentro de outro
-workspace, e passa a produzir dados la. Por isso exige admin/owner nos DOIS
-lados, e nao o `editor` que basta para criar e duplicar dentro do proprio
-workspace.
+Moving crosses the tenant boundary: it takes the definition — which carries
+`credential_id` in plain text and Drive file ids — into another workspace, and
+starts producing data there. That is why it requires admin/owner on BOTH
+sides, and not the `editor` that suffices to create and duplicate inside one's
+own workspace.
 
-E a lacuna que `app/schemas/workflow.py` descreve ao recusar `workspace_id` no
-PUT: la a autorizacao seria resolvida contra o workspace ANTERIOR a mudanca.
+It is the gap that `app/schemas/workflow.py` describes when refusing
+`workspace_id` in the PUT: there, authorization would be resolved against the
+workspace from BEFORE the change.
 
-As duas guardas sao as de verdade, sem subir a aplicacao: a da ORIGEM e a
-dependencia `workflow_com_papel` declarada na propria rota (lida do router), e
-a do DESTINO roda em `_move`, com o papel vindo de `get_workspace_member_role`.
+Both guards are the real ones, without starting the application: the SOURCE
+one is the `workflow_com_papel` dependency declared on the route itself (read
+from the router), and the DESTINATION one runs in `_move`, with the role coming
+from `get_workspace_member_role`.
 """
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -31,7 +33,7 @@ _ROTAS_DE_MOVER = ["/workflows/{id_hash}/move", "/workflows/{id_hash}/move/previ
 
 
 def _guarda_da_origem(caminho: str):
-    """A dependencia de papel que a rota declara — a que roda em producao."""
+    """The role dependency the route declares — the one that runs in production."""
     (rota,) = [r for r in WR.router.routes if r.path == caminho]
     (guarda,) = [d.call for d in rota.dependant.dependencies if hasattr(d.call, "papel_minimo")]
     return guarda
@@ -43,7 +45,7 @@ async def _origem(papel, caminho=_ROTAS_DE_MOVER[0]):
 
 
 async def _mover(papel_no_destino):
-    """`_move` com o papel no destino decidido pelo teste; devolve o service."""
+    """`_move` with the destination role decided by the test; returns the service."""
     service = SimpleNamespace(move_workflow=AsyncMock(return_value={
         "id": "wf-1", "name": "Fluxo", "renamed": False, "from_workspace_id": "ws-origem",
         "to_workspace_id": "ws-destino", "dry_run": True, "warnings": [],
@@ -65,8 +67,8 @@ async def _mover(papel_no_destino):
 @pytest.mark.parametrize("caminho", _ROTAS_DE_MOVER)
 @pytest.mark.parametrize("origem", ["viewer", "editor", "operator"])
 async def test_403_quando_o_papel_na_origem_e_insuficiente(origem, caminho):
-    """O move e o preview declaram a MESMA guarda: o preview sem ela viraria um
-    oraculo sobre o conteudo de workspaces alheios."""
+    """Move and preview declare the SAME guard: a preview without it would become
+    an oracle about the contents of other people's workspaces."""
     with pytest.raises(HTTPException) as exc:
         await _origem(origem, caminho)
 
@@ -97,9 +99,9 @@ async def test_403_quando_admin_apenas_no_destino():
 
 
 async def test_nao_membro_e_workspace_inexistente_dao_a_mesma_resposta():
-    """`get_workspace_member_role` devolve None para nao-membro, workspace
-    inexistente e workspace na lixeira. Distinguir permitiria enumerar
-    workspaces alheios chutando ids."""
+    """`get_workspace_member_role` returns None for a non-member, a nonexistent
+    workspace and a workspace in the trash. Distinguishing them would allow
+    enumerating other people's workspaces by guessing ids."""
     with pytest.raises(HTTPException) as nao_membro:
         await _mover(None)
 
@@ -126,17 +128,18 @@ async def test_destino_insuficiente_nao_chega_ao_service():
 @pytest.mark.parametrize("origem", ["admin", "owner"])
 @pytest.mark.parametrize("destino", ["admin", "owner"])
 async def test_admin_ou_owner_nos_dois_lados_passa(origem, destino):
-    """`owner` esta acima de `admin` em WORKSPACE_ROLE_ORDER, entao a checagem
-    de minimo ja o cobre — nao ha ramo especial para dono."""
+    """`owner` ranks above `admin` in WORKSPACE_ROLE_ORDER, so the minimum check
+    already covers it — there is no special branch for the owner."""
     await _origem(origem)
     service = await _mover(destino)
     service.move_workflow.assert_awaited_once()
 
 
-# ── Regressao: o PUT continua sem poder trocar de tenant ─────────────────────
+# ── Regression: the PUT still cannot change tenant ───────────────────────────
 
 def test_workspace_id_continua_proibido_no_update():
-    """Esta rota existe justamente para que o PUT nao precise aceitar o campo.
-    Se `extra="forbid"` cair, o buraco de IDOR volta pela porta antiga."""
+    """This route exists precisely so that the PUT does not need to accept the
+    field. If `extra="forbid"` goes away, the IDOR hole comes back through the
+    old door."""
     with pytest.raises(ValidationError):
         WorkflowUpdate(name="x", workspace_id="ws-alheio")

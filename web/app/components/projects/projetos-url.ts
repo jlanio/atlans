@@ -1,10 +1,10 @@
 /**
- * Estado de Projetos na URL (docs/specs/projects.md §3.6).
+ * Projects state in the URL (docs/specs/projects.md §3.6).
  *
- * Busca, chip e ordenação vivem na query string: F5, voltar do editor e um
- * link colado no chat reabrem a mesma estante. Os defaults não vão para a
- * URL, para ela ficar limpa quando nada foi tocado — mesmo padrão de
- * `observability/historico-url.ts`.
+ * Search, chip and sort live in the query string: F5, going back from the
+ * editor and a link pasted in chat reopen the same shelf. The defaults do not
+ * go into the URL, so it stays clean when nothing was touched — same pattern
+ * as `observability/historico-url.ts`.
  */
 export type Filtro =
   | "todos" | "ativos" | "inativos"
@@ -12,7 +12,7 @@ export type Filtro =
   | "assistente"
   | "pausado" | "nunca"
 
-/** Todos os filtros que a URL aceita. `pausado` e `nunca` não têm chip: chegam pela faixa de atenção. */
+/** All filters the URL accepts. `pausado` and `nunca` have no chip: they arrive through the attention strip. */
 export const FILTROS: Filtro[] = [
   "todos", "ativos", "inativos",
   "executando", "falha", "agendados", "webhook", "subfluxos", "portal",
@@ -33,19 +33,19 @@ export const ESTADO_PADRAO: EstadoDeProjetos = { q: "", filtro: "todos", ordem: 
 
 type Leitor = { get(nome: string): string | null }
 
-/** Lê a query string; qualquer valor inválido cai no default, sem quebrar a tela. */
+/** Reads the query string; any invalid value falls back to the default, without breaking the screen. */
 export function lerEstado(sp: Leitor): EstadoDeProjetos {
   const filtroBruto = sp.get("filtro")
   const filtro = (FILTROS as string[]).includes(filtroBruto ?? "") ? (filtroBruto as Filtro) : ESTADO_PADRAO.filtro
   const ordemBruta = sp.get("ordem")
   const ordem = (ORDENS as string[]).includes(ordemBruta ?? "") ? (ordemBruta as Ordem) : ESTADO_PADRAO.ordem
-  // Mesmo teto do Histórico: uma busca não é um documento, e um `q` gigante
-  // colado na URL não pode custar um `normalize` por linha a cada tecla.
+  // Same ceiling as History: a search is not a document, and a giant `q`
+  // pasted into the URL must not cost a `normalize` per row on every keystroke.
   const q = (sp.get("q") ?? "").trim().slice(0, 200)
   return { q, filtro, ordem }
 }
 
-/** Query string (sem "?") só com o que difere do default. */
+/** Query string (without "?") with only what differs from the default. */
 export function escreverEstado(estado: EstadoDeProjetos): string {
   const sp = new URLSearchParams()
   if (estado.q.trim()) sp.set("q", estado.q.trim())
@@ -55,9 +55,9 @@ export function escreverEstado(estado: EstadoDeProjetos): string {
 }
 
 /**
- * Quantos recortes estão ativos: busca e chip. A ordenação não recorta a
- * lista, então não conta — "Limpar filtros" não deve aparecer só porque a
- * pessoa ordenou por data.
+ * How many slices are active: search and chip. Sorting does not slice the
+ * list, so it does not count — "Limpar filtros" should not appear just because
+ * the person sorted by date.
  */
 export function filtrosAtivos(estado: EstadoDeProjetos): number {
   return [estado.q.trim() || null, estado.filtro !== ESTADO_PADRAO.filtro ? estado.filtro : null]

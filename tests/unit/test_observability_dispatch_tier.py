@@ -1,5 +1,5 @@
 # tests/unit/test_observability_dispatch_tier.py
-"""`dispatch_tier` sai na serialização do run (nulo em runs antigos)."""
+"""`dispatch_tier` comes out in the run's serialization (null on old runs)."""
 from unittest.mock import MagicMock
 
 from app.services.observability_service import _serialize_run

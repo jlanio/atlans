@@ -1,20 +1,19 @@
 # tests/unit/test_extensoes.py
 """
-As extensões: o que uma instalação tem além do núcleo (`app/extensoes`).
+Extensions: what an installation has beyond the core (`app/extensoes`).
 
-O núcleo nunca importa uma extensão pelo nome. Cada subpacote é descoberto,
-importado e chamado em `registrar(registro)`; sem nenhum, cada ponto de
-encaixe tem um padrão. Aqui as extensões são de mentira, numa pasta
-temporária — os testes valem igual na distribuição livre, que não traz
-extensão nenhuma.
+The core never imports an extension by name. Each subpackage is discovered,
+imported and called in `registrar(registro)`; with none, each extension point
+has a default. Here the extensions are fake, in a temporary folder — the tests
+hold just the same in the free distribution, which ships no extension at all.
 
-  DESCOBERTA   subpacotes de app/extensoes, menos os que começam com _
-  DESLIGADAS   ATLANS_SEM_EXTENSOES ignora as presentes
-  ERROS        extensão sem registrar, ou que não importa, derruba o arranque
-  MODELOS      <extensão>/modelos entra no metadata; a falta dele, não; e o
-               <extensão>/schema.sql vai para a base zero do alembic
-  NÚCLEO       sem extensão: sem plano, o teto da instalação, nada a vender
-  TETO         ASSISTENTE_TETO_DE_TOKENS_POR_DIA, positivo
+  DISCOVERY    subpackages of app/extensoes, except those starting with _
+  DISABLED     ATLANS_SEM_EXTENSOES ignores the ones present
+  ERRORS       an extension without registrar, or that fails to import, aborts startup
+  MODELS       <extensão>/modelos goes into the metadata; its absence does not; and
+               <extensão>/schema.sql goes into the alembic zero baseline
+  CORE         no extension: no plan, the installation ceiling, nothing to sell
+  CEILING      ASSISTENTE_TETO_DE_TOKENS_POR_DIA, positive
 """
 from __future__ import annotations
 
@@ -33,8 +32,8 @@ RAIZ = Path(__file__).resolve().parents[2]
 
 @pytest.fixture
 def pasta_de_extensoes(tmp_path, monkeypatch):
-    """`app.extensoes` olhando para uma pasta temporária, com o registro limpo
-    antes e depois — e sem deixar módulos de mentira em `sys.modules`."""
+    """`app.extensoes` looking at a temporary folder, with the registry cleared
+    before and after — and without leaving fake modules in `sys.modules`."""
     monkeypatch.setattr(extensoes, "__path__", [str(tmp_path)])
     monkeypatch.setattr(extensoes, "_registro", None)
     monkeypatch.delenv("ATLANS_SEM_EXTENSOES", raising=False)
@@ -118,7 +117,7 @@ def test_extensao_sem_registrar_derruba_o_arranque(pasta_de_extensoes):
 
 
 def test_extensao_que_nao_importa_derruba_o_arranque(pasta_de_extensoes):
-    """Sumir em silêncio com a cobrança seria pior que não subir."""
+    """Silently disappearing along with billing would be worse than not starting."""
     _extensao(pasta_de_extensoes, "quebrada", "import modulo_que_nao_existe\n")
     with pytest.raises(ModuleNotFoundError):
         extensoes.registro()
@@ -136,16 +135,16 @@ def test_importar_modelos_importa_o_de_cada_extensao(pasta_de_extensoes):
 
 
 def test_modelos_que_nao_importam_nao_somem_em_silencio(pasta_de_extensoes):
-    """Só a falta do PRÓPRIO `modelos` é normal; um import quebrado dentro dele
-    é erro."""
+    """Only the absence of its OWN `modelos` is normal; a broken import inside it
+    is an error."""
     _extensao(pasta_de_extensoes, "ouro", REGISTRA_TUDO, {"modelos/__init__.py": "import tabela_que_falta\n"})
     with pytest.raises(ModuleNotFoundError, match="tabela_que_falta"):
         extensoes.importar_modelos()
 
 
 def test_o_schema_de_cada_extensao_vai_para_a_base_zero(pasta_de_extensoes, monkeypatch):
-    """As tabelas de uma extensão moram no `schema.sql` dela, que a base zero do
-    alembic roda depois do script do núcleo — sem importar a extensão."""
+    """An extension's tables live in its `schema.sql`, which the alembic zero
+    baseline runs after the core script — without importing the extension."""
     _extensao(pasta_de_extensoes, "ouro", "raise RuntimeError('não é para importar')\n",
               {"schema.sql": "CREATE TABLE ouro (id INT);\n"})
     _extensao(pasta_de_extensoes, "prata", "def registrar(registro):\n    pass\n")
@@ -156,7 +155,7 @@ def test_o_schema_de_cada_extensao_vai_para_a_base_zero(pasta_de_extensoes, monk
     assert extensoes.esquemas() == []
 
 
-# ── NÚCLEO ───────────────────────────────────────────────────────────────────
+# ── CORE ─────────────────────────────────────────────────────────────────────
 
 async def test_sem_extensao_o_teto_e_o_da_instalacao(registro_de_teste):
     from app.mcp import cotas
@@ -183,7 +182,7 @@ async def test_com_extensao_quem_responde_e_ela(registro_de_teste):
 
 
 def test_os_emails_do_nucleo_nao_veem_os_das_extensoes(registro_de_teste, monkeypatch, tmp_path):
-    """As pastas de modelos de e-mail das extensões entram DEPOIS da do núcleo."""
+    """The extensions' e-mail template folders go in AFTER the core's."""
     from jinja2 import TemplateNotFound
 
     from app.services import email_service
@@ -220,7 +219,7 @@ def test_o_teto_da_instalacao_vem_do_ambiente(valor, teto):
 
 @pytest.mark.parametrize("valor", ["0", "-5", "muito"])
 def test_teto_que_nao_e_positivo_impede_a_api_de_subir(valor):
-    """Zero travaria toda conversa depois do primeiro turno, sem aviso."""
+    """Zero would lock every conversation after the first turn, without warning."""
     r = _teto_com(valor)
     assert r.returncode != 0
     assert "ASSISTENTE_TETO_DE_TOKENS_POR_DIA" in r.stderr

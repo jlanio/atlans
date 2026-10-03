@@ -40,11 +40,11 @@ class FileTrigger(BaseNode):
         if not path_a or not path_b:
             raise ValueError("Parâmetros 'pathA' e 'pathB' são obrigatórios.")
 
-        # Os caminhos vêm do workflow, portanto de quem edita o fluxo — sem este
-        # guard o nó lia QUALQUER arquivo do host do executor (chaves, certificado
-        # mTLS, .env) e devolvia o conteúdo como GeoDataFrame no output do run.
-        # validate_file_path resolve o caminho e exige que esteja dentro de
-        # ALLOWED_FILE_DIRS; é o mesmo guard já usado pelos demais nós de arquivo.
+        # The paths come from the workflow, hence from whoever edits it — without this
+        # guard the node read ANY file on the executor host (keys, mTLS
+        # certificate, .env) and returned the content as a GeoDataFrame in the run's output.
+        # validate_file_path resolves the path and requires it to be inside
+        # ALLOWED_FILE_DIRS; it is the same guard already used by the other file nodes.
         from flow.utils.geo_helpers import validate_file_path
         safe_a = validate_file_path(path_a)
         safe_b = validate_file_path(path_b)
@@ -53,8 +53,8 @@ class FileTrigger(BaseNode):
             if not p.exists():
                 raise FileNotFoundError(f"Caminho não encontrado: {p}")
 
-        # Carrega shapefiles de forma assíncrona para não bloquear o loop.
-        # `ler_geodataframe` recusa conteudo VRT / caminho virtual do GDAL.
+        # Loads shapefiles asynchronously so as not to block the loop.
+        # `ler_geodataframe` rejects VRT content / GDAL virtual paths.
         gdf1 = await asyncio.to_thread(ler_geodataframe, str(safe_a))
         gdf2 = await asyncio.to_thread(ler_geodataframe, str(safe_b))
 

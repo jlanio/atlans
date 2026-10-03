@@ -17,11 +17,11 @@ import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPIL
 
 dayjs.locale("pt-br")
 
-// Linha de execução: a linha inteira leva à página da execução; o erro se
-// expande por um botão próprio, para os dois gestos não disputarem o clique.
-// Memoizada: a tabela lista até 20 linhas e o poll do workspace/política
-// re-renderizava a página inteira; com `onAbrir` estável (useCallback abaixo)
-// cada linha só reconcilia quando seu próprio `run` muda.
+// Run row: the whole row leads to the run's page; the error expands through
+// its own button, so the two gestures do not fight over the click.
+// Memoized: the table lists up to 20 rows and the workspace/policy poll
+// re-rendered the whole page; with a stable `onAbrir` (useCallback below)
+// each row only reconciles when its own `run` changes.
 const RunRow = memo(function RunRow({ run, dedicado, onAbrir }: { run: IRunSummary; dedicado: boolean; onAbrir: (runId: string) => void }) {
   const [expanded, setExpanded] = useState(false)
   const hasError = !!run.error_message
@@ -33,9 +33,9 @@ const RunRow = memo(function RunRow({ run, dedicado, onAbrir }: { run: IRunSumma
         onClick={() => onAbrir(run.run_id)}
       >
         <td className={`py-2 pr-4 font-mono text-xs text-muted-foreground ${DESTAQUE_DA_FICHA}`}>
-          {/* Alvo de teclado/leitor de tela: um botão no id, não a linha inteira
-              (uma <tr role="button"> apagaria as células e não pode conter o
-              botão de expandir o erro). */}
+          {/* Keyboard/screen-reader target: a button on the id, not the whole row
+              (a <tr role="button"> would erase the cells and cannot contain the
+              button that expands the error). */}
           <button
             type="button"
             onClick={e => { e.stopPropagation(); onAbrir(run.run_id) }}
@@ -56,8 +56,8 @@ const RunRow = memo(function RunRow({ run, dedicado, onAbrir }: { run: IRunSumma
             <DispatchTierBadge tier={run.dispatch_tier} dedicado={dedicado} />
           </span>
         </td>
-        {/* Sem `data-rotulo`: a célula fica VAZIA quando não houve retry, e um
-            rótulo solto seria pior que nada. O glifo já carrega o sentido. */}
+        {/* No `data-rotulo`: the cell is EMPTY when there was no retry, and a
+            stray label would be worse than nothing. The glyph already carries the meaning. */}
         <td className="py-2 text-xs text-muted-foreground text-right">
           {run.retry_count > 0 && <span className="text-amber-600">↺{run.retry_count}</span>}
         </td>
@@ -79,12 +79,12 @@ const RunRow = memo(function RunRow({ run, dedicado, onAbrir }: { run: IRunSumma
       </tr>
       {expanded && run.error_message && (
         <tr className={`bg-red-50 dark:bg-red-950/20 ${LINHA_EXPANDIDA}`}>
-          {/* `whitespace-pre-wrap` só quebra nos espaços: uma URL ou um caminho
-              sem espaço virava a largura mínima da tabela inteira, e ela rolava
-              para o lado. `wrap-anywhere` deixa quebrar em qualquer ponto (o
-              `break-words` não basta em tabela: não reduz a largura mínima da
-              coluna). A altura para em 12 linhas; um traceback longo rola ali
-              dentro. */}
+          {/* `whitespace-pre-wrap` only breaks at spaces: a URL or a path with
+              no space became the minimum width of the whole table, and it
+              scrolled sideways. `wrap-anywhere` allows breaking at any point
+              (`break-words` is not enough in a table: it does not reduce the
+              column's minimum width). The height stops at 12 lines; a long
+              traceback scrolls inside it. */}
           <td colSpan={7} className="px-3 py-2 text-xs text-red-700 dark:text-red-400 font-mono whitespace-pre-wrap wrap-anywhere">
             <div className="max-h-48 overflow-y-auto">{run.error_message}</div>
           </td>
@@ -94,10 +94,10 @@ const RunRow = memo(function RunRow({ run, dedicado, onAbrir }: { run: IRunSumma
   )
 })
 
-// ── Gantt de execução por nó ─────────────────────────────────────────────────
+// ── Per-node execution Gantt ─────────────────────────────────────────────────
 function GanttTimeline({ nodes }: { nodes: INodeStatSummary[] }) {
-  // clone+sort memoizado em `nodes` (acima do early return por causa das
-  // regras dos hooks) para não reordenar a cada render do pai.
+  // clone+sort memoized on `nodes` (above the early return because of the
+  // rules of hooks) so as not to re-sort on every parent render.
   const sorted = useMemo(() => [...nodes].sort((a, b) => b.avg_duration_ms - a.avg_duration_ms), [nodes])
   if (nodes.length === 0) return null
   const maxMs = sorted[0].avg_duration_ms || 1
@@ -145,10 +145,10 @@ function GanttTimeline({ nodes }: { nodes: INodeStatSummary[] }) {
   )
 }
 
-// Tabela de nós mais lentos
+// Slowest nodes table
 function NodeStatsTable({ nodes }: { nodes: INodeStatSummary[] }) {
-  // Math.max(...map) memoizado em `nodes` (acima do early return por causa das
-  // regras dos hooks); com lista vazia dá 1, sem afetar o estado vazio abaixo.
+  // Math.max(...map) memoized on `nodes` (above the early return because of the
+  // rules of hooks); with an empty list it gives 1, without affecting the empty state below.
   const maxMs = useMemo(() => Math.max(...nodes.map(n => n.avg_duration_ms), 1), [nodes])
   if (nodes.length === 0) return (
     <div className="flex flex-col items-center justify-center py-8 gap-3 text-center">
@@ -178,7 +178,7 @@ function NodeStatsTable({ nodes }: { nodes: INodeStatSummary[] }) {
             <td className={`py-2 pr-4 ${DESTAQUE_DA_FICHA}`}>
               <div className="flex flex-col gap-1">
                 <span className="font-medium">{node.node_name}</span>
-                {/* Barra de duração relativa */}
+                {/* Relative duration bar */}
                 <div className="h-1 w-full max-w-[120px] bg-muted rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary rounded-full"
@@ -216,9 +216,10 @@ export default function WorkflowObservabilityPage() {
 
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
-  // O selo "rodou no pool" so faz sentido num workspace COM dedicado. O
-  // workspace do workflow vem no payload apenas para admin; para os demais
-  // e o ativo — o unico em que o workflow pode estar.
+  // The "rodou no pool" (ran on the pool) badge only makes sense in a workspace
+  // WITH a dedicated one. The workflow's workspace comes in the payload only
+  // for admins; for everyone else it is the active one — the only one the
+  // workflow can be in.
   const { current } = useWorkspace()
   const [dedicado, setDedicado] = useState(false)
 
@@ -228,28 +229,28 @@ export default function WorkflowObservabilityPage() {
     [id]
   )
 
-  // Espera as metricas: para admin o workspace vem nelas, e ler o ativo antes
-  // disso custava uma segunda requisicao (e um selo do workspace errado).
+  // Waits for the metrics: for admins the workspace comes in them, and reading the
+  // active one before that cost a second request (and a badge for the wrong workspace).
   const workspaceId = metrics ? (metrics.workspace_id ?? current?.id_hash ?? null) : null
   useEffect(() => {
     if (!workspaceId) { setDedicado(false); return }
     let cancelado = false
     GisFlowService.getWorkspacePolicy(workspaceId).then(res => {
       if (cancelado) return
-      // Leitura falhando = sem selo: nao se afirma nada sobre a politica.
+      // A failing read = no badge: nothing is asserted about the policy.
       setDedicado(!res.error && (res.data?.primary.length ?? 0) > 0)
     })
     return () => { cancelado = true }
   }, [workspaceId])
 
   const successRate = metrics ? `${(metrics.success_rate * 100).toFixed(1)}%` : "—"
-  // Estável para o React.memo de RunRow segurar: sem isto, cada render dava uma
-  // função nova a todas as linhas e o poll re-renderizava a tabela inteira.
+  // Stable so RunRow's React.memo holds: without this, every render gave a new
+  // function to all rows and the poll re-rendered the whole table.
   const abrirRun = useCallback((runId: string) => router.push(`/observability/run/${runId}`), [router])
 
   return (
     <PageRoot>
-      {/* Cabeçalho */}
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => router.push("/observability")} aria-label="Voltar ao Histórico">
@@ -263,8 +264,8 @@ export default function WorkflowObservabilityPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* O detalhe é de leitura; quem chega aqui por uma falha quase
-              sempre quer corrigir o fluxo, e o editor é outra rota. */}
+          {/* The detail is read-only; whoever arrives here through a failure almost
+              always wants to fix the workflow, and the editor is another route. */}
           <Button variant="outline" size="sm" onClick={() => router.push(`/workflow/${id}`)}>
             <TbEdit />
             Abrir no editor
@@ -282,7 +283,7 @@ export default function WorkflowObservabilityPage() {
         </div>
       )}
 
-      {/* Cards de métricas resumidas */}
+      {/* Summary metric cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -332,7 +333,7 @@ export default function WorkflowObservabilityPage() {
         </Card>
       </div>
 
-      {/* Tabela de últimas execuções */}
+      {/* Latest runs table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Últimas execuções</CardTitle>
@@ -341,10 +342,10 @@ export default function WorkflowObservabilityPage() {
           {loading ? (
             <p className="text-sm text-muted-foreground">Carregando…</p>
           ) : metrics?.last_runs?.length ? (
-            // Sete colunas não cabem num telefone: de `md` para cima a tabela
-            // rola por conta própria (o body contém a rolagem lateral da
-            // página); abaixo disso a linha vira ficha empilhada, sem rolagem
-            // nenhuma (ver tabela-empilhada.ts).
+            // Seven columns do not fit on a phone: from `md` up the table
+            // scrolls on its own (the body contains the page's horizontal
+            // scroll); below that the row becomes a stacked card, with no
+            // scrolling at all (see tabela-empilhada.ts).
             <div className="overflow-x-auto">
             <table className="w-full md:min-w-[720px]">
               <thead className={CABECALHO_DE_COLUNAS}>
@@ -376,7 +377,7 @@ export default function WorkflowObservabilityPage() {
         <GanttTimeline nodes={metrics!.node_stats_summary} />
       )}
 
-      {/* Tabela de nós mais lentos */}
+      {/* Slowest nodes table */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Nós mais lentos</CardTitle>

@@ -1,8 +1,8 @@
 // web/app/components/home/i18n/secoes/casca.ts
 //
-// A casca da Home: o hero sobre o globo, o painel de camadas, a barra lateral
-// (a vitrine do catálogo de quem ainda não entrou), o menu da conta e as
-// Preferências. O português é o texto de sempre, byte a byte.
+// The Home shell: the hero over the globe, the layers panel, the sidebar (the
+// catalog showcase for those not yet signed in), the account menu and the
+// Preferências. The Portuguese is the usual text, byte for byte.
 
 export const pt = {
   titulo: "Atlans — pergunte em português e receba análises espaciais no globo",
@@ -37,13 +37,13 @@ export const pt = {
   },
   barraLateral: {
     rotulo: "Barra lateral da Home",
-    /** O painel do telefone e o botão de abrir/recolher, para leitor de tela. */
+    /** The phone panel and the open/collapse button, for screen readers. */
     painelTitulo: "Barra lateral",
     painelDescricao: "Navegação lateral, aberta como painel.",
     alternar: "Alternar barra lateral",
-    /** O gatilho flutuante do telefone (o `AppHeader` na Home). */
+    /** The phone's floating trigger (the `AppHeader` on the Home). */
     abrirMenu: "Abrir menu",
-    /** O trilho da borda da barra (`SidebarRail`): expandir recolhida, redimensionar aberta. */
+    /** The rail on the bar's edge (`SidebarRail`): expand when collapsed, resize when open. */
     trilho: {
       expandir: "Expandir barra lateral",
       redimensionar: "Redimensionar a barra lateral",
@@ -64,7 +64,7 @@ export const pt = {
     brasil: "Brasil",
     foraDoBrasil: "Fora do Brasil",
     convite: "Pare de procurar dados. Pergunte ao Atlans.",
-    /** Os países da vitrine, pela `pasta` (a chave estável do catálogo). */
+    /** The showcase countries, by `pasta` (the catalog's stable key). */
     paises: {
       Equador: "Equador",
       "Nicarágua": "Nicarágua",
@@ -96,7 +96,7 @@ export const pt = {
     detectado: (nome: string) => `Detectado: ${nome}`,
     notaDoIdioma: "No automático, a Home segue o idioma do navegador e a região de onde você acessa.",
   },
-  /** O globo: títulos dos controles (leitor de tela e `title`) e o popup de feição. */
+  /** The globe: control titles (screen reader and `title`) and the feature popup. */
   mapa: {
     controles: {
       "Map.Title": "Mapa",

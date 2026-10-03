@@ -5,8 +5,8 @@ import { useTextosDaCasca } from "@/app/components/home/i18n/da-casca"
 import type { IConversaResumo } from "@/service/types"
 import type { AnuncioDeConversa } from "@/app/stores/homeStore"
 
-/** O resultado de uma escrita otimista. O `erro` existe porque um booleano só
- *  dizia "não deu" — e o diálogo de renomear ficava aberto sem explicar nada. */
+/** The result of an optimistic write. `erro` exists because a boolean only
+ *  said "it didn't work" — and the rename dialog stayed open without explaining anything. */
 export interface ResultadoDaEscrita {
   ok: boolean
   erro?: string
@@ -14,26 +14,26 @@ export interface ResultadoDaEscrita {
 
 export interface UseConversas {
   conversas: IConversaResumo[]
-  /** Só a PRIMEIRA carga (o esqueleto). */
+  /** Only the FIRST load (the skeleton). */
   carregando: boolean
-  /** Recarga em voo sobre a lista já na tela — `aria-busy`, não esqueleto. */
+  /** Reload in flight over the list already on screen — `aria-busy`, not a skeleton. */
   atualizando: boolean
-  /** Já houve uma carga aceita: o bloco de erro só toma a lista antes disso. */
+  /** An accepted load has already happened: the error block only takes over the list before that. */
   jaCarregou: boolean
   erro: string | null
   /** Quantas conversas o servidor tem — a lista vem cortada em `LIMITE`. */
   total: number
-  /** Uma página a mais em voo (o "Ver mais"). */
+  /** One more page in flight (the "Ver mais" (see more)). */
   carregandoMais: boolean
-  /** Relê o que está na tela — TODAS as páginas já carregadas, de uma vez. */
+  /** Rereads what is on screen — ALL pages already loaded, at once. */
   recarregar: () => void
-  /** Anexa a próxima página. Sem isto o corte em 50 era invisível. */
+  /** Appends the next page. Without this the cutoff at 50 was invisible. */
   carregarMais: () => void
-  /** Refaz o que falhou por último: a página do "Ver mais", ou a recarga. */
+  /** Redoes what failed last: the "Ver mais" page, or the reload. */
   tentarDeNovo: () => void
   /**
-   * Aplica um anúncio do stream do assistente (ver `AnuncioDeConversa`): a
-   * conversa nova entra no topo com o título; a existente sobe. Sem GET.
+   * Applies an announcement from the assistant stream (see `AnuncioDeConversa`):
+   * a new conversation goes in at the top with its title; an existing one moves up. No GET.
    */
   anunciar: (anuncio: AnuncioDeConversa) => void
   /** Renomeia (otimista). */
@@ -42,26 +42,26 @@ export interface UseConversas {
   apagar: (id: string) => Promise<ResultadoDaEscrita>
 }
 
-// O teto do endpoint (`limit = max(1, min(limit, 100))` no agente_router) — e é
-// SILENCIOSO: pedir mais devolve 100 sem erro. Por isso a recarga lê por páginas.
+// The endpoint's ceiling (`limit = max(1, min(limit, 100))` in agente_router) — and
+// it is SILENT: asking for more returns 100 with no error. That is why the reload reads by pages.
 const LIMITE = 100
 
 /**
- * A falha guardada: a microcopy da casa como CHAVE, para a frase sair no idioma
- * em uso quando é mostrada (trocar de idioma nas Preferências não recarrega a
- * lista), ou o `detail` do servidor, que não se traduz.
+ * The stored failure: our own microcopy as a KEY, so the sentence comes out in
+ * the language in use when it is shown (switching language in Preferences does
+ * not reload the list), or the server's `detail`, which is not translated.
  */
 type Falha = "carregar" | "carregarMais" | { detalhe: string }
 
 /**
- * A lista com um anúncio aplicado — o que o servidor devolveria na próxima
- * leitura (ordem por `updated_at DESC`), sem ir buscar:
- * - a conversa já está na lista → sobe ao topo (o título do anúncio, se veio,
- *   é o do servidor; `updated_at` = agora);
- * - não está e o anúncio traz título → linha nova no topo (`inseriu`);
- * - não está e veio SEM título (a confirmação aceita só sabe o id) → nada:
- *   nunca se inventa uma linha "Sem título".
- * Idempotente: aplicar o mesmo anúncio duas vezes não duplica.
+ * The list with an announcement applied — what the server would return on the
+ * next read (ordered by `updated_at DESC`), without fetching:
+ * - the conversation is already in the list → moves to the top (the
+ *   announcement's title, if present, is the server's; `updated_at` = now);
+ * - it is not, and the announcement has a title → new row at the top (`inseriu`);
+ * - it is not, and it came WITHOUT a title (the accepted confirmation only knows
+ *   the id) → nothing: a "Sem título" (untitled) row is never invented.
+ * Idempotent: applying the same announcement twice does not duplicate.
  */
 export function comAnuncio(
   lista: IConversaResumo[],
@@ -85,19 +85,20 @@ export function comAnuncio(
 }
 
 /**
- * A lista de conversas do assistente da Home (os "Chats"). JSON puro — a
- * conversa ao vivo é SSE e mora noutro hook (o painel). Renomear e apagar são
- * otimistas: a linha muda/some na hora e a lista não é recarregada (a época de
- * escrita do GisFlowService já invalida leituras concorrentes).
+ * The list of the Home assistant's conversations (the "Chats"). Plain JSON — the
+ * live conversation is SSE and lives in another hook (the panel). Rename and
+ * delete are optimistic: the row changes/disappears right away and the list is
+ * not reloaded (GisFlowService's write epoch already invalidates concurrent reads).
  *
- * A lista NÃO se atualiza sozinha: quem a ensina sobre uma conversa nova (ou
- * uma que ganhou mensagem) é `anunciar`, alimentado pelo `ChatsLista` com o
- * anúncio que o HomeView deixa na store. Residual aceito: uma recarga iniciada
- * NO MEIO de um turno de conversa existente mostra a ordem pré-turno até a
- * próxima atividade ou F5 — o servidor carimba `updated_at` só no fim do turno.
+ * The list does NOT update by itself: what teaches it about a new conversation
+ * (or one that got a message) is `anunciar`, fed by `ChatsLista` with the
+ * announcement HomeView leaves in the store. Accepted residual: a reload started
+ * IN THE MIDDLE of a turn of an existing conversation shows the pre-turn order
+ * until the next activity or F5 — the server stamps `updated_at` only at the
+ * end of the turn.
  *
- * Precedência de estados do §3: uma recarga que falha NÃO apaga as conversas já
- * na tela — o `setConversas` só acontece com TODAS as páginas boas.
+ * State precedence from §3: a reload that fails does NOT erase the conversations
+ * already on screen — `setConversas` only happens with ALL pages good.
  */
 export function useConversas(): UseConversas {
   const t = useTextosDaCasca().listas
@@ -108,25 +109,25 @@ export function useConversas(): UseConversas {
   const [falha, setFalha] = useState<Falha | null>(null)
   const [total, setTotal] = useState(0)
   const [carregandoMais, setCarregandoMais] = useState(false)
-  // Descarta respostas de uma carga anterior à mais recente (troca rápida).
+  // Discards responses from a load older than the most recent one (quick switch).
   const geracao = useRef(0)
   const jaCarregouRef = useRef(false)
-  // A lista atual sem entrar nas dependências: o "Ver mais" precisa do tamanho e
-  // o anúncio precisa saber se a conversa já está aqui (os callbacks têm de ser
-  // estáveis para não recriar handlers a cada linha nova).
+  // The current list without entering the dependencies: "Ver mais" needs the size
+  // and the announcement needs to know whether the conversation is already here
+  // (the callbacks must be stable so as not to recreate handlers on every new row).
   const listaRef = useRef<IConversaResumo[]>([])
   listaRef.current = conversas
-  // O que falhou por último — é o que "Tentar de novo" refaz.
+  // What failed last — it is what "Tentar de novo" redoes.
   const ultimaFalha = useRef<"recarga" | "pagina">("recarga")
 
   const recarregar = useCallback(() => {
     const minha = ++geracao.current
     if (jaCarregouRef.current) setAtualizando(true)
     else setCarregando(true)
-    // Relê TODAS as páginas que estão na tela, e não só a primeira: depois do
-    // "Ver mais" a lista tinha 200, 300 linhas e uma recarga a devolvia a 100.
-    // O teto do servidor é silencioso, então é por offset, em paralelo e
-    // tudo-ou-nada — uma página ruim e a lista fica como estava (§3).
+    // Rereads ALL pages on screen, not just the first: after "Ver mais" the
+    // list had 200, 300 rows and a reload brought it back to 100.
+    // The server ceiling is silent, so it goes by offset, in parallel and
+    // all-or-nothing — one bad page and the list stays as it was (§3).
     const paginas = Math.max(1, Math.ceil(listaRef.current.length / LIMITE))
     const pedidos = Array.from({ length: paginas }, (_, i) =>
       i === 0 ? GisFlowService.listarConversas(LIMITE) : GisFlowService.listarConversas(LIMITE, i * LIMITE),
@@ -135,8 +136,8 @@ export function useConversas(): UseConversas {
       if (minha !== geracao.current) return
       const ruim = respostas.find((r) => !r.success || !r.data)
       if (!ruim) {
-        // Uma conversa que subiu entre duas páginas pode vir repetida: a chave
-        // é o id, não a posição (o mesmo cuidado do "Ver mais").
+        // A conversation that moved up between two pages may come repeated: the key
+        // is the id, not the position (the same care as "Ver mais").
         const vistos = new Set<string>()
         const itens: IConversaResumo[] = []
         for (const r of respostas) {
@@ -153,8 +154,8 @@ export function useConversas(): UseConversas {
         setJaCarregou(true)
       } else {
         ultimaFalha.current = "recarga"
-        // A microcopy da casa vem antes do `detail` cru do backend: um 500
-        // devolvia "Erro inesperado." como se fosse texto escrito para a pessoa.
+        // Our own microcopy comes before the backend's raw `detail`: a 500
+        // returned "Erro inesperado." (unexpected error) as if it were text written for the person.
         const detalhe = ruim.error?.message
         setFalha(ruim.status >= 500 || !detalhe ? "carregar" : { detalhe })
       }
@@ -163,13 +164,13 @@ export function useConversas(): UseConversas {
     })
   }, [])
 
-  // Carrega no mount. A `geracao` já descarta respostas de uma carga anterior à
-  // mais recente (troca rápida); um setState após desmontar é no-op no React 18.
+  // Loads on mount. `geracao` already discards responses from a load older than
+  // the most recent one (quick switch); a setState after unmount is a no-op in React 18.
   useEffect(() => { recarregar() }, [recarregar])
 
   const carregarMais = useCallback(() => {
-    // A geração NÃO avança: esta é outra página da MESMA carga, e uma recarga em
-    // paralelo precisa poder invalidá-la.
+    // The generation does NOT advance: this is another page of the SAME load, and a
+    // parallel reload must be able to invalidate it.
     const minha = geracao.current
     setCarregandoMais(true)
     GisFlowService.listarConversas(LIMITE, listaRef.current.length).then((res) => {
@@ -177,8 +178,8 @@ export function useConversas(): UseConversas {
       if (res.success && res.data) {
         const pagina = res.data.itens
         setConversas((atual) => {
-          // Apagar é otimista e encurta a lista, então o offset pode repetir uma
-          // conversa que já está na tela — a chave é o id, não a posição.
+          // Deleting is optimistic and shortens the list, so the offset may repeat a
+          // conversation already on screen — the key is the id, not the position.
           const vistos = new Set(atual.map((c) => c.id))
           return [...atual, ...pagina.filter((c) => !vistos.has(c.id))]
         })
@@ -200,9 +201,9 @@ export function useConversas(): UseConversas {
   const anunciar = useCallback((anuncio: AnuncioDeConversa) => {
     const agora = new Date().toISOString()
     setConversas((atual) => comAnuncio(atual, anuncio, agora).lista)
-    // O total sobe só quando a conversa NASCEU agora e ainda não estava aqui
-    // (a carga de montagem pode ter chegado depois dela). FORA do updater de
-    // `setConversas`: no StrictMode os updaters rodam duas vezes.
+    // The total goes up only when the conversation was JUST born and was not here
+    // yet (the mount load may have arrived after it). OUTSIDE the `setConversas`
+    // updater: in StrictMode updaters run twice.
     const jaEstava = listaRef.current.some((c) => c.id === anuncio.id)
     if (anuncio.nova && anuncio.titulo && !jaEstava) setTotal((n) => n + 1)
   }, [])
@@ -210,8 +211,8 @@ export function useConversas(): UseConversas {
   const renomear = useCallback(async (id: string, titulo: string): Promise<ResultadoDaEscrita> => {
     const res = await GisFlowService.renomearConversa(id, titulo)
     if (res.success) {
-      // O servidor carimba `updated_at` no PATCH: renomear conta como atividade
-      // e a conversa sobe. Espelhar aqui evita o pulo de ordem no F5.
+      // The server stamps `updated_at` on PATCH: renaming counts as activity
+      // and the conversation moves up. Mirroring it here avoids the order jump on F5.
       const agora = new Date().toISOString()
       setConversas((atual) => comAnuncio(atual, { id, titulo, nova: false }, agora).lista)
       return { ok: true }

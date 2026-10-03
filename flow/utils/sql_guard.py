@@ -1,55 +1,55 @@
 """
-Validação read-only das queries dos nós DatabaseQuery / DatabaseSpatialQuery.
+Read-only validation of the queries of the DatabaseQuery / DatabaseSpatialQuery nodes.
 
-A versão anterior era uma denylist de palavras (`\\b(INSERT|...|DO|...)\\b`)
-aplicada sobre o texto da query com os comentários removidos por regex. Isso
-errava nos dois sentidos:
+The previous version was a word denylist (`\\b(INSERT|...|DO|...)\\b`)
+applied to the query text with comments removed by regex. That
+was wrong in both directions:
 
-- Falso positivo: a denylist não sabe o que é código e o que é texto. Qualquer
-  literal em português com "do" (`WHERE cidade = 'Rio do Sul'`, `LIKE '%do%'`),
-  uma coluna chamada `comment`, ou uma auditoria com
-  `acao IN ('INSERT','UPDATE','DELETE')` era rejeitada como comando proibido.
-- Falso negativo: os dois regexes de comentário rodavam em sequência, cegos a
-  strings. Um `--` dentro de um literal apagava o resto da query da validação,
-  então `WHERE obs = 'a--b' ; DROP TABLE alvo` passava limpo.
+- False positive: the denylist doesn't know what is code and what is text. Any
+  Portuguese literal with "do" (`WHERE cidade = 'Rio do Sul'`, `LIKE '%do%'`),
+  a column named `comment`, or an audit with
+  `acao IN ('INSERT','UPDATE','DELETE')` was rejected as a forbidden command.
+- False negative: the two comment regexes ran in sequence, blind to
+  strings. A `--` inside a literal erased the rest of the query from validation,
+  so `WHERE obs = 'a--b' ; DROP TABLE alvo` passed clean.
 
-A abordagem aqui é inversa: um scanner de um passe só remove comentários,
-strings e identificadores quotados (`strip_sql_literals`), e a validação olha
-para a FORMA do statement no que sobrou — deve começar com SELECT/WITH, ser um
-único statement, não conter CTE de escrita nem `INTO`. Assim o texto do usuário
-nunca é confundido com comando.
+The approach here is the reverse: a single-pass scanner removes comments,
+strings and quoted identifiers (`strip_sql_literals`), and the validation looks
+at the SHAPE of the statement in what remains — it must start with SELECT/WITH, be a
+single statement, and contain no writing CTE nor `INTO`. That way the user's text
+is never mistaken for a command.
 
-A defesa efetiva continua sendo `conn.transaction(readonly=True)` nos nós
-(SET TRANSACTION READ ONLY no Postgres) somada ao protocolo estendido do
-asyncpg, que já recusa múltiplos statements. Este módulo é defesa em
-profundidade — e, principalmente, mensagem de erro acionável para o usuário.
+The effective defense remains `conn.transaction(readonly=True)` in the nodes
+(SET TRANSACTION READ ONLY in Postgres) together with asyncpg's extended
+protocol, which already rejects multiple statements. This module is defense in
+depth — and, above all, an actionable error message for the user.
 """
 import re
 
-# Limites de segurança para queries
+# Safety limits for queries
 _MAX_QUERY_LENGTH = 20_000  # caracteres
-_MAX_SUBQUERY_DEPTH = 25    # subqueries (SELECT dentro de SELECT)
+_MAX_SUBQUERY_DEPTH = 25    # subqueries (SELECT inside SELECT)
 
-# Abertura de dollar-quoting: $$ ou $tag$
+# Opening of dollar-quoting: $$ or $tag$
 _DOLLAR_TAG = re.compile(r"\$([A-Za-z_]\w*)?\$")
 
-# O statement precisa ser uma leitura. Parênteses à esquerda são válidos:
+# The statement must be a read. Leading parentheses are valid:
 # `(SELECT 1 UNION SELECT 2) ORDER BY 1`.
 _LEADING_READ = re.compile(r"^\s*[(\s]*(WITH|SELECT|TABLE|VALUES)\b", re.IGNORECASE)
 
-# CTE de escrita — `WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d` começa
-# com WITH e escreve. Sobre o código já limpo, essas palavras só podem ser
-# comandos: são reservadas no Postgres, não servem de identificador sem aspas.
+# Writing CTE — `WITH d AS (DELETE FROM t RETURNING *) SELECT * FROM d` starts
+# with WITH and writes. On the already cleaned code, these words can only be
+# commands: they are reserved in Postgres and can't be used as unquoted identifiers.
 _WRITE_CTE = re.compile(r"\b(INSERT|UPDATE|DELETE|MERGE)\b", re.IGNORECASE)
 
-# `SELECT ... INTO nova_tabela` cria tabela. INTO é reservada — fora de string
-# não há uso legítimo num nó de leitura.
+# `SELECT ... INTO nova_tabela` creates a table. INTO is reserved — outside a string
+# there is no legitimate use in a read node.
 _SELECT_INTO = re.compile(r"\bINTO\b", re.IGNORECASE)
 
-# Funções que escapam do escopo da transação read-only: dblink/postgres_fdw
-# abrem OUTRA conexão (o READ ONLY local não vale lá), e as de arquivo/objeto
-# grande tocam o filesystem do servidor. Denylist de NOME DE FUNÇÃO seguido de
-# `(` — diferente de palavra solta, isso não colide com texto em português.
+# Functions that escape the read-only transaction's scope: dblink/postgres_fdw
+# open ANOTHER connection (the local READ ONLY doesn't apply there), and the
+# file/large-object ones touch the server's filesystem. Denylist of FUNCTION NAME
+# followed by `(` — unlike a loose word, this doesn't collide with Portuguese text.
 _DANGEROUS_CALL = re.compile(
     r"\b(dblink\w*|pg_read_file|pg_read_binary_file|pg_write_file|pg_ls_dir"
     r"|pg_stat_file|lo_import|lo_export|pg_sleep\w*|pg_terminate_backend"
@@ -62,23 +62,23 @@ _TRAILING_SEMICOLONS = re.compile(r"[\s;]+$")
 
 
 def strip_sql_literals(sql: str) -> str:
-    """Substitui comentários, strings e identificadores quotados por espaços.
+    """Replaces comments, strings and quoted identifiers with spaces.
 
-    Passe único da esquerda para a direita — é o que garante que um `--` dentro
-    de string não vire comentário e que um `*/` dentro de comentário de linha não
-    feche um bloco.
+    A single left-to-right pass — that is what guarantees that a `--` inside
+    a string doesn't become a comment and that a `*/` inside a line comment
+    doesn't close a block.
 
-    A saída tem o MESMO COMPRIMENTO da entrada, e cada caractere mascarado vira
-    um espaço na posição em que estava. Isso é o que permite usar o resultado
-    como mapa: quem precisa saber se uma posição do SQL original é código ou
-    texto — o `prepare_query`, que não pode trocar `:nome` dentro de um literal —
-    consulta o índice equivalente aqui. As checagens de forma abaixo não se
-    importam com o comprimento; elas só olham a sequência de tokens que sobra.
+    The output has the SAME LENGTH as the input, and each masked character becomes
+    a space at the position where it was. That is what allows using the result
+    as a map: whoever needs to know whether a position in the original SQL is code
+    or text — `prepare_query`, which must not replace `:nome` inside a literal —
+    looks up the equivalent index here. The shape checks below don't care
+    about length; they only look at the sequence of tokens that remains.
 
-    Levanta ValueError em construção não terminada (string, bloco ou
-    dollar-quote sem fechamento): além de ser SQL inválido de qualquer forma,
-    consumir até o fim do texto silenciosamente esconderia o resto da query da
-    validação.
+    Raises ValueError on an unterminated construct (string, block or
+    dollar-quote without a closing): besides being invalid SQL anyway,
+    silently consuming to the end of the text would hide the rest of the query
+    from validation.
     """
     out: list[str] = []
     i, n = 0, len(sql)
@@ -87,13 +87,13 @@ def strip_sql_literals(sql: str) -> str:
         c = sql[i]
         inicio = i
 
-        # -- comentário de linha (vai até \n; sem \n no fim do arquivo é válido)
+        # -- line comment (goes up to \n; without \n at end of file it is valid)
         if c == "-" and sql.startswith("--", i):
             quebra = sql.find("\n", i)
             i = n if quebra == -1 else quebra
             out.append(" " * (i - inicio))
 
-        # /* bloco */ — o Postgres permite aninhamento, então contamos a profundidade
+        # /* block */ — Postgres allows nesting, so we count the depth
         elif c == "/" and sql.startswith("/*", i):
             profundidade, i = 1, i + 2
             while i < n and profundidade:
@@ -107,7 +107,7 @@ def strip_sql_literals(sql: str) -> str:
                 raise ValueError("Comentário de bloco `/*` não fechado na query.")
             out.append(" " * (i - inicio))
 
-        # 'string' — aspa dobrada ('') escapa; com prefixo E'' o backslash também
+        # 'string' — a doubled quote ('') escapes; with the E'' prefix the backslash does too
         elif c == "'":
             escapa_barra = i > 0 and sql[i - 1] in "eE" and (i < 2 or not sql[i - 2].isalnum())
             i += 1
@@ -162,13 +162,13 @@ def strip_sql_literals(sql: str) -> str:
 
 
 def validate_readonly_sql(query: str) -> None:
-    """Garante que a query é uma leitura única. Levanta ValueError se não for."""
+    """Ensures the query is a single read. Raises ValueError if it is not."""
     if len(query) > _MAX_QUERY_LENGTH:
         raise ValueError(f"Query excede o limite de {_MAX_QUERY_LENGTH} caracteres.")
 
     codigo = strip_sql_literals(query)
 
-    # Um `;` final (com espaços) é aceito; no meio significa mais de um statement.
+    # A trailing `;` (with spaces) is accepted; in the middle it means more than one statement.
     if ";" in _TRAILING_SEMICOLONS.sub("", codigo):
         raise ValueError(
             "Query contém mais de um comando SQL (`;`). "

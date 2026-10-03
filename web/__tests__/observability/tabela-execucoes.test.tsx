@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { TabelaExecucoes, duracaoDaExecucao, sublinhaDoWorkflow } from "@/app/components/observability/tabela-execucoes"
 import type { IRunSummary } from "@/service/types"
 
-// O StatusBadge em português é colateral de outra frente (spec §4.4); aqui
-// ele é dublado com o mesmo contrato (rotuloDoStatus) para o teste não
-// depender da ordem de integração.
+// The Portuguese StatusBadge is a side effect of another workstream (spec
+// §4.4); here it's doubled with the same contract (rotuloDoStatus) so the test
+// doesn't depend on the integration order.
 vi.mock("@/app/components/shared/StatusBadge", async () => {
   const { rotuloDoStatus } = await import("@/app/components/shared/status-rotulos")
   return { StatusBadge: ({ status }: { status: string }) => <span>{rotuloDoStatus(status)}</span> }
@@ -47,7 +47,7 @@ describe("TabelaExecucoes", () => {
     ]} />)
     const selos = screen.getAllByLabelText("Fluxo criado pelo assistente")
     expect(selos).toHaveLength(1)
-    // Na linha certa: a do fluxo do assistente, não a de cima nem a de baixo.
+    // On the right row: the assistant workflow's, not the one above or below.
     expect(selos[0].closest("tr")).toHaveTextContent("Embargos no Brasil")
   })
 
@@ -57,8 +57,8 @@ describe("TabelaExecucoes", () => {
     expect(screen.getByRole("columnheader", { name: "Workflow" })).toBeInTheDocument()
     expect(screen.getByRole("columnheader", { name: "Erro" })).toBeInTheDocument()
 
-    // O botão fica no nome do workflow; a linha (célula a célula) continua
-    // legível para leitores de tela — por isso o texto é lido na <tr>.
+    // The button sits on the workflow name; the row (cell by cell) stays
+    // readable for screen readers — that's why the text is read on the <tr>.
     const botao = screen.getByRole("button", { name: "Abrir execução de Integração SICAR" })
     const linha = botao.closest("tr")!
     expect(linha).toHaveTextContent("Falhou")
@@ -69,7 +69,7 @@ describe("TabelaExecucoes", () => {
     expect(linha).toHaveTextContent("reserva")
     const erro = within(linha).getByTitle("tempo esgotado · Timeout ao consultar o WFS do SICAR (30 s)")
     expect(erro.className).toContain("text-red")
-    // Rodapé com o total da primeira página.
+    // Footer with the first page's total.
     expect(screen.getByText("Mostrando 1 de 1.284")).toBeInTheDocument()
     expect(screen.getByRole("button", { name: "Ver mais" })).toBeInTheDocument()
   })
@@ -81,15 +81,15 @@ describe("TabelaExecucoes", () => {
     const linha = botao.closest("tr")!
     expect(linha).not.toHaveAttribute("role")
     fireEvent.click(linha)
-    fireEvent.click(botao)   // Enter/Espaço num <button> nativo viram click
+    fireEvent.click(botao)   // Enter/Space on a native <button> become a click
     expect(onAbrir).toHaveBeenCalledTimes(2)
     expect(onAbrir).toHaveBeenCalledWith("run-1")
   })
 
   it("erro com URL longa: o limite de largura fica no texto, não no <td>", () => {
-    // `max-width` em célula de tabela não é definido pela especificação; com o
-    // limite no <td>, uma URL sem espaço podia alargar a coluna até a tabela
-    // rolar para o lado. No <span> a regra é a de um bloco comum.
+    // `max-width` on a table cell isn't defined by the specification; with the
+    // limit on the <td>, a URL without spaces could widen the column until the
+    // table scrolled sideways. On the <span> the rule is that of a regular block.
     const url = "HTTPError: 503 Server Error: Service Unavailable for url: https://geoservicos.ibge.gov.br/geoserver/ows?service=WFS&version=2.0.0&request=GetFeature&typeNames=CGEO:ANMS2010_06_grade_estatistica"
     render(<TabelaExecucoes {...base} runs={[run({ error_message: url, error_category: "transient" })]} />)
     const erro = screen.getByTitle(`transitório · ${url}`)

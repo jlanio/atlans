@@ -3,14 +3,14 @@ import { describe, it, expect } from "vitest"
 import { textosDe } from "@/app/components/home/i18n"
 
 /**
- * A tipografia dos dicionários: o inglês usa o apóstrofo tipográfico (’), como
- * a casca e as listas sempre usaram. Misturar os dois deixava "Couldn't start
- * your session" no login ao lado de "Couldn’t load chats" na barra.
+ * The dictionaries' typography: English uses the typographic apostrophe (’), as
+ * the shell and the lists always did. Mixing the two left "Couldn't start
+ * your session" on the login next to "Couldn’t load chats" in the bar.
  */
 function textos(o: unknown, caminho: string): Array<[string, string]> {
   if (typeof o === "string") return [[caminho, o]]
   if (typeof o === "function") {
-    // Texto que depende de número: amostrado com um e com vários.
+    // Text that depends on a number: sampled with one and with several.
     return [1, 3].flatMap((n) => {
       try {
         return textos(o(n, n), `${caminho}(${n})`)

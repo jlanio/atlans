@@ -1,10 +1,10 @@
 /**
- * A regra de quando a câmera acompanha o fluxo sendo montado.
+ * The rule for when the camera follows the workflow being built.
  *
- * O teste que dá razão a este arquivo é o do "cresceu pouco": sem folga, o
- * auto-layout reposicionando os nós por alguns pixels a cada passo dispararia
- * um reenquadramento novo a cada desenho — que é exatamente o salto de escala
- * que a regra existe para remover.
+ * The test that justifies this file is the "grew a little" one: without slack,
+ * auto-layout repositioning the nodes by a few pixels at each step would
+ * trigger a fresh reframing on every draw — which is exactly the zoom jump the
+ * rule exists to remove.
  */
 import { describe, it, expect, afterEach, vi } from "vitest"
 
@@ -20,9 +20,9 @@ const caixa = (x: number, y: number, width: number, height: number): Caixa =>
 
 describe("cabeNoEnquadrado", () => {
   it("sem quadro anterior, sempre precisa enquadrar", () => {
-    // O primeiro desenho da conversa: não há o que comparar, e deixar a pessoa
-    // olhando para uma tela parada enquanto o fluxo nasce fora dela é o defeito
-    // que o enquadramento existe para evitar.
+    // The conversation's first draw: there is nothing to compare, and leaving the
+    // person looking at a still screen while the workflow is born outside it is the
+    // defect the framing exists to avoid.
     expect(cabeNoEnquadrado(caixa(0, 0, 100, 100), null)).toBe(false)
   })
 
@@ -31,13 +31,13 @@ describe("cabeNoEnquadrado", () => {
     expect(cabeNoEnquadrado(c, c)).toBe(true)
   })
 
-  // A folga vai EXPLÍCITA nestes, e não pela constante. Escrever
-  // `FOLGA_DO_ENQUADRAMENTO - 1` parece mais robusto e é o contrário: o número
-  // do teste passa a se mover junto com a constante, e zerar a constante deixa
-  // de quebrar qualquer coisa. Medido — a mutação sobreviveu escrito assim.
+  // The slack is EXPLICIT in these, not via the constant. Writing
+  // `FOLGA_DO_ENQUADRAMENTO - 1` looks more robust and is the opposite: the
+  // test's number starts moving along with the constant, and zeroing the constant
+  // no longer breaks anything. Measured — the mutation survived written that way.
   it("crescer menos que a folga não move a câmera", () => {
-    // É o caso do auto-layout: os nós reposicionam por pouco a cada passo, e
-    // sem isto cada passo viraria um reenquadramento.
+    // This is the auto-layout case: nodes reposition slightly at each step, and
+    // without this every step would become a reframing.
     const antes = caixa(0, 0, 200, 200)
     expect(cabeNoEnquadrado(caixa(0, 0, 230, 230), antes, 40)).toBe(true)
   })
@@ -48,10 +48,10 @@ describe("cabeNoEnquadrado", () => {
   })
 
   it("a folga padrão é útil nos dois extremos", () => {
-    // Zero faria cada reposicionamento do auto-layout virar um
-    // reenquadramento — o salto que a regra existe para remover. E grande
-    // demais engoliria um nó inteiro entrando: os nós são espaçados de 180 em
-    // 180 pelo layout, então a folga tem de ficar bem abaixo disso.
+    // Zero would turn every auto-layout repositioning into a reframing — the
+    // jump the rule exists to remove. And too large would swallow a whole
+    // node coming in: the layout spaces nodes 180 apart, so the slack has to
+    // stay well below that.
     expect(FOLGA_DO_ENQUADRAMENTO).toBeGreaterThan(0)
     expect(FOLGA_DO_ENQUADRAMENTO).toBeLessThan(90)
   })
@@ -59,9 +59,9 @@ describe("cabeNoEnquadrado", () => {
   it("cada borda conta sozinha", () => {
     const antes = caixa(0, 0, 200, 200)
     const fora = 41
-    // esquerda, topo, direita, baixo — um nó novo pode entrar por qualquer uma,
-    // e uma comparação que só olhasse largura e altura perderia as duas
-    // primeiras.
+    // left, top, right, bottom — a new node can come in through any of them,
+    // and a comparison that only looked at width and height would miss the
+    // first two.
     expect(cabeNoEnquadrado(caixa(-fora, 0, 200, 200), antes)).toBe(false)
     expect(cabeNoEnquadrado(caixa(0, -fora, 200, 200), antes)).toBe(false)
     expect(cabeNoEnquadrado(caixa(0, 0, 200 + fora, 200), antes)).toBe(false)
@@ -69,14 +69,14 @@ describe("cabeNoEnquadrado", () => {
   })
 
   it("o fluxo mudar de lugar move a câmera", () => {
-    // Redesenho com geometria outra: a caixa tem o mesmo tamanho e não está
-    // mais onde estava.
+    // Redraw with different geometry: the box has the same size and is no
+    // longer where it was.
     expect(cabeNoEnquadrado(caixa(900, 900, 200, 200), caixa(0, 0, 200, 200))).toBe(false)
   })
 
   it("encolher não move a câmera", () => {
-    // Um fluxo menor continua dentro do que já se vê; arrastar a câmera para
-    // apertar o zoom seria movimento sem informação.
+    // A smaller workflow stays within what is already visible; dragging the camera
+    // to tighten the zoom would be movement without information.
     expect(cabeNoEnquadrado(caixa(50, 50, 20, 20), caixa(0, 0, 200, 200))).toBe(true)
   })
 })
@@ -95,10 +95,10 @@ describe("semMovimento", () => {
   })
 
   it("sem `matchMedia` não quebra — e não some com a animação", () => {
-    // jsdom não implementa `matchMedia`, e o mesmo vale para o render do
-    // servidor. Sem a guarda isto seria um TypeError no meio do desenho; e o
-    // default tem de ser "há movimento", senão um ambiente sem a API desligaria
-    // a animação para todo mundo.
+    // jsdom does not implement `matchMedia`, and the same goes for server
+    // rendering. Without the guard this would be a TypeError mid-draw; and the
+    // default has to be "there is motion", otherwise an environment without the
+    // API would turn off the animation for everyone.
     vi.stubGlobal("matchMedia", undefined)
     expect(semMovimento()).toBe(false)
   })

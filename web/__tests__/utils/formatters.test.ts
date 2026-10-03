@@ -3,18 +3,18 @@ import { readFileSync, readdirSync, statSync } from "fs"
 import { join, relative } from "path"
 import { formatBytes, formatDuration, successRateColor } from "@/utils/formatters"
 
-// Formatação de valores: uma implementação por conceito.
+// Value formatting: one implementation per concept.
 //
-// `formatBytes` tinha quatro cópias em DUAS famílias incompatíveis (uma
-// parava em MB, outra escalava até TB); `formatDate` tinha quatro wrappers do
-// próprio default de `formatLocal`; e a cor por taxa de sucesso tinha quatro
-// cópias com TRÊS limiares — a divergência mais visível de todas.
+// `formatBytes` had four copies in TWO incompatible families (one stopped at
+// MB, the other scaled up to TB); `formatDate` had four wrappers of
+// `formatLocal`'s own default; and the success-rate color had four copies with
+// THREE thresholds — the most visible divergence of all.
 
 const RAIZ = join(__dirname, "..", "..")
 
 describe("formatBytes", () => {
   it("escala até TB — a razão de unificar na família certa", () => {
-    // A versão de /artifacts e /drive parava em MB: 3 GB viravam "3072.0 MB".
+    // The /artifacts and /drive version stopped at MB: 3 GB became "3072.0 MB".
     expect(formatBytes(3 * 1024 ** 3)).toBe("3.00 GB")
     expect(formatBytes(2 * 1024 ** 4)).toBe("2.00 TB")
   })
@@ -33,7 +33,7 @@ describe("formatBytes", () => {
   })
 
   it("não estoura o array de unidades em valores absurdos", () => {
-    // Sem o clamp, um valor acima de TB indexaria fora do array e produziria
+    // Without the clamp, a value above TB would index outside the array and produce
     // "1.00 undefined".
     expect(formatBytes(1024 ** 6)).toContain("TB")
   })
@@ -41,8 +41,8 @@ describe("formatBytes", () => {
 
 describe("successRateColor", () => {
   it("60% é vermelho em TODAS as telas agora", () => {
-    // Era a divergência: três telas mostravam vermelho e /observability/[id]
-    // mostrava âmbar — o mesmo número, dois julgamentos opostos.
+    // That was the divergence: three screens showed red and /observability/[id]
+    // showed amber — the same number, two opposite judgments.
     expect(successRateColor(0.6)).toBe("text-red-500")
     expect(successRateColor(0.6, "amber")).toBe("text-red-500 dark:text-red-400")
   })
@@ -56,7 +56,7 @@ describe("successRateColor", () => {
   })
 
   it("preserva a paleta que cada tela já usava", () => {
-    // O tom âmbar ganhou variante escura: no card escuro o 600 tinha contraste baixo.
+    // The amber tone got a dark variant: on the dark card the 600 had low contrast.
     expect(successRateColor(0.95, "amber")).toBe("text-green-600 dark:text-green-400")
     expect(successRateColor(0.75, "amber")).toBe("text-amber-600 dark:text-amber-400")
   })
@@ -75,7 +75,7 @@ describe("formatDuration", () => {
   })
 })
 
-// ── Guardas contra a duplicação voltar ───────────────────────────────────────
+// ── Guards against the duplication coming back ───────────────────────────────
 
 function arquivosTs(dir: string, acc: string[] = []): string[] {
   for (const nome of readdirSync(dir)) {
@@ -96,8 +96,8 @@ describe("sem cópias locais", () => {
   })
 
   it("nenhuma página redefine formatDate", () => {
-    // As quatro cópias eram wrappers do DEFAULT de `formatLocal` — chamavam
-    // `formatLocal(iso, "DD/MM/YYYY HH:mm")`, que é literalmente o default.
+    // The four copies were wrappers of `formatLocal`'s DEFAULT — they called
+    // `formatLocal(iso, "DD/MM/YYYY HH:mm")`, which is literally the default.
     const violacoes = arquivosTs(join(RAIZ, "app"))
       .filter(c => /^\s*(function|const)\s+formatDate\s*[(:=]/m.test(readFileSync(c, "utf8")))
       .map(c => relative(RAIZ, c))

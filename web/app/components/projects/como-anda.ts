@@ -5,45 +5,45 @@ import { fromBackend, dayjs } from "@/lib/dayjs"
 import { formatarDecorridoGrosso, formatarQuando, rotuloDaOrigem } from "@/lib/formatos"
 
 /**
- * "Como anda": a última execução de um workflow (docs/specs/projects.md
- * §3.5). Puro — cruza a linha de métricas (janela de 30 dias, cache de 45 s)
- * com o run vivo do `ActiveRunsContext` (10 s), que vence por ser mais
- * fresco. Devolve strings prontas onde a tela só mostra ("quando", "desde")
- * e números crus onde ela formata ("61 execuções em 30 d · 3 falhas").
+ * "Como anda" (how it is going): a workflow's last run (docs/specs/projects.md
+ * §3.5). Pure — crosses the metrics row (30-day window, 45 s cache) with the
+ * live run from `ActiveRunsContext` (10 s), which wins for being fresher.
+ * Returns ready-made strings where the screen only displays ("quando",
+ * "desde") and raw numbers where it formats ("61 execuções em 30 d · 3 falhas").
  */
 
-/** Janela das métricas da listagem (`days=30`), a mesma que separa "nunca" de "sem execuções". */
+/** Window of the listing metrics (`days=30`), the same one that separates "nunca" (never) from "sem execuções" (no runs). */
 export const JANELA_EM_DIAS = 30
 
 export type ComoAnda =
   | {
       tipo: "executando"
-      /** "há 4 min"; vazio quando o run ainda não tem `started_at`. */
+      /** "há 4 min"; empty when the run has no `started_at` yet. */
       desde: string
-      /** Instante (ms) do início, para ordenar por execução; agora quando não se sabe. */
+      /** Start instant (ms), to sort by run; now when unknown. */
       instante: number
       origem: string | null
       executor: string | null
-      /** Mediana (s) das execuções na janela: "costuma levar 7 min". */
+      /** Median (s) of the runs in the window: "costuma levar 7 min". */
       tipica: number | null
     }
   | {
       tipo: "concluida" | "falhou" | "cancelada"
       /** "há 3 h" / "hoje, 18:00" / "ontem, 06:00" / "4 set, 03:00". */
       quando: string
-      /** Instante (ms) da última execução, para ordenar. */
+      /** Instant (ms) of the last run, for sorting. */
       instante: number
-      /** Só em `falhou`; nulo nos demais. */
+      /** Only in `falhou`; null in the others. */
       erro: string | null
       total: number
       falhas: number
       mediana: number | null
     }
-  /** Sem linha de métricas na janela (ou `last_run_at` nulo) e o workflow tem mais de 30 dias. */
+  /** No metrics row in the window (or `last_run_at` null) and the workflow is older than 30 days. */
   | { tipo: "sem-execucoes" }
-  /** `total_runs` 0 e criado há menos de 30 dias: "execute uma vez para validar". */
+  /** `total_runs` 0 and created less than 30 days ago: "execute uma vez para validar" (run once to validate). */
   | { tipo: "nunca" }
-  /** As métricas falharam. */
+  /** The metrics failed. */
   | { tipo: "indisponivel" }
 
 export function derivarComoAnda(
@@ -53,8 +53,8 @@ export function derivarComoAnda(
   metricasIndisponiveis: boolean,
   agora: Date = new Date(),
 ): ComoAnda {
-  // O run vivo vence tudo, inclusive a falta de métricas: ele vem de outro
-  // endpoint, com cadência de 10 s, e é o que a pessoa está esperando ver.
+  // The live run beats everything, including missing metrics: it comes from
+  // another endpoint, at a 10 s cadence, and it is what the person is waiting to see.
   if (emExecucao) {
     const inicio = fromBackend(emExecucao.startedAt)
     return {
@@ -72,10 +72,10 @@ export function derivarComoAnda(
   const ultima = fromBackend(metrica?.last_run_at)
   if (!metrica || !ultima || !metrica.last_status) return nuncaOuSemExecucoes(wf, metrica, agora)
 
-  // Métricas dizem "rodando" mas o contexto não tem o run: ou o contexto
-  // ainda não fez o primeiro poll, ou o run acabou há menos de 45 s (cache).
-  // Mostrar "em execução" com o que se sabe é mais honesto que chutar um
-  // status final que ninguém informou.
+  // Metrics say "running" but the context does not have the run: either the
+  // context has not done its first poll yet, or the run ended less than 45 s
+  // ago (cache). Showing "em execução" (running) with what is known is more
+  // honest than guessing a final status nobody reported.
   if (metrica.last_status === "running" || metrica.last_status === "pending") {
     return {
       tipo: "executando",
@@ -102,8 +102,8 @@ export function derivarComoAnda(
     case "cancelled":
       return { ...base, tipo: "cancelada" }
     default:
-      // `success` e qualquer status terminal que o backend venha a criar: a
-      // execução acabou sem erro registrado.
+      // `success` and any terminal status the backend may come to create: the
+      // run ended with no error recorded.
       return { ...base, tipo: "concluida" }
   }
 }
@@ -113,10 +113,10 @@ function nuncaOuSemExecucoes(
   metrica: IWorkflowMetricsRow | undefined,
   agora: Date,
 ): ComoAnda {
-  // "Nunca" é o convite ao workflow novo ("execute uma vez para validar");
-  // passada a janela, não dá para saber se rodou antes dela — e o texto
-  // vira o neutro "sem execuções em 30 dias". Sem `created_at` não há como
-  // afirmar que é novo.
+  // "Nunca" (never) is the invitation for the new workflow ("execute uma vez
+  // para validar"); past the window, there is no way to know whether it ran
+  // before it — and the text becomes the neutral "sem execuções em 30 dias".
+  // Without `created_at` there is no way to claim it is new.
   const criado = fromBackend(wf.created_at)
   const semRuns = (metrica?.total_runs ?? 0) === 0
   const recente = criado != null && dayjs(agora).diff(criado, "day") < JANELA_EM_DIAS

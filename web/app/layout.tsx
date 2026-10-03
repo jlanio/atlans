@@ -11,8 +11,8 @@ import { CodigoFonteProvider } from '@/app/components/share/codigo-fonte';
 import { lerNomeNaTelaDoAmbiente } from '@/lib/nome-na-tela';
 import { NomeNaTelaProvider } from '@/app/components/share/nome-na-tela';
 
-// O título da aba é o nome desta instalação (NOME_NA_TELA; «Atlans» sem ela),
-// lido a cada pedido como o resto da configuração do layout.
+// The tab title is this installation's name (NOME_NA_TELA; "Atlans" without it),
+// read on every request like the rest of the layout configuration.
 export async function generateMetadata() {
   return {
     title: lerNomeNaTelaDoAmbiente(process.env),
@@ -20,42 +20,42 @@ export async function generateMetadata() {
   };
 }
 
-// Declarado em vez de herdado do default do Next por causa do `viewportFit`:
-// sem ele, num iPhone com notch a área útil para de onde a barra do sistema
-// começa, e as camadas fixas do canvas (toolbar, painel de execução) ficam
-// espremidas acima dela. Com `cover` a página ocupa a tela inteira e quem
-// precisa recuar usa `env(safe-area-inset-*)` — ver globals.css.
+// Declared instead of inherited from Next's default because of `viewportFit`:
+// without it, on an iPhone with a notch the usable area stops where the system
+// bar starts, and the canvas's fixed layers (toolbar, execution panel) get
+// squeezed above it. With `cover` the page takes the whole screen and whatever
+// needs to inset uses `env(safe-area-inset-*)` — see globals.css.
 //
-// `maximumScale`/`userScalable` NÃO entram: travar o zoom é barreira de
-// acessibilidade, e o iOS ignora desde a versão 10 de qualquer forma.
+// `maximumScale`/`userScalable` are NOT included: locking zoom is an
+// accessibility barrier, and iOS has ignored it since version 10 anyway.
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover' as const,
 };
 
-// Sessão, notificações e paleta de comandos vivem em (dashboard)/layout.tsx:
-// aqui em cima eles também eram montados no login e no portal público /share,
-// que carregavam o cliente do next-auth, o GisFlowService e os ícones de nós
-// sem precisar — e ainda disparavam um GET /api/auth/session sem sessão.
-// O Toaster fica no root porque as telas de login também emitem toasts.
+// Session, notifications and command palette live in (dashboard)/layout.tsx:
+// up here they were also mounted on the login and on the public /share portal,
+// which loaded the next-auth client, GisFlowService and the node icons
+// without needing them — and also fired a GET /api/auth/session with no session.
+// The Toaster stays at the root because the login screens also emit toasts.
 export default async function RootLayout(props: { children: ReactNode }) {
   const cookieStore = await cookies();
-  // Dark é o tema PADRÃO da plataforma: sem o cookie `theme` (usuário novo, ou
-  // que nunca trocou), a página abre no escuro. Quem escolheu um tema mantém a
-  // escolha — o toggle grava o cookie (ver ThemeContext), e "light" nele
-  // continua abrindo claro. Resolvido no servidor: a classe `dark` já sai no
-  // <html>, sem flash.
+  // Dark is the platform's DEFAULT theme: without the `theme` cookie (a new user,
+  // or one who never switched), the page opens dark. Whoever chose a theme keeps
+  // the choice — the toggle writes the cookie (see ThemeContext), and "light" in
+  // it still opens light. Resolved on the server: the `dark` class already goes
+  // out on <html>, with no flash.
   const mode = cookieStore.get("theme")?.value ?? "dark";
-  // Os servidores de tiles desta instalação (MAPA_*), lidos a cada pedido: o
-  // layout já é dinâmico (cookies), e a imagem do web é a mesma para todas.
+  // This installation's tile servers (MAPA_*), read on every request: the
+  // layout is already dynamic (cookies), and the web image is the same for all.
   const fundosDoMapa = lerFundosDoAmbiente(process.env);
-  // O link para o código-fonte desta instalação (CODIGO_FONTE_URL, AGPL §13),
-  // lido do mesmo jeito: a tela de entrada e o menu da conta o mostram.
+  // The link to this installation's source code (CODIGO_FONTE_URL, AGPL §13),
+  // read the same way: the sign-in screen and the account menu show it.
   const codigoFonte = lerCodigoFonteDoAmbiente(process.env);
-  // O nome que a tela mostra (NOME_NA_TELA): o wordmark da barra lateral e o
-  // cabeçalho da tela de entrada. O código mostra «Atlans»; a forma com o
-  // domínio é da instalação do titular (TRADEMARKS.md).
+  // The name the screen shows (NOME_NA_TELA): the sidebar wordmark and the
+  // sign-in screen header. The code shows "Atlans"; the form with the
+  // domain belongs to the trademark holder's installation (TRADEMARKS.md).
   const nomeNaTela = lerNomeNaTelaDoAmbiente(process.env);
 
   return (

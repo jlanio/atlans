@@ -1,15 +1,16 @@
 # tests/unit/test_nodes_router_wfs_layers.py
-"""`GET /nodes/wfs/layers` continua igual para o editor.
+"""`GET /nodes/wfs/layers` stays the same for the editor.
 
-A rota virou um wrapper fino de `fontes_service.listar_camadas_wfs` — a MESMA
-sondagem que o catálogo de fontes usa. O que o editor vê não muda: o corpo
-`{layers: [{name, title}]}` e os status (400 URL inválida, 403 SSRF, 502
-servidor, 504 timeout, 404 sem camadas).
+The route became a thin wrapper of `fontes_service.listar_camadas_wfs` — the SAME
+probe the source catalog uses. What the editor sees doesn't change: the body
+`{layers: [{name, title}]}` and the statuses (400 invalid URL, 403 SSRF, 502
+server, 504 timeout, 404 no layers).
 
-Com `credential_id`, lista como a execução do nó veria (as camadas protegidas
-de um GeoServer), no escopo do /validate: as credenciais de quem pede e, para
-operator ou acima no workspace do fluxo informado (`workflow_id`), as
-compartilhadas com ele — é o fluxo que diz o workspace, não o cliente.
+With `credential_id`, it lists as the node's execution would see it (a
+GeoServer's protected layers), within the /validate scope: the requester's
+credentials and, for operator or above in the given workflow's workspace
+(`workflow_id`), those shared with it — the workflow states the workspace, not
+the client.
 """
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
@@ -24,7 +25,7 @@ ROTA = "/nodes/wfs/layers"
 
 @pytest.fixture
 def sem_dns(monkeypatch):
-    """A validação SSRF resolve DNS; aqui ela só deixa passar."""
+    """SSRF validation resolves DNS; here it just lets things through."""
     monkeypatch.setattr(geo, "validate_url_ssrf", lambda url: None)
 
 
@@ -33,14 +34,14 @@ async def test_devolve_as_camadas_do_servico_com_a_url_normalizada(client, monke
 
     async def _listar(url, version="2.0.0", *, auth=None):
         chamadas.append(url)
-        assert auth is None  # sem credencial no nó, a listagem é anônima
+        assert auth is None  # with no credential on the node, the listing is anonymous
         return [{"name": "Funai:tis_poligonais", "title": "Terras indígenas"}]
 
     monkeypatch.setattr(fs, "listar_camadas_wfs", _listar)
     r = await client.get(ROTA, params={"url": "https://geoserver.funai.gov.br/geoserver/ows?service=WFS&request=GetCapabilities"})
     assert r.status_code == 200
     assert r.json() == {"layers": [{"name": "Funai:tis_poligonais", "title": "Terras indígenas"}]}
-    # A query do input é descartada antes de sondar.
+    # The input's query string is discarded before probing.
     assert chamadas == ["https://geoserver.funai.gov.br/geoserver/ows"]
 
 
@@ -67,17 +68,17 @@ async def test_url_sem_http_e_400_sem_sondar(client, monkeypatch, sem_dns):
     assert r.status_code == 400
 
 
-# ── Com a credencial do nó ─────────────────────────────────────────────────────
+# ── With the node's credential ─────────────────────────────────────────────────
 
 CID = "3f2a7c18-5b90-4c2e-9a44-1d6f8e2b7c05"
 CHAVE = "c0ffee-SEGREDO-42"
-USUARIO = "usr-test-001"  # o do `client`
+USUARIO = "usr-test-001"  # the `client`'s one
 
 
 @pytest.fixture
 def banco(monkeypatch):
-    """A sessão (com os fluxos que existem), o papel no workspace e o resolver
-    dublados; guarda o escopo pedido."""
+    """The session (with the workflows that exist), the workspace role and the
+    resolver stubbed; records the requested scope."""
     import app.core.authorization.credential_loader as loader
     import app.core.authorization.workflow_access as acesso
     import app.core.db as db
@@ -91,7 +92,7 @@ def banco(monkeypatch):
             estado.commits += 1
 
         async def execute(self, stmt):
-            # A consulta do workspace do fluxo, compilada: o que ela pede fica à vista.
+            # The workflow's workspace query, compiled: what it asks for is in plain view.
             sql = str(stmt.compile(compile_kwargs={"literal_binds": True}))
             estado.consultas.append(sql)
             achado = next((ws for wf, ws in estado.fluxos.items() if f"'{wf}'" in sql), None)
@@ -116,7 +117,7 @@ def banco(monkeypatch):
 
 @pytest.fixture
 def listagem(monkeypatch, sem_dns):
-    """As credenciais com que a rota listou (uma por pedido que chegou à rede)."""
+    """The credentials the route listed with (one per request that reached the network)."""
     usadas: list = []
 
     async def _listar(url, version="2.0.0", *, auth=None):
@@ -133,9 +134,9 @@ async def test_lista_com_a_credencial_propria(client, banco, listagem):
     assert r.status_code == 200 and r.json()["layers"][0]["name"] == "ns:protegida"
     (auth,) = listagem
     assert (auth.tipo, auth.segredo, auth.nome, auth.no_cabecalho) == ("authkey", CHAVE, "authkey", False)
-    # Sem workspace, o escopo é só o de quem pede.
+    # Without a workspace, the scope is only the requester's.
     assert banco.escopos == [([CID], {USUARIO}, None)]
-    assert banco.commits == 1  # o carimbo de uso
+    assert banco.commits == 1  # the usage stamp
 
 
 @pytest.mark.parametrize("papel, compartilhado", [
@@ -148,7 +149,7 @@ async def test_compartilhadas_do_workspace_do_fluxo_so_para_quem_executa(client,
     assert r.status_code == 200
     assert banco.escopos == [([CID], {USUARIO}, compartilhado)]
     (consulta,) = banco.consultas
-    assert "deleted_at IS NULL" in consulta  # fluxo na lixeira não dá escopo
+    assert "deleted_at IS NULL" in consulta  # a workflow in the trash grants no scope
 
 
 async def test_quem_nao_e_do_workspace_do_fluxo_nao_resolve_nada(client, banco, listagem):
@@ -163,8 +164,8 @@ async def test_fluxo_inexistente_e_404_e_o_cliente_nao_escolhe_o_workspace(clien
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID, "workflow_id": "wf-sumido"})
     assert r.status_code == 404
     assert banco.escopos == [] and listagem == []
-    # `workspace_id` deixou de ser parâmetro: o alcance vem de um fluxo que
-    # existe (e do workspace dele), não de um id de workspace escolhido à mão.
+    # `workspace_id` is no longer a parameter: the reach comes from a workflow that
+    # exists (and its workspace), not from a workspace id chosen by hand.
     r = await client.get(ROTA, params={"url": "https://geo.x.gov.br/ows", "credential_id": CID, "workspace_id": "ws1"})
     assert r.status_code == 200 and banco.escopos == [([CID], {USUARIO}, None)]
 

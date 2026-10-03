@@ -6,17 +6,17 @@ import * as Estado from "@/app/components/shared/estados"
 import type { ArtifactTab } from "@/app/(dashboard)/artifacts/use-artifacts-query"
 
 /**
- * Estados da tela de Artefatos (contrato §3): skeleton da 1ª carga, erro de
- * espinha em cartão, vazio de primeiro uso vs sem resultado, e o aviso âmbar de
- * recarga que falhou sobre uma lista já pronta. A precedência (carregando →
- * erro só se nunca houve carga → primeiro uso → conteúdo) fica na página; aqui
- * ficam o skeleton e as frases, com a moldura de `shared/estados.tsx`.
+ * States of the Artifacts screen (contract §3): 1st-load skeleton, spine error
+ * in a card, first-use empty vs no result, and the amber notice for a reload
+ * that failed over an already-ready list. The precedence (loading → error only
+ * if there was never a load → first use → content) lives in the page; the
+ * skeleton and the sentences live here, with the frame from `shared/estados.tsx`.
  */
 
 /**
- * Primeira carga: o cabeçalho real fica por cima (a página o renderiza sempre)
- * e aqui vai o desenho da tabela — a mesma moldura, os mesmos cinco blocos de
- * linha na altura real — para a troca para o conteúdo não pular a página.
+ * First load: the real header stays on top (the page always renders it) and
+ * here goes the table's outline — the same frame, the same five row blocks at
+ * the real height — so the swap to the content does not make the page jump.
  */
 export function SkeletonDeArtefatos() {
   return (
@@ -42,18 +42,18 @@ export function SkeletonDeArtefatos() {
 }
 
 /**
- * A listagem caiu na 1ª carga (sem `atualizadoEm` ainda): sem ela não há
- * tabela, então o cartão de erro toma o lugar. Uma recarga que falha sobre uma
- * lista pronta NÃO chega aqui — vira o aviso âmbar e a tabela permanece.
+ * The listing went down on the 1st load (no `atualizadoEm` yet): without it
+ * there is no table, so the error card takes its place. A reload that fails over
+ * a ready list does NOT get here — it becomes the amber notice and the table stays.
  */
 export function ErroDeCarga({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
   return <Estado.ErroDeCarga titulo="Não foi possível carregar os artefatos" mensagem={mensagem} onTentar={onTentar} />
 }
 
 /**
- * Primeiro uso: o workspace/aba não tem nenhum artefato e não há recorte ativo.
- * Diferente de "sem resultado" — aqui não há o que limpar, só a explicação de
- * onde os artefatos nascem.
+ * First use: the workspace/tab has no artifacts and there is no active slice.
+ * Different from "no result" — here there is nothing to clear, only the
+ * explanation of where artifacts come from.
  */
 export function VazioPrimeiroUso({ tab }: { tab: ArtifactTab }) {
   return (
@@ -68,8 +68,8 @@ export function VazioPrimeiroUso({ tab }: { tab: ArtifactTab }) {
 }
 
 /**
- * Busca ou chip de formato sem nenhuma linha. Ao contrário do primeiro uso, há
- * um recorte a desfazer — a saída óbvia é "Limpar filtros", e a tela oferece.
+ * Search or format chip with no rows. Unlike first use, there is a slice to
+ * undo — the obvious way out is "Limpar filtros", and the screen offers it.
  */
 export function SemResultado({ q, formato, tab, onLimpar }: {
   q: string
@@ -80,8 +80,8 @@ export function SemResultado({ q, formato, tab, onLimpar }: {
   return <Estado.SemResultado texto={textoDeSemResultado(q, formato, tab)} onLimpar={onLimpar} />
 }
 
-/** "Nenhum artefato com «q»" / "Nenhuma publicação em GEOJSON" — o substantivo
- *  acompanha a aba (execução → artefato; publicação → publicação). */
+/** "Nenhum artefato com «q»" / "Nenhuma publicação em GEOJSON" — the noun
+ *  follows the tab (execution → artifact; publication → publication). */
 export function textoDeSemResultado(termo: string, formato: string | null, tab: ArtifactTab): string {
   const nada = tab === "execution" ? "Nenhum artefato" : "Nenhuma publicação"
   const fmt = formato && formato !== "all" ? formato.toUpperCase() : null
@@ -95,9 +95,9 @@ export function textoDeSemResultado(termo: string, formato: string | null, tab: 
 }
 
 /**
- * Recarga que falhou com a lista já na tela (§3.4): uma linha âmbar discreta,
- * não derruba a tabela. Cobre também o "Ver mais" que errou — o botão continua
- * lá para tentar de novo.
+ * A reload that failed with the list already on screen (§3.4): a discreet amber
+ * line, it does not bring down the table. It also covers a "Ver mais" that
+ * errored — the button stays there to try again.
  */
 export function AvisoDeRecarga({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
   return <Estado.AvisoAmbar onTentar={onTentar}>{mensagem}</Estado.AvisoAmbar>

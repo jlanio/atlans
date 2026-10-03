@@ -2,25 +2,25 @@ import { CSSProperties } from "react"
 import { INodeContext } from "@/context/useFlowContext"
 
 /**
- * Métricas geométricas do card de nó.
+ * Geometric metrics of the node card.
  *
- * Fonte única para os componentes de nó (que precisam da altura para posicionar
- * as portas) e para o auto-layout (que precisa dela para não sobrepor cards).
- * Antes o cálculo estava duplicado em `types/default-type.tsx` e
- * `types/trigger/default-trigger-icon.tsx`, e o auto-layout usava um passo
- * vertical fixo que ignorava nós altos.
+ * Single source for the node components (which need the height to position
+ * the ports) and for the auto-layout (which needs it to avoid overlapping cards).
+ * The calculation used to be duplicated in `types/default-type.tsx` and
+ * `types/trigger/default-trigger-icon.tsx`, and the auto-layout used a fixed
+ * vertical step that ignored tall nodes.
  */
 
 /** Largura do card — definida em `icon-root.tsx` via `w-[158px]`. */
 export const NODE_WIDTH = 158
 
-/** Altura mínima do card — `icon-root.tsx` via `h-[60px]`. */
+/** Minimum card height — `icon-root.tsx` via `h-[60px]`. */
 export const NODE_MIN_HEIGHT = 60
 
-/** Espaço vertical reservado por porta, para as arestas não se colarem. */
+/** Vertical space reserved per port, so the edges do not stick together. */
 export const PX_PER_PORT = 26
 
-/** Altura do card em função do número de portas do lado mais populoso. */
+/** Card height as a function of the number of ports on the more populated side. */
 export function calcNodeHeight(portCount: number): number {
   return Math.max(NODE_MIN_HEIGHT, portCount * PX_PER_PORT + 8)
 }
@@ -28,9 +28,9 @@ export function calcNodeHeight(portCount: number): number {
 type PortStyle = CSSProperties & { '--port-top': string }
 
 /**
- * Distribui a porta `index` de `total` uniformemente ao longo da altura.
- * O valor sai como CSS var consumida pela classe `.port-top` (globals.css) —
- * a classe é estática para o Tailwind conseguir escaneá-la.
+ * Distributes port `index` of `total` evenly along the height.
+ * The value comes out as a CSS var consumed by the `.port-top` class (globals.css) —
+ * the class is static so Tailwind can scan it.
  */
 export function portTopStyle(index: number, total: number, height: number): PortStyle {
   const px = Math.round(((index + 1) / (total + 1)) * height)
@@ -38,10 +38,11 @@ export function portTopStyle(index: number, total: number, height: number): Port
 }
 
 /**
- * Altura efetiva de um nó já montado. Prefere a medição real do React Flow
- * (`measured`, preenchido pelo ResizeObserver do v12) e cai no cálculo por
- * portas quando o nó ainda não foi medido — caso de nó recém-criado ou de
- * nó fora da viewport com `onlyRenderVisibleElements`.
+ * Effective height of an already mounted node. Prefers React Flow's real
+ * measurement (`measured`, filled by v12's ResizeObserver) and falls back to the
+ * per-port calculation when the node has not been measured yet — the case of a
+ * freshly created node or of a node outside the viewport with
+ * `onlyRenderVisibleElements`.
  */
 export function measuredHeight(node: INodeContext): number {
   const measured = node.measured?.height
@@ -54,7 +55,7 @@ export function measuredHeight(node: INodeContext): number {
   return calcNodeHeight(Math.max(isOutputNode ? 0 : outputs, inputs))
 }
 
-/** Largura efetiva de um nó já montado, com fallback na largura fixa do card. */
+/** Effective width of an already mounted node, falling back to the card's fixed width. */
 export function measuredWidth(node: INodeContext): number {
   const measured = node.measured?.width
   return measured && measured > 0 ? measured : NODE_WIDTH

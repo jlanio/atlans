@@ -1,26 +1,26 @@
 # app/services/storage_purge_service.py
 """
-Purga de armazenamento por workspace (Drive + Artefatos).
+Per-workspace storage purge (Drive + Artifacts).
 
-Dois usos:
+Two uses:
 
-1. **Botão do admin** em /admin/storage — libera espaço de um workspace ativo,
-   ou limpa os órfãos deixados por um workspace já deletado.
-2. **DELETE /workspaces/{id}** — antes o hard delete não tocava nos dados, e os
-   artefatos ficavam apontando para um workspace inexistente: inacessíveis
-   (`verify_workspace_access` nunca casa) e ocupando disco para sempre.
+1. **Admin button** in /admin/storage — frees space for an active workspace,
+   or cleans up the orphans left by an already deleted workspace.
+2. **DELETE /workspaces/{id}** — before, the hard delete did not touch the data, and the
+   artifacts were left pointing to a nonexistent workspace: inaccessible
+   (`verify_workspace_access` never matches) and taking up disk forever.
 
-Os artefatos saem por `remocao_de_artefatos.remover_artefatos`, a mesma regra
-das rotas de exclusão e da retenção: objeto do MinIO primeiro (falha preserva a
-linha, e repetir a purga resolve), conteúdo local só com a ordem ENTREGUE ao
-executor (offline mantém a linha e a próxima passada reenvia), camada do portal
-junto. Aqui só se somam os contadores.
+Artifacts go out through `remocao_de_artefatos.remover_artefatos`, the same rule
+as the delete routes and retention: MinIO object first (a failure keeps the
+row, and repeating the purge fixes it), local content only with the order DELIVERED to the
+executor (offline keeps the row and the next pass resends), portal layer
+along with it. Here we only add up the counters.
 
-Arquivo de Drive catalogado (`content_location='executor'`) NÃO segue essa
-semântica, e a diferença é deliberada: ele é um arquivo do próprio usuário,
-numa pasta que ele escolheu sincronizar, do qual a plataforma nunca teve os
-bytes nem ocupa armazenamento. `drive_service._recusar_se_catalogado` recusa
-apagá-lo na exclusão avulsa; aqui ele é preservado e contado em
+A cataloged Drive file (`content_location='executor'`) does NOT follow these
+semantics, and the difference is deliberate: it is the user's own file,
+in a folder they chose to sync, whose bytes the platform never had
+and which takes up no storage. `drive_service._recusar_se_catalogado` refuses
+to delete it in a standalone deletion; here it is preserved and counted in
 `skipped_catalogados`.
 """
 from __future__ import annotations
@@ -42,11 +42,11 @@ SCOPES = ("all", "artifacts", "drive")
 async def purge_workspace_storage(
     db: AsyncSession, workspace_id: str, *, scope: str = "all",
 ) -> dict:
-    """Remove objetos do MinIO e as linhas correspondentes. IRREVERSÍVEL.
+    """Removes objects from MinIO and the corresponding rows. IRREVERSIBLE.
 
     `scope`: "all" | "artifacts" | "drive".
-    Retorna contadores do que foi efetivamente removido e o que ficou pendente
-    por falha no S3 (esses são re-tentáveis: basta repetir a purga).
+    Returns counters of what was actually removed and what was left pending
+    due to an S3 failure (those are retryable: just repeat the purge).
     """
     if scope not in SCOPES:
         raise ValueError(f"scope inválido: {scope!r}. Use um de {SCOPES}.")
@@ -61,18 +61,18 @@ async def purge_workspace_storage(
         "drive_files":      0,
         "drive_bytes":      0,
         "skipped_s3_errors": 0,
-        # Artefatos locais cuja ordem de remoção não foi entregue (executor
-        # offline): a linha fica, e a próxima passada tenta de novo.
+        # Local artifacts whose removal order was not delivered (executor
+        # offline): the row stays, and the next pass tries again.
         "pending_executor": 0,
-        # Artefatos locais sem executor_id/local_path — sem rastro para onde
-        # mandar a ordem; a linha fica para não perder o registro do arquivo.
+        # Local artifacts without executor_id/local_path — no trace of where to
+        # send the order; the row stays so as not to lose the file's record.
         "skipped_sem_rastro": 0,
-        # Arquivos de Drive catalogados no executor: preservados por política.
+        # Drive files cataloged on the executor: preserved by policy.
         "skipped_catalogados": 0,
-        # Referências de pin zeradas nos workflows do workspace: os objetos do
-        # pin-cache caem junto com os demais artefatos, e a ref pendurada seria
-        # um 404 permanente. Zerar (em vez de remover) preserva a intenção de
-        # pin — pin_metadata fica — e a próxima run regrava o cache sozinha.
+        # Pin references cleared in the workspace's workflows: the pin-cache
+        # objects drop along with the other artifacts, and the dangling ref would be
+        # a permanent 404. Clearing (instead of removing) preserves the pin
+        # intent — pin_metadata stays — and the next run rewrites the cache on its own.
         "pins_resetados": 0,
     }
 
@@ -86,12 +86,12 @@ async def purge_workspace_storage(
         removed["pending_executor"] += len(remocao.pendentes_local)
         removed["skipped_sem_rastro"] += len(remocao.sem_rastro)
 
-        # Pins dos workflows deste workspace: os objetos do pin-cache acabaram
-        # de ser apagados do MinIO (logo acima), então toda ref `__pin_s3_key__`
-        # que sobrar aponta para o nada — 404 em cada run seguinte, e como o
-        # auto-pin só dispara com a ref VAZIA, a quebra não se resolvia sozinha.
-        # Zera a ref e mantém pin_metadata: a intenção de pin sobrevive e a
-        # próxima execução regrava o cache sob uma chave nova.
+        # Pins of this workspace's workflows: the pin-cache objects have just
+        # been deleted from MinIO (right above), so every `__pin_s3_key__` ref
+        # left over points to nothing — a 404 on every following run, and since
+        # auto-pin only fires with an EMPTY ref, the breakage did not resolve itself.
+        # Clears the ref and keeps pin_metadata: the pin intent survives and the
+        # next run rewrites the cache under a new key.
         from sqlalchemy.orm.attributes import flag_modified
         from app.models.workflow import Workflow
 
@@ -123,16 +123,16 @@ async def purge_workspace_storage(
 
         ids = []
         for wf in files:
-            # Arquivo CATALOGADO (GeoSync "manter apenas no executor"): a
-            # plataforma nunca teve os bytes, e o arquivo está na pasta que o
-            # próprio usuário escolheu sincronizar. Apagar a linha não removeria
-            # nada e destruiria a única ficha que registra o vínculo; mandar o
-            # executor apagar seria destruir dado do usuário que nunca
-            # pertenceu à plataforma. É a mesma recusa que
-            # `drive_service._recusar_se_catalogado` aplica na exclusão avulsa —
-            # aqui o registro era apagado em silêncio, contradizendo aquela
-            # política. Ele também não ocupa armazenamento nenhum da plataforma,
-            # então preservá-lo não conflita com o objetivo da purga.
+            # CATALOGED file (GeoSync "manter apenas no executor", keep only on the
+            # executor): the platform never had the bytes, and the file is in the folder the
+            # user themselves chose to sync. Deleting the row would remove
+            # nothing and would destroy the only record of the link; telling the
+            # executor to delete it would destroy user data that never
+            # belonged to the platform. It is the same refusal that
+            # `drive_service._recusar_se_catalogado` applies in a standalone deletion —
+            # here the record used to be deleted silently, contradicting that
+            # policy. It also takes up no platform storage at all,
+            # so preserving it does not conflict with the purpose of the purge.
             if getattr(wf, "content_location", "minio") == "executor":
                 removed["skipped_catalogados"] += 1
                 continue
@@ -163,15 +163,15 @@ async def purge_workspace_storage(
 
 
 async def schedule_workspace_data_expiry(db: AsyncSession, workspace_id: str) -> dict:
-    """Marca os dados do workspace para remoção pelo cleanup global.
+    """Marks the workspace's data for removal by the global cleanup.
 
-    Usado no DELETE do workspace. Preferimos `expires_at` a apagar na hora:
-    dá janela de arrependimento e reaproveita `purge_expired_artifacts`, que já
-    trata MinIO, PortalLayer e retry em falha de S3.
+    Used in the workspace DELETE. We prefer `expires_at` to deleting right away:
+    it gives a window for second thoughts and reuses `purge_expired_artifacts`, which already
+    handles MinIO, PortalLayer and retry on S3 failure.
 
-    Arquivos do Drive não têm coluna de expiração, então são purgados
-    imediatamente — deixá-los seria manter no MinIO um dado que ninguém mais
-    consegue listar (a listagem é sempre por workspace).
+    Drive files have no expiration column, so they are purged
+    immediately — leaving them would keep in MinIO data that nobody can
+    list anymore (the listing is always per workspace).
     """
     now = utc_now_naive()
 
@@ -179,7 +179,7 @@ async def schedule_workspace_data_expiry(db: AsyncSession, workspace_id: str) ->
         select(func.count(Artifact.id)).where(Artifact.workspace_id == workspace_id)
     )).scalar() or 0
 
-    # Expira imediatamente: o cleanup roda periodicamente e faz a remoção real.
+    # Expires immediately: the cleanup runs periodically and does the actual removal.
     await db.execute(
         Artifact.__table__.update()
         .where(Artifact.workspace_id == workspace_id)

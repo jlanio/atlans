@@ -1,15 +1,15 @@
 // desktop/src/main/ui/tray.ts
 //
-// Ícone de bandeja: é a presença do app quando a janela está fechada.
+// Tray icon: it is the app's presence when the window is closed.
 //
-// O ícone comunica o estado de relance — conectado, ocupado, offline. Sem isso
-// o usuário não tem como saber se o executor está recebendo jobs sem abrir a
-// janela.
+// The icon communicates the state at a glance — connected, busy, offline.
+// Without it the user has no way of knowing whether the executor is receiving
+// jobs without opening the window.
 //
-// ⚠️ Este módulo é notificado a CADA atualização do store, ou seja, uma vez por
-// segundo enquanto o executor roda. Tudo aqui é guardado por comparação com o
-// estado anterior: reconstruir o menu a 1 Hz fecha o menu na cara de quem
-// acabou de abri-lo, e recarregar o ícone do disco a 1 Hz é I/O puro em vão.
+// ⚠️ This module is notified on EVERY store update, that is, once per second
+// while the executor runs. Everything here is guarded by comparison with the
+// previous state: rebuilding the menu at 1 Hz closes it in the face of whoever
+// just opened it, and reloading the icon from disk at 1 Hz is pure wasted I/O.
 import { Menu, Tray, app, nativeImage, type NativeImage } from 'electron'
 import fs from 'node:fs'
 import { arquivoDoApp } from '../paths.js'
@@ -28,7 +28,7 @@ const ARQUIVO_ICONE: Record<IconeEstado, string> = {
   offline: 'icon-offline.ico',
 }
 
-/** Ícones carregados uma vez. Ver a nota do cabeçalho sobre I/O a 1 Hz. */
+/** Icons loaded once. See the header note about I/O at 1 Hz. */
 const cacheIcones = new Map<IconeEstado, NativeImage>()
 
 function carregarIcone(estado: IconeEstado): NativeImage {
@@ -36,9 +36,9 @@ function carregarIcone(estado: IconeEstado): NativeImage {
   if (emCache) return emCache
 
   const caminho = arquivoDoApp('build', ARQUIVO_ICONE[estado])
-  // `createFromPath` num arquivo ausente devolve uma imagem VAZIA em vez de
-  // lançar, e o resultado é um tray invisível — o app parece não ter aberto.
-  // Melhor um ícone genérico visível que nenhum.
+  // `createFromPath` on a missing file returns an EMPTY image instead of
+  // throwing, and the result is an invisible tray — the app seems not to have
+  // opened. A visible generic icon is better than none.
   let img = nativeImage.createEmpty()
   if (fs.existsSync(caminho)) {
     const carregada = nativeImage.createFromPath(caminho)
@@ -48,7 +48,7 @@ function carregarIcone(estado: IconeEstado): NativeImage {
   return img
 }
 
-// ── Funções puras (testáveis sem Electron) ───────────────────────────────────
+// ── Pure functions (testable without Electron) ───────────────────────────────
 
 export function estadoDoIcone(estado: EstadoApp | null): IconeEstado {
   if (!estado || estado.supervisor !== 'running') return 'offline'
@@ -80,15 +80,15 @@ export function resumo(estado: EstadoApp | null): string {
 }
 
 /**
- * Recorte do estado que o tray de fato exibe.
+ * Slice of the state the tray actually displays.
  *
- * É por esta string que se decide reconstruir o menu. Comparar o `EstadoApp`
- * inteiro seria inútil: ele muda a cada snapshot (uptime, CPU, memória), e nada
- * disso aparece na bandeja.
+ * This string is what decides whether to rebuild the menu. Comparing the whole
+ * `EstadoApp` would be useless: it changes on every snapshot (uptime, CPU,
+ * memory), and none of that appears in the tray.
  *
- * `autostartAtivo()` responde do cache do módulo (ver autostart.ts): ele lia o
- * registro do Windows de forma síncrona, aqui dentro, a cada atualização de
- * estado — o único ponto do arquivo que escapava da blindagem contra 1 Hz.
+ * `autostartAtivo()` answers from the module cache (see autostart.ts): it used
+ * to read the Windows registry synchronously, right here, on every state
+ * update — the only spot in the file that escaped the 1 Hz shielding.
  */
 export function assinaturaDoTray(estado: EstadoApp | null): string {
   return [
@@ -99,7 +99,7 @@ export function assinaturaDoTray(estado: EstadoApp | null): string {
   ].join('|')
 }
 
-// ── Ciclo de vida ────────────────────────────────────────────────────────────
+// ── Lifecycle ────────────────────────────────────────────────────────────────
 
 export interface AcoesTray {
   iniciar: () => void
@@ -112,10 +112,11 @@ let ultimaAssinatura = ''
 export function criarTray(acoes: AcoesTray): Tray {
   tray = new Tray(carregarIcone('offline'))
 
-  // Clique simples abre o app — a janela web, que é a cara do produto. É o
-  // gesto que o usuário tenta primeiro, e não responder passa impressão de app
-  // travado. Sem `double-click`: no Windows um duplo clique dispara `click`
-  // duas vezes E `double-click`, o que abriria a janela três vezes.
+  // A single click opens the app — the web window, which is the face of the
+  // product. It is the gesture the user tries first, and not responding gives
+  // the impression of a frozen app. No `double-click`: on Windows a double
+  // click fires `click` twice AND `double-click`, which would open the window
+  // three times.
   tray.on('click', () => abrirJanelaWeb())
 
   ultimaAssinatura = ''
@@ -132,8 +133,8 @@ export function atualizarTray(estado: EstadoApp | null, acoes: AcoesTray): void 
 
   const texto = resumo(estado)
   tray.setImage(carregarIcone(estadoDoIcone(estado)))
-  // O tooltip do Windows corta em 127 caracteres; um detalhe de erro longo
-  // encheria o limite e esconderia o começo, que é a parte útil.
+  // The Windows tooltip cuts off at 127 characters; a long error detail would
+  // fill the limit and hide the beginning, which is the useful part.
   tray.setToolTip(`Atlans Executor — ${texto}`.slice(0, 127))
 
   const rodando = estado?.supervisor === 'running' || estado?.supervisor === 'starting'
@@ -154,9 +155,9 @@ export function atualizarTray(estado: EstadoApp | null, acoes: AcoesTray): void 
       checked: autostartAtivo(),
       click: (item) => {
         definirAutostart(item.checked)
-        // O menu guarda o próprio estado do checkbox; forçar a reconstrução
-        // faz a marcação refletir o que o sistema DE FATO gravou, e não o que
-        // o clique pediu — `definirAutostart` pode falhar em silêncio.
+        // The menu keeps the checkbox's own state; forcing the rebuild makes the
+        // check mark reflect what the system ACTUALLY wrote, not what the click
+        // asked for — `definirAutostart` can fail silently.
         ultimaAssinatura = ''
         atualizarTray(estado, acoes)
       },

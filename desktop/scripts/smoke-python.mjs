@@ -1,11 +1,12 @@
 // desktop/scripts/smoke-python.mjs
 //
-// Executa scripts/smoke.py dentro do runtime empacotado, no mesmo ambiente do
-// spawn de producao (cwd=resources, PYTHONPATH=resources, env sanitizado).
+// Runs scripts/smoke.py inside the packaged runtime, in the same environment as
+// the production spawn (cwd=resources, PYTHONPATH=resources, sanitized env).
 //
-// Roda SEMPRE no CI, inclusive quando o cache do runtime deu hit: o cache cobre
-// resources/python/, mas executor/ e flow/ mudam a cada commit — e e justamente
-// o import de flow via job_executor.py que quebra quando alguem mexe na arvore.
+// ALWAYS runs in CI, even when the runtime cache hit: the cache covers
+// resources/python/, but executor/ and flow/ change with every commit — and it
+// is precisely the import of flow via job_executor.py that breaks when someone
+// touches the tree.
 //
 //   node scripts/smoke-python.mjs
 import fs from 'node:fs'
@@ -22,19 +23,19 @@ for (const dir of ['executor', 'flow']) {
 
 const env = pythonEnv({
   PYTHONPATH: RESOURCES,
-  // Aponta para um caminho inexistente de proposito: sem isso o load_dotenv de
-  // config.py pegaria o .env do desenvolvedor e o smoke passaria a testar a
-  // maquina de quem roda, nao o bundle.
+  // Points to a nonexistent path on purpose: without it, config.py's
+  // load_dotenv would pick up the developer's .env and the smoke test would
+  // end up testing the machine of whoever runs it, not the bundle.
   EXECUTOR_ENV_PATH: path.join(RESOURCES, '.env.inexistente-no-smoke'),
 })
 
 step('Smoke do bundle Python')
 run(PY_EXE, ['-X', 'utf8', path.join(SCRIPTS, 'smoke.py')], { cwd: RESOURCES, env })
 
-// `enroll --help` cobre o caminho de entrada real do app: __main__.py chama
-// bootstrap_ca() antes de qualquer import de sub-comando, e e la que um
-// certifi/cryptography quebrado apareceria. Roda em cwd temporario porque o
-// bootstrap escreve certs/ ao lado.
+// `enroll --help` covers the app's real entry path: __main__.py calls
+// bootstrap_ca() before any subcommand import, and that is where a broken
+// certifi/cryptography would show up. Runs in a temporary cwd because the
+// bootstrap writes certs/ next to it.
 step('python -m executor enroll --help')
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-smoke-'))
 try {

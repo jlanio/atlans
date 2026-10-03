@@ -4,10 +4,11 @@ import type { CamadaDoAssistente } from "@/app/components/home/assistente/quadro
 import { useTextos } from "../i18n"
 
 /**
- * A menção inline de uma camada que a conversa pôs (ou tentou pôr) no globo. O
- * desenho de verdade é no globo (useCamadas); aqui é só o reconhecimento na
- * conversa, com o motivo quando não há prévia. Pipoca ao chegar (`home-pop`,
- * globals.css) — no replay todos chegam juntos, e é breve.
+ * The inline mention of a layer the conversation put (or tried to put) on the
+ * globe. The actual drawing happens on the globe (useCamadas); this is only the
+ * acknowledgment in the conversation, with the reason when there is no preview.
+ * Pops in on arrival (`home-pop`, globals.css) — on replay they all arrive
+ * together, and it is brief.
  */
 export default function CartaoCamada({ camada }: { camada: CamadaDoAssistente }) {
   const t = useTextos().assistente.camada

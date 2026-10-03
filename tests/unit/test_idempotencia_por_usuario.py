@@ -1,15 +1,15 @@
 # tests/unit/test_idempotencia_por_usuario.py
 """
-Idempotência de `POST /workflows/{id}/execute` por USUÁRIO e por WORKFLOW.
+Idempotency of `POST /workflows/{id}/execute` per USER and per WORKFLOW.
 
-A chave no Redis era global à instalação: dois usuários mandando
-`Idempotency-Key: 1` recebiam o `task_id` um do outro — e o segundo nem
-disparava. Com o servidor MCP, agentes diferentes vão gerar chaves curtas e
-previsíveis ("1", "retry-2"), então a colisão deixava de ser teórica. Agora a
-chave carrega quem disparou e qual workflow.
+The Redis key was global to the installation: two users sending
+`Idempotency-Key: 1` got each other's `task_id` — and the second one did not even
+trigger. With the MCP server, different agents will generate short, predictable
+keys ("1", "retry-2"), so the collision stopped being theoretical. Now the
+key carries who triggered and which workflow.
 
-Redis falso com dicionário (não `AsyncMock`): um mock que sempre devolve None
-não distingue "não colidiu" de "não gravou".
+A fake Redis backed by a dictionary (not `AsyncMock`): a mock that always returns None
+cannot distinguish "did not collide" from "did not write".
 """
 from __future__ import annotations
 
@@ -56,8 +56,8 @@ def _sem_banco():
 
 @pytest.fixture
 def service():
-    """`start_analysis` com tudo antes e depois do despacho mockado; cada
-    despacho devolve um id novo, para dois disparos serem distinguíveis."""
+    """`start_analysis` with everything before and after the dispatch mocked; each
+    dispatch returns a new id, so two triggers can be told apart."""
     db = AsyncMock()
     db.add = MagicMock()
     svc = WorkflowService(db)
@@ -118,8 +118,8 @@ async def test_mesmo_usuario_mesma_chave_workflows_diferentes_sao_duas_execucoes
 
 @pytest.mark.asyncio
 async def test_sem_usuario_a_chave_leva_um_traco(service, redis):
-    """Cron e webhook não passam chave hoje; se passarem, não podem cair na
-    fatia de nenhum usuário."""
+    """Cron and webhook do not pass a key today; if they do, they must not fall into
+    any user's slice."""
     await _disparar(service, "wf-1", None, "k1")
     assert redis.gravacoes[0][0] == "idempotency:wf_execute:-:wf-1:k1"
 

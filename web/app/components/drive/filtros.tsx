@@ -9,15 +9,15 @@ interface Props {
   onBusca: (v: string) => void
   ext: string
   onExt: (v: string) => void
-  /** Extensões conhecidas (acumuladas), já ordenadas. */
+  /** Known extensions (accumulated), already sorted. */
   extensoes: string[]
 }
 
 /**
- * Busca por nome + chips de extensão. Os chips viraram o grupo de toggle
- * canônico do contrato (§1): cada um é `aria-pressed`, ativo em `bg-accent
- * text-foreground`, com o par de foco `ring-[3px]` e alvo de 40px no telefone.
- * Antes eram botões com borda laranja literal e sem estado pressionado.
+ * Search by name + extension chips. The chips became the contract's canonical
+ * toggle group (§1): each one is `aria-pressed`, active in `bg-accent
+ * text-foreground`, with the `ring-[3px]` focus pair and a 40px target on phones.
+ * Before they were buttons with a literal orange border and no pressed state.
  */
 export function FiltrosDoDrive({ busca, onBusca, ext, onExt, extensoes }: Props) {
   return (

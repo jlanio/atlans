@@ -19,8 +19,8 @@ const STATUS_TEXT: Record<NodeRun["status"], string> = {
   running:   "executando",
   completed: "concluído",
   failed:    "falhou",
-  // Distinto de "aguardando": este nó COMEÇOU. O que falta é a notícia do
-  // término, que se perdeu antes de chegar ao painel.
+  // Distinct from "aguardando" (waiting): this node STARTED. What is missing is
+  // the news of its completion, which was lost before reaching the panel.
   unknown:   "sem resposta",
 }
 
@@ -31,13 +31,13 @@ const NodeRow = memo(function NodeRow({
   maxMs: number
   search: string
   expanded: boolean
-  /** Vem como prop (e não de um selector aqui dentro) para que só a linha
-   *  revelada re-renderize — assinando a store, todas as linhas re-renderizavam
-   *  a cada clique no canvas. */
+  /** Comes as a prop (and not from a selector in here) so that only the
+   *  revealed row re-renders — subscribed to the store, every row re-rendered
+   *  on each click on the canvas. */
   isRevealed: boolean
-  /** Recebe o id em vez de uma closure já amarrada ao nó: `onToggle={() =>
-   *  toggle(node.nodeId)}` nascia com identidade nova a cada render do pai e
-   *  derrubava o `memo` de TODAS as linhas a cada flush do painel. */
+  /** Takes the id instead of a closure already bound to the node: `onToggle={() =>
+   *  toggle(node.nodeId)}` was born with a new identity on every parent render
+   *  and broke the `memo` of ALL rows on every panel flush. */
   onToggle: (nodeId: string) => void
 }) {
   const { focusNode, setHovered } = useNodeFocus()
@@ -45,7 +45,7 @@ const NodeRow = memo(function NodeRow({
   const rowRef = useRef<HTMLDivElement>(null)
   const reveal = useRunPanelStore(s => s.reveal)
 
-  // Canvas → painel: clicar num nó no canvas rola até a linha dele aqui.
+  // Canvas → panel: clicking a node on the canvas scrolls to its row here.
   useEffect(() => {
     if (!isRevealed) return
     rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" })
@@ -81,8 +81,8 @@ const NodeRow = memo(function NodeRow({
 
         <NodeStatusIcon status={node.status} />
 
-        {/* Nó de dentro de um sub-fluxo: sem o selo a linha se passava por um
-            nó do fluxo atual, e o nome podia coincidir com o de um nó daqui. */}
+        {/* Node from inside a sub-workflow: without the badge the row passed for a
+            node of the current workflow, and the name could match one here. */}
         {node.subFlow && (
           <span
             title={`Dentro do sub-fluxo executado por "${node.subFlow}"`}
@@ -123,7 +123,7 @@ const NodeRow = memo(function NodeRow({
             : formatMs(node.durationMs)}
         </span>
 
-        {/* Barra proporcional — ler "quem demorou" sem precisar comparar números */}
+        {/* Proportional bar — read "who took long" without comparing numbers */}
         <span className="hidden h-1 w-20 shrink-0 overflow-hidden rounded-full bg-muted md:block">
           <span
             className={cn(
@@ -223,8 +223,8 @@ const NodesTab = ({ timeline }: { timeline: RunTimeline }) => {
   const search = useRunPanelStore(s => s.search)
   const revealNodeId = useRunPanelStore(s => s.revealNodeId)
   const [sort, setSort] = useState<SortKey>("order")
-  // Chaveado por nodeId — o painel antigo usava o índice do array filtrado,
-  // então trocar de filtro abria a linha errada.
+  // Keyed by nodeId — the old panel used the index in the filtered array,
+  // so switching filters opened the wrong row.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
 
   const visible = useMemo(() => {
@@ -246,8 +246,8 @@ const NodesTab = ({ timeline }: { timeline: RunTimeline }) => {
     [timeline.nodes],
   )
 
-  // Estável (forma funcional do setState): é o que permite ao `memo` do NodeRow
-  // segurar de verdade.
+  // Stable (functional form of setState): this is what lets NodeRow's `memo`
+  // actually hold.
   const toggle = useCallback((nodeId: string) => {
     setExpanded(prev => {
       const next = new Set(prev)

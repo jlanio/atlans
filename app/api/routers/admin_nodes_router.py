@@ -1,12 +1,12 @@
 # app/api/routers/admin_nodes_router.py
 """
-Endpoints admin para habilitar/desabilitar nodes da plataforma.
+Admin endpoints to enable/disable platform nodes.
 
-- GET    /admin/nodes              -> lista TODOS os nodes do registry com status
+- GET    /admin/nodes              -> lists ALL registry nodes with status
 - PATCH  /admin/nodes/{name}       -> {enabled: bool, reason?: str}
 
-Persistencia: SystemConfig key="disabled_nodes". Ver
-app/services/disabled_nodes_service.py para o contrato.
+Persistence: SystemConfig key="disabled_nodes". See
+app/services/disabled_nodes_service.py for the contract.
 """
 from __future__ import annotations
 
@@ -58,10 +58,10 @@ class NodeToggleBody(BaseModel):
 async def list_admin_nodes(
     db: AsyncSession = Depends(get_db),
 ) -> list[dict[str, Any]]:
-    """Lista TODOS os nodes do registry com status atual.
+    """Lists ALL registry nodes with their current status.
 
-    Mesmo se desabilitado, o node aparece aqui — diferente do /nodes publico,
-    que filtra os desabilitados para nao mostrar no drawer.
+    Even if disabled, the node shows up here — unlike the public /nodes,
+    which filters out disabled ones so they are not shown in the drawer.
     """
     disabled = await svc.list_disabled(db)
     out: list[dict[str, Any]] = []
@@ -77,7 +77,7 @@ async def list_admin_nodes(
             "disabled_at": (meta or {}).get("disabled_at"),
             "disabled_by": (meta or {}).get("disabled_by"),
         })
-    # Ordem estavel: por tipo (na ordem do drawer) e depois alfabetica.
+    # Stable order: by type (in drawer order) and then alphabetical.
     _TYPE_ORDER = {"trigger": 0, "action": 1, "datasource": 2, "control": 3, "spatial": 4, "output": 5}
     out.sort(key=lambda e: (_TYPE_ORDER.get(e.get("type") or "", 99), (e.get("alias") or "").lower()))
     return out
@@ -90,12 +90,12 @@ async def patch_admin_node(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Habilita ou desabilita um node por nome.
+    """Enables or disables a node by name.
 
-    - Desabilitar exige `reason` (>=5 chars apos strip).
-    - Habilitar (`enabled: True`) ignora `reason`.
-    - Nome precisa existir em NODE_REGISTRY (senao 404 — evita lixo no
-      SystemConfig por nomes errados).
+    - Disabling requires `reason` (>=5 chars after strip).
+    - Enabling (`enabled: True`) ignores `reason`.
+    - The name must exist in NODE_REGISTRY (otherwise 404 — avoids garbage in
+      SystemConfig from wrong names).
     """
     if name not in NODE_REGISTRY:
         raise HTTPException(

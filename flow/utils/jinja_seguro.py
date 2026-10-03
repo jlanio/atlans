@@ -1,35 +1,35 @@
 # flow/utils/jinja_seguro.py
-# Ambiente Jinja sandboxado e ENDURECIDO, compartilhado por todos os pontos que
-# renderizam expressao vinda do usuario (expression_service, jinja_branch,
+# Sandboxed and HARDENED Jinja environment, shared by every place that renders
+# user-supplied expressions (expression_service, jinja_branch,
 # field_transformer).
 #
-# O SandboxedEnvironment do Jinja bloqueia atributos com sublinhado e chamaveis
-# marcados como `unsafe`/`alters_data`, mas deixa passar QUALQUER metodo publico
-# dos objetos do contexto. Os outputs dos nos anteriores entram no contexto como
-# GeoDataFrame/DataFrame/ndarray vivos, e esses expoem metodos de I/O que gravam
-# arquivo — `to_file`, `to_csv(path)`, `to_parquet`, `tofile`, etc. Escrita
-# arbitraria no processo do executor (que guarda o cert mTLS da maquina e as
-# credenciais ja descriptografadas) e precursor de execucao de codigo.
+# Jinja's SandboxedEnvironment blocks underscore attributes and callables
+# marked `unsafe`/`alters_data`, but lets through ANY public method of the
+# context objects. Previous nodes' outputs enter the context as live
+# GeoDataFrame/DataFrame/ndarray objects, and these expose I/O methods that write
+# files — `to_file`, `to_csv(path)`, `to_parquet`, `tofile`, etc. Arbitrary
+# writes in the executor process (which holds the machine's mTLS cert and the
+# already-decrypted credentials) are a precursor to code execution.
 #
-# Este modulo fecha isso em duas frentes:
-#   1) is_safe_attribute recusa o ACESSO a um conjunto de nomes que ou gravam
-#      arquivo por natureza, ou sao handle de modulo/chamavel perigoso.
-#   2) call() recusa a CHAMADA dos escritores que so gravam quando recebem um
-#      destino (to_csv/to_json/...): sem argumento devolvem string (uso legitimo);
-#      com um caminho/buffer, gravam — e ai a chamada e barrada.
+# This module closes that on two fronts:
+#   1) is_safe_attribute refuses ACCESS to a set of names that either write
+#      files by nature, or are handles to a module/dangerous callable.
+#   2) call() refuses the CALL of writers that only write when given a
+#      destination (to_csv/to_json/...): without an argument they return a string
+#      (legitimate use); with a path/buffer, they write — and then the call is blocked.
 
 import os as _os
 from jinja2.sandbox import SandboxedEnvironment, SecurityError
 
-# Gravam arquivo/estado por natureza, ou dao acesso a modulo/execucao. O acesso
-# ao proprio atributo ja e negado — nem chega a ser chamado.
+# Write files/state by nature, or give access to modules/execution. Access to
+# the attribute itself is already denied — it never even gets called.
 _ATRIB_SEMPRE_BLOQUEADOS = frozenset({
     # pandas/geopandas/numpy/xarray: escrita em disco/banco
     "to_file", "to_pickle", "to_parquet", "to_feather", "to_hdf", "to_excel",
     "to_orc", "to_stata", "to_sql", "to_gbq", "to_netcdf", "to_zarr", "tofile",
     "savefig", "save", "savez", "savez_compressed", "savetxt", "dump",
     "write", "writelines", "writerow", "writerows",
-    # handles de modulo e chamaveis perigosos (mesma classe do code_sandbox)
+    # module handles and dangerous callables (same class as code_sandbox)
     "os", "sys", "subprocess", "importlib", "socket", "ssl", "ctypes",
     "system", "popen", "environ", "getattr", "setattr", "delattr",
     "open", "fdopen", "remove", "unlink", "rmdir", "mkdir", "makedirs",
@@ -38,13 +38,13 @@ _ATRIB_SEMPRE_BLOQUEADOS = frozenset({
     "eval", "exec", "compile", "import_module", "load_module",
 })
 
-# Devolvem string quando chamados sem destino; gravam quando recebem um caminho
-# ou buffer. So a chamada COM destino e bloqueada.
+# Return a string when called without a destination; write when given a path
+# or buffer. Only the call WITH a destination is blocked.
 _ESCRITORES_COM_DESTINO = frozenset({
     "to_csv", "to_json", "to_html", "to_xml", "to_string", "to_markdown",
     "to_latex",
 })
-# Nomes de argumento que designam o destino de escrita nesses metodos.
+# Argument names that designate the write destination in these methods.
 _KWARGS_DE_DESTINO = (
     "path_or_buf", "buf", "path", "fname", "excel_writer",
     "filepath_or_buffer", "filename",
@@ -52,7 +52,7 @@ _KWARGS_DE_DESTINO = (
 
 
 def _designa_destino(args, kwargs) -> bool:
-    """True se a chamada aponta um caminho/buffer de escrita."""
+    """True if the call targets a write path/buffer."""
     alvo = args[0] if args else None
     for k in _KWARGS_DE_DESTINO:
         if kwargs.get(k) is not None:
@@ -81,8 +81,8 @@ class _AmbienteSandboxEndurecido(SandboxedEnvironment):
 
 
 def criar_ambiente_sandbox(**kwargs) -> SandboxedEnvironment:
-    """Cria o ambiente Jinja sandboxado e endurecido do GISFlow.
+    """Creates GISFlow's sandboxed and hardened Jinja environment.
 
-    Aceita os mesmos kwargs de `SandboxedEnvironment` (ex.: `undefined`).
+    Accepts the same kwargs as `SandboxedEnvironment` (e.g. `undefined`).
     """
     return _AmbienteSandboxEndurecido(**kwargs)

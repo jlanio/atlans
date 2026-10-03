@@ -14,18 +14,18 @@ import { cn } from "@/lib/utils"
 
 type DriveFile = IDriveFile
 
-/** Data da última escrita de conteúdo — chave por que o backend ordena a lista. */
+/** Date of the last content write — the key the backend sorts the list by. */
 export function lastWrite(file: DriveFile): string {
   return file.content_written_at ?? file.created_at
 }
 
-/** Houve reescrita depois do envio original? (guarda as duas datas). */
+/** Was there a rewrite after the original upload? (keeps both dates). */
 export function foiReescrito(file: DriveFile): boolean {
   const escrita = file.content_written_at
   return Boolean(escrita && formatLocal(escrita) !== formatLocal(file.created_at))
 }
 
-/** Os textos do diálogo. Padrão: o português do Drive; a Home traduzida passa os dela. */
+/** The dialog's texts. Default: the Drive's Portuguese; the translated Home passes its own. */
 export interface TextosDosMetadados {
   descricao: string
   rotulos: {
@@ -39,7 +39,7 @@ export interface TextosDosMetadados {
     crs: string
     feicoes: string
     colunas: string
-    /** O bbox — em português, "Extensão" como a do arquivo. */
+    /** The bbox — in Portuguese, "Extensão" like the file's extension. */
     extensaoEspacial: string
   }
   semNuvemTitulo: string
@@ -47,7 +47,7 @@ export interface TextosDosMetadados {
   executor: (id: string) => string
   fechar: string
   inteiro: (n: number) => string
-  /** Data e hora exatas — o dado EXATO, não o relativo do resumo. */
+  /** Exact date and time — the EXACT value, not the summary's relative one. */
   dataEHora: (iso: string | null | undefined) => string
 }
 
@@ -78,9 +78,10 @@ export const TEXTOS_DOS_METADADOS_PT: TextosDosMetadados = {
 }
 
 /**
- * Linhas de metadados espaciais extraídos pelo GeoSync (CRS, bbox, contagem).
- * Só aparecem quando existem: o upload comum não os extrai, e mostrar "—" para
- * cinco campos vazios em todo arquivo pioraria o diálogo no caso normal.
+ * Rows of spatial metadata extracted by GeoSync (CRS, bbox, count).
+ * They only appear when they exist: a regular upload doesn't extract them, and
+ * showing "—" for five empty fields on every file would make the dialog worse in
+ * the normal case.
  */
 function metadadosEspaciais(file: DriveFile, textos: TextosDosMetadados): Array<[string, string]> {
   const m = file.spatial_metadata
@@ -99,8 +100,8 @@ function metadadosEspaciais(file: DriveFile, textos: TextosDosMetadados): Array<
     linhas.push([r.colunas, textos.inteiro(m.columns.length)])
   }
   if (Array.isArray(m.bbox) && m.bbox.length === 4) {
-    // Arredondado: o bbox cru tem 6 casas e estoura a largura do diálogo sem
-    // acrescentar nada a quem só quer situar a área.
+    // Rounded: the raw bbox has 6 decimal places and overflows the dialog width
+    // without adding anything for someone who just wants to locate the area.
     linhas.push([r.extensaoEspacial, (m.bbox as number[]).map(n => n.toFixed(3)).join(", ")])
   }
   return linhas
@@ -112,7 +113,7 @@ export function MetadataDialog({
   file: DriveFile | null
   open: boolean
   onClose: () => void
-  /** A Home passa `home-portal`: o conteúdo é portado ao <body>, fora da paleta dela. */
+  /** The Home passes `home-portal`: the content is portaled to <body>, outside its palette. */
   className?: string
   textos?: TextosDosMetadados
 }) {
@@ -133,23 +134,23 @@ export function MetadataDialog({
             [r.extensao,  file.extension.toUpperCase()],
             [r.tamanho,   formatBytes(file.size)],
             [r.mime,      file.mime_type ?? "—"],
-            // O diálogo de metadados existe para expor o dado EXATO — data e
-            // hora completas, não o relativo "há 3 min" do resumo.
+            // The metadata dialog exists to expose the EXACT value — full date
+            // and time, not the summary's relative "há 3 min".
             [r.enviadoEm, textos.dataEHora(file.created_at)],
-            // Só aparece quando o conteúdo foi de fato reescrito depois do envio.
+            // Only appears when the content was actually rewritten after the upload.
             ...(foiReescrito(file) ? [[r.atualizadoEm, textos.dataEHora(lastWrite(file))]] : []),
             [r.id, file.id_hash],
-            // No modo catálogo estes são os ÚNICOS dados que a plataforma tem
-            // sobre o conteúdo — sem eles o arquivo seria só um nome.
+            // In catalog mode these are the ONLY data the platform has about
+            // the content — without them the file would be just a name.
             ...metadadosEspaciais(file, textos),
-            // A chave é a posição: em português a extensão do arquivo e a do
-            // bbox têm o mesmo rótulo.
+            // The key is the position: in Portuguese the file's extension and the
+            // bbox's extent have the same label.
           ] as Array<[string, string]>).map(([label, value], i) => (
             <div key={i} className="flex justify-between gap-4">
               <span className="shrink-0 text-muted-foreground">{label}</span>
-              {/* Quebra em vez de cortar: em mono o bbox arredondado e um MIME
-                  como application/geopackage+sqlite3 passam de 200px, e o
-                  pedaço cortado era justamente a informação. */}
+              {/* Wrap instead of truncating: in mono the rounded bbox and a MIME
+                  like application/geopackage+sqlite3 exceed 200px, and the
+                  truncated piece was precisely the information. */}
               <span className="min-w-0 text-right font-mono text-xs tabular-nums wrap-anywhere" title={value}>{value}</span>
             </div>
           ))}

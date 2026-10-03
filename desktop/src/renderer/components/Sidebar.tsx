@@ -1,12 +1,12 @@
 // desktop/src/renderer/components/Sidebar.tsx
 //
-// Navegação lateral — mesmo esqueleto do Atlans Studio, para quem usa os dois
-// reconhecer de imediato.
+// Side navigation — same skeleton as Atlans Studio, so someone who uses both
+// recognizes it immediately.
 //
-// Além de navegar, a barra carrega o controle de ciclo de vida do executor —
-// um alvo grande, no mesmo lugar em qualquer aba. O ESTADO (conectado, parado)
-// não está aqui: ele é chrome da janela e vive na StatusBar do rodapé, onde a
-// largura não é disputada com a navegação.
+// Besides navigating, the bar carries the executor lifecycle control — a large
+// target, in the same place on every tab. The STATE (connected, stopped) is not
+// here: it is window chrome and lives in the StatusBar at the bottom, where the
+// width is not contested by the navigation.
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   TbActivity, TbAdjustments, TbCloudDataConnection, TbHandStop, TbLayoutDashboard,
@@ -17,11 +17,11 @@ import { Button } from './ui/button.js'
 import { cn } from '../lib/utils.js'
 
 /**
- * As telas do app.
+ * The app's screens.
  *
- * Sem 'logs': o log não é mais uma aba. Ele abre em JANELA PRÓPRIA pelo botão da
- * barra de rodapé, que é como ele se usa — acompanhado ao lado de outra coisa,
- * e não visitado no lugar dela.
+ * No 'logs': the log is no longer a tab. It opens in its OWN WINDOW from the
+ * footer bar button, which is how it is used — followed alongside something
+ * else, not visited in its place.
  */
 export type Aba = 'painel' | 'execucoes' | 'geosync' | 'ajustes'
 
@@ -33,31 +33,32 @@ const ITENS: Array<{ id: Aba; rotulo: string; icone: ReactNode }> = [
 ]
 
 /**
- * Quanto tempo o botão "Forçar parada" fica inerte depois de aparecer.
+ * How long the "Forçar parada" (force stop) button stays inert after appearing.
  *
- * Meio segundo é o intervalo padrão de duplo clique do Windows: acima disso o
- * clique já não é acidental, e abaixo o botão destrutivo herdaria o segundo
- * clique de quem só quis parar.
+ * Half a second is the default Windows double-click interval: above that the
+ * click is no longer accidental, and below it the destructive button would
+ * inherit the second click of someone who only wanted to stop.
  */
 const MS_ATE_LIBERAR_FORCAR = 500
 
 /**
- * O controle de ciclo de vida — um botão só, que muda de papel com o estado.
+ * The lifecycle control — a single button that changes role with the state.
  *
- * Dois botões lado a lado (um "Iniciar" e um "Parar", um deles sempre
- * desabilitado) obrigariam a ler os dois para descobrir qual está ativo. Aqui
- * há sempre UMA ação possível, e o ícone diz qual antes do texto ser lido:
- * triângulo para partir, quadrado para parar, mão para forçar.
+ * Two buttons side by side (a "Iniciar" and a "Parar", one of them always
+ * disabled) would force you to read both to find out which one is active. Here
+ * there is always ONE possible action, and the icon says which before the text
+ * is read: triangle to start, square to stop, hand to force.
  *
- * Nos estados de transição o ícone vira um spinner — é o que separa "está
- * demorando" de "o clique não pegou", e sem ele a única pista seria o botão
- * apagado.
+ * In the transition states the icon becomes a spinner — that is what separates
+ * "it is taking a while" from "the click did not register", and without it the
+ * only clue would be the dimmed button.
  *
- * Não há mais um "ocupado" GLOBAL: as três ações voltam na hora pelo IPC, e quem
- * conta o andamento é o PRÓPRIO estado (o botão vira "Encerrando…", depois
- * "Forçar parada"). O flag antigo ficava preso à promessa de `parar`, que só
- * resolvia no fim da drenagem — e desabilitava até o botão de forçar, que é a
- * saída da espera. O que ficou é local a cada botão, abaixo.
+ * There is no longer a GLOBAL "busy": the three actions return right away over
+ * IPC, and progress is told by the state ITSELF (the button becomes
+ * "Encerrando…", then "Forçar parada"). The old flag was tied to the `parar`
+ * promise, which only resolved at the end of the drain — and it disabled even
+ * the force button, which is the way out of the wait. What remains is local to
+ * each button, below.
  */
 function ControleExecutor({
   estado, aoIniciar, aoParar, aoForcar,
@@ -67,29 +68,29 @@ function ControleExecutor({
   aoParar: () => void
   aoForcar: () => void
 }) {
-  // `w-full` + `justify-start`: alinhar os ícones à esquerda deixa a coluna do
-  // botão em linha com os ícones da navegação acima.
+  // `w-full` + `justify-start`: left-aligning the icons puts the button column
+  // in line with the navigation icons above.
   const comum = 'w-full justify-start gap-2 font-medium'
   const fase = estado.supervisor
 
-  // Feedback imediato do clique em "Parar".
+  // Immediate feedback for the click on "Parar".
   //
-  // O IPC volta na hora, mas o estado `draining` só chega ~100 ms depois
-  // (coalescência do store + IPC + render). Nesse vão o botão ainda dizia
-  // "Parar" e continuava clicável: o segundo clique de um duplo clique entrava
-  // e pedia uma SEGUNDA parada. Este flag desabilita SÓ este botão — nunca o
-  // "Forçar", que aparece em seguida.
+  // The IPC returns right away, but the `draining` state only arrives ~100 ms
+  // later (store coalescing + IPC + render). In that gap the button still said
+  // "Parar" and remained clickable: the second click of a double click got in
+  // and requested a SECOND stop. This flag disables ONLY this button — never
+  // "Forçar", which appears next.
   const [paradaPedida, setParadaPedida] = useState(false)
   useEffect(() => {
-    // Saiu de `running`/`starting`: o pedido chegou e o botão já é outro.
+    // Left `running`/`starting`: the request arrived and the button is already another one.
     if (fase !== 'running' && fase !== 'starting') setParadaPedida(false)
   }, [fase])
 
-  // "Forçar parada" nasce inerte por meio segundo.
+  // "Forçar parada" (force stop) starts inert for half a second.
   //
-  // Ele ocupa a MESMA posição na tela que o "Parar" que acabou de sumir; sem
-  // este intervalo, o segundo clique de um duplo clique cairia nele e mataria
-  // as execuções em andamento a frio, sem ninguém ter pedido isso.
+  // It occupies the SAME position on screen as the "Parar" that just vanished;
+  // without this interval, the second click of a double click would land on it
+  // and kill the runs in progress cold, without anyone having asked for that.
   const [forcarLiberado, setForcarLiberado] = useState(false)
   useEffect(() => {
     if (fase !== 'draining') {
@@ -106,9 +107,9 @@ function ControleExecutor({
   }
 
   switch (fase) {
-    // Drenando: insistir em "Parar" não faria nada. A saída é forçar, e ela
-    // precisa parecer perigosa — a espera pode chegar a 150s, mas cortá-la
-    // mata execuções em andamento.
+    // Draining: insisting on "Parar" would do nothing. The way out is to force,
+    // and it needs to look dangerous — the wait can reach 150s, but cutting it
+    // short kills runs in progress.
     case 'draining':
       return (
         <Button size="sm" variant="destructive" className={comum}
@@ -125,8 +126,8 @@ function ControleExecutor({
         </Button>
       )
 
-    // Ainda subindo, mas clicável de propósito: um boot travado precisa de
-    // saída, e desabilitar o botão deixaria o usuário sem nenhuma.
+    // Still starting up, but clickable on purpose: a stuck boot needs a way out,
+    // and disabling the button would leave the user with none.
     case 'starting':
       return (
         <Button size="sm" variant="outline" className={comum}
@@ -151,8 +152,9 @@ function ControleExecutor({
         </Button>
       )
 
-    // `stopped` e `failed`: a ação é a mesma, e é a única de destaque no app —
-    // fica no `default` do botão, na cor primária.
+    // `stopped` and `failed`: the action is the same, and it is the only
+    // highlighted one in the app — it uses the button's `default`, in the
+    // primary color.
     default:
       return (
         <Button size="sm" className={comum} onClick={aoIniciar}>
@@ -168,7 +170,7 @@ export function Sidebar({
 }: {
   aba: Aba
   aoTrocar: (a: Aba) => void
-  /** Telas com alterações não salvas — ganham um ponto na navegação. */
+  /** Screens with unsaved changes — they get a dot in the navigation. */
   pendencias?: Partial<Record<Aba, boolean>>
   estado: EstadoApp
   aoIniciar: () => void
@@ -187,10 +189,11 @@ export function Sidebar({
             key={item.id}
             type="button"
             onClick={() => aoTrocar(item.id)}
-            // `aria-current="page"` é o que diz "você está aqui" a quem não vê
-            // o realce; o `focus-visible` é a receita do system.md (Focus &
-            // Accessibility) — esta navegação é a ÚNICA rota de teclado do app,
-            // e sem anel de foco quem tabula não sabe onde está.
+            // `aria-current="page"` is what says "you are here" to those who do not see
+            // the highlight; `focus-visible` is the system.md recipe (Focus &
+            // Accessibility) — this navigation is the ONLY keyboard route in the
+            // app, and without a focus ring someone tabbing does not know where
+            // they are.
             aria-current={ativo ? 'page' : undefined}
             className={cn(
               'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm outline-none',
@@ -201,15 +204,16 @@ export function Sidebar({
                 : 'text-muted-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-foreground',
             )}
           >
-            {/* `transition-colors` no ícone também: sem ele o fundo transicionava
-                e o glifo saltava de cinza para laranja no mesmo quadro. */}
+            {/* `transition-colors` on the icon too: without it the background
+                transitioned and the glyph jumped from gray to orange in the
+                same frame. */}
             <span className={cn('shrink-0 transition-colors', ativo && 'text-primary')}>
               {item.icone}
             </span>
             <span className="flex-1 text-left">{item.rotulo}</span>
 
-            {/* Contadores só onde há algo a notar — um "0" em toda linha não
-                informa e polui. */}
+            {/* Counters only where there is something to notice — a "0" on every
+                row does not inform and adds clutter. */}
             {item.id === 'execucoes' && emExecucao > 0 && (
               <span
                 className="rounded-full bg-blue-500/20 px-1.5 text-[10px] font-semibold text-blue-400 tabular-nums animate-in fade-in-0 zoom-in-95 duration-200"
@@ -219,13 +223,14 @@ export function Sidebar({
               </span>
             )}
 
-            {/* Alterações não salvas nesta tela.
-                Um ponto, e não um texto: a navegação tem 192px e o recado é
-                binário. A cor é a primária, e não a de erro — não há nada
-                errado, só trabalho por concluir.
+            {/* Unsaved changes on this screen.
+                A dot, not text: the navigation is 192px wide and the message
+                is binary. The color is the primary one, not the error one —
+                nothing is wrong, there is just work left to finish.
 
-                `title` mais `sr-only`: o alvo tem 6px e o `title` sozinho é um
-                recado que só existe para quem acerta o ponteiro nele. */}
+                `title` plus `sr-only`: the target is 6px and `title` alone is
+                a message that only exists for someone who lands the pointer on
+                it. */}
             {pendencias?.[item.id] && (
               <span
                 className="size-1.5 shrink-0 rounded-full bg-primary animate-in fade-in-0 zoom-in-50 duration-200"
@@ -239,9 +244,9 @@ export function Sidebar({
         })}
       </nav>
 
-      {/* ── Rodapé: estado e ação ─────────────────────────────────────────
-          Fica na barra, e não no cabeçalho de uma aba, para continuar visível
-          enquanto o usuário lê o log ou mexe nos ajustes. */}
+      {/* ── Footer: state and action ──────────────────────────────────────
+          It sits in the bar, not in a tab header, so it stays visible while
+          the user reads the log or changes the settings. */}
       <div className="border-t border-sidebar-border p-2">
         <ControleExecutor
           estado={estado}

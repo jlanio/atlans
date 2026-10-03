@@ -1,15 +1,15 @@
 # tests/unit/test_change_detector.py
-"""Testes do node ChangeDetector — bifurcação por mudança de input.
+"""Tests for the ChangeDetector node — branching on input change.
 
-Cobre:
-  - Determinismo do _stable_hash (dict reordenado, float precision, sets)
-  - Hash incremental de DataFrame/GeoDataFrame
-  - Branching: primeira run, idêntico, mudou, fields filter
-  - Fail-closed quando o backend de estado falha
+Covers:
+  - Determinism of _stable_hash (reordered dict, float precision, sets)
+  - Incremental hash of DataFrame/GeoDataFrame
+  - Branching: first run, identical, changed, fields filter
+  - Fail-closed when the state backend fails
 
-O node fala com o servidor via /internal/change-detector (mTLS) — o executor nao
-tem acesso ao Redis. Os testes de branching usam _FakeBackend, um duplo do
-endpoint de SWAP (POST unico que grava o hash atual e devolve o anterior).
+The node talks to the server via /internal/change-detector (mTLS) — the executor
+has no access to Redis. The branching tests use _FakeBackend, a double of the
+SWAP endpoint (a single POST that stores the current hash and returns the previous one).
 """
 import httpx
 import pytest
@@ -66,9 +66,9 @@ def test_set_ordem_irrelevante():
 def test_fields_filter_ignora_campos_volateis():
     base = {"feature_count": 150, "bbox": [10.0, 20.0]}
     com_timestamp = {**base, "queried_at": "2026-04-28T10:00:00Z"}
-    # Sem filter, hashes são diferentes (timestamp muda).
+    # Without a filter, the hashes differ (timestamp changes).
     assert _stable_hash(base) != _stable_hash(com_timestamp)
-    # Com filter incluindo só os campos estáveis, hashes são iguais.
+    # With a filter including only the stable fields, the hashes are equal.
     assert _stable_hash(base, ["feature_count", "bbox"]) == _stable_hash(
         com_timestamp, ["feature_count", "bbox"]
     )
@@ -95,7 +95,7 @@ def test_dataframe_mesma_estrutura_mesmo_hash():
 
 
 def test_dataframe_linhas_em_ordem_diferente_mesmo_hash():
-    """XOR cumulativo é insensível a ordem das linhas — desejado."""
+    """Cumulative XOR is insensitive to row order — desired."""
     pd = pytest.importorskip("pandas")
     df1 = pd.DataFrame({"a": [1, 2, 3]})
     df2 = pd.DataFrame({"a": [3, 1, 2]})
@@ -128,12 +128,12 @@ def test_canonicalize_preserva_primitivos():
 # ── Node ChangeDetector — branching ──────────────────────────────────────────
 
 class _FakeBackend:
-    """Duplo do endpoint POST /internal/change-detector/{key} (swap atomico).
+    """Double of the POST /internal/change-detector/{key} endpoint (atomic swap).
 
-    `stored=None` → previous_hash None (primeira execução). `swap_exc` simula
-    backend indisponível — o node decide o branch pela política
-    `on_backend_error`. Cada swap grava o hash recebido como novo `stored`,
-    então dois swaps seguidos exercitam o ciclo real de duas runs.
+    `stored=None` → previous_hash None (first run). `swap_exc` simulates an
+    unavailable backend — the node decides the branch by the `on_backend_error`
+    policy. Each swap stores the received hash as the new `stored`, so two
+    consecutive swaps exercise the real two-run cycle.
     """
 
     def __init__(self, stored: str | None = None, *, swap_exc=None):
@@ -172,7 +172,7 @@ class _FakeBackend:
 
 
 def _make_node(properties=None):
-    """Instancia ChangeDetector com properties padrão de teste."""
+    """Instantiates ChangeDetector with default test properties."""
     node = ChangeDetector(node_id="n-test", parameters=properties or {})
     node._workflow_hash = "wfh-test"
     node._workspace_id = "ws-test"
@@ -189,7 +189,7 @@ async def _run(node, inputs, backend: _FakeBackend):
 
 @pytest.mark.asyncio
 async def test_primeira_execucao_branch_true():
-    backend = _FakeBackend(stored=None)  # nunca rodou
+    backend = _FakeBackend(stored=None)  # never ran
     result = await _run(_make_node(), {"data": {"a": 1}}, backend)
 
     assert result["branch"] is True
@@ -224,7 +224,7 @@ async def test_input_mudou_branch_true():
 
 @pytest.mark.asyncio
 async def test_data_passada_adiante():
-    """O input original é exposto como 'data' no output em ambos branches."""
+    """The original input is exposed as 'data' in the output on both branches."""
     payload = {"foo": "bar", "n": 42}
     result = await _run(_make_node(), {"x": payload}, _FakeBackend())
 
@@ -233,30 +233,30 @@ async def test_data_passada_adiante():
 
 @pytest.mark.asyncio
 async def test_fields_filter_aplicado():
-    """Com fields_filter, mudanças em campos fora da lista NÃO marcam changed."""
+    """With fields_filter, changes in fields outside the list do NOT mark changed."""
     expected_hash = _stable_hash({"a": 1, "b": 2}, ["a", "b"])
     backend = _FakeBackend(stored=expected_hash)
 
-    # Mesmos a/b, mas com timestamp adicional. fields_filter deve ignorar.
+    # Same a/b, but with an additional timestamp. fields_filter must ignore it.
     result = await _run(
         _make_node({"fields": "a,b"}),
         {"data": {"a": 1, "b": 2, "ts": "2026-04-28T10:00"}},
         backend,
     )
 
-    assert result["branch"] is False  # mudou só timestamp, fields ignora
+    assert result["branch"] is False  # only timestamp changed, fields ignores it
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("guardado", [
-    "a,b",           # formato ANTIGO (CSV), ja salvo nas definitions
-    ["a", "b"],      # lista de verdade (editor de objeto)
-    '["a","b"]',     # JSON-string — o que o campo de fichas grava
+    "a,b",           # OLD format (CSV), already saved in the definitions
+    ["a", "b"],      # a real list (object editor)
+    '["a","b"]',     # JSON string — what the chips field stores
 ])
 async def test_fields_aceita_fichas_lista_json_e_csv(guardado):
-    """O campo virou fichas ("chips") e passou a gravar JSON-string. Os tres
-    formatos tem de filtrar IGUAL — workflow salvo antes nao muda de
-    comportamento."""
+    """The field became chips and started storing a JSON string. The three
+    formats have to filter THE SAME — a workflow saved before doesn't change
+    behavior."""
     expected_hash = _stable_hash({"a": 1, "b": 2}, ["a", "b"])
     backend = _FakeBackend(stored=expected_hash)
     result = await _run(
@@ -280,25 +280,25 @@ async def test_ttl_zero_sem_expiracao():
     backend = _FakeBackend()
     await _run(_make_node({"ttl_hours": 0}), {"data": {"a": 1}}, backend)
 
-    # ttl_seconds=0 → servidor grava sem expiração.
+    # ttl_seconds=0 → the server stores with no expiry.
     assert backend.swaps[0][1]["ttl_seconds"] == 0
 
 
 @pytest.mark.asyncio
 async def test_backend_fora_default_fail_closed_branch_true():
-    """Backend indisponível com política default → branch=True (fail-closed)."""
+    """Unavailable backend with the default policy → branch=True (fail-closed)."""
     backend = _FakeBackend(swap_exc=httpx.ConnectError("backend down"))
     with patch("asyncio.sleep", AsyncMock()):
         result = await _run(_make_node(), {"data": {"a": 1}}, backend)
 
     assert result["branch"] is True
-    assert result["previous_hash"] is None  # não conseguimos ler
+    assert result["previous_hash"] is None  # we couldn't read
     assert result["reason"] == "backend_indisponivel"
 
 
 @pytest.mark.asyncio
 async def test_backend_fora_politica_sem_mudanca():
-    """on_backend_error=sem_mudanca: infra piscou NÃO dispara o efeito caro."""
+    """on_backend_error=sem_mudanca: an infra blip does NOT trigger the expensive effect."""
     backend = _FakeBackend(swap_exc=httpx.ConnectError("backend down"))
     with patch("asyncio.sleep", AsyncMock()):
         result = await _run(
@@ -311,7 +311,7 @@ async def test_backend_fora_politica_sem_mudanca():
 
 @pytest.mark.asyncio
 async def test_backend_fora_politica_falhar():
-    """on_backend_error=falhar: a run erra visivelmente em vez de decidir às cegas."""
+    """on_backend_error=falhar: the run fails visibly instead of deciding blindly."""
     backend = _FakeBackend(swap_exc=httpx.ConnectError("backend down"))
     with patch("asyncio.sleep", AsyncMock()), pytest.raises(RuntimeError) as exc:
         await _run(
@@ -330,7 +330,7 @@ async def test_escopo_workspace_usa_shared_key():
         backend,
     )
 
-    # Verifica formato da chave — deve usar prefixo ws e a shared_key.
+    # Checks the key format — it must use the ws prefix and the shared_key.
     assert backend.swaps[0][0].endswith("/internal/change-detector/ws:ws-test:monitor_zones")
 
 
@@ -354,7 +354,7 @@ async def test_escopo_workflow_default():
     assert backend.swaps[0][0].endswith("/internal/change-detector/wf:wfh-test:n-test")
 
 
-# ── Canonização estendida: tipos estáveis ────────────────────────────────────
+# ── Extended canonicalization: stable types ──────────────────────────────────
 
 def test_hash_datetime_estavel():
     import datetime as dt
@@ -364,7 +364,7 @@ def test_hash_datetime_estavel():
     # Momento diferente → hash diferente.
     c = {"ts": dt.datetime(2025, 1, 1, 12, 0, 1)}
     assert _stable_hash(a) != _stable_hash(c)
-    # date e time também canonizam.
+    # date and time also canonicalize.
     assert _stable_hash({"d": dt.date(2025, 1, 1)}) == _stable_hash({"d": dt.date(2025, 1, 1)})
 
 
@@ -385,10 +385,10 @@ def test_hash_decimal_path_enum():
         RED = 1
         BLUE = 2
 
-    # Decimal preserva precisão (str), estável entre instâncias iguais.
+    # Decimal preserves precision (str), stable across equal instances.
     assert _stable_hash({"v": Decimal("1.10")}) == _stable_hash({"v": Decimal("1.10")})
     assert _stable_hash({"v": Decimal("1.10")}) != _stable_hash({"v": Decimal("1.1")})
-    # Path canoniza via as_posix.
+    # Path canonicalizes via as_posix.
     assert _stable_hash({"p": PurePosixPath("/a/b")}) == _stable_hash({"p": PurePosixPath("/a/b")})
     # Enum: name + value.
     assert _stable_hash({"c": Color.RED}) == _stable_hash({"c": Color.RED})
@@ -404,13 +404,13 @@ def test_hash_tipo_desconhecido_fail_fast():
 
     with pytest.raises(ChangeDetectorTypeError) as exc:
         _stable_hash({"obj": Custom(1)})
-    # Mensagem inclui o caminho do tipo para diagnóstico.
+    # The message includes the type's path for diagnosis.
     assert "Custom" in str(exc.value)
 
 
 @pytest.mark.asyncio
 async def test_hash_tipo_desconhecido_no_node_fail_safe():
-    """Input com tipo não-hashable → node cai em branch=True (fail-safe), não quebra."""
+    """Input with a non-hashable type → node falls back to branch=True (fail-safe), doesn't break."""
     class Custom:
         pass
 
@@ -422,7 +422,7 @@ async def test_hash_tipo_desconhecido_no_node_fail_safe():
 
 @pytest.mark.asyncio
 async def test_hash_corrompido_no_backend():
-    """Valor inválido no backend (não-hex/tamanho errado) → tratado como primeira run."""
+    """Invalid value in the backend (non-hex/wrong size) → treated as the first run."""
     backend = _FakeBackend(stored="nao-eh-um-hash-valido")  # lixo
     result = await _run(_make_node(), {"data": {"a": 1}}, backend)
 
@@ -436,7 +436,7 @@ async def test_hash_corrompido_no_backend():
 
 @pytest.mark.asyncio
 async def test_http_retry_em_503(monkeypatch):
-    """503 transitório duas vezes + 200 → retorna 200 após retries."""
+    """Transient 503 twice + 200 → returns 200 after retries."""
     from unittest.mock import MagicMock
     from flow.utils.http_retry import async_request_with_retry
 
@@ -453,7 +453,7 @@ async def test_http_retry_em_503(monkeypatch):
             calls["n"] += 1
             return r
 
-    # Não dorme de verdade.
+    # Doesn't really sleep.
     monkeypatch.setattr("asyncio.sleep", AsyncMock())
     with patch("httpx.AsyncClient", FakeClient):
         resp = await async_request_with_retry("GET", "https://x/y", base_delay=0)
@@ -464,7 +464,7 @@ async def test_http_retry_em_503(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_http_retry_desiste_apos_max(monkeypatch):
-    """503 sempre → retorna o último 503 após max_attempts (caller faz fail-closed)."""
+    """503 always → returns the last 503 after max_attempts (caller fails closed)."""
     from unittest.mock import MagicMock
     from flow.utils.http_retry import async_request_with_retry
 
@@ -488,7 +488,7 @@ async def test_http_retry_desiste_apos_max(monkeypatch):
     assert calls["n"] == 3  # 1 + 2 retries
 
 
-# ── cleanup pós-delete de workflow ────────────────────────────────────────────
+# ── cleanup after workflow delete ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_cleanup_keys_no_delete_workflow():
@@ -517,7 +517,7 @@ async def test_cleanup_keys_no_delete_workflow():
 
 @pytest.mark.asyncio
 async def test_cleanup_keys_falha_redis_nao_propaga():
-    """Falha no Redis durante cleanup não propaga (best-effort)."""
+    """A Redis failure during cleanup doesn't propagate (best-effort)."""
     from app.services.workflow_service import _cleanup_change_detector_keys
 
     class BrokenRedis:
@@ -527,15 +527,15 @@ async def test_cleanup_keys_falha_redis_nao_propaga():
     with patch("app.core.redis.get_redis_pool", return_value=BrokenRedis()):
         removed = await _cleanup_change_detector_keys("wfh-test")
 
-    assert removed == 0  # não removeu nada, mas não levantou
+    assert removed == 0  # removed nothing, but didn't raise
 
 
-# ── v2 do hash de tabela: soma modular em vez de XOR ─────────────────────────
+# ── v2 of the table hash: modular sum instead of XOR ─────────────────────────
 
 def test_dataframe_par_duplicado_trocado_e_detectado():
-    """Regressão da v1: XOR anulava pares de linhas idênticas — trocar {x, x}
-    por {y, y} mantinha n_rows/cols/dtypes E o agregado, passando como 'sem
-    mudança'. A soma modular detecta."""
+    """v1 regression: XOR canceled out pairs of identical rows — swapping {x, x}
+    for {y, y} kept n_rows/cols/dtypes AND the aggregate, passing as 'no
+    change'. The modular sum detects it."""
     pd = pytest.importorskip("pandas")
     from flow.nodes.control.change_detector import _hash_dataframe
 
@@ -557,8 +557,8 @@ def test_geodataframe_par_duplicado_trocado_e_detectado():
 
 
 def test_dataframe_assinatura_e_versionada():
-    """O bump para v2 é explícito na assinatura — invalida os hashes v1 uma
-    única vez após o deploy, de propósito."""
+    """The bump to v2 is explicit in the signature — it invalidates the v1 hashes
+    a single time after the deploy, on purpose."""
     pd = pytest.importorskip("pandas")
     from flow.nodes.control.change_detector import _hash_dataframe
 
@@ -567,7 +567,7 @@ def test_dataframe_assinatura_e_versionada():
     assert "soma" in assinatura and "xor" not in assinatura
 
 
-# ── ignore_fields: exclusão com caminho pontilhado ───────────────────────────
+# ── ignore_fields: exclusion with a dotted path ──────────────────────────────
 
 def test_ignore_na_raiz():
     com_ts = {"a": 1, "fetched_at": "2026-08-31T10:00"}
@@ -578,7 +578,7 @@ def test_ignore_caminho_pontilhado():
     a = {"a": 2, "meta": {"updated_at": "ontem", "fonte": "wfs"}}
     b = {"a": 2, "meta": {"updated_at": "hoje", "fonte": "wfs"}}
     assert _stable_hash(a, None, ["meta.updated_at"]) == _stable_hash(b, None, ["meta.updated_at"])
-    # Sem o ignore, os dois diferem — o filtro é quem iguala.
+    # Without the ignore, the two differ — the filter is what makes them equal.
     assert _stable_hash(a) != _stable_hash(b)
 
 
@@ -593,7 +593,7 @@ def test_ignore_remove_coluna_de_dataframe():
     a = {"tabela": pd.DataFrame({"v": [1, 2], "fetched_at": ["t1", "t2"]})}
     b = {"tabela": pd.DataFrame({"v": [1, 2], "fetched_at": ["t9", "t8"]})}
     assert _stable_hash(a, None, ["tabela.fetched_at"]) == _stable_hash(b, None, ["tabela.fetched_at"])
-    # Coluna ausente não é erro: o input já está como o filtro quer.
+    # A missing column is not an error: the input is already as the filter wants.
     sem_coluna = {"tabela": pd.DataFrame({"v": [1, 2]})}
     assert _stable_hash(sem_coluna, None, ["tabela.fetched_at"]) == _stable_hash(
         a, None, ["tabela.fetched_at"]
@@ -608,7 +608,7 @@ def test_ignore_nao_muta_o_input():
 
 @pytest.mark.asyncio
 async def test_ignore_fields_aplicado_no_node():
-    """Param ignore_fields do nó: mudou só o campo ignorado → 'Sem mudança'."""
+    """The node's ignore_fields param: only the ignored field changed → 'Sem mudança' (no change)."""
     esperado = _stable_hash({"a": 1}, None, None)
     backend = _FakeBackend(stored=esperado)
     result = await _run(
@@ -623,7 +623,7 @@ async def test_ignore_fields_aplicado_no_node():
 @pytest.mark.asyncio
 @pytest.mark.parametrize("guardado", ["ts", ["ts"], '["ts"]'])
 async def test_ignore_fields_aceita_fichas_lista_json_e_csv(guardado):
-    """Mesma tolerância de formato do `fields` — inclusive o CSV antigo."""
+    """Same format tolerance as `fields` — including the old CSV."""
     esperado = _stable_hash({"a": 1}, None, None)
     backend = _FakeBackend(stored=esperado)
     result = await _run(
@@ -635,7 +635,7 @@ async def test_ignore_fields_aceita_fichas_lista_json_e_csv(guardado):
     assert result["reason"] == "sem_mudanca"
 
 
-# ── primeira execução silenciosa ─────────────────────────────────────────────
+# ── silent first run ─────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_primeira_execucao_silenciosa_registra_baseline_sem_disparar():
@@ -644,10 +644,10 @@ async def test_primeira_execucao_silenciosa_registra_baseline_sem_disparar():
         _make_node({"primeira_execucao": "sem_mudanca"}), {"data": {"a": 1}}, backend
     )
 
-    assert result["branch"] is False                      # não dispara o alerta
+    assert result["branch"] is False                      # doesn't trigger the alert
     assert result["reason"] == "primeira_execucao"
-    assert len(backend.swaps) == 1                        # mas o baseline foi gravado
-    # A run seguinte com o MESMO input continua 'Sem mudança'...
+    assert len(backend.swaps) == 1                        # but the baseline was stored
+    # The next run with the SAME input is still 'Sem mudança'...
     result2 = await _run(
         _make_node({"primeira_execucao": "sem_mudanca"}), {"data": {"a": 1}}, backend
     )
@@ -663,7 +663,7 @@ async def test_primeira_execucao_silenciosa_registra_baseline_sem_disparar():
 
 @pytest.mark.asyncio
 async def test_ttl_hours_vazio_cai_no_default():
-    """Campo limpo na UI ('') não pode derrubar a run — usa o default 168h."""
+    """A field cleared in the UI ('') must not bring down the run — uses the 168h default."""
     backend = _FakeBackend()
     result = await _run(_make_node({"ttl_hours": ""}), {"data": {"a": 1}}, backend)
 
@@ -671,26 +671,26 @@ async def test_ttl_hours_vazio_cai_no_default():
     assert backend.swaps[0][1]["ttl_seconds"] == 168 * 3600
 
 
-# ── múltiplas entradas ───────────────────────────────────────────────────────
+# ── multiple inputs ──────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_multiplas_entradas_todas_entram_no_hash():
-    """Duas edges ligadas: ambas entram no hash (ordenadas por nome) — antes a
-    segunda era descartada em silêncio e mudança nela passava despercebida."""
+    """Two edges connected: both go into the hash (sorted by name) — before, the
+    second was silently discarded and a change in it went unnoticed."""
     backend = _FakeBackend()
     r1 = await _run(_make_node(), {"b": {"y": 2}, "a": {"x": 1}}, backend)
     assert r1["current_hash"] == _stable_hash({"a": {"x": 1}, "b": {"y": 2}})
 
-    # Mudança APENAS na segunda entrada é detectada.
+    # A change ONLY in the second input is detected.
     r2 = await _run(_make_node(), {"a": {"x": 1}, "b": {"y": 999}}, backend)
     assert r2["branch"] is True and r2["reason"] == "mudou"
 
 
 @pytest.mark.asyncio
 async def test_cleanup_ws_keys_no_delete_do_workspace():
-    """Chaves ws:* (shared_key) não pertencem a workflow nenhum — o cascade do
-    workspace é o único lugar que pode limpá-las; com ttl_hours=0 elas viveriam
-    para sempre."""
+    """ws:* keys (shared_key) belong to no workflow — the workspace cascade is the
+    only place that can clean them up; with ttl_hours=0 they would live
+    forever."""
     from app.services.workflow_service import _cleanup_change_detector_ws_keys
 
     existing = [
@@ -720,7 +720,7 @@ async def test_cleanup_ws_keys_no_delete_do_workspace():
 
 @pytest.mark.asyncio
 async def test_soft_delete_do_workspace_dispara_a_limpeza_ws():
-    """O cascade do workspace precisa chamar a limpeza ws:* além da por-workflow."""
+    """The workspace cascade must call the ws:* cleanup in addition to the per-workflow one."""
     from app.services import workflow_service as ws_mod
     import datetime as dt
 

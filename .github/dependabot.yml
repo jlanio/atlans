@@ -1,51 +1,51 @@
 # .github/dependabot.yml
 #
-# PRs de atualização de dependências, que passam pelo mesmo CI de qualquer
-# mudança. Complementa o job "Auditoria de dependências" do ci.yml: lá aparece o
-# que tem vulnerabilidade conhecida; aqui chega a versão nova.
+# Dependency update PRs, which go through the same CI as any other change.
+# Complements the "Auditoria de dependências" (dependency audit) job in ci.yml:
+# that one shows what has a known vulnerability; this one brings the new version.
 #
-# Política conservadora, por causa dos ataques à cadeia de suprimentos (conta de
-# mantenedor sequestrada publicando versão maliciosa, worm que se espalha pelo
-# script de instalação). Atualizar assim que sai versão nova é justamente o que
-# esses ataques exploram, então:
+# Conservative policy, because of supply-chain attacks (a hijacked maintainer
+# account publishing a malicious version, a worm spreading through the install
+# script). Updating as soon as a new version comes out is exactly what those
+# attacks exploit, so:
 #
-#   - Versão nova só UMA VEZ POR MÊS (dia 1º), num lote por ecossistema:
-#     menos portas de entrada, cada uma revisada com calma.
-#   - `cooldown`: uma versão só é proposta depois de 14 dias publicada; versão
-#     maior, 30. Versão maliciosa costuma ser descoberta e retirada em horas ou
-#     poucos dias, e a quarentena deixa a descoberta acontecer antes.
-#   - Correção de SEGURANÇA não espera nem o mês nem a quarentena: vem pelas
-#     "Dependabot security updates" (Settings → Code security), que não seguem
-#     este arquivo. Ali a falha já é pública, e esperar custa mais.
+#   - New versions only ONCE A MONTH (the 1st), in one batch per ecosystem:
+#     fewer entry points, each one reviewed calmly.
+#   - `cooldown`: a version is only proposed after it has been published for 14
+#     days; a major version, 30. A malicious version is usually discovered and
+#     pulled within hours or a few days, and the quarantine lets that happen first.
+#   - SECURITY fixes wait for neither the month nor the quarantine: they come via
+#     "Dependabot security updates" (Settings → Code security), which do not follow
+#     this file. There the flaw is already public, and waiting costs more.
 #
-# Todo PR daqui é revisado antes do merge (roteiro em CONTRIBUTING.md, "PRs do
-# Dependabot"). Abrir o PR não expõe nada: o CI de PR do Dependabot roda com
-# token só de leitura e sem os segredos do repositório.
+# Every PR from here is reviewed before merge (checklist in CONTRIBUTING.md,
+# "Dependabot PRs"). Opening the PR exposes nothing: Dependabot's PR CI runs with
+# a read-only token and without the repository's secrets.
 #
-# Fora daqui de propósito: as imagens base dos Dockerfiles. A versão do Python
-# anda junto em quatro lugares (Dockerfile.api, Dockerfile.executor, o
-# setup-python do CI e desktop/python-runtime.json) e a do Node também tem par
-# no CI — um PR que trocasse só a tag da imagem quebraria essa amarração.
+# Left out on purpose: the Dockerfiles' base images. The Python version moves
+# together in four places (Dockerfile.api, Dockerfile.executor, the CI's
+# setup-python and desktop/python-runtime.json) and the Node one also has a
+# twin in CI — a PR that changed only the image tag would break that coupling.
 version: 2
 updates:
-  # Python. `directory: "/"` já alcança as subpastas de primeiro nível. Os
-  # pares `.in` -> `.txt` (requirements, requirements-dev, executor/
-  # requirements-full e executor/requirements) são locks do pip-compile com
-  # hash, e o Dependabot os regenera sozinho: acha o lock de cada `.in` pelo
-  # `--output-file` do cabeçalho e deduz as opções do conteúdo (as linhas com
-  # hash). Ele sobe o que está nos `.in`, e as transitivas só por segurança; as
-  # outras o `scripts/travar_python.py --renovar` traz em dia. A mesma versão
-  # sobe em todos os locks no mesmo PR, e o CI confere
-  # (tests/unit/test_locks_python.py, e o job Desktop instala o lock do
-  # executor no Windows). A quarentena vale para o pacote atualizado: as
-  # transitivas que o pip-compile traz junto vêm na versão do dia, e o job de
-  # auditoria do CI lista as que têm menos de 14 dias.
+  # Python. `directory: "/"` already reaches first-level subfolders. The
+  # `.in` -> `.txt` pairs (requirements, requirements-dev, executor/
+  # requirements-full and executor/requirements) are pip-compile locks with
+  # hashes, and Dependabot regenerates them on its own: it finds each `.in`'s
+  # lock via the header's `--output-file` and infers the options from the
+  # content (the hashed lines). It bumps what is in the `.in` files, and
+  # transitive ones only for security; `scripts/travar_python.py --renovar`
+  # keeps the others current. The same version goes up in every lock in the
+  # same PR, and CI checks it (tests/unit/test_locks_python.py, and the
+  # Desktop job installs the executor lock on Windows). The quarantine applies
+  # to the updated package: the transitive ones pip-compile pulls along come
+  # at that day's version, and CI's audit job lists those under 14 days old.
   #
-  # Menores e correções vêm num PR por mês (pacotes acoplados, como boto3 +
-  # botocore + s3transfer, sobem juntos). numpy, pandas e pyproj vêm sozinhos:
-  # estão pinados na versão de produção desde a troca para o Python 3.12, e
-  # subir cada um é migração. O salto do pandas para a 3.x fica de fora: muda
-  # o comportamento dos nós (copy-on-write e o dtype de string novo).
+  # Minor versions and fixes come in one PR per month (coupled packages, such
+  # as boto3 + botocore + s3transfer, go up together). numpy, pandas and pyproj
+  # come alone: they are pinned at the production version since the switch to
+  # Python 3.12, and bumping each one is a migration. The jump to pandas 3.x is
+  # left out: it changes node behavior (copy-on-write and the new string dtype).
   - package-ecosystem: pip
     directory: "/"
     schedule:
@@ -68,8 +68,8 @@ updates:
         exclude-patterns: ["numpy", "pandas", "pyproj"]
         update-types: [minor, patch]
 
-  # Menores e correções num PR por mês; versão maior (Next, React,
-  # MapLibre...) vem sozinha, porque costuma pedir mudança de código.
+  # Minor versions and fixes in one PR per month; a major version (Next, React,
+  # MapLibre...) comes alone, because it usually requires code changes.
   - package-ecosystem: npm
     directory: "/web"
     schedule:
@@ -84,23 +84,23 @@ updates:
       prefix: build
       include: scope
     ignore:
-      # O teto do TypeScript e do ESLint é o do lint que vem com o
-      # eslint-config-next 16 (medido no 16.3.3). O npm instala as versões novas
-      # por cima, só com aviso de peer; quem quebra é o `npm run lint`:
-      #   - TypeScript 7: o `next build` passa, mas o typescript-eslint 8
-      #     recusa ("does not support TS 7.0"; aceita abaixo do 6.1);
-      #   - ESLint 10: o eslint-plugin-react 7.37 cai ("getFilename is not a
+      # The TypeScript and ESLint ceiling is that of the lint shipped with
+      # eslint-config-next 16 (measured on 16.3.3). npm installs the new versions
+      # on top, with only a peer warning; what breaks is `npm run lint`:
+      #   - TypeScript 7: `next build` passes, but typescript-eslint 8
+      #     refuses ("does not support TS 7.0"; accepts below 6.1);
+      #   - ESLint 10: eslint-plugin-react 7.37 crashes ("getFilename is not a
       #     function").
-      # O TypeScript 6.0 fica dentro do teto: chega como versão maior, e o CI
-      # decide. Os tetos sobem quando um eslint-config-next novo aceitar as versões.
+      # TypeScript 6.0 is within the ceiling: it arrives as a major version, and CI
+      # decides. The ceilings go up when a new eslint-config-next accepts the versions.
       - dependency-name: typescript
         versions: [">=6.1.0"]
       - dependency-name: eslint
         versions: [">=10.0.0"]
     groups:
-      # O eslint-config-next tem de acompanhar a versão do Next: separados, o
-      # PR de um deles quebra o `npm ci` ou o lint. O primeiro grupo que casa
-      # leva o pacote, então este vem antes do de menores.
+      # eslint-config-next has to track the Next version: separately, the
+      # PR for either one breaks `npm ci` or the lint. The first matching group
+      # takes the package, so this one comes before the minor-versions one.
       next:
         patterns: ["next", "eslint-config-next"]
       web-menores:
@@ -121,9 +121,9 @@ updates:
       prefix: build
       include: scope
     groups:
-      # O vite e o @vitejs/plugin-react só instalam juntos quando muda a versão
-      # maior (o plugin declara o vite que aceita): separados, cada PR para em
-      # ERESOLVE no `npm ci` (#235 e #216).
+      # vite and @vitejs/plugin-react only install together when the major
+      # version changes (the plugin declares which vite it accepts): separately,
+      # each PR stops at ERESOLVE in `npm ci` (#235 and #216).
       vite:
         patterns: ["vite", "@vitejs/*"]
       desktop-menores:
@@ -136,8 +136,8 @@ updates:
       interval: monthly
       time: "07:00"
       timezone: America/Cuiaba
-    # 30 dias para tudo: o Dependabot não aceita `semver-*-days` para actions
-    # (recusa o arquivo inteiro), e a versão maior tem de esperar os 30.
+    # 30 days for everything: Dependabot does not accept `semver-*-days` for actions
+    # (it rejects the whole file), and the major version must wait the 30.
     cooldown:
       default-days: 30
     commit-message:

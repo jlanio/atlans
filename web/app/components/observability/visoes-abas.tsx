@@ -16,9 +16,9 @@ interface Props {
   visao: Visao
   onVisao: (v: Visao) => void
   contagens: ContagensDasVisoes
-  /** "Confirmações" é admin-only: `/pending-acks` responde 403 aos demais. */
+  /** "Confirmações" is admin-only: `/pending-acks` answers 403 to everyone else. */
   isAdmin: boolean
-  /** Há confirmação atrasada — a pílula de Confirmações fica vermelha. */
+  /** There is a late acknowledgment — the Confirmações pill turns red. */
   alerta?: boolean
 }
 
@@ -30,10 +30,10 @@ const ABAS: { id: Visao; rotulo: string; soAdmin?: boolean }[] = [
 ]
 
 /**
- * Barra de visões da tabela (spec §4.3). Mesma lista, quatro recortes; a
- * contagem em cada pílula diz quantas linhas há do outro lado antes de a
- * pessoa clicar. Segue o padrão ARIA de abas: setas movem o foco e já trocam
- * a visão, Home/End vão às pontas.
+ * The table's view bar (spec §4.3). Same list, four slices; the count on each
+ * pill says how many rows are on the other side before the person clicks.
+ * Follows the ARIA tabs pattern: arrows move focus and switch the view right
+ * away, Home/End go to the ends.
  */
 export function VisoesAbas({ visao, onVisao, contagens, isAdmin, alerta = false }: Props) {
   const abas = ABAS.filter(a => !a.soAdmin || isAdmin)
@@ -52,8 +52,8 @@ export function VisoesAbas({ visao, onVisao, contagens, isAdmin, alerta = false 
   }
 
   return (
-    // `overflow-y-hidden` junto do `-mb-px`: sem ele o navegador abre uma barra
-    // vertical de 1px e, em cascata, uma horizontal (mesmo caso da página antiga).
+    // `overflow-y-hidden` together with `-mb-px`: without it the browser opens a 1px
+    // vertical bar and, in cascade, a horizontal one (same case as the old page).
     <div
       role="tablist"
       aria-label="Visões do histórico"

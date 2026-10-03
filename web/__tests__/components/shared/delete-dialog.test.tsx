@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { Dialog } from "@/app/components/ui/dialog"
 import { DeleteDialog } from "@/app/components/shared/DeleteDialog"
 
-/** O diálogo é compartilhado e portado ao <body>: quem o abre da Home passa `home-portal`. */
+/** The dialog is shared and portaled to <body>: whoever opens it from Home passes `home-portal`. */
 afterEach(cleanup)
 
 const montar = (className?: string) =>
@@ -27,7 +27,7 @@ describe("DeleteDialog — a paleta de quem o abre", () => {
 })
 
 describe("DeleteDialog — confirmação por digitação", () => {
-  /** Uma exclusão que só termina quando o teste manda. */
+  /** A deletion that only finishes when the test says so. */
   function lenta() {
     let terminar!: () => void
     const onConfirm = vi.fn(() => new Promise<void>(res => { terminar = res }))
@@ -75,8 +75,8 @@ describe("DeleteDialog — confirmação por digitação", () => {
   })
 
   it("durante a ação o campo fica só leitura, com o foco: depois de uma falha, o Enter tenta de novo", async () => {
-    // A falha como os diálogos a entregam: o `useAcaoDeDialogo` mostra o toast
-    // e resolve, e o diálogo fica aberto para a pessoa tentar de novo.
+    // The failure as the dialogs deliver it: `useAcaoDeDialogo` shows the toast
+    // and resolves, and the dialog stays open so the person can try again.
     let falhar!: () => void
     const onConfirm = vi.fn(() => new Promise<void>(resolver => { falhar = resolver }))
     render(
@@ -89,8 +89,8 @@ describe("DeleteDialog — confirmação por digitação", () => {
     campo.focus()
     fireEvent.keyDown(campo, { key: "Enter" })
 
-    // `disabled` faria o navegador tirar o foco do campo (o jsdom não aplica
-    // essa regra; o atributo é o que dá para conferir aqui).
+    // `disabled` would make the browser take focus away from the field (jsdom
+    // doesn't apply that rule; the attribute is what can be checked here).
     expect(campo).not.toBeDisabled()
     expect(campo.readOnly).toBe(true)
     expect(document.activeElement).toBe(campo)
@@ -115,8 +115,8 @@ describe("DeleteDialog — confirmação por digitação", () => {
   })
 
   it("o que foi digitado não sobrevive a fechar e reabrir", async () => {
-    // O diálogo aberto por um item de menu fica montado dentro do `Dialog`
-    // fechado: é o campo que tem de nascer vazio de novo.
+    // The dialog opened by a menu item stays mounted inside the closed
+    // `Dialog`: it's the field that has to start out empty again.
     function Tela() {
       const [aberto, setAberto] = useState(true)
       return (

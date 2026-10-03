@@ -2,10 +2,10 @@
 """
 `trigger_source="mcp"` (docs/specs/metrics-history.md §2; mcp-server.md §1).
 
-O servidor MCP vai carimbar as execuções que dispara com uma origem própria,
-para o Histórico distinguir "um agente rodou" de "alguém clicou". A coluna não
-tem CHECK — o vocabulário vive no filtro da rota e na web. Aqui fica o lado
-da rota: `mcp` passa; um valor de fora continua 422.
+The MCP server will stamp the runs it triggers with an origin of its own, so
+that History can tell "an agent ran it" from "someone clicked". The column has
+no CHECK — the vocabulary lives in the route's filter and in the web app. This
+covers the route side: `mcp` passes; a value from outside is still a 422.
 """
 from __future__ import annotations
 

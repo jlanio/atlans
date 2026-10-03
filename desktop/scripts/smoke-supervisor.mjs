@@ -1,15 +1,15 @@
 // desktop/scripts/smoke-supervisor.mjs
 //
-// Integracao de verdade: o supervisor do app contra o executor Python real.
+// Real integration: the app's supervisor against the real Python executor.
 //
-// Os testes de vitest usam um `spawnFn` falso — provam a politica de reinicio,
-// nao a ponte. Este script prova a ponte inteira: spawn com o ambiente
-// sanitizado, NDJSON chegando pelo stdout, log humano pelo stderr, comando indo
-// pelo stdin e o `ack` voltando.
+// The vitest tests use a fake `spawnFn` — they prove the restart policy, not
+// the bridge. This script proves the whole bridge: spawn with the sanitized
+// environment, NDJSON arriving over stdout, human log over stderr, a command
+// going over stdin and the `ack` coming back.
 //
-// Nao precisa de servidor: com um cert dir falso, o executor sobe, emite
-// `hello`, tenta a fase 0 e reporta `state: failed`. Isso exercita exatamente o
-// caminho que a GUI mais precisa acertar — a falha de boot com causa.
+// It needs no server: with a fake cert dir, the executor starts, emits
+// `hello`, attempts phase 0 and reports `state: failed`. That exercises exactly
+// the path the GUI most needs to get right — boot failure with a cause.
 //
 //   node scripts/smoke-supervisor.mjs
 import { build } from 'esbuild'
@@ -28,8 +28,8 @@ for (const dir of ['executor', 'flow']) {
   }
 }
 
-// O supervisor nao importa `electron` (de proposito — a logica de processo tem
-// de ser testavel fora dele), entao da para carrega-lo aqui direto.
+// The supervisor does not import `electron` (on purpose — the process logic
+// has to be testable outside it), so it can be loaded here directly.
 step('Compilando o supervisor')
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'atlas-sup-'))
 const saida = path.join(tmp, 'supervisor.mjs')
@@ -41,7 +41,7 @@ await build({
 })
 const { PythonSupervisor } = await import(pathToFileURL(saida).href)
 
-// ── Ambiente minimo para o executor passar do assert_enrolled ────────────────
+// ── Minimal environment for the executor to get past assert_enrolled ─────────
 const certDir = path.join(tmp, 'certs')
 fs.mkdirSync(certDir, { recursive: true })
 for (const f of ['cert.pem', 'key.pem']) fs.writeFileSync(path.join(certDir, f), '')
@@ -59,7 +59,7 @@ const env = {
   EXECUTOR_DASHBOARD_INTERVAL: '0.3',
   EXECUTOR_AUTO_RESTART: 'never',
   EXECUTOR_SUPERVISOR_PID: String(process.pid),
-  // Porta fechada: a fase 0 falha rapido, sem depender de rede externa.
+  // Closed port: phase 0 fails fast, without depending on an external network.
   EXECUTOR_SERVER_URL: 'wss://127.0.0.1:1',
   LOG_COLOR: 'never',
 }
@@ -89,15 +89,15 @@ const checagens = []
 const checar = (nome, ok_) => { checagens.push([nome, ok_]); log(`  ${ok_ ? 'OK   ' : 'FALHA'} ${nome}`) }
 
 /**
- * Campos declarados em `Snapshot`, lido de `src/shared/events.ts`.
+ * Fields declared in `Snapshot`, read from `src/shared/events.ts`.
  *
- * Derivar do arquivo, em vez de manter uma lista aqui, é o que faz esta
- * checagem não envelhecer: quem adicionar um campo no dataclass Python e
- * esquecer o espelho TS (ou o contrário) vê exatamente qual campo ficou de
- * fora, em vez de um número que não bate.
+ * Deriving from the file, instead of keeping a list here, is what keeps this
+ * check from going stale: whoever adds a field to the Python dataclass and
+ * forgets the TS mirror (or the other way around) sees exactly which field was
+ * left out, instead of a number that doesn't match.
  *
- * `Snapshot \{` com a chave é proposital: sem ela o regex casaria também com
- * `SnapshotEvent`, e os campos dos dois se misturariam.
+ * `Snapshot \{` with the brace is intentional: without it the regex would also
+ * match `SnapshotEvent`, and the fields of the two would get mixed up.
  */
 function camposDoEspelhoTS() {
   const src = fs.readFileSync(path.join(DESKTOP, 'src', 'shared', 'events.ts'), 'utf8')
@@ -120,10 +120,10 @@ try {
 
   await esperar(() => tipos().includes('snapshot'), 15_000, 'o primeiro snapshot')
   const snap = eventos.find((e) => e.t === 'snapshot').data
-  // O que importa aqui é o CONTRATO entre o dataclass Python e o espelho em
-  // events.ts, não uma contagem. A versão anterior afirmava "55 campos" e
-  // quebrou ao ganhar dois — e o erro (`55 != 57`) não dizia quais, nem de que
-  // lado estava a divergência.
+  // What matters here is the CONTRACT between the Python dataclass and the
+  // mirror in events.ts, not a count. The previous version asserted "55 fields"
+  // and broke when it gained two — and the error (`55 != 57`) said neither
+  // which ones nor on which side the divergence was.
   const esperados = camposDoEspelhoTS()
   const recebidos = new Set(Object.keys(snap))
   const faltando = [...esperados].filter((c) => !recebidos.has(c))
@@ -135,8 +135,8 @@ try {
   if (sobrando.length) log(`         so no Python:    ${sobrando.join(', ')}`)
   checar('snapshot traz o executor_id', snap.executor_id === env.EXECUTOR_ID)
 
-  // O ping so responde se o comando atravessou stdin -> thread -> event loop e
-  // o ack voltou pelo stdout. E o teste do transporte de ida e volta.
+  // The ping only answers if the command crossed stdin -> thread -> event loop
+  // and the ack came back over stdout. It is the round-trip transport test.
   sup.enviar({ cmd: 'ping', id: 'smoke-1' })
   await esperar(() => eventos.some((e) => e.t === 'ack' && e.id === 'smoke-1'), 10_000, 'o ack do ping')
   const ack = eventos.find((e) => e.t === 'ack' && e.id === 'smoke-1')
@@ -151,20 +151,20 @@ try {
   checar('stderr recebeu o log humano', stderrLinhas.length > 0)
   checar('stdout nao teve linha fora do framing', stdoutBrutas.length === 0)
 } finally {
-  // ESPERA o processo morrer antes de sair.
+  // WAITS for the process to die before exiting.
   //
-  // `forcar()` dispara `taskkill` de forma assincrona; sair do script na
-  // sequencia deixava o `python.exe` VIVO, segurando as DLLs de
-  // `resources/python`. O sintoma aparecia longe daqui: o proximo
-  // `npm run python:build` falhava com `EPERM: unlink libcrypto-1_1-x64.dll`,
-  // sem nenhuma pista de que um smoke anterior era o culpado.
+  // `forcar()` fires `taskkill` asynchronously; exiting the script right after
+  // left `python.exe` ALIVE, holding the DLLs of `resources/python`. The
+  // symptom showed up far from here: the next `npm run python:build` failed
+  // with `EPERM: unlink libcrypto-1_1-x64.dll`, with no clue that an earlier
+  // smoke run was the culprit.
   const pid = sup.pid
   sup.forcar()
   for (let i = 0; i < 50 && pid; i++) {
     try {
       process.kill(pid, 0)          // so testa a existencia
     } catch {
-      break                         // ja morreu
+      break                         // already dead
     }
     await new Promise((r) => setTimeout(r, 100))
   }

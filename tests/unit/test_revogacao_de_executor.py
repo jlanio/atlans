@@ -1,14 +1,14 @@
-"""Revogar um executor vale de verdade.
+"""Revoking an executor actually takes effect.
 
-Duas brechas:
+Two loopholes:
 
-- Uma renovação de cert em andamento desfazia a revogação só do cert. A
-  renovação autentica no início do request, espera o step-ca assinar e grava o
-  serial novo sem condição: a revogação que entrasse nessa janela
-  (`cert_serial=None`) era sobrescrita por um cert novo e válido.
-- O mTLS só é conferido ao conectar. Se o aviso de fechamento da revogação se
-  perdesse (Redis reiniciando, listener reconectando), a sessão revogada seguia
-  viva — recebendo jobs — até reconectar.
+- A cert renewal in progress undid a cert-only revocation. The renewal
+  authenticates at the start of the request, waits for step-ca to sign and
+  writes the new serial unconditionally: a revocation that came in during that
+  window (`cert_serial=None`) was overwritten by a new, valid cert.
+- mTLS is only checked on connect. If the revocation's close notice got lost
+  (Redis restarting, listener reconnecting), the revoked session stayed alive —
+  receiving jobs — until it reconnected.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from app.services.executor_service import motivo_da_revogacao
 from ._mcp_harness import banco_de_executores
 
 _AGORA = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
-_VISTO = datetime(2026, 9, 26, 8, 0)          # coluna em UTC sem fuso
+_VISTO = datetime(2026, 9, 26, 8, 0)          # UTC column without time zone
 
 
 def _cert(serial: str = "S2") -> dict:
@@ -52,7 +52,7 @@ async def _linha(Sessao):
         )).one()
 
 
-# ── A renovação não desfaz a revogação ───────────────────────────────────────
+# ── Renewal does not undo the revocation ─────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_renovacao_grava_o_cert_novo_sem_mexer_em_status_nem_last_seen():
@@ -67,13 +67,13 @@ async def test_renovacao_grava_o_cert_novo_sem_mexer_em_status_nem_last_seen():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("revogacao", [
-    {"cert_serial": None},                          # só o cert (admin_revoke_cert)
+    {"cert_serial": None},                          # only the cert (admin_revoke_cert)
     {"cert_serial": None, "status": "revoked"},     # o executor inteiro (revoke_executor)
 ])
 async def test_revogacao_durante_a_renovacao_prevalece(revogacao):
-    """A corrida, na ordem em que acontece em produção: a renovação carrega o
-    executor no mTLS, o admin revoga enquanto o step-ca assina, e só então a
-    renovação grava."""
+    """The race, in the order it happens in production: the renewal loads the
+    executor in mTLS, the admin revokes while step-ca signs, and only then does
+    the renewal write."""
     async with banco_de_executores() as Sessao:
         await _executor(Sessao)
         renovacao = Sessao()
@@ -89,7 +89,7 @@ async def test_revogacao_durante_a_renovacao_prevalece(revogacao):
 
         assert renovou is False
         status, serial, _, _ = await _linha(Sessao)
-        assert serial is None                       # antes: "S2", um cert novo e válido
+        assert serial is None                       # before: "S2", a new, valid cert
         assert status == revogacao.get("status", "active")
 
 
@@ -143,7 +143,7 @@ async def test_rota_renova_pelo_compare_and_swap(monkeypatch):
 
     assert resposta.serial == "S2"
     assert renova.await_args.args[:3] == (db, "ex-1", "S1")
-    assert [c.args[0] for c in revoga.await_args_list] == ["S1"]     # só o antigo vai para a blacklist
+    assert [c.args[0] for c in revoga.await_args_list] == ["S1"]     # only the old one goes to the blacklist
 
 
 @pytest.mark.asyncio
@@ -154,8 +154,8 @@ async def test_rota_descarta_o_cert_novo_se_o_executor_mudou(monkeypatch):
         await R.agent_renew_cert(request=None, payload=SimpleNamespace(csr_pem="csr"), db=MagicMock(), executor=executor)
 
     assert erro.value.status_code == 409
-    # O antigo e também o recém-emitido: o mTLS já recusaria o novo (o serial
-    # dele não está no banco), a blacklist é o cinto duplo.
+    # The old one and also the freshly issued one: mTLS would already reject the
+    # new one (its serial is not in the database); the blacklist is belt and braces.
     assert [c.args[0] for c in revoga.await_args_list] == ["S1", "S2"]
 
 
@@ -178,12 +178,12 @@ def test_chave_do_limite_e_o_cn_do_cert():
     assert R._chave_do_executor_no_mtls(sem_cert) == "10.0.0.9"
 
 
-# ── A sessão aberta de um executor revogado cai ──────────────────────────────
+# ── The open session of a revoked executor is dropped ────────────────────────
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("campos, motivo", [
     ({}, None),
-    ({"cert_serial": "S2"}, None),                            # renovado: a sessão que renovou segue
+    ({"cert_serial": "S2"}, None),                            # renewed: the session that renewed carries on
     ({"cert_serial": None}, "Cert revogado."),
     ({"status": "revoked", "cert_serial": None}, "Executor revogado."),
     ({"deleted_at": datetime(2026, 9, 27, 9, 0)}, "Executor removido."),
@@ -212,8 +212,8 @@ class _Socket:
 
 
 def _vigia_sem_espera(monkeypatch, motivos):
-    """A vigia de verdade, sem o intervalo e sem banco: `motivos` é o que a
-    conferência devolve a cada volta (uma exceção simula o banco fora)."""
+    """The real watcher, without the interval and without a database: `motivos` is
+    what the check returns on each round (an exception simulates the database being down)."""
     from contextlib import asynccontextmanager
 
     @asynccontextmanager
@@ -245,8 +245,8 @@ async def test_vigia_fecha_com_4403_quando_revogam():
 
 @pytest.mark.asyncio
 async def test_vigia_nao_derruba_a_sessao_com_o_banco_fora():
-    """Um blip do banco derrubaria as sessões vivas da frota inteira: fica para
-    a próxima volta."""
+    """A database blip would drop the live sessions of the whole fleet: it waits
+    for the next round."""
     import app.core.executor_connections as ec
 
     ws = _Socket()

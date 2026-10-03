@@ -14,9 +14,10 @@ import {
 import { SidebarMenuButton } from "../ui/sidebar"
 
 function NotificationItem({ n }: { n: AppNotification }) {
-  // Tempo relativo pela mesma régua das outras telas (grão grosso "há N min/h",
-  // depois calendário) em vez do cálculo caseiro — o timestamp é um Date local,
-  // então normalizamos para ISO antes de passar ao formatador do contrato.
+  // Relative time by the same ruler as the other screens (coarse grain "há N
+  // min/h", then calendar) instead of the home-made calculation — the timestamp
+  // is a local Date, so we normalize to ISO before passing it to the contract's
+  // formatter.
   const quando = formatarQuando(n.timestamp.toISOString())
 
   return (
@@ -24,8 +25,8 @@ function NotificationItem({ n }: { n: AppNotification }) {
       "flex gap-2.5 px-3 py-2.5 border-b border-border last:border-0",
       !n.read && "bg-muted/40"
     )}>
-      {/* Ícone de estado nos pares de status canônicos, com o par dark: — sucesso
-          em verde, falha no token destrutivo (§6 do contrato). */}
+      {/* Status icon in the canonical status pairs, with the dark: pair — success
+          in green, failure in the destructive token (§6 of the contract). */}
       <div className="mt-0.5 shrink-0">
         {n.type === "success"
           ? (

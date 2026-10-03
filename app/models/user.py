@@ -15,10 +15,10 @@ class User(Base):
     email_verified = Column(Boolean, nullable=False, server_default=text("false"))
     # "active" | "suspended" | "deleted"
     status = Column(String(20), nullable=False, server_default="active", index=True)
-    # "admin" | "user" — padrão "user"
+    # "admin" | "user" — default "user"
     role = Column(String(20), nullable=False, server_default="user")
-    # Cota individual de executores dedicados que o usuário pode criar (0 = não pode).
-    # Admin global ignora a cota (criação ilimitada).
+    # Individual quota of dedicated executors the user can create (0 = cannot).
+    # Global admins ignore the quota (unlimited creation).
     agent_quota = Column(Integer, nullable=False, server_default="0")
     workspace_id = Column(String(36), nullable=True, index=True)
     suspended_at = Column(DateTime, nullable=True)

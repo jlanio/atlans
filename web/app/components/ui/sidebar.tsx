@@ -25,24 +25,24 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-// `SIDEBAR_WIDTH = "16rem"` saiu: a largura agora vem em px (um arrasto é em
-// px), e o mesmo número é `SIDEBAR_WIDTH_PADRAO` logo abaixo.
-// A largura ESCOLHIDA pela pessoa, em px, no mesmo molde do `sidebar_state`: o
-// layout a lê no servidor e a devolve como `defaultWidth`, então ela sobrevive
-// ao F5 e não pisca no primeiro quadro.
+// `SIDEBAR_WIDTH = "16rem"` is gone: the width now comes in px (a drag is in
+// px), and the same number is `SIDEBAR_WIDTH_PADRAO` right below.
+// The width CHOSEN by the person, in px, on the same template as `sidebar_state`:
+// the layout reads it on the server and returns it as `defaultWidth`, so it
+// survives F5 and doesn't flash on the first frame.
 const SIDEBAR_WIDTH_COOKIE_NAME = "sidebar_width"
-/** 16rem — o padrão, e o destino do duplo clique no separador. */
+/** 16rem — the default, and the target of a double click on the separator. */
 export const SIDEBAR_WIDTH_PADRAO = 256
-// Abaixo de 180px a sublista de Artefatos não cabe (ícone + nome + gatilho de
-// ações); acima de 480px a barra passa a competir com o globo, que é o conteúdo.
+// Below 180px the Artifacts sublist doesn't fit (icon + name + actions
+// trigger); above 480px the bar starts competing with the globe, which is the content.
 export const SIDEBAR_WIDTH_MIN = 180
 export const SIDEBAR_WIDTH_MAX = 480
 
-/** Mantém a largura dentro dos limites — o arrasto e o teclado passam por aqui. */
+/** Keeps the width within the limits — dragging and the keyboard go through here. */
 export function limitarLargura(px: number): number {
-  // `Math.max(min, Math.min(max, NaN))` é NaN, e `--sidebar-width: NaNpx` não
-  // é uma largura — a barra sumia. O valor vem de um cookie, que é entrada do
-  // cliente, então a guarda mora aqui e não em quem chama.
+  // `Math.max(min, Math.min(max, NaN))` is NaN, and `--sidebar-width: NaNpx` is
+  // not a width — the bar vanished. The value comes from a cookie, which is
+  // client input, so the guard lives here and not in the caller.
   if (!Number.isFinite(px)) return SIDEBAR_WIDTH_PADRAO
   return Math.round(Math.max(SIDEBAR_WIDTH_MIN, Math.min(SIDEBAR_WIDTH_MAX, px)))
 }
@@ -58,7 +58,7 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
-  /** Largura atual da barra, em px (desktop; no telefone é um Sheet). */
+  /** Current width of the bar, in px (desktop; on the phone it's a Sheet). */
   width: number
   setWidth: (px: number) => void
 }
@@ -85,7 +85,7 @@ function SidebarProvider({
   ...props
 }: React.ComponentProps<"div"> & {
   defaultOpen?: boolean
-  /** Largura inicial em px, lida do cookie `sidebar_width` pelo layout. */
+  /** Initial width in px, read from the `sidebar_width` cookie by the layout. */
   defaultWidth?: number
   open?: boolean
   onOpenChange?: (open: boolean) => void
@@ -112,10 +112,10 @@ function SidebarProvider({
     [setOpenProp, open]
   )
 
-  // A largura escolhida. Gravada no mesmo molde do `sidebar_state`: um cookie,
-  // porque quem precisa dela ANTES do primeiro quadro é o servidor (o layout a
-  // injeta como `defaultWidth`) — em localStorage a barra nasceria com 16rem e
-  // saltaria para a largura da pessoa no primeiro efeito.
+  // The chosen width. Stored on the same template as `sidebar_state`: a cookie,
+  // because what needs it BEFORE the first frame is the server (the layout
+  // injects it as `defaultWidth`) — in localStorage the bar would be born at
+  // 16rem and jump to the person's width on the first effect.
   const [width, _setWidth] = React.useState(() => limitarLargura(defaultWidth))
   const setWidth = React.useCallback((px: number) => {
     const v = limitarLargura(px)
@@ -170,9 +170,9 @@ function SidebarProvider({
           data-slot="sidebar-wrapper"
           style={
             {
-              // Em px, não em rem: a largura vem de um arrasto, que é em px.
-              // O `SIDEBAR_WIDTH` de 16rem continua sendo o padrão, agora via
-              // `SIDEBAR_WIDTH_PADRAO` (o mesmo número).
+              // In px, not rem: the width comes from a drag, which is in px.
+              // The 16rem `SIDEBAR_WIDTH` remains the default, now via
+              // `SIDEBAR_WIDTH_PADRAO` (the same number).
               "--sidebar-width": `${width}px`,
               "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
               ...style,
@@ -204,7 +204,7 @@ function Sidebar({
   side?: "left" | "right"
   variant?: "sidebar" | "floating" | "inset"
   collapsible?: "offcanvas" | "icon" | "none"
-  /** Nome e descrição do painel do telefone para leitor de tela (a Home traduzida passa os dela). */
+  /** Screen-reader name and description of the phone panel (the translated Home passes its own). */
   mobileTitle?: string
   mobileDescription?: string
 }) {
@@ -232,11 +232,11 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          // O `className` do <Sidebar> TEM de chegar aqui: no telefone o painel
-          // é este SheetContent (portado para o <body>), e é ele quem pinta o
-          // fundo. Sem repassar, uma barra temática como a da Home declarava a
-          // paleta só nos filhos — texto quase branco sobre o `--sidebar` do
-          // tema do app, ilegível no tema claro.
+          // The <Sidebar>'s `className` MUST reach here: on the phone the panel
+          // is this SheetContent (portaled to <body>), and it's what paints the
+          // background. Without passing it on, a themed bar like the Home's declared
+          // the palette only on the children — nearly white text over the app
+          // theme's `--sidebar`, unreadable in the light theme.
           className={cn(
             "bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden",
             className
@@ -272,12 +272,12 @@ function Sidebar({
         data-slot="sidebar-gap"
         className={cn(
           "relative w-(--sidebar-width) bg-transparent transition-[width] duration-200 ease-linear",
-          // Arrastando, a transição perseguiria o ponteiro com 200ms de atraso
-          // — a barra parecia elástica. Ancorado no GRUPO, e não neste div:
-          // `has-data-[arrastando]` aqui nunca casava, porque o separador vive
-          // no `sidebar-container`, que é IRMÃO deste. E é justamente este div
-          // que reserva o espaço e empurra o <main> — sem a regra certa, o
-          // conteúdo ficava 200ms atrás da borda durante o gesto.
+          // While dragging, the transition would chase the pointer with a 200ms lag
+          // — the bar felt elastic. Anchored on the GROUP, not on this div:
+          // `has-data-[arrastando]` here never matched, because the separator lives
+          // in `sidebar-container`, which is a SIBLING of this one. And it's precisely
+          // this div that reserves the space and pushes <main> — without the right
+          // rule, the content lagged 200ms behind the edge during the gesture.
           "group-has-data-[arrastando]:transition-none",
           "group-data-[collapsible=offcanvas]:w-0",
           "group-data-[side=right]:rotate-180",
@@ -290,8 +290,8 @@ function Sidebar({
         data-slot="sidebar-container"
         className={cn(
           "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-linear md:flex",
-          // No grupo também, por simetria com o gap acima: os dois têm de
-          // parar de animar no mesmo quadro, senão um persegue o outro.
+          // On the group too, by symmetry with the gap above: both have to
+          // stop animating on the same frame, otherwise one chases the other.
           "group-has-data-[arrastando]:transition-none",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
@@ -344,22 +344,21 @@ function SidebarTrigger({
 }
 
 /**
- * A borda da barra. Ela SEMPRE mostrou o cursor de redimensionar
- * (`cursor-w-resize`) e só sabia RECOLHER — a interface prometia um arrasto que
- * não existia, e quem tentava alargar para ler o nome inteiro de um artefato
- * via a barra fechar na cara. Agora ela faz as duas coisas, cada uma no estado
- * em que faz sentido:
+ * The bar's edge. It ALWAYS showed the resize cursor (`cursor-w-resize`) and
+ * only knew how to COLLAPSE — the interface promised a drag that didn't exist,
+ * and whoever tried to widen it to read an artifact's full name saw the bar shut
+ * in their face. Now it does both, each in the state where it makes sense:
  *
- * - **Expandida**: é um separador (`role="separator"`, o padrão WAI-ARIA de
- *   janela). Arrastar redimensiona; ←/→ ajustam pelo teclado (com Shift, em
- *   passos maiores); Home/End vão aos limites; duplo clique volta ao padrão.
- * - **Recolhida**: continua o botão que expande, que é o único jeito de voltar
- *   do trilho de 3rem por aqui.
+ * - **Expanded**: it's a separator (`role="separator"`, the WAI-ARIA window
+ *   pattern). Dragging resizes; ←/→ adjust from the keyboard (with Shift, in
+ *   larger steps); Home/End go to the limits; double click returns to the default.
+ * - **Collapsed**: it remains the button that expands, which is the only way
+ *   back from the 3rem rail from here.
  *
- * Recolher não se perdeu: o `SidebarTrigger` do cabeçalho e o Ctrl/Cmd+B
- * continuam fazendo isso, e são as duas formas anunciadas.
+ * Collapsing wasn't lost: the header's `SidebarTrigger` and Ctrl/Cmd+B still
+ * do it, and they are the two advertised ways.
  */
-/** Os rótulos do trilho. O padrão é o português da administração; a Home passa os do idioma dela. */
+/** The rail's labels. The default is the admin area's Portuguese; the Home passes its language's. */
 export interface TextosDoTrilho {
   expandir: string
   redimensionar: string
@@ -382,22 +381,22 @@ function SidebarRail({
   const ref = React.useRef<HTMLButtonElement>(null)
   const [arrastando, setArrastando] = React.useState(false)
 
-  // O lado importa para a conta: à esquerda a barra começa em x=0, à direita
-  // ela termina na borda da janela. Lido do DOM (o `data-side` do grupo) em vez
-  // de virar prop — o componente não recebe `side`, quem o recebe é o <Sidebar>.
+  // The side matters for the math: on the left the bar starts at x=0, on the right
+  // it ends at the window edge. Read from the DOM (the group's `data-side`) instead
+  // of becoming a prop — the component doesn't receive `side`, the <Sidebar> does.
   const larguraDoPonteiro = React.useCallback((clientX: number) => {
     const grupo = ref.current?.closest<HTMLElement>('[data-slot="sidebar"]')
     const direita = grupo?.dataset.side === "right"
     return direita ? window.innerWidth - clientX : clientX
   }, [])
 
-  // Durante o gesto o React fica FORA do caminho: a largura vai direto na
-  // variável de CSS do envoltório, e o estado só recebe o valor no fim.
+  // During the gesture React stays OUT of the way: the width goes straight into
+  // the wrapper's CSS variable, and the state only receives the value at the end.
   //
-  // Medido antes de escrever isto: com `setWidth` a cada `pointermove`, um
-  // segundo de arrasto custava 60 renders de CADA consumidor de `useSidebar`
-  // (são nove, a lista virtualizada de Artefatos entre eles) e 60 escritas
-  // síncronas em `document.cookie`. Agora é um render e um cookie por gesto.
+  // Measured before writing this: with `setWidth` on every `pointermove`, one
+  // second of dragging cost 60 renders of EACH `useSidebar` consumer
+  // (there are nine, the virtualized Artifacts list among them) and 60 synchronous
+  // writes to `document.cookie`. Now it's one render and one cookie per gesture.
   const larguraViva = React.useRef(width)
   const envoltorio = React.useCallback(
     () => ref.current?.closest<HTMLElement>('[data-slot="sidebar-wrapper"]'),
@@ -406,8 +405,8 @@ function SidebarRail({
 
   function aoApontar(e: React.PointerEvent<HTMLButtonElement>) {
     if (recolhida || e.button !== 0) return
-    // O ponteiro fica preso ao separador: sair de cima dele (ou passar sobre um
-    // iframe, como o do globo) não interrompe o arrasto no meio.
+    // The pointer stays captured by the separator: moving off it (or passing over an
+    // iframe, like the globe's) doesn't interrupt the drag midway.
     ref.current?.setPointerCapture(e.pointerId)
     larguraViva.current = width
     setArrastando(true)
@@ -422,13 +421,13 @@ function SidebarRail({
     if (!arrastando) return
     ref.current?.releasePointerCapture(e.pointerId)
     setArrastando(false)
-    // Aqui, e só aqui: o estado (com ele o `aria-valuenow`) e o cookie.
+    // Here, and only here: the state (and with it `aria-valuenow`) and the cookie.
     setWidth(larguraViva.current)
   }
   function aoTeclar(e: React.KeyboardEvent<HTMLButtonElement>) {
     if (recolhida) return
-    // A barra à direita cresce para o outro lado: ← e → trocam de papel, senão
-    // a seta "para fora" encolheria.
+    // A bar on the right grows the other way: ← and → swap roles, otherwise
+    // the "outward" arrow would shrink it.
     const paraDireita = ref.current?.closest<HTMLElement>('[data-slot="sidebar"]')?.dataset.side !== "right"
     const passo = (e.shiftKey ? 48 : 16) * (paraDireita ? 1 : -1)
     if (e.key === "ArrowRight") { e.preventDefault(); setWidth(width + passo) }
@@ -444,9 +443,9 @@ function SidebarRail({
       data-sidebar="rail"
       data-slot="sidebar-rail"
       data-arrastando={arrastando || undefined}
-      // Recolhida é um botão que expande; expandida é um separador que
-      // redimensiona. O papel e o rótulo acompanham, senão o leitor de tela
-      // anunciaria uma coisa e a tecla faria outra.
+      // Collapsed it's a button that expands; expanded it's a separator that
+      // resizes. The role and label follow, otherwise the screen reader would
+      // announce one thing and the key would do another.
       {...(recolhida
         ? { "aria-label": textos.expandir, tabIndex: -1, onClick: toggleSidebar, title: textos.expandir }
         : {
@@ -472,11 +471,11 @@ function SidebarRail({
         "hover:group-data-[collapsible=offcanvas]:bg-sidebar group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full",
         "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
         "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
-        // Expandida o cursor é o de coluna (redimensionar para os dois lados),
-        // e não o `w-resize` de "empurrar para fechar".
+        // Expanded, the cursor is the column one (resize both ways),
+        // not the "push to close" `w-resize`.
         !recolhida && "in-data-[side=left]:cursor-col-resize in-data-[side=right]:cursor-col-resize",
-        // Enquanto arrasta, a linha fica acesa e o foco do teclado também a
-        // mostra — sem isso o separador é invisível para quem chega por Tab.
+        // While dragging, the line stays lit and keyboard focus also shows
+        // it — without that the separator is invisible to whoever arrives via Tab.
         "focus-visible:outline-none focus-visible:after:bg-sidebar-border data-[arrastando]:after:bg-sidebar-border",
         className
       )}

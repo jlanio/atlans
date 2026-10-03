@@ -16,9 +16,9 @@ export function createAgent(payload: IExecutorCreateRequest) {
 }
 
 /**
- * Gera um OTP de uso unico para enrollment do executor.
- * O plaintext retornado aparece APENAS UMA VEZ — entregue ao operador
- * via canal seguro (1Password, Signal, etc).
+ * Generates a single-use OTP for executor enrollment.
+ * The returned plaintext appears ONLY ONCE — hand it to the operator
+ * over a secure channel (1Password, Signal, etc).
  */
 /** Metadados do instalador Windows publicado (versao, tamanho, URL). */
 export function getDesktopInstaller() {
@@ -33,7 +33,7 @@ export function updateAgent(id_hash: string, payload: { name?: string; descripti
   return patch<IExecutor>(`/executores/${id_hash}`, payload)
 }
 
-/** `force`: retira o executor dos níveis da política mesmo que isso esvazie o principal de algum workspace. */
+/** `force`: removes the executor from the policy's tiers even if that empties some workspace's main tier. */
 export function revokeAgent(id_hash: string, force = false) {
   return del(`/executores/${id_hash}${force ? "?force=true" : ""}`)
 }
@@ -42,7 +42,7 @@ export function deleteAgent(id_hash: string, force = false) {
   return del(`/executores/${id_hash}/permanent${force ? "?force=true" : ""}`)
 }
 
-// ── Executores: observabilidade de ACKs ───────────────────────────────────
+// ── Executors: ACK observability ──────────────────────────────────────────
 
 export function getPendingAcks() {
   return get<{

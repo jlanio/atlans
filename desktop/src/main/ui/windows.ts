@@ -6,15 +6,15 @@ import { ehExternoSeguro } from '../../shared/ui.js'
 let janela: BrowserWindow | null = null
 let janelaLog: BrowserWindow | null = null
 
-/** URL do dev server do Vite, quando `npm run dev` a definiu. */
+/** URL of the Vite dev server, when `npm run dev` set it. */
 const DEV_SERVER = process.env.VITE_DEV_SERVER_URL
 
 /**
- * Hash que diz ao renderer qual tela montar.
+ * Hash that tells the renderer which screen to mount.
  *
- * Hash e não query: com `loadFile` o Electron entrega a página por `file://`, e
- * o `search` de uma URL `file://` é aceito mas some do `location` em alguns
- * caminhos de navegação. O fragmento sobrevive aos dois esquemas.
+ * Hash and not query: with `loadFile` Electron serves the page via `file://`,
+ * and the `search` of a `file://` URL is accepted but disappears from
+ * `location` on some navigation paths. The fragment survives both schemes.
  */
 export const HASH_LOG = '#log'
 
@@ -22,7 +22,7 @@ export function janelaPrincipal(): BrowserWindow | null {
   return janela && !janela.isDestroyed() ? janela : null
 }
 
-/** Subconjunto de `BrowserWindow` usado por `trazerParaFrente`. */
+/** Subset of `BrowserWindow` used by `trazerParaFrente`. */
 export interface JanelaVisivel {
   isMinimized(): boolean
   isVisible(): boolean
@@ -32,18 +32,19 @@ export interface JanelaVisivel {
 }
 
 /**
- * Traz uma janela existente para a frente, venha ela de onde vier.
+ * Brings an existing window to the front, wherever it comes from.
  *
- * Os três estados são independentes e cada um exige a sua chamada:
+ * The three states are independent and each one requires its own call:
  *
- *   minimizada → `restore()`
- *   ESCONDIDA  → `show()`
- *   ao fundo   → `focus()`
+ *   minimized  → `restore()`
+ *   HIDDEN     → `show()`
+ *   behind     → `focus()`
  *
- * O `show()` faltava, e era o caso MAIS comum: o botão vermelho da barra de
- * título esconde a janela em vez de encerrar o app (ele vive na bandeja).
- * Depois disso, "Abrir painel" no menu da bandeja chamava `focus()` numa janela
- * escondida — e `focus()` não torna nada visível. O menu parecia morto.
+ * The `show()` was missing, and it was the MOST common case: the red button in
+ * the title bar hides the window instead of quitting the app (it lives in the
+ * tray). After that, "Abrir painel" (open panel) in the tray menu called
+ * `focus()` on a hidden window — and `focus()` does not make anything visible.
+ * The menu looked dead.
  */
 export function trazerParaFrente(win: JanelaVisivel): void {
   if (win.isMinimized()) win.restore()
@@ -51,13 +52,13 @@ export function trazerParaFrente(win: JanelaVisivel): void {
   win.focus()
 }
 
-/** Subconjunto de `WebContents` usado por `protegerNavegacao`. */
+/** Subset of `WebContents` used by `protegerNavegacao`. */
 export type ConteudoNavegavel = Pick<WebContents, 'setWindowOpenHandler' | 'on' | 'getURL'>
 
 /**
- * A mesma página que a janela já mostra (esquema, host e caminho), com
- * qualquer hash ou query: é o `location.reload()` — o Vite o chama a cada
- * recarga completa em dev, e ele dispara `will-navigate`.
+ * The same page the window already shows (scheme, host and path), with any
+ * hash or query: it is `location.reload()` — Vite calls it on every full
+ * reload in dev, and it fires `will-navigate`.
  */
 export function mesmaPagina(atual: string, destino: string): boolean {
   try {
@@ -70,20 +71,20 @@ export function mesmaPagina(atual: string, destino: string): boolean {
 }
 
 /**
- * Link externo abre no navegador do sistema, nunca numa BrowserWindow sem
- * barra de endereço — o usuário precisa ver para onde está indo. Mas só
- * http(s) e mailto (`ehExternoSeguro`, a mesma allowlist da janela web):
- * `shell.openExternal` entrega o destino ao SO, e um `file:` ou `smb:` (UNC →
- * vazamento do hash NTLM no Windows) vindo de uma URL num log ou de um XSS no
- * painel não pode sair daqui. Antes as janelas do painel repassavam qualquer
- * esquema.
+ * An external link opens in the system browser, never in a BrowserWindow
+ * without an address bar — the user needs to see where they are going. But
+ * only http(s) and mailto (`ehExternoSeguro`, the same allowlist as the web
+ * window): `shell.openExternal` hands the destination to the OS, and a `file:`
+ * or `smb:` (UNC → NTLM hash leak on Windows) coming from a URL in a log or
+ * from an XSS in the panel must not get out of here. Previously the panel
+ * windows passed along any scheme.
  *
- * E o frame de topo não sai do painel. A página é uma SPA carregada uma vez
- * (`loadFile`/`loadURL` e troca de hash não disparam `will-navigate`); o que
- * dispara é recarregar a própria página — deixado passar — ou trocá-la por
- * outra, com o preload anexado — barrado e mandado ao navegador pela mesma
- * regra. `will-redirect` recebe o mesmo tratamento: um redirect 30x no meio de
- * uma recarga não pode terminar renderizando outra origem aqui.
+ * And the top frame does not leave the panel. The page is an SPA loaded once
+ * (`loadFile`/`loadURL` and hash changes do not fire `will-navigate`); what
+ * fires it is reloading the page itself — let through — or swapping it for
+ * another, with the preload attached — blocked and sent to the browser by the
+ * same rule. `will-redirect` gets the same treatment: a 30x redirect in the
+ * middle of a reload must not end up rendering another origin here.
  */
 export function protegerNavegacao(conteudo: ConteudoNavegavel): void {
   const abrirFora = (destino: string): void => {
@@ -110,36 +111,35 @@ export function abrirJanela(): BrowserWindow {
   }
 
   janela = new BrowserWindow({
-    // Menor que os 1100x720 anteriores: com a navegação na lateral o conteúdo
-    // deixou de precisar de uma faixa de abas e de um cabeçalho de estado, e
-    // este é um app de segundo plano — ocupar meia tela para mostrar oito
-    // números é desproporcional.
+    // Smaller than the previous 1100x720: with the navigation on the side the
+    // content no longer needs a tab strip and a status header, and this is a
+    // background app — taking up half the screen to show eight numbers is
+    // disproportionate.
     //
-    // A largura mínima acomoda a sidebar (192px) mais os quatro cartões de
-    // métrica no breakpoint `md` (768px).
+    // The minimum width fits the sidebar (192px) plus the four metric cards at
+    // the `md` breakpoint (768px).
     width: 980,
     height: 680,
     minWidth: 820,
     minHeight: 520,
-    // Barra de tarefas e Alt+Tab. Sem isto o dev roda com o ícone do Electron.
+    // Taskbar and Alt+Tab. Without this dev runs with the Electron icon.
     icon: ICONE_APP,
-    // Sem a moldura do Windows: a barra de título é desenhada pelo renderer,
-    // com os controles à esquerda, no formato do macOS.
+    // No Windows frame: the title bar is drawn by the renderer, with the
+    // controls on the left, macOS-style.
     //
-    // `frame: false` em vez de `titleBarStyle: 'hidden'` + `titleBarOverlay`
-    // porque o overlay do Windows desenha os botões nativos à DIREITA e não
-    // permite movê-los — o resultado seria dois conjuntos de controles.
-    // Com `frame: false` a janela perde o redimensionamento por borda, então
-    // `resizable` continua ligado e o Electron mantém as bordas invisíveis de
-    // arrasto.
+    // `frame: false` instead of `titleBarStyle: 'hidden'` + `titleBarOverlay`
+    // because the Windows overlay draws the native buttons on the RIGHT and
+    // does not allow moving them — the result would be two sets of controls.
+    // With `frame: false` the window loses edge resizing, so `resizable` stays
+    // on and Electron keeps the invisible drag edges.
     frame: false,
     resizable: true,
-    // Cantos arredondados no Windows 11 (no-op nas versões anteriores).
+    // Rounded corners on Windows 11 (no-op on earlier versions).
     roundedCorners: true,
-    // Evita o flash entre a janela aparecer e o React pintar. É o `--background`
-    // de index.css — oklch(0.188 0.008 55) — em hex; qualquer outro valor
-    // aparece como um lampejo de cor errada. `show: false` + `ready-to-show`
-    // faz o resto.
+    // Avoids the flash between the window appearing and React painting. It is
+    // the `--background` from index.css — oklch(0.188 0.008 55) — in hex; any
+    // other value shows up as a flash of the wrong color. `show: false` +
+    // `ready-to-show` does the rest.
     backgroundColor: '#1d1a17',
     show: false,
     autoHideMenuBar: true,
@@ -153,9 +153,10 @@ export function abrirJanela(): BrowserWindow {
 
   janela.once('ready-to-show', () => janela?.show())
 
-  // Fechar a janela NAO encerra o app: ele vive no tray e o executor segue
-  // rodando. Sem isto, fechar a janela mataria o executor no meio de um job —
-  // o oposto do que o usuario espera de um agente em background.
+  // Closing the window does NOT quit the app: it lives in the tray and the
+  // executor keeps running. Without this, closing the window would kill the
+  // executor in the middle of a job — the opposite of what the user expects
+  // from a background agent.
   janela.on('close', (evento) => {
     if (!encerrandoDeVerdade) {
       evento.preventDefault()
@@ -167,9 +168,10 @@ export function abrirJanela(): BrowserWindow {
 
   protegerNavegacao(janela.webContents)
 
-  // F12 e Ctrl+Shift+I. Sem moldura nao ha menu do sistema, entao o atalho
-  // precisa ser tratado aqui — e a unica forma de abrir o DevTools no app
-  // empacotado quando algo precisa ser investigado na maquina do usuario.
+  // F12 and Ctrl+Shift+I. Without a frame there is no system menu, so the
+  // shortcut has to be handled here — it is the only way to open DevTools in
+  // the packaged app when something needs to be investigated on the user's
+  // machine.
   janela.webContents.on('before-input-event', (_evento, input) => {
     if (input.type !== 'keyDown') return
     const f12 = input.key === 'F12'
@@ -179,12 +181,13 @@ export function abrirJanela(): BrowserWindow {
 
   if (DEV_SERVER) {
     void janela.loadURL(DEV_SERVER)
-    // NAO abre sozinho. O DevTools do Chromium despeja no console do terminal
-    // um punhado de erros internos dele mesmo — "Unknown VE context",
-    // "Autofill.enable wasn't found" — que nao tem relacao nenhuma com o app e
-    // fazem qualquer `npm run dev` parecer quebrado.
+    // It does NOT open by itself. Chromium's DevTools dumps onto the terminal
+    // console a handful of its own internal errors — "Unknown VE context",
+    // "Autofill.enable wasn't found" — that have nothing to do with the app
+    // and make any `npm run dev` look broken.
     //
-    // Quem quer o DevTools aberto de saida pede: ATLANS_DEVTOOLS=1 npm run dev.
+    // Whoever wants DevTools open from the start asks for it:
+    // ATLANS_DEVTOOLS=1 npm run dev.
     if (process.env.ATLANS_DEVTOOLS === '1') {
       janela.webContents.openDevTools({ mode: 'detach' })
     }
@@ -195,20 +198,19 @@ export function abrirJanela(): BrowserWindow {
 }
 
 /**
- * Janela dedicada ao log.
+ * Window dedicated to the log.
  *
- * Existe para o log poder ficar ao lado de outra coisa — o painel do app, o
- * Studio no navegador, um editor. Numa janela só, ler o log custa perder de
- * vista todo o resto, e é justamente enquanto se investiga um problema que se
- * quer os dois.
+ * It exists so the log can sit next to something else — the app's panel, the
+ * Studio in the browser, an editor. In a single window, reading the log costs
+ * losing sight of everything else, and it is precisely while investigating a
+ * problem that you want both.
  *
- * Diferenças em relação à principal, ambas deliberadas:
+ * Differences from the main window, both deliberate:
  *
- *  - fechar FECHA. Ela não guarda estado nenhum (o log vive no store do main),
- *    então escondê-la como a principal só criaria uma janela fantasma.
- *  - proporção larga e baixa por padrão: linha de log é comprida, e o formato
- *    quase quadrado da janela principal desperdiçaria altura em quebra de
- *    linha.
+ *  - closing CLOSES. It keeps no state at all (the log lives in main's store),
+ *    so hiding it like the main window would only create a ghost window.
+ *  - wide, short proportions by default: log lines are long, and the nearly
+ *    square shape of the main window would waste height on line wrapping.
  */
 export function abrirJanelaDeLog(): BrowserWindow {
   if (janelaLog && !janelaLog.isDestroyed()) {
@@ -259,17 +261,18 @@ export function abrirJanelaDeLog(): BrowserWindow {
 
 let encerrandoDeVerdade = false
 
-/** Libera o `close` para fechar de fato. Chamado no caminho de saida do app. */
+/** Releases `close` to actually close. Called on the app's exit path. */
 export function permitirEncerramento(): void {
   encerrandoDeVerdade = true
 }
 
 /**
- * Diz se o app já está no caminho de saída.
+ * Tells whether the app is already on its exit path.
  *
- * A janela web (janela-web.ts) também esconde no `close` em vez de encerrar, e
- * precisa consultar esta mesma decisão — sem isso, cada janela guardaria a sua
- * cópia do estado e uma delas fecharia de verdade no meio da drenagem.
+ * The web window (janela-web.ts) also hides on `close` instead of quitting,
+ * and needs to consult this same decision — without it, each window would keep
+ * its own copy of the state and one of them would really close in the middle
+ * of the drain.
  */
 export function estaEncerrando(): boolean {
   return encerrandoDeVerdade

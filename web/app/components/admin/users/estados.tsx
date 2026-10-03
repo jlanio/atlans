@@ -5,17 +5,17 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
 
 /*
- * Os quatro estados da tela Admin › Usuários (contrato §3): skeleton da 1ª
- * carga espelhando a tabela, erro só quando nunca houve carga, vazio de
- * primeiro uso × sem resultado, e o cartão de sem-acesso. A composição e a
- * precedência vivem no `page.tsx`; aqui ficam o skeleton e as frases, com a
- * moldura de `shared/estados.tsx`.
+ * The four states of the Admin › Users screen (contract §3): 1st-load skeleton
+ * mirroring the table, error only when there was never a load, first-use empty
+ * × no result, and the no-access card. The composition and precedence live in
+ * `page.tsx`; the skeleton and the sentences live here, with the frame from
+ * `shared/estados.tsx`.
  */
 
 /**
- * Primeira carga: o cabeçalho e a toolbar reais ficam por cima (o `page.tsx`
- * os renderiza sempre) e aqui vai o desenho da tabela — cinco linhas com a
- * altura de verdade — para a troca para o conteúdo não pular a página.
+ * First load: the real header and toolbar stay on top (`page.tsx` always
+ * renders them) and here goes the table's outline — five rows with the real
+ * height — so the swap to the content does not make the page jump.
  */
 export function SkeletonDeUsuarios() {
   return (
@@ -43,18 +43,19 @@ export function SkeletonDeUsuarios() {
 }
 
 /**
- * A listagem caiu na 1ª carga: sem ela não há tabela, então o bloco de erro
- * toma o lugar. Numa recarga que falha sobre uma lista já pronta isto NÃO
- * aparece — o `page.tsx` mantém o que havia e mostra só um toast (contrato §3.2).
+ * The listing went down on the 1st load: without it there is no table, so the
+ * error block takes its place. On a reload that fails over an already-ready list
+ * this does NOT appear — `page.tsx` keeps what was there and only shows a toast
+ * (contract §3.2).
  */
 export function ErroDeCarga({ mensagem, onTentar }: { mensagem: string; onTentar: () => void }) {
   return <Estado.ErroDeCarga titulo="Não foi possível carregar os usuários" mensagem={mensagem} onTentar={onTentar} />
 }
 
 /**
- * Nenhum usuário e nenhum recorte: primeiro uso da instância. Raro numa tela de
- * admin (sempre há ao menos o próprio admin), mas o contrato pede a distinção
- * entre "não há nada" e "o filtro escondeu tudo".
+ * No users and no slice: the instance's first use. Rare on an admin screen
+ * (there is always at least the admin themself), but the contract asks for the
+ * distinction between "there is nothing" and "the filter hid everything".
  */
 export function VazioPrimeiroUso() {
   return (
@@ -67,9 +68,9 @@ export function VazioPrimeiroUso() {
 }
 
 /**
- * Busca ou filtro sem nenhuma linha: a saída óbvia é limpar o recorte, e a
- * tela diz isso (contrato §3.3, ícone `TbFilterOff`). A página só passa a
- * busca: sem termo, o que zerou a lista é o recorte de status e role.
+ * Search or filter with no rows: the obvious way out is clearing the slice, and
+ * the screen says so (contract §3.3, `TbFilterOff` icon). The page only passes
+ * the search: with no term, what zeroed the list is the status and role slice.
  */
 export function SemResultado({ q, onLimpar }: { q: string; onLimpar: () => void }) {
   return (
@@ -81,7 +82,7 @@ export function SemResultado({ q, onLimpar }: { q: string; onLimpar: () => void 
   )
 }
 
-/** Não-admin: a tela inteira dá lugar ao cartão centralizado de sem-acesso. */
+/** Non-admin: the whole screen gives way to the centered no-access card. */
 export function SemAcesso() {
   return (
     <Estado.CartaoDeEstado

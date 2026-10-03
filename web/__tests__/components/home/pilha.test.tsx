@@ -6,11 +6,11 @@ import { useHomeStore } from "@/app/stores/homeStore"
 import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
 
 /**
- * A conversa ao centro: a MESMA conversa do painel, recortada à última troca e
- * desenhada como a legenda do globo (a faixa). jsdom não faz layout, então a
- * faixa, a linha única e o corte em 4 linhas ficam para o CSS; o que se mede
- * aqui é o recorte, o contador, a legenda (`compacta`), a ordem — os itens e
- * depois o rodapé — e a saída para a lateral.
+ * The conversation in the center: the SAME conversation as the panel, cut down to the last exchange and
+ * drawn as the globe's caption (the strip). jsdom does no layout, so the
+ * strip, the single line and the 4-line clamp are left to CSS; what is measured
+ * here is the cut, the counter, the caption (`compacta`), the order — the items and
+ * then the footer — and the exit to the side.
  */
 
 function pergunta(id: string, texto: string): TurnoDoAssistente {
@@ -156,12 +156,12 @@ describe("Pilha — a última troca ao centro", () => {
 
   it("a folga dos extras (chips de anexo) vira a var que o CSS soma ao bottom", () => {
     const turnos = [pergunta("u1", "oi"), resposta("a1", "olá")]
-    // Sem anexos, a folga é 0 — a faixa fica na posição de sempre.
+    // Without attachments, the offset is 0 — the strip stays in its usual position.
     const { rerender } = render(
       <Pilha turnos={turnos} correndo={false} confirmar={vi.fn()} enviar={vi.fn()} />,
     )
     expect(screen.getByTestId("pilha").style.getPropertyValue("--folga-extras")).toBe("0px")
-    // Com chips medidos na barra, a faixa recebe a altura e sobe.
+    // With chips measured in the bar, the strip receives the height and moves up.
     rerender(<Pilha turnos={turnos} correndo={false} confirmar={vi.fn()} enviar={vi.fn()} folgaExtras={40} />)
     expect(screen.getByTestId("pilha").style.getPropertyValue("--folga-extras")).toBe("40px")
   })

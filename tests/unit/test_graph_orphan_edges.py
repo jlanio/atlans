@@ -1,16 +1,16 @@
 # tests/unit/test_graph_orphan_edges.py
 """
-Robustez do grafo contra arestas ÓRFÃS (F1).
+Graph robustness against ORPHAN edges (F1).
 
-Uma aresta cujo source e/ou target não existe em node_defs é cruft real: o
-canvas deletou um nó e deixou a aresta pendurada, ou o JSON foi importado/editado
-à mão. Antes, isso derrubava o run inteiro:
-  - target órfão → KeyError cru em compute_order (predecessors é dict comum);
-  - source órfão → o id fantasma vazava por static_order() e estourava depois na
-    instanciação (os filtros só removem CHAVES, nunca o valor).
+An edge whose source and/or target does not exist in node_defs is real cruft: the
+canvas deleted a node and left the edge dangling, or the JSON was imported/edited
+by hand. Before, this brought down the whole run:
+  - orphan target → raw KeyError in compute_order (predecessors is a plain dict);
+  - orphan source → the ghost id leaked through static_order() and blew up later at
+    instantiation (the filters only remove KEYS, never the value).
 
-WorkflowGraph agora descarta a aresta órfã (indexação e ordenação) em vez de
-estourar.
+WorkflowGraph now discards the orphan edge (indexing and ordering) instead of
+blowing up.
 """
 
 from flow.core.graph import WorkflowGraph
@@ -33,8 +33,8 @@ def test_target_orfao_nao_estoura_compute_order():
 
 
 def test_source_orfao_nao_vaza_para_a_ordem():
-    # Antes: 'ghost' entrava em predecessors[b] como valor e saía em static_order,
-    # depois estourava na instanciação (node_defs['ghost']).
+    # Before: 'ghost' went into predecessors[b] as a value and came out in static_order,
+    # then blew up at instantiation (node_defs['ghost']).
     g = WorkflowGraph(
         _nd("a", "b"),
         [{"source": "a", "target": "b"}, {"source": "ghost", "target": "b"}],
@@ -49,9 +49,9 @@ def test_aresta_orfa_nao_entra_no_incoming_outgoing():
     g = WorkflowGraph(
         _nd("a", "b"),
         [
-            {"source": "a", "target": "b"},        # válida
-            {"source": "a", "target": "ghost"},    # target órfão
-            {"source": "ghost2", "target": "b"},   # source órfão
+            {"source": "a", "target": "b"},        # valid
+            {"source": "a", "target": "ghost"},    # orphan target
+            {"source": "ghost2", "target": "b"},   # orphan source
         ],
     )
     assert dict(g.outgoing) == {"a": [{"source": "a", "target": "b"}]}
@@ -72,7 +72,7 @@ def test_aresta_com_os_dois_endpoints_orfaos_e_descartada():
 
 
 def test_grafo_valido_permanece_intacto():
-    # Guarda contra falso positivo: nenhuma aresta legítima pode ser descartada.
+    # Guard against false positives: no legitimate edge may be discarded.
     g = WorkflowGraph(
         _nd("a", "b", "c"),
         [{"source": "a", "target": "b"}, {"source": "b", "target": "c"}],

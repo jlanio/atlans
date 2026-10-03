@@ -22,10 +22,11 @@ const ExecuteWorkflow = () => {
 
   const paramsSchema = statusWorkflow?.paramsSchema as Record<string, ParamSchema> | undefined
 
-  // Pré-voo: a política do workspace ativo diz se há para onde despachar. Só
-  // informa — o botão nunca depende da leitura, que pode falhar ou atrasar.
-  // Relê ao montar e ao fim de cada execução: o executor que caiu durante o
-  // run é justamente o caso em que o aviso mais importa.
+  // Preflight: the active workspace's policy says whether there's anywhere to
+  // dispatch to. It only informs — the button never depends on the read, which
+  // may fail or lag. Re-reads on mount and at the end of each execution: the
+  // executor that went down during the run is precisely the case where the
+  // warning matters most.
   const { current } = useWorkspace()
   const workspaceId = current?.id_hash ?? null
   const [preFlight, setPreFlight] = useState<string | null>(null)
@@ -39,11 +40,11 @@ const ExecuteWorkflow = () => {
     return () => { cancelado = true }
   }, [workspaceId, isExecuting])
 
-  // Ref para executeWorkflow — o useCallback abaixo precisa ser estável para
-  // o useEffect do Cmd+Enter não re-registrar o listener a cada render do
-  // hook (executeWorkflow muda a cada render). Sem a ref, ou tínhamos
-  // listener churn ou closure stale que capturava a versão da primeira
-  // render (quando o canvas ainda não tinha hidratado → nodes=[]).
+  // Ref to executeWorkflow — the useCallback below needs to be stable so the
+  // Cmd+Enter useEffect doesn't re-register the listener on every render of the
+  // hook (executeWorkflow changes on every render). Without the ref, we had
+  // either listener churn or a stale closure capturing the version from the
+  // first render (when the canvas hadn't hydrated yet → nodes=[]).
   const executeWorkflowRef = useRef(executeWorkflow)
   useEffect(() => { executeWorkflowRef.current = executeWorkflow }, [executeWorkflow])
 
@@ -58,10 +59,11 @@ const ExecuteWorkflow = () => {
     executeWorkflowRef.current(inputs)
   }, [isExecuting, flagActive, paramsSchema])
 
-  // O tempo decorrido do run vive só na barra do painel de execução. Duplicá-lo
-  // aqui dava dois relógios com bases diferentes — este partia do momento em que
-  // ESTE mount via `isExecuting`, então ao reabrir um run em andamento reiniciava
-  // do zero e contradizia o painel. O spinner do botão já sinaliza atividade.
+  // The run's elapsed time lives only in the run panel's bar. Duplicating it
+  // here gave two clocks with different bases — this one started from the moment
+  // THIS mount saw `isExecuting`, so on reopening an in-progress run it restarted
+  // from zero and contradicted the panel. The button's spinner already signals
+  // activity.
 
   // Atalho de teclado: Cmd/Ctrl+Enter executa o workflow.
   useEffect(() => {
@@ -91,23 +93,23 @@ const ExecuteWorkflow = () => {
       createToast.info("A execução já havia terminado")
       return
     }
-    // Não mexe na store aqui: o estado final chega pelo WebSocket quando o
-    // executor confirma a interrupção. Marcar como cancelado já poderia
-    // mentir — o job pode concluir no intervalo entre o pedido e a parada.
+    // Doesn't touch the store here: the final state arrives via WebSocket when the
+    // executor confirms the interruption. Marking it as cancelled right away could
+    // lie — the job may finish in the interval between the request and the stop.
     createToast.info("Cancelamento solicitado", "Aguardando o executor interromper o job…")
   }
 
   function handleClearExecute() {
-    // Reseta o estado de execução na store: limpa statusWorkflow,
-    // losingNodeIds/Edges, e volta isExecuting para false. Sem isso, os
-    // nodes continuavam mostrando os ícones de check/erro/cache_hit e o
-    // ring colorido mesmo após o clique em Clear.
+    // Resets the execution state in the store: clears statusWorkflow,
+    // losingNodeIds/Edges, and sets isExecuting back to false. Without this, the
+    // nodes kept showing the check/error/cache_hit icons and the
+    // colored ring even after clicking Clear.
     //
-    // Antes havia aqui um `setEdges` que zerava `edge.style.stroke`. Era
-    // no-op desde sempre: `CustomEdge` nunca leu `style` — a cor vem do
-    // status da origem na store. Só custava: trocar a identidade do array de
-    // arestas invalidava os WeakMap de lanes (edge-bundling) e de adjacência
-    // (workflowExecutionStore) sem mudar um pixel.
+    // There used to be a `setEdges` here that reset `edge.style.stroke`. It was
+    // a no-op all along: `CustomEdge` never read `style` — the color comes from
+    // the source's status in the store. It only had a cost: changing the edges
+    // array identity invalidated the lanes (edge-bundling) and adjacency
+    // (workflowExecutionStore) WeakMaps without changing a pixel.
     useWorkflowExecutionStore.getState().resetExecution()
   }
 
@@ -157,9 +159,9 @@ const ExecuteWorkflow = () => {
           {flagActive === false ? "Desativado" : "Executar"}
         </Button>
 
-        {/* Parar: só existe enquanto há um run vivo com task_id conhecido.
-            Antes não havia como interromper um job caro ou travado — ele só
-            terminava sozinho ou pelo timeout do executor. */}
+        {/* Stop: only exists while there is a live run with a known task_id.
+            Before there was no way to interrupt an expensive or stuck job — it
+            only ended by itself or by the executor's timeout. */}
         {isExecuting && statusWorkflow?.task_id && (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -187,11 +189,11 @@ const ExecuteWorkflow = () => {
           </Button>
         }
 
-        {/* Aviso de pré-voo: curto na tela, por extenso no tooltip e para o
-            leitor de tela. Fica NA fileira — abaixo dela, empurrava a barra
-            ancorada no rodapé a cada montagem e a cada run. O botão continua
-            habilitado: o servidor é quem decide, e a leitura daqui pode estar
-            defasada. */}
+        {/* Preflight warning: short on screen, spelled out in the tooltip and for the
+            screen reader. It stays IN the row — below it, it pushed the bar
+            docked at the bottom on every mount and every run. The button stays
+            enabled: the server is who decides, and the read here may be
+            stale. */}
         {preFlight && (
           <Tooltip>
             <TooltipTrigger asChild>

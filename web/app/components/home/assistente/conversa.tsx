@@ -2,20 +2,20 @@
 
 // web/app/components/home/assistente/conversa.tsx
 //
-// A conversa desenhada: turnos de quem pergunta, turnos do assistente.
+// The rendered conversation: turns from whoever asks, turns from the assistant.
 //
-// O turno do assistente é uma LINHA DO TEMPO (`assistente-quadros.ts`), e não
-// blocos de texto separados dos passos. É a escolha que dá espaço ao modelo
-// para EXPLICAR o que fez entre uma ferramenta e a próxima — que é o que
-// impede alguém de aplicar um fluxo sem entender, e a razão pela qual a gaveta
-// lateral venceu a barra de comando.
+// The assistant turn is a TIMELINE (`assistente-quadros.ts`), not text blocks
+// separate from the steps. That is the choice that gives the model room to
+// EXPLAIN what it did between one tool and the next — which is what keeps
+// someone from applying a workflow without understanding it, and the reason the
+// side drawer beat the command bar.
 //
-// A MESMA Conversa serve de LEGENDA na Home (`compacta`, a faixa acima da
-// barra): a pergunta numa linha, e de cada resposta só o que ficou — o último
-// texto, cortado em 4 linhas, os erros e os cartões — mais o que está vivo (o
-// passo em curso). O processo (raciocínio, passos concluídos, textos
-// anteriores) não entra: uma legenda que mostrasse tudo encheria a faixa até o
-// teto e voltaria a rolar; ele fica a um "Expandir", no painel.
+// The SAME Conversa serves as the CAPTION on the Home (`compacta`, the strip
+// above the bar): the question on one line, and from each answer only what
+// remained — the last text, clipped to 4 lines, the errors and the cards — plus
+// what is live (the step in progress). The process (reasoning, completed steps,
+// earlier texts) is left out: a caption that showed everything would fill the
+// strip up to the ceiling and scroll again; it stays one "Expandir" away, in the panel.
 
 import { useCallback, useEffect, useRef } from "react"
 import { TbAlertTriangle, TbChevronRight, TbSparkles } from "react-icons/tb"
@@ -29,10 +29,10 @@ import type { Idioma } from "@/lib/idioma"
 import { textosDe, useIdiomaDaTela, useTextos } from "../i18n"
 
 /**
- * O texto de um erro na tela. Em português é a mensagem do servidor COMO VEIO
- * (a de sempre). Em inglês e espanhol, um código conhecido vira a frase do
- * dicionário — a mensagem do servidor é em português; um código novo ainda
- * aparece como veio, que é melhor que nada.
+ * The on-screen text of an error. In Portuguese it is the server message AS IT
+ * CAME (as always). In English and Spanish, a known code becomes the dictionary
+ * sentence — the server message is in Portuguese; a new code still shows up as
+ * it came, which is better than nothing.
  */
 export function textoDoErro(erro: ErroDoAssistente, idioma: Idioma): { message: string; hint?: string } {
   if (idioma === "pt-BR") return { message: erro.message, hint: erro.hint }
@@ -42,62 +42,62 @@ export function textoDoErro(erro: ErroDoAssistente, idioma: Idioma): { message: 
   return { message: conhecido.message(erro.teto ?? null), hint: conhecido.hint || undefined }
 }
 
-/** O que a `Conversa` sabe de um bloco além dele mesmo, para quem renderiza os `extras`. */
+/** What the `Conversa` knows about a block beyond the block itself, for whoever renders the `extras`. */
 export interface ContextoDoBloco {
-  /** O bloco está no ÚLTIMO turno da lista — o único onde uma oferta ainda vale. */
+  /** The block is in the LAST turn of the list — the only one where an offer still holds. */
   ultimoTurno: boolean
 }
 
-/** O indicador de atividade do item pendente: um SVG que aceita `size` (o `ExecActivity`; a marca da Home). */
+/** The activity indicator of the pending item: an SVG that accepts `size` (the `ExecActivity`; the Home's logo). */
 export type IndicadorDeAtividade = React.ComponentType<{ size?: number; className?: string }>
 
 interface Props {
   turnos: TurnoDoAssistente[]
   correndo: boolean
-  // Opcional: só a gaveta do editor sabe desenhar uma proposta no canvas —
-  // ela injeta o cartão por aqui. A Home não passa (a superfície HOME não
-  // emite `proposta`) e usa `extras` para os blocos que só ela tem.
+  // Optional: only the editor drawer knows how to draw a proposal on the canvas —
+  // it injects the card through here. The Home does not pass it (the HOME surface
+  // does not emit `proposta`) and uses `extras` for the blocks only it has.
   proposta?: (proposta: PropostaDeFluxo) => React.ReactNode
   /**
-   * Renderiza os blocos que esta Conversa não conhece (`fluxo`/`camada`/
-   * `confirmacao`/`respostas_rapidas` do assistente da Home). Sem ele, um bloco
-   * desconhecido some. O editor não passa — e nunca emite esses tipos. O
-   * `contexto` diz se o bloco está no ÚLTIMO turno: é o que deixa as respostas
-   * rápidas valerem só para aquela vez.
+   * Renders the blocks this Conversa does not know (`fluxo`/`camada`/
+   * `confirmacao`/`respostas_rapidas` from the Home assistant). Without it, an
+   * unknown block disappears. The editor does not pass it — and never emits these
+   * types. The `contexto` says whether the block is in the LAST turn: that is what
+   * makes the quick replies valid only for that one time.
    */
   extras?: (bloco: BlocoDoAssistente, contexto: ContextoDoBloco) => React.ReactNode
   /**
-   * Como a superfície se chama no anúncio para leitor de tela. O editor é o
-   * "assistente"; na Home a mesma conversa é o "assistente", e anunciar o nome
-   * errado é anunciar uma tela que não existe ali.
+   * What the surface is called in the screen reader announcement. The editor is
+   * the "assistente"; on the Home the same conversation is the "assistente", and
+   * announcing the wrong name is announcing a screen that does not exist there.
    */
   nome?: string
   /**
-   * O convite da conversa vazia. O padrão fala do editor (descrever um fluxo,
-   * aplicar no canvas); a Home, que não tem canvas, passa o dela.
+   * The empty conversation's invitation. The default talks about the editor
+   * (describe a workflow, apply it on the canvas); the Home, which has no canvas, passes its own.
    */
   vazio?: React.ReactNode
   /**
-   * A vista de LEGENDA da Home (a faixa colada à barra): a pergunta numa linha
-   * ("Você · …", truncada, o texto inteiro no `title`), e de cada resposta só o
-   * que ficou — o último texto, cortado em 4 linhas, os erros e os cartões dos
-   * `extras` — mais o que está vivo enquanto o turno corre (o "Trabalhando…" ou o
-   * passo em curso). Raciocínio, passos concluídos e textos anteriores ficam
-   * para o painel. O editor e o painel não passam: a conversa inteira, como
-   * sempre.
+   * The Home's CAPTION view (the strip attached to the bar): the question on one
+   * line ("Você · …", truncated, the full text in `title`), and from each answer
+   * only what remained — the last text, clipped to 4 lines, the errors and the
+   * `extras` cards — plus what is live while the turn runs (the "Trabalhando…" or
+   * the step in progress). Reasoning, completed steps and earlier texts are left
+   * for the panel. The editor and the panel do not pass it: the whole
+   * conversation, as always.
    */
   compacta?: boolean
   /**
-   * O indicador de atividade do item pendente (o "Trabalhando…" do turno sem bloco
-   * e o raciocínio vivo). O padrão é o `ExecActivity` do editor — um vocabulário
-   * de "ocupado" só, o mesmo do nó em execução. A Home passa a marca animada
-   * (`assistente/marca-animada.tsx`): ali quem pensa é o site.
+   * The activity indicator of the pending item (the "Trabalhando…" of a turn with
+   * no block and the live reasoning). The default is the editor's `ExecActivity` —
+   * a single "busy" vocabulary, the same as the running node. The Home passes the
+   * animated logo (`assistente/marca-animada.tsx`): there, the one thinking is the site.
    */
   indicador?: IndicadorDeAtividade
   /**
-   * Um cursor piscando no fim do parágrafo que está sendo escrito (o último
-   * grupo do turno em curso), como o da sugestão digitada da Home. Opt-in da
-   * Home (`.home-caret` mora no CSS dela); o editor não passa e fica igual.
+   * A blinking cursor at the end of the paragraph being written (the last group
+   * of the turn in progress), like the one in the Home's typed suggestion. Opt-in
+   * by the Home (`.home-caret` lives in its CSS); the editor does not pass it and stays the same.
    */
   cursorAoEscrever?: boolean
 }
@@ -111,8 +111,8 @@ export default function Conversa({
   const fimRef = useRef<HTMLDivElement>(null)
   const grudadoRef = useRef(true)
 
-  // Rola só quando já se estava no fim. Quem subiu para reler uma explicação
-  // não deve ser arrastado de volta a cada delta de texto.
+  // Scrolls only when already at the bottom. Someone who scrolled up to reread an
+  // explanation must not be dragged back on every text delta.
   useEffect(() => {
     if (grudadoRef.current) fimRef.current?.scrollIntoView({ block: "end" })
   }, [turnos])
@@ -122,40 +122,41 @@ export default function Conversa({
     grudadoRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
   }
 
-  // Abrir um `<details>` aumenta o `scrollHeight` SEM disparar evento `scroll`
-  // — crescimento de conteudo nao dispara. Entao o `grudadoRef` fica preso no
-  // ultimo valor lido, quase sempre `true`, e o proximo delta arrasta de volta
-  // para o fim: o clique de quem so queria ler o raciocinio e desfeito sozinho.
-  // Quem abre um bloco ANTIGO desgruda; quem abre o que esta sendo escrito
-  // continua acompanhando, que e o que se quer nos dois casos.
+  // Opening a `<details>` increases `scrollHeight` WITHOUT firing a `scroll`
+  // event — content growth does not fire it. So `grudadoRef` stays stuck at the
+  // last value read, almost always `true`, and the next delta drags back to the
+  // bottom: the click of someone who only wanted to read the reasoning is undone
+  // on its own. Whoever opens an OLD block unsticks; whoever opens the one being
+  // written keeps following, which is what is wanted in both cases.
   const desgrudar = useCallback(() => { grudadoRef.current = false }, [])
 
   const idDoUltimo = turnos[turnos.length - 1]?.id
 
   return (
-    // `min-h-0` NAO e detalhe: sem ele o layout quebra conforme a conversa
-    // cresce. Filho de flex nasce com `min-height: auto`, entao `flex-1` +
-    // `overflow-y-auto` nao encolhe abaixo do conteudo — a lista empurra o
-    // formulario de enviar para fora da gaveta em vez de rolar. O sintoma
-    // aparece so depois de alguns turnos, que e o que o torna dificil de achar.
-    // `min-w-0` pelo mesmo motivo no outro eixo, com a gaveta em 300px.
+    // `min-h-0` is NOT a detail: without it the layout breaks as the conversation
+    // grows. A flex child starts with `min-height: auto`, so `flex-1` +
+    // `overflow-y-auto` does not shrink below its content — the list pushes the
+    // send form out of the drawer instead of scrolling. The symptom shows up
+    // only after a few turns, which is what makes it hard to find.
+    // `min-w-0` for the same reason on the other axis, with the drawer at 300px.
     //
-    // E este container existe SEMPRE, inclusive com a conversa vazia. Antes o
-    // estado vazio era um retorno antecipado, irmao do formulario e sem rolagem
-    // nenhuma: com a gaveta ganhando teto de altura, ~300px de convite mais o
-    // cabecalho e o formulario nao cabem num viewport curto (telefone deitado,
-    // janela baixa) e o campo de enviar sairia da tela sem nada para rolar —
-    // justamente em `/workflow/create`, onde a gaveta nasce aberta.
+    // And this container ALWAYS exists, including with an empty conversation.
+    // Before, the empty state was an early return, a sibling of the form with no
+    // scrolling at all: with the drawer gaining a height ceiling, ~300px of
+    // invitation plus the header and the form do not fit in a short viewport
+    // (phone in landscape, short window) and the send field would leave the
+    // screen with nothing to scroll — precisely on `/workflow/create`, where the
+    // drawer starts open.
     <div
-      // A legenda não tem padding próprio: a faixa (`.home-pilha`) já o dá.
+      // The caption has no padding of its own: the strip (`.home-pilha`) provides it.
       className={cn("nowheel min-h-0 min-w-0 flex-1 overflow-y-auto", !compacta && "px-3 py-3")}
       onScroll={aoRolar}
       aria-busy={correndo}
     >
-      {/* O anúncio para leitor de tela é GROSSO, e a lista NÃO é `aria-live`.
-          O texto do modelo chega em dezenas de deltas que se acumulam no mesmo
-          parágrafo; uma região viva ali reanunciaria a resposta inteira a cada
-          pedaço, e a pessoa não ouviria o fim de frase nenhuma. */}
+      {/* The screen reader announcement is COARSE, and the list is NOT `aria-live`.
+          The model's text arrives in dozens of deltas that pile up in the same
+          paragraph; a live region there would re-announce the whole answer on
+          every chunk, and the person would never hear the end of any sentence. */}
       <p className="sr-only" role="status">
         {correndo ? t.respondendo(nome) : ""}
       </p>
@@ -171,8 +172,8 @@ export default function Conversa({
                     proposta={proposta}
                     extras={extras}
                     compacta={compacta}
-                    // O turno do modelo que esta correndo e, por construcao, o
-                    // ULTIMO da lista. Nao ha estado novo aqui.
+                    // The model turn that is running is, by construction, the
+                    // LAST one in the list. There is no new state here.
                     pensando={correndo && turno.id === idDoUltimo}
                     ultimoTurno={turno.id === idDoUltimo}
                     Indicador={Indicador}
@@ -193,9 +194,9 @@ export default function Conversa({
 function Pergunta({ texto, compacta }: { texto: string; compacta: boolean }) {
   const t = useTextos().assistente.conversa
   if (compacta) {
-    // Uma linha: "Você · pergunta", truncada, com o texto inteiro no `title`.
-    // A pergunta fica num `<span>` próprio, e não solta ao lado de "Você": é
-    // ela que o leitor de tela lê e que quem procura a frase encontra.
+    // One line: "Você · pergunta", truncated, with the full text in `title`.
+    // The question sits in its own `<span>`, not loose next to "Você": it is
+    // what the screen reader reads and what someone searching for the sentence finds.
     return (
       <p className="truncate text-xs text-muted-foreground" title={texto}>
         <span className="text-primary">{t.voce}</span> · <span>{texto}</span>
@@ -223,10 +224,10 @@ function Resposta({
   turno: TurnoDoAssistente
   proposta?: (proposta: PropostaDeFluxo) => React.ReactNode
   extras?: (bloco: BlocoDoAssistente, contexto: ContextoDoBloco) => React.ReactNode
-  /** Este turno e o que esta sendo escrito agora. */
+  /** This turn is the one being written right now. */
   pensando: boolean
   compacta: boolean
-  /** Este turno e o ultimo da lista (os `extras` sabem: uma oferta so vale nele). */
+  /** This turn is the last in the list (the `extras` know: an offer only holds there). */
   ultimoTurno: boolean
   Indicador: IndicadorDeAtividade
   cursorAoEscrever: boolean
@@ -234,8 +235,8 @@ function Resposta({
 }) {
   if (!turno.blocos.length) return <Pensando Indicador={Indicador} />
 
-  // Os passos consecutivos viram uma lista só: cinco `<ul>` de um item cada
-  // desenhavam cinco blocos soltos onde há uma sequência.
+  // Consecutive steps become a single list: five `<ul>` of one item each
+  // drew five loose blocks where there is a sequence.
   const grupos: BlocoDoAssistente[][] = []
   for (const bloco of turno.blocos) {
     const ultimo = grupos[grupos.length - 1]
@@ -243,12 +244,12 @@ function Resposta({
     else grupos.push([bloco])
   }
 
-  // Na legenda (`compacta`) entra só o que FICOU — o último texto, os erros e
-  // os cartões — e o que está VIVO: o último grupo enquanto o turno corre (o
-  // "Trabalhando…" ou o passo em curso). Raciocínio e passos concluídos, e os
-  // textos anteriores ao último, ficam para o painel. O índice guardado é o
-  // ORIGINAL (a `key` e o `pensandoAgora` dependem dele): o filtro não pode
-  // deslocar dono.
+  // In the caption (`compacta`) only what REMAINED goes in — the last text, the
+  // errors and the cards — plus what is LIVE: the last group while the turn runs
+  // (the "Trabalhando…" or the step in progress). Reasoning and completed steps,
+  // and the texts before the last one, are left for the panel. The stored index
+  // is the ORIGINAL one (the `key` and `pensandoAgora` depend on it): the filter
+  // must not shift ownership.
   const ultimoTexto = grupos.map((g) => g[0].tipo).lastIndexOf("texto")
   const vivo = grupos.length - 1
   const visiveis = grupos
@@ -258,7 +259,7 @@ function Resposta({
       const tipo = grupo[0].tipo
       if (tipo === "texto") return i === ultimoTexto
       if (tipo === "pensando" || tipo === "ferramenta") return pensando && i === vivo
-      return true // `erro` e os cartões da Home; `proposta` não chega à Home
+      return true // `erro` and the Home's cards; `proposta` never reaches the Home
     })
 
   return (
@@ -269,11 +270,11 @@ function Resposta({
           grupo={grupo}
           proposta={proposta}
           extras={extras}
-          // O `key={i}` e seguro porque os indices sao APPEND-ONLY: `acumular`
-          // substitui o ultimo bloco ou anexa, `mapearFerramenta` substitui no
-          // lugar, e todo o resto anexa. Nenhum grupo desloca no meio, entao um
-          // <details> aberto nao salta de dono durante o stream. Se algum
-          // quadro novo passar a inserir bloco no MEIO, isto deixa de valer.
+          // The `key={i}` is safe because the indices are APPEND-ONLY: `acumular`
+          // replaces the last block or appends, `mapearFerramenta` replaces in
+          // place, and everything else appends. No group shifts in the middle, so
+          // an open <details> does not jump owners during the stream. If some new
+          // frame starts inserting a block in the MIDDLE, this no longer holds.
           pensandoAgora={pensando && i === vivo}
           compacta={compacta}
           ultimoTurno={ultimoTurno}
@@ -300,7 +301,7 @@ function Grupo({
   grupo: BlocoDoAssistente[]
   proposta?: (proposta: PropostaDeFluxo) => React.ReactNode
   extras?: (bloco: BlocoDoAssistente, contexto: ContextoDoBloco) => React.ReactNode
-  /** Este e o ultimo grupo de um turno em andamento — ou seja, o vivo. */
+  /** This is the last group of a turn in progress — that is, the live one. */
   pensandoAgora: boolean
   compacta: boolean
   ultimoTurno: boolean
@@ -313,7 +314,7 @@ function Grupo({
   const t = textosDe(idioma).assistente.conversa
 
   if (primeiro.tipo === "ferramenta") {
-    // Na legenda, só o passo em curso: os anteriores do grupo já terminaram.
+    // In the caption, only the step in progress: the earlier ones in the group are done.
     const passos = compacta ? grupo.slice(-1) : grupo
     return (
       <ul className="rounded-md border border-dashed bg-muted/30 px-2.5 py-1">
@@ -325,20 +326,21 @@ function Grupo({
   }
 
   if (primeiro.tipo === "pensando") {
-    // RECOLHIDO por padrao, e nao mais sempre aberto.
+    // COLLAPSED by default, no longer always open.
     //
-    // O texto vem em INGLES e nao ha como pedir outro idioma: com
-    // `display: "summarized"` o pensamento cru nunca volta, e o resumo e
-    // gerado por um passo separado que nao obedece o "Responda sempre em
-    // {ASSISTENTE_IDIOMA}" do system prompt (`app/services/assistente/editor_service.py`).
-    // Traduzir custaria outra chamada ao modelo por bloco e mataria justamente
-    // o streaming. Entao: enquanto o modelo pensa fica so a animacao, e o texto
-    // continua a um clique — no DOM, achavel por Ctrl+F e por leitor de tela.
+    // The text comes in ENGLISH and there is no way to ask for another language:
+    // with `display: "summarized"` the raw thinking never comes back, and the
+    // summary is generated by a separate step that does not obey the "Responda
+    // sempre em {ASSISTENTE_IDIOMA}" of the system prompt (`app/services/assistente/editor_service.py`).
+    // Translating would cost another model call per block and would kill
+    // precisely the streaming. So: while the model thinks there is only the
+    // animation, and the text remains one click away — in the DOM, findable by
+    // Ctrl+F and by screen readers.
     //
-    // `<details>` nativo e nao `useState`: o estado aberto mora no DOM, entao
-    // os turnos serem reconstruidos a cada delta nao o fecha; e `<summary>` ja
-    // e focavel e ja anuncia recolhido/expandido sem `aria-expanded`. Molde
-    // copiado de `components/executores/dialogs.tsx`.
+    // Native `<details>` and not `useState`: the open state lives in the DOM, so
+    // rebuilding the turns on every delta does not close it; and `<summary>` is
+    // already focusable and already announces collapsed/expanded without
+    // `aria-expanded`. Pattern copied from `components/executores/dialogs.tsx`.
     return (
       <details
         className="group rounded-md border-l-2 border-primary/40 bg-muted/20 py-1.5 pl-2.5 pr-2"
@@ -348,12 +350,12 @@ function Grupo({
           {pensandoAgora ? (
             <>
               <Indicador size={12} />
-              {/* O rótulo ganha o brilho que varre (o sistema do "Trabalhando…"
-                  da barra) e as reticências são DIGITADAS pelo ::after do
-                  .tic-pensando — vida no indicador sem expor o raciocínio, que
-                  continua recolhido (e em inglês) de propósito. O "…" real fica
-                  no sr-only: o leitor de tela e os testes leem "Trabalhando…",
-                  enquanto o olho vê os pontos aparecerem um a um. */}
+              {/* The label gets the sweeping shimmer (the bar's "Trabalhando…" system)
+                  and the ellipsis is TYPED by the ::after of .tic-pensando —
+                  life in the indicator without exposing the reasoning, which
+                  stays collapsed (and in English) on purpose. The real "…" stays
+                  in sr-only: the screen reader and the tests read "Trabalhando…",
+                  while the eye sees the dots appear one by one. */}
               <span className="texto-pensando">
                 {t.trabalhando}
                 <span className="tic-pensando" aria-hidden="true" />
@@ -367,8 +369,8 @@ function Grupo({
             aria-hidden="true"
           />
         </summary>
-        {/* `lang="en"`: o conteudo E ingles, comprovadamente, e sem isto o
-            leitor de tela o soletra com fonetica portuguesa. */}
+        {/* `lang="en"`: the content IS English, demonstrably, and without this the
+            screen reader spells it out with Portuguese phonetics. */}
         <p lang="en" className="mt-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">
           {primeiro.texto}
         </p>
@@ -378,9 +380,9 @@ function Grupo({
 
   if (primeiro.tipo === "texto") {
     return (
-      // Na legenda a resposta corta em 4 linhas; o texto inteiro fica no painel.
-      // O cursor só no parágrafo VIVO: some quando uma ferramenta o segue ou o
-      // turno acaba.
+      // In the caption the answer is clipped to 4 lines; the full text stays in the panel.
+      // The cursor only on the LIVE paragraph: it disappears when a tool follows it
+      // or the turn ends.
       <p className={cn("whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground", compacta && "line-clamp-4")}>
         {primeiro.texto}
         {cursorAoEscrever && pensandoAgora && <span className="home-caret" aria-hidden="true" />}
@@ -389,7 +391,7 @@ function Grupo({
   }
 
   if (primeiro.tipo === "proposta") {
-    // Só a gaveta injeta o cartão; sem o slot (a Home) o bloco não se desenha.
+    // Only the drawer injects the card; without the slot (the Home) the block is not drawn.
     return proposta ? <>{proposta(primeiro.proposta)}</> : null
   }
 
@@ -411,34 +413,34 @@ function Grupo({
     )
   }
 
-  // Blocos que esta Conversa não conhece (fluxo/camada/confirmação/respostas
-  // rápidas da Home). O editor não passa `extras` e nunca emite esses tipos →
-  // some, como antes. O contexto diz se o bloco está no último turno.
+  // Blocks this Conversa does not know (the Home's fluxo/camada/confirmação/quick
+  // replies). The editor does not pass `extras` and never emits these types →
+  // it disappears, as before. The context says whether the block is in the last turn.
   return <>{extras?.(primeiro, { ultimoTurno })}</>
 }
 
 /**
- * O turno que ainda nao produziu bloco nenhum.
+ * The turn that has not produced any block yet.
  *
- * No editor o indicador e o `ExecActivity` — as quatro barras oscilando fora de
- * fase que o nó em execucao ja usa. Nao e so economia de codigo: o docstring
- * dele registra POR QUE aquela forma foi escolhida (rotacao e o glifo de
- * "aguarde"; a oscilacao diz que ha trabalho ACONTECENDO), e e exatamente isso
- * que a gaveta precisa dizer enquanto o modelo monta; uma segunda animacao de
- * "ocupado" no editor seria um segundo vocabulario para a mesma ideia. A Home
- * passa outro pelo `indicador` da Conversa: a marca animada do site — ali quem
- * pensa e o site, e a marca e o que diz isso.
+ * In the editor the indicator is the `ExecActivity` — the four out-of-phase
+ * oscillating bars the running node already uses. It is not just code economy:
+ * its docstring records WHY that shape was chosen (rotation is the "please wait"
+ * glyph; oscillation says work is HAPPENING), and that is exactly what the
+ * drawer needs to say while the model builds; a second "busy" animation in the
+ * editor would be a second vocabulary for the same idea. The Home passes another
+ * one through the Conversa's `indicador`: the site's animated logo — there, the
+ * one thinking is the site, and the logo is what says so.
  *
- * O que havia aqui antes eram tres pontos com `animate-pulse` e atraso de
- * 150ms. O ciclo do `animate-pulse` e de 2s, entao 150ms sao 7,5% de fase: os
- * tres piscavam praticamente JUNTOS, e o que se lia era um bloco piscando, nao
- * uma onda. O `exec-activity` cicla em 1s com passos de 0,14s — 14% de fase, a
- * onda que se queria. E ele ja degrada sob `prefers-reduced-motion`, congelando
- * as barras em alturas diferentes em vez de sumir.
+ * What was here before was three dots with `animate-pulse` and a 150ms delay.
+ * The `animate-pulse` cycle is 2s, so 150ms is 7.5% of phase: the three blinked
+ * practically TOGETHER, and what one saw was a blinking block, not a wave. The
+ * `exec-activity` cycles in 1s with 0.14s steps — 14% of phase, the wave that
+ * was wanted. And it already degrades under `prefers-reduced-motion`, freezing
+ * the bars at different heights instead of disappearing.
  *
- * Cabe dentro de um `<summary>` porque `<svg>` e *phrasing content*; o `<p>`
- * daqui nao caberia, e o `role="status"` dele tampouco — um por bloco de
- * raciocinio seria a regiao viva que o comentario do `<ol>` acima recusa.
+ * It fits inside a `<summary>` because `<svg>` is *phrasing content*; the `<p>`
+ * from here would not fit, and neither would its `role="status"` — one per
+ * reasoning block would be the live region the comment on the `<ol>` above rejects.
  */
 function Pensando({ Indicador }: { Indicador: IndicadorDeAtividade }) {
   const t = useTextos().assistente.barra
@@ -452,9 +454,9 @@ function Pensando({ Indicador }: { Indicador: IndicadorDeAtividade }) {
 
 function Vazio() {
   return (
-    // `min-h-full` e nao `flex-1`: o pai agora e o container de rolagem, e nao
-    // mais a coluna da gaveta. Resolve contra a content box dele — a altura
-    // menos o `py-3` —, entao centraliza quando ha espaco e ROLA quando nao ha.
+    // `min-h-full` and not `flex-1`: the parent is now the scroll container, and no
+    // longer the drawer column. It resolves against its content box — the height
+    // minus `py-3` —, so it centers when there is room and SCROLLS when there is not.
     <div className="flex min-h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
       <span className="rounded-full bg-muted/60 p-4" aria-hidden="true">
         <TbSparkles size={22} className="text-muted-foreground/50" />

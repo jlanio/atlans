@@ -1,16 +1,17 @@
 # app/services/workflow_move_service.py
-"""Movimentação de um workflow entre workspaces.
+"""Moving a workflow between workspaces.
 
-A troca de tenant não passa pelo `PUT /workflows/{id}`: `WorkflowUpdate` exclui
-`workspace_id` de propósito, porque lá a autorização é resolvida contra o
-workspace ANTERIOR à mudança — quem edita o próprio workflow poderia empurrá-lo
-para dentro de um workspace alheio. Esta é a rota própria que aquele comentário
-pede, e ela exige papel de admin/owner nos DOIS lados (ver o router).
+The tenant change does not go through `PUT /workflows/{id}`: `WorkflowUpdate`
+excludes `workspace_id` on purpose, because there authorization is resolved
+against the workspace PRIOR to the change — someone editing their own workflow
+could push it into somebody else's workspace. This is the dedicated route that
+comment asks for, and it requires the admin/owner role on BOTH sides (see the
+router).
 
-O move nunca falha por dependência quebrada: o que deixa de funcionar no destino
-sai como aviso (`workflow_move_report`). Em compensação, o que é consequência
-determinística da troca de tenant é aplicado aqui, sem perguntar — agendamento
-desligado, portal desativado, grupo e pins limpos.
+The move never fails because of a broken dependency: whatever stops working at
+the destination comes out as a warning (`workflow_move_report`). In exchange,
+whatever is a deterministic consequence of the tenant change is applied here,
+without asking — schedule turned off, portal disabled, group and pins cleared.
 """
 
 import copy
@@ -35,7 +36,7 @@ _logger = get_logger(__name__)
 
 
 async def nomes_no_workspace(db, workspace_id: str) -> set[str]:
-    """Nomes já ocupados no workspace. Compartilhado com a duplicação."""
+    """Names already taken in the workspace. Shared with duplication."""
     return {
         n for (n,) in (
             await db.execute(
@@ -48,14 +49,15 @@ async def nomes_no_workspace(db, workspace_id: str) -> set[str]:
     }
 
 
-# `workflows.name` é String(255). Um sufixo de desambiguação sobre um nome já no
-# limite estouraria a coluna, e DataError não é IntegrityError — escaparia do
-# retry como 500, justamente na operação que promete não falhar.
+# `workflows.name` is String(255). A disambiguation suffix on a name already at
+# the limit would overflow the column, and DataError is not IntegrityError — it
+# would escape the retry as a 500, precisely in the operation that promises not
+# to fail.
 _MAX_NOME = 255
 
 
 def _com_sufixo(base: str, sufixo: str) -> str:
-    """`base (sufixo)`, encurtando a base se o resultado passar de 255 chars."""
+    """`base (suffix)`, shortening the base if the result exceeds 255 chars."""
     excedente = len(base) + len(sufixo) + 3 - _MAX_NOME
     if excedente > 0:
         base = base[: max(1, len(base) - excedente)]
@@ -63,14 +65,15 @@ def _com_sufixo(base: str, sufixo: str) -> str:
 
 
 def nome_livre(base: str, existentes: set[str]) -> str:
-    """Primeiro nome livre a partir de `base`: "X", "X (2)", "X (3)"…
+    """First free name starting from `base`: "X", "X (2)", "X (3)"…
 
-    Existe UniqueConstraint(name, workspace_id): sem desambiguar, mover para um
-    workspace que já tem um workflow homônimo estouraria IntegrityError — e o
-    contrato deste recurso é que a movimentação não falha por isso.
+    There is a UniqueConstraint(name, workspace_id): without disambiguation,
+    moving to a workspace that already has a workflow with the same name would
+    blow up with IntegrityError — and the contract of this feature is that the
+    move does not fail because of that.
 
-    O teto e o sufixo aleatório repetem o que `_nome_de_copia` já faz na
-    duplicação: é preferível um nome feio a um 409 na cara do usuário.
+    The ceiling and the random suffix repeat what `_nome_de_copia` already does
+    for duplication: an ugly name is preferable to a 409 in the user's face.
     """
     base = base[:_MAX_NOME]
     if base not in existentes:
@@ -91,18 +94,19 @@ async def move_workflow(
     moved_by_id: str | None = None,
     dry_run: bool = False,
 ) -> dict:
-    """Move o workflow para `target_workspace_id` e devolve o relatório.
+    """Moves the workflow to `target_workspace_id` and returns the report.
 
-    Com `dry_run=True` nada é gravado — serve ao preview que o diálogo mostra
-    antes de confirmar.
+    With `dry_run=True` nothing is written — it serves the preview the dialog
+    shows before confirming.
 
-    ATENÇÃO À DEFINITION: `decrypt_workflow_connections` muta o dict in place, e
-    a dependency da rota (`get_accessible_workflow_with_role`) já chamou
-    `get_workflow_by_hash`, que descriptografa. Como a sessão é a mesma, o objeto
-    do identity map pode chegar aqui COM a connectionString em texto puro. Hoje
-    isso não vaza porque ninguém reescreve a coluna; este método reescreve. Por
-    isso toda gravação passa por `encrypt_workflow_connections`, que é
-    idempotente — trocar `get_workflow_by_hash` por `get_by_hash` não basta.
+    MIND THE DEFINITION: `decrypt_workflow_connections` mutates the dict in
+    place, and the route's dependency (`get_accessible_workflow_with_role`) has
+    already called `get_workflow_by_hash`, which decrypts. Since the session is
+    the same, the identity map object may arrive here WITH the connectionString
+    in plain text. Today this does not leak because nobody rewrites the column;
+    this method does. That is why every write goes through
+    `encrypt_workflow_connections`, which is idempotent — swapping
+    `get_workflow_by_hash` for `get_by_hash` is not enough.
     """
     db = crud.db
 
@@ -112,13 +116,13 @@ async def move_workflow(
 
     origin_ws = wf.workspace_id
     if target_workspace_id == origin_ws:
-        # Invariante da operação, não validação de payload: mover para o próprio
-        # workspace não seria um no-op — geraria versão, desligaria o
-        # agendamento, apagaria pins e desativaria o portal. Fica aqui para que
-        # qualquer chamador (rota, limpeza em lote, script) herde a guarda.
+        # Invariant of the operation, not payload validation: moving to the same
+        # workspace would not be a no-op — it would create a version, turn off
+        # the schedule, delete pins and disable the portal. It lives here so that
+        # any caller (route, batch cleanup, script) inherits the guard.
         raise WorkflowMoveTargetError("O workflow já está neste workspace.")
 
-    # deepcopy ANTES de descriptografar: a análise não pode tocar o objeto do ORM.
+    # deepcopy BEFORE decrypting: the analysis must not touch the ORM object.
     definition_clara = decrypt_workflow_connections(copy.deepcopy(wf.definition or {}))
 
     warnings = await collect_warnings(db, wf, definition_clara, origin_ws, target_workspace_id)
@@ -149,30 +153,31 @@ async def move_workflow(
     if dry_run:
         return resultado
 
-    # Desligar o agendamento na definition. Vai junto na mesma transação do
-    # UPDATE em `schedules`, abaixo. `definition_clara` já é uma cópia privada
-    # (nada mais a lê depois daqui), então a mutação in place é segura.
+    # Turn off the schedule in the definition. It goes in the same transaction as
+    # the UPDATE on `schedules`, below. `definition_clara` is already a private
+    # copy (nothing else reads it after this point), so the in-place mutation is
+    # safe.
     disable_schedule_node(definition_clara)
 
-    # `definition` cifrada uma vez só: `encrypt_workflow_connections` muta o dict
-    # que recebe, e reaproveitar o resultado evita depender de idempotência entre
-    # as duas tentativas.
+    # `definition` encrypted only once: `encrypt_workflow_connections` mutates the
+    # dict it receives, and reusing the result avoids depending on idempotence
+    # between the two attempts.
     definition_cifrada = encrypt_workflow_connections(definition_clara)
-    # Snapshot do estado ANTERIOR. O explícito não é redundante: pelo motivo da
-    # docstring, `wf.definition` pode estar em claro na sessão, e
-    # workflow_versions é tabela persistida como outra qualquer.
+    # Snapshot of the PREVIOUS state. Being explicit is not redundant: for the
+    # reason in the docstring, `wf.definition` may be in plain text in the
+    # session, and workflow_versions is a persisted table like any other.
     snapshot = encrypt_workflow_connections(copy.deepcopy(wf.definition or {}))
     pins_para_apagar = _pin_keys(wf.pinned_outputs)
 
     async def _aplicar(nome: str) -> None:
-        """Escreve tudo o que compõe o move. Reexecutável após um rollback.
+        """Writes everything that makes up the move. Re-runnable after a rollback.
 
-        `create_version` faz apenas `flush`, e o UPDATE em `schedules` é DML na
-        mesma transação — um rollback desfaz os dois junto com a troca de
-        workspace. Por isso a tentativa de retry precisa repetir o bloco inteiro,
-        e não só renomear: senão o workflow acabaria movido sem snapshot de
-        versão e, pior, com o agendamento ainda ativo apontando para o novo
-        workspace.
+        `create_version` only does a `flush`, and the UPDATE on `schedules` is
+        DML in the same transaction — a rollback undoes both along with the
+        workspace change. That is why the retry attempt has to repeat the whole
+        block, not just rename: otherwise the workflow would end up moved
+        without a version snapshot and, worse, with the schedule still active
+        pointing at the new workspace.
         """
         await crud.create_version(
             workflow_hash=id_hash,
@@ -180,22 +185,24 @@ async def move_workflow(
             change_note=f"Movido do workspace {origin_ws} para {target_workspace_id}",
         )
 
-        # UPDATE direto na tabela em vez de `apply_schedule_if_needed`: o
-        # ScheduleCRUD commita por dentro (quebraria a transação), a função pode
-        # deletar e recriar o schedule, e `create_schedule` recusa workflow
-        # desativado. Desligar nos dois lugares é obrigatório — o AsyncScheduler
-        # tica sobre `Schedule.active` no banco, e o canvas lê o `active` do nó.
+        # Direct UPDATE on the table instead of `apply_schedule_if_needed`: the
+        # ScheduleCRUD commits internally (it would break the transaction), the
+        # function may delete and recreate the schedule, and `create_schedule`
+        # refuses a deactivated workflow. Turning it off in both places is
+        # mandatory — the AsyncScheduler ticks on `Schedule.active` in the
+        # database, and the canvas reads the node's `active`.
         await db.execute(
             Schedule.__table__.update()
             .where(Schedule.workflow_hash == id_hash)
             .values(active=False, workspace_id=target_workspace_id)
         )
 
-        # As linhas de artefato do pin acompanham os objetos que serão apagados:
-        # ficariam como downloads mortos para os membros da origem, e
-        # `_upsert_pin_artifact` (que busca por workflow_hash + node_id, sem
-        # filtrar tenant) reaproveitaria a linha num futuro pin no destino,
-        # repontando-a para um objeto de lá sem trocar o `workspace_id`.
+        # The pin's artifact rows follow the objects that will be deleted: they
+        # would remain as dead downloads for the origin's members, and
+        # `_upsert_pin_artifact` (which looks up by workflow_hash + node_id,
+        # without filtering by tenant) would reuse the row for a future pin at
+        # the destination, repointing it to an object there without changing
+        # the `workspace_id`.
         await db.execute(
             Artifact.__table__.delete().where(
                 Artifact.workflow_hash == id_hash,
@@ -206,7 +213,7 @@ async def move_workflow(
         alvo = await crud.get_by_hash(id_hash)
         alvo.workspace_id = target_workspace_id
         alvo.name = nome
-        alvo.group_id = None                # o grupo pertence ao workspace de origem
+        alvo.group_id = None                # the group belongs to the origin workspace
         alvo.portal_access = "disabled"     # portal_shared_with lista o tenant antigo
         alvo.portal_shared_with = None
         alvo.pinned_outputs = None          # apontam para pin-cache/{ws_origem}/…
@@ -222,9 +229,10 @@ async def move_workflow(
         await db.rollback()
         if "uq_workflow_name_workspace" not in str(exc.orig):
             raise
-        # Corrida real: alguém criou um workflow com este nome no destino entre a
-        # checagem e o commit. Uma segunda tentativa com sufixo aleatório resolve
-        # sem devolver 409 para uma operação que prometeu não falhar.
+        # Real race: someone created a workflow with this name at the destination
+        # between the check and the commit. A second attempt with a random suffix
+        # solves it without returning 409 for an operation that promised not to
+        # fail.
         _logger.warning(
             "Colisão de nome ao mover o workflow %s para %s; tentando sufixo único.",
             id_hash, target_workspace_id,
@@ -233,17 +241,18 @@ async def move_workflow(
         try:
             await _aplicar(nome_final)
         except IntegrityError as exc2:
-            # Colidir de novo com um sufixo aleatório é improvável a ponto de
-            # indicar outra coisa; ainda assim, 409 legível é melhor do que
-            # deixar o IntegrityError escapar como 500.
+            # Colliding again with a random suffix is unlikely enough to indicate
+            # something else; still, a readable 409 is better than letting the
+            # IntegrityError escape as a 500.
             #
-            # O filtro pelo nome da constraint não é simetria estética com o
-            # `except` de cima: sem ele, QUALQUER IntegrityError desta segunda
-            # tentativa virava "não há nome livre no destino" — mensagem
-            # factualmente falsa, que manda investigar o lugar errado. E fica
-            # mais necessário agora que `create_version` reconverge sozinho: uma
-            # violação que chegue até aqui passou a ser genuinamente inesperada,
-            # e rotulá-la como conflito de nome esconderia justamente o caso novo.
+            # Filtering by the constraint name is not aesthetic symmetry with
+            # the `except` above: without it, ANY IntegrityError from this second
+            # attempt would become "no free name at the destination" — a
+            # factually false message that sends you investigating the wrong
+            # place. And it is even more necessary now that `create_version`
+            # reconverges on its own: a violation that makes it here is now
+            # genuinely unexpected, and labeling it as a name conflict would hide
+            # precisely the new case.
             await db.rollback()
             if "uq_workflow_name_workspace" not in str(exc2.orig):
                 raise
@@ -258,7 +267,7 @@ async def move_workflow(
 
 
 def _pin_keys(pinned_outputs) -> list[str]:
-    """s3_keys dos pins, para remoção depois do commit."""
+    """The pins' s3_keys, for removal after the commit."""
     if not isinstance(pinned_outputs, dict):
         return []
     return [
@@ -269,12 +278,14 @@ def _pin_keys(pinned_outputs) -> list[str]:
 
 
 async def _apagar_pins(keys: list[str]) -> None:
-    """Remove os objetos de pin do MinIO. Best-effort, depois do commit.
+    """Removes the pin objects from MinIO. Best-effort, after the commit.
 
-    As keys estão sob `pin-cache/{workspace_origem}/…` e o workflow já não vive
-    lá: mantê-las produziria lixo que ninguém mais alcança, e o unpin futuro
-    apagaria um objeto do outro workspace. Falha aqui não desfaz o move — o pior
-    caso é um objeto órfão, que a reconciliação de storage já sabe auditar.
+    The keys are under `pin-cache/{workspace_origem}/…` and the workflow no
+    longer lives there: keeping them would produce garbage nobody can reach
+    anymore, and a future unpin would delete an object from the other
+    workspace. A failure here does not undo the move — the worst case is an
+    orphaned object, which the storage reconciliation already knows how to
+    audit.
     """
     if not keys:
         return

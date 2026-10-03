@@ -1,5 +1,5 @@
 # app/services/workflow_version_service.py
-# Gerenciamento de versões de workflows.
+# Workflow version management.
 
 import copy
 
@@ -21,18 +21,18 @@ _logger = get_logger(__name__)
 
 
 def _has_substantial_changes(old_def: dict, new_def: dict) -> bool:
-    """Retorna True apenas se houve mudanças substanciais na definição do workflow:
-    adição/remoção de nós, alteração de conexões ou modificação de propriedades.
-    Movimentação de nós (position) não é considerada substancial.
+    """Returns True only if there were substantial changes to the workflow definition:
+    nodes added/removed, connections changed or properties modified.
+    Moving nodes (position) is not considered substantial.
     """
     old_nodes: dict = {n["id"]: n for n in old_def.get("nodes", [])}
     new_nodes: dict = {n["id"]: n for n in new_def.get("nodes", [])}
 
-    # Nós adicionados ou removidos
+    # Nodes added or removed
     if set(old_nodes.keys()) != set(new_nodes.keys()):
         return True
 
-    # Conexões (edges) alteradas
+    # Connections (edges) changed
     def _edge_key(e: dict) -> tuple:
         return (e.get("source"), e.get("target"), e.get("sourceHandle"), e.get("targetHandle"))
 
@@ -41,13 +41,13 @@ def _has_substantial_changes(old_def: dict, new_def: dict) -> bool:
     if old_edges != new_edges:
         return True
 
-    # Propriedades de algum nó alteradas. A definition PERSISTIDA/PUT é plana
-    # (`{id, name, type, properties, position}` — sem wrapper `data`, ver
-    # `montarPayloadDoGrafo` na web), então ler `node["data"]["properties"]`
-    # via cada lado enxergava `{}` vs `{}` e uma edição só-de-propriedade (trocar
-    # a cron, a URL de um HttpRequest, o SQL, o credential_id) nunca virava
-    # versão. `_node_properties` aceita os dois formatos (o plano de produção e o
-    # `data.properties` que só as fixtures montam).
+    # Properties of some node changed. The PERSISTED/PUT definition is flat
+    # (`{id, name, type, properties, position}` — no `data` wrapper, see
+    # `montarPayloadDoGrafo` in the web app), so reading `node["data"]["properties"]`
+    # on each side saw `{}` vs `{}` and a property-only edit (changing the cron,
+    # the URL of an HttpRequest, the SQL, the credential_id) never became a
+    # version. `_node_properties` accepts both formats (the flat production one
+    # and the `data.properties` that only the fixtures build).
     for node_id, new_node in new_nodes.items():
         old_props = _node_properties(old_nodes[node_id])
         new_props = _node_properties(new_node)
@@ -58,7 +58,7 @@ def _has_substantial_changes(old_def: dict, new_def: dict) -> bool:
 
 
 async def list_versions(crud: WorkflowCRUD, id_hash: str):
-    """Lista todas as versões de um workflow."""
+    """Lists all versions of a workflow."""
     wf = await crud.get_by_hash(id_hash)
     if not wf:
         raise WorkflowNotFoundError(f"Workflow {id_hash} não existe")
@@ -66,41 +66,43 @@ async def list_versions(crud: WorkflowCRUD, id_hash: str):
 
 
 async def get_version(crud: WorkflowCRUD, id_hash: str, version_number: int):
-    """Retorna uma versão específica com a definition REDIGIDA.
+    """Returns a specific version with the definition REDACTED.
 
-    Quem consome isto (hoje a tool `get_workflow_version` do MCP; antes, a rota
-    `GET /workflows/{id}/versions/{n}`) não exige papel nenhum além de
-    pertencer ao workspace — então entregava a `connectionString`
-    em texto claro a qualquer `viewer`. Ler o histórico é legítimo para quem só
-    lê; conhecer a senha do banco de produção não é, e restaurar uma versão
-    tampouco precisa disso (o `restore` copia o blob cifrado sem abri-lo).
+    Whoever consumes this (today the MCP `get_workflow_version` tool; before,
+    the `GET /workflows/{id}/versions/{n}` route) requires no role beyond
+    belonging to the workspace — so it handed the `connectionString` in plain
+    text to any `viewer`. Reading the history is legitimate for read-only
+    users; knowing the production database password is not, and restoring a
+    version does not need it either (`restore` copies the encrypted blob
+    without opening it).
 
-    A descriptografia continua acontecendo, e antes da redação, por um motivo:
-    é ela que denuncia um token corrompido com um erro explícito. Redigir o
-    valor cifrado direto esconderia a corrupção até a próxima execução.
+    Decryption still happens, and before redaction, for one reason: it is what
+    exposes a corrupted token with an explicit error. Redacting the encrypted
+    value directly would hide the corruption until the next execution.
 
-    SEG: nada disso toca a linha VIVA da sessão. Era uma atribuição direta
-    (`v.definition = decrypt(...)`) — qualquer commit posterior no mesmo request
-    gravaria a connection string em texto claro na tabela de versões, desfazendo
-    a criptografia em repouso de um histórico que ninguém mais reescreve.
-    `set_committed_value` grava o valor como se tivesse vindo assim do banco: o
-    flush não vê diferença nenhuma e não emite UPDATE.
+    SEC: none of this touches the session's LIVE row. It used to be a direct
+    assignment (`v.definition = decrypt(...)`) — any later commit in the same
+    request would write the connection string in plain text to the versions
+    table, undoing the encryption at rest of a history nobody ever rewrites.
+    `set_committed_value` stores the value as if it had come from the database
+    that way: the flush sees no difference at all and emits no UPDATE.
 
-    O `deepcopy` cobre a outra metade: `decrypt_workflow_connections` grava no
-    dict que recebe, e esse dict é o mesmo objeto que a linha carregada guarda —
-    o mesmo que `restore_version` chega a atribuir direto ao workflow. Trabalhar
-    sobre uma cópia deixa o original cifrado para qualquer ponto que já tenha
-    referência a ele.
+    The `deepcopy` covers the other half: `decrypt_workflow_connections` writes
+    into the dict it receives, and that dict is the same object the loaded row
+    holds — the same one `restore_version` goes as far as assigning directly to
+    the workflow. Working on a copy leaves the original encrypted for any place
+    that already holds a reference to it.
 
-    E o `expunge` fecha a última: sem ele a redação ficaria escrita na instância
-    VIVA do identity map, e um `restore_version` na MESMA sessão receberia essa
-    mesma instância de volta e gravaria `"<REDACTED>"` na definition do
-    workflow — trocando o vazamento da credencial pela DESTRUIÇÃO silenciosa
-    dela. Hoje a REST não alcança isso (cada request tem sessão própria, e
-    nenhuma rota faz as duas coisas), mas as ferramentas do servidor MCP abrem
-    UMA sessão e encadeiam operações nela: ler uma versão e restaurá-la é
-    exatamente o par que cairia nessa armadilha. Desanexada, a linha serializa
-    igual e um `get_version` seguinte relê o cifrado do banco.
+    And the `expunge` closes the last one: without it the redaction would be
+    written into the LIVE instance of the identity map, and a `restore_version`
+    in the SAME session would get that same instance back and write
+    `"<REDACTED>"` into the workflow's definition — trading the credential leak
+    for its silent DESTRUCTION. Today the REST API does not reach this (each
+    request has its own session, and no route does both things), but the MCP
+    server tools open ONE session and chain operations on it: reading a version
+    and restoring it is exactly the pair that would fall into this trap.
+    Detached, the row serializes the same and a following `get_version`
+    re-reads the encrypted value from the database.
     """
     v = await crud.get_version(id_hash, version_number)
     if not v:
@@ -123,13 +125,14 @@ async def get_version(crud: WorkflowCRUD, id_hash: str, version_number: int):
 
 
 async def restore_version(crud: WorkflowCRUD, id_hash: str, version_number: int):
-    """Restaura a definição do workflow para uma versão anterior.
+    """Restores the workflow definition to an earlier version.
 
-    Restaurar troca a definition inteira — inclusive o ScheduleTrigger. Sem
-    sincronizar os agendamentos, voltar para uma versão com outro cron (ou sem
-    nó de agendamento nenhum) deixava o Schedule antigo valendo no banco: o
-    canvas mostrava uma coisa e o AsyncScheduler disparava por outra. É o mesmo
-    "scheduler zumbi" que `update_workflow` já fecha no save normal.
+    Restoring swaps the entire definition — including the ScheduleTrigger.
+    Without syncing the schedules, going back to a version with a different
+    cron (or with no schedule node at all) left the old Schedule in effect in
+    the database: the canvas showed one thing and the AsyncScheduler fired on
+    another. It is the same "zombie scheduler" that `update_workflow` already
+    closes on a normal save.
     """
     v = await crud.get_version(id_hash, version_number)
     if not v:
@@ -139,42 +142,44 @@ async def restore_version(crud: WorkflowCRUD, id_hash: str, version_number: int)
     wf = await crud.get_by_hash(id_hash)
     if not wf:
         raise WorkflowNotFoundError(f"Workflow {id_hash} não existe")
-    # Snapshot da versão atual antes de restaurar.
+    # Snapshot of the current version before restoring.
     #
-    # `get_by_hash` (sem decrypt) NÃO garante que `wf.definition` esteja
-    # cifrada: a dependency desta rota já chamou `get_workflow_by_hash`, que faz
-    # `wf.definition = decrypt_workflow_connections(...)` — mutação in place na
-    # linha viva. Sendo a mesma sessão, aqui volta o MESMO objeto Python, já em
-    # claro, e o snapshot gravaria a credencial legível em `workflow_versions`.
-    # Cifrar explicitamente resolve nos dois estados, porque
-    # `encrypt_workflow_connections` pula o que já começa com `gAAAA`. Mesmo
-    # remédio de `update_workflow` e de `workflow_move_service._aplicar`.
+    # `get_by_hash` (no decrypt) does NOT guarantee that `wf.definition` is
+    # encrypted: this route's dependency has already called
+    # `get_workflow_by_hash`, which does
+    # `wf.definition = decrypt_workflow_connections(...)` — an in-place mutation
+    # on the live row. Being the same session, the SAME Python object comes back
+    # here, already in plain text, and the snapshot would write the credential in
+    # readable form to `workflow_versions`. Encrypting explicitly solves it in
+    # both states, because `encrypt_workflow_connections` skips what already
+    # starts with `gAAAA`. Same remedy as in `update_workflow` and
+    # `workflow_move_service._aplicar`.
     await crud.create_version(
         workflow_hash=id_hash,
         definition=encrypt_workflow_connections(copy.deepcopy(wf.definition or {})),
         change_note=f"Auto-snapshot antes de restaurar para versão {version_number}",
     )
-    # Restaura: a definição armazenada na versão já está criptografada
+    # Restores: the definition stored in the version is already encrypted
     wf = await crud.update(wf, {"definition": v.definition})
 
-    # A definition criptografada vai para o hook como está, de propósito: ele lê
-    # apenas `properties` do nó ScheduleTrigger, que não é cifrado, e
-    # `decrypt_workflow_connections` grava no dict recebido — descriptografar
-    # aqui marcaria a linha como suja e o commit seguinte gravaria a connection
-    # string em texto claro.
+    # The encrypted definition goes to the hook as is, on purpose: it reads only
+    # the `properties` of the ScheduleTrigger node, which are not encrypted, and
+    # `decrypt_workflow_connections` writes into the dict it receives —
+    # decrypting here would mark the row as dirty and the next commit would write
+    # the connection string in plain text.
     #
-    # Best-effort como nos demais call sites: falhar no agendamento não pode
-    # desfazer uma restauração já commitada.
+    # Best-effort as in the other call sites: a scheduling failure must not undo
+    # a restore that has already been committed.
     #
-    # Mas engolir em silêncio também não serve: `update_workflow` devolve
-    # `schedule_notices` justamente para a tela poder dizer "restaurei, e o cron
-    # não sincronizou". Sem isso, quem restaura uma versão com agendamento vê
-    # sucesso e descobre dias depois que a rotina parou — o sintoma de
-    # agendamento quebrado é o silêncio.
+    # But swallowing it silently is no good either: `update_workflow` returns
+    # `schedule_notices` precisely so the screen can say "restored, and the cron
+    # did not sync". Without it, whoever restores a version with a schedule sees
+    # success and finds out days later that the routine stopped — the symptom of
+    # a broken schedule is silence.
     #
-    # `schedule_notices` é atributo TRANSIENTE no objeto ORM, não coluna: um
-    # `db.refresh` o apaga. Por isso ele é setado por último, e quem lê o
-    # capta na hora (`WorkflowRead.schedule_notices`).
+    # `schedule_notices` is a TRANSIENT attribute on the ORM object, not a
+    # column: a `db.refresh` wipes it. That is why it is set last, and whoever
+    # reads it picks it up right away (`WorkflowRead.schedule_notices`).
     schedule_notices = []
     try:
         schedule_notices = await apply_schedule_if_needed(wf, wf.definition, crud.db) or []

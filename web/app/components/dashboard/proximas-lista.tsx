@@ -9,19 +9,19 @@ import { SeloAssistente } from "../shared/selo-assistente"
 import type { EstadoDoEscopo } from "./dashboard-url"
 
 interface Props {
-  /** Já filtrados e cortados por `proximas()`; a lista só desenha. */
+  /** Already filtered and trimmed by `proximas()`; the list only draws. */
   workflows: IWorkflow[]
   escopo: EstadoDoEscopo
-  /** Nome do workspace do item, só usado no escopo "todos"; `null` some. */
+  /** Workspace name of the item, only used in the "todos" scope; `null` hides it. */
   nomeDoWorkspace?: (workspaceId: string | null | undefined) => string | null
   onAbrir: (id: string) => void
-  /** Aquece a rota do editor antes do clique (o editor é a rota mais pesada). */
+  /** Warms up the editor route before the click (the editor is the heaviest route). */
   onPrefetch?: (id: string) => void
 }
 
-// Ícone por tipo de gatilho, as mesmas escolhas de `linha-workflow.tsx`. Só o
-// agendado tende a aparecer aqui (é o que tem `next_run_at`), mas os demais
-// existem para o webhook/arquivo com agendamento secundário não ficarem sem cara.
+// Icon per trigger type, the same choices as `linha-workflow.tsx`. Only the
+// scheduled one tends to appear here (it is the one with `next_run_at`), but the
+// others exist so webhook/file with a secondary schedule don't end up faceless.
 const ICONE: Record<TipoDeGatilho, IconType> = {
   agendado: TbClock,
   webhook: TbBolt,
@@ -32,12 +32,13 @@ const ICONE: Record<TipoDeGatilho, IconType> = {
 }
 
 /**
- * "Próximas execuções" (docs/specs/dashboard.md §3.6): a única tela que
- * responde "o que vai rodar". Recebe os workflows já filtrados por
- * `proximas()` (agendados, ativos, com a próxima no futuro, cortados em 5) e
- * desenha cada um com o ícone do gatilho, o nome (que abre o editor) e o texto
- * do agendamento de `projects/gatilho.ts`. No escopo "todos", a etiqueta do
- * workspace aparece; no escopo de um só, ela some (é redundante).
+ * "Próximas execuções" (upcoming runs, docs/specs/dashboard.md §3.6): the only
+ * screen that answers "what is going to run". Receives the workflows already
+ * filtered by `proximas()` (scheduled, active, with the next run in the future,
+ * trimmed to 5) and draws each one with the trigger icon, the name (which
+ * opens the editor) and the schedule text from `projects/gatilho.ts`. In the
+ * "todos" scope, the workspace label appears; in a single-workspace scope, it
+ * disappears (it is redundant).
  */
 export function ProximasLista({ workflows, escopo, nomeDoWorkspace, onAbrir, onPrefetch }: Props) {
   return (
@@ -79,7 +80,7 @@ function Item({ workflow, escopo, nomeDoWorkspace, onAbrir, onPrefetch }: {
   const gatilho = derivarGatilho(workflow)
   const Icone = ICONE[gatilho.tipo]
   const resumo = resumirAgendamento(workflow.schedule, workflow.flag_ative)
-  // Só no "todos" a etiqueta importa; no escopo de um workspace ela é redundante.
+  // Only in "todos" does the label matter; in a single-workspace scope it is redundant.
   const workspace = escopo === "todos" ? nomeDoWorkspace?.(workflow.workspace_id) : null
 
   return (

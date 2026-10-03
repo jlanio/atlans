@@ -10,8 +10,8 @@ logger = get_logger(__name__)
 @register_node
 class SimplifyNode(BaseNode):
     """
-    Simplifica a topologia das geometrias de um GeoDataFrame usando o
-    algoritmo Douglas-Peucker (via Shapely/GEOS).
+    Simplifies the topology of a GeoDataFrame's geometries using the
+    Douglas-Peucker algorithm (via Shapely/GEOS).
     """
 
     @classmethod
@@ -63,7 +63,7 @@ class SimplifyNode(BaseNode):
                 f"Tolerância deve ser não-negativa. Recebido: {tolerance}."
             )
 
-        # Obtém o GeoDataFrame de entrada via helper da classe base
+        # Gets the input GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
 
         logger.info(
@@ -85,7 +85,7 @@ class SimplifyNode(BaseNode):
             logger.error(f"Erro ao simplificar geometrias: {e}")
             raise RuntimeError(f"Erro na simplificação: {e}")
 
-        # Avisa sobre geometrias degeneradas introduzidas
+        # Warns about degenerate geometries introduced
         if result.crs is None and gdf.crs is not None:
             result = result.set_crs(gdf.crs)
 

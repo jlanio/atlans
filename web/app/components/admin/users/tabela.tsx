@@ -29,12 +29,12 @@ import {
 } from "./dialogs"
 
 /*
- * A tabela da tela Admin › Usuários, extraída da página. Mantém a variante de
- * "trilho" denso (linhas de tabela que viram ficha empilhada no telefone via
- * shared/tabela-empilhada) e todo o comportamento — seleção em massa,
- * ordenação por coluna, menu de ações por linha —, só padronizando a moldura,
- * as cores de status/role (pares claro/escuro sancionados) e a ordenação
- * (botão + aria-sort + ícone react-icons, não glifos ▲/▼).
+ * The table of the Admin › Users screen, extracted from the page. It keeps the
+ * dense "rail" variant (table rows that become a stacked card on the phone via
+ * shared/tabela-empilhada) and all the behavior — bulk selection, sorting by
+ * column, per-row action menu — only standardizing the frame, the status/role
+ * colors (sanctioned light/dark pairs) and the sorting (button + aria-sort +
+ * react-icons icon, not ▲/▼ glyphs).
  */
 
 // ── Cores de status e role (pares claro/escuro sancionados, contrato §6) ────────
@@ -77,7 +77,7 @@ function RoleUsuarioBadge({ role, quota }: { role: string; quota: number }) {
       >
         {admin ? "Admin" : "Usuário"}
       </span>
-      {/* Cota de executores: só faz sentido para não-admin com cota > 0. */}
+      {/* Executor quota: only makes sense for non-admins with quota > 0. */}
       {!admin && quota > 0 && (
         <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium select-none bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400 tabular-nums">
           <TbServer size={11} aria-hidden="true" /> {quota}
@@ -87,7 +87,7 @@ function RoleUsuarioBadge({ role, quota }: { role: string; quota: number }) {
   )
 }
 
-// ── Cabeçalho ordenável ─────────────────────────────────────────────────────────
+// ── Sortable header ─────────────────────────────────────────────────────────────
 
 interface Props {
   users: IAdminUser[]
@@ -108,9 +108,9 @@ interface Props {
   onCompleted: () => void
 }
 
-// React.memo: a página re-renderiza a cada tecla na busca, mas as props aqui já
-// vêm estáveis (memoizadas na página) — o memo evita repintar as ~25 linhas
-// Radix a cada tecla.
+// React.memo: the page re-renders on every keystroke in the search, but the props
+// here already come stable (memoized in the page) — the memo avoids repainting the
+// ~25 Radix rows on every keystroke.
 export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
   users, loading, currentUserId,
   selected, selectableUsers, allOnPageSelected, onToggleSelect, onToggleSelectAll,
@@ -123,17 +123,17 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
   const showTo = Math.min(offset + pageSize, total)
 
   return (
-    // `aria-busy` numa recarga sobre a lista pronta; a opacidade dá o feedback
-    // de "atualizando" sem apagar o que está na tela.
+    // `aria-busy` on a reload over the ready list; the opacity gives the
+    // "updating" feedback without erasing what is on screen.
     <div
       aria-busy={loading}
       className={cn("flex flex-col gap-4 transition-opacity duration-300", loading ? "opacity-60" : "opacity-100")}
     >
-      {/* Moldura de cartão. `overflow-x-auto` interno: de `md` para cima as
-          colunas de largura fixa somam mais que a viewport e o body é
-          `overflow-x: clip` — sem rolagem própria aqui as últimas colunas
-          ficariam inalcançáveis. Abaixo de `md` a linha vira ficha
-          (shared/tabela-empilhada) e não há rolagem. */}
+      {/* Card frame. Internal `overflow-x-auto`: from `md` up the fixed-width
+          columns add up to more than the viewport and the body is
+          `overflow-x: clip` — without its own scrolling here the last columns
+          would be unreachable. Below `md` the row becomes a card
+          (shared/tabela-empilhada) and there is no scrolling. */}
       <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-sm md:min-w-[720px]">
@@ -244,7 +244,7 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
         </div>
       </div>
 
-      {/* Paginação */}
+      {/* Pagination */}
       {total > 0 && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground tabular-nums">
@@ -283,9 +283,9 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
 })
 
 /**
- * `<th>` ordenável: `<button>` (não `<th onClick>`) com `aria-sort` no cabeçalho
- * e ícone `react-icons/tb` em vez de glifo ▲/▼. Inativa mostra a seta neutra
- * esmaecida para dizer "dá para ordenar por aqui".
+ * Sortable `<th>`: a `<button>` (not `<th onClick>`) with `aria-sort` on the
+ * header and a `react-icons/tb` icon instead of a ▲/▼ glyph. Inactive, it shows
+ * the faded neutral arrow to say "you can sort by this".
  */
 function ColunaOrdenavel({
   col, label, className, sortBy, sortOrder, onSort,

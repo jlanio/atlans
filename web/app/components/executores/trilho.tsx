@@ -1,11 +1,12 @@
 "use client"
 
-// O "trilho" — tabela densa de executores, mantida como VARIANTE DELIBERADA do
-// contrato (serve à comparação vertical entre máquinas; não vira lista de
-// cartões). Aqui ficam a grade de colunas, o cabeçalho, a linha (ExecutorRow) e
-// os medidores que ela abre. A padronização foi de apresentação: tokens de
-// status (green no lugar de emerald), `tabular-nums` nos números, foco visível,
-// alvos de toque ≥40px no telefone e formatação via `lib/formatos`.
+// The "rail" — dense table of executors, kept as a DELIBERATE VARIANT of the
+// contract (it serves vertical comparison between machines; it doesn't become
+// a list of cards). Here live the column grid, the header, the row
+// (ExecutorRow) and the gauges it opens. The standardization was about
+// presentation: status tokens (green instead of emerald), `tabular-nums` on
+// numbers, visible focus, ≥40px touch targets on phones and formatting via
+// `lib/formatos`.
 
 import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -38,10 +39,10 @@ import { EditAgentDialog, RevokeAgentDialog, DeleteAgentDialog } from "./dialogs
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-// Rótulo pt-BR do status do EXECUTOR. Distinto de `rotuloDoStatus` (shared),
-// que traduz status de EXECUÇÃO (success/failed/running…): os vocabulários não
-// se sobrepõem — "pending" de um executor é "aguardando enrollment", não "na
-// fila" — então a tradução do executor mora aqui, no seu domínio.
+// pt-BR label for the EXECUTOR status. Distinct from `rotuloDoStatus` (shared),
+// which translates RUN statuses (success/failed/running…): the vocabularies
+// don't overlap — an executor's "pending" is "aguardando enrollment", not "na
+// fila" — so the executor's translation lives here, in its own domain.
 const ROTULO_STATUS_EXECUTOR: Record<IExecutor["status"], string> = {
   active:   "Ativo",
   pending:  "Pendente",
@@ -49,7 +50,7 @@ const ROTULO_STATUS_EXECUTOR: Record<IExecutor["status"], string> = {
   revoked:  "Revogado",
 }
 
-/** Tempo no ar em segundos, para formatar por extenso via `formatarDuracao`. */
+/** Uptime in seconds, to format in long form via `formatarDuracao`. */
 function uptimeEmSegundos(connectedAt: string | null): number | null {
   if (!connectedAt) return null
   const start = fromBackend(connectedAt)?.valueOf()
@@ -57,36 +58,37 @@ function uptimeEmSegundos(connectedAt: string | null): number | null {
   return Math.max(0, Math.floor((Date.now() - start) / 1000))
 }
 
-// ── Grade do trilho ───────────────────────────────────────────────────────────
-// A grade é declarada UMA vez e usada pelo cabeçalho e por cada linha. Foi o
-// que faltava no card empilhado: a faixa de hardware era `flex-wrap`, então
-// RAM e disco pousavam num x diferente por executor e nada era comparável na
-// vertical.
+// ── Rail grid ─────────────────────────────────────────────────────────────────
+// The grid is declared ONCE and used by the header and by each row. That is
+// what the stacked card lacked: the hardware strip was `flex-wrap`, so RAM
+// and disk landed on a different x per executor and nothing was comparable
+// vertically.
 //
-// Uma vez, mas em TRÊS larguras. As colunas fixas somavam 360px (492px com a de
-// tipo) e não cabiam nem num tablet com a sidebar aberta — muito menos num
-// telefone, onde o `overflow-x: clip` do body CORTA o que vaza em vez de rolar:
-// o menu de ações de cada linha ficava fora da tela, sem caminho até ele.
+// Once, but in THREE widths. The fixed columns added up to 360px (492px with
+// the type one) and didn't fit even on a tablet with the sidebar open — let
+// alone on a phone, where the body's `overflow-x: clip` CUTS what overflows
+// instead of scrolling: each row's action menu ended up off screen, with no
+// way to reach it.
 //
-//   < md   telefone — duas linhas por executor, sem colunas (ver ExecutorRow)
-//   md     trilho enxuto — tipo e versão saem; o nome é o que distingue as linhas
-//   lg     trilho inteiro
+//   < md   phone — two lines per executor, no columns (see ExecutorRow)
+//   md     lean rail — type and version go away; the name is what tells rows apart
+//   lg     full rail
 const TRILHO_COLUNAS = cn(
   "grid-cols-[1.25rem_minmax(0,1fr)_auto]",
   "md:grid-cols-[1.25rem_minmax(0,1fr)_6rem_5rem_2rem]",
   "lg:grid-cols-[1.25rem_minmax(0,1fr)_6rem_4.5rem_5rem_2rem]",
 )
-/** Coluna de tipo — só no trilho inteiro. Na faixa `md` o cabeçalho do grupo já
- *  nomeia o tipo, e repeti-lo por linha custava 120px que faltavam ao nome. */
+/** Type column — only in the full rail. In the `md` band the group header already
+ *  names the type, and repeating it per row cost 120px the name was missing. */
 const TRILHO_COLUNAS_TIPO = "lg:grid-cols-[1.25rem_minmax(0,1fr)_7.5rem_6rem_4.5rem_5rem_2rem]"
 
-/** Cabeçalho de colunas do trilho. */
+/** Column header of the rail. */
 export function CabecalhoDoTrilho({ mostrarTipo }: { mostrarTipo: boolean }) {
   return (
-    // `hidden md:grid`: no telefone a linha não tem colunas, e um cabeçalho de
-    // colunas sobre um empilhamento rotularia o que não existe.
-    // font-mono aqui é intencional — rótulos de coluna em caixa-alta dão o tom
-    // "terminal" do trilho; não são números (ver o contrato §5 sobre tabular-nums).
+    // `hidden md:grid`: on phones the row has no columns, and a column header
+    // over a stack would label what doesn't exist.
+    // font-mono here is intentional — uppercase column labels give the rail its
+    // "terminal" tone; they are not numbers (see contract §5 on tabular-nums).
     <div className={cn("hidden md:grid gap-3", TRILHO_COLUNAS, mostrarTipo && TRILHO_COLUNAS_TIPO,
       "items-center px-3 py-1.5 bg-muted/50 border-b border-border",
       "font-mono text-[10px] uppercase tracking-wider text-muted-foreground select-none")}>
@@ -101,12 +103,12 @@ export function CabecalhoDoTrilho({ mostrarTipo }: { mostrarTipo: boolean }) {
   )
 }
 
-/** LED de estado — um sinal só.
+/** Status LED — a single signal.
  *
- *  O card dizia o estado quatro vezes: faixa colorida na borda, cor do ícone,
- *  badge de texto e a frase "Conectado há…". E os quatro podiam discordar —
- *  `status: "active"` com `online: false` dava faixa âmbar, ícone cinza e badge
- *  verde "Ativo" ao mesmo tempo. */
+ *  The card stated the status four times: colored strip on the border, icon
+ *  color, text badge and the sentence "Conectado há…". And the four could
+ *  disagree — `status: "active"` with `online: false` gave an amber strip, a
+ *  gray icon and a green "Ativo" badge at the same time. */
 export function EstadoDoExecutor({ status, online, className }: {
   status: IExecutor["status"]; online: boolean; className?: string
 }) {
@@ -123,23 +125,23 @@ export function EstadoDoExecutor({ status, online, className }: {
   )
 }
 
-/** Ocupação em células, uma por vaga.
+/** Occupancy in cells, one per slot.
  *
- *  `running` e `max_concurrent` são contagens DISCRETAS. A `LoadBar` desenhava
- *  uma barra contínua, e ali 4/4 e 4/4-com-seis-na-fila viravam a mesma barra
- *  cheia. As células da fila ficam ALÉM do limite, mostrando o excesso. */
+ *  `running` and `max_concurrent` are DISCRETE counts. `LoadBar` drew a
+ *  continuous bar, and there 4/4 and 4/4-with-six-queued became the same full
+ *  bar. The queue cells sit BEYOND the limit, showing the excess. */
 export function MedidorDeSlots({ running, queued, maxConcurrent, online }: {
   running: number; queued: number; maxConcurrent: number; online: boolean
 }) {
   if (!online) return <span className="hidden md:inline text-[11px] tabular-nums text-muted-foreground">—</span>
 
-  // Teto de células: `max_concurrent` é configurável e uma máquina com 64 vagas
-  // esticaria a coluna. Acima disso o número basta.
-  // Teto baixo de propósito: a coluna tem largura fixa, e o alinhamento
-  // vertical é a razão de existir do trilho. Com 8 vagas + 3 de fila as
-  // células passavam de 110px numa faixa de 96px e invadiam "versão",
-  // quebrando justamente o que a grade veio garantir. O número ao lado
-  // continua exato.
+  // Cell ceiling: `max_concurrent` is configurable and a machine with 64 slots
+  // would stretch the column. Above that the number is enough.
+  // Low ceiling on purpose: the column has a fixed width, and vertical
+  // alignment is the rail's reason to exist. With 8 slots + 3 queued the
+  // cells went past 110px in a 96px band and spilled into "versão",
+  // breaking precisely what the grid was meant to guarantee. The number
+  // beside it stays exact.
   const TETO = 5
   const vagas = Math.max(0, Math.min(maxConcurrent, TETO))
   const naFila = Math.min(queued, 2)
@@ -160,7 +162,7 @@ export function MedidorDeSlots({ running, queued, maxConcurrent, online }: {
   )
 }
 
-// ── Barra de carga (na gaveta) ────────────────────────────────────────────────
+// ── Load bar (in the drawer) ──────────────────────────────────────────────────
 
 export function LoadBar({ running, queued, maxConcurrent, maxQueue }: {
   running: number
@@ -173,7 +175,7 @@ export function LoadBar({ running, queued, maxConcurrent, maxQueue }: {
 
   return (
     <div className="flex flex-col gap-1 min-w-[120px]">
-      {/* Execução */}
+      {/* Execution */}
       <div className="flex items-center gap-1.5">
         <span className="text-[10px] text-muted-foreground w-14 shrink-0">Rodando</span>
         <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
@@ -203,7 +205,7 @@ export function LoadBar({ running, queued, maxConcurrent, maxQueue }: {
   )
 }
 
-// ── Bloco de métricas históricas ─────────────────────────────────────────────
+// ── Historical metrics block ─────────────────────────────────────────────────
 
 export function ExecutorHistoricMetrics({ metrics }: { metrics: IExecutorMetrics }) {
   return (
@@ -212,8 +214,8 @@ export function ExecutorHistoricMetrics({ metrics }: { metrics: IExecutorMetrics
         <span className="font-medium tabular-nums text-foreground">{metrics.total_runs}</span> execuções
       </span>
       <span>
-        {/* Percentual em pt-BR: "96,4%" com vírgula (formatarPercentual), não
-            "96.4%" com ponto. A cor segue a regra unificada de successRate. */}
+        {/* Percentage in pt-BR: "96,4%" with a comma (formatarPercentual), not
+            "96.4%" with a period. The color follows the unified successRate rule. */}
         <span className={cn("font-medium tabular-nums", successRateColor(metrics.success_rate, "amber"))}>
           {formatarPercentual(metrics.success_rate)}
         </span> sucesso
@@ -230,13 +232,13 @@ export function ExecutorHistoricMetrics({ metrics }: { metrics: IExecutorMetrics
   )
 }
 
-// ── Seção de usuários atribuídos ao executor ─────────────────────────────────
+// ── Section of users assigned to the executor ────────────────────────────────
 
-// A seção fica atrás de um disclosure porque ela era montada em TODO card de
-// executor dedicado: abrir /executores como admin disparava um
-// GET /executores/{id}/users por card, dezenas de requisições em paralelo
-// disputando as 6 conexões do browser só para preencher um bloco que quase
-// ninguém abre. Agora a busca só acontece quando o admin de fato expande.
+// The section sits behind a disclosure because it used to be mounted on EVERY
+// dedicated executor card: opening /executores as admin fired one
+// GET /executores/{id}/users per card, dozens of parallel requests
+// competing for the browser's 6 connections just to fill a block almost
+// no one opens. Now the fetch only happens when the admin actually expands it.
 export function AgentUsersSection({ agentId }: { agentId: string }) {
   const [aberto, setAberto]       = useState(false)
   const [users, setUsers]         = useState<IExecutorUserAssignment[]>([])
@@ -291,8 +293,8 @@ export function AgentUsersSection({ agentId }: { agentId: string }) {
     }
   }
 
-  // Memoizado: sem isto o Set era reconstruído a cada render — inclusive a cada
-  // tecla na busca de e-mail. Só muda quando a lista de atribuídos muda.
+  // Memoized: without this the Set was rebuilt on every render — including on
+  // every keystroke in the email search. Only changes when the assigned list changes.
   const assignedIds = useMemo(() => new Set(users.map(u => u.user_id)), [users])
 
   return (
@@ -336,7 +338,7 @@ export function AgentUsersSection({ agentId }: { agentId: string }) {
         </ul>
       )}
 
-      {/* Busca e atribuição */}
+      {/* Search and assignment */}
       {aberto && (
         <div className="flex gap-2">
           <Input
@@ -381,36 +383,36 @@ export function AgentUsersSection({ agentId }: { agentId: string }) {
   )
 }
 
-// ── Linha de executor ─────────────────────────────────────────────────────────
+// ── Executor row ──────────────────────────────────────────────────────────────
 
-// React.memo: o auto-refresh de 15s traz objetos novos do JSON, mas só alguns
-// executores mudam de fato. Sem o memo (e com `onRefresh` já estabilizado pelo
-// useFetchData), a lista inteira era recriada a cada ciclo. A reconciliação por
-// conteúdo (ver reconciliar-executores.ts) é o que faz a comparação rasa do
-// memo de fato economizar.
+// React.memo: the 15s auto-refresh brings new objects from the JSON, but only a
+// few executors actually change. Without the memo (and with `onRefresh` already
+// stabilized by useFetchData), the whole list was recreated on every cycle.
+// Reconciliation by content (see reconciliar-executores.ts) is what makes the
+// memo's shallow comparison actually save work.
 export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, onRefresh, isAdmin, currentUserId, mostrarTipo, ehEsteComputador }: {
   executor: IExecutor
   metrics: IExecutorMetrics | undefined
   onRefresh: () => void
   isAdmin: boolean
   currentUserId?: string
-  /** O selo de tipo só informa quando a lista mistura tipos — sob um filtro de
-   *  categoria seria a mesma palavra em toda linha. */
+  /** The type badge only informs when the list mixes types — under a category
+   *  filter it would be the same word on every row. */
   mostrarTipo: boolean
-  /** Este executor é a máquina onde o app desktop está rodando (só no desktop). */
+  /** This executor is the machine where the desktop app is running (desktop only). */
   ehEsteComputador?: boolean
 }) {
-  // Detalhe fechado por padrão: hardware, histórico e usuários eram o que
-  // fazia cada executor ocupar ~200px de altura, e é justamente o que não se
-  // compara entre máquinas — some da varredura e volta sob demanda.
+  // Detail closed by default: hardware, history and users were what made
+  // each executor take ~200px of height, and they are precisely what isn't
+  // compared between machines — out of the scan, back on demand.
   const [aberto, setAberto] = useState(false)
   const estiloTipo = estiloDoTipo(executor.executor_type)
   const IconeTipo = estiloTipo.icone
   const isOnline = executor.online
   const cap = executor.capacity
   const uptimeSecs = uptimeEmSegundos(executor.connected_at)
-  // Dono = criou o executor (created_by). Pode gerar OTP e revogar/remover o próprio executor,
-  // mas não tem ações exclusivas de admin (editar, pool padrão).
+  // Owner = created the executor (created_by). Can generate an OTP and revoke/remove their own executor,
+  // but has no admin-only actions (edit, default pool).
   const isOwner = !isAdmin && !!currentUserId && executor.created_by === currentUserId
   const canManage = isAdmin || isOwner
 
@@ -436,17 +438,17 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
 
   return (
     <div className="border-b border-border/60 last:border-b-0">
-      {/* Linha compacta — a grade é a MESMA do cabeçalho de colunas (ver
-          CabecalhoDoTrilho), e é o que faz a memória de todos os executores
-          cair no mesmo x. */}
+      {/* Compact row — the grid is the SAME as the column header's (see
+          CabecalhoDoTrilho), and that is what makes every executor's memory
+          land on the same x. */}
       <div
         onClick={() => setAberto(v => !v)}
         className={cn("grid gap-x-3 gap-y-1.5 md:gap-3", TRILHO_COLUNAS, mostrarTipo && TRILHO_COLUNAS_TIPO,
           "items-center px-3 py-2 min-h-[2.75rem] cursor-pointer transition-colors hover:bg-accent/50")}
       >
-        {/* Estado — um LED só, no lugar de faixa + ícone + badge dizendo o
-            mesmo. No telefone as três células da primeira linha são posicionadas
-            à mão — estado, nome e ações — e o resto desce para a segunda. */}
+        {/* Status — a single LED, instead of strip + icon + badge saying the
+            same thing. On phones the three cells of the first line are positioned
+            by hand — status, name and actions — and the rest drops to the second. */}
         <EstadoDoExecutor
           status={executor.status}
           online={isOnline}
@@ -456,11 +458,11 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
         {/* Identidade */}
         <div className="min-w-0 col-start-2 row-start-1 md:col-auto md:row-auto">
           <div className="flex items-center gap-1.5 min-w-0">
-            {/* O nome É o botão da gaveta. A linha inteira também alterna no
-                clique, mas por conveniência de mouse: transformá-la em
-                `role="button"` seria inválido, porque o menu de ações é um
-                botão dentro dela — e sem um controle real nada disto (carga,
-                hardware, métricas, usuários) tinha caminho por teclado. */}
+            {/* The name IS the drawer button. The whole row also toggles on
+                click, but as a mouse convenience: turning it into
+                `role="button"` would be invalid, because the action menu is a
+                button inside it — and without a real control none of this (load,
+                hardware, metrics, users) was reachable by keyboard. */}
             <button
               type="button"
               aria-expanded={aberto}
@@ -492,17 +494,17 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
           </span>
         </div>
 
-        {/* `md:contents` é o que permite UM só markup para as duas formas: no
-            telefone este div é a segunda linha (tipo, slots, versão e
-            atividade lado a lado, embaixo do nome); de `md` para cima ele
-            desaparece do layout e os filhos voltam a ser células da grade. */}
+        {/* `md:contents` is what allows ONE markup for both forms: on the
+            phone this div is the second line (type, slots, version and
+            activity side by side, below the name); from `md` up it
+            disappears from the layout and the children become grid cells again. */}
         <div className="col-start-2 col-end-4 row-start-2 flex flex-wrap items-center gap-x-3 gap-y-1 md:contents">
-          {/* Tipo — só quando a lista mistura tipos */}
+          {/* Type — only when the list mixes types */}
           {mostrarTipo && (
             <span className={cn(
               "inline-flex items-center gap-1 w-fit text-[10px] font-medium px-1.5 py-0.5 rounded",
-              // some na faixa `md` junto com a coluna (ver TRILHO_COLUNAS_TIPO);
-              // no telefone continua visível, que ali sobra largura na 2ª linha.
+              // hidden in the `md` band along with the column (see TRILHO_COLUNAS_TIPO);
+              // on phones it stays visible, since there is spare width on the 2nd line.
               "md:hidden lg:inline-flex",
               estiloTipo.fundo, estiloTipo.texto,
             )}>
@@ -510,7 +512,7 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
             </span>
           )}
 
-          {/* Slots — célula por vaga. */}
+          {/* Slots — one cell per slot. */}
           <MedidorDeSlots
             running={cap?.running ?? 0}
             queued={cap?.queued ?? 0}
@@ -521,21 +523,21 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
           <span
             className={cn(
               "text-[11px] tabular-nums text-muted-foreground text-right truncate md:hidden lg:block",
-              // Mesmo motivo do traço dos slots: sem versão reportada, no telefone
-              // não sobra nada além de um "—" sem rótulo.
+              // Same reason as the slots' dash: with no version reported, on phones
+              // nothing is left but an unlabeled "—".
               !executor.executor_version && "hidden",
             )}
-            // A do executor Docker leva o commit (v2.15.0+3f02f44) e não cabe
-            // inteira na coluna: o corte é o mesmo da coluna ao lado, e a
-            // versão completa fica no title.
+            // The Docker executor's one carries the commit (v2.15.0+3f02f44) and doesn't
+            // fit whole in the column: the truncation is the same as the next
+            // column's, and the full version goes in the title.
             title={executor.executor_version ? `v${executor.executor_version}` : undefined}
           >
             {executor.executor_version ? `v${executor.executor_version}` : "—"}
           </span>
 
-          {/* Uptime e "visto em" são grandezas OPOSTAS e cabiam na mesma
-              coluna sem rótulo: "2 h 15 min" num executor conectado lia como
-              duas horas SEM contato, o contrário do que é. O prefixo desambigua. */}
+          {/* Uptime and "visto em" (last seen) are OPPOSITE quantities and shared the
+              same unlabeled column: "2 h 15 min" on a connected executor read as
+              two hours WITHOUT contact, the opposite of what it is. The prefix disambiguates. */}
           <span className="text-[11px] tabular-nums text-muted-foreground text-right truncate">
             {isOnline && uptimeSecs != null ? `no ar ${formatarDuracao(uptimeSecs)}`
               : executor.last_seen_at ? `visto ${formatarQuando(executor.last_seen_at)}`
@@ -544,9 +546,9 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
         </div>
 
         {canManage && (
-          // `stopPropagation`: o clique no menu não pode alternar a gaveta da
-          // linha — abrir o dropdown e ver o detalhe expandir junto seria um
-          // efeito colateral que ninguém pediu.
+          // `stopPropagation`: a click on the menu must not toggle the row's
+          // drawer — opening the dropdown and seeing the detail expand along
+          // with it would be a side effect nobody asked for.
           <div
             className="shrink-0 justify-self-end col-start-3 row-start-1 md:col-auto md:row-auto"
             onClick={e => e.stopPropagation()}
@@ -603,14 +605,14 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
         )}
       </div>
 
-      {/* Gaveta — tudo o que não se compara entre máquinas e por isso não
-          merece coluna própria. */}
+      {/* Drawer — everything that isn't compared between machines and therefore
+          doesn't deserve its own column. */}
       {aberto && (
       <div className="flex flex-col gap-3 px-3 pb-3 pt-1 bg-muted/25">
 
-      {/* A descrição é escrita pelo usuário e sumia por completo quando o
-          executor reportava hostname — a sublinha mostra um ou outro, nunca os
-          dois. Aqui ela tem lugar garantido. */}
+      {/* The description is written by the user and vanished entirely when the
+          executor reported a hostname — the subline shows one or the other, never
+          both. Here it has a guaranteed place. */}
       {executor.description && (
         <p className="text-xs text-muted-foreground">{executor.description}</p>
       )}
@@ -625,7 +627,7 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
         </div>
       )}
 
-      {/* Linha de métricas — sempre visível se online ou com histórico */}
+      {/* Metrics line — always visible if online or with history */}
       {isOnline || metrics ? (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-border pt-3">
           {isOnline && (
@@ -642,7 +644,7 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
         </div>
       ) : null}
 
-      {/* Informações de hardware */}
+      {/* Hardware information */}
       {executor.system_info && (
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-2 text-xs text-muted-foreground">
           {executor.system_info.os_name && (
@@ -686,7 +688,7 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
         </div>
       )}
 
-      {/* Usuários atribuídos — admin + executor dedicated */}
+      {/* Assigned users — admin + dedicated executor */}
       {isAdmin && executor.executor_type === "dedicated" && (
         <AgentUsersSection agentId={executor.id_hash} />
       )}

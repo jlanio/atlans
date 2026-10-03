@@ -1,5 +1,5 @@
 # tests/unit/test_workflow_crud.py
-"""Testes unitarios para WorkflowCRUD."""
+"""Unit tests for WorkflowCRUD."""
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
@@ -7,7 +7,7 @@ from uuid import uuid4
 
 @pytest.fixture
 def mock_db():
-    """Mock de AsyncSession."""
+    """Mock of AsyncSession."""
     db = AsyncMock()
     db.commit = AsyncMock()
     db.refresh = AsyncMock()
@@ -25,7 +25,7 @@ class TestWorkflowCRUD:
 
     @pytest.mark.asyncio
     async def test_create_workflow(self, crud, mock_db):
-        """Deve criar workflow com nome e definition."""
+        """Should create a workflow with name and definition."""
         mock_db.refresh = AsyncMock(side_effect=lambda wf: setattr(wf, 'id_hash', str(uuid4())))
 
         wf = await crud.create("test-workflow", {"nodes": [], "edges": []})
@@ -47,7 +47,7 @@ class TestWorkflowCRUD:
 
     @pytest.mark.asyncio
     async def test_get_by_hash_found(self, crud, mock_db):
-        """Deve retornar workflow quando encontrado."""
+        """Should return the workflow when found."""
         from app.models.workflow import Workflow
         fake_wf = Workflow(name="found", definition={})
         fake_wf.id_hash = "abc123"
@@ -62,7 +62,7 @@ class TestWorkflowCRUD:
 
     @pytest.mark.asyncio
     async def test_get_by_hash_not_found(self, crud, mock_db):
-        """Deve retornar None quando nao encontrado."""
+        """Should return None when not found."""
         mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
         mock_db.execute = AsyncMock(return_value=mock_result)
@@ -72,7 +72,7 @@ class TestWorkflowCRUD:
 
     @pytest.mark.asyncio
     async def test_update_workflow(self, crud, mock_db):
-        """Deve atualizar campos do workflow."""
+        """Should update the workflow's fields."""
         from app.models.workflow import Workflow
         wf = Workflow(name="old-name", definition={})
         wf.id_hash = "abc123"
@@ -85,7 +85,7 @@ class TestWorkflowCRUD:
 
     @pytest.mark.asyncio
     async def test_soft_delete_by_hash(self, crud, mock_db):
-        """Deve soft-deletar workflow (flag_ative=False) por id_hash."""
+        """Should soft-delete the workflow (flag_ative=False) by id_hash."""
         from app.models.workflow import Workflow
         fake_wf = Workflow(name="to-delete", definition={})
         fake_wf.id_hash = "del123"

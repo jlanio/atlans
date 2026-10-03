@@ -8,11 +8,11 @@ import { dayjs, fromBackend } from "@/lib/dayjs";
 import { conjuntoDoFundo, type Basemap } from "@/lib/fundos-do-mapa";
 import { useFundosDoMapa } from "./fundos-do-mapa";
 
-// O maplibre-gl 6 só sai em ESM e roda o worker a partir de uma URL, que com
-// bundler ele não acha sozinho: sem isto, cria o worker com a URL da própria
-// página, o worker morre em silêncio e os tiles vetoriais nunca carregam. O
-// worker e o `maplibre-gl-shared.mjs` que ele importa são copiados do pacote
-// para `public/maplibre` no build e no dev (scripts/copiar-maplibre.mjs).
+// maplibre-gl 6 ships only as ESM and runs the worker from a URL, which with a
+// bundler it cannot find on its own: without this, it creates the worker with
+// the page's own URL, the worker dies silently and the vector tiles never load.
+// The worker and the `maplibre-gl-shared.mjs` it imports are copied from the
+// package to `public/maplibre` in build and dev (scripts/copiar-maplibre.mjs).
 maplibregl.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
 
 export interface MapLayer {
@@ -25,43 +25,43 @@ export interface MapLayer {
   geomType?: string;
   bbox?: number[];
   /**
-   * Camada publicada (MVT): tiles vetoriais deste artefato. Sobrepõe o par
-   * global `workflowHash`/`tileLayerKeys` do portal — a Home tem camadas de
-   * fluxos diferentes, cada uma com o seu tile. Quando ausente, o caminho MVT
-   * segue o do portal (um `workflowHash` só).
+   * Published layer (MVT): this artifact's vector tiles. Overrides the portal's
+   * global `workflowHash`/`tileLayerKeys` pair — the Home has layers from
+   * different workflows, each with its own tile. When absent, the MVT path
+   * follows the portal's (a single `workflowHash`).
    */
   mvt?: { workflowHash: string; layerKey: string };
   /**
-   * O arquivo de origem pode ser baixado (`GET /artifacts/{id}/download`). Vem
-   * do servidor (`CamadaDoGlobo.baixavel`), e NÃO é o mesmo que "está no globo":
-   * uma camada publicada aparece com o conteúdo no PostGIS e pode não ter
-   * arquivo no storage. Quem oferece a ação a esconde quando é falso.
+   * The source file can be downloaded (`GET /artifacts/{id}/download`). It comes
+   * from the server (`CamadaDoGlobo.baixavel`), and it is NOT the same as "is on
+   * the globe": a published layer appears with its content in PostGIS and may
+   * have no file in storage. Whoever offers the action hides it when false.
    */
   baixavel?: boolean;
 }
 
-// ── O giro lento do hero da Home ─────────────────────────────────────────────
-// Os números são os do previewer aprovado: meio grau por segundo, para oeste (a
-// Terra vista do espaço), em passos lineares de um segundo encadeados no
-// `moveend`; pausa depois de um gesto; a volta ao `center`/`zoom` dura o mesmo
-// que a transição da barra (globals.css, `--home-dur`).
+// ── The slow spin of the Home hero ───────────────────────────────────────────
+// The numbers are those of the approved previewer: half a degree per second,
+// westward (the Earth seen from space), in linear one-second steps chained on
+// `moveend`; pause after a gesture; the return to `center`/`zoom` lasts the
+// same as the bar transition (globals.css, `--home-dur`).
 export const VELOCIDADE_DO_GIRO_GRAUS_POR_S = 0.5;
 export const PASSO_DO_GIRO_MS = 1000;
 export const PAUSA_APOS_GESTO_MS = 2500;
 export const DURACAO_DA_VOLTA_MS = 900;
 const INTERVALO_DE_RETOMADA_MS = 300;
-// O enquadramento antes de haver dado (o `fitBounds` o troca quando as camadas
-// chegam): o mundo, sem região de preferência.
+// The framing before there is data (`fitBounds` replaces it when the layers
+// arrive): the world, with no preferred region.
 const CENTRO_PADRAO: [number, number] = [0, 20];
 const ZOOM_PADRAO = 1.5;
-/** Os gestos que pausam o giro. Nomes de evento do `Map`: desde o maplibre-gl 6, `on`/`off` não aceitam uma `string` qualquer. */
+/** The gestures that pause the spin. `Map` event names: since maplibre-gl 6, `on`/`off` do not accept just any `string`. */
 const GESTOS: readonly (keyof maplibregl.MapEventType)[] = ["mousedown", "touchstart", "wheel", "dragstart", "mouseup", "touchend", "dragend"];
 
 function _easeInOutCubic(t: number): number {
   return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 }
 
-/** Lido na hora, e não num hook: aqui o valor não muda markup nenhum. */
+/** Read on the spot, not in a hook: here the value changes no markup at all. */
 function _prefereMenosMovimento(): boolean {
   return typeof window !== "undefined"
     && typeof window.matchMedia === "function"
@@ -69,24 +69,25 @@ function _prefereMenosMovimento(): boolean {
 }
 
 /**
- * Os textos do mapa — os títulos dos controles (o `locale` do MapLibre, lido
- * pelo leitor de tela e no `title` de cada botão) e os do popup de feição. O
- * padrão é o português do portal `/share`; a Home traduzida passa os do idioma
- * dela. Os controles são lidos no construtor: valem os da montagem.
+ * The map texts — the control titles (MapLibre's `locale`, read by the screen
+ * reader and in each button's `title`) and those of the feature popup. The
+ * default is the Portuguese of the `/share` portal; the translated Home passes
+ * those of its language. The controls are read in the constructor: the ones
+ * at mount time apply.
  */
 export interface TextosDoMapa {
   controles: Readonly<Record<string, string>>;
   semAtributos: string;
   campos: (n: number) => string;
-  /** O locale dos números do popup (`toLocaleString`). */
+  /** The locale for the popup's numbers (`toLocaleString`). */
   numeros: string;
-  /** Formatos `dayjs` das datas do popup. */
+  /** `dayjs` formats for the popup's dates. */
   data: { comHora: string; semHora: string };
 }
 
 export const TEXTOS_DO_MAPA_PT: TextosDoMapa = {
-  // O documento é lang="pt-BR": sem isto o canvas anuncia "Map" e os botões
-  // saem em inglês no leitor de tela.
+  // The document is lang="pt-BR": without this the canvas announces "Map" and
+  // the buttons come out in English on the screen reader.
   controles: {
     "Map.Title": "Mapa",
     "NavigationControl.ZoomIn": "Aproximar",
@@ -107,18 +108,19 @@ export const TEXTOS_DO_MAPA_PT: TextosDoMapa = {
 export interface MapLibreMapHandle {
   fitToLayer: (layerId: string) => void;
   /**
-   * Aciona o controle de localização (o mesmo botão do canto), para uma entrada
-   * FORA do mapa — o "Usar minha localização" do compositor. No-op sem
-   * `geolocalizar`. O navegador pede a permissão no primeiro acionamento.
+   * Triggers the location control (the same button in the corner), for an
+   * entry point OUTSIDE the map — the composer's "Usar minha localização" (use
+   * my location). No-op without `geolocalizar`. The browser asks for permission
+   * on the first trigger.
    */
   localizar: () => void;
 }
 
-/** A posição que o globo devolve ao pai no evento `geolocate`. */
+/** The position the globe returns to the parent on the `geolocate` event. */
 export interface PosicaoDoUsuario {
   lat: number;
   lon: number;
-  /** Raio de precisão em metros (o `accuracy` do navegador); `null` se ausente. */
+  /** Accuracy radius in meters (the browser's `accuracy`); `null` if absent. */
   precisao_m: number | null;
 }
 
@@ -128,86 +130,88 @@ interface Props {
   useMvt?: boolean;
   workflowHash?: string;
   tileLayerKeys?: Record<string, string>;
-  /** Cache-busting: muda quando a camada é re-publicada → invalida tiles antigas. */
+  /** Cache-busting: changes when the layer is re-published → invalidates old tiles. */
   tileLayerVersions?: Record<string, string>;
   isDark?: boolean;
-  // ── Extensões da Home (todas opt-in; sem elas o comportamento do portal é
-  //    idêntico ao de sempre) ────────────────────────────────────────────────
-  /** Projeção do mapa. "globe" desenha a esfera 3D (aplicada no `style.load`). */
+  // ── Home extensions (all opt-in; without them the portal's behavior is
+  //    identical to what it always was) ────────────────────────────────────────
+  /** Map projection. "globe" draws the 3D sphere (applied on `style.load`). */
   projection?: "globe" | "mercator";
-  /** Injeta credenciais nos tiles privados do assistente. Repassado ao construtor. */
+  /** Injects credentials into the assistant's private tiles. Passed to the constructor. */
   transformRequest?: maplibregl.RequestTransformFunction;
-  /** Mostra o alternador de basemap (Mapa ↔ Satélite). */
+  /** Shows the basemap toggle (Mapa ↔ Satélite). */
   basemapToggle?: boolean;
   /**
-   * O basemap com que o mapa NASCE. Padrão: "streets" (as ruas), o do portal.
-   * A Home nasce em "hybrid" — a imagem de satélite com vias e rótulos que a
-   * instalação configurou — e fica nele: sem alternador, é o único basemap dela.
-   * Com `basemapToggle`, só faz sentido "streets" ou "satellite", os dois lados
-   * que o alternador conhece.
+   * The basemap the map is BORN with. Default: "streets", the portal's.
+   * The Home is born in "hybrid" — the satellite imagery with roads and labels
+   * that the installation configured — and stays in it: with no toggle, it is
+   * its only basemap. With `basemapToggle`, only "streets" or "satellite" make
+   * sense, the two sides the toggle knows.
    */
   basemapInicial?: Basemap;
   /**
-   * Veste a chrome do MapLibre (zoom, bússola, escala) com a linguagem do
-   * alternador — vidro, borda fina, ícone de baixo contraste — e recolhe a
-   * atribuição a um "ⓘ" que abre no clique. O portal segue no padrão do
-   * MapLibre: caixa branca sólida e atribuição sempre aberta.
+   * Dresses MapLibre's chrome (zoom, compass, scale) in the toggle's
+   * language — glass, thin border, low-contrast icon — and collapses the
+   * attribution into an "ⓘ" that opens on click. The portal stays with the
+   * MapLibre default: solid white box and attribution always open.
    */
   controlesDiscretos?: boolean;
-  /** Prefixo dos tiles vetoriais. Padrão: os do portal (`/terra/artifacts/tiles`). */
+  /** Vector tile prefix. Default: the portal's (`/terra/artifacts/tiles`). */
   tilesBaseUrl?: string;
   /**
-   * Gira o globo devagar enquanto `true` — o hero da Home. Meio grau por
-   * segundo para oeste, como no previewer aprovado; pausa 2,5 s depois de
-   * qualquer gesto da pessoa; não gira com `prefers-reduced-motion`. Ao voltar
-   * a `false`, o mapa RETORNA a `center`/`zoom` em 900 ms (num salto, sem
-   * movimento): é a volta à região de quem abriu a página no primeiro token da resposta.
+   * Spins the globe slowly while `true` — the Home hero. Half a degree per
+   * second westward, as in the approved previewer; pauses 2.5 s after any
+   * gesture by the person; does not spin with `prefers-reduced-motion`. When it
+   * goes back to `false`, the map RETURNS to `center`/`zoom` in 900 ms (in a
+   * jump, with no motion): it is the return to the region of whoever opened the
+   * page, on the first token of the answer.
    */
   giroLento?: boolean;
-  /** Centro inicial. Padrão: o mundo inteiro, até as camadas enquadrarem. */
+  /** Initial center. Default: the whole world, until the layers frame it. */
   center?: [number, number];
-  /** Zoom inicial. Padrão: 1.5. */
+  /** Initial zoom. Default: 1.5. */
   zoom?: number;
   /**
-   * Canto do grupo de zoom/bússola. Padrão: "top-right" (o portal). Existe
-   * porque em telas cheias com painel sobreposto o canto padrão fica coberto —
-   * a bússola é o único jeito de reendireitar o norte depois de um gesto.
+   * Corner of the zoom/compass group. Default: "top-right" (the portal). It
+   * exists because on full screens with an overlaid panel the default corner is
+   * covered — the compass is the only way to set north straight after a gesture.
    */
   controlsPosition?: maplibregl.ControlPosition;
   /**
-   * Liga o controle de localização do MapLibre — só a Home. Um botão no grupo
-   * de controles mostra a pessoa no globo e a SEGUE em tempo real (o ponto e o
-   * mapa acompanham enquanto ela anda). Localizar pausa o giro do hero e cancela
-   * a volta à região enquanto o seguir estiver ativo. O portal `/share` não o
-   * liga. Exige `Permissions-Policy: geolocation=(self)` (next.config.ts); o
-   * navegador pede a permissão no primeiro clique.
+   * Turns on MapLibre's location control — Home only. A button in the control
+   * group shows the person on the globe and FOLLOWS them in real time (the dot
+   * and the map keep up as they move). Locating pauses the hero spin and cancels
+   * the return to the region while following is active. The `/share` portal
+   * does not turn it on. Requires `Permissions-Policy: geolocation=(self)`
+   * (next.config.ts); the browser asks for permission on the first click.
    */
   geolocalizar?: boolean;
   /**
-   * Chamado a cada posição resolvida pelo controle de localização (o evento
-   * `geolocate` do MapLibre), com a coordenada e a precisão. A Home usa para
-   * anexar a localização ao turno do assistente. Só dispara com `geolocalizar`.
+   * Called on every position resolved by the location control (MapLibre's
+   * `geolocate` event), with the coordinate and the accuracy. The Home uses it
+   * to attach the location to the assistant turn. Fires only with `geolocalizar`.
    */
   aoLocalizar?: (pos: PosicaoDoUsuario) => void;
   /**
-   * Chamado quando a localização FALHA (o evento `error` do controle), com o
-   * código do navegador (1 = permissão negada). É o único retorno visível a
-   * partir do compositor — o estado do botão do controle fica no canto do
-   * globo, invisível no telefone com o painel aberto por cima.
+   * Called when location FAILS (the control's `error` event), with the
+   * browser's code (1 = permission denied). It is the only visible feedback from
+   * the composer — the control button's state sits in the globe's corner,
+   * invisible on the phone with the panel open on top.
    */
   aoErroDeLocalizacao?: (codigo: number) => void;
-  /** Os textos dos controles e do popup. Padrão: `TEXTOS_DO_MAPA_PT`. */
+  /** The texts of the controls and the popup. Default: `TEXTOS_DO_MAPA_PT`. */
   textos?: TextosDoMapa;
 }
 
 const FALLBACK_COLORS = ["#3b82f6", "#e74c3c", "#2ecc71", "#f39c12", "#9b59b6"];
 
-// Os fundos vêm da instalação (MAPA_*, web/lib/fundos-do-mapa.ts): o código
-// só traz as ruas do OpenStreetMap. O HÍBRIDO é a imagem de satélite MAIS vias e
-// rótulos — o basemap da Home, que sem ele cai no satélite e, sem este, nas
-// ruas. O portal alterna ruas ↔ satélite, e sem satélite não há alternador.
+// The basemaps come from the installation (MAPA_*, web/lib/fundos-do-mapa.ts):
+// the code only ships OpenStreetMap streets. HYBRID is the satellite imagery
+// PLUS roads and labels — the Home's basemap, which without it falls back to
+// satellite and, without that, to streets. The portal toggles streets ↔
+// satellite, and without satellite there is no toggle.
 
-/** O estilo v8 mínimo de um basemap raster — o que o construtor monta. */
+/** The minimal v8 style of a raster basemap — what the constructor builds. */
 function _estiloRaster(ts: { tiles: string[]; attribution: string }): maplibregl.StyleSpecification {
   return {
     version: 8,
@@ -217,18 +221,18 @@ function _estiloRaster(ts: { tiles: string[]; attribution: string }): maplibregl
 }
 
 /**
- * O CSS escopado ao container do mapa. Puro e exportado porque é a ÚNICA parte
- * da aparência do MapLibre que não passa pelo React: popup e controles são DOM
- * do próprio MapLibre, com folha de estilo própria — daí o `!important`.
+ * The CSS scoped to the map container. Pure and exported because it is the ONLY
+ * part of MapLibre's appearance that does not go through React: popup and
+ * controls are MapLibre's own DOM, with its own stylesheet — hence `!important`.
  *
- * `controlesDiscretos` veste a chrome do mapa (zoom, bússola, escala) com a
- * mesma linguagem do alternador de basemap — vidro translúcido, borda fina,
- * sem a caixa branca com anel. O padrão do MapLibre é branco sólido, que sobre
- * o globo quase preto da Home vira o objeto mais claro da tela.
+ * `controlesDiscretos` dresses the map chrome (zoom, compass, scale) in the
+ * same language as the basemap toggle — translucent glass, thin border, without
+ * the white box with a ring. MapLibre's default is solid white, which over the
+ * Home's near-black globe becomes the brightest object on the screen.
  *
- * NÃO é um interruptor de "sumir": o ícone fica em 0,65 de opacidade e sobe a
- * 1 no hover/foco; no toque, onde não existe hover, o piso é mais alto. Menos
- * contraste contra o mapa, e não menos legível.
+ * It is NOT a "disappear" switch: the icon sits at 0.65 opacity and rises to
+ * 1 on hover/focus; on touch, where there is no hover, the floor is higher.
+ * Less contrast against the map, not less legible.
  */
 export function _cssDoMapa(scope: string, isDark: boolean, controlesDiscretos: boolean): string {
   const popup = isDark
@@ -249,9 +253,9 @@ export function _cssDoMapa(scope: string, isDark: boolean, controlesDiscretos: b
 
   if (!controlesDiscretos) return popup;
 
-  // Os ícones do MapLibre são SVG embutido em `background-image`, com a cor
-  // ASSADA no data URI (um cinza escuro). Não dá para recolori-los por `color`;
-  // sobre o vidro escuro eles sumiriam. `invert` é o que existe.
+  // MapLibre's icons are SVG embedded in `background-image`, with the color
+  // BAKED into the data URI (a dark gray). They cannot be recolored via `color`;
+  // over the dark glass they would vanish. `invert` is what there is.
   const iconeEscuro = isDark ? `${scope} .maplibregl-ctrl-icon { filter: invert(1); }` : "";
 
   return `${popup}
@@ -327,60 +331,60 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
   const initializedRef = useRef(false);
   const fittedRef = useRef(false);
   /**
-   * A pessoa está sendo localizada/seguida: o giro do hero fica suspenso e a
-   * volta à região não dispara (senão o mapa a puxaria para longe no instante
-   * em que a encontramos). Ref, não estado: o laço do giro a lê ao vivo, sem
-   * re-render. Só vira `true` quando `geolocalizar` liga o controle.
+   * The person is being located/followed: the hero spin is suspended and the
+   * return to the region does not fire (otherwise the map would pull it away the
+   * instant we find them). A ref, not state: the spin loop reads it live, with
+   * no re-render. It only becomes `true` when `geolocalizar` turns on the control.
    */
   const geolocalizandoRef = useRef(false);
-  /** O controle de localização, guardado para o `localizar()` do handle acioná-lo. */
+  /** The location control, kept so the handle's `localizar()` can trigger it. */
   const geoControlRef = useRef<maplibregl.GeolocateControl | null>(null);
-  /** `aoLocalizar` num ref: o evento é ligado na montagem e o callback muda por render. */
+  /** `aoLocalizar` in a ref: the event is bound at mount and the callback changes per render. */
   const aoLocalizarRef = useRef(aoLocalizar);
   aoLocalizarRef.current = aoLocalizar;
   const aoErroDeLocalizacaoRef = useRef(aoErroDeLocalizacao);
   aoErroDeLocalizacaoRef.current = aoErroDeLocalizacao;
   /**
-   * Há um movimento NOSSO (passo do giro ou volta à região) em voo. É o que o
-   * início do seguir pode cortar com `stop()` — cortar QUALQUER movimento, como
-   * antes, matava também o enquadramento do próprio controle de localização no
-   * reclique a partir do 2º plano (o fitBounds roda antes do evento de start).
+   * One of OUR movements (spin step or return to the region) is in flight. It
+   * is what the start of following may cut with `stop()` — cutting ANY
+   * movement, as before, also killed the location control's own framing on
+   * re-click from background mode (the fitBounds runs before the start event).
    */
   const giroEmVooRef = useRef(false);
   /**
-   * Estilo carregado (o `style.load` já passou). É o que habilita
-   * `addSource`/`addLayer` — diferente de `isStyleLoaded()`, que também exige
-   * todas as fontes em dia e por isso é falso sempre que há tile em voo.
+   * Style loaded (`style.load` has already passed). It is what enables
+   * `addSource`/`addLayer` — unlike `isStyleLoaded()`, which also requires
+   * all sources to be up to date and is therefore false whenever a tile is in flight.
    */
   const estiloProntoRef = useRef(false);
-  /** Camadas atuais para os handlers de ponteiro, presos ao closure da montagem. */
+  /** Current layers for the pointer handlers, bound to the mount closure. */
   const camadasRef = useRef<MapLayer[]>(layers);
-  /** Ids da última sincronização: o delta dispensa varrer o estilo inteiro. */
+  /** Ids from the last sync: the delta avoids scanning the whole style. */
   const idsAnterioresRef = useRef<string[]>([]);
   /**
-   * A sincronização de camadas ATUAL, para o `style.load` poder chamá-la.
-   * Um `setStyle` que caia em carga completa apaga sources e layers, e o
-   * efeito de `[layers]` não roda de novo — as camadas não mudaram. A troca
-   * de basemap do portal pede `diff: true`, mas o MapLibre recarrega o estilo
-   * inteiro quando o diff não se aplica. Sem este ponteiro, essa recarga
-   * apagaria as camadas de dados do mapa.
+   * The CURRENT layer sync, so `style.load` can call it.
+   * A `setStyle` that falls into a full load erases sources and layers, and the
+   * `[layers]` effect does not run again — the layers did not change. The
+   * portal's basemap switch asks for `diff: true`, but MapLibre reloads the
+   * whole style when the diff does not apply. Without this pointer, that reload
+   * would erase the map's data layers.
    */
   const sincronizarRef = useRef<() => void>(() => {});
   /**
-   * O basemap JÁ aplicado ao mapa. Sem ele o efeito da troca dispararia na
-   * montagem e faria um `setStyle` redundante logo depois do construtor.
+   * The basemap ALREADY applied to the map. Without it the switch effect would
+   * fire on mount and do a redundant `setStyle` right after the constructor.
    */
   const basemapAplicadoRef = useRef<Basemap>(basemapInicial);
   const [basemap, setBasemap] = useState<Basemap>(basemapInicial);
-  // Os servidores de tiles da instalação. Lidos por ref nos efeitos: o mapa é
-  // construído uma vez, e o contexto não muda durante a vida da página.
+  // The installation's tile servers. Read via ref in the effects: the map is
+  // built once, and the context does not change during the page's life.
   const fundos = useFundosDoMapa();
   const fundosRef = useRef(fundos);
   fundosRef.current = fundos;
-  // Sem satélite configurado, os dois lados do alternador seriam o mesmo mapa.
+  // With no satellite configured, both sides of the toggle would be the same map.
   const comAlternador = basemapToggle && Boolean(fundos.satelite);
 
-  // ── Expõe fitToLayer / localizar para o pai ────────────────────────────────
+  // ── Exposes fitToLayer / localizar to the parent ───────────────────────────
   useImperativeHandle(ref, () => ({
     fitToLayer(layerId: string) {
       const map = mapRef.current;
@@ -394,13 +398,14 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
     },
     localizar() {
       const geo = geoControlRef.current;
-      if (!geo) return; // sem `geolocalizar`, o controle não existe
-      // `trigger()` é um ALTERNADOR: já seguindo (ou aguardando o fix), ele
-      // DESLIGA o rastreio — o oposto do que o "Usar minha localização" do
-      // compositor pede. Nesses estados, só reemitimos a última posição (o
-      // chip volta na hora) e não tocamos no controle; do 2º plano/OFF, o
-      // trigger() faz o certo (recentra/religa). Campos internos do maplibre,
-      // versão pinada em 5.20.x; sem eles, cai no trigger() de sempre.
+      if (!geo) return; // without `geolocalizar`, the control does not exist
+      // `trigger()` is a TOGGLE: when already following (or waiting for the fix), it
+      // TURNS OFF tracking — the opposite of what the composer's "Usar minha
+      // localização" asks for. In those states, we only re-emit the last position
+      // (the chip comes back at once) and do not touch the control; from
+      // background/OFF, trigger() does the right thing (recenters/turns back on).
+      // maplibre internal fields, version pinned at 5.20.x; without them, it
+      // falls back to the usual trigger().
       const interno = geo as unknown as { _watchState?: string; _lastKnownPosition?: GeolocationPosition };
       if (interno._watchState === "ACTIVE_LOCK" || interno._watchState === "WAITING_ACTIVE") {
         const c = interno._lastKnownPosition?.coords;
@@ -439,10 +444,10 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
         return true;
       });
 
-      // Auditoria (SEG-122): a cor da camada vem de publish_config.color (string
-      // livre) e é interpolada dentro de `style="…"` que vai para Popup.setHTML.
-      // Só aceita hex válido; qualquer outra coisa cai no padrão, fechando a
-      // injeção de HTML/atributo pelo valor da cor.
+      // Audit (SEG-122): the layer color comes from publish_config.color (free
+      // string) and is interpolated inside a `style="…"` that goes to Popup.setHTML.
+      // Only a valid hex is accepted; anything else falls back to the default,
+      // closing HTML/attribute injection through the color value.
       const COR_HEX_OK = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
       const color = layerColor && COR_HEX_OK.test(layerColor) ? layerColor : "#FF6A00";
       const text = isDark ? "#e5e5e5" : "#1a1a1a";
@@ -488,11 +493,11 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
           return `<a href="${safe}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:${linkText};text-decoration:none;word-break:break-all">${safe}</a>`;
         }
         if (isIsoDate(s)) {
-          // Timestamp (tem hora): trata string sem offset como UTC e converte
-          // para o fuso local — mesmo helper do resto do app (fromBackend).
-          // `new Date(s)` cru interpretava o UTC como local, deslocando +offset.
-          // Data-so (sem hora): nao tem semantica de fuso — exibe como veio para
-          // nao deslocar o dia (meia-noite UTC viraria o dia anterior em UTC-).
+          // Timestamp (has a time): treats a string with no offset as UTC and converts
+          // to the local time zone — same helper as the rest of the app (fromBackend).
+          // A raw `new Date(s)` interpreted the UTC as local, shifting by +offset.
+          // Date-only (no time): has no time zone semantics — shown as it came so
+          // as not to shift the day (UTC midnight would become the previous day in UTC-).
           const hasTime = s.includes("T");
           const dj = hasTime ? fromBackend(s) : dayjs(s);
           if (dj && dj.isValid()) {
@@ -505,7 +510,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
 
       const safeLabel = escapeHtml(layerLabel);
 
-      // Detecta a propriedade de "nome" do feature (painel selecionado) por convenção
+      // Detects the feature's "name" property (selected panel) by convention
       const NAME_KEYS = ["nome", "name", "titulo", "title", "label", "rotulo", "descricao", "description"];
       const nameKey = entries.find(([k, v]) =>
         NAME_KEYS.includes(k.toLowerCase()) && v !== null && v !== undefined && v !== "" && typeof v !== "object"
@@ -513,7 +518,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       const nameVal = nameKey ? String(properties[nameKey]) : null;
       const safeName = nameVal ? escapeHtml(nameVal) : null;
 
-      // Linhas: omitir a chave promovida ao header para evitar duplicação
+      // Rows: omit the key promoted to the header to avoid duplication
       const bodyEntries = nameKey ? entries.filter(([k]) => k !== nameKey) : entries;
       const bodyCount = bodyEntries.length;
 
@@ -554,72 +559,74 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
     },
     [visibleFields, isDark, textos],
   );
-  // O handler de clique é registrado UMA vez (efeito de montagem, deps []), então
-  // captura o `buildPopupHtml` do PRIMEIRO render — com o `isDark`/`visibleFields`
-  // daquele instante assados nas cores inline de cada célula. Trocar o tema
-  // recriava o callback, mas o handler seguia chamando o velho: o popup abria
-  // meio-atualizado (o container já vira pelo CSS, as células não). Lê-lo por ref
-  // — mesmo idioma de `camadasRef`/`alvoDaVoltaRef` — faz o clique usar sempre o
-  // callback corrente.
+  // The click handler is registered ONCE (mount effect, deps []), so it
+  // captures the FIRST render's `buildPopupHtml` — with that instant's
+  // `isDark`/`visibleFields` baked into each cell's inline colors. Switching the
+  // theme recreated the callback, but the handler kept calling the old one: the
+  // popup opened half-updated (the container flips via CSS, the cells do not).
+  // Reading it via ref — same idiom as `camadasRef`/`alvoDaVoltaRef` — makes the
+  // click always use the current callback.
   const buildPopupHtmlRef = useRef(buildPopupHtml);
   buildPopupHtmlRef.current = buildPopupHtml;
 
-  // ── Inicialização ──────────────────────────────────────────────────────────
+  // ── Initialization ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (!containerRef.current || initializedRef.current) return;
     initializedRef.current = true;
 
     const map = new maplibregl.Map({
       container: containerRef.current,
-      // O raster de sempre; `basemapInicial` escolhe QUAL. O portal nasce em
-      // "streets" e alterna; a Home nasce em "hybrid" e fica.
+      // The usual raster; `basemapInicial` picks WHICH one. The portal is born in
+      // "streets" and toggles; the Home is born in "hybrid" and stays.
       style: _estiloRaster(conjuntoDoFundo(fundosRef.current, basemapInicial)),
       center: center ?? CENTRO_PADRAO,
       zoom: zoom ?? ZOOM_PADRAO,
       locale: { ...textos.controles },
-      // `transformRequest`/`attributionControl` só existem para a Home; sem eles
-      // o construtor fica idêntico ao de antes.
+      // `transformRequest`/`attributionControl` only exist for the Home; without them
+      // the constructor stays identical to what it was.
       ...(transformRequest ? { transformRequest } : {}),
-      // NUNCA `customAttribution`. Todo basemap que usamos já declara a própria
-      // atribuição na fonte (o crédito de MAPA_*_CREDITO). Passar um texto
-      // nosso por cima não substituía a da fonte: o MapLibre CONCATENA os dois
-      // com " | ", e a Home mostrava a mesma coisa duas vezes. Deixar a fonte
-      // falar também trava sozinha quando o basemap troca.
+      // NEVER `customAttribution`. Every basemap we use already declares its own
+      // attribution in the source (the MAPA_*_CREDITO credit). Passing our own
+      // text on top did not replace the source's: MapLibre CONCATENATES the two
+      // with " | ", and the Home showed the same thing twice. Letting the source
+      // speak also keeps it right on its own when the basemap changes.
       //
-      // `compact` recolhe o que sobra a um "ⓘ" que abre no clique. É a forma que
-      // o MapLibre oferece para a atribuição ocupar pouco — ela continua a um
-      // clique, que é o que a ODbL do OSM e os termos dos provedores pedem. Some, não.
+      // `compact` collapses what remains into an "ⓘ" that opens on click. It is
+      // the way MapLibre offers for the attribution to take little space — it
+      // stays one click away, which is what OSM's ODbL and the providers' terms
+      // ask for. Hidden, no.
       ...(controlesDiscretos ? { attributionControl: { compact: true as const } } : {}),
     });
 
-    // `style.load` dispara a cada estilo carregado: na montagem e sempre que um
-    // `setStyle` recarrega o estilo inteiro. É aqui que marcamos o mapa como
-    // apto a receber camadas e que a projeção globo é (re)aplicada.
+    // `style.load` fires on every style loaded: on mount and whenever a
+    // `setStyle` reloads the whole style. This is where we mark the map as
+    // ready to receive layers and where the globe projection is (re)applied.
     map.on("style.load", () => {
-      // `true` da SEGUNDA carga em diante. Ela só existe se um `setStyle` caiu
-      // em carga completa: a troca de basemap do portal pede `diff: true`, mas
-      // o MapLibre recarrega tudo quando o diff não se aplica.
+      // `true` from the SECOND load on. It only exists if a `setStyle` fell into
+      // a full load: the portal's basemap switch asks for `diff: true`, but
+      // MapLibre reloads everything when the diff does not apply.
       const recarga = estiloProntoRef.current;
       estiloProntoRef.current = true;
       if (projection === "globe") map.setProjection({ type: "globe" });
-      // A carga completa apaga sources e layers, e o efeito de `[layers]` NÃO
-      // roda de novo — as camadas não mudaram. Sem esta chamada, ela apagaria
-      // do mapa as camadas de dados. Na PRIMEIRA carga quem sincroniza é o
-      // próprio efeito de `[layers]`, que espera por este mesmo evento
-      // (`_quandoEstiloPronto`); chamar aqui também seria trabalho repetido.
-      // `idsAnterioresRef` fica como está de propósito: ele só alimenta o
-      // cálculo do que REMOVER, e `_syncLayers` recria o que falta olhando o
-      // mapa (`if (!map.getSource(src))`), não a lista.
+      // The full load erases sources and layers, and the `[layers]` effect does
+      // NOT run again — the layers did not change. Without this call, it would
+      // erase the data layers from the map. On the FIRST load the one that syncs
+      // is the `[layers]` effect itself, which waits for this same event
+      // (`_quandoEstiloPronto`); calling here too would be repeated work.
+      // `idsAnterioresRef` is left as is on purpose: it only feeds the
+      // computation of what to REMOVE, and `_syncLayers` recreates what is
+      // missing by looking at the map (`if (!map.getSource(src))`), not the list.
       if (recarga) sincronizarRef.current();
     });
 
     map.addControl(new maplibregl.NavigationControl(), controlsPosition);
-    // Localizar (só a Home): entra logo abaixo do zoom/bússola, no mesmo canto.
-    // `trackUserLocation` dá o modo SEGUIR (a câmera acompanha a pessoa e cai
-    // para "segundo plano" quando ela arrasta o mapa); o ponto e o círculo de
-    // precisão são do próprio controle. Localizar MANDA no globo: o giro pausa e
-    // a volta à região não dispara enquanto seguimos — retoma quando ela desliga
-    // o seguir (ou o boot do erro), se o hero ainda pedir giro.
+    // Locate (Home only): goes right below the zoom/compass, in the same corner.
+    // `trackUserLocation` gives the FOLLOW mode (the camera follows the person
+    // and drops to "background" when they drag the map); the dot and the
+    // accuracy circle belong to the control itself. Locating RULES the globe: the
+    // spin pauses and the return to the region does not fire while we follow —
+    // it resumes when the person turns following off (or the error boot), if the
+    // hero still asks for a spin.
     if (geolocalizar) {
       const geo = new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
@@ -629,24 +636,24 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       });
       geo.on("trackuserlocationstart", () => {
         geolocalizandoRef.current = true;
-        // Corta só o passo do giro/volta em voo — parar QUALQUER movimento
-        // matava o enquadramento do próprio controle no reclique a partir do
-        // 2º plano (o fitBounds dele roda ANTES deste evento).
+        // Cuts only the in-flight spin/return step — stopping ANY movement
+        // killed the control's own framing on re-click from
+        // background mode (its fitBounds runs BEFORE this event).
         if (giroEmVooRef.current) map.stop();
       });
       geo.on("trackuserlocationend", () => {
-        // Este evento também dispara ao cair para o 2º PLANO (a pessoa arrastou
-        // o mapa), com o watch ainda vivo e o zoom lá em cima — retomar o giro
-        // aí varria a tela a 0,5°/s sobre a casa da pessoa. Só libera quando o
-        // controle foi mesmo a OFF. `_watchState` é interno do maplibre (versão
-        // pinada em 5.20.x); se sumir numa atualização, o fallback é liberar
-        // como antes.
+        // This event also fires when dropping to BACKGROUND (the person dragged
+        // the map), with the watch still alive and the zoom way up — resuming the
+        // spin there swept the screen at 0.5°/s over the person's home. It only
+        // releases when the control really went to OFF. `_watchState` is a
+        // maplibre internal (version pinned at 5.20.x); if it disappears in an
+        // update, the fallback is to release as before.
         const estado = (geo as unknown as { _watchState?: string })._watchState;
         if (estado && estado !== "OFF") return;
         geolocalizandoRef.current = false;
       });
-      // Cada posição resolvida (o modo seguir emite várias) sobe ao pai — é o
-      // que a Home anexa ao turno. O evento carrega um GeolocationPosition.
+      // Each resolved position (follow mode emits several) goes up to the parent —
+      // it is what the Home attaches to the turn. The event carries a GeolocationPosition.
       geo.on("geolocate", (e) => {
         const c = (e as unknown as GeolocationPosition).coords;
         if (!c) return;
@@ -656,10 +663,10 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
           precisao_m: Number.isFinite(c.accuracy) ? c.accuracy : null,
         });
       });
-      // PERMISSÃO NEGADA derruba o controle para OFF SEM `trackuserlocationend`
-      // — sem este handler o giro do hero ficava suspenso para sempre. E é o
-      // único jeito de o compositor dar retorno da falha (o botão do controle
-      // fica escondido atrás do painel no telefone).
+      // PERMISSION DENIED drops the control to OFF WITHOUT `trackuserlocationend`
+      // — without this handler the hero spin stayed suspended forever. And it is
+      // the only way for the composer to give feedback on the failure (the
+      // control button is hidden behind the panel on the phone).
       geo.on("error", (e) => {
         const codigo = (e as unknown as GeolocationPositionError | undefined)?.code ?? 0;
         if (codigo === 1) geolocalizandoRef.current = false;
@@ -671,8 +678,8 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
     map.addControl(new maplibregl.ScaleControl(), "bottom-right");
     mapRef.current = map;
 
-    // Qualquer movimento que termina (inclusive um `stop()`) encerra o "nosso"
-    // voo — o flag só religa quando o giro/volta dispararem o próximo easeTo.
+    // Any movement that ends (including a `stop()`) closes "our" flight — the
+    // flag only turns back on when the spin/return fire the next easeTo.
     map.on("moveend", () => { giroEmVooRef.current = false; });
 
     map.on("mousemove", (e) => {
@@ -713,11 +720,11 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ── Giro lento (o hero da Home) ────────────────────────────────────────────
-  // Declarado DEPOIS da inicialização: na montagem com `giroLento` já ligado, o
-  // mapa precisa existir quando este efeito rodar. `center`/`zoom` entram por
-  // ref, e não pelas dependências: o Globo os passa como literais, e um array
-  // novo a cada render reiniciaria o giro (com um `stop()`) a cada render.
+  // ── Slow spin (the Home hero) ──────────────────────────────────────────────
+  // Declared AFTER the initialization: on mount with `giroLento` already on, the
+  // map needs to exist when this effect runs. `center`/`zoom` come in via ref,
+  // not through the dependencies: the Globo passes them as literals, and a new
+  // array on every render would restart the spin (with a `stop()`) on every render.
   const alvoDaVoltaRef = useRef({ center, zoom });
   alvoDaVoltaRef.current = { center, zoom };
   const girouRef = useRef(false);
@@ -727,24 +734,24 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
     const reduzMovimento = _prefereMenosMovimento();
 
     if (!giroLento) {
-      // Só volta quem girou: no portal, que nunca gira, isto não faz nada.
+      // Only what spun returns: in the portal, which never spins, this does nothing.
       if (!girouRef.current) return;
       girouRef.current = false;
-      // Seguindo a pessoa: NÃO voltar à região — isso a puxaria para longe no
-      // instante em que a encontramos (decisão do dono).
+      // Following the person: do NOT return to the region — that would pull the map
+      // away the instant we find them (the owner's decision).
       if (geolocalizandoRef.current) return;
       const { center: c, zoom: z } = alvoDaVoltaRef.current;
       const destino = { center: c ?? CENTRO_PADRAO, zoom: z ?? ZOOM_PADRAO };
       if (reduzMovimento) map.jumpTo(destino);
       else {
-        giroEmVooRef.current = true; // localizar durante a volta pode cortá-la
+        giroEmVooRef.current = true; // locating during the return may cut it
         map.easeTo({ ...destino, duration: DURACAO_DA_VOLTA_MS, easing: _easeInOutCubic, essential: true });
       }
       return;
     }
 
     girouRef.current = true;
-    // Sem movimento o globo fica parado — e a volta, acima, é um salto.
+    // Without motion the globe stays still — and the return, above, is a jump.
     if (reduzMovimento) return;
 
     let ultimoGesto = -Infinity;
@@ -755,7 +762,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       if (map.isMoving()) return;
       if (Date.now() - ultimoGesto < PAUSA_APOS_GESTO_MS) return;
       const atual = map.getCenter();
-      giroEmVooRef.current = true; // é o passo que o início do seguir pode cortar
+      giroEmVooRef.current = true; // it is the step that the start of following may cut
       map.easeTo({
         center: [atual.lng - VELOCIDADE_DO_GIRO_GRAUS_POR_S * (PASSO_DO_GIRO_MS / 1000), atual.lat],
         duration: PASSO_DO_GIRO_MS,
@@ -764,7 +771,7 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       });
     };
     for (const g of GESTOS) map.on(g, gesto);
-    // Encadeia no fim de cada passo; o intervalo retoma depois da pausa de um gesto.
+    // Chains at the end of each step; the interval resumes after a gesture's pause.
     map.on("moveend", passo);
     const retomada = setInterval(passo, INTERVALO_DE_RETOMADA_MS);
     passo();
@@ -772,23 +779,23 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       clearInterval(retomada);
       map.off("moveend", passo);
       for (const g of GESTOS) map.off(g, gesto);
-      // Interrompe o passo em voo: a volta (o efeito seguinte) parte de onde o
-      // globo está. Num desmonte o mapa já pode ter sido removido — daí o try.
+      // Interrupts the in-flight step: the return (the next effect) starts from where
+      // the globe is. On unmount the map may already have been removed — hence the try.
       try { map.stop(); } catch { /* mapa removido */ }
     };
   }, [giroLento]);
 
-  // ── Troca de basemap ───────────────────────────────────────────────────────
-  // O basemap é UMA fonte raster dentro de um estilo que montamos à mão. Trocar
-  // é remendar `sources.basemap.tiles` — barato, e as camadas de dados nem
-  // piscam. (Se o diff não se aplicar e o MapLibre recarregar o estilo inteiro,
-  // o `style.load` acima as recoloca.) A atribuição acompanha sozinha: o
-  // controle do MapLibre a relê do estilo a cada `styledata`.
+  // ── Basemap switch ─────────────────────────────────────────────────────────
+  // The basemap is ONE raster source inside a style we build by hand. Switching
+  // is patching `sources.basemap.tiles` — cheap, and the data layers do not even
+  // flicker. (If the diff does not apply and MapLibre reloads the whole style,
+  // the `style.load` above puts them back.) The attribution follows on its own:
+  // MapLibre's control re-reads it from the style on every `styledata`.
   useEffect(() => {
     const map = mapRef.current;
-    // Cobre a montagem: o estado nasce em `basemapInicial` e o mapa já foi
-    // construído assim. Sem o guarda, o primeiro render faria um `setStyle`
-    // redundante.
+    // Covers the mount: the state is born as `basemapInicial` and the map was
+    // already built that way. Without the guard, the first render would do a
+    // redundant `setStyle`.
     if (!map || basemapAplicadoRef.current === basemap) return;
     basemapAplicadoRef.current = basemap;
     const ts = conjuntoDoFundo(fundosRef.current, basemap);
@@ -819,15 +826,15 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
       idsAnterioresRef.current = layers.map((l) => l.id);
       if (didFit) fittedRef.current = true;
     };
-    // O `style.load` chama ESTA sincronização depois de um `setStyle`. Guardar
-    // o closure atual é o que mantém as camadas da conversa no globo quando o
-    // basemap troca — o efeito de `[layers]` não roda nessa hora.
+    // `style.load` calls THIS sync after a `setStyle`. Keeping the current
+    // closure is what keeps the conversation's layers on the globe when the
+    // basemap changes — the `[layers]` effect does not run at that moment.
     sincronizarRef.current = sync;
-    // Esperar por `load`/`isStyleLoaded()` perdia sincronizações em silêncio:
-    // `load` dispara UMA vez na vida do mapa (um `once` registrado depois nunca
-    // roda) e `isStyleLoaded()` é falso enquanto houver tile em voo — no globo
-    // vetorial, a regra. O que basta para criar camadas é o estilo ter
-    // carregado, sinalizado uma vez por estilo em `style.load`.
+    // Waiting for `load`/`isStyleLoaded()` silently lost syncs: `load` fires
+    // ONCE in the map's life (a `once` registered later never runs) and
+    // `isStyleLoaded()` is false while any tile is in flight — on the vector
+    // globe, the rule. What is enough to create layers is the style having
+    // loaded, signaled once per style on `style.load`.
     return _quandoEstiloPronto(map, estiloProntoRef.current, sync);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layers]);
@@ -836,9 +843,9 @@ const MapLibreMap = forwardRef<MapLibreMapHandle, Props>(function MapLibreMap(
     <div className="relative w-full h-full">
       <div id={`map-${mapId}`} ref={containerRef} className="w-full h-full" />
 
-      {/* Alternador de basemap. Dois botões e não um interruptor: o rótulo do
-          lado ATIVO tem de ficar visível — "Mapa"/"Satélite" dizem o que se está
-          vendo, e um interruptor só diria para onde se vai. */}
+      {/* Basemap toggle. Two buttons and not a switch: the label of the
+          ACTIVE side must stay visible — "Mapa"/"Satélite" say what you are
+          seeing, and a switch would only say where you are going. */}
       {comAlternador && (
       <div className="absolute bottom-6 left-3 z-10 flex rounded-xl overflow-hidden border border-border/50 shadow-lg bg-background/80 backdrop-blur-md">
         <button
@@ -879,11 +886,11 @@ export default MapLibreMap;
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
 /**
- * Ids clicáveis derivados das camadas do componente. Antes vinham de
- * `map.getStyle()`, que serializa TODAS as fontes e camadas do estilo — com um
- * basemap vetorial (mais de cem camadas) isso acontecia a cada mousemove.
- * Aqui o custo é proporcional às nossas camadas, que são poucas.
- * Exportada para teste.
+ * Clickable ids derived from the component's layers. They used to come from
+ * `map.getStyle()`, which serializes ALL sources and layers of the style — with
+ * a vector basemap (over a hundred layers) that happened on every mousemove.
+ * Here the cost is proportional to our layers, which are few.
+ * Exported for tests.
  */
 export function _idsInterativos(map: maplibregl.Map, layers: MapLayer[]): string[] {
   const ids: string[] = [];
@@ -891,8 +898,8 @@ export function _idsInterativos(map: maplibregl.Map, layers: MapLayer[]): string
     if (!layer.visible) continue;
     for (const prefixo of ["fill-", "line-", "circle-"]) {
       const id = `${prefixo}${layer.id}`;
-      // A camada pode não existir (tipo de geometria que não a usa) e
-      // `queryRenderedFeatures` com id inexistente derruba a consulta inteira.
+      // The layer may not exist (a geometry type that does not use it) and
+      // `queryRenderedFeatures` with a nonexistent id brings down the whole query.
       if (map.getLayer(id)) ids.push(id);
     }
   }
@@ -900,8 +907,8 @@ export function _idsInterativos(map: maplibregl.Map, layers: MapLayer[]): string
 }
 
 /**
- * Roda `sync` agora, se o estilo já carregou, ou no próximo `style.load`.
- * Devolve a limpeza do listener. Exportada para teste.
+ * Runs `sync` now, if the style has already loaded, or on the next `style.load`.
+ * Returns the listener cleanup. Exported for tests.
  */
 export function _quandoEstiloPronto(
   map: maplibregl.Map,
@@ -917,8 +924,8 @@ export function _quandoEstiloPronto(
 }
 
 /**
- * Filtro por tipo de geometria do feature. Aceita também as variantes Multi*
- * (o GeoJSON as devolve; o MVT só as simples). Exportada para teste.
+ * Filter by the feature's geometry type. Also accepts the Multi* variants
+ * (GeoJSON returns them; MVT only the simple ones). Exported for tests.
  */
 export function _filtroGeom(...tipos: Array<"Point" | "LineString" | "Polygon">): maplibregl.FilterSpecification {
   const aceitos = tipos.flatMap((t) => [t, `Multi${t}`]);
@@ -926,9 +933,9 @@ export function _filtroGeom(...tipos: Array<"Point" | "LineString" | "Polygon">)
 }
 
 /**
- * Ids das camadas DESTE componente presentes no estilo (sufixo de `fill-`/
- * `line-`/`circle-` cuja fonte é `src-*`, mais fontes `src-*` órfãs). Caminho
- * de compatibilidade para quem chama `_syncLayers` sem a lista anterior.
+ * Ids of THIS component's layers present in the style (suffix of `fill-`/
+ * `line-`/`circle-` whose source is `src-*`, plus orphan `src-*` sources).
+ * Compatibility path for callers of `_syncLayers` without the previous list.
  */
 function _nossasCamadasDoEstilo(map: maplibregl.Map): string[] {
   const estilo = map.getStyle();
@@ -945,13 +952,13 @@ function _nossasCamadasDoEstilo(map: maplibregl.Map): string[] {
   return [...ids];
 }
 
-// O maplibre-gl 6 tipa o nome e o valor de cada propriedade de pintura. O tipo
-// que os lista vem do style-spec, que não é dependência direta: daí lê-los da
-// assinatura do `setPaintProperty`.
+// maplibre-gl 6 types the name and value of each paint property. The type that
+// lists them comes from style-spec, which is not a direct dependency: hence
+// reading them from the `setPaintProperty` signature.
 type PropriedadeDePintura = Parameters<maplibregl.Map["setPaintProperty"]>[1];
 type ValorDePintura = Parameters<maplibregl.Map["setPaintProperty"]>[2];
 
-/** Só escreve a propriedade quando ela de fato mudou (evita repintar o estilo). */
+/** Only writes the property when it actually changed (avoids repainting the style). */
 function _definirPaint(map: maplibregl.Map, id: string, prop: PropriedadeDePintura, valor: ValorDePintura): void {
   if (map.getPaintProperty(id, prop) !== valor) {
     map.setPaintProperty(id, prop, valor);
@@ -960,12 +967,12 @@ function _definirPaint(map: maplibregl.Map, id: string, prop: PropriedadeDePintu
 
 function _definirVisibilidade(map: maplibregl.Map, id: string, visivel: boolean): void {
   const alvo = visivel ? "visible" : "none";
-  // `visibility` ausente equivale a "visible" — não reescreve à toa.
+  // A missing `visibility` is equivalent to "visible" — do not rewrite for nothing.
   const atual = map.getLayoutProperty(id, "visibility") ?? "visible";
   if (atual !== alvo) map.setLayoutProperty(id, "visibility", alvo);
 }
 
-/** Retorna true se fitBounds foi chamado nesta invocação. Exportada para teste. */
+/** Returns true if fitBounds was called in this invocation. Exported for tests. */
 export function _syncLayers(
   map: maplibregl.Map,
   layers: MapLayer[],
@@ -976,13 +983,13 @@ export function _syncLayers(
   tilesBaseUrl?: string,
   idsAnteriores?: string[],
 ): boolean {
-  // ── Remove as camadas que sumiram da lista ─────────────────────────────────
-  // A Home tira camada do globo (o portal tem lista estável, então nada some
-  // lá). Só mexe no que ESTE componente criou — camadas cuja fonte é `src-*` —,
-  // nunca nas do próprio basemap. Layers antes das fontes:
-  // não dá para remover uma fonte ainda em uso.
-  // Quem passa `idsAnteriores` (o componente, via ref) fecha o delta sem
-  // `getStyle()`, que serializa todas as fontes e camadas do basemap.
+  // ── Removes the layers that left the list ──────────────────────────────────
+  // The Home removes layers from the globe (the portal has a stable list, so
+  // nothing disappears there). It only touches what THIS component created —
+  // layers whose source is `src-*` —, never the basemap's own. Layers before
+  // sources: a source still in use cannot be removed.
+  // Whoever passes `idsAnteriores` (the component, via ref) closes the delta
+  // without `getStyle()`, which serializes all of the basemap's sources and layers.
   const desejadas = new Set(layers.map((l) => l.id));
   const removidas = idsAnteriores
     ? idsAnteriores.filter((id) => !desejadas.has(id))
@@ -1004,19 +1011,19 @@ export function _syncLayers(
     const circleId = `circle-${layer.id}`;
     const color = layer.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length];
 
-    // MVT por camada (a Home) tem precedência sobre o par global do portal.
+    // Per-layer MVT (the Home) takes precedence over the portal's global pair.
     const layerKey = tileLayerKeys?.[layer.id];
     const mvtInfo = layer.mvt ?? (mvtWorkflowHash && layerKey ? { workflowHash: mvtWorkflowHash, layerKey } : undefined);
     const useMvt = !!mvtInfo;
 
     if (!map.getSource(src)) {
       if (mvtInfo) {
-        // Cache-buster: query string baseada na ultima publicacao da camada.
-        // Sem isso, MapLibre/Cloudflare/browser servem tiles velhos apos uma
-        // re-publicacao (max-age=3600 no backend) — usuario ve dados misturados.
+        // Cache-buster: query string based on the layer's last publication.
+        // Without it, MapLibre/Cloudflare/browser serve stale tiles after a
+        // re-publication (max-age=3600 on the backend) — the user sees mixed data.
         const version = tileLayerVersions?.[layer.id]
         const versionQs = version ? `?v=${encodeURIComponent(version)}` : ""
-        // Padrão: tiles do portal. A Home passa `/terra/assistente/tiles`.
+        // Default: portal tiles. The Home passes `/terra/assistente/tiles`.
         const base = tilesBaseUrl ?? `${window.location.origin}/terra/artifacts/tiles`
         map.addSource(src, {
           type: "vector",
@@ -1031,12 +1038,12 @@ export function _syncLayers(
       (map.getSource(src) as maplibregl.GeoJSONSource).setData(layer.geojson);
     }
 
-    // geomType null NÃO renderia nada, em silêncio. Inferimos do primeiro
-    // feature (GeoJSON). Num MVT sem tipo declarado caímos em `semTipo`: aí
-    // adicionamos as três camadas COM filtro por `geometry-type`. O filtro é
-    // obrigatório: um layer `circle` desenha um círculo por VÉRTICE, inclusive
-    // os de um polígono, e um layer `fill` triangula até LineString — sem ele
-    // um talhão vira uma nuvem de bolinhas no portal público.
+    // A null geomType rendered NOTHING, silently. We infer it from the first
+    // feature (GeoJSON). In an MVT with no declared type we fall into `semTipo`:
+    // there we add the three layers WITH a `geometry-type` filter. The filter is
+    // mandatory: a `circle` layer draws a circle per VERTEX, including those of
+    // a polygon, and a `fill` layer triangulates even a LineString — without it
+    // a field plot becomes a cloud of dots on the public portal.
     const gt = layer.geomType || _sniffGeomType(layer.geojson);
     const semTipo = useMvt && !gt;
     const isPoly = gt.includes("Polygon");
@@ -1062,7 +1069,7 @@ export function _syncLayers(
       if (!map.getLayer(lineId)) {
         map.addLayer({
           id: lineId, type: "line", source: src, ...(sourceLayer ? { "source-layer": sourceLayer } : {}),
-          // Sem tipo declarado, a borda cobre polígono E linha: os dois têm contorno.
+          // With no declared type, the outline covers polygon AND line: both have an outline.
           ...(semTipo ? { filter: _filtroGeom("Polygon", "LineString") } : {}),
           paint: { "line-color": color, "line-width": isPoly ? 1.5 : 2.5, "line-opacity": 0.9 },
         });
@@ -1089,7 +1096,7 @@ export function _syncLayers(
     if (layer.visible && _estenderBounds(bounds, layer)) hasBounds = true;
   });
 
-  // fitBounds apenas na primeira carga
+  // fitBounds only on the first load
   if (hasBounds && !alreadyFitted) {
     map.fitBounds(bounds, { padding: 50, maxZoom: 15 });
     return true;
@@ -1097,14 +1104,14 @@ export function _syncLayers(
   return false;
 }
 
-/** Tipo de geometria do primeiro feature — "" se não houver (ex.: MVT). */
+/** Geometry type of the first feature — "" if there is none (e.g. MVT). */
 export function _sniffGeomType(fc: GeoJSON.FeatureCollection): string {
   const g = fc?.features?.find((f) => f.geometry)?.geometry;
   return g?.type ?? "";
 }
 
-/** Estende `bounds` pela bbox da camada, ou pelas coordenadas dos features.
-    Retorna true se estendeu. */
+/** Extends `bounds` by the layer's bbox, or by the features' coordinates.
+    Returns true if it extended. */
 export function _estenderBounds(bounds: maplibregl.LngLatBounds, layer: MapLayer): boolean {
   if (layer.bbox && layer.bbox.length === 4) {
     bounds.extend([layer.bbox[0], layer.bbox[1]] as [number, number]);

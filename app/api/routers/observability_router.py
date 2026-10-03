@@ -1,21 +1,21 @@
 # app/api/routers/observability_router.py
 """
-Observability endpoints — métricas agregadas de execução dos workflows.
-Contrato com a web: docs/specs/metrics-history.md (§3).
+Observability endpoints — aggregated workflow run metrics.
+Contract with the web: docs/specs/metrics-history.md (§3).
 
-Regras de escopo:
-  - admin  → vê tudo (sem filtro)
-  - usuário → vê runs e workflows dos workspaces onde é dono ou membro
+Scope rules:
+  - admin  → sees everything (no filter)
+  - user → sees runs and workflows of the workspaces where they are owner or member
 
-A visão total NÃO é deduzida pelo service a partir do `User`: é este router
-que a declara, em toda chamada, com `como_admin=e_admin_global(current_user)`.
-O servidor MCP (docs/specs/mcp-server.md §6.12) usa os mesmos services com a
-visão de membro, e um admin com PAT não pode atravessar o escopo do token só
-porque o objeto `User` carrega o papel.
+The full view is NOT inferred by the service from the `User`: it is this router
+that declares it, on every call, with `como_admin=e_admin_global(current_user)`.
+The MCP server (docs/specs/mcp-server.md §6.12) uses the same services with the
+member view, and an admin with a PAT cannot cross the token's scope just
+because the `User` object carries the role.
 
-Filtros comuns (opcionais): `workspace_id` (403 fora do escopo do usuário),
-`workflow_id` (404 fora do escopo) e, no gráfico por dia, `tz` (422 se não for
-um nome IANA).
+Common filters (optional): `workspace_id` (403 outside the user's scope),
+`workflow_id` (404 outside the scope) and, in the per-day chart, `tz` (422 if it
+is not an IANA name).
 """
 
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -39,8 +39,8 @@ _svc = ObservabilityService
 def _tz_valido(
     tz: str = Query("UTC", description="Fuso IANA para cortar o dia (ex.: America/Sao_Paulo)"),
 ) -> str:
-    """Valida o `?tz=` na borda: um nome inválido viraria erro de SQL no
-    `AT TIME ZONE` do PostgreSQL (500) em vez de um 422 que a web entende."""
+    """Validates `?tz=` at the edge: an invalid name would become an SQL error in
+    PostgreSQL's `AT TIME ZONE` (500) instead of a 422 the web understands."""
     try:
         ZoneInfo(tz)
     except (ZoneInfoNotFoundError, ValueError):
@@ -64,12 +64,12 @@ async def get_metrics(
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
     """
-    Retorna métricas agregadas da janela pedida (`period_days` na resposta),
-    o período anterior de mesmo tamanho, percentis de duração e o bloco `now`.
-    Admin vê todos os dados; usuário vê workflows do(s) seu(s) workspace(s).
+    Returns aggregated metrics for the requested window (`period_days` in the response),
+    the previous period of the same size, duration percentiles and the `now` block.
+    Admin sees all data; a user sees workflows of their workspace(s).
 
-    Servido de um cache Redis de ~45s: são números de painel, e sem ele cada
-    aba aberta repetia as mesmas agregações sobre `workflow_runs`.
+    Served from a ~45s Redis cache: these are dashboard numbers, and without it each
+    open tab repeated the same aggregations over `workflow_runs`.
     """
     return await _svc.get_metrics(
         db, current_user, workspace_ids,
@@ -88,8 +88,8 @@ async def get_workflows_metrics(
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
     """
-    Todos os workflows acessíveis — inclusive os sem execução na janela, com
-    zeros — ordenados por execuções (desc) e nome. Mesmo cache curto de `/metrics`.
+    All accessible workflows — including those with no runs in the window, with
+    zeros — ordered by runs (desc) and name. Same short cache as `/metrics`.
     """
     return await _svc.get_workflows_metrics(
         db, current_user, workspace_ids, days=days, force=force, workspace_id=workspace_id,
@@ -103,16 +103,16 @@ async def get_workflows_metrics(
 )
 async def get_workflow_metrics(
     id_hash: str,
-    # Teto de 1000 não era defensável: cada execução carregava métricas de
-    # todos os seus nós e a tela mostra dezenas de linhas, não mil.
+    # A ceiling of 1000 was not defensible: each run loaded metrics for
+    # all its nodes and the screen shows dozens of rows, not a thousand.
     limit: int = Query(20, ge=1, le=100, description="Últimas N execuções"),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
     """
-    Retorna métricas de um workflow específico.
-    Admin acessa qualquer workflow; usuário acessa workflows do(s) seu(s) workspace(s).
+    Returns metrics for a specific workflow.
+    Admin accesses any workflow; a user accesses workflows of their workspace(s).
     """
     return await _svc.get_workflow_metrics(
         db, id_hash, current_user, workspace_ids, limit,
@@ -130,9 +130,9 @@ async def get_executor_metrics(
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
     """
-    Estatísticas por executor na janela pedida, mais presença e capacidade
-    atuais. Admin vê todos; usuário vê runs dos seus workspaces. Mesmo cache
-    curto de `/metrics`.
+    Per-executor statistics in the requested window, plus current presence and
+    capacity. Admin sees all; a user sees runs of their workspaces. Same short
+    cache as `/metrics`.
     """
     return await _svc.get_executor_metrics(
         db, current_user, workspace_ids, days=days, force=force, workspace_id=workspace_id,
@@ -170,10 +170,10 @@ async def list_runs(
     current_user=Depends(get_current_user),
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
-    """Lista execuções. Admin vê todas; usuário vê runs dos seus workspaces.
+    """Lists runs. Admin sees all; a user sees runs of their workspaces.
 
-    `total` só vem preenchido com `with_total=1`; sem ele a resposta traz
-    `has_more`, que é o que o "Ver mais" precisa e não custa um count da tabela.
+    `total` is only filled with `with_total=1`; without it the response carries
+    `has_more`, which is what "Ver mais" (See more) needs and does not cost a table count.
     """
     return await _svc.list_runs(
         db, current_user, workspace_ids,
@@ -202,8 +202,8 @@ async def get_run_detail(
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
     """
-    Detalhes de uma execução. Admin acessa qualquer run;
-    usuário acessa runs de workflows no(s) seu(s) workspace(s).
+    Details of a run. Admin accesses any run;
+    a user accesses runs of workflows in their workspace(s).
     """
     return await _svc.get_run_detail(
         db, run_id, current_user, workspace_ids, como_admin=e_admin_global(current_user),
@@ -218,9 +218,9 @@ async def get_run_events(
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
     """
-    Linha do tempo bruta de eventos de um run (o mesmo replay que o WebSocket
-    entrega ao conectar). Permite ao painel de execução reabrir o log de uma
-    execução já concluída. Histórico expira em 1h no Redis.
+    Raw event timeline of a run (the same replay the WebSocket
+    delivers on connect). Lets the run panel reopen the log of an
+    already finished run. History expires after 1h in Redis.
     """
     return await _svc.get_run_events(
         db, run_id, current_user, workspace_ids, como_admin=e_admin_global(current_user),
@@ -238,9 +238,9 @@ async def runs_by_day(
     workspace_ids: List[str] = Depends(get_user_workspace_ids),
 ):
     """
-    Contagem de execuções por dia, com o dia cortado no fuso `tz` e todos os
-    dias da janela presentes (zeros incluídos). Admin vê tudo; usuário vê runs
-    dos seus workspaces.
+    Run count per day, with the day cut in the `tz` time zone and every
+    day of the window present (zeros included). Admin sees everything; a user sees
+    runs of their workspaces.
     """
     return await _svc.get_runs_by_day(
         db, current_user, workspace_ids, days,

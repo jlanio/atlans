@@ -1,7 +1,7 @@
 # app/api/routers/portal_router.py
 """
-Portal de compartilhamento publico — endpoints para visualizacao de mapas,
-publicacao de camadas (PublishMap node), tiles MVT e download de GeoJSON.
+Public sharing portal — endpoints for viewing maps,
+publishing layers (PublishMap node), MVT tiles and GeoJSON download.
 """
 import asyncio
 import zlib
@@ -26,21 +26,21 @@ router = APIRouter(
 )
 
 
-# ── Gate de acesso ao portal (reutilizavel) ───────────────────────────────────
+# ── Portal access gate (reusable) ─────────────────────────────────────────────
 
 async def enforce_portal_access(wf: "Workflow | None", request: Request) -> None:
-    """Aplica o controle de acesso do portal. Levanta HTTPException se negado.
+    """Applies the portal's access control. Raises HTTPException if denied.
 
-    disabled/inexistente/inativo -> 404; public -> livre; private -> Bearer de
-    access + membro de portal_shared_with (401/403).
+    disabled/nonexistent/inactive -> 404; public -> open; private -> access
+    Bearer + member of portal_shared_with (401/403).
 
-    Extraido de get_portal_data para ser aplicado tambem em tiles e download —
-    que antes so checavam 'disabled', vazando as geometrias de um portal privado
-    a qualquer um que soubesse workflow_hash + layer_key (baixa entropia).
+    Extracted from get_portal_data to also be applied to tiles and download —
+    which before only checked 'disabled', leaking a private portal's geometries
+    to anyone who knew workflow_hash + layer_key (low entropy).
 
-    Aceita tanto a entidade `Workflow` quanto uma Row com as tres colunas que o
-    gate le (`flag_ative`, `portal_access`, `portal_shared_with`) — o tile MVT
-    projeta so essas para nao carregar a `definition` do fluxo por tile.
+    Accepts both the `Workflow` entity and a Row with the three columns the
+    gate reads (`flag_ative`, `portal_access`, `portal_shared_with`) — the MVT tile
+    projects only those so as not to load the workflow's `definition` per tile.
     """
     if not wf or not wf.flag_ative or wf.portal_access == "disabled":
         raise HTTPException(status_code=404, detail="Portal nao encontrado.")
@@ -52,8 +52,8 @@ async def enforce_portal_access(wf: "Workflow | None", request: Request) -> None
         raise HTTPException(status_code=401, detail="Autenticacao necessaria.")
     token = auth_header[7:]
 
-    # decode + audience(access) + type + blacklist, no ponto único. Exige access
-    # (bloqueia refresh/ws-token) e rejeita token revogado no logout.
+    # decode + audience(access) + type + blacklist, at the single point. Requires access
+    # (blocks refresh/ws-token) and rejects a token revoked at logout.
     from app.api.dependencies import validate_access_token_claims
     claims = await validate_access_token_claims(token)
     if claims is None:
@@ -65,15 +65,15 @@ async def enforce_portal_access(wf: "Workflow | None", request: Request) -> None
 
 
 def _headers_do_tile(portal_access: str) -> dict:
-    """Cache/CORS de um tile MVT conforme a visibilidade do portal.
+    """Cache/CORS of an MVT tile according to the portal's visibility.
 
-    O gate ja 404 disabled/inativo; aqui sobra public ou private. Um portal
-    PRIVADO nao pode sair como `public, max-age`: o browser (e qualquer CDN que
-    honre `public`) guardaria a geometria e a serviria por ate 1 h APOS o dono
-    revogar o acesso — ou a uma requisicao SEM Bearer. O proprio comentario do
-    endpoint diz "nada de cache com TTL"; o header contradizia isso. Privado ->
-    `private, no-store` e sem `Access-Control-Allow-Origin: *` (nao se abre a
-    origem de uma resposta autenticada). Publico segue cacheavel/CDN.
+    The gate already 404s disabled/inactive; what remains here is public or private. A
+    PRIVATE portal cannot go out as `public, max-age`: the browser (and any CDN that
+    honors `public`) would keep the geometry and serve it for up to 1 h AFTER the owner
+    revokes access — or to a request WITHOUT a Bearer. The endpoint's own comment
+    says "nada de cache com TTL" (no TTL cache); the header contradicted it. Private ->
+    `private, no-store` and no `Access-Control-Allow-Origin: *` (the origin of an
+    authenticated response is not opened up). Public stays cacheable/CDN.
     """
     if portal_access == "public":
         return {"Cache-Control": "public, max-age=3600", "Access-Control-Allow-Origin": "*"}
@@ -89,12 +89,12 @@ async def get_portal_data(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Retorna metadados e camadas publicadas do portal de um workflow.
-    Acesso controlado por portal_access: disabled->404, public->livre, private->JWT obrigatorio.
+    Returns metadata and published layers of a workflow's portal.
+    Access controlled by portal_access: disabled->404, public->open, private->JWT required.
     """
-    # Projeta só as 4 colunas do gate + o nome da resposta — não a entidade
-    # inteira, que arrastaria a `definition` (o fluxo, dezenas de KB) num
-    # endpoint público chamado a cada abertura do portal. Mesmo padrão do MVT.
+    # Projects only the gate's 4 columns + the response name — not the whole
+    # entity, which would drag along the `definition` (the workflow, dozens of KB) in a
+    # public endpoint called on every portal open. Same pattern as the MVT.
     result = await db.execute(
         select(
             Workflow.name, Workflow.flag_ative,
@@ -104,7 +104,7 @@ async def get_portal_data(
     wf = result.first()
     await enforce_portal_access(wf, request)
 
-    # Busca metadados das camadas (sem geojson_data)
+    # Fetch layer metadata (without geojson_data)
     _pl_cols = (
         PortalLayer.id_hash, PortalLayer.layer_key, PortalLayer.features,
         PortalLayer.bbox, PortalLayer.geometry_type,
@@ -130,8 +130,8 @@ async def get_portal_data(
             "features": pl.features,
             "bbox": pl.bbox,
             "geometry_type": pl.geometry_type,
-            # `updated_at` vira parte da URL do tile (cache-busting). Sem isso,
-            # MapLibre/Cloudflare/browser servem tiles velhos apos uma re-publicacao.
+            # `updated_at` becomes part of the tile URL (cache-busting). Without it,
+            # MapLibre/Cloudflare/browser serve stale tiles after a re-publication.
             "updated_at": pl.updated_at.isoformat() if pl.updated_at else None,
             "publish_config": {
                 "title": pl.title,
@@ -178,22 +178,22 @@ async def get_portal_data(
 # ── POST /artifacts/portal/publish ────────────────────────────────────────────
 
 _MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024  # 50 MB
-# Teto do CORPO que entra (comprimido ou nao). Um gzip legitimo de 50 MB de
-# GeoJSON cabe MUITO abaixo disto; acima e bomba ou payload absurdo, recusado
-# antes de ser materializado.
+# Ceiling on the incoming BODY (compressed or not). A legitimate gzip of 50 MB of
+# GeoJSON fits WELL below this; above it is a bomb or an absurd payload, rejected
+# before being materialized.
 _MAX_COMPRESSED_BYTES = _MAX_UNCOMPRESSED_BYTES
 
 
 class _CorpoGrandeDemais(Exception):
-    """Corpo (comprimido ou descomprimido) passou do teto configurado."""
+    """Body (compressed or decompressed) exceeded the configured ceiling."""
 
 
 async def _ler_corpo_limitado(request: Request, teto: int) -> bytes:
-    """Le o corpo em blocos, cortando no teto — nunca bufferiza um corpo absurdo.
+    """Reads the body in chunks, cutting at the ceiling — never buffers an absurd body.
 
-    `await request.body()` materializa o corpo inteiro na RAM antes de qualquer
-    checagem; aqui um corpo acima do teto e recusado assim que passa, sem ser
-    lido por inteiro.
+    `await request.body()` materializes the whole body in RAM before any
+    check; here a body above the ceiling is rejected as soon as it crosses it, without
+    being read in full.
     """
     pedacos: list[bytes] = []
     total = 0
@@ -206,18 +206,18 @@ async def _ler_corpo_limitado(request: Request, teto: int) -> bytes:
 
 
 def _descomprimir_gzip_com_teto(raw: bytes, teto: int) -> bytes:
-    """Descomprime gzip em blocos, cortando no teto — nunca materializa a bomba.
+    """Decompresses gzip in chunks, cutting at the ceiling — never materializes the bomb.
 
-    `gzip.decompress()` descomprimiria o payload INTEIRO antes de qualquer check
-    de tamanho; uma bomba (poucos KB -> GBs) derrubaria a API por memoria. O
-    decompressobj para de produzir no primeiro byte acima do teto. Sincrono e
-    CPU-bound — chame via asyncio.to_thread para nao travar o event loop.
+    `gzip.decompress()` would decompress the ENTIRE payload before any size
+    check; a bomb (a few KB -> GBs) would bring down the API through memory. The
+    decompressobj stops producing at the first byte above the ceiling. Synchronous and
+    CPU-bound — call it via asyncio.to_thread so as not to block the event loop.
     """
     d = zlib.decompressobj(16 + zlib.MAX_WBITS)  # 16 = espera cabecalho gzip
     saida = bytearray()
     dados = raw
     while True:
-        # +1 no limite para detectar o estouro exatamente no teto
+        # +1 on the limit to detect the overflow exactly at the ceiling
         saida += d.decompress(dados, max(1, teto + 1 - len(saida)))
         if len(saida) > teto:
             raise _CorpoGrandeDemais()
@@ -247,11 +247,11 @@ async def publish_portal_layer(
     except HTTPException:
         raise
 
-    # ── 2. Leitura + descompressao com teto (anti-bomba, fora do event loop)
-    # Le em blocos com corte no teto (nunca bufferiza um corpo absurdo) e, se
-    # gzip, descomprime incrementalmente parando no primeiro byte acima do limite
-    # — uma bomba (poucos KB -> GBs) e recusada sem materializar. descomprimir e
-    # o json.loads (50 MB) vao para thread para nao travar o event loop.
+    # ── 2. Read + decompress with a ceiling (anti-bomb, off the event loop)
+    # Reads in chunks cutting at the ceiling (never buffers an absurd body) and, if
+    # gzip, decompresses incrementally stopping at the first byte above the limit
+    # — a bomb (a few KB -> GBs) is rejected without being materialized. Decompressing
+    # and the json.loads (50 MB) go to a thread so as not to block the event loop.
     try:
         raw_body = await _ler_corpo_limitado(request, _MAX_COMPRESSED_BYTES)
     except _CorpoGrandeDemais:
@@ -303,7 +303,7 @@ async def publish_portal_layer(
     if len(features_list) > _MAX_FEATURES:
         raise HTTPException(status_code=400, detail=f"Limite de {_MAX_FEATURES} features excedido ({len(features_list)}).")
 
-    # Validação básica de estrutura das features
+    # Basic validation of the features' structure
     for i, feat in enumerate(features_list[:10]):  # valida amostra
         if not isinstance(feat, dict):
             raise HTTPException(status_code=400, detail=f"Feature[{i}] não é um objeto válido.")
@@ -430,15 +430,15 @@ async def download_portal_layer(
     request: Request,
     db: AsyncSession = Depends(get_db),
 ):
-    """Serve o GeoJSON armazenado na portal_layers direto do banco."""
+    """Serves the GeoJSON stored in portal_layers straight from the database."""
     from fastapi.responses import JSONResponse
     result = await db.execute(select(PortalLayer).where(PortalLayer.id_hash == layer_id_hash))
     pl = result.scalar_one_or_none()
     if not pl:
         raise HTTPException(status_code=404, detail="Camada nao encontrada.")
 
-    # SEG: resolve o workflow dono e aplica o mesmo gate. Antes o GeoJSON
-    # inteiro saia sem qualquer checagem, bastando o UUID da camada.
+    # SEC: resolves the owning workflow and applies the same gate. Before, the entire
+    # GeoJSON went out without any check, only the layer UUID was needed.
     wf_result = await db.execute(
         select(
             Workflow.flag_ative, Workflow.portal_access, Workflow.portal_shared_with,
@@ -465,15 +465,15 @@ async def get_mvt_tile(
     """Gera tile MVT via ST_AsMVT do PostGIS."""
     from fastapi.responses import Response
 
-    # PERF: um pan/zoom no portal pede dezenas de tiles, e cada um pagava TRES
-    # idas ao Postgres: workflow (entidade inteira, arrastando a `definition`
-    # completa do fluxo), camada e o ST_AsMVT. Aqui as duas primeiras viram uma
-    # só, com outerjoin e apenas as colunas que o gate usa.
+    # PERF: a pan/zoom on the portal requests dozens of tiles, and each one paid THREE
+    # trips to Postgres: workflow (whole entity, dragging along the workflow's full
+    # `definition`), layer and the ST_AsMVT. Here the first two become a
+    # single one, with an outerjoin and only the columns the gate uses.
     #
-    # SEG: mesmo gate de get_portal_data, e continua sendo lido do banco a cada
-    # tile — nada de cache com TTL, que faria um portal marcado como privado
-    # seguir servindo geometrias até o prazo vencer. Antes so 'disabled' era
-    # checado e tiles de portal privado saiam sem auth.
+    # SEC: same gate as get_portal_data, and it is still read from the database on every
+    # tile — no TTL cache, which would make a portal marked as private
+    # keep serving geometries until the deadline expired. Before, only 'disabled' was
+    # checked and private portal tiles went out without auth.
     gate_result = await db.execute(
         select(
             Workflow.flag_ative,
@@ -510,11 +510,11 @@ async def get_mvt_tile(
 
 
 async def tile_mvt(db: AsyncSession, *, layer_id: int, layer_key: str, z: int, x: int, y: int) -> bytes | None:
-    """A query `ST_AsMVT` de UMA camada — o miolo compartilhado entre o tile do
-    portal (aqui) e o tile da Home (`assistente_camadas_router`, com portao de MEMBRO
-    em vez do de portal). Recebe o `layer_id` JA resolvido e autorizado por quem
-    chama: nao faz gate nenhum. Devolve os bytes do protobuf, ou None quando o
-    tile nao intersecta nenhuma feicao (o chamador responde 204)."""
+    """The `ST_AsMVT` query for ONE layer — the core shared between the portal
+    tile (here) and the Home tile (`assistente_camadas_router`, with a MEMBER gate
+    instead of the portal one). Receives the `layer_id` ALREADY resolved and authorized
+    by the caller: it does no gating at all. Returns the protobuf bytes, or None when the
+    tile intersects no feature (the caller responds 204)."""
     from sqlalchemy import text
 
     tile_query = text("""

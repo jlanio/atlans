@@ -1,17 +1,17 @@
 "use client"
 
 /**
- * Editor das portas de entrada de um nó de entradas dinâmicas (Script Python).
+ * Editor for the input ports of a node with dynamic inputs (Python Script).
  *
- * É um CAMPO, e não um helper: o `HELPER_MAP` do node-config-form substitui o
- * formulário inteiro, e aqui o código Python precisa continuar visível ao lado
- * das portas — os nomes que se define aqui são as variáveis daquele código.
+ * It is a FIELD, not a helper: node-config-form's `HELPER_MAP` replaces the
+ * whole form, and here the Python code needs to stay visible next to the ports
+ * — the names defined here are the variables of that code.
  *
- * Por que isto existe: o nome que chega ao script vem do `to_key` da aresta, e o
- * editor só preenche `to_key` quando o nó de destino declara mais de uma porta.
- * Um nó sem portas declaradas recebe as duas arestas na mesma chave e perde uma
- * — o script reclama de uma variável indefinida sem nada dizer que a outra foi
- * sobrescrita.
+ * Why this exists: the name that reaches the script comes from the edge's
+ * `to_key`, and the editor only fills `to_key` when the target node declares
+ * more than one port. A node without declared ports receives both edges on the
+ * same key and loses one — the script complains about an undefined variable
+ * without anything saying the other one was overwritten.
  */
 import { useMemo } from "react"
 import { TbPlus, TbTrash, TbInfoCircle, TbPlugConnected } from "react-icons/tb"
@@ -23,13 +23,13 @@ import { FieldLabel } from "./field-label"
 import type { FieldProps } from "./types"
 
 /**
- * Aviso de editor de portas travado por arestas ligadas.
+ * Notice for a port editor locked by connected edges.
  *
- * Vive aqui e é usado também pelo editor de portas do sub-fluxo: o motivo do
- * bloqueio é o mesmo nos dois, e o pior desfecho também. Mudar as portas com
- * arestas ligadas as faz apontar para um ponto de conexão que deixou de
- * existir — elas somem do canvas e continuam executando, e sem linha desenhada
- * nem o botão de excluir é alcançável.
+ * It lives here and is also used by the sub-workflow port editor: the reason
+ * for the lock is the same in both, and so is the worst outcome. Changing the
+ * ports with connected edges makes them point to a connection point that no
+ * longer exists — they vanish from the canvas and keep executing, and with no
+ * line drawn not even the delete button is reachable.
  */
 export function AvisoPortasTravadas({ conexoes }: { conexoes: number }) {
   return (
@@ -45,7 +45,7 @@ export function AvisoPortasTravadas({ conexoes }: { conexoes: number }) {
 }
 
 type PortsFieldProps = FieldProps<{
-  /** Quantas arestas chegam a este nó — o editor trava enquanto houver alguma. */
+  /** How many edges arrive at this node — the editor locks while there is any. */
   conexoesDeEntrada?: number
 }>
 
@@ -53,8 +53,8 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
   const portas = useMemo(() => lerPortas(values?.[field.name]), [values, field.name])
   const travado = conexoesDeEntrada > 0
 
-  // Guardado como JSON: `setNodeField` só aceita string/number/boolean, e a
-  // propriedade viaja como valor único na definition do workflow.
+  // Stored as JSON: `setNodeField` only accepts string/number/boolean, and the
+  // property travels as a single value in the workflow definition.
   const gravar = (proximo: string[]) => setNodeField(field.name, JSON.stringify(proximo))
 
   function adicionar() {
@@ -108,9 +108,9 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
                     placeholder="ex: pontos"
                     className="h-8 font-mono text-sm"
                     onChange={e => {
-                      // Sem `trim`: cortar o espaço aqui o fazia sumir enquanto
-                      // a pessoa digitava, como se a tecla não funcionasse, e o
-                      // aviso abaixo nunca via o valor para explicar o motivo.
+                      // No `trim`: cutting the space here made it vanish while
+                      // the person typed, as if the key didn't work, and the
+                      // warning below never saw the value to explain why.
                       const proximo = portas.slice()
                       proximo[i] = e.target.value
                       gravar(proximo)
@@ -126,10 +126,11 @@ const PortsField = ({ field, values, setNodeField, conexoesDeEntrada = 0 }: Port
                   </Button>
                 </div>
                 {invalida && (
-                  // O nome vira VARIÁVEL dentro do script: espaço ou acento
-                  // produziriam um SyntaxError no meio do código do usuário,
-                  // longe da causa. O espaço ganha mensagem própria por ser o
-                  // caso comum e o único com uma correção óbvia a sugerir.
+                  // The name becomes a VARIABLE inside the script: a space or an
+                  // accent would produce a SyntaxError in the middle of the
+                  // user's code, far from the cause. The space gets its own
+                  // message for being the common case and the only one with an
+                  // obvious fix to suggest.
                   <span className="text-[10px] text-destructive">
                     {temEspaco
                       ? "Espaços não são aceitos — use _ para separar palavras (ex: meus_pontos)."

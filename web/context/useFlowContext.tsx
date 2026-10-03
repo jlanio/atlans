@@ -7,12 +7,12 @@ export type INodeContext = Node<INodes<ActionsType | TriggersType | ControlsType
 
 export type StatusWorkflow = "idle" | "queued" | "completed" | "running" | "failed" | "cancelled"
 
-/** `unknown`: o run terminou e este nó começou, mas o evento de término dele
- *  nunca chegou. Todas as camadas do caminho executor→servidor→browser podem
- *  descartar evento (fila do executor, inbox do servidor, buffer do espectador,
- *  rate limit) e o socket pode cair sem aviso — então "não sei" é um desfecho
- *  REAL, e precisa de representação própria. Antes esse nó ficava em `started`
- *  para sempre, girando, sugerindo um trabalho que já tinha acabado. */
+/** `unknown`: the run finished and this node started, but its completion event
+ *  never arrived. Every layer on the executor→server→browser path can drop
+ *  events (executor queue, server inbox, viewer buffer, rate limit) and the
+ *  socket can drop without warning — so "I don't know" is a REAL outcome, and
+ *  needs its own representation. Before, that node stayed in `started`
+ *  forever, spinning, suggesting work that had already finished. */
 export type StatusNodeStatusWorkFlow = "idle" | "started" | "completed" | "failed" | "unknown"
 export interface IStatusWorkflow {
   status: StatusWorkflow
@@ -27,21 +27,22 @@ export interface INodeStatusWorkFlow extends Node{
   error?: string
   duration?: number
   output_keys?: string[]
-  /** Colunas de cada saída, vistas na última execução: {chave: [coluna, …]}.
-   *  É o que permite sugerir nomes de coluna em vez de exigir que a pessoa
-   *  execute o fluxo só para descobrir o que chega no próximo nó. */
+  /** Columns of each output, as seen in the last run: {key: [column, …]}.
+   *  This is what makes it possible to suggest column names instead of
+   *  requiring the person to run the workflow just to find out what reaches
+   *  the next node. */
   output_columns?: Record<string, string[]> | null
   branch_result?: boolean
   cache_hit?: boolean
   schema_drift?: { missing: string[]; extra: string[] }
 }
 
-// Campos dinâmicos (nodesAPI, credentials, pinnedNodes, nodesDrawerState,
-// newlyAddedNodeId) foram migrados para useWorkflowCatalogStore (Zustand),
-// eliminando re-renders em cascata quando esses campos mudam.
-// O contexto agora guarda apenas refs imutáveis ao ReactFlow/DOM e o callback
-// de reload. `setFlowContext` aqui só atualiza esses 3 campos — não é mais
-// um setter genérico.
+// Dynamic fields (nodesAPI, credentials, pinnedNodes, nodesDrawerState,
+// newlyAddedNodeId) were migrated to useWorkflowCatalogStore (Zustand),
+// eliminating cascading re-renders when those fields change.
+// The context now holds only immutable refs to ReactFlow/DOM and the reload
+// callback. `setFlowContext` here only updates those 3 fields — it is no
+// longer a generic setter.
 interface IFlowContext {
   reactFlowInstance: ReactFlowInstance<Node, Edge>
   flowRef: React.RefObject<HTMLDivElement | null>

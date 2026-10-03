@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { destinoDaRedefinicao } from "@/lib/entrada";
 
-// A tela de "Nova senha" virou um painel do modal de entrada da Home
-// (`components/home/entrada/painel-redefinir.tsx`). Esta rota fica porque é o
-// que está escrito nos e-mails JÁ ENVIADOS: ela leva o token para a Home, onde
-// o painel o usa no POST. Sem token, cai no painel que pede um link novo — o
-// que a tela "Link inválido" oferecia, em um passo a menos.
+// The "Nova senha" (new password) screen became a panel of the Home's sign-in
+// modal (`components/home/entrada/painel-redefinir.tsx`). This route stays because
+// it is what is written in emails ALREADY SENT: it carries the token to the Home,
+// where the panel uses it in the POST. Without a token, it lands on the panel that
+// asks for a new link — what the "Link inválido" screen offered, in one step fewer.
 //
-// O token continua na query, como sempre esteve: ele é de uso único e curto, e
-// quem o valida é o backend.
+// The token stays in the query, as it always was: it is single-use and short-lived,
+// and the backend is what validates it.
 export default async function ResetPasswordPage({
   searchParams,
 }: {

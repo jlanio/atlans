@@ -1,22 +1,22 @@
 """
-Versão do executor — a que o painel de executores mostra.
+Executor version — the one the executors panel shows.
 
-Ordem de escolha, em `versao_do_executor()`:
+Order of precedence, in `versao_do_executor()`:
 
-1. a gravada na imagem Docker no build (`ARQUIVO_DA_IMAGEM`, FORA da árvore
-   do código: um checkout nunca a tem, então o desktop e a CLI não a herdam).
-   Vence o ambiente de propósito: as instalações antigas têm
-   `EXECUTOR_VERSION=1.0.0` no `executor/.env`, semeado do `.env.example`, e
-   por isso todo executor Docker aparecia como "v1.0.0";
-2. `EXECUTOR_VERSION` do ambiente — o app desktop define com a versão dele;
+1. the one written into the Docker image at build time (`ARQUIVO_DA_IMAGEM`,
+   OUTSIDE the code tree: a checkout never has it, so the desktop and the CLI
+   do not inherit it). It beats the environment on purpose: old installations
+   have `EXECUTOR_VERSION=1.0.0` in `executor/.env`, seeded from `.env.example`,
+   and that is why every Docker executor showed up as "v1.0.0";
+2. `EXECUTOR_VERSION` from the environment — the desktop app sets it to its own version;
 3. "1.0.0".
 
-No build, `python -m executor.versao <pasta> <destino>` grava a versão do
-produto — a do app desktop, `desktop/package.json`; o release passa a da tag em
-`EXECUTOR_BASE` — mais o commit: `2.15.0+3f02f44`. O commit vem do próprio
-checkout (o Dockerfile copia `.git/HEAD`, `packed-refs` e `refs` para a pasta;
-o .dockerignore deixa entrar só isso) ou de `EXECUTOR_COMMIT`, que vale mais.
-Sem nenhum dos dois (build de um tarball), sai só a versão do produto.
+At build time, `python -m executor.versao <pasta> <destino>` writes the product
+version — the desktop app's, `desktop/package.json`; the release passes the tag's
+in `EXECUTOR_BASE` — plus the commit: `2.15.0+3f02f44`. The commit comes from the
+checkout itself (the Dockerfile copies `.git/HEAD`, `packed-refs` and `refs` into
+the folder; .dockerignore lets only that in) or from `EXECUTOR_COMMIT`, which wins.
+Without either (build from a tarball), only the product version comes out.
 """
 from __future__ import annotations
 
@@ -28,11 +28,11 @@ from pathlib import Path
 from typing import Mapping
 
 ARQUIVO_DA_IMAGEM = Path("/usr/local/share/atlans-executor/VERSAO")
-# O servidor descarta versões maiores que isso (`_EXECUTOR_VERSION_MAX` em
-# app/api/routers/executor_ws/protocolo.py) e o painel ficaria sem nenhuma.
+# The server discards versions longer than this (`_EXECUTOR_VERSION_MAX` in
+# app/api/routers/executor_ws/protocolo.py) and the panel would show none at all.
 TAMANHO_MAXIMO = 20
 PADRAO = "1.0.0"
-_SHA = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")   # SHA-1 ou SHA-256
+_SHA = re.compile(r"^[0-9a-f]{40}([0-9a-f]{24})?$")   # SHA-1 or SHA-256
 
 
 def _aceitavel(versao: str) -> bool:
@@ -42,16 +42,16 @@ def _aceitavel(versao: str) -> bool:
 def versao_do_executor(
     ambiente: Mapping[str, str] | None = None, arquivo: Path | None = None
 ) -> str:
-    """A versão que o executor declara no handshake e no enroll (ver a ordem acima).
+    """The version the executor declares in the handshake and at enroll (see the order above).
 
-    Tolerante: um arquivo ilegível, grande demais ou com lixo é ignorado —
-    isto roda na importação de `executor.config`, e um erro aqui impediria o
-    executor de subir.
+    Tolerant: an unreadable, oversized or garbage file is ignored —
+    this runs on import of `executor.config`, and an error here would keep the
+    executor from starting.
 
-    O `EXECUTOR_VERSION` passa pela mesma régua do arquivo: o enroll valida o
-    tamanho (`executor_version`, até 20 caracteres) e recusaria com 422 um
-    `<versão>+<commit>` longo de um build local. Grande demais, o commit
-    encurta como no build (`compor`); sem conserto, fica o padrão.
+    `EXECUTOR_VERSION` goes through the same yardstick as the file: enroll validates
+    the length (`executor_version`, up to 20 characters) and would reject with 422 a
+    long `<versão>+<commit>` from a local build. If too long, the commit is
+    shortened as in the build (`compor`); if it cannot be fixed, the default stays.
     """
     ambiente = os.environ if ambiente is None else ambiente
     arquivo = ARQUIVO_DA_IMAGEM if arquivo is None else arquivo
@@ -73,9 +73,9 @@ def versao_do_executor(
 
 
 def commit_do_git(pasta: Path) -> str | None:
-    """SHA do HEAD a partir das cópias de `.git/HEAD`, `.git/packed-refs` e do
-    conteúdo de `.git/refs` (`heads/`, `tags/`...) numa pasta só — o layout que
-    o `COPY` do Dockerfile produz. None se não der para saber."""
+    """HEAD SHA from the copies of `.git/HEAD`, `.git/packed-refs` and the
+    contents of `.git/refs` (`heads/`, `tags/`...) in a single folder — the layout
+    that the Dockerfile's `COPY` produces. None if it cannot be determined."""
     try:
         head = (pasta / "HEAD").read_text(encoding="utf-8").strip()
     except (OSError, ValueError):
@@ -88,7 +88,7 @@ def commit_do_git(pasta: Path) -> str | None:
     if ".." in ref.split("/"):
         return None
     try:
-        # A ref solta vence a empacotada: o `git pull` atualiza só ela.
+        # The loose ref beats the packed one: `git pull` only updates the loose one.
         solta = (pasta / ref[len("refs/"):]).read_text(encoding="utf-8").strip()
         if _SHA.match(solta):
             return solta
@@ -105,10 +105,10 @@ def commit_do_git(pasta: Path) -> str | None:
 
 
 def compor(versao_do_produto: str, commit: str | None) -> str:
-    """`<versão>+<commit curto>` dentro do limite do servidor.
+    """`<versão>+<commit curto>` within the server's limit.
 
-    O hash encurta (7 → 4 caracteres) antes de sair; se nem a versão do
-    produto couber, fica só o commit, que é o que identifica o código.
+    The hash is shortened (7 → 4 characters) first; if not even the product
+    version fits, only the commit remains, which is what identifies the code.
     """
     base = versao_do_produto.strip()
     curto = "".join(c for c in (commit or "").strip() if c.isalnum())[:7]
@@ -125,17 +125,17 @@ def compor(versao_do_produto: str, commit: str | None) -> str:
 def gravar(
     pasta: Path, destino: Path, *, commit: str | None = None, base: str | None = None,
 ) -> str | None:
-    """Build da imagem: grava a versão em `destino` e a devolve.
+    """Image build: writes the version to `destino` and returns it.
 
-    Nunca derruba o build: sem versão aceitável, avisa e não grava — o
-    executor cai no EXECUTOR_VERSION, como antes.
+    Never breaks the build: with no acceptable version, it warns and writes
+    nothing — the executor falls back to EXECUTOR_VERSION, as before.
     """
     if not base:
         try:
             base = json.loads((pasta / "package.json").read_text(encoding="utf-8"))["version"]
         except (OSError, ValueError, KeyError, TypeError):
             base = ""
-    # A tag do release é `executor/v1.2.3`; o painel já põe o "v" na frente.
+    # The release tag is `executor/v1.2.3`; the panel already prepends the "v".
     base = re.sub(r"^[vV](?=\d)", "", str(base).strip())
     versao = compor(base, commit or commit_do_git(pasta))
     if not versao:

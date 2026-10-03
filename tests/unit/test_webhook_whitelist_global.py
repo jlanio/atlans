@@ -1,9 +1,9 @@
-"""A whitelist global de webhooks (admin → Configurações) passa a valer no disparo.
+"""The global webhook whitelist (admin → Configurações) now applies at trigger time.
 
-Ela era gravada e exibida — a tela avisava quando estava vazia —, mas nenhum
-disparo a consultava: a restrição que o admin configurava não restringia nada.
-Vazia continua sem restrição; com itens, o host precisa estar nela E na
-allowlist do workspace.
+It was saved and displayed — the screen warned when it was empty —, but no
+trigger consulted it: the restriction the admin configured restricted nothing.
+Empty still means no restriction; with items, the host must be in it AND in the
+workspace's allowlist.
 """
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,7 +15,7 @@ from app.core import run_result_consumer as rrc
 from app.core.utils.allowlist import normalizar_dominio, padroes_validos, validar_allowlist
 
 
-# ── Normalização e validação ─────────────────────────────────────────────────
+# ── Normalization and validation ─────────────────────────────────────────────
 
 
 @pytest.mark.parametrize("entrada, esperado", [
@@ -35,14 +35,14 @@ def test_validar_recusa_o_que_o_matcher_ignoraria(entrada):
 
 
 def test_padroes_validos_descarta_o_legado_que_nunca_casou():
-    """Um `*` gravado antes (para "liberar tudo") não pode passar a bloquear tudo."""
+    """A `*` saved earlier (to "allow everything") must not start blocking everything."""
     assert padroes_validos(["*", "https://hooks.slack.com/x", "localhost", "hooks.slack.com"]) == [
         "hooks.slack.com",
     ]
     assert padroes_validos(["*"]) == []
 
 
-# ── PATCH do admin ──────────────────────────────────────────────────────────
+# ── Admin PATCH ─────────────────────────────────────────────────────────────
 
 
 async def test_patch_grava_o_host_da_url_colada():
@@ -57,8 +57,8 @@ async def test_patch_grava_o_host_da_url_colada():
 
 
 async def test_get_devolve_a_lista_efetiva():
-    """A tela mostra o que o disparo aplica: o `*` legado não aparece como
-    restrição (e a tela avisa "sem restrição")."""
+    """The screen shows what the trigger applies: the legacy `*` does not show up
+    as a restriction (and the screen warns "sem restrição" (no restriction))."""
     from app.api.routers import health_router
 
     gravada = ["*", "https://Hooks.Slack.com/x", "hooks.slack.com"]
@@ -84,7 +84,7 @@ async def test_patch_recusa_curinga_sozinho_com_400():
 
 
 def _db(url: str, workspace_allowlist=None):
-    """Duas consultas: a do workflow (`first`) e a do workspace (`scalar_one_or_none`)."""
+    """Two queries: the workflow's (`first`) and the workspace's (`scalar_one_or_none`)."""
     workflow = MagicMock()
     workflow.first.return_value = (url, "ws-1")
     workspace = MagicMock()
@@ -124,7 +124,7 @@ async def test_legado_so_com_curinga_nao_bloqueia_tudo():
 
 
 async def test_as_duas_listas_valem_juntas():
-    """Na global mas fora da do workspace: bloqueado pela do workspace."""
+    """In the global list but not in the workspace's: blocked by the workspace's."""
     agendar = await _disparar(
         "https://hooks.slack.com/services/x", ["hooks.slack.com"], workspace_allowlist=["api.exemplo.com"],
     )
@@ -135,7 +135,7 @@ async def test_as_duas_listas_valem_juntas():
     "hooks.slack.com, api.exemplo.com", "a b.com", "exemplo.com;", ".x.com", "x..com",
 ])
 def test_entrada_que_nunca_casaria_e_recusada(entrada):
-    """Com a lista aplicada, uma entrada assim bloquearia TODO webhook sem explicar."""
+    """With the list enforced, an entry like this would block EVERY webhook without explanation."""
     with pytest.raises(ValueError):
         validar_allowlist([entrada])
 

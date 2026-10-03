@@ -2,22 +2,23 @@
 
 // web/app/components/home/assistente/aviso-de-cota.tsx
 //
-// O aviso de cota cheia.
+// The quota-exhausted warning.
 //
-// **Por que um componente, e não três cópias.** O texto vivia duplicado em TRÊS
-// superfícies: a barra da Home, o painel flutuante da Home e a gaveta do
-// assistente no editor. Uma oferta pendurada nele (a de uma extensão, ver
-// `ofertaDaCota` em `web/extensoes/tipos.ts`) existiria numa superfície e não
-// na outra conforme a cópia. A casca continua de cada uma (a barra é uma
-// cápsula, o painel é um bloco, a gaveta é um bloco no tema do app), o conteúdo
-// é daqui.
+// **Why a component, and not three copies.** The text lived duplicated on THREE
+// surfaces: the Home bar, the Home's floating panel and the assistant drawer in
+// the editor. An offer hung on it (an extension's, see `ofertaDaCota` in
+// `web/extensoes/tipos.ts`) would exist on one surface and not on another
+// depending on the copy. The shell is still each one's own (the bar is a
+// capsule, the panel is a block, the drawer is a block in the app theme), the
+// content is from here.
 //
-// **As cores são cientes de tema** por causa da terceira: a Home força `dark`
-// nas suas cascas, mas a gaveta do editor segue o tema de quem olha. Fixar a
-// paleta escura aqui pintaria âmbar-400 sobre fundo claro, que não se lê.
+// **The colors are theme-aware** because of the third one: the Home forces `dark`
+// on its shells, but the editor drawer follows the viewer's theme. Fixing the
+// dark palette here would paint amber-400 on a light background, which can't be read.
 //
-// `plano` e `assinaturasAtivas` vêm do `/estado` e só interessam à oferta: sem
-// extensão, o servidor manda `null` e `false`, e o aviso é só o aviso.
+// `plano` and `assinaturasAtivas` come from `/estado` and only matter to the
+// offer: without an extension, the server sends `null` and `false`, and the
+// warning is just the warning.
 
 import { IDIOMA_PADRAO, type Idioma } from "@/lib/idioma"
 import { textosDe, useIdiomaDaTela } from "../i18n"
@@ -26,11 +27,11 @@ import { EXTENSOES, LimiteDaExtensao } from "@/extensoes"
 import { cn } from "@/lib/utils"
 import type { IAssistenteCota } from "@/service/types"
 
-/** «reabre em 6 h 12 min», ou o vago quando o servidor não sabe o prazo.
+/** "reabre em 6 h 12 min" (reopens in 6 h 12 min), or the vague one when the server doesn't know the deadline.
  *
- *  O prazo exato vem em `reabre_em_segundos` e o donut logo abaixo já o usa —
- *  dizer «algumas horas» aqui, com o número na mão, era a tela sabendo mais do
- *  que contava. */
+ *  The exact deadline comes in `reabre_em_segundos` and the donut right below
+ *  already uses it — saying "algumas horas" (a few hours) here, with the number
+ *  at hand, was the screen knowing more than it told. */
 export function quandoReabre(cota: IAssistenteCota, idioma: Idioma = IDIOMA_PADRAO): string {
   const t = textosDe(idioma).assistente.cota
   return cota.reabre_em_segundos != null
@@ -42,7 +43,7 @@ interface Props {
   cota: IAssistenteCota
   plano: string | null | undefined
   assinaturasAtivas: boolean | undefined
-  /** A casca é de cada superfície: cápsula na barra, bloco no painel. */
+  /** The shell belongs to each surface: capsule in the bar, block in the panel. */
   className?: string
 }
 

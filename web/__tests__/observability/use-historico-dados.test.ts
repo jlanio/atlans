@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import { ESTADO_PADRAO, type EstadoDoHistorico } from "@/app/components/observability/historico-url"
 
-// Só o serviço é dublado: o hook é testado de verdade (cache, sequência, poll).
+// Only the service is doubled: the hook is tested for real (cache, sequence, poll).
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
     getObservabilityMetrics: vi.fn(),
@@ -57,7 +57,7 @@ describe("useHistoricoDados", () => {
     expect(svc.getObservabilityMetrics).toHaveBeenCalledWith(7, false, { workspace_id: "ws1", workflow_id: "wf1" })
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
     expect(svc.getRunsByDay).toHaveBeenCalledWith(7, { workspace_id: "ws1", workflow_id: "wf1", tz })
-    // Frota e lista de workflows não se recortam por workflow.
+    // The fleet and the workflow list aren't sliced by workflow.
     expect(svc.getExecutorMetrics).toHaveBeenCalledWith(7, false, { workspace_id: "ws1" })
     expect(svc.getWorkflowMetricsList).toHaveBeenCalledWith(7, false, { workspace_id: "ws1" })
 
@@ -94,7 +94,7 @@ describe("useHistoricoDados", () => {
 
     rerender({ periodo: 30 })
     await waitFor(() => expect(result.current.periodoDosDados).toBe(30))
-    // Cache hit: nenhuma chamada nova, e nada de skeleton.
+    // Cache hit: no new call, and no skeleton.
     expect(svc.getObservabilityMetrics).toHaveBeenCalledTimes(2)
     expect(result.current.carregando).toBe(false)
 
@@ -122,7 +122,7 @@ describe("useHistoricoDados", () => {
   })
 
   it("resposta velha não sobrescreve a nova (carimbo de sequência)", async () => {
-    // Período 30 responde DEPOIS do 7: a tela tem de ficar com o 7.
+    // Period 30 answers AFTER 7: the screen has to stay with 7.
     let soltar30: (v: unknown) => void = () => {}
     svc.getObservabilityMetrics.mockImplementation((days: number) =>
       days === 30 ? new Promise(r => { soltar30 = r }) : Promise.resolve(ok(metricas(7))),
@@ -155,19 +155,20 @@ describe("useHistoricoDados", () => {
     svc.getExecutorMetrics.mockResolvedValue(falhou())
     svc.getObservabilityMetrics.mockResolvedValue(ok(metricas(99)))
     rerender({ periodo: 7 })
-    // Espera o DADO novo, não `carregando`: logo após o rerender o efeito ainda
-    // não ligou a carga, e `carregando=false` do estado anterior passaria cedo
-    // demais (o teste ficava intermitente com a suíte inteira rodando).
+    // Waits for the new DATA, not `carregando`: right after the rerender the
+    // effect hasn't started the load yet, and the previous state's
+    // `carregando=false` would pass too early (the test was flaky with the
+    // whole suite running).
     await waitFor(() => expect(result.current.metrics?.total_runs).toBe(99))
     await waitFor(() => expect(result.current.carregando).toBe(false))
-    // Cada parte chega e é gravada por conta própria: a falha dos executores
-    // pode aterrissar um tick depois das métricas.
+    // Each part arrives and is stored on its own: the executors' failure can
+    // land one tick after the metrics.
     await waitFor(() => expect(result.current.falhas.executores).toBe("Não foi possível carregar os executores."))
     expect(result.current.falhas.metrics).toBeUndefined()
-    // A lista anterior continua na tela — melhor que uma tabela vazia.
+    // The previous list stays on screen — better than an empty table.
     expect(result.current.executores).toHaveLength(1)
 
-    // E a parte que falhou NÃO foi memorizada: voltar ao 7 refaz só ela.
+    // And the part that failed was NOT memoized: going back to 7 redoes only it.
     svc.getExecutorMetrics.mockResolvedValue(ok({ executores: [{ agent_host: "h2" }] }))
     rerender({ periodo: 30 })
     await waitFor(() => expect(result.current.periodoDosDados).toBe(30))
@@ -193,7 +194,7 @@ describe("useHistoricoDados", () => {
     expect(svc.getRunsByDay).toHaveBeenCalledTimes(1)
     expect(result.current.carregando).toBe(false)
 
-    // Aba oculta: nenhum tick.
+    // Hidden tab: no tick.
     Object.defineProperty(document, "visibilityState", { configurable: true, get: () => "hidden" })
     await act(async () => { await vi.advanceTimersByTimeAsync(2_100) })
     expect(svc.getObservabilityMetrics).toHaveBeenCalledTimes(2)

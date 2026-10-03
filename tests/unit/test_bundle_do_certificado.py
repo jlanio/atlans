@@ -1,11 +1,12 @@
 # tests/unit/test_bundle_do_certificado.py
 """
-Persistencia do bundle mTLS — um caminho so para o enroll e o renewal.
+mTLS bundle persistence — a single path for enroll and renewal.
 
-O renewal validava o bundle e trocava os arquivos com `.new` + os.replace desde
-que um `ca_pem` vazio sobrescreveu o ca.pem BOM e deixou o executor offline sem
-chance de autocorrecao. O enroll ficou para tras: gravava direto, aceitando o
-mesmo `ca_pem` vazio — num RE-enroll, o ca.pem bom virava um arquivo vazio.
+Renewal has validated the bundle and swapped the files with `.new` + os.replace
+ever since an empty `ca_pem` overwrote the GOOD ca.pem and left the executor
+offline with no chance of self-correction. Enroll was left behind: it wrote
+directly, accepting the same empty `ca_pem` — on a RE-enroll, the good ca.pem
+became an empty file.
 """
 import datetime
 import os
@@ -37,7 +38,7 @@ def _pem(cert: x509.Certificate) -> str:
 
 
 class _CA:
-    """CA de teste que assina o CSR recebido, como a step-ca atras do servidor."""
+    """Test CA that signs the received CSR, like the step-ca behind the server."""
 
     def __init__(self):
         self.chave = Ed25519PrivateKey.generate()
@@ -90,7 +91,7 @@ def _servidor_de_enroll(monkeypatch, ca: _CA, **sobrescrever) -> dict:
 
 
 def _enroll(cert_dir: Path, tmp_path: Path) -> dict:
-    # env_path explicito: sem ele o enroll gravaria no executor/.env do checkout.
+    # Explicit env_path: without it, enroll would write to the checkout's executor/.env.
     return enrollment.enroll(
         "https://srv.invalid", "otp", "exec-1", cert_dir, env_path=tmp_path / ".env",
     )
@@ -116,7 +117,7 @@ def test_reenroll_com_ca_pem_vazio_nao_sobrescreve_o_ca_bom(tmp_path, monkeypatc
 
 
 def test_enroll_com_cert_de_outra_chave_nao_grava_nada(tmp_path, monkeypatch):
-    """Mesma validacao do renewal: cert que nao e da chave gerada = par quebrado."""
+    """Same validation as renewal: a cert that isn't for the generated key = broken pair."""
     cert_dir = _cert_dir_enrolado(tmp_path)
     ca = _CA()
     alheio = ca.bundle(enrollment._build_csr(Ed25519PrivateKey.generate(), "executor-x").decode())
@@ -152,8 +153,8 @@ def test_enroll_valido_troca_toda_a_identidade(tmp_path, monkeypatch):
 
 
 def test_falha_de_escrita_no_meio_nao_troca_arquivo_nenhum(tmp_path, monkeypatch):
-    """Tudo vai para .new antes do primeiro os.replace: disco cheio na metade
-    nao deixa metade das credenciais nova e metade velha."""
+    """Everything goes to .new before the first os.replace: a disk filling up midway
+    doesn't leave half the credentials new and half old."""
     cert_dir = _cert_dir_enrolado(tmp_path)
     ca = _CA()
     chave = Ed25519PrivateKey.generate()
@@ -196,13 +197,13 @@ async def test_renewal_valido_passa_pelo_mesmo_caminho(tmp_path, monkeypatch):
     cert = x509.load_pem_x509_certificate((cert_dir / "cert.pem").read_bytes())
     chave = serialization.load_pem_private_key((cert_dir / "key.pem").read_bytes(), None)
     assert cert.public_key() == chave.public_key()
-    # A chave de envelope nao e do cert mTLS: o renewal nao a toca.
+    # The envelope key isn't part of the mTLS cert: renewal doesn't touch it.
     assert (cert_dir / "x25519_key.pem").read_bytes() == b"X25519-BOM"
     assert not list(cert_dir.glob("*.new"))
 
 
 def test_renewal_nao_grava_arquivo_por_conta_propria():
-    """A escrita das credenciais tem um lugar so; a segunda copia foi a que divergiu."""
+    """Writing the credentials has a single place; the second copy was the one that diverged."""
     texto = (RAIZ / "executor" / "renewal.py").read_text(encoding="utf-8")
     assert "_write_pem(" not in texto
     assert "os.replace(" not in texto

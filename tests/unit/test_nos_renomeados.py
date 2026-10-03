@@ -1,9 +1,10 @@
 # tests/unit/test_nos_renomeados.py
-"""Fluxos salvos com nomes antigos de nós (renomeação "sem shim" de 27/07).
+"""Workflows saved with old node names (the "no shim" rename of July 27).
 
-Em 25/09 o TESTE_BPA, agendado, falhava todo dia na partida com "Node
-'DriveTrigger' não encontrado" — o nó tinha virado `DataInput` e ninguém
-migrou as definições salvas. O Geoserver (com `ArtifactOutput`) estava igual.
+On September 25 the scheduled TESTE_BPA failed every day at startup with "Node
+'DriveTrigger' não encontrado" (not found) — the node had become `DataInput`
+and nobody migrated the saved definitions. Geoserver (with `ArtifactOutput`)
+was the same.
 """
 
 from contextlib import asynccontextmanager
@@ -23,7 +24,7 @@ def _definicao(*nos):
     return {"nodes": list(nos), "edges": [{"source": "a", "target": "b"}]}
 
 
-# ── A reescrita de uma definição ─────────────────────────────────────────────
+# ── Rewriting a definition ───────────────────────────────────────────────────
 
 def test_drive_trigger_vira_data_input_lendo_do_drive():
     antes = _definicao(
@@ -40,14 +41,14 @@ def test_drive_trigger_vira_data_input_lendo_do_drive():
     }
     assert depois["nodes"][1] == antes["nodes"][1]
     assert depois["edges"] == antes["edges"]
-    # O original não é tocado: quem chama decide se grava.
+    # The original is not touched: the caller decides whether to save.
     assert antes["nodes"][0]["name"] == "DriveTrigger"
 
 
 def test_artifact_output_protegido_continua_protegido():
-    """No ArtifactOutput a credencial protegia o download; no DataOutput o
-    padrão é público e a credencial só vale com isPublic=False. Renomear sem
-    isso publicaria um artefato que era protegido."""
+    """In ArtifactOutput the credential protected the download; in DataOutput
+    the default is public and the credential only applies with isPublic=False.
+    Renaming without this would publish an artifact that was protected."""
     antes = _definicao({"id": "a", "name": "ArtifactOutput", "properties": {
         "label": "resultado", "credential_id": "cred-1", "destination": "artifacts",
     }})
@@ -67,7 +68,7 @@ def test_artifact_output_sem_credencial_continua_publico():
     }}))
 
     props = depois["nodes"][0]["properties"]
-    assert "isPublic" not in props            # default do DataOutput: público, como era
+    assert "isPublic" not in props            # DataOutput's default: public, as it was
     assert props["context"] == "drive"
 
 
@@ -94,7 +95,7 @@ def test_definicao_estranha_nao_quebra(definicao):
     assert migrar_definicao(definicao) == (definicao, [])
 
 
-# ── As expressões que citam o nó migrado ─────────────────────────────────────
+# ── The expressions that cite the migrated node ──────────────────────────────
 
 def _renderizar(texto: str, contexto: dict) -> str:
     from flow.utils.expression_service import ExpressionService
@@ -102,10 +103,10 @@ def _renderizar(texto: str, contexto: dict) -> str:
 
 
 def test_expressoes_que_citam_o_no_continuam_resolvendo():
-    """Sem alias válido (o editor grava o rótulo "Drive de arquivos"), os outros
-    nós citam o nó pelo NOME. Trocar o nome sem fixar o alias quebraria
-    `{{ DriveTrigger... }}` ("undefined") e — pior — mandaria `$DriveTrigger...`
-    como TEXTO para o nó seguinte, sem erro nenhum."""
+    """Without a valid alias (the editor saves the label "Drive de arquivos"), the
+    other nodes cite the node by NAME. Changing the name without pinning the
+    alias would break `{{ DriveTrigger... }}` ("undefined") and — worse — send
+    `$DriveTrigger...` as TEXT to the next node, with no error at all."""
     antes = _definicao(
         {"id": "a", "name": "DriveTrigger", "alias": "Drive de arquivos",
          "properties": {"driveFileId": "f-1"}},
@@ -123,15 +124,15 @@ def test_expressoes_que_citam_o_no_continuam_resolvendo():
     no = depois["nodes"][0]
     assert (no["name"], no["alias"]) == ("DataInput", "DriveTrigger")
     from flow.core.aliases import resolve_alias
-    assert resolve_alias(no) == "DriveTrigger"   # como o executor o registra
+    assert resolve_alias(no) == "DriveTrigger"   # as the executor registers it
 
     props = depois["nodes"][1]["properties"]
     assert props["subject"] == "Chegou $DriveTrigger.metadata.original_name"
     assert props["params"] == {"ids": ["$DriveTrigger.metadata.file_id"]}
-    assert props["outro"] == "{{ MeuDriveTrigger.metadata.drive_file_id }}"   # outro nó
+    assert props["outro"] == "{{ MeuDriveTrigger.metadata.drive_file_id }}"   # another node
     assert ("b", "metadata.drive_file_id", "metadata.file_id") in trocas
 
-    # O que o DataInput entrega de verdade (flow/nodes/datasource/data_input.py).
+    # What DataInput actually delivers (flow/nodes/datasource/data_input.py).
     saida = {"DriveTrigger": {"metadata": {"file_id": "f-1", "original_name": "x.geojson"}}}
     assert _renderizar(props["subject"], saida) == "Chegou x.geojson"
     assert _renderizar(props["body"], saida) == "id=f-1 e f-1"
@@ -153,14 +154,14 @@ def test_formas_de_subscrito_e_get_tambem_sao_reescritas():
         "dois": "{{ DriveTrigger.metadata.get('file_id') }}",
         "tres": '{{ DriveTrigger["metadata"].get( "file_id") }}',
     }
-    # O `.get()` antigo não quebrava: rendia None em silêncio. Agora resolve.
+    # The old `.get()` didn't break: it silently yielded None. Now it resolves.
     saida = {"DriveTrigger": {"metadata": {"file_id": "f-1"}}}
     assert [_renderizar(v, saida) for v in props.values()] == ["f-1", "f-1", "f-1"]
 
 
 def test_o_que_o_comando_nao_reescreve_sai_para_revisar():
-    """`named.X`, `nodes['id']`, entrada mapeada e código Python citam a saída
-    sem o alias na frente — reescrever às cegas quebraria outra coisa."""
+    """`named.X`, `nodes['id']`, a mapped input and Python code cite the output
+    without the alias in front — rewriting blindly would break something else."""
     from app.services.nos_renomeados import sobras_para_revisar
 
     depois, _ = migrar_definicao(_definicao(
@@ -172,7 +173,7 @@ def test_o_que_o_comando_nao_reescreve_sai_para_revisar():
         {"id": "d", "name": "SendEmail", "properties": {"body": "{{ DriveTrigger.metadata.drive_file_id }}"}},
     ))
 
-    assert sobras_para_revisar(depois) == ["b", "c"]   # o "d" foi reescrito
+    assert sobras_para_revisar(depois) == ["b", "c"]   # the "d" was rewritten
 
 
 def test_alias_customizado_fica_e_as_expressoes_dele_sao_reescritas():
@@ -180,7 +181,7 @@ def test_alias_customizado_fica_e_as_expressoes_dele_sao_reescritas():
         {"id": "a", "name": "DriveTrigger", "alias": "Entrada", "properties": {"driveFileId": "f"}},
         {"id": "b", "name": "PythonScript", "properties": {
             "code": "x = '{{ Entrada.metadata.drive_file_id }}'",
-            "nota": "$DriveTrigger.metadata.drive_file_id",   # não é este nó
+            "nota": "$DriveTrigger.metadata.drive_file_id",   # it isn't this node
         }},
     ))
 
@@ -202,7 +203,7 @@ def test_artifact_output_tambem_mantem_o_nome_pelo_qual_e_citado():
     assert depois["nodes"][0]["alias"] == "ArtifactOutput"
 
 
-# ── O comando sobre o banco ──────────────────────────────────────────────────
+# ── The command against the database ─────────────────────────────────────────
 
 @pytest.fixture
 async def db():
@@ -258,8 +259,8 @@ async def test_aplicar_grava_e_a_segunda_rodada_nao_acha_nada(db):
 
 
 async def test_nome_antigo_desabilitado_pelo_admin_e_avisado(db, monkeypatch):
-    """A marca de "desabilitado" é por nome e não passa para o nó novo —
-    desabilitar o DataOutput pararia também quem já o usa. O comando avisa."""
+    """The "disabled" flag is by name and doesn't carry over to the new node —
+    disabling DataOutput would also stop whoever already uses it. The command warns."""
     from app.services import disabled_nodes_service
     from app.services.nos_renomeados import nomes_antigos_desabilitados
 
@@ -292,13 +293,13 @@ async def test_cli_simula_pede_backup_e_avisa_o_desabilitado(db, monkeypatch, ca
     saida = capsys.readouterr().out
     assert "workflow wf-bpa (TESTE_BPA): DriveTrigger -> DataInput (no e5c072df)" in saida
     assert "ATENCAO: o admin desabilitou 'DriveTrigger'" in saida
-    # O pg_dump não aceita o driver no esquema nem o `?ssl=` do asyncpg — e a
-    # dica tem de funcionar colada em sh/dash, não só em bash.
+    # pg_dump accepts neither the driver in the scheme nor asyncpg's `?ssl=` — and
+    # the hint has to work pasted into sh/dash, not just bash.
     assert "U=$(printf %s \"$DATABASE_URL\" | sed -e 's/+asyncpg//' -e 's/?.*//')" in saida
     assert 'pg_dump "$U" -t workflows -t workflow_versions' in saida
     await db.rollback()
     wf = (await db.execute(select(Workflow).where(Workflow.id_hash == "wf-bpa"))).scalar_one()
-    assert wf.definition["nodes"][0]["name"] == "DriveTrigger"   # simulação não grava
+    assert wf.definition["nodes"][0]["name"] == "DriveTrigger"   # a dry run doesn't save
 
 
 async def test_cli_aponta_o_que_revisar_a_mao(db, monkeypatch, capsys):
@@ -326,7 +327,7 @@ async def test_cli_aponta_o_que_revisar_a_mao(db, monkeypatch, capsys):
     assert "REVISAR a mao: no(s) b ainda citam drive_file_id" in capsys.readouterr().out
 
 
-# ── O mapa e as mensagens ────────────────────────────────────────────────────
+# ── The map and the messages ─────────────────────────────────────────────────
 
 def test_todo_nome_antigo_aponta_para_um_no_que_existe():
     from flow.registry import NODE_REGISTRY
@@ -337,7 +338,7 @@ def test_todo_nome_antigo_aponta_para_um_no_que_existe():
 
 
 def test_no_desconhecido_diz_para_onde_o_no_foi():
-    """A falha diária do TESTE_BPA só dizia "não encontrado"; agora diz o que fazer."""
+    """TESTE_BPA's daily failure only said "não encontrado" (not found); now it says what to do."""
     from flow.factory import NodeFactory
     from flow.utils.definition_lint import lint_definition
 
@@ -346,7 +347,7 @@ def test_no_desconhecido_diz_para_onde_o_no_foi():
         registry_names={"DataInput"},
     )
     mensagem = rel.errors[0].message
-    # O prefixo da factory continua à letra (é o que scripts/validar.py procura).
+    # The factory's prefix stays to the letter (it is what scripts/validar.py looks for).
     assert mensagem.startswith("Node 'DriveTrigger' não encontrado para instância (id=n1).")
     assert "renomeado para 'DataInput'" in mensagem
 
@@ -367,9 +368,10 @@ def test_todo_no_removido_saiu_mesmo_do_registro():
 
 
 def test_no_removido_diz_que_saiu_e_nao_sugere_typo():
-    """Um fluxo salvo com o Cluster (removido no Lote 1) passou a falhar na
-    construção — até com o nó num ramo que não roda. "Confira o nome exato no
-    catálogo" mandava procurar um erro de digitação que não existe."""
+    """A workflow saved with Cluster (removed in Batch 1) started failing at
+    build time — even with the node on a branch that doesn't run. "Confira o
+    nome exato no catálogo" (check the exact name in the catalog) sent people
+    looking for a typo that doesn't exist."""
     from flow.factory import NodeFactory
     from flow.utils.definition_lint import lint_definition
 
@@ -388,8 +390,8 @@ def test_no_removido_diz_que_saiu_e_nao_sugere_typo():
 
 @pytest.mark.parametrize("shell", ["sh", "bash"])
 def test_a_dica_de_pg_dump_limpa_a_url_em_sh_e_em_bash(shell):
-    """A dica é colada num terminal qualquer — dash (o `sh` do Debian) não tem
-    `${VAR/a/b}`, que era o que ela usava."""
+    """The hint gets pasted into any terminal — dash (Debian's `sh`) doesn't have
+    `${VAR/a/b}`, which is what it used."""
     import shutil
     import subprocess
 

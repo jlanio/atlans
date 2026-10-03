@@ -1,36 +1,36 @@
 # app/services/fontes_vault.py
 """
-O parser do Vault de geoserviços — o markdown do Obsidian vira registros do
-catálogo de fontes, sem tocar em banco nem em rede.
+The geoservice Vault parser — Obsidian markdown becomes records of the
+source catalog, without touching the database or the network.
 
-A pasta versionada em `catalogo/geoservicos/` é uma cópia do Vault do dono:
-uma subpasta por instituição, e dentro dela três notas geradas por script —
+The versioned folder in `catalogo/geoservicos/` is a copy of the owner's Vault:
+one subfolder per institution, and inside it three script-generated notes —
 
-- a nota da instituição (`<Nome — SIGLA>.md`, ou `nota-base.md`): uma lista de
-  campos `- **Campo:** valor` (Mantenedor, Finalidade, Endpoint WFS,
+- the institution note (`<Nome — SIGLA>.md`, or `nota-base.md`): a list of
+  `- **Campo:** valor` fields (Mantenedor, Finalidade, Endpoint WFS,
   GetCapabilities, Versão usada para os schemas, Última coleta de metadados…),
-  um parágrafo de observações e, às vezes, um callout "Como consumir no Atlans";
-- `Camadas.md`: `## <Grupo> (n)` e, por camada, `- `ns:camada` — Título`;
-- `Atributos.md`: `### `ns:camada`` seguido da tabela
-  `| Campo | Tipo XSD | Nulo | Ocorrência |` do DescribeFeatureType.
+  a paragraph of remarks and, sometimes, a "Como consumir no Atlans" callout;
+- `Camadas.md`: `## <Grupo> (n)` and, per layer, `- `ns:camada` — Título`;
+- `Atributos.md`: `### `ns:camada`` followed by the DescribeFeatureType's
+  `| Campo | Tipo XSD | Nulo | Ocorrência |` table.
 
-O parser lê esse formato COMO ESTÁ e, por cima dele, três extensões opcionais
-que o Obsidian já sabe editar (ver `docs/sources.md`):
+The parser reads that format AS IS and, on top of it, three optional extensions
+that Obsidian already knows how to edit (see `docs/sources.md`):
 
-- **frontmatter YAML** na nota da instituição (`sigla`, `pais`, `uf`,
-  `endpoint_wfs`, `versao_wfs`, `temas`, `prioridade`, `coletada_em`) — só o
-  subconjunto plano do YAML, sem dependência nova;
-- **tags inline** no fim da linha da camada (`#terras-indígenas #preferida`),
-  que saem do título e entram em `temas`; `#preferida`/`#secundaria` viram a
-  prioridade;
-- **`_sinonimos.md`** na raiz, uma tabela `| termo | sinônimos |` que a busca
-  usa para expandir a consulta.
+- **YAML frontmatter** in the institution note (`sigla`, `pais`, `uf`,
+  `endpoint_wfs`, `versao_wfs`, `temas`, `prioridade`, `coletada_em`) — only the
+  flat subset of YAML, with no new dependency;
+- **inline tags** at the end of the layer line (`#terras-indígenas #preferida`),
+  which leave the title and go into `temas`; `#preferida`/`#secundaria` become the
+  priority;
+- **`_sinonimos.md`** at the root, a `| termo | sinônimos |` table that search
+  uses to expand the query.
 
-Só entra o que o nó `WFS` consegue ler: pasta sem `Endpoint WFS` (ArcGIS REST,
-placeholders "em validação") sai como `Ignorada`, com o motivo, para o resumo da
-importação dizer o que ficou de fora. Nada aqui levanta exceção por uma nota
-mal escrita: a pasta vira `Ignorada(motivo="nota_ilegivel")` e a importação
-segue para a próxima.
+Only what the `WFS` node can read gets in: a folder without `Endpoint WFS` (ArcGIS REST,
+"em validação" placeholders) comes out as `Ignorada`, with the reason, so the import
+summary can say what was left out. Nothing here raises an exception over a badly
+written note: the folder becomes `Ignorada(motivo="nota_ilegivel")` and the import
+moves on to the next one.
 """
 from __future__ import annotations
 
@@ -47,18 +47,18 @@ ARQUIVO_DE_ATRIBUTOS = "Atributos.md"
 ARQUIVO_DE_SINONIMOS = "_sinonimos.md"
 VERSAO_PADRAO = "2.0.0"
 
-# Os candidatos a coluna de ordenação, na ordem de preferência: o GeoServer
-# exige um SORTBY para paginar camada sem chave primária, e uma coluna de id é
-# a aposta que quase sempre acerta.
+# The candidates for the sort column, in order of preference: GeoServer
+# requires a SORTBY to paginate a layer without a primary key, and an id column is
+# the bet that almost always pays off.
 CANDIDATOS_A_SORTBY = ("gid", "fid", "id", "objectid", "ogc_fid")
 
-# Teto das observações que viram `dicas`: o parágrafo da nota é curto, mas um
-# callout de várias linhas passaria o orçamento de contexto de `describe_source`.
+# Ceiling for the remarks that become `dicas`: the note's paragraph is short, but a
+# multi-line callout would exceed `describe_source`'s context budget.
 MAX_DICAS = 600
 
-# `gml:<G>PropertyType` → tipo de geometria, a mesma tabela que o owslib usa
-# (`owslib/feature/schema.py`), copiada porque o owslib não é dependência do
-# servidor nem deve ser.
+# `gml:<G>PropertyType` → geometry type, the same table owslib uses
+# (`owslib/feature/schema.py`), copied because owslib is not a dependency of the
+# server, nor should it be.
 GEOMETRIAS = {
     "PointPropertyType": "Point",
     "MultiPointPropertyType": "MultiPoint",
@@ -143,7 +143,7 @@ class Instituicao:
 
 @dataclass(frozen=True)
 class RegistroDoVault:
-    """Uma camada do Vault, pronta para virar linha do catálogo."""
+    """A Vault layer, ready to become a catalog row."""
 
     instituicao: str
     grupo: str | None
@@ -161,7 +161,7 @@ class RegistroDoVault:
 
     @property
     def vault_hash(self) -> str:
-        """sha256 do registro canônico — muda quando QUALQUER campo muda."""
+        """sha256 of the canonical record — changes when ANY field changes."""
         canonico = {
             "instituicao": self.instituicao,
             "grupo": self.grupo,
@@ -184,7 +184,7 @@ class RegistroDoVault:
 
 @dataclass(frozen=True)
 class Ignorada:
-    """Uma pasta que não entra no catálogo — e por quê."""
+    """A folder that does not go into the catalog — and why."""
 
     pasta: str
     motivo: str
@@ -195,7 +195,7 @@ class Ignorada:
 
 
 def nfc(texto: str) -> str:
-    """Nomes vindos do macOS chegam em NFD; o catálogo compara em NFC."""
+    """Names coming from macOS arrive in NFD; the catalog compares in NFC."""
     return unicodedata.normalize("NFC", texto)
 
 
@@ -219,11 +219,11 @@ def _lista_yaml(valor: str) -> list[str]:
 
 
 def ler_frontmatter(texto: str) -> tuple[dict, str]:
-    """O bloco `---` do topo como dict plano, e o resto do texto.
+    """The `---` block at the top as a flat dict, and the rest of the text.
 
-    Só o YAML que o Obsidian escreve nas Propriedades: `chave: valor`, listas
-    inline `[a, b]` e listas em bloco (`- item`). Sem dependência: PyYAML não
-    está no servidor, e o subconjunto basta para o que o catálogo lê.
+    Only the YAML Obsidian writes in Properties: `chave: valor`, inline
+    lists `[a, b]` and block lists (`- item`). No dependency: PyYAML is not
+    on the server, and the subset is enough for what the catalog reads.
     """
     achado = _FRONTMATTER.match(texto)
     if not achado:
@@ -271,7 +271,7 @@ def _prioridade(valor) -> int | None:
 
 
 def _tags(texto: str) -> tuple[str, tuple[str, ...]]:
-    """Separa as tags `#x` do fim de um título; devolve (título limpo, tags)."""
+    """Splits the `#x` tags off the end of a title; returns (clean title, tags)."""
     tags = tuple(t for t in _TAG.findall(texto))
     if not tags:
         return texto.strip(), ()
@@ -279,11 +279,11 @@ def _tags(texto: str) -> tuple[str, tuple[str, ...]]:
     return limpo, tags
 
 
-# ── A nota da instituição ─────────────────────────────────────────────────────
+# ── The institution note ──────────────────────────────────────────────────────
 
 
 def ler_instituicao(texto: str, *, nome_da_pasta: str) -> Instituicao:
-    """Os campos da nota, com o frontmatter (quando há) valendo mais que o corpo."""
+    """The note's fields, with the frontmatter (when present) taking precedence over the body."""
     frontmatter, corpo = ler_frontmatter(texto)
     titulo = _TITULO_H1.search(corpo)
     inst = Instituicao(nome=nfc(titulo.group(1).strip()) if titulo else nfc(nome_da_pasta))
@@ -293,7 +293,7 @@ def ler_instituicao(texto: str, *, nome_da_pasta: str) -> Instituicao:
     em_navegacao = False
     for linha in corpo.splitlines():
         if linha.startswith("## "):
-            em_navegacao = True  # daqui em diante é navegação/wikilinks
+            em_navegacao = True  # from here on it is navigation/wikilinks
             continue
         if em_navegacao or linha.startswith("# "):
             continue
@@ -320,7 +320,7 @@ def ler_instituicao(texto: str, *, nome_da_pasta: str) -> Instituicao:
     if "—" in inst.nome:
         inst.sigla = inst.nome.rsplit("—", 1)[1].strip() or None
 
-    # O frontmatter vence o corpo: é a forma explícita, editada nas Propriedades.
+    # The frontmatter beats the body: it is the explicit form, edited in Properties.
     if frontmatter.get("sigla"):
         inst.sigla = str(frontmatter["sigla"]).strip()
     if frontmatter.get("endpoint_wfs"):
@@ -353,7 +353,7 @@ def _normalizar_chave(chave: str) -> str:
 
 
 def ler_camadas(texto: str) -> list[Camada]:
-    """As camadas, com o grupo (`## Grupo (n)`) em que aparecem e as tags."""
+    """The layers, with the group (`## Grupo (n)`) they appear in and the tags."""
     camadas: list[Camada] = []
     grupo: str | None = None
     for linha in texto.splitlines():
@@ -366,8 +366,8 @@ def ler_camadas(texto: str) -> list[Camada]:
             continue
         type_name = item.group(1).strip()
         titulo, tags = _tags(nfc(item.group(2) or ""))
-        # Bullet de ArcGIS (`- \`Título\` — <url>`): o "nome" não é um typeName
-        # e o título é uma URL. Fica de fora — o nó WFS não lê isso.
+        # ArcGIS bullet (`- \`Título\` — <url>`): the "name" is not a typeName
+        # and the title is a URL. Left out — the WFS node does not read this.
         if titulo.startswith("<http") or titulo.startswith("http"):
             continue
         camadas.append(Camada(grupo=grupo, type_name=type_name, titulo=titulo or type_name, tags=tags))
@@ -393,7 +393,7 @@ def _coluna(celulas: list[str]) -> Coluna | None:
 
 
 def ler_atributos(texto: str) -> dict[str, EsquemaDoVault]:
-    """`{type_name: esquema}` das tabelas de `Atributos.md`."""
+    """`{type_name: esquema}` from the `Atributos.md` tables."""
     esquemas: dict[str, EsquemaDoVault] = {}
     atual: str | None = None
     colunas: list[Coluna] = []
@@ -433,7 +433,7 @@ def ler_atributos(texto: str) -> dict[str, EsquemaDoVault]:
 
 
 def ler_sinonimos(texto: str) -> dict[str, set[str]]:
-    """`{termo: {sinônimos}}` da tabela (ou das linhas `- termo: a, b`)."""
+    """`{termo: {sinônimos}}` from the table (or from `- termo: a, b` lines)."""
     saida: dict[str, set[str]] = {}
     for linha in texto.splitlines():
         linha = linha.strip()
@@ -457,8 +457,8 @@ def ler_sinonimos(texto: str) -> dict[str, set[str]]:
 
 
 def _notas_da_instituicao(pasta: Path) -> list[Path]:
-    """As notas candidatas, `nota-base.md` por último: a nota nomeada é a que
-    costuma trazer o endpoint."""
+    """The candidate notes, `nota-base.md` last: the named note is the one that
+    usually carries the endpoint."""
     notas = [
         p for p in sorted(pasta.iterdir())
         if p.is_file() and p.suffix.lower() == ".md"
@@ -477,7 +477,7 @@ def _sort_by(colunas: tuple[Coluna, ...]) -> str | None:
 
 
 def ler_instituicao_da_pasta(pasta: Path) -> Iterator[RegistroDoVault | Ignorada]:
-    """Os registros de UMA pasta de instituição (ou a `Ignorada` que a resume)."""
+    """The records of ONE institution folder (or the `Ignorada` that sums it up)."""
     nome = nfc(pasta.name)
     try:
         inst: Instituicao | None = None
@@ -551,10 +551,10 @@ def ler_instituicao_da_pasta(pasta: Path) -> Iterator[RegistroDoVault | Ignorada
 
 
 def ler_pasta(caminho: str | Path) -> Iterator[RegistroDoVault | Ignorada]:
-    """Percorre `<caminho>/<INSTITUIÇÃO>/` e gera os registros e as ignoradas.
+    """Walks `<caminho>/<INSTITUIÇÃO>/` and produces the records and the ignored ones.
 
-    Arquivos soltos na raiz (índice, relatórios, scripts) não são fontes e são
-    pulados sem aviso — só `_sinonimos.md` tem papel, lido por `sinonimos_de`.
+    Loose files at the root (index, reports, scripts) are not sources and are
+    skipped silently — only `_sinonimos.md` has a role, read by `sinonimos_de`.
     """
     raiz = Path(caminho)
     if not raiz.is_dir():
@@ -564,7 +564,7 @@ def ler_pasta(caminho: str | Path) -> Iterator[RegistroDoVault | Ignorada]:
 
 
 def sinonimos_de(caminho: str | Path) -> dict[str, set[str]]:
-    """Os sinônimos de `_sinonimos.md` na raiz da pasta, ou `{}`."""
+    """The synonyms from `_sinonimos.md` at the folder root, or `{}`."""
     arquivo = Path(caminho) / ARQUIVO_DE_SINONIMOS
     if not arquivo.is_file():
         return {}

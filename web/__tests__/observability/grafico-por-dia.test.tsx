@@ -2,8 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 import type { IRunsByDay } from "@/service/types"
 
-// O Recharts entra por `dynamic()` e não pinta nada em jsdom (ResponsiveContainer
-// mede 0×0). O que se testa aqui é o card: título, subtítulo, legenda, estados.
+// Recharts comes in through `dynamic()` and paints nothing in jsdom (ResponsiveContainer
+// measures 0×0). What's tested here is the card: title, subtitle, legend, states.
 vi.mock("next/dynamic", () => ({
   default: () => function BarrasDubladas({ dias }: { dias: IRunsByDay[] }) {
     return <div data-testid="barras">{dias.length} dias</div>

@@ -1,30 +1,30 @@
-"""Base zero: o banco nasce pronto.
+"""Base zero: the database is born ready.
 
-Colapsa a cadeia de 53 migracoes numa revisao inicial unica (F3 da
-simplificacao — docs/specs/simplification.md, A9/N3; premissa dada pelo dono:
-nada esta em producao de verdade, nao ha banco legado a preservar).
+Collapses the chain of 53 migrations into a single initial revision (F3 of the
+simplification — docs/specs/simplification.md, A9/N3; premise given by the owner:
+nothing is really in production, there is no legacy database to preserve).
 
-O corpo NAO mora aqui: e o proprio `scripts/init_schema.sql`, lido e executado
-na hora. E o mesmo arquivo que os testes de convergencia ja prendem aos models
-(tests/unit/test_init_schema_bootstrap.py), entao alembic, psql e testes
-enxergam UMA fonte de verdade — a divergencia entre "o que a cadeia constroi"
-e "o que o script constroi", que a convergencia vigiava, deixa de poder
-existir. Depois dele vem o `schema.sql` de cada extensao presente
-(`app/extensoes`, ver `esquemas()`): as tabelas que so existem com ela.
+The body does NOT live here: it is `scripts/init_schema.sql` itself, read and
+executed on the spot. It is the same file the convergence tests already pin to the
+models (tests/unit/test_init_schema_bootstrap.py), so alembic, psql and tests
+see ONE source of truth — the divergence between "what the chain builds"
+and "what the script builds", which the convergence test guarded, can no longer
+exist. After it comes the `schema.sql` of each extension present
+(`app/extensoes`, see `esquemas()`): the tables that only exist with it.
 
-O filtro tira do script, antes de executar, apenas os comandos sobre
-`alembic_version` (DROP/CREATE/INSERT): dentro do alembic quem gerencia essa
-tabela e o proprio alembic; o INSERT do arquivo existe para o caminho psql e
-aqui viraria linha duplicada. Os DROPs das tabelas de aplicacao FICAM — num
-banco vazio sao no-op, e e o que mantem o texto identico ao do reset manual.
+Before executing, the filter strips from the script only the commands on
+`alembic_version` (DROP/CREATE/INSERT): inside alembic, that table is managed
+by alembic itself; the file's INSERT exists for the psql path and here it
+would become a duplicate row. The DROPs of the application tables STAY — on an
+empty database they are no-ops, and they keep the text identical to the manual reset.
 
-Banco EXISTENTE (carimbado numa revisao da cadeia antiga): o schema nao muda —
-o squash produz o mesmo DDL que a cadeia produzia. Rode uma vez:
+EXISTING database (stamped at a revision of the old chain): the schema does not
+change — the squash produces the same DDL the chain produced. Run once:
 
     alembic stamp --purge 9ed006ca1660
 
-ou resete do zero com `psql -f scripts/init_schema.sql` (o proprio script
-carimba esta revisao).
+or reset from scratch with `psql -f scripts/init_schema.sql` (the script itself
+stamps this revision).
 """
 import re
 from pathlib import Path
@@ -41,33 +41,33 @@ _RAIZ = Path(__file__).resolve().parents[2]
 
 
 def _sql_sem_alembic_version(sql: str) -> str:
-    """O script pronto para o `op.execute`.
+    """The script ready for `op.execute`.
 
-    Dois cortes, nenhum deles mudando o efeito num banco vazio:
-    - os comandos sobre `alembic_version` (motivo no docstring do modulo);
-    - as linhas que sao SO comentario: `op.execute` passa o texto por
-      `sqlalchemy.text()`, que le `:palavra` como bind — e a secao comentada
-      de GRANTs usa `:app_user` como variavel do psql. Sem este corte, o
-      upgrade falha pedindo valor para um parametro que so existe num
-      comentario. No caminho psql o arquivo segue integro, comentarios e tudo.
+    Two cuts, neither of them changing the effect on an empty database:
+    - the commands on `alembic_version` (reason in the module docstring);
+    - the lines that are ONLY comments: `op.execute` passes the text through
+      `sqlalchemy.text()`, which reads `:palavra` (any `:word`) as a bind — and the commented-out
+      GRANTs section uses `:app_user` as a psql variable. Without this cut, the
+      upgrade fails asking for a value for a parameter that only exists in a
+      comment. On the psql path the file stays intact, comments and all.
     """
     sql = re.sub(r"^DROP TABLE IF EXISTS alembic_version CASCADE;[^\n]*$", "", sql, flags=re.M)
     sql = re.sub(r"^CREATE TABLE alembic_version \(.*?\);[^\n]*$", "", sql, flags=re.M | re.S)
     sql = re.sub(r"^INSERT INTO alembic_version[^\n]*$", "", sql, flags=re.M)
     sql = re.sub(r"^\s*--[^\n]*$", "", sql, flags=re.M)
-    # Nenhum comando executavel pode sobrar mirando a tabela do alembic, e
-    # nenhum falso bind do psql pode chegar ao text().
+    # No executable command targeting the alembic table may remain, and
+    # no fake psql bind may reach text().
     sobras = re.search(r"^\s*(DROP|CREATE|INSERT)[^\n]*alembic_version", sql, flags=re.M | re.I)
     assert not sobras, f"filtro deixou passar: {sobras.group(0)!r}"
     assert ":app_user" not in sql
     return sql
 
 
-# O preâmbulo do script offline (--sql): reproduz a guarda do modo online do
-# lado de quem EXECUTA. `alembic_version` pode ainda não existir no ponto em
-# que o preâmbulo roda (a criação dela pelo alembic varia com o modo), por isso
-# o EXECUTE dinâmico: presente e carimbada -> segue; presente e vazia, ou
-# ausente, com tabelas da aplicação no banco -> aborta antes do DROP ALL.
+# The preamble of the offline script (--sql): reproduces the online mode's guard
+# on the side of whoever EXECUTES it. `alembic_version` may not exist yet at the
+# point the preamble runs (alembic creating it depends on the mode), hence
+# the dynamic EXECUTE: present and stamped -> proceed; present and empty, or
+# absent, with application tables in the database -> abort before the DROP ALL.
 _GUARDA_OFFLINE = """
 DO $guarda_base_zero$
 DECLARE
@@ -89,18 +89,18 @@ $guarda_base_zero$;
 
 
 def upgrade() -> None:
-    # Guarda do único caminho destrutivo que a base zero abriria: um banco COM
-    # tabelas da aplicação e SEM carimbo (alembic_version vazia ou ausente).
-    # Só nesse estado o alembic decide "nada aplicado" e chega aqui — e o corpo
-    # é DROP ALL + CREATE ALL. Um banco da cadeia antiga nunca chega (o carimbo
-    # desconhecido derruba o alembic antes, sem tocar em nada); um banco vazio
-    # passa.
+    # Guard for the only destructive path base zero would open: a database WITH
+    # application tables and WITHOUT a stamp (alembic_version empty or absent).
+    # Only in that state does alembic decide "nothing applied" and get here — and the
+    # body is DROP ALL + CREATE ALL. A database from the old chain never gets here (the
+    # unknown stamp brings alembic down first, without touching anything); an empty
+    # database passes.
     #
-    # No modo offline (--sql) não há banco para inspecionar NA GERAÇÃO — mas o
-    # script gerado é executável e roda longe dos olhos do alembic. Então a
-    # MESMA guarda vai como preâmbulo do próprio script (um DO que aborta em
-    # banco populado sem carimbo), em vez de confiar que ninguém o aplica às
-    # cegas. Gerar continua sempre funcionando; é a EXECUÇÃO que se recusa.
+    # In offline mode (--sql) there is no database to inspect AT GENERATION — but the
+    # generated script is executable and runs out of alembic's sight. So the
+    # SAME guard goes in as the script's own preamble (a DO that aborts on a
+    # populated database without a stamp), instead of trusting that nobody applies it
+    # blindly. Generating always keeps working; it is the EXECUTION that refuses.
     if context.is_offline_mode():
         op.execute(_GUARDA_OFFLINE)
     else:
@@ -119,8 +119,8 @@ def upgrade() -> None:
     caminho = _RAIZ / "scripts" / "init_schema.sql"
     op.execute(_sql_sem_alembic_version(caminho.read_text(encoding="utf-8")))
 
-    # As tabelas de cada extensao presente, depois das do nucleo e com o mesmo
-    # filtro. Sem extensao (a distribuicao livre), nada.
+    # The tables of each extension present, after the core ones and with the same
+    # filter. Without extensions (the free distribution), nothing.
     from app.extensoes import esquemas
 
     for esquema in esquemas():

@@ -10,16 +10,16 @@ interface Props {
   total: number
   mostrandoDe: number
   mostrandoAte: number
-  /** Recarga em curso trava a navegação para não pular páginas no meio. */
+  /** A reload in progress locks navigation so pages aren't skipped midway. */
   refreshing: boolean
   onPrev: () => void
   onNext: () => void
 }
 
 /**
- * Rodapé "Mostrando X–Y de N" + navegação, no mesmo formato de admin/users.
- * A estrutura (span "{page} / {totalPages}" ladeado pelos dois botões) é a que
- * o teste de troca de workspace usa para navegar — mantida de propósito.
+ * "Mostrando X–Y de N" footer + navigation, in the same format as admin/users.
+ * The structure (span "{page} / {totalPages}" flanked by the two buttons) is what
+ * the workspace-switch test uses to navigate — kept on purpose.
  */
 export function RodapeDePaginacao({
   page, totalPages, total, mostrandoDe, mostrandoAte, refreshing, onPrev, onNext,

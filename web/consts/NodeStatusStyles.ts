@@ -1,5 +1,5 @@
-// Cores e labels de status de execução de nodes — fonte única de verdade.
-// Usado pelo InputInspector, OutputPreview, RunLogs e outros componentes.
+// Colors and labels for node execution status — single source of truth.
+// Used by InputInspector, OutputPreview, RunLogs and other components.
 
 export const STATUS_COLOR_MAP: Record<string, string> = {
   idle: "bg-muted text-muted-foreground",

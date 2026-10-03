@@ -27,9 +27,9 @@ import { VisaoWorkflows } from "@/app/components/observability/visao-workflows"
 import { VisoesAbas, type ContagensDasVisoes } from "@/app/components/observability/visoes-abas"
 
 /**
- * Histórico (docs/specs/metrics-history.md §4.3). A página só compõe: o
- * estado mora na URL, os dados nos dois hooks, e cada bloco decide o próprio
- * texto. O `Suspense` é exigido pelo `useSearchParams` na build estática.
+ * History (docs/specs/metrics-history.md §4.3). The page only composes: the
+ * state lives in the URL, the data in the two hooks, and each block decides its
+ * own text. The `Suspense` is required by `useSearchParams` in the static build.
  */
 export default function HistoricoPage() {
   return (
@@ -50,12 +50,12 @@ function Historico() {
   const execucoes = useExecucoes(estado, { habilitado })
   const acks = usePendingAcks({ enabled: isAdmin })
 
-  // "Confirmações" é admin-only; a sessão resolve depois do primeiro render e
-  // uma URL colada por um admin não pode deixar outra pessoa numa aba vazia.
+  // "Confirmações" is admin-only; the session resolves after the first render and
+  // a URL pasted by an admin must not leave someone else on an empty tab.
   const visao: Visao = estado.visao === "confirmacoes" && !isAdmin ? "execucoes" : estado.visao
 
-  // Origem do fluxo por hash: as métricas do alerta não a trazem, o
-  // inventário por workflow sim — é o que dá o selo do assistente na atenção.
+  // Workflow origin by hash: the alert metrics do not carry it, the per-workflow
+  // inventory does — it is what gives the assistant badge in the attention list.
   const origemPorWorkflow = useMemo(() => {
     const m = new Map<string, string | null | undefined>()
     for (const wf of dados.workflows) m.set(wf.workflow_hash, wf.origem)
@@ -71,18 +71,18 @@ function Historico() {
     [dados.metrics, dados.executores, origemPorWorkflow],
   )
 
-  // O chip "Assistente" também recorta a visão "Por workflow". Aqui é local: o
-  // inventário vem inteiro numa chamada só, sem paginação a refazer.
+  // The "Assistente" chip also slices the "Por workflow" view. Here it is local:
+  // the inventory comes whole in a single call, with no pagination to redo.
   const workflowsVisiveis = useMemo(
     () => estado.assistente ? dados.workflows.filter(w => w.origem === "assistente") : dados.workflows,
     [dados.workflows, estado.assistente],
   )
   const vazioDaAtencao = useMemo(() => textoDeVazio(dados.metrics), [dados.metrics])
 
-  // Workspaces do filtro: os da pessoa, mais os que aparecem nas linhas de
-  // workflow — para admin, é assim que os workspaces alheios entram na lista.
-  // As opções só crescem: com um workspace escolhido, `dados.workflows` vem
-  // recortado por ele, e sem a memória o select do admin perderia os outros.
+  // Workspaces for the filter: the person's own, plus those that appear in the
+  // workflow rows — for an admin, that is how other people's workspaces get into
+  // the list. The options only grow: with a workspace chosen, `dados.workflows`
+  // comes sliced by it, and without the memory the admin's select would lose the others.
   const workspacesVistos = useRef(new Map<string, string>())
   const workspacesDoFiltro = useMemo(() => {
     const porId = workspacesVistos.current
@@ -94,7 +94,7 @@ function Historico() {
   }, [meusWorkspaces, dados.workflows])
   const mostrarWorkspace = isAdmin || workspacesDoFiltro.length > 1
 
-  // Nome amigável dos executores para a visão Confirmações, que só recebe ids.
+  // Friendly executor names for the Confirmações view, which only receives ids.
   const nomesDosExecutores = useMemo(() => {
     const m: Record<string, string> = {}
     for (const e of dados.executores) if (e.executor_id) m[e.executor_id] = e.display_name
@@ -105,8 +105,8 @@ function Historico() {
     execucoes: execucoes.total,
     workflows: dados.workflows.length || null,
     executores: dados.executores.length || null,
-    // Em confirmações o que importa é o atraso: a pílula só aparece (vermelha)
-    // quando há alguma, senão o número seria "quantas estão em voo agora".
+    // In confirmations what matters is the delay: the pill only appears (red)
+    // when there is some, otherwise the number would be "how many are in flight now".
     confirmacoes: isAdmin && acks.atrasadas.length > 0 ? acks.atrasadas.length : null,
   }), [execucoes.total, dados.workflows.length, dados.executores.length, isAdmin, acks.atrasadas.length])
 
@@ -133,9 +133,9 @@ function Historico() {
     atualizar({ status: null, workspace: null, workflow: null, executor: null, origem: null, q: "" })
   }, [atualizar])
 
-  // O toast é daqui porque é aqui que a mensagem da API chega; a visão só
-  // precisa saber se desfaz o interruptor. A lista volta com `force` para o
-  // Redis de 45 s não devolver o `active` antigo.
+  // The toast is here because this is where the API message arrives; the view only
+  // needs to know whether to undo the switch. The list comes back with `force` so
+  // the 45 s Redis cache does not return the old `active`.
   const alternarAtivo = useCallback(async (workflowHash: string, ativo: boolean) => {
     const res = await GisFlowService.setAdminWorkflowStatus(workflowHash, ativo)
     if (res.error || !res.data) {
@@ -174,8 +174,8 @@ function Historico() {
         periodo={dados.periodoDosDados}
       />
 
-      {/* Duas colunas no desktop; abaixo de `lg` o gráfico vem primeiro e a
-          lista de atenção logo depois — ela é a que se lê no telefone. */}
+      {/* Two columns on desktop; below `lg` the chart comes first and the
+          attention list right after — it is the one people read on the phone. */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,1fr)]">
         <GraficoPorDia
           dias={dados.dias}
@@ -207,9 +207,9 @@ function Historico() {
               <Filtros
                 estado={estado}
                 onEstado={atualizar}
-                // As contagens vêm das métricas, que só conhecem período,
-                // workspace e workflow: com executor, origem ou busca ativos o
-                // número do chip seria de outra lista — melhor nenhum.
+                // The counts come from the metrics, which only know period,
+                // workspace and workflow: with executor, origin or search active
+                // the chip's number would belong to another list — better none.
                 contagens={estado.executor || estado.origem || estado.q.trim() ? undefined : dados.metrics?.by_status}
                 workspaces={workspacesDoFiltro}
                 workflows={dados.workflows}
@@ -233,10 +233,10 @@ function Historico() {
             </>
           )}
 
-          {/* Os recortes por workspace e por workflow valem para a página
-              inteira (indicadores, gráfico, atenção e listas): fora da visão
-              Execuções, onde ficam os selects, precisam ao menos ser vistos e
-              removíveis. */}
+          {/* The workspace and workflow slices apply to the whole page
+              (indicators, chart, attention and lists): outside the
+              Execuções view, where the selects are, they at least need to be
+              visible and removable. */}
           {visao !== "execucoes" && (estado.workspace || estado.workflow) && (
             <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               Filtrado por
@@ -291,7 +291,7 @@ function Historico() {
   )
 }
 
-/** Falha parcial: o bloco abaixo continua com o que tinha; o aviso diz que está velho. */
+/** Partial failure: the block below keeps what it had; the notice says it is stale. */
 function Aviso({ children }: { children: React.ReactNode }) {
   return (
     <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">

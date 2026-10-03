@@ -1,20 +1,20 @@
 # app/services/execution_alert_service.py
 """
-Alertas de execução agendada sem executor (spec §7.4).
+Alerts for scheduled runs with no executor (spec §7.4).
 
-Um cron cujo workspace está sem executor — grupo dedicado fora, ou o pool
-inteiro — não pode sumir em silêncio nem virar um e-mail a cada tick. O estado
-por `schedule_id` vive no Redis e a notificação é por TRANSIÇÃO:
+A cron whose workspace has no executor — dedicated group down, or the whole
+pool — cannot vanish silently nor turn into an email on every tick. The state
+per `schedule_id` lives in Redis and the notification is on TRANSITION:
 
-  1ª falha da janela   → e-mail "as execuções agendadas de X estão falhando"
-  falhas seguintes     → no máximo UM lembrete a cada REMINDER_INTERVAL
-  próxima que roda     → e-mail de recuperação, e o estado é limpo
+  1st failure of the window → email "as execuções agendadas de X estão falhando"
+  subsequent failures       → at most ONE reminder every REMINDER_INTERVAL
+  next one that runs        → recovery email, and the state is cleared
 
-Destinatários: dono do workspace + membros com papel admin. O `Schedule` não
-tem dono próprio; quem responde pelo workspace responde pelo cron.
+Recipients: workspace owner + members with the admin role. The `Schedule` has
+no owner of its own; whoever answers for the workspace answers for the cron.
 
-Best-effort por inteiro: falha de Redis ou de e-mail é logada e nunca derruba
-o agendador — o run `failed` já ficou registrado no histórico antes disto.
+Best-effort throughout: a Redis or email failure is logged and never brings
+down the scheduler — the `failed` run was already recorded in the history before this.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ from app.services.email_service import send_email_background
 logger = get_logger(__name__)
 
 REMINDER_INTERVAL_SECONDS = 6 * 60 * 60
-_STATE_TTL_SECONDS = 30 * 24 * 60 * 60  # uma janela de indisponibilidade não dura um mês
+_STATE_TTL_SECONDS = 30 * 24 * 60 * 60  # an unavailability window does not last a month
 
 _TEMPLATE_FAILURE = "schedule_no_executor.html"
 _TEMPLATE_RECOVERED = "schedule_recovered.html"
@@ -79,7 +79,7 @@ async def _clear_state(schedule_id) -> None:
 
 
 def decide_failure(state: dict | None, now: float) -> tuple[dict, bool]:
-    """Transição pura (testável): devolve (novo_estado, notificar?)."""
+    """Pure (testable) transition: returns (new_state, notify?)."""
     if not state:
         return {"first_failure_at": now, "last_notified_at": now, "failures": 1}, True
     novo = dict(state)
@@ -92,8 +92,8 @@ def decide_failure(state: dict | None, now: float) -> tuple[dict, bool]:
 
 
 async def record_failure(db: AsyncSession, *, schedule_id, workflow, reason: str, category: str) -> bool:
-    """Registra a falha da ocorrência; envia e-mail se for transição ou lembrete.
-    Devolve se notificou."""
+    """Records the occurrence's failure; sends an email if it is a transition or a reminder.
+    Returns whether it notified."""
     now = time.time()
     estado, notificar = decide_failure(await _load_state(schedule_id), now)
     await _save_state(schedule_id, estado)
@@ -115,8 +115,8 @@ async def record_failure(db: AsyncSession, *, schedule_id, workflow, reason: str
 
 
 async def record_success(db: AsyncSession, *, schedule_id, workflow) -> bool:
-    """A ocorrência rodou: se havia janela de indisponibilidade, avisa que
-    recuperou e limpa o estado. Devolve se notificou."""
+    """The occurrence ran: if there was an unavailability window, announces the
+    recovery and clears the state. Returns whether it notified."""
     estado = await _load_state(schedule_id)
     if not estado:
         return False
@@ -134,7 +134,7 @@ async def record_success(db: AsyncSession, *, schedule_id, workflow) -> bool:
 
 
 async def workspace_recipients(db: AsyncSession, workspace_id: str | None) -> list[User]:
-    """Dono + membros admin do workspace, com e-mail."""
+    """Owner + admin members of the workspace, with an email address."""
     if not workspace_id:
         return []
     ws = (await db.execute(
@@ -172,9 +172,9 @@ async def _send_to_workspace(db: AsyncSession, workspace_id: str | None, templat
 
 
 async def notify_primary_emptied(db: AsyncSession, esvaziados: list[dict], *, executor_name: str) -> None:
-    """Remoção forçada de um executor esvaziou o nível principal destes
-    workspaces (spec §4.4): toda execução futura vai falhar (terminal `fail`)
-    ou transbordar (terminal `pool`). O dono tem de saber agora."""
+    """A forced removal of an executor emptied the primary tier of these
+    workspaces (spec §4.4): every future execution will fail (terminal `fail`)
+    or overflow (terminal `pool`). The owner has to know now."""
     for d in esvaziados:
         await _send_to_workspace(
             db, d.get("workspace_id"), "policy_primary_emptied.html",
@@ -184,11 +184,11 @@ async def notify_primary_emptied(db: AsyncSession, esvaziados: list[dict], *, ex
 
 
 def notify_primary_emptied_background(esvaziados: list[dict], *, executor_name: str) -> None:
-    """Versão fire-and-forget de `notify_primary_emptied` com sessão PRÓPRIA.
+    """Fire-and-forget version of `notify_primary_emptied` with its OWN session.
 
-    A sessão da requisição é fechada assim que o handler responde; uma task
-    que continuasse a usá-la correria contra o `rollback()`/`close()` do
-    teardown (e o e-mail nunca sairia)."""
+    The request session is closed as soon as the handler responds; a task
+    that kept using it would race against the teardown's `rollback()`/`close()`
+    (and the email would never go out)."""
     if not esvaziados:
         return
     import asyncio
@@ -206,8 +206,8 @@ def notify_primary_emptied_background(esvaziados: list[dict], *, executor_name: 
 
 
 async def notify_floor_forced(db: AsyncSession, ws) -> None:
-    """O admin da plataforma fixou o piso `no_pool` e o terminal foi forçado de
-    `pool` para `fail`: o dono precisa saber que o fallback deixou de existir."""
+    """The platform admin set the `no_pool` floor and the terminal was forced from
+    `pool` to `fail`: the owner needs to know that the fallback no longer exists."""
     await _send_to_workspace(
         db, ws.id_hash, "policy_floor_forced.html",
         subject=f"[Atlans] O workspace \"{ws.name}\" passou a ser isolado",

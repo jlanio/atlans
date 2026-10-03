@@ -1,54 +1,55 @@
 # app/mcp/catalogo.py
 """
-O catálogo de nós em dois tamanhos: o índice que cabe no contexto e a ficha completa.
+The node catalog in two sizes: the index that fits in the context and the full sheet.
 
-O `description()` de todos os nós registrados soma perto de 80 KB de JSON.
-Entregar isso numa chamada consome o orçamento de contexto de quem está do
-outro lado antes de a conversa começar — e nove décimos daquilo é detalhe de
-propriedade que só interessa depois de escolhido o nó. Daí a divisão:
+The `description()` of all registered nodes adds up to about 80 KB of JSON.
+Delivering that in one call consumes the context budget of whoever is on the
+other side before the conversation starts — and nine tenths of it is property
+detail that only matters once the node has been chosen. Hence the split:
 
-- `indice_compacto` responde "que nós existem, e para quê" em ~10 KB: nome,
-  tipo, a primeira frase da descrição e se o nó pede credencial;
-- `descrever(brief=True)` responde "como configuro este nó" com as propriedades
-  essenciais;
-- `descrever(brief=False)` entrega a ficha inteira mais as dicas que não estão
-  em nenhum campo — que as saídas deste nó dependem do que o usuário declarar,
-  que tal propriedade espera um nome de coluna.
+- `indice_compacto` answers "which nodes exist, and what for" in ~10 KB: name,
+  type, the first sentence of the description and whether the node needs a
+  credential;
+- `descrever(brief=True)` answers "how do I configure this node" with the
+  essential properties;
+- `descrever(brief=False)` delivers the whole sheet plus the hints that are not
+  in any field — that this node's outputs depend on what the user declares,
+  that a given property expects a column name.
 
-Tudo é derivado do registro de nós em tempo de chamada. Nenhuma lista copiada:
-um nó novo aparece aqui no mesmo deploy em que aparece no editor, e um nó
-desabilitado some dos dois.
+Everything is derived from the node registry at call time. No copied list: a
+new node appears here in the same deploy in which it appears in the editor, and
+a disabled node disappears from both.
 """
 from __future__ import annotations
 
 import unicodedata
 from typing import Any, Iterable, Mapping
 
-# A primeira frase de uma descrição longa ainda pode ser longa; o índice
-# inteiro é lido de uma vez, então o corte vale mais que a frase completa
-# (quem quiser o texto todo chama `describe_node`).
+# The first sentence of a long description can still be long; the whole index
+# is read at once, so the cut is worth more than the full sentence
+# (whoever wants the whole text calls `describe_node`).
 _MAX_ONE_LINE = 160
 
-# Piso para aceitar um segmento como frase. O ponto que fecha uma frase e o
-# ponto de uma abreviação ("Ex.", "etc.", "p. ex.", "Obs.") são o mesmo
-# caractere, e cortar no primeiro deixaria o índice cheio de linhas "Ex" e
-# "etc" — que não dizem nada sobre o nó. Abaixo deste tamanho o segmento é
-# JUNTADO ao seguinte, nunca descartado: perder o resto da frase é pior do que
-# uma linha um pouco mais longa. O valor fica abaixo de qualquer frase real
-# curta ("Recorta camadas", "Ordena as linhas") e acima das abreviações que
-# aparecem nas descrições.
+# Floor for accepting a segment as a sentence. The period that ends a sentence
+# and the period of an abbreviation ("Ex.", "etc.", "p. ex.", "Obs.") are the
+# same character, and cutting at the first one would fill the index with "Ex"
+# and "etc" lines — which say nothing about the node. Below this length the
+# segment is JOINED to the next one, never discarded: losing the rest of the
+# sentence is worse than a slightly longer line. The value sits below any real
+# short sentence ("Recorta camadas", "Ordena as linhas") and above the
+# abbreviations that appear in the descriptions.
 _MIN_ONE_LINE = 8
 
-# Abreviações que fecham com ponto no MEIO da frase e escapam do piso acima
-# ("Junta SHP, GeoJSON, etc. Aceita ZIP." tem 33 caracteres antes do ponto).
-# Lista curta e explícita de propósito: o que não estiver aqui simplesmente
-# corta como sempre cortou — errar para o lado de uma linha mais curta é
-# preferível a adivinhar gramática.
+# Abbreviations that end with a period in the MIDDLE of a sentence and escape the
+# floor above ("Junta SHP, GeoJSON, etc. Aceita ZIP." has 33 characters before
+# the period). A short, explicit list on purpose: whatever is not here simply
+# cuts as it always did — erring on the side of a shorter line is preferable to
+# guessing grammar.
 _ABREVIACOES = frozenset({"ex", "etc", "p", "pag", "obs", "cf", "fig", "aprox", "vs", "ref"})
 
 
 def _texto_de_descricao(desc: Any) -> str:
-    """A descrição, venha ela como texto, dict ou `NodeDefinition`."""
+    """The description, whether it comes as text, a dict or a `NodeDefinition`."""
     if isinstance(desc, str):
         return desc
     if isinstance(desc, Mapping):
@@ -57,18 +58,19 @@ def _texto_de_descricao(desc: Any) -> str:
 
 
 def one_line(desc: Any) -> str:
-    """A primeira frase da descrição, sem o ponto final.
+    """The first sentence of the description, without the final period.
 
-    O corte é no primeiro PARÁGRAFO, e não na primeira quebra de linha: muitas
-    descrições do catálogo são escritas em texto corrido e quebram no meio da
-    frase, mas quase todas separam a explicação longa por uma linha em branco.
+    The cut is at the first PARAGRAPH, not at the first line break: many
+    catalog descriptions are written as running text and break mid-sentence,
+    but almost all of them separate the long explanation with a blank line.
 
-    Dentro do parágrafo, a frase termina no primeiro ponto seguido de ESPAÇO —
-    exigir o espaço é o que protege os decimais, que o catálogo usa o tempo todo
-    ("buffer de 0.5 m"). Sobra a abreviação, que traz o espaço junto: um segmento
-    curto demais para ser frase ("Ex.", "p. ex.") ou terminado numa abreviação
-    conhecida ("…, etc.") é juntado ao seguinte, em vez de cortar a descrição no
-    meio e deixar a linha do índice sem dizer para que o nó serve.
+    Within the paragraph, the sentence ends at the first period followed by a
+    SPACE — requiring the space is what protects decimals, which the catalog
+    uses all the time ("buffer de 0.5 m"). That leaves abbreviations, which
+    bring the space along: a segment too short to be a sentence ("Ex.",
+    "p. ex.") or ending in a known abbreviation ("…, etc.") is joined to the
+    next one, instead of cutting the description in the middle and leaving the
+    index line without saying what the node is for.
     """
     paragrafo = _texto_de_descricao(desc).split("\n\n")[0]
     texto = " ".join(paragrafo.split())
@@ -88,10 +90,10 @@ def one_line(desc: Any) -> str:
 
 
 def _fim_de_frase(trecho: str) -> bool:
-    """O ponto depois deste trecho fecha mesmo uma frase?
+    """Does the period after this excerpt really end a sentence?
 
-    Duas recusas: o trecho é curto demais para ser frase (é uma abreviação
-    inteira, "Ex.") ou termina numa abreviação conhecida ("…, etc.").
+    Two refusals: the excerpt is too short to be a sentence (it is a whole
+    abbreviation, "Ex.") or it ends in a known abbreviation ("…, etc.").
     """
     sem_ponto = trecho.rstrip(".")
     if len(sem_ponto) < _MIN_ONE_LINE:
@@ -102,7 +104,7 @@ def _fim_de_frase(trecho: str) -> bool:
 
 
 def _normalizar(texto: str) -> str:
-    """Minúsculas e sem acento — busca por "área" acha "area" e vice-versa."""
+    """Lowercase and without accents — searching for "área" finds "area" and vice versa."""
     sem_acento = unicodedata.normalize("NFKD", texto)
     return "".join(c for c in sem_acento if not unicodedata.combining(c)).casefold()
 
@@ -122,10 +124,10 @@ def _campos_de_busca(d: Any) -> str:
 def indice_compacto(
     defs: Iterable[Any], *, query: str | None = None, tipo: str | None = None
 ) -> list[dict]:
-    """O índice filtrado, ordenado por nome.
+    """The filtered index, sorted by name.
 
-    O filtro por `query` corre sobre nome, apelido, tipo e descrição: quem
-    procura "postgres" não sabe se o nó se chama `DatabaseQuery`.
+    The `query` filter runs over name, nickname, type and description: whoever
+    searches for "postgres" does not know the node is called `DatabaseQuery`.
     """
     alvo = _normalizar(query) if query else None
     itens: list[dict] = []
@@ -146,7 +148,7 @@ def indice_compacto(
 
 
 def tipos_do_catalogo(defs: Iterable[Any]) -> list[dict]:
-    """`[{type, count}]` — o mapa que diz por onde filtrar antes de listar tudo."""
+    """`[{type, count}]` — the map that tells where to filter before listing everything."""
     contagem: dict[str, int] = {}
     for d in defs:
         chave = str(getattr(d, "type", "") or "sem_tipo")
@@ -155,10 +157,10 @@ def tipos_do_catalogo(defs: Iterable[Any]) -> list[dict]:
 
 
 def _propriedade_essencial(p: Any) -> dict:
-    """O mínimo para configurar a propriedade — sem rótulo, ajuda nem visibilidade."""
+    """The minimum to configure the property — no label, help or visibility."""
     item: dict[str, Any] = {"name": getattr(p, "name", None), "type": getattr(p, "type", None)}
-    # `required` não existe no catálogo de hoje; é lido por getattr para que um
-    # dia em que passe a existir a informação apareça sem mexer aqui.
+    # `required` does not exist in today's catalog; it is read via getattr so that
+    # the day it starts to exist the information shows up without touching this.
     if getattr(p, "required", None):
         item["required"] = True
     default = getattr(p, "default", None)
@@ -177,7 +179,7 @@ def _propriedade_essencial(p: Any) -> dict:
 
 
 def _dicas(d: Any) -> list[str]:
-    """O que a ficha não diz por campo e faz a diferença na hora de montar o nó."""
+    """What the sheet does not say per field and makes a difference when building the node."""
     dicas: list[str] = []
     if getattr(d, "dynamic_inputs", False):
         dicas.append(
@@ -218,11 +220,11 @@ def _dicas(d: Any) -> list[str]:
 
 
 def descrever(d: Any, *, brief: bool) -> dict:
-    """A ficha do nó — essencial ou completa, sempre com as dicas no fim."""
+    """The node's sheet — essential or complete, always with the hints at the end."""
     if not brief:
-        # `model_dump` do próprio `NodeDefinition`: a ficha completa é o que o
-        # editor consome, e copiá-la campo a campo aqui criaria uma segunda
-        # definição do que é um nó, fadada a ficar para trás.
+        # `NodeDefinition`'s own `model_dump`: the full sheet is what the
+        # editor consumes, and copying it field by field here would create a second
+        # definition of what a node is, doomed to fall behind.
         ficha = d.model_dump(exclude_none=True) if hasattr(d, "model_dump") else dict(d)
         ficha["hints"] = _dicas(d)
         return ficha

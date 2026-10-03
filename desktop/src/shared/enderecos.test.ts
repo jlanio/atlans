@@ -1,4 +1,4 @@
-// O servidor e a UI que o app grava no executável vêm do build, nunca do código.
+// The server and UI the app writes into the executable come from the build, never from the code.
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   DEV, TESTE, conferirMarcaDoBuild, defineDosEnderecos, enderecosDoBuild, marcaDoBuild,

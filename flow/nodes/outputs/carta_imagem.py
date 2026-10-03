@@ -1,37 +1,38 @@
 # flow/nodes/outputs/carta_imagem.py
 """
-CartaImagem — a carta imagem (PNG, JPG ou PDF) das camadas que o fluxo escolher.
+CartaImagem — the image map (PNG, JPG or PDF) of whichever layers the workflow chooses.
 
-Um no so, de saida, com PORTAS DINAMICAS: cada porta e uma camada da carta e a
-pessoa liga a ela a saida que quiser ver desenhada. O que nao esta ligado fica
-de fora — e assim que "nem toda camada do fluxo precisa aparecer na imagem".
-Nao ha gancho de fim de run e nao precisa haver: o proprio grafo garante que
-este no roda depois de todas as camadas ligadas as suas portas.
+A single output node with DYNAMIC PORTS: each port is a layer of the map, and
+the person connects to it whatever output they want drawn. What is not
+connected is left out — that is how "not every layer of the workflow needs to
+appear in the image". There is no end-of-run hook, and none is needed: the
+graph itself guarantees this node runs after every layer connected to its ports.
 
-As regras do editor que mandam aqui (web/app/components/workflow/utils/
-resolve-edge-keys.ts e node-ports.ts):
+The editor rules that apply here (web/app/components/workflow/utils/
+resolve-edge-keys.ts and node-ports.ts):
 
-  - com DUAS ou mais portas, cada uma vira um ponto de conexao proprio e o
-    editor grava o `to_key` da aresta com o nome da porta — a camada chega em
+  - with TWO or more ports, each becomes its own connection point and the
+    editor writes the edge's `to_key` with the port name — the layer arrives in
     `inputs[nome_da_porta]`;
-  - com uma porta ou nenhuma, a aresta e anonima e o executor ESPALHA o dict do
-    no anterior: a camada chega como `inputs["output"]` (ou a chave que o pai
-    usar), nunca pelo nome da porta. Por isso este no tem dois modos, e o
-    editor barra a segunda aresta nesse caso (duas espalhariam os dois dicts
-    na mesma chave e a ultima venceria, sem que o no pudesse perceber);
-  - o nome da porta tem de ser identificador (sem espaco nem acento), entao o
-    rotulo da legenda tem campo proprio (`rotulos`).
+  - with one port or none, the edge is anonymous and the executor SPREADS the
+    previous node's dict: the layer arrives as `inputs["output"]` (or whatever
+    key the parent uses), never by the port name. That is why this node has two
+    modes, and the editor blocks the second edge in that case (two would spread
+    both dicts onto the same key and the last would win, with no way for the
+    node to notice);
+  - the port name must be an identifier (no spaces or accents), so the legend
+    label has its own field (`rotulos`).
 
-A renderizacao acontece NO EXECUTOR, com matplotlib: as camadas ja estao em
-memoria e o arquivo segue a localidade dos dados como qualquer outro artefato
-(inclusive "manter apenas no executor"). O matplotlib e importado so na hora de
-desenhar: `flow/` e importado pela API e pelos testes de catalogo, e o import
-custa meio segundo e memoria. O fundo de mapa (tiles da web) passa pelas mesmas
-guardas de SSRF dos nos de HTTP.
+Rendering happens ON THE EXECUTOR, with matplotlib: the layers are already in
+memory and the file follows the data locality like any other artifact
+(including "keep only on the executor"). matplotlib is imported only when it is
+time to draw: `flow/` is imported by the API and by the catalog tests, and the
+import costs half a second plus memory. The basemap (web tiles) goes through
+the same SSRF guards as the HTTP nodes.
 
-O que esta fora desta versao, por decisao: previa inline (a carta e um artefato
-para baixar), cartao na Home, reprojecao do fundo (com fundo a carta e sempre
-EPSG:3857).
+Deliberately out of this version: inline preview (the image map is an artifact
+to download), a card on the Home page, reprojection of the basemap (with a
+basemap the image map is always EPSG:3857).
 """
 from __future__ import annotations
 
@@ -97,7 +98,7 @@ logger = get_logger(__name__)
 TENTATIVAS_POR_TILE = 3
 STATUS_TRANSITORIOS = frozenset({502, 503, 504})
 TETO_DE_BYTES_POR_TILE = 2_000_000
-CONEXOES_SIMULTANEAS = 2      # a politica de uso do OpenStreetMap
+CONEXOES_SIMULTANEAS = 2      # the OpenStreetMap usage policy
 AVISO_DE_FEICOES = 200_000    # acima disto o desenho fica lento e o PDF sai rasterizado
 
 MENSAGEM_SEM_MATPLOTLIB = (
@@ -140,22 +141,23 @@ class _Render:
 
 
 def _importar_matplotlib():
-    """Separado para o teste simular um executor sem a biblioteca."""
+    """Separate so the test can simulate an executor without the library."""
     import matplotlib
     return matplotlib
 
 
 def _carregar_matplotlib():
-    """Import preguicoso + backend Agg, os dois ANTES de qualquer desenho.
+    """Lazy import + Agg backend, both BEFORE any drawing.
 
-    `gdf.plot` importa o pyplot por dentro (geopandas.plotting), e o pyplot
-    resolve o backend na hora — na thread do render. No app desktop o Tk e
-    podado do runtime, e o fallback tatearia backends inexistentes. `use("Agg")`
-    e deterministico e seguro em thread; nada aqui chama `plt.*`.
+    `gdf.plot` imports pyplot internally (geopandas.plotting), and pyplot
+    resolves the backend on the spot — in the render thread. In the desktop app
+    Tk is pruned from the runtime, and the fallback would probe nonexistent
+    backends. `use("Agg")` is deterministic and thread-safe; nothing here calls
+    `plt.*`.
 
-    O cache de fontes (fontlist-*.json) vai para um diretorio que o executor
-    sabe que e gravavel, em vez do HOME — no primeiro import o matplotlib
-    varre as fontes do sistema e grava o resultado.
+    The font cache (fontlist-*.json) goes to a directory the executor knows is
+    writable, instead of HOME — on the first import matplotlib scans the system
+    fonts and writes the result.
     """
     raiz = Path(artifacts_root()) / ".mpl"
     try:
@@ -173,7 +175,7 @@ def _carregar_matplotlib():
 
 @register_node
 class CartaImagem(BaseNode):
-    """Compoe as camadas ligadas as portas numa carta (PNG, JPG ou PDF)."""
+    """Composes the layers connected to the ports into an image map (PNG, JPG or PDF)."""
 
     @classmethod
     def description(cls) -> Dict[str, Any]:
@@ -187,10 +189,10 @@ class CartaImagem(BaseNode):
                 "coordenadas e fundo de mapa, cada um opcional. Cada porta e uma camada; "
                 "o arquivo vira um artefato da execucao."
             ),
-            # Entradas DECLARADAS PELO USUARIO, via `ports` — o mesmo mecanismo do
-            # Script Python e do SubWorkflowOutput. Com duas ou mais portas o
-            # editor grava o `to_key` de cada aresta e cada camada chega pelo
-            # nome; com uma ou nenhuma a aresta e anonima (ver o cabecalho).
+            # Inputs DECLARED BY THE USER, via `ports` — the same mechanism as the
+            # Python Script and SubWorkflowOutput. With two or more ports the
+            # editor writes each edge's `to_key` and each layer arrives by
+            # name; with one or none the edge is anonymous (see the header).
             "dynamic_inputs": True,
             "dynamic_output": False,
             "outputs": [
@@ -278,10 +280,10 @@ class CartaImagem(BaseNode):
                     ),
                 },
                 {
-                    # INJETADA pelo servidor no despacho, para os fundos com nome:
-                    # a URL e a atribuicao que a instalacao configurou (MAPA_*).
-                    # Declarada porque `validate()` reconstroi os parametros a
-                    # partir desta lista; a UI a esconde pelo nome.
+                    # INJECTED by the server at dispatch, for the named basemaps:
+                    # the URL and attribution the installation configured (MAPA_*).
+                    # Declared because `validate()` rebuilds the parameters from
+                    # this list; the UI hides it by name.
                     "name": "fundo_da_instalacao",
                     "label": "Fundo da instalacao",
                     "type": "object",
@@ -302,7 +304,7 @@ class CartaImagem(BaseNode):
                     "default": "",
                     "description": "Token Bearer para proteger o download. Sem credencial, o artefato e publico.",
                     "credential_types": ["webhook_token"],
-                    # Nao ha download a proteger num artefato que fica no executor.
+                    # There is no download to protect on an artifact that stays on the executor.
                     "visibleWhen": {"field": "localidade", "in": ["herdar"]},
                 },
                 propriedade_localidade(),
@@ -314,9 +316,9 @@ class CartaImagem(BaseNode):
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
 
-        # formato, tamanho e fundo ja validados contra as options pelo
-        # self.validate(); as options sao as chaves de FORMATOS, TAMANHOS e
-        # FUNDOS_COM_NOME (ver test_carta_imagem).
+        # format, size and basemap already validated against the options by
+        # self.validate(); the options are the keys of FORMATOS, TAMANHOS and
+        # FUNDOS_COM_NOME (see test_carta_imagem).
         formato = self.get_param("formato", "png")
         mime, ext = FORMATOS[formato]
         tamanho = self.get_param("tamanho", "a4-paisagem")
@@ -350,8 +352,8 @@ class CartaImagem(BaseNode):
                     f"({variavel} no servidor). Use 'Ruas' ou uma URL personalizada de tiles."
                 )
             if configurado is None:
-                # Executor atualizado antes do servidor: o servidor anterior a
-                # esta versao nao manda o fundo, e o executor nao tem o seu.
+                # Executor updated before the server: a server older than this
+                # version does not send the basemap, and the executor has none of its own.
                 raise ValueError(
                     f"O servidor nao mandou o fundo '{fundo}' (servidor anterior a esta "
                     f"versao do executor?) e o executor nao tem {variavel}. Atualize o "
@@ -371,7 +373,7 @@ class CartaImagem(BaseNode):
         localidade, quem = resolver_localidade(self.get_param("localidade", None))
         credential_id = self.get_param("credential_id", "") or None
         if localidade == EXECUTOR:
-            # Nao ha download a proteger num artefato que fica no executor.
+            # There is no download to protect on an artifact that stays on the executor.
             credential_id = None
         label = self.derive_label(titulo, "")
         workspace_id, task_id = self.require_execution_context()
@@ -382,7 +384,7 @@ class CartaImagem(BaseNode):
         camadas = self._camadas(inputs, portas, rotulos, cores)
         total = sum(len(c.gdf) for c in camadas)
 
-        # ── CRS: a ordem importa — sem CRS e 4326 ANTES de qualquer reprojecao ──
+        # ── CRS: order matters — no CRS means 4326, BEFORE any reprojection ──
         caixa_4326 = await asyncio.to_thread(self._caixa_4326, camadas)
         crs_texto, aviso = crs_da_carta(caixa_4326, crs_param, fundo)
         if aviso:
@@ -391,8 +393,8 @@ class CartaImagem(BaseNode):
         projetado = crs_e_projetado(crs_texto)
         crs_e_3857 = _e_3857(crs_texto)
         caixa = _caixa_das_camadas(camadas)
-        # A moldura e fixa (o quadro na pagina); a extensao cresce ate a proporcao
-        # dela — e e ESTA extensao que o fundo de mapa precisa cobrir.
+        # The frame is fixed (the box on the page); the extent grows to its
+        # aspect ratio — and it is THIS extent that the basemap must cover.
         _e, _b, largura_q, altura_q = quadro_do_mapa(legenda)
         proporcao = (largura_q * largura_pol) / (altura_q * altura_pol)
         extensao = extensao_no_quadro(extensao_com_margem(caixa, projetado), proporcao)
@@ -445,9 +447,9 @@ class CartaImagem(BaseNode):
             f"{len(camadas)} camada(s), {total} feicoes, CRS {crs_texto})"
         )
 
-        # Chaves PLANAS, as mesmas do static_output: o executor compara as chaves
-        # de topo com as declaradas e acende o aviso de drift no painel se nao
-        # casarem (flow/executor/core.py, "schema drift").
+        # FLAT keys, the same as static_output: the executor compares the top-level
+        # keys with the declared ones and lights the drift warning on the panel if
+        # they don't match (flow/executor/core.py, "schema drift").
         return {
             "artifact_filename": filename,
             "artifact_s3_key": s3_key,
@@ -462,12 +464,12 @@ class CartaImagem(BaseNode):
     # ── Partes ───────────────────────────────────────────────────────────────
 
     def _reservar_nome(self, filename: str) -> None:
-        """Dois nos com o mesmo titulo gravariam a MESMA chave S3 e o servidor
-        deduplicaria em silencio, sobrando uma carta so. O registro fica no
-        `context` do run (compartilhado por todos os nos), e e feito de forma
-        sincrona antes do primeiro `await` — o batch roda em `gather`,
-        cooperativo, entao nao ha corrida. Guarda o node_id: um retry do MESMO
-        no nao e colisao."""
+        """Two nodes with the same title would write the SAME S3 key and the server
+        would silently deduplicate, leaving a single image map. The record lives
+        in the run's `context` (shared by all nodes), and it is made
+        synchronously before the first `await` — the batch runs in `gather`,
+        cooperatively, so there is no race. Stores the node_id: a retry of the
+        SAME node is not a collision."""
         ctx = getattr(self, "context", None)
         if not isinstance(ctx, dict):
             return
@@ -501,8 +503,8 @@ class CartaImagem(BaseNode):
                 ))
             conhecidas = set(portas)
         else:
-            # Aresta anonima: o dict do pai foi espalhado nos inputs. A camada e
-            # o primeiro GeoDataFrame que chegou (o criterio de get_first_gdf).
+            # Anonymous edge: the parent's dict was spread into the inputs. The layer is
+            # the first GeoDataFrame that arrived (the get_first_gdf criterion).
             candidatos = [k for k, v in (inputs or {}).items() if e_camada(v)]
             if candidatos:
                 if len({id(inputs[k]) for k in candidatos}) > 1:
@@ -531,11 +533,11 @@ class CartaImagem(BaseNode):
         return camadas
 
     def _caixa_4326(self, camadas: list) -> tuple:
-        """A extensao de todas as camadas em lon/lat, para estimar o CRS.
+        """The extent of all layers in lon/lat, to estimate the CRS.
 
-        Camada sem CRS e tratada como EPSG:4326 AQUI, antes de qualquer
-        reprojecao: `to_crs` sem CRS de origem falharia, e um `set_crs` com o
-        CRS da carta rotularia graus como metros.
+        A layer without a CRS is treated as EPSG:4326 HERE, before any
+        reprojection: `to_crs` without a source CRS would fail, and a `set_crs`
+        with the map's CRS would label degrees as meters.
         """
         from pyproj import Transformer
 
@@ -555,20 +557,20 @@ class CartaImagem(BaseNode):
         )
 
     async def _baixar_fundo(self, template: str, extensao_3857: tuple, largura_px: int):
-        """Baixa e monta o mosaico de tiles que cobre a extensao (EPSG:3857).
+        """Downloads and assembles the tile mosaic that covers the extent (EPSG:3857).
 
-        Cada URL passa pela guarda de SSRF (`safe_httpx_request` pina o IP,
-        bloqueia redirect e limita o corpo), como nos nos de HTTP: um template
-        escrito no fluxo nao pode alcancar a rede interna nem os metadados da
-        nuvem. Duas conexoes por vez e retry so em erro transitorio (a politica
-        de uso do OpenStreetMap); 4xx e erro definitivo.
+        Each URL goes through the SSRF guard (`safe_httpx_request` pins the IP,
+        blocks redirects and limits the body), as in the HTTP nodes: a template
+        written in the workflow cannot reach the internal network or the cloud
+        metadata. Two connections at a time and retry only on transient errors
+        (the OpenStreetMap usage policy); 4xx is a definitive error.
         """
         z = zoom_para(extensao_3857, largura_px)
         z, tx0, tx1, ty0, ty1 = tiles_da_extensao(extensao_3857, z)
         await asyncio.to_thread(validate_url_ssrf, url_do_tile(template, z, tx0, ty0))
 
         semaforo = asyncio.Semaphore(CONEXOES_SIMULTANEAS)
-        # O site da instalação no User-Agent, como a política do OSM pede
+        # The installation's site in the User-Agent, as the OSM policy asks
         # (flow/utils/identidade.py).
         cabecalhos = {"User-Agent": user_agent("carta")}
 
@@ -609,7 +611,7 @@ class CartaImagem(BaseNode):
         return imagem, extensao_dos_tiles(tx0, tx1, ty0, ty1, z)
 
 
-# ── Funcoes de modulo (rodam em thread, sem `self`) ──────────────────────────
+# ── Module functions (run in a thread, without `self`) ──────────────────────
 
 def _e_4326(crs: Any) -> bool:
     try:
@@ -669,11 +671,11 @@ def _montar_mosaico(tiles: list, tx0: int, tx1: int, ty0: int, ty1: int):
 
 
 def _renderizar(r: _Render) -> bytes:
-    """Desenha a carta e devolve os bytes do arquivo. Roda em thread.
+    """Draws the image map and returns the file's bytes. Runs in a thread.
 
-    API orientada a objeto do matplotlib (Figure + FigureCanvasAgg): sem
-    pyplot, sem `rc_context` (estado global compartilhado entre threads) —
-    tamanhos e cores vao por artista.
+    matplotlib's object-oriented API (Figure + FigureCanvasAgg): no pyplot, no
+    `rc_context` (global state shared across threads) — sizes and colors go
+    per artist.
     """
     _carregar_matplotlib()
     import numpy as np
@@ -686,9 +688,9 @@ def _renderizar(r: _Render) -> bytes:
     fig = Figure(figsize=(r.largura_pol, r.altura_pol), dpi=r.dpi)
     FigureCanvasAgg(fig)
 
-    # O mapa a esquerda; a coluna da direita so existe com legenda. A extensao
-    # ja veio na proporcao deste quadro (extensao_no_quadro), entao o eixo
-    # nao encolhe.
+    # The map on the left; the right column exists only with a legend. The extent
+    # already came in this frame's aspect ratio (extensao_no_quadro), so the
+    # axis does not shrink.
     caixa_mapa = list(quadro_do_mapa(r.legenda))
     ax = fig.add_axes(caixa_mapa)
     x0, y0, x1, y1 = r.extensao
@@ -700,13 +702,14 @@ def _renderizar(r: _Render) -> bytes:
         )
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
-    # `box`: o eixo encolhe para manter a proporcao e os limites ficam EXATOS —
-    # e o que permite ancorar escala e norte por fracao da extensao.
+    # `box`: the axis shrinks to keep the aspect ratio and the limits stay EXACT —
+    # which is what allows anchoring the scale bar and north arrow by fraction
+    # of the extent.
     ax.set_aspect("equal", adjustable="box")
     ax.set_facecolor("#f4f4f4" if r.fundo is None else "white")
 
-    # Simplificacao a 1 pixel: e o que segura o desenho de camadas grandes sem
-    # mudar nada visivel.
+    # Simplification to 1 pixel: this is what keeps large layers drawable without
+    # changing anything visible.
     largura_px_mapa = max(caixa_mapa[2] * r.largura_px, 1.0)
     tolerancia = (x1 - x0) / largura_px_mapa
 
@@ -730,7 +733,7 @@ def _renderizar(r: _Render) -> bytes:
         else:
             gdf.plot(color=c.cor, edgecolor=borda, linewidth=0.6, **comum)
             alcas.append(Patch(facecolor=c.cor, edgecolor=borda, alpha=r.opacidade))
-    # gdf.plot pode mexer nos limites (autoscale); a extensao da carta manda.
+    # gdf.plot may touch the limits (autoscale); the map's extent wins.
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
 
@@ -769,7 +772,7 @@ def _renderizar(r: _Render) -> bytes:
             fator = fator_de_escala_3857(lat_c)
         metros = comprimento_da_escala((x1 - x0) * fator)
         if metros > 0:
-            comprimento = metros / fator            # em unidades do mapa
+            comprimento = metros / fator            # in map units
             bx = x0 + 0.03 * (x1 - x0)
             by = y0 + 0.04 * (y1 - y0)
             h = 0.012 * (y1 - y0)

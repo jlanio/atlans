@@ -1,19 +1,19 @@
 # tests/unit/test_fix_flow_core.py
 """
-Regressões de flow/executor/core.py:
+Regressions in flow/executor/core.py:
 
-- P7: o log por nó não pode materializar o payload de inputs quando o nível
-  está acima de DEBUG (f-string eager custava CPU/RAM em todo nó). O "qual nó
-  está rodando" continua em INFO — é a única pista quando o WS cai.
-- P3: o dict LEVE de referências de spill só pode viver em `all_node_outputs`,
-  que é o caminho que rehidrata via `_load_from_disk`. `named[alias]` e
-  `final_outputs` guardam o payload real de propósito: nada rehidrata o
-  contexto Jinja, e o Parquet é apagado por `_free_node_outputs`.
-- P3: o cleanup do spill precisa rodar mesmo quando o workflow falha, senão
-  o _spill_cache (dict de módulo) vaza GeoDataFrames pelo resto da vida do
-  processo do executor.
-- P3.1b: as threads de spill precisam ser drenadas ANTES do rmtree do cleanup,
-  senão um run cancelado deixa Parquet órfão em /tmp para sempre.
+- P7: the per-node log must not materialize the inputs payload when the level
+  is above DEBUG (an eager f-string cost CPU/RAM on every node). The "which node
+  is running" stays at INFO — it is the only clue when the WS drops.
+- P3: the LIGHT dict of spill references may only live in `all_node_outputs`,
+  which is the path that rehydrates via `_load_from_disk`. `named[alias]` and
+  `final_outputs` hold the real payload on purpose: nothing rehydrates the
+  Jinja context, and the Parquet is deleted by `_free_node_outputs`.
+- P3: the spill cleanup must run even when the workflow fails, otherwise
+  _spill_cache (a module-level dict) leaks GeoDataFrames for the rest of the
+  executor process's life.
+- P3.1b: the spill threads must be drained BEFORE the cleanup's rmtree,
+  otherwise a cancelled run leaves an orphan Parquet in /tmp forever.
 """
 import asyncio
 import logging
@@ -36,11 +36,11 @@ def _node(node_id, alias=None):
 
 
 def _trigger(node_id, alias=None):
-    """Nó de entrada: `type == 'trigger'` faz o executor injetar initial_inputs.
+    """Input node: `type == 'trigger'` makes the executor inject initial_inputs.
 
-    O `name` continua 'Merge' porque é o factory lookup — com strategy 'first'
-    ele devolve o primeiro valor não-nulo dos inputs, que é o jeito mais curto
-    de fazer um GeoDataFrame real sair do output de um nó.
+    The `name` stays 'Merge' because it is the factory lookup — with strategy 'first'
+    it returns the first non-null value among the inputs, which is the shortest way
+    to get a real GeoDataFrame out of a node's output.
     """
     node = _node(node_id, alias=alias)
     node["type"] = "trigger"
@@ -61,7 +61,7 @@ def _publisher():
 
 class TestLazySummary:
     def test_str_resume_dict_sem_materializar_payload(self):
-        """__str__ devolve o resumo por chave, não o repr do payload."""
+        """__str__ returns the per-key summary, not the payload's repr."""
         payload = {"body": "x" * 10_000}
         resumo = str(_LazySummary(payload))
         assert "body" in resumo
@@ -72,9 +72,9 @@ class TestLazySummary:
 
     def test_logger_acima_de_debug_nao_chama_str(self, caplog):
         """
-        Com o nível acima de DEBUG o logging nem toca no argumento — é isso
-        que torna o log por nó gratuito. Se alguém voltar a usar f-string,
-        este contrato some.
+        With the level above DEBUG, logging does not even touch the argument — that is
+        what makes the per-node log free. If someone goes back to using an f-string,
+        this contract disappears.
         """
         chamadas = []
 
@@ -89,7 +89,7 @@ class TestLazySummary:
         assert chamadas == [], "o resumo foi construído mesmo com nível acima de DEBUG"
 
     def test_run_node_nao_loga_inputs_em_info(self, caplog):
-        """O payload de inputs não pode aparecer em logs de nível INFO."""
+        """The inputs payload must not appear in INFO-level logs."""
         definition = {"nodes": [_node("n1")], "edges": []}
         executor = WorkflowExecutor(definition, task_id="fix-core-log-1", publisher=_publisher())
         with caplog.at_level(logging.INFO, logger="flow.executor.core"):
@@ -97,30 +97,30 @@ class TestLazySummary:
         assert "conteudo-gigante" not in caplog.text
 
 
-# ── P3: spill devolve a referência leve ──────────────────────────────────────
+# ── P3: spill returns the light reference ────────────────────────────────────
 
 class TestSpillSubstituiPayload:
     def test_alias_e_final_outputs_recebem_o_payload_real(self, tmp_path, monkeypatch):
-        """O spill NÃO pode vazar a referência leve para `named`/`final_outputs`.
+        """The spill must NOT leak the light reference into `named`/`final_outputs`.
 
-        Guarda de regressão. Devolver o dict spilled reduziria o pico de RAM,
-        mas `named[alias]` alimenta o contexto Jinja (`context.update(named)`) e
-        a rehidratação por `_load_from_disk` só existe no caminho de
-        `parent_outputs`. Com a referência leve no alias, `{{ Alvo.output }}`
-        renderizaria `{'__spilled__': True, …}` em vez do dado — corrupção
-        silenciosa entre nós. `final_outputs` ainda ficaria apontando para
-        Parquets que `_free_node_outputs` já apagou.
+        Regression guard. Returning the spilled dict would lower peak RAM,
+        but `named[alias]` feeds the Jinja context (`context.update(named)`) and
+        rehydration via `_load_from_disk` only exists on the
+        `parent_outputs` path. With the light reference in the alias, `{{ Alvo.output }}`
+        would render `{'__spilled__': True, …}` instead of the data — silent
+        corruption between nodes. `final_outputs` would also keep pointing at
+        Parquets that `_free_node_outputs` has already deleted.
 
-        `all_node_outputs` continua recebendo o dict leve (é o consumo por
-        `parent_outputs`, que rehidrata).
+        `all_node_outputs` keeps receiving the light dict (it is consumed through
+        `parent_outputs`, which rehydrates).
         """
-        # A referência de spill aponta para um Parquet REAL e legível — a
-        # invariante de produção: uma ref de spill só existe porque o arquivo
-        # foi escrito. Desde a correção do #164, `_load_from_disk` FALHA ALTO
-        # quando não restaura (em vez de deixar a sentinela viajar); n2 consome
-        # o output de n1 por esse caminho, então o Parquet precisa existir. O
-        # que este teste prova é que a ref leve não vaza para `named`/
-        # `final_outputs`; o caminho de falha do load tem teste próprio
+        # The spill reference points to a REAL, readable Parquet — the production
+        # invariant: a spill ref only exists because the file was written.
+        # Since the fix for #164, `_load_from_disk` FAILS LOUDLY when it does
+        # not restore (instead of letting the sentinel travel on); n2 consumes
+        # n1's output through that path, so the Parquet must exist. What
+        # this test proves is that the light ref does not leak into `named`/
+        # `final_outputs`; the load failure path has its own test
         # (test_executor_correcao_auditoria::test_spill_nao_restaurado_levanta).
         real = tmp_path / "leve.parquet"
         _gdf(3).to_parquet(real)
@@ -136,16 +136,16 @@ class TestSpillSubstituiPayload:
         monkeypatch.setattr("flow.executor.core._delete_spill_files",
                             lambda outputs: None)
 
-        # Grafo com aresta: o Merge de n2 só produz output se receber input de n1,
-        # e sem output não há spill — o teste passaria sem exercitar nada.
+        # Graph with an edge: n2's Merge only produces output if it gets input from n1,
+        # and without output there is no spill — the test would pass without exercising anything.
         definition = {
             "nodes": [_node("n1"), _node("n2", alias="Alvo")],
             "edges": [_edge("n1", "n2")],
         }
         executor = WorkflowExecutor(definition, task_id="fix-core-spill-1", publisher=_publisher())
         asyncio.run(executor.run(initial_inputs={"output": {"dado": "real"}}))
-        # `_delete_spill_files` está anulado (acima), então a limpeza normal não
-        # roda: tira o GDF relido do cache de módulo para não vazar entre testes.
+        # `_delete_spill_files` is stubbed out (above), so the normal cleanup does not
+        # run: remove the re-read GDF from the module cache so it does not leak between tests.
         spill_mod._spill_cache.pop(str(real), None)
 
         assert "n2" in spills, "o spill precisa ter sido exercitado para o teste valer"
@@ -159,7 +159,7 @@ class TestSpillSubstituiPayload:
         )
 
     def test_sem_spill_devolve_o_proprio_dict(self, monkeypatch):
-        """Sem spill (retorno idêntico), nada muda: devolve o dict original."""
+        """Without spill (identical return), nothing changes: returns the original dict."""
         monkeypatch.setattr("flow.executor.core._spill_to_disk",
                             lambda task_id, node_id, outputs: outputs)
 
@@ -170,7 +170,7 @@ class TestSpillSubstituiPayload:
         assert "output" in executor.final_outputs["n1"]
 
 
-# ── P3/P3.1b: spill REAL, sem fake do mecanismo ──────────────────────────────
+# ── P3/P3.1b: REAL spill, no fake of the mechanism ───────────────────────────
 
 def _gdf(n=200):
     gpd = pytest.importorskip("geopandas")
@@ -183,13 +183,13 @@ def _gdf(n=200):
 
 
 class TestSpillReal:
-    """Exercita `_spill_to_disk`/`_load_from_disk` de verdade.
+    """Exercises `_spill_to_disk`/`_load_from_disk` for real.
 
-    Os outros testes de spill do repo substituem `_spill_to_disk` por um fake,
-    o que anula exatamente o que se quer provar: a escrita do Parquet, a
-    rehidratação no consumo e a limpeza. Aqui o threshold vai a 1 KB e o
-    diretório para tmp_path, então o código de produção escreve e relê o
-    arquivo. O único wrapper é um espião que CHAMA a função real.
+    The repo's other spill tests replace `_spill_to_disk` with a fake,
+    which nullifies exactly what we want to prove: the Parquet write, the
+    rehydration on consumption and the cleanup. Here the threshold goes to 1 KB and
+    the directory to tmp_path, so the production code writes and re-reads the
+    file. The only wrapper is a spy that CALLS the real function.
     """
 
     def _tmp_spill(self, tmp_path, monkeypatch):
@@ -225,13 +225,13 @@ class TestSpillReal:
 
         assert paths, "nenhum spill real aconteceu — o teste não provaria nada"
 
-        # n1 spillou; n2 só produz output porque `_load_from_disk` rehidratou o
-        # Parquet no caminho de parent_outputs.
+        # n1 spilled; n2 only produces output because `_load_from_disk` rehydrated the
+        # Parquet on the parent_outputs path.
         assert executor.node_stats["n2"]["input_features"] == 200, (
             "o filho não recebeu o GeoDataFrame de volta do disco"
         )
 
-        # O alias e o final_outputs guardam o DADO, nunca a referência de spill.
+        # The alias and final_outputs hold the DATA, never the spill reference.
         alvo = executor.expression_context["named"]["Alvo"]["output"]
         assert isinstance(alvo, gpd.GeoDataFrame), f"alias virou {type(alvo).__name__}"
         assert len(alvo) == 200
@@ -241,7 +241,7 @@ class TestSpillReal:
             "o dict leve de spill vazou para final_outputs"
         )
 
-        # Nada sobrou em disco nem no cache de módulo.
+        # Nothing was left on disk or in the module cache.
         assert list(tmp_path.rglob("*.parquet")) == [], "Parquet de spill não foi limpo"
         assert not os.path.isdir(str(tmp_path / "spill" / "spill-real-1"))
         assert [k for k in spill_mod._spill_cache if k in paths] == [], (
@@ -249,13 +249,13 @@ class TestSpillReal:
         )
 
     def test_run_cancelado_nao_deixa_parquet_orfao(self, tmp_path, monkeypatch):
-        """P3.1b: o rmtree do cleanup não pode correr antes da thread de spill.
+        """P3.1b: the cleanup's rmtree must not run before the spill thread.
 
-        `asyncio.to_thread` não é cancelável. Sem o dreno, o `finally` de
-        `run()` apagava o diretório enquanto a thread ainda escrevia — ela
-        recriava o dir no `os.makedirs` e deixava o Parquet órfão para sempre
-        (não há janitor). Reproduz o caminho de produção: o job_executor
-        envolve `run()` num `asyncio.wait_for(..., JOB_TIMEOUT)`.
+        `asyncio.to_thread` is not cancellable. Without the drain, the `finally` of
+        `run()` deleted the directory while the thread was still writing — it
+        recreated the dir in `os.makedirs` and left the Parquet orphaned forever
+        (there is no janitor). Reproduces the production path: job_executor
+        wraps `run()` in an `asyncio.wait_for(..., JOB_TIMEOUT)`.
         """
         import asyncio
         import time
@@ -264,7 +264,7 @@ class TestSpillReal:
         real_spill = spill_mod._spill_to_disk
 
         def _lento(task_id, node_id, outputs):
-            # Garante que a thread ainda esteja viva quando o wait_for estourar.
+            # Ensures the thread is still alive when wait_for times out.
             time.sleep(0.4)
             return real_spill(task_id, node_id, outputs)
 
@@ -286,7 +286,7 @@ class TestSpillReal:
         )
 
 
-# ── P3: contexto sem referências duplicadas ──────────────────────────────────
+# ── P3: context without duplicated references ────────────────────────────────
 
 class TestContextoSemDuplicatas:
     def test_nodes_do_contexto_e_o_dict_vivo(self):
@@ -310,7 +310,7 @@ class TestContextoSemDuplicatas:
         )
 
 
-# ── P3: cleanup do spill em caminho de falha ─────────────────────────────────
+# ── P3: spill cleanup on the failure path ────────────────────────────────────
 
 class TestCleanupEmFalha:
     def test_cleanup_roda_quando_no_falha(self, monkeypatch):

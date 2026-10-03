@@ -1,13 +1,14 @@
 # flow/nodes/spatial/sobreposicao_binaria.py
 """
-Base dos nós que são um `gpd.overlay` de A com B e só diferem no `how`.
+Base for the nodes that are a `gpd.overlay` of A with B and differ only in `how`.
 
-Diferença (A - B) e Diferença Simétrica (A △ B) eram o mesmo nó copiado,
-mudando o `how` e os textos. Cada subclasse declara os quatro abaixo e a sua
-`description()`; nome do nó, descriptor, parâmetros e mensagens continuam os de
-antes, então um workflow salvo não percebe a troca.
+Difference (A - B) and Symmetric Difference (A △ B) were the same node copied,
+changing the `how` and the texts. Each subclass declares the four below and its
+own `description()`; node name, descriptor, parameters and messages are the same
+as before, so a saved workflow does not notice the change.
 
-Não é registrada: sem `@register_node` e sem `description()`, não vira nó.
+It is not registered: without `@register_node` and without `description()`, it
+does not become a node.
 """
 import asyncio
 from typing import Any, Dict
@@ -21,10 +22,10 @@ logger = get_logger(__name__)
 
 
 class SobreposicaoBinaria(BaseNode):
-    """Overlay binário que recusa CRS diferentes e geometria não suportada."""
+    """Binary overlay that rejects differing CRSs and unsupported geometry."""
 
-    HOW: str            # `how` do gpd.overlay
-    OPERACAO: str       # a operação nas mensagens de recusa (CRS, tipo de geometria)
+    HOW: str            # gpd.overlay's `how`
+    OPERACAO: str       # the operation in the rejection messages (CRS, geometry type)
     ROTULO: str         # "Erro na operação de <ROTULO>: ..."
     DESCRICAO_LOG: str  # "Executando <DESCRICAO_LOG> entre N e M feições."
 

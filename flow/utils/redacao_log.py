@@ -1,45 +1,46 @@
 # flow/utils/redacao_log.py
-"""Redação de segredos no log por PADRÃO — Bearer, Basic, DSN com senha, PAT,
-chave AWS, bloco PEM.
+"""PATTERN-based secret redaction in the log — Bearer, Basic, DSN with password, PAT,
+AWS key, PEM block.
 
-Mora no flow/ porque o flow está nas três imagens (API, executor e o executor
-empacotado no desktop). A lista vivia em `app/core/utils/logger.py`, e só os
-loggers do app a usavam: o executor, que decifra DSN e monta cabeçalho de
-autenticação, logava sem máscara nenhuma. O app reexporta daqui — uma lista só.
+Lives in flow/ because flow is in all three images (API, executor and the executor
+packaged in the desktop app). The list used to live in `app/core/utils/logger.py`, and
+only the app's loggers used it: the executor, which decrypts DSNs and builds
+authentication headers, logged with no masking at all. The app re-exports from
+here — a single list.
 
-Duas formas de ligar:
+Two ways to turn it on:
 
-- `SecretScrubFilter`: filtro por logger (o `get_logger` do app o anexa).
-- `instalar_no_processo()`: a fábrica de LogRecord, por onde passa TODO
-  registro do processo — inclusive o de biblioteca de terceiro e o de handler
-  que ainda nem existe (o executor instala vários: console, arquivos, painel).
-  É o mesmo ponto que `segredos_vivos` usa para os segredos em uso.
+- `SecretScrubFilter`: per-logger filter (the app's `get_logger` attaches it).
+- `instalar_no_processo()`: the LogRecord factory, through which EVERY record
+  in the process passes — including third-party libraries' and those of handlers
+  that don't exist yet (the executor installs several: console, files, panel).
+  It is the same hook `segredos_vivos` uses for the secrets in use.
 """
 import logging
 import re
 import threading
 
 # ── Secret scrubbing ─────────────────────────────────────────────────────────
-# Padroes que redigimos ANTES do log ir para stdout/arquivo. Evita que:
-#   - Traceback com body de request contendo `"password": "..."` vaze
-#   - Header Authorization com JWT chegue ao Loki/CloudWatch
-#   - OTPs de enrollment (uso unico mas ainda uteis pra postmortem se
-#     capturados) fiquem em plaintext
-#   - GitHub PATs / AWS keys / Ed25519 privates deem match acidental
+# Patterns we redact BEFORE the log goes to stdout/file. Prevents:
+#   - A traceback with a request body containing `"password": "..."` from leaking
+#   - An Authorization header with a JWT from reaching Loki/CloudWatch
+#   - Enrollment OTPs (single-use but still useful for a postmortem if
+#     captured) from staying in plaintext
+#   - GitHub PATs / AWS keys / Ed25519 privates from matching accidentally
 #
-# `_SCRUB_PATTERNS` corre em ordem — os mais especificos vem primeiro para
-# nao serem mascarados por regras genericas (ex: "Bearer <jwt>" antes de
-# "token=..."). O `_REDACTED` mantem o mesmo comprimento visual em qualquer
-# match — nao vaza o tamanho do secreto original.
+# `_SCRUB_PATTERNS` runs in order — the most specific come first so they are
+# not masked by generic rules (e.g. "Bearer <jwt>" before
+# "token=..."). `_REDACTED` keeps the same visual length on any
+# match — it does not leak the original secret's size.
 _REDACTED = "<REDACTED>"
 
 _SCRUB_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # Authorization: Bearer <jwt> — case-insensitive
     (re.compile(r"(?i)(authorization\s*[:=]\s*bearer\s+)[\w.\-]+"), rf"\1{_REDACTED}"),
     (re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._\-]{20,}"), rf"\1{_REDACTED}"),
-    # Authorization: Basic <base64(usuario:senha)> — a senha do Basic (a
-    # credencial "wfs" e a http_basic) viaja assim, e um proxy ou WAF que ecoa
-    # os cabeçalhos do pedido a devolve assim, trivialmente reversível.
+    # Authorization: Basic <base64(user:password)> — the Basic password (the
+    # "wfs" credential and http_basic) travels like this, and a proxy or WAF that
+    # echoes the request headers returns it like this, trivially reversible.
     (re.compile(r"(?i)(authorization\s*[:=]\s*basic\s+)[A-Za-z0-9+/=_\-]{8,}"), rf"\1{_REDACTED}"),
 
     # JSON keys sensiveis: "password":"...", "otp":"...", "api_key":"...",
@@ -50,9 +51,9 @@ _SCRUB_PATTERNS: list[tuple[re.Pattern[str], str]] = [
         r'signing[_-]?key)"\s*:\s*")[^"]+(")'
     ), rf"\1{_REDACTED}\2"),
 
-    # `authkey` e a chave do modulo authkey do GeoServer, que o no WFS manda na
-    # URL — ja codificada: `%2B`, `%2F` e cia. fazem parte dela, e a regra
-    # generica abaixo pararia no primeiro `%` deixando o resto da chave.
+    # `authkey` is the key of GeoServer's authkey module, which the WFS node sends in
+    # the URL — already encoded: `%2B`, `%2F` and co. are part of it, and the
+    # generic rule below would stop at the first `%`, leaving the rest of the key.
     (re.compile(r"(?i)\b(authkey)=([^&#\s\"'<>]{6,})"), rf"\1={_REDACTED}"),
 
     # Query / form: otp=..., password=..., token=... (nao pega palavras curtas).
@@ -64,25 +65,25 @@ _SCRUB_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     # GitHub Personal Access Tokens (github_pat_..., ghp_..., ghs_..., etc)
     (re.compile(r"\b(github_pat_|ghp_|ghs_|gho_|ghu_|ghr_)[A-Za-z0-9_]{20,}"), _REDACTED),
 
-    # Tokens pessoais de acesso do Atlans (atl_pat_ + 43 chars url-safe) — o
-    # caso "Bearer atl_pat_..." ja cai na regra de Bearer; esta pega o token nu.
-    # Sem `\b`: o prefixo e especifico o bastante, e um token colado a outra
-    # palavra ("id=atl_pat_...", "_atl_pat_...") tambem tem de sumir.
+    # Atlans personal access tokens (atl_pat_ + 43 url-safe chars) — the
+    # "Bearer atl_pat_..." case already falls under the Bearer rule; this one catches
+    # the bare token. No `\b`: the prefix is specific enough, and a token glued to
+    # another word ("id=atl_pat_...", "_atl_pat_...") must also disappear.
     (re.compile(r"atl_pat_[A-Za-z0-9_\-]{43}"), _REDACTED),
 
-    # DSN / URL com credencial embutida, como
+    # DSN / URL with an embedded credential, such as
     #   postgresql://user:senha@host/db  ou  https://user:senha@api/...  # pragma: allowlist secret
-    # Falha de asyncpg/SQLAlchemy embute a DSN inteira na mensagem, e
-    # `connectionString` legado grava assim. So a senha some: esquema, usuario
-    # e host ficam para o diagnostico continuar util. Fica antes das chaves
-    # genericas (AWS, sk-) para nenhuma delas mascarar o match pela metade.
+    # asyncpg/SQLAlchemy failures embed the whole DSN in the message, and
+    # legacy `connectionString` is stored like this. Only the password goes: scheme,
+    # user and host stay so diagnostics remain useful. It comes before the
+    # generic keys (AWS, sk-) so none of them masks the match halfway.
     #
-    # Os tres tetos sao o que mantem o custo linear: sem eles, cada letra de um
-    # texto longo sem "://" abria uma varredura ate o fim (100 KB custavam 26 s
-    # de CPU sincrona no event loop, porque o filtro corre em TODO log). O
-    # usuario e opcional — `redis://:senha@host` e a forma canonica do REDIS_URL
-    # — e a senha e gulosa ate o ultimo "@" antes de "/" ou espaco, senao
-    # `user:p@ss@host` deixaria a cauda da senha para tras.
+    # The three ceilings are what keep the cost linear: without them, each letter
+    # of a long text without "://" opened a scan to the end (100 KB cost 26 s
+    # of synchronous CPU on the event loop, because the filter runs on EVERY log).
+    # The user is optional — `redis://:senha@host` is the canonical form of
+    # REDIS_URL — and the password is greedy up to the last "@" before "/" or a
+    # space, otherwise `user:p@ss@host` would leave the password's tail behind.
     (re.compile(r"(?i)\b([a-z][a-z0-9+.\-]{0,31}://[^/\s:@]*:)[^\s/]{1,256}(@)"), rf"\1{_REDACTED}\2"),
 
     # AWS access keys
@@ -101,37 +102,37 @@ _SCRUB_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
 
 def _scrub(text: str) -> str:
-    """Aplica todos os padroes em ordem e retorna o texto redigido."""
+    """Applies all patterns in order and returns the redacted text."""
     for pattern, replacement in _SCRUB_PATTERNS:
         text = pattern.sub(replacement, text)
     return text
 
 
-# Nome publico da mesma funcao: quem redige texto que SAI do servidor (erros
-# de run, definitions, payloads de eventos) usa a mesma lista de padroes do
-# log — um lugar so para acrescentar formato novo. `_scrub` fica pelos
-# chamadores existentes.
+# Public name of the same function: whoever redacts text that LEAVES the server
+# (run errors, definitions, event payloads) uses the same pattern list as
+# the log — a single place to add a new format. `_scrub` stays for the
+# existing callers.
 scrub_text = _scrub
 
 
 class SecretScrubFilter(logging.Filter):
     """
-    Filter que redige secrets em record.msg + record.args ANTES do formatter
-    ser chamado. Anexado a todo logger criado por `get_logger()` — impede que
-    handlers de arquivo, console ou qualquer sink (Loki, Sentry) vejam o
+    Filter that redacts secrets in record.msg + record.args BEFORE the formatter
+    is called. Attached to every logger created by `get_logger()` — prevents
+    file and console handlers, or any sink (Loki, Sentry), from seeing the
     plaintext.
 
-    Falha aberta: se o scrub der exception (regex catastrofica em str gigante),
-    o filter deixa o record passar sem modificar. Perda de log seria pior que
-    log com secret.
+    Fails open: if the scrub raises an exception (catastrophic regex on a huge str),
+    the filter lets the record through unmodified. Losing the log would be worse
+    than a log with a secret.
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
-            # msg puro (antes de interpolar args)
+            # bare msg (before interpolating args)
             if isinstance(record.msg, str):
                 record.msg = _scrub(record.msg)
-            # args interpolados: substitui em cada string do tuple
+            # interpolated args: substitute in each string of the tuple
             if record.args:
                 if isinstance(record.args, dict):
                     record.args = {k: _scrub(v) if isinstance(v, str) else v
@@ -145,32 +146,32 @@ class SecretScrubFilter(logging.Filter):
 
 
 
-# Argumentos que o passo dos padrões já viu por inteiro: texto (redigido um a
-# um) e número (não carrega segredo). Com todos assim, a mensagem interpolada
-# não tem nada a mais para mostrar.
+# Arguments the pattern pass has already seen in full: text (redacted one by
+# one) and numbers (carry no secret). With all of them like this, the interpolated
+# message has nothing more to show.
 _ARGS_SIMPLES = (str, int, float, bool, type(None))
 
 
 def _redigir_registro(registro: logging.LogRecord) -> None:
-    """O `SecretScrubFilter` e mais o que só aparece INTERPOLADO: um argumento
-    que não é string (a exceção do asyncpg traz a DSN no `str()`), e a pilha
-    da exceção. O registro mantém a forma (`msg`/`args` um a um) quando nada
-    muda na interpolação — há formatadores que leem `record.args`."""
-    # 1. Os segredos EM USO (`segredos_vivos`) primeiro, pelo valor exato. Os
-    #    padrões param no primeiro `%`, `+` ou `/` do valor (`token=Kq7v%2B…`)
-    #    e, rodando antes, cortavam a agulha que a troca exata procura: a
-    #    cauda da chave saía no log. Não importa a ordem em que as duas
-    #    fábricas foram instaladas — esta aplica as duas, nesta ordem.
+    """The `SecretScrubFilter` plus what only shows up INTERPOLATED: an argument
+    that is not a string (the asyncpg exception carries the DSN in its `str()`), and
+    the exception's traceback. The record keeps its shape (`msg`/`args` one by one)
+    when nothing changes in the interpolation — some formatters read `record.args`."""
+    # 1. The secrets IN USE (`segredos_vivos`) first, by exact value. The
+    #    patterns stop at the first `%`, `+` or `/` of the value (`token=Kq7v%2B…`)
+    #    and, running first, cut off the needle the exact replacement looks for:
+    #    the tail of the key ended up in the log. It doesn't matter in which order
+    #    the two factories were installed — this one applies both, in this order.
     from flow.utils import segredos_vivos
 
     formas = segredos_vivos._formas
     if formas:
         segredos_vivos._limpar(registro, formas)
-    # 2. Os padrões em `msg` e em cada argumento de texto.
+    # 2. The patterns on `msg` and on each text argument.
     _secret_filter_do_flow.filter(registro)
-    # 3. A mensagem interpolada, só quando há o que ela mostre a mais: `msg` que
-    #    não é texto, ou argumento que não é texto nem número. Reescanear a
-    #    mensagem inteira sempre dobrava o custo de todo registro.
+    # 3. The interpolated message, only when it has something more to show: a `msg`
+    #    that is not text, or an argument that is neither text nor a number.
+    #    Rescanning the whole message every time doubled the cost of every record.
     args = registro.args
     valores = args.values() if isinstance(args, dict) else (args or ())
     if not isinstance(registro.msg, str) or not all(isinstance(v, _ARGS_SIMPLES) for v in valores):
@@ -182,8 +183,8 @@ def _redigir_registro(registro: logging.LogRecord) -> None:
             redigida = _scrub(mensagem)
             if redigida != mensagem:
                 registro.msg, registro.args = redigida, None
-    # 4. A pilha: formatada uma vez e guardada em `exc_text` (o formatter a usa
-    #    pronta em vez de formatar `exc_info` de novo).
+    # 4. The traceback: formatted once and stored in `exc_text` (the formatter uses it
+    #    ready-made instead of formatting `exc_info` again).
     if registro.exc_info and not registro.exc_text:
         texto = logging.Formatter().formatException(registro.exc_info)
         redigido = _scrub(texto)
@@ -200,10 +201,10 @@ _instalada = False
 
 
 def instalar_no_processo() -> None:
-    """Redige todo registro de log deste processo. Idempotente.
+    """Redacts every log record of this process. Idempotent.
 
-    Falha aberta, como o filtro: se a redação levantar, o registro segue como
-    veio — perder o log seria pior.
+    Fails open, like the filter: if the redaction raises, the record goes on as
+    it came — losing the log would be worse.
     """
     global _instalada
     with _lock:
@@ -215,7 +216,7 @@ def instalar_no_processo() -> None:
             registro = anterior(*args, **kwargs)
             try:
                 _redigir_registro(registro)
-            except Exception:  # o log nunca derruba quem loga
+            except Exception:  # logging never brings down the caller
                 pass
             return registro
 

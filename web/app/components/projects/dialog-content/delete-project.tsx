@@ -5,13 +5,13 @@ import { createToast } from "@/utils/createToast"
 
 interface DeleteProjectProps {
   workflow: IWorkflow
-  /** Chamado depois do DELETE dar certo: o pai tira o workflow da lista e fecha o diálogo. */
+  /** Called after the DELETE succeeds: the parent removes the workflow from the list and closes the dialog. */
   onDeleted: (id: string) => void
 }
 
-// Recebe o workflow por prop, e não por um contexto de página: a lista vive
-// no hook de dados de Projetos, e um segundo lugar guardando "os projetos"
-// divergiria dela na primeira mutação otimista.
+// Takes the workflow by prop, not through a page context: the list lives
+// in the Projects data hook, and a second place holding "the projects"
+// would diverge from it on the first optimistic mutation.
 const DeleteProject = ({ workflow, onDeleted }: DeleteProjectProps) => {
   async function handleConfirm() {
     const res = await GisFlowService.deleteWorkflowById(workflow.id_hash)

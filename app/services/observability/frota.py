@@ -1,6 +1,6 @@
 # app/services/observability/frota.py
-# Lógica de negócio e consultas de observabilidade extraídas do router.
-# Contrato com a web: docs/specs/metrics-history.md (§3).
+# Business logic and observability queries extracted from the router.
+# Contract with the web app: docs/specs/metrics-history.md (§3).
 
 import asyncio
 from typing import Iterable, Optional
@@ -25,10 +25,10 @@ def _executor_id_do_host(host: Optional[str]) -> Optional[str]:
 
 
 async def _executores_do_escopo(db: AsyncSession, user, *, como_admin: bool = False) -> list[dict]:
-    """Frota que o usuario enxerga (spec §3.1): com `como_admin`, todos os
-    ativos; senao, os acessiveis por `get_user_accessible_agents` (pool padrao
-    + workspaces dele + atribuidos), tambem so os ativos — um executor inativo
-    na conta "a de b online" faria a frota parecer maior do que e."""
+    """Fleet the user sees (spec §3.1): with `como_admin`, all the
+    active ones; otherwise, those accessible via `get_user_accessible_agents` (default pool
+    + their workspaces + assigned), also only the active ones — an inactive executor
+    in the "a of b online" count would make the fleet look bigger than it is."""
     if como_admin:
         result = await db.execute(
             select(
@@ -58,7 +58,7 @@ async def _executores_do_escopo(db: AsyncSession, user, *, como_admin: bool = Fa
 
 
 def _normalizar_capacidade(cap) -> Optional[dict]:
-    """So os quatro campos do contrato; o executor pode publicar mais coisa."""
+    """Only the contract's four fields; the executor may publish more."""
     if not isinstance(cap, dict):
         return None
     saida = {}
@@ -69,17 +69,17 @@ def _normalizar_capacidade(cap) -> Optional[dict]:
 
 
 async def _presenca(executor_ids: Iterable[str]) -> tuple[dict[str, bool], dict[str, Optional[dict]]]:
-    """Online (presenca no Redis) e capacidade publicada, por executor. Um
-    Redis fora do ar vira "offline, sem capacidade" — nunca derruba a tela."""
+    """Online (presence in Redis) and published capacity, per executor. A
+    Redis outage becomes "offline, no capacity" — it never brings down the screen."""
     from app.core.executor_connections import executor_registry
 
     ids = list(executor_ids)
 
-    # Uma ida ao Redis por executor, em paralelo — antes eram 2N idas em série
-    # (presenca e depois capacidade, um executor de cada vez). Cada corrotina
-    # engole a própria exceção e devolve o fallback, então o gather nunca levanta:
-    # um Redis instável continua virando "offline, sem capacidade", nunca derruba
-    # a tela.
+    # One Redis round trip per executor, in parallel — it used to be 2N serial trips
+    # (presence then capacity, one executor at a time). Each coroutine
+    # swallows its own exception and returns the fallback, so the gather never raises:
+    # an unstable Redis still becomes "offline, no capacity", never brings down
+    # the screen.
     async def _online(eid: str) -> bool:
         try:
             return bool(await executor_registry.is_online(eid))
@@ -97,7 +97,7 @@ async def _presenca(executor_ids: Iterable[str]) -> tuple[dict[str, bool], dict[
             logger.debug("Capacidade do executor '%s' indisponivel: %s", eid, exc)
             return None
 
-    # Só lê capacidade de quem está online (mesma regra de antes).
+    # Only reads capacity of those online (same rule as before).
     online_ids = [eid for eid in ids if online[eid]]
     cap_vals = await asyncio.gather(*(_cap(eid) for eid in online_ids))
     capacidade: dict[str, Optional[dict]] = {eid: None for eid in ids}
@@ -106,13 +106,13 @@ async def _presenca(executor_ids: Iterable[str]) -> tuple[dict[str, bool], dict[
 
 
 async def _confirmacoes_atrasadas() -> Optional[int]:
-    """Jobs em voo sem ACK alem do limiar — o mesmo `list_pending_acks` +
-    `JOB_ACK_WARN_SECONDS` de que a aba Confirmacoes deriva "atrasado", para
-    que o numero da faixa Agora e o da aba nunca discordem.
+    """In-flight jobs without an ACK past the threshold — the same `list_pending_acks` +
+    `JOB_ACK_WARN_SECONDS` from which the Confirmacoes tab derives "atrasado" (late), so
+    that the number in the Agora strip and the tab's never disagree.
 
-    `None` quando o registro nao responde (Redis fora, ou um dublê sem o
-    metodo): a faixa mostra "nao sei" em vez de a tela inteira cair por causa
-    de um numero secundario."""
+    `None` when the registry does not answer (Redis down, or a test double without the
+    method): the strip shows "nao sei" (don't know) instead of the whole screen failing
+    because of a secondary number."""
     from app.core.executor_connections import executor_registry
 
     try:
@@ -133,16 +133,16 @@ async def _nomes_de_executores(db: AsyncSession, executor_ids: Iterable[str]) ->
 
 
 async def _resolve_agent_names(db: AsyncSession, runs) -> dict[str, str]:
-    """Resolve nomes dos executores para hosts no formato 'executor:{id_hash}'."""
+    """Resolves executor names for hosts in the 'executor:{id_hash}' format."""
     return await _nomes_de_executores(
         db, [_executor_id_do_host(r.host) for r in runs if _executor_id_do_host(r.host)]
     )
 
 
 async def _nomes_de_workspaces(db: AsyncSession, workspace_ids: Iterable[str]) -> dict[str, str]:
-    """Nome pelo `workspace_id` DO RUN, nao pelo workspace atual do workflow:
-    um run produzido antes de o workflow ser movido pertence ao workspace de
-    origem, e e esse nome que a linha tem de mostrar."""
+    """Name by the RUN's `workspace_id`, not by the workflow's current workspace:
+    a run produced before the workflow was moved belongs to the original
+    workspace, and that is the name the row has to show."""
     ids = [i for i in set(workspace_ids) if isinstance(i, str)]
     if not ids:
         return {}

@@ -1,14 +1,14 @@
 # app/services/executor_service.py
 """
-Operacoes de negocio para Executores:
-  - Criacao (admin) — apenas registra metadata; credencial vem via enrollment OTP + cert mTLS.
-  - CRUD basico + revogacao (`revogar_executor` + `concluir_revogacoes`, a
-    unica versao para todos os caminhos que revogam).
+Business operations for Executors:
+  - Creation (admin) — only records metadata; the credential comes via enrollment OTP + mTLS cert.
+  - Basic CRUD + revocation (`revogar_executor` + `concluir_revogacoes`, the
+    single version for every path that revokes).
 
-A autenticacao do executor agora e feita inteiramente por mTLS — a API key
-estatica foi removida e o JWT intermediario do WebSocket eliminado. Ver
-app/services/executor_enrollment_service.py para o fluxo de bootstrap e
-app/api/routers/executor_ws_router.py para auth do WS por cert.
+Executor authentication is now done entirely via mTLS — the static API key
+was removed and the intermediate WebSocket JWT eliminated. See
+app/services/executor_enrollment_service.py for the bootstrap flow and
+app/api/routers/executor_ws_router.py for WS auth by cert.
 """
 from dataclasses import dataclass
 from datetime import datetime
@@ -29,14 +29,14 @@ logger = get_logger(__name__)
 
 
 class ExecutorQuotaError(Exception):
-    """Usuário sem permissão ou que atingiu sua cota de executores dedicados."""
+    """User without permission or who has reached their dedicated executor quota."""
 
     def __init__(self, message: str, *, status_code: int):
         super().__init__(message)
         self.status_code = status_code
 
 
-# ── Operacoes de servico ──────────────────────────────────────────────────────
+# ── Service operations ────────────────────────────────────────────────────────
 
 
 async def create_executor(
@@ -52,14 +52,14 @@ async def create_executor(
     commit: bool = True,
 ) -> Executor:
     """
-    Cria um novo executor em status 'pending'.
+    Creates a new executor in 'pending' status.
 
-    Apos a criacao, o admin precisa gerar um OTP de enrollment (ver
-    executor_enrollment_service.create_enrollment_otp) e entrega-lo ao operador.
-    O executor troca o OTP por cert mTLS via POST /executores/enroll.
+    After creation, the admin needs to generate an enrollment OTP (see
+    executor_enrollment_service.create_enrollment_otp) and hand it to the operator.
+    The executor exchanges the OTP for an mTLS cert via POST /executores/enroll.
 
-    commit=False deixa a transacao aberta (apenas flush para popular id_hash),
-    permitindo ao chamador agrupar inserts relacionados num unico commit.
+    commit=False leaves the transaction open (only a flush to populate id_hash),
+    letting the caller group related inserts into a single commit.
     """
     if executor_type not in ("default", "dedicated"):
         raise ValueError("executor_type deve ser 'default' ou 'dedicated'.")
@@ -90,11 +90,11 @@ async def create_executor(
 
 async def count_user_created_executors(db: AsyncSession, user_id: str) -> int:
     """
-    Conta executores do usuário (created_by) que ainda ocupam vaga na cota.
+    Counts the user's executors (created_by) that still occupy a quota slot.
 
-    Ignora revogados e soft-deletados — executores nesses estados estão "mortos
-    para todos os efeitos" e não devem bloquear o user de criar um novo
-    quando o admin restaura a cota.
+    Ignores revoked and soft-deleted ones — executors in those states are "dead
+    for all purposes" and must not block the user from creating a new one
+    when the admin restores the quota.
     """
     result = await db.execute(
         select(func.count())
@@ -118,12 +118,12 @@ async def create_dedicated_for_user(
     max_queue_size: int = 50,
 ) -> Executor:
     """
-    Cria um executor dedicado em nome de um usuário comum (self-service).
+    Creates a dedicated executor on behalf of a regular user (self-service).
 
-    Valida a cota individual (User.agent_quota) — 0 bloqueia, e o número de
-    executores próprios não-deletados não pode atingir a cota. Força tipo dedicado
-    e cria a atribuição direta (UserExecutorAssignment) para dar visibilidade ao
-    criador em /executores/my. Lança ExecutorQuotaError (403/409) em caso de bloqueio.
+    Validates the individual quota (User.agent_quota) — 0 blocks, and the number of
+    the user's own non-deleted executors cannot reach the quota. Forces the dedicated
+    type and creates the direct assignment (UserExecutorAssignment) to give the
+    creator visibility in /executores/my. Raises ExecutorQuotaError (403/409) when blocked.
     """
     quota = user.agent_quota or 0
     if quota <= 0:
@@ -137,8 +137,8 @@ async def create_dedicated_for_user(
             f"Limite de executores atingido ({current}/{quota}).", status_code=409
         )
 
-    # commit=False: executor + atribuição entram num único commit (criação atômica).
-    # Sem isso, falha ao gravar a atribuição deixaria um executor órfão consumindo cota.
+    # commit=False: executor + assignment go into a single commit (atomic creation).
+    # Without this, a failure writing the assignment would leave an orphan executor using quota.
     ag = await create_executor(
         db,
         name=name,
@@ -164,8 +164,8 @@ async def create_dedicated_for_user(
 
 async def update_agent(db: AsyncSession, executor_id: str, data: dict) -> Executor:
     """
-    Atualiza name e/ou description de um executor.
-    Lanca ValueError se executor nao encontrado, deletado ou revogado.
+    Updates an executor's name and/or description.
+    Raises ValueError if the executor is not found, deleted or revoked.
     """
     ag = await get_agent(db, executor_id)
     if ag is None:
@@ -181,21 +181,21 @@ async def update_agent(db: AsyncSession, executor_id: str, data: dict) -> Execut
 
 
 async def get_agent(db: AsyncSession, executor_id: str, include_deleted: bool = False) -> Executor | None:
-    """Busca executor por id_hash. Por padrao, ignora executores deletados."""
+    """Fetches an executor by id_hash. By default, ignores deleted executors."""
     return await ExecutorCRUD(db).get(executor_id, include_deleted=include_deleted)
 
 
 async def list_agents(db: AsyncSession) -> list[Executor]:
-    """Lista executores ativos (nao deletados)."""
+    """Lists active (non-deleted) executors."""
     return await ExecutorCRUD(db).list()
 
 
 async def delete_agent(db: AsyncSession, executor_id: str) -> Executor:
     """
-    Soft-delete de um executor — so permitido quando status='revoked'.
+    Soft-delete of an executor — only allowed when status='revoked'.
 
-    Preenche deleted_at com a data/hora atual; o executor deixa de aparecer
-    nas listagens mas permanece no banco para preservar historico de execucoes.
+    Fills deleted_at with the current date/time; the executor stops appearing
+    in listings but stays in the database to preserve the execution history.
     """
     ag = await ExecutorCRUD(db).get_any(executor_id)
     if ag is None:
@@ -208,29 +208,29 @@ async def delete_agent(db: AsyncSession, executor_id: str) -> Executor:
     return ag
 
 
-# ── Revogação ─────────────────────────────────────────────────────────────────
+# ── Revocation ────────────────────────────────────────────────────────────────
 #
-# Uma só, para os quatro caminhos que revogam: o DELETE do executor, o "revogar
-# todos" do operador, a suspensão/exclusão da conta e (só o cert) a revogação do
-# certificado. Cada um copiava os passos à mão, e as cópias divergiram: a
-# suspensão não tirava o executor dos níveis da política nem derrubava a sessão
-# aberta, e o "revogar todos" avisava os donos com o id no lugar do nome.
+# A single one, for the four paths that revoke: the executor DELETE, the operator's
+# "revoke all", account suspension/deletion and (cert only) the certificate
+# revocation. Each one copied the steps by hand, and the copies diverged: the
+# suspension did not take the executor out of the policy tiers nor drop the open
+# session, and "revoke all" notified the owners with the id instead of the name.
 
 
 @dataclass
 class Revogacao:
-    """Um executor revogado na sessão de quem chama, com o que só pode sair do
-    banco depois do commit — ver `concluir_revogacoes`."""
+    """An executor revoked in the caller's session, with what can only leave the
+    database after the commit — see `concluir_revogacoes`."""
 
     executor_id: str
     nome: str
-    # O cert que acabou de ser anulado, para a blacklist.
+    # The cert that was just voided, for the blacklist.
     serial: str | None
     serial_expira_em: datetime | None
-    # O que o executor ouve: o motivo do `control` e o do fechamento do WS.
+    # What the executor hears: the reason in the `control` and in the WS close.
     aviso: str
     fechamento: str
-    # Workspaces que tinham o executor num nível (o retorno de `detach_executor`).
+    # Workspaces that had the executor in a tier (the return of `detach_executor`).
     afetados: Sequence[dict] = ()
 
 
@@ -245,20 +245,20 @@ async def revogar_executor(
     fechamento: str,
     desanexar: bool = True,
 ) -> Revogacao:
-    """Revoga `ag` na transação de quem chama — NÃO faz commit.
+    """Revokes `ag` in the caller's transaction — does NOT commit.
 
-    1. Com `desanexar` (o DELETE do executor e o "revogar todos" do operador),
-       tira o executor de todos os níveis da política, com a auditoria
-       (`detach_executor`; `WorkspacePolicyConflictError` se esvaziaria o nível
-       principal de alguém e `force` não foi pedido; forçado, os donos são
-       avisados). Sem `desanexar` (a suspensão e a exclusão da conta — ver
-       `revogar_executores_do_usuario`), o executor fica nos níveis.
-    2. Status `revoked` e cert anulado — se voltar, só com novo enrollment.
+    1. With `desanexar` (the executor DELETE and the operator's "revoke all"),
+       takes the executor out of every policy tier, with the audit
+       (`detach_executor`; `WorkspacePolicyConflictError` if it would empty
+       someone's primary tier and `force` was not requested; when forced, the
+       owners are notified). Without `desanexar` (account suspension and deletion — see
+       `revogar_executores_do_usuario`), the executor stays in the tiers.
+    2. Status `revoked` and cert voided — if it comes back, only with a new enrollment.
 
-    Blacklist, aviso aos donos e o fechamento do WebSocket não são banco e só
-    valem depois do commit: quem chama roda `concluir_revogacoes` com o que esta
-    função devolve. Avisar antes seria agir sobre uma revogação que um rollback
-    ainda desfaz — e o close 4403 é terminal para o executor.
+    Blacklist, owner notification and the WebSocket close are not database work and
+    only apply after the commit: the caller runs `concluir_revogacoes` with what this
+    function returns. Notifying earlier would act on a revocation that a rollback
+    can still undo — and the 4403 close is terminal for the executor.
     """
     afetados = await politica.detach_executor(
         db, ag.id_hash, force=force, actor_id=actor_id, reason=motivo,
@@ -277,29 +277,29 @@ async def revogar_executores_do_usuario(
     db: AsyncSession, usuario, *, motivo: str, desanexar: bool,
     actor_id: str | None = None,
 ) -> list[Revogacao]:
-    """Revoga todos os executores criados por `usuario` que ainda não estão
-    revogados — o "revogar todos" do operador e a suspensão/exclusão da conta
-    (auditoria SEG-16: sem isto o executor de uma conta suspensa seguia
-    conectado, recebendo jobs com código e credenciais em claro e renovando o
-    próprio cert).
+    """Revokes every executor created by `usuario` that is not yet
+    revoked — the operator's "revoke all" and account suspension/deletion
+    (audit SEG-16: without this the executor of a suspended account stayed
+    connected, receiving jobs with code and credentials in the clear and renewing
+    its own cert).
 
-    Pendentes entram junto: uma conta suspensa não deixa executor à espera de
-    enrollment (quem tem o OTP ainda o enrolaria). NÃO faz commit, como
+    Pending ones are included: a suspended account does not leave an executor waiting
+    for enrollment (whoever has the OTP would still enroll it). Does NOT commit, like
     `revogar_executor`.
 
-    `desanexar` é de quem chama, e as duas escolhas são deliberadas:
+    `desanexar` is the caller's choice, and both choices are deliberate:
 
-    - "revogar todos" (`True`, forçado): ação explícita do operador sobre os
-      executores, a mesma do DELETE — sai dos níveis, e um nível principal
-      esvaziado vira aviso ao dono.
-    - suspensão/exclusão da conta (`False`): o executor FICA nos níveis dos
-      workspaces — muitas vezes de outros donos —, como manda a spec
-      (docs/specs/executor-isolation-routing.md §4.4: executor fora de serviço
-      continua no nível e só deixa de ser elegível). O despacho o pula e segue
-      a cadeia (reserva ou falha fechada). Tirá-lo à força esvaziava o nível
-      principal: o workspace Isolado virava pool compartilhado (jobs com
-      credenciais indo para a frota comum) e a configuração do dono se perdia
-      sem volta, mesmo com a conta reativada depois.
+    - "revoke all" (`True`, forced): an explicit operator action on the
+      executors, the same as the DELETE — leaves the tiers, and an emptied
+      primary tier becomes a notice to the owner.
+    - account suspension/deletion (`False`): the executor STAYS in the tiers of the
+      workspaces — often other owners' —, as the spec requires
+      (docs/specs/executor-isolation-routing.md §4.4: an out-of-service executor
+      stays in the tier and merely stops being eligible). Dispatch skips it and follows
+      the chain (fallback or fail closed). Removing it by force emptied the primary
+      tier: the Isolated workspace became a shared pool (jobs with
+      credentials going to the common fleet) and the owner's configuration was lost
+      for good, even with the account reactivated later.
     """
     result = await db.execute(
         select(Executor).where(
@@ -319,9 +319,9 @@ async def revogar_executores_do_usuario(
 
 
 def avisar_donos_de_niveis_esvaziados(afetados: Sequence[dict], *, executor_name: str) -> None:
-    """Remoção que esvaziou o nível principal de alguém: e-mail ao dono
-    (best-effort, em background, com sessão própria — a da requisição fecha
-    junto com a resposta). Sem isto o workspace descobriria pelo 503."""
+    """A removal that emptied someone's primary tier: email to the owner
+    (best-effort, in the background, with its own session — the request's closes
+    along with the response). Without this the workspace would find out from the 503."""
     from app.services.execution_alert_service import notify_primary_emptied_background
 
     esvaziados = [d for d in afetados if d.get("would_empty_primary")]
@@ -329,18 +329,18 @@ def avisar_donos_de_niveis_esvaziados(afetados: Sequence[dict], *, executor_name
 
 
 async def concluir_revogacoes(revogacoes: Iterable[Revogacao]) -> None:
-    """O que a revogação faz fora do banco, DEPOIS do commit de quem chama.
+    """What revocation does outside the database, AFTER the caller's commit.
 
-    Tudo best-effort e isolado por executor — a revogação já vale no banco, e a
-    vigia da sessão (`_vigiar_revogacao`) derruba o WebSocket mesmo que o
-    fechamento daqui se perca:
+    All best-effort and isolated per executor — the revocation already holds in the
+    database, and the session watcher (`_vigiar_revogacao`) drops the WebSocket even
+    if the close from here gets lost:
 
-    - blacklist do cert no Redis (defesa em profundidade além da CRL);
-    - e-mail aos donos dos workspaces cujo nível principal esvaziou;
-    - `control: revoked` (o motivo, para o operador ler) e close 4403 — é o
-      close que faz o executor parar, mesmo um que ignore o control. Os dois
-      fazem relay pelo Redis quando o WebSocket está em outro worker: sem o
-      relay, um admin que caísse num worker sem o WS revogava só o banco.
+    - cert blacklist in Redis (defense in depth beyond the CRL);
+    - email to the owners of workspaces whose primary tier was emptied;
+    - `control: revoked` (the reason, for the operator to read) and close 4403 — it is
+      the close that makes the executor stop, even one that ignores the control. Both
+      are relayed through Redis when the WebSocket is on another worker: without the
+      relay, an admin who landed on a worker without the WS revoked only the database.
     """
     from app.services import executor_enrollment_service
 
@@ -367,18 +367,18 @@ async def concluir_revogacoes(revogacoes: Iterable[Revogacao]) -> None:
 
 
 async def update_agent_last_seen(db: AsyncSession, executor_id: str):
-    """Atualiza last_seen_at — chamado no início de cada sessão WebSocket."""
+    """Updates last_seen_at — called at the start of each WebSocket session."""
     await ExecutorCRUD(db).touch_last_seen(executor_id)
 
 
 async def motivo_da_revogacao(db: AsyncSession, executor_id: str) -> str | None:
-    """Por que uma sessão WebSocket já aberta deixou de valer; None se vale.
+    """Why an already-open WebSocket session stopped being valid; None if it is valid.
 
-    Espelha o que o mTLS exige na conexão (`validate_executor_mtls`): executor
-    existente, não removido, ativo e com cert. A revogação do cert zera o
-    `cert_serial`; a do executor (e a do operador, que revoga os executores
-    dele) muda o status. A renovação troca o serial sem zerar — não derruba a
-    sessão que a fez."""
+    Mirrors what mTLS requires on connection (`validate_executor_mtls`): an
+    existing executor, not removed, active and with a cert. Cert revocation zeroes
+    `cert_serial`; executor revocation (and the operator's, which revokes their
+    executors) changes the status. Renewal swaps the serial without zeroing it — it
+    does not drop the session that performed it."""
     linha = (await db.execute(
         select(Executor.status, Executor.cert_serial, Executor.deleted_at)
         .where(Executor.id_hash == executor_id)
@@ -393,9 +393,9 @@ async def motivo_da_revogacao(db: AsyncSession, executor_id: str) -> str | None:
 
 
 async def registrar_fim_da_sessao(db: AsyncSession, executor_id: str, visto_em) -> None:
-    """Fim de uma sessão WebSocket: `last_seen_at` passa a ser o último contato
-    dela — se for posterior ao que está no banco. O fim de uma sessão
-    substituída chega depois do handshake da nova (segundos, até ~100 s quando
-    o aviso de takeover se perde) e, gravado sem condição, apagava o início da
-    nova: o "no ar desde" que os outros workers leem daqui."""
+    """End of a WebSocket session: `last_seen_at` becomes its last contact —
+    if later than what is in the database. The end of a replaced session
+    arrives after the new one's handshake (seconds, up to ~100 s when the
+    takeover notice gets lost) and, written unconditionally, erased the start of
+    the new one: the "no ar desde" (online since) that the other workers read from here."""
     await ExecutorCRUD(db).touch_last_seen_if_later(executor_id, visto_em)

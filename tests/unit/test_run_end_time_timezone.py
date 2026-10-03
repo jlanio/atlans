@@ -1,11 +1,11 @@
 # tests/unit/test_run_end_time_timezone.py
-"""`end_time` do run precisa chegar ao banco com fuso explícito.
+"""The run's `end_time` must reach the database with an explicit time zone.
 
-O produtor usava `utcnow().isoformat()`, que gera string SEM offset. O consumer
-fazia fromisoformat e entregava um datetime naive para WorkflowRun.end_time, que
-e timestamptz: o Postgres assumia o fuso da sessao (TZ=America/Cuiaba nos
-containers) e gravava o fim 4h no futuro. Toda execucao aparecia com ~4h de
-duracao quando a UI subtraia end_time - start_time.
+The producer used `utcnow().isoformat()`, which yields a string WITHOUT an offset.
+The consumer did fromisoformat and handed a naive datetime to WorkflowRun.end_time,
+which is timestamptz: Postgres assumed the session time zone (TZ=America/Cuiaba in
+the containers) and stored the end 4h in the future. Every run showed a duration
+of ~4h when the UI computed end_time - start_time.
 """
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
@@ -33,7 +33,7 @@ async def test_end_time_com_offset_e_preservado():
 
 
 async def test_end_time_naive_e_assumido_como_utc():
-    """Payload antigo na fila não pode virar 4h de deslocamento no banco."""
+    """An old payload in the queue must not turn into a 4h offset in the database."""
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
 
     await _update_run_status(db, run, _payload("2026-08-04T17:01:34"))

@@ -5,12 +5,12 @@ import { useStore } from "@xyflow/react"
 import { useCanvasViewStore } from "@/app/stores/canvasViewStore"
 import { buildFocusCss } from "./utils/focus-css"
 
-/** Aplica ao canvas o realce de caminho e o nível de detalhe do zoom.
+/** Applies the path highlight and the zoom level of detail to the canvas.
  *
- * Não desenha nada: só mantém as classes de modo no container `.react-flow` e
- * a folha de estilo com a allow-list do caminho em foco. É o único componente
- * que re-renderiza quando o foco ou o zoom mudam — nenhum nó ou aresta é
- * reconciliado. Renderizar como filho de `<ReactFlow>`.
+ * It draws nothing: it only maintains the mode classes on the `.react-flow`
+ * container and the stylesheet with the allow-list of the focused path. It's the
+ * only component that re-renders when the focus or the zoom changes — no node or
+ * edge is reconciled. Render as a child of `<ReactFlow>`.
  */
 const CanvasViewLayer = () => {
 
@@ -21,10 +21,10 @@ const CanvasViewLayer = () => {
   const focusEdgeIds = useCanvasViewStore(s => s.focusEdgeIds)
   const lod = useCanvasViewStore(s => s.lod)
 
-  // Excluir o nó em foco (o clique na lixeira da toolbar do nó também fixa o
-  // realce, porque borbulha para `onNodeClick`) deixaria o canvas travado
-  // meio-esmaecido em volta de uma âncora que não existe mais. O selector
-  // devolve booleano, então só re-renderiza quando a resposta muda.
+  // Deleting the focused node (clicking the trash can on the node toolbar also pins
+  // the highlight, because it bubbles up to `onNodeClick`) would leave the canvas
+  // stuck half-faded around an anchor that no longer exists. The selector returns
+  // a boolean, so it only re-renders when the answer changes.
   const anchorExists = useStore(s => focusNodeId === null || s.nodeLookup.has(focusNodeId))
 
   useEffect(() => {

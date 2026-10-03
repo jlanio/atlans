@@ -6,13 +6,13 @@ import { Skeleton } from "@/app/components/ui/skeleton"
 import { formatarInteiro, plural } from "@/lib/formatos"
 
 interface Props {
-  /** Total do filtro inteiro; nulo na 1ª carga (o subtítulo vira esqueleto). */
+  /** Total for the whole filter; null on the 1st load (the subtitle becomes a skeleton). */
   total: number | null
-  /** Quantos arquivos a página atual mostra — sempre ≤ total. */
+  /** How many files the current page shows — always ≤ total. */
   mostrados: number
-  /** Recarga em curso: o botão gira e trava. */
+  /** Reload in progress: the button spins and locks. */
   atualizando: boolean
-  /** Quantos itens estão selecionados (só o owner seleciona/exclui em lote). */
+  /** How many items are selected (only the owner selects/deletes in batch). */
   selecionados: number
   canEdit: boolean
   onAtualizar: () => void
@@ -20,8 +20,8 @@ interface Props {
 }
 
 /**
- * "300 arquivos · 50 no total" some para "50 arquivos" quando tudo cabe numa
- * página, e vira "Nenhum arquivo" no zero — nunca "0 arquivos" pendurado.
+ * "300 arquivos · 50 no total" shrinks to "50 arquivos" when everything fits on
+ * one page, and becomes "Nenhum arquivo" at zero — never a dangling "0 arquivos".
  */
 export function textoDoSubtitulo(total: number, mostrados: number): string {
   if (total === 0) return "Nenhum arquivo"
@@ -32,9 +32,9 @@ export function textoDoSubtitulo(total: number, mostrados: number): string {
 }
 
 /**
- * Cabeçalho do Drive no esqueleto do contrato §1: h1 + subtítulo de escopo,
- * "Excluir N" como ação destrutiva (só quando há seleção) e "Atualizar" em
- * ghost.
+ * Drive header in the skeleton of contract §1: h1 + scope subtitle, "Excluir N"
+ * (delete N) as the destructive action (only when there is a selection) and
+ * "Atualizar" as ghost.
  */
 export function CabecalhoDoDrive({
   total, mostrados, atualizando, selecionados, canEdit, onAtualizar, onExcluirSelecionados,

@@ -1,6 +1,6 @@
 # app/services/observability/escopo.py
-# Lógica de negócio e consultas de observabilidade extraídas do router.
-# Contrato com a web: docs/specs/metrics-history.md (§3).
+# Business logic and observability queries extracted from the router.
+# Contract with the web app: docs/specs/metrics-history.md (§3).
 
 import hashlib
 import json
@@ -23,35 +23,35 @@ from app.models.models import Workflow, WorkflowRun
 logger = get_logger(__name__)
 
 
-# Numeros de dashboard nao precisam ser transacionais: 45s de defasagem e
-# invisivel na tela e corta as agregacoes repetidas de varias abas/usuarios
-# olhando a mesma coisa. O botao "Atualizar" manda `force` e fura o cache.
+# Dashboard numbers do not need to be transactional: a 45s lag is
+# invisible on screen and cuts the repeated aggregations of several tabs/users
+# looking at the same thing. The "Atualizar" (refresh) button sends `force` and bypasses the cache.
 _METRICS_CACHE_TTL = 45
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _agora_utc() -> datetime:
-    """Instante atual UTC, AWARE.
+    """Current UTC instant, AWARE.
 
-    `WorkflowRun.start_time` e `DateTime(timezone=True)` — timestamptz. Um
-    datetime NAIVE mandado como bind para timestamptz nao e lido como UTC: o
-    codec do asyncpg faz `obj.astimezone(utc)`, que num naive assume o fuso
-    LOCAL DO PROCESSO. Como o docker-compose injeta `TZ` na api (o .env.example
-    traz America/Cuiaba, UTC-4), toda janela deste servico chegava ao Postgres
-    deslocada em 4 horas: o card "Execucoes (24h)" contava so as ultimas 20h e
-    omitia a madrugada inteira, sem erro nenhum.
+    `WorkflowRun.start_time` is `DateTime(timezone=True)` — timestamptz. A
+    NAIVE datetime sent as a bind for timestamptz is not read as UTC: the
+    asyncpg codec does `obj.astimezone(utc)`, which on a naive one assumes the
+    PROCESS'S LOCAL time zone. Since docker-compose injects `TZ` into the api (.env.example
+    has America/Cuiaba, UTC-4), every window of this service reached Postgres
+    shifted by 4 hours: the "Execucoes (24h)" card counted only the last 20h and
+    left out the whole early morning, with no error at all.
     """
     return datetime.now(timezone.utc)
 
 
 def _como_utc(valor: datetime) -> datetime:
-    """Normaliza um datetime do usuario para AWARE, assumindo UTC se vier sem
-    fuso — mesma armadilha de `_agora_utc`, agora vindo do `?date_from=`.
+    """Normalizes a user datetime to AWARE, assuming UTC if it comes without a
+    time zone — the same pitfall as `_agora_utc`, now coming from `?date_from=`.
 
-    Tambem serve para o que VOLTA do banco: o SQLite (testes, harness de
-    capturas) nao guarda fuso e devolve naive, o que quebraria a subtracao
-    com `_agora_utc()` e mandaria ISO sem offset para a web.
+    It also serves what COMES BACK from the database: SQLite (tests, the screenshot
+    harness) does not store the time zone and returns naive, which would break the
+    subtraction with `_agora_utc()` and send ISO without an offset to the web app.
     """
     return valor if valor.tzinfo is not None else valor.replace(tzinfo=timezone.utc)
 
@@ -61,8 +61,8 @@ def _iso(valor: Optional[datetime]) -> Optional[str]:
 
 
 def _zona(tz: str) -> ZoneInfo:
-    """Fuso IANA do `?tz=`. O router ja recusa com 422; aqui e a rede de
-    seguranca para chamadas diretas do servico."""
+    """IANA time zone from `?tz=`. The router already rejects with 422; this is the safety
+    net for direct calls to the service."""
     try:
         return ZoneInfo(tz or "UTC")
     except (ZoneInfoNotFoundError, ValueError):
@@ -70,9 +70,9 @@ def _zona(tz: str) -> ZoneInfo:
 
 
 def _e_postgres(db) -> bool:
-    """Decide entre SQL nativo do PostgreSQL (percentile_cont, AT TIME ZONE) e o
-    fallback em Python. O SQLite entra nos testes e no harness de capturas; nao
-    tem ordered-set aggregates nem fusos, e nao vale um dialeto proprio."""
+    """Decides between native PostgreSQL SQL (percentile_cont, AT TIME ZONE) and the
+    Python fallback. SQLite comes in for tests and the screenshot harness; it has
+    no ordered-set aggregates nor time zones, and is not worth a dialect of its own."""
     try:
         return str(db.bind.dialect.name) == "postgresql"
     except Exception:
@@ -80,29 +80,29 @@ def _e_postgres(db) -> bool:
 
 
 def e_admin_global(user) -> bool:
-    """Diz se o usuário tem o papel global `admin`.
+    """Tells whether the user has the global `admin` role.
 
-    É a ÚNICA porta de entrada da visão total: quem decide que um admin vê
-    tudo é a borda (o router REST, via `como_admin=e_admin_global(user)`), e
-    não o service. O servidor MCP (docs/specs/mcp-server.md §6.12) chama os
-    mesmos services com o `User` admin e a visão de membro — se o service
-    deduzisse o papel do próprio objeto, um PAT de admin atravessaria o
-    escopo de workspaces do token sem que nenhuma linha do MCP o tivesse
-    permitido.
+    It is the ONLY entry point to the full view: what decides that an admin sees
+    everything is the edge (the REST router, via `como_admin=e_admin_global(user)`), and
+    not the service. The MCP server (docs/specs/mcp-server.md §6.12) calls the
+    same services with the admin `User` and the member view — if the service
+    inferred the role from the object itself, an admin PAT would cross the
+    token's workspace scope without any line of the MCP having
+    allowed it.
     """
     return getattr(user, "role", None) == ROLE_ADMIN
 
 
 def _wf_filter(user, workspace_ids: List[str], *, como_admin: bool = False) -> list:
     """
-    Filtro para a tabela Workflow.
-    Com `como_admin=True` não há filtro; fora isso o usuário vê os workflows
-    do(s) seu(s) workspace(s) — inclusive quando o `user` tem papel admin,
-    porque o papel só vale o que a borda declarou (ver `e_admin_global`).
+    Filter for the Workflow table.
+    With `como_admin=True` there is no filter; otherwise the user sees the workflows
+    of their workspace(s) — even when `user` has the admin role,
+    because the role is only worth what the edge declared (see `e_admin_global`).
 
-    O `OR workspace_id IS NULL` que existia aqui era um vazamento: entregava a
-    qualquer autenticado todo workflow legado sem workspace. A coluna é NOT NULL
-    desde a migration 20260828_0001, então não há mais o que acomodar.
+    The `OR workspace_id IS NULL` that used to be here was a leak: it handed
+    every authenticated user every legacy workflow without a workspace. The column is NOT NULL
+    since migration 20260828_0001, so there is nothing left to accommodate.
     """
     if como_admin:
         return []
@@ -111,27 +111,27 @@ def _wf_filter(user, workspace_ids: List[str], *, como_admin: bool = False) -> l
 
 def _run_filter(user, workspace_ids: List[str], *, como_admin: bool = False) -> list:
     """
-    Filtro para WorkflowRun pelo workspace do PRÓPRIO run.
-    Com `como_admin=True` não há filtro; o papel do `user` sozinho não basta
-    (ver `e_admin_global`).
+    Filter for WorkflowRun by the run's OWN workspace.
+    With `como_admin=True` there is no filter; the `user`'s role alone is not enough
+    (see `e_admin_global`).
 
-    Antes isto era uma subquery sobre `Workflow.workspace_id` — o workspace
-    ATUAL do workflow. Como um workflow pode mudar de workspace (POST
-    /workflows/{id}/move), autorizar pelo workflow entregava aos membros do
-    novo workspace todo o histórico produzido no antigo (error_message,
-    node_stats, host do executor), e tirava esse histórico de quem só tem
-    acesso ao workspace onde ele de fato aconteceu.
+    This used to be a subquery over `Workflow.workspace_id` — the workflow's
+    CURRENT workspace. Since a workflow can change workspaces (POST
+    /workflows/{id}/move), authorizing by the workflow handed the members of the
+    new workspace all the history produced in the old one (error_message,
+    node_stats, executor host), and took that history away from those who only have
+    access to the workspace where it actually happened.
 
-    `WorkflowRun.workspace_id` é gravado no despacho e nunca muda: é o dado
-    histórico correto, e já indexado. É também o mesmo critério que o WebSocket
-    de logs sempre usou (log_workflows_router) e que os artefatos usam
-    (artifacts_router filtra por Artifact.workspace_id).
+    `WorkflowRun.workspace_id` is written at dispatch and never changes: it is the correct
+    historical data, and already indexed. It is also the same criterion the logs
+    WebSocket has always used (log_workflows_router) and that artifacts use
+    (artifacts_router filters by Artifact.workspace_id).
 
-    O `is_(None)` que acompanhava este filtro caiu junto com a nulabilidade da
-    coluna (migration 20260828_0001). Ele existia para preservar histórico
-    legado, mas o preço era entregar esse histórico — error_message, node_stats,
-    host do executor — a qualquer usuário autenticado. A migration atribui os
-    runs antigos ao workspace correto em vez de deixá-los públicos.
+    The `is_(None)` that accompanied this filter went away along with the column's
+    nullability (migration 20260828_0001). It existed to preserve legacy history,
+    but the price was handing that history — error_message, node_stats,
+    executor host — to any authenticated user. The migration assigns the
+    old runs to the correct workspace instead of leaving them public.
     """
     if como_admin:
         return []
@@ -147,13 +147,13 @@ async def _resolver_escopo(
     workflow_id: Optional[str] = None,
     como_admin: bool = False,
 ) -> tuple[list, list]:
-    """Filtros comuns da spec §3 por cima do escopo de tenant.
+    """Common filters of spec §3 on top of the tenant scope.
 
-    Devolve `(filtros de WorkflowRun, filtros de Workflow)`. O `workspace_id`
-    pedido precisa estar entre os do usuario (403 `workspace_access_denied`) —
-    com `como_admin=True` filtra qualquer um. O `workflow_id` precisa existir
-    num workspace acessivel; fora disso e 404, o mesmo que "nao existe", para
-    nao confirmar a existencia de workflows de outros tenants.
+    Returns `(WorkflowRun filters, Workflow filters)`. The requested `workspace_id`
+    must be among the user's (403 `workspace_access_denied`) —
+    with `como_admin=True` it filters any. The `workflow_id` must exist
+    in an accessible workspace; otherwise it is 404, the same as "does not exist", so as
+    not to confirm the existence of other tenants' workflows.
     """
     run_f = _run_filter(user, workspace_ids, como_admin=como_admin)
     wf_f = _wf_filter(user, workspace_ids, como_admin=como_admin)
@@ -179,24 +179,24 @@ async def _resolver_escopo(
 def _metrics_cache_key(
     prefix: str, user, workspace_ids: List[str], days: int, *, como_admin: bool = False, **filtros,
 ) -> str:
-    """Chave do cache de metricas.
+    """Metrics cache key.
 
-    SEG: o escopo de tenant faz PARTE da chave. A visao total (`como_admin`)
-    tem chave propria, e o usuario comum e chaveado pela lista exata de
-    workspaces que o `Depends(get_user_workspace_ids)` devolveu. Sem isso, o
-    primeiro request a preencher o cache serviria os numeros do seu tenant a
-    todo mundo. O mesmo admin com e sem `como_admin` (REST × MCP) tambem nao
-    pode compartilhar chave: a resposta "todos" ficaria 45 s no cache e seria
-    servida a um PAT restrito a um workspace.
+    SEC: the tenant scope is PART of the key. The full view (`como_admin`)
+    has its own key, and a regular user is keyed by the exact list of
+    workspaces that `Depends(get_user_workspace_ids)` returned. Without that, the
+    first request to fill the cache would serve its tenant's numbers to
+    everyone. The same admin with and without `como_admin` (REST × MCP) also cannot
+    share a key: the "all" response would sit 45 s in the cache and be
+    served to a PAT restricted to one workspace.
 
-    Os filtros opcionais (workspace_id, workflow_id, tz) tambem entram: sem
-    eles, o primeiro pedido "todos os workspaces" seria servido a quem pediu
-    "so o workspace X" pelos 45 s seguintes.
+    The optional filters (workspace_id, workflow_id, tz) also go in: without
+    them, the first "all workspaces" request would be served to whoever asked for
+    "only workspace X" for the next 45 s.
     """
-    # O usuario entra na chave junto com os workspaces: a frota do bloco "now"
-    # e de /metrics/executores vem de `get_user_accessible_agents`, que inclui
-    # executores atribuidos DIRETAMENTE ao usuario — duas pessoas com os mesmos
-    # workspaces nao tem necessariamente a mesma frota.
+    # The user goes into the key along with the workspaces: the fleet of the "now" block
+    # and of /metrics/executores comes from `get_user_accessible_agents`, which includes
+    # executors assigned DIRECTLY to the user — two people with the same
+    # workspaces do not necessarily have the same fleet.
     visao = "todos" if como_admin else "membro"
     escopo = f"{visao}:{getattr(user, 'id_hash', '')}:" + ",".join(sorted(workspace_ids))
     chave = f"obs:{prefix}:{hashlib.sha256(escopo.encode()).hexdigest()[:16]}:{days}"
@@ -207,7 +207,7 @@ def _metrics_cache_key(
 
 
 async def _cache_get(key: str):
-    """Le o cache. Redis fora do ar nunca pode derrubar o dashboard."""
+    """Reads the cache. Redis being down must never bring down the dashboard."""
     try:
         from app.core.redis import get_redis_pool
         raw = await get_redis_pool().get(key)

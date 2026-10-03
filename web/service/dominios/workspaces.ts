@@ -5,10 +5,10 @@ import type {
   IExecutorUserAssignment, IUserSearchResult, IWorkspace, IWorkspaceMember, IWorkspaceNotifications, IWorkspacePolicy, IWorkspacePolicyAdmin, IsolationFloor, PolicyTerminal,
 } from "../types"
 
-// ── Workspaces: política de execução ────────────────────────────────────────
-// (docs/specs/executor-isolation-routing.md). O GET traz níveis, terminal,
-// piso e a saúde de cada nível; as mutações devolvem a política já
-// recalculada, exceto o DELETE (204) — quem remove relê.
+// ── Workspaces: execution policy ────────────────────────────────────────────
+// (docs/specs/executor-isolation-routing.md). The GET brings tiers, terminal,
+// floor and each tier's health; the mutations return the already recomputed
+// policy, except the DELETE (204) — whoever removes re-reads.
 
 export function getWorkspacePolicy(workspaceId: string) {
   return get<IWorkspacePolicy>(`/workspaces/${encodeURIComponent(workspaceId)}/executors`)
@@ -28,12 +28,12 @@ export function setWorkspaceFallback(workspaceId: string, terminal: PolicyTermin
   return put<IWorkspacePolicy>(`/workspaces/${encodeURIComponent(workspaceId)}/fallback`, { terminal })
 }
 
-/** Só o admin da plataforma: a política de todos os workspaces vivos, para a tela do piso. */
+/** Platform admin only: the policy of every live workspace, for the floor screen. */
 export function listWorkspacePolicies() {
   return get<IWorkspacePolicyAdmin[]>("/admin/workspaces/policies")
 }
 
-/** Só o admin da plataforma: `no_pool` força o terminal a falhar e tranca a escolha do dono. */
+/** Platform admin only: `no_pool` forces the terminal to fail and locks the owner's choice. */
 export function setWorkspaceIsolationFloor(workspaceId: string, floor: IsolationFloor) {
   return put<{
     workspace_id: string
@@ -78,8 +78,8 @@ export function updateWorkspace(idHash: string, name: string, description: strin
 }
 
 /**
- * Soft delete: o workspace vai para a lixeira. Os workflows sao desativados
- * junto e os agendamentos param. Restaurar e acao de admin — ver
+ * Soft delete: the workspace goes to the trash. The workflows are disabled
+ * along with it and the schedules stop. Restoring is an admin action — see
  * restoreWorkspace.
  */
 export function deleteWorkspace(idHash: string) {
@@ -107,14 +107,14 @@ export function updateWorkspaceMemberRole(idHash: string, userId: string, role: 
   )
 }
 
-/** Remove um membro — e tambem como um membro sai por conta propria. */
+/** Removes a member — it is also how a member leaves on their own. */
 export function removeWorkspaceMember(idHash: string, userId: string) {
   return del(
     `/workspaces/${encodeURIComponent(idHash)}/members/${encodeURIComponent(userId)}`,
   )
 }
 
-// ── Workspaces: allowlist de notificacao ────────────────────────────────────
+// ── Workspaces: notification allowlist ──────────────────────────────────────
 
 export function getWorkspaceNotifications(idHash: string) {
   return get<import("../types").IWorkspaceNotifications>(

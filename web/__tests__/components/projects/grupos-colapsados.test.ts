@@ -1,9 +1,9 @@
 /**
- * Persistência de quais grupos ficam recolhidos.
+ * Persistence of which groups stay collapsed.
  *
- * Era `useState` puro: quem recolhia os grupos que não usa via tudo aberto de
- * novo a cada visita. E `localStorage` lança em janela privada ou com a cota
- * cheia — um erro ao LER não pode impedir a página de abrir.
+ * It was plain `useState`: someone who collapsed the groups they do not use saw everything open
+ * again on every visit. And `localStorage` throws in a private window or with the quota
+ * full — an error on READ must not keep the page from opening.
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest"
 
@@ -22,8 +22,8 @@ describe("chaveDosColapsados", () => {
   })
 
   it("workspace ausente tem chave própria, não a de outro", () => {
-    // `undefined` na chave viraria a string "undefined" e colidiria com
-    // qualquer outro estado sem workspace — aqui é explícito.
+    // `undefined` in the key would become the string "undefined" and collide with
+    // any other state without a workspace — here it is explicit.
     expect(chaveDosColapsados(undefined)).toBe(chaveDosColapsados(null))
     expect(chaveDosColapsados(undefined)).not.toBe(chaveDosColapsados("ws-1"))
   })
@@ -60,8 +60,8 @@ describe("conteúdo inesperado não derruba a página", () => {
   })
 
   it("descarta itens que não são texto", () => {
-    // Um número dentro do Set nunca casaria com `has(id)`, e o grupo ficaria
-    // recolhido para sempre sem que o clique resolvesse.
+    // A number inside the Set would never match `has(id)`, and the group would stay
+    // collapsed forever without the click fixing it.
     const chave = chaveDosColapsados("ws-1")
     window.localStorage.setItem(chave, '["a", 3, null, "b"]')
     expect([...lerColapsados(chave)].sort()).toEqual(["a", "b"])
@@ -78,7 +78,7 @@ describe("localStorage indisponível", () => {
   })
 
   it("gravar não lança", () => {
-    // Cota cheia: a preferência de exibição se perde, e nada mais.
+    // Quota full: the display preference is lost, and nothing else.
     vi.spyOn(window.localStorage.__proto__, "setItem").mockImplementation(() => {
       throw new Error("QuotaExceededError")
     })

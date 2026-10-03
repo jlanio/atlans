@@ -1,8 +1,9 @@
 // desktop/src/shared/executor-status.test.ts
 //
-// `derivarStatus` é o choke point da ponte read-only: tudo o que a UI web
-// pode ler sai daqui. Os testes fixam a derivação dos quatro estados e a
-// dedupe — e, por tabela, o que NÃO influencia o status (métricas de recurso).
+// `derivarStatus` is the choke point of the read-only bridge: everything the
+// web UI can read comes out of here. The tests pin down the derivation of the
+// four states and the dedupe — and, by extension, what does NOT influence the
+// status (resource metrics).
 import { describe, expect, it } from 'vitest'
 import type { Snapshot } from './events.js'
 import type { EstadoApp } from '../main/state/store.js'
@@ -43,7 +44,7 @@ describe('derivarStatus', () => {
   })
 
   it('running mas sem conexão → offline', () => {
-    // O status diz "dá para receber job agora?". Subiu mas não conectou: não dá.
+    // The status says "can it take a job right now?". Started but not connected: no.
     const s = derivarStatus({ supervisor: 'running', snapshot: snap({ conn_state: 'reconnecting' }) }, VINCULADO)
     expect(s.estado).toBe('offline')
   })
@@ -98,8 +99,9 @@ describe('assinaturaStatus', () => {
   })
 
   it('muda quando a capacidade (max_concurrent) muda', () => {
-    // `capacidade` entra na chave: se saísse, um push com nova capacidade seria
-    // deduplicado e a UI web nunca a receberia. Demais campos iguais.
+    // `capacidade` is part of the key: if it were left out, a push with a new
+    // capacity would be deduplicated and the web UI would never receive it.
+    // Other fields equal.
     const a = assinaturaStatus(derivarStatus({ supervisor: 'running', snapshot: snap({ max_concurrent: 4 }) }, VINCULADO))
     const b = assinaturaStatus(derivarStatus({ supervisor: 'running', snapshot: snap({ max_concurrent: 8 }) }, VINCULADO))
     expect(a).not.toBe(b)

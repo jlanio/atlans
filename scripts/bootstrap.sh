@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # scripts/bootstrap.sh
-# Prepara um host limpo para subir o Atlans:
-#   - cria volume external `step-ca-data`
-#   - cria diretorios secrets/, traefik/atlans-ca/, certs/, backups/
-#   - gera secrets/stepca_password.txt
-#   - copia .env.example -> .env e substitui placeholders dev por secrets fortes
+# Prepares a clean host to bring up Atlans:
+#   - creates the external volume `step-ca-data`
+#   - creates the directories secrets/, traefik/atlans-ca/, certs/, backups/
+#   - generates secrets/stepca_password.txt
+#   - copies .env.example -> .env and replaces the dev placeholders with strong secrets
 #
-# Idempotente: rodar duas vezes nao destroi nada criado antes.
+# Idempotent: running it twice does not destroy anything created before.
 
 set -euo pipefail
 
@@ -41,7 +41,7 @@ else
     ok "Volume step-ca-data criado."
 fi
 
-# ── 3. Diretorios do host ────────────────────────────────────────────────────
+# ── 3. Host directories ──────────────────────────────────────────────────────
 mkdir -p secrets traefik/atlans-ca certs backups
 log "Diretorios secrets/, traefik/atlans-ca/, certs/, backups/ prontos."
 
@@ -51,16 +51,17 @@ if [ -s secrets/stepca_password.txt ]; then
     STEPCA_PASS="$(cat secrets/stepca_password.txt)"
 else
     STEPCA_PASS="$(openssl rand -base64 48 | tr -d '\n')"
-    # umask no subshell: o arquivo ja NASCE 600 (sem a janela entre criar e o chmod).
+    # umask in the subshell: the file is BORN 600 (no window between creating it and the chmod).
     ( umask 077 && printf '%s' "$STEPCA_PASS" > secrets/stepca_password.txt )
     chmod 600 secrets/stepca_password.txt
     ok "secrets/stepca_password.txt gerado (chmod 600)."
 fi
 
-# A step-ca roda como o usuario step (UID 1000) e le este arquivo pelo secret do
-# compose, que o monta com o dono e o modo do host: com outro dono e modo 600,
-# ela nao o le e nunca fica healthy (e a API, que depende dela, nao sobe).
-# So no Linux: no Docker Desktop (Mac, Windows) o dono do host nao chega ao container.
+# step-ca runs as the step user (UID 1000) and reads this file through the
+# compose secret, which mounts it with the host's owner and mode: with another
+# owner and mode 600, it cannot read it and never becomes healthy (and the API,
+# which depends on it, does not come up).
+# Linux only: on Docker Desktop (Mac, Windows) the host's owner does not reach the container.
 DONO_DO_SEGREDO="$(ls -n secrets/stepca_password.txt | awk '{print $3}')"
 if [ "$(uname -s)" = "Linux" ] && [ "$DONO_DO_SEGREDO" != "1000" ]; then
     if [ "$(id -u)" = "0" ]; then
@@ -72,11 +73,11 @@ if [ "$(uname -s)" = "Linux" ] && [ "$DONO_DO_SEGREDO" != "1000" ]; then
     fi
 fi
 
-# ── 5. .env a partir do .env.example ─────────────────────────────────────────
-# Helper: substitui (ou injeta) chave=valor em um arquivo .env.
+# ── 5. .env from .env.example ────────────────────────────────────────────────
+# Helper: replaces (or injects) key=value in a .env file.
 upsert_env() {
     local file="$1" key="$2" value="$3"
-    # Escapa caracteres especiais para sed
+    # Escapes special characters for sed
     local escaped
     escaped=$(printf '%s' "$value" | sed -e 's/[\/&|]/\\&/g')
     if grep -qE "^${key}=" "$file"; then

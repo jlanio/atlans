@@ -2,22 +2,22 @@
 
 // web/app/components/workflow/assistente/cartao-proposta.tsx
 //
-// O cartão da proposta — e, agora, DOIS papéis.
+// The proposal card — and now with TWO roles.
 //
-// `desenhar: true` vem de `desenhar_no_canvas` e significa "põe na tela agora".
-// O fluxo aparece sozinho, enquanto o modelo monta: é o que torna a construção
-// incremental em vez de um único despejo no fim.
+// `desenhar: true` comes from `desenhar_no_canvas` and means "put it on screen now".
+// The workflow appears by itself while the model builds it: that's what makes the
+// construction incremental instead of a single dump at the end.
 //
-// `desenhar: false` vem de `validate_workflow` e traz só o veredito do que já
-// está desenhado. Não há botão: o fluxo já está lá.
+// `desenhar: false` comes from `validate_workflow` and carries only the verdict on
+// what is already drawn. There's no button: the workflow is already there.
 //
-// A exceção é o canvas que JÁ TEM trabalho. Aí o primeiro desenho da conversa
-// espera um clique — e depois dele a conversa desenha sozinha, sem interromper
-// de novo. Não é `window.confirm`: ele trava a thread, e travar a thread no
-// meio de um stream é parar de ler o stream.
+// The exception is a canvas that ALREADY HAS work. Then the conversation's first
+// drawing waits for a click — and after it the conversation draws by itself,
+// without interrupting again. It isn't `window.confirm`: that blocks the thread,
+// and blocking the thread in the middle of a stream means stopping reading the stream.
 //
-// O assistente continua NÃO gravando: desenhar é rascunho no canvas, e o Salvar
-// do editor continua sendo de quem está usando.
+// The assistant still does NOT save: drawing is a draft on the canvas, and the
+// editor's Save still belongs to whoever is using it.
 
 import { useEffect, useMemo, useRef } from "react"
 import { useNodes } from "@xyflow/react"
@@ -33,17 +33,17 @@ import type { PropostaDeFluxo } from "@/app/components/home/assistente/quadros"
 interface Props {
   proposta: PropostaDeFluxo
   onAplicar: (resultado: ResultadoDaProposta) => void
-  /** A conversa já pode desenhar sozinha num canvas que tinha trabalho. */
+  /** The conversation may now draw by itself on a canvas that had work. */
   liberado: boolean
-  /** Chamado no primeiro desenho aceito, para os seguintes não perguntarem. */
+  /** Called on the first accepted drawing, so the following ones don't ask. */
   onLiberar: () => void
 }
 
 export default function CartaoProposta({ proposta, onAplicar, liberado, onLiberar }: Props) {
   const nodesAPI = useWorkflowCatalogStore(s => s.nodesAPI)
-  // Assina o canvas AQUI, e não na gaveta: só este cartão precisa reagir ao que
-  // está desenhado, e assinar lá em cima re-renderizaria a conversa inteira a
-  // cada quadro de um arraste.
+  // Subscribes to the canvas HERE, not in the drawer: only this card needs to react
+  // to what is drawn, and subscribing up there would re-render the whole
+  // conversation on every frame of a drag.
   const nos = useNodes<INodeContext>()
 
   const resultado = useMemo(
@@ -53,25 +53,25 @@ export default function CartaoProposta({ proposta, onAplicar, liberado, onLibera
 
   const { novos, alterados, removidos } = resultado.resumo
 
-  // Canvas vazio: nada a perder, desenha sempre. Canvas com trabalho: só depois
-  // do primeiro aceite da conversa.
+  // Empty canvas: nothing to lose, always draws. Canvas with work: only after
+  // the conversation's first acceptance.
   const canvasVazio = nos.length === 0
   const desenhaSozinho = proposta.desenhar === true
     && resultado.catalogoPronto
     && (canvasVazio || liberado)
 
-  // Uma vez por cartão. Sem a trava, qualquer re-render do canvas (um arraste,
-  // um zoom) reaplicaria a mesma proposta e desfaria o que a pessoa acabou de
-  // mexer — e `resultado` muda de identidade a cada render, então a lista de
-  // dependências sozinha não segura.
+  // Once per card. Without the lock, any canvas re-render (a drag,
+  // a zoom) would reapply the same proposal and undo what the person just
+  // changed — and `resultado` changes identity on every render, so the
+  // dependency list alone doesn't hold it.
   const jaDesenhou = useRef(false)
   useEffect(() => {
     if (!desenhaSozinho || jaDesenhou.current) return
     jaDesenhou.current = true
     onAplicar(resultado)
   }, [desenhaSozinho, onAplicar, resultado])
-  // `ok: null` é "não sei" — o relatório da validação não pôde ser lido. Tratar
-  // como "passou" seria oferecer aplicar um fluxo que ninguém confirmou.
+  // `ok: null` is "don't know" — the validation report couldn't be read. Treating
+  // it as "passed" would mean offering to apply a workflow nobody confirmed.
   const validou = proposta.ok === true && (proposta.erros ?? 0) === 0
 
   return (
@@ -112,8 +112,8 @@ export default function CartaoProposta({ proposta, onAplicar, liberado, onLibera
         </p>
       )}
 
-      {/* A contagem do que MUDA no canvas. Só aparece quando há canvas: num
-          fluxo vazio "4 novos" não informa nada que os 4 nós já não digam. */}
+      {/* The count of what CHANGES on the canvas. Only appears when there is a canvas:
+          on an empty workflow "4 novos" tells nothing the 4 nodes don't already say. */}
       {(alterados > 0 || removidos > 0) && (
         <p className="mt-2 text-xs tabular-nums text-muted-foreground">
           {[
@@ -129,10 +129,10 @@ export default function CartaoProposta({ proposta, onAplicar, liberado, onLibera
         </p>
       )}
 
-      {/* O botão só existe no caso que precisa de aceite: o primeiro desenho
-          de uma conversa num canvas que já tinha trabalho. Depois dele, a
-          conversa desenha sozinha e o rodapé some — interromper a cada nó seria
-          o oposto de acompanhar o fluxo crescer. */}
+      {/* The button only exists in the case that needs acceptance: a conversation's
+          first drawing on a canvas that already had work. After it, the
+          conversation draws by itself and the footer disappears — interrupting at
+          every node would be the opposite of watching the workflow grow. */}
       {proposta.desenhar && !desenhaSozinho && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
@@ -140,9 +140,9 @@ export default function CartaoProposta({ proposta, onAplicar, liberado, onLibera
             className="max-md:h-10"
             disabled={!resultado.catalogoPronto}
             onClick={() => {
-              // A trava ANTES de liberar: liberar torna `desenhaSozinho`
-              // verdadeiro, o efeito dispara, e sem isto o mesmo desenho
-              // entraria duas vezes no canvas.
+              // The lock BEFORE releasing: releasing makes `desenhaSozinho`
+              // true, the effect fires, and without this the same drawing
+              // would land on the canvas twice.
               jaDesenhou.current = true
               onLiberar()
               onAplicar(resultado)

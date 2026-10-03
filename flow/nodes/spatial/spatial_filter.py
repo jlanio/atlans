@@ -1,6 +1,6 @@
 # flow/nodes/spatial/spatial_filter.py
 """
-Nó Spatial Filter — filtra feições por bounding box ou por outra camada (máscara).
+Spatial Filter node — filters features by bounding box or by another layer (mask).
 """
 import asyncio
 import geopandas as gpd
@@ -84,7 +84,7 @@ class SpatialFilterNode(BaseNode):
         filter_mode = self.parameters.get("filter_mode", "mask").strip().lower()
         predicate = self.parameters.get("predicate", "intersects").strip().lower()
         invert = bool(self.parameters.get("invert", False))
-        # filter_mode/predicate já validados contra as options pelo self.validate().
+        # filter_mode/predicate already validated against the options by self.validate().
 
         gdf = self.get_input_gdf(inputs, "layer")
 
@@ -103,8 +103,8 @@ class SpatialFilterNode(BaseNode):
             result = await asyncio.to_thread(_bbox_filter, gdf)
 
         else:  # mask
-            # A máscara é porta OPCIONAL (só vale neste modo), e a mensagem diz
-            # qual modo a exige — por isso não passa por get_pair/get_input_gdf.
+            # The mask is an OPTIONAL port (only applies in this mode), and the message says
+            # which mode requires it — that is why it does not go through get_pair/get_input_gdf.
             mask_gdf = inputs.get("mask")
             if mask_gdf is None or not isinstance(mask_gdf, gpd.GeoDataFrame) or mask_gdf.empty:
                 raise ValueError(
@@ -112,31 +112,31 @@ class SpatialFilterNode(BaseNode):
                 )
 
             def _mask_filter(gdf: gpd.GeoDataFrame, mask_gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-                # Máscara no CRS da camada quando as duas têm CRS e diferem —
-                # aqui, na thread: to_crs é O(n) e rodava no event loop.
+                # Mask in the layer's CRS when both have a CRS and they differ —
+                # here, in the thread: to_crs is O(n) and ran on the event loop.
                 mask_gdf = align_crs(gdf, mask_gdf)
                 if predicate == "intersects":
-                    # Join espacial indexado (STRtree): dispensa o unary_union
-                    # caro e o predicado elementwise sobre a camada inteira. Para
-                    # 'intersects', "intersecta a união" ⟺ "intersecta ALGUMA
-                    # feição da máscara", então o resultado é idêntico ao antigo.
+                    # Indexed spatial join (STRtree): avoids the expensive unary_union
+                    # and the elementwise predicate over the whole layer. For
+                    # 'intersects', "intersects the union" ⟺ "intersects SOME
+                    # feature of the mask", so the result is identical to the old one.
                     #
-                    # reset_index(drop=True): a seleção é POSICIONAL, imune a
-                    # índice duplicado (concat/explode/read_parquet a montante) —
-                    # com índice não-único, isin por rótulo super-selecionaria.
-                    # [["geometry"]]: descarta qualquer coluna 'index_right'
-                    # pré-existente (ex.: saída de um SpatialJoin anterior), que
-                    # senão faria o próprio sjoin levantar ValueError.
+                    # reset_index(drop=True): the selection is POSITIONAL, immune to
+                    # a duplicated index (concat/explode/read_parquet upstream) —
+                    # with a non-unique index, isin by label would over-select.
+                    # [["geometry"]]: drops any pre-existing 'index_right' column
+                    # (e.g. output of a previous SpatialJoin), which would
+                    # otherwise make sjoin itself raise ValueError.
                     base = gdf.reset_index(drop=True)
                     casados = gpd.sjoin(
                         base[["geometry"]], mask_gdf[["geometry"]],
                         predicate="intersects", how="inner",
                     ).index.unique()
-                    hits = base.index.isin(casados)  # np.ndarray[bool], por posição
+                    hits = base.index.isin(casados)  # np.ndarray[bool], by position
                     return gdf[~hits] if invert else gdf[hits]
-                # within/contains/overlaps NÃO são monotônicos sob união (estar
-                # "dentro da união" ≠ "dentro de uma feição"), então mantêm o
-                # caminho por unary_union para preservar exatamente a semântica.
+                # within/contains/overlaps are NOT monotonic under union (being
+                # "inside the union" ≠ "inside a feature"), so they keep the
+                # unary_union path to preserve the semantics exactly.
                 from shapely.ops import unary_union
                 mask_geom = unary_union(mask_gdf.geometry.values)
                 hits = getattr(gdf.geometry, predicate)(mask_geom)

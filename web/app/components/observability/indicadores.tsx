@@ -18,33 +18,33 @@ interface Props {
 }
 
 /**
- * Os quatro indicadores do período (spec §4.3), cada um comparado ao período
- * anterior de mesmo tamanho. Sem animação de contagem nem entrada escalonada:
- * a página antiga reanimava os oito cards a cada troca de aba, e o número que
- * importa é o final, não a contagem até ele.
+ * The period's four indicators (spec §4.3), each compared to the previous
+ * period of the same size. No count-up animation or staggered entrance:
+ * the old page re-animated the eight cards on every tab switch, and the number
+ * that matters is the final one, not the count up to it.
  */
 export function Indicadores({ metrics, dias, carregando, periodo }: Props) {
   const serieTotal = useMemo(() => dias.map(d => d.total), [dias])
   const serieFalhas = useMemo(() => dias.map(d => d.failed), [dias])
-  // Taxa por dia = concluídas ÷ (concluídas + falhas); dias sem nenhuma das
-  // duas não têm taxa e ficam de fora em vez de virarem 0 ou 100%.
+  // Rate per day = completed ÷ (completed + failed); days with neither of the
+  // two have no rate and are left out instead of becoming 0 or 100%.
   const serieTaxa = useMemo(
     () => dias.filter(d => d.success + d.failed > 0).map(d => d.success / (d.success + d.failed)),
     [dias],
   )
 
-  // Um período anterior SEM execuções não é base de comparação: "+81" e
-  // "+80,5 pt" sobre zero são só o próprio número com uma seta enganosa. A
-  // tendência some e a descrição diz por quê.
+  // A previous period WITH NO runs is no basis for comparison: "+81" and
+  // "+80,5 pt" over zero are just the number itself with a misleading arrow.
+  // The trend is hidden and the description says why.
   const prevBruto = metrics?.prev_period ?? null
   const prev = prevBruto && prevBruto.total_runs > 0 ? prevBruto : null
   const semAnterior = !!prevBruto && prevBruto.total_runs === 0
   const dur = metrics?.duration ?? null
 
-  // ── Execuções ──
+  // ── Runs ──
   const total = metrics?.total_runs ?? null
-  // Memoizado nos valores numéricos: o poll troca `metrics` a cada 30 s e, sem
-  // isto, o objeto da tendência mudava de identidade e reconciliava o Indicador.
+  // Memoized on the numeric values: the poll replaces `metrics` every 30 s and,
+  // without this, the trend object changed identity and reconciled the Indicador.
   const tendTotal: Tendencia | null = useMemo(() => {
     const vTotal = variacao(total, prev?.total_runs)
     return vTotal ? {
@@ -57,13 +57,13 @@ export function Indicadores({ metrics, dias, carregando, periodo }: Props) {
     ? `${formatarInteiro(prev.total_runs)} no período anterior`
     : semAnterior ? "nenhuma no período anterior" : `nos últimos ${periodo} dias`
 
-  // ── Taxa de sucesso ──
-  // Sem execução no período, `success_rate` é 0/0 — o backend devolve 0.0, que
-  // viraria um "0%" enganoso. `—` (null) é o certo, como nas visões irmãs por
-  // linha (visao-workflows/visao-executores usam o mesmo `total_runs > 0`).
+  // ── Success rate ──
+  // With no run in the period, `success_rate` is 0/0 — the backend returns 0.0,
+  // which would become a misleading "0%". `—` (null) is right, as in the sibling
+  // per-row views (visao-workflows/visao-executores use the same `total_runs > 0`).
   const taxa = metrics && metrics.total_runs > 0 ? metrics.success_rate : null
   const deltaTaxa = taxa != null && prev ? taxa - prev.success_rate : null
-  // Memoizado no delta numérico para não recriar o objeto a cada poll.
+  // Memoized on the numeric delta so the object is not recreated on every poll.
   const tendTaxa: Tendencia | null = useMemo(() => deltaTaxa != null ? {
     direcao: Math.abs(deltaTaxa * 100) < 0.05 ? "igual" : deltaTaxa > 0 ? "sobe" : "desce",
     bom: Math.abs(deltaTaxa * 100) < 0.05 ? "neutro" : deltaTaxa > 0 ? "bom" : "ruim",
@@ -73,7 +73,7 @@ export function Indicadores({ metrics, dias, carregando, periodo }: Props) {
     ? `${formatarPercentual(prev.success_rate)} no período anterior`
     : semAnterior ? "sem período anterior para comparar" : "concluídas ÷ (concluídas + falhas)"
 
-  // ── Duração típica ──
+  // ── Typical duration ──
   const p50 = dur?.p50_seconds ?? null
   const p95 = dur?.p95_seconds ?? null
   const descDuracao = prev?.p50_seconds != null
@@ -83,18 +83,18 @@ export function Indicadores({ metrics, dias, carregando, periodo }: Props) {
   // ── Falhas ──
   const falhas = metrics?.failed_runs ?? null
   const deltaFalhas = falhas != null && prev ? falhas - prev.failed_runs : null
-  // Menos falhas é verde: a seta segue o que é bom, não o sinal. Memoizado no
-  // delta para não recriar o objeto a cada poll.
+  // Fewer failures is green: the arrow follows what is good, not the sign. Memoized
+  // on the delta so the object is not recreated on every poll.
   const tendFalhas: Tendencia | null = useMemo(() => deltaFalhas != null ? {
     direcao: deltaFalhas === 0 ? "igual" : deltaFalhas > 0 ? "sobe" : "desce",
     bom: deltaFalhas === 0 ? "neutro" : deltaFalhas > 0 ? "ruim" : "bom",
     texto: comSinal(deltaFalhas),
   } : null, [deltaFalhas])
   const pior = metrics?.top_failing_workflows?.[0]
-  // ReactNode memoizado nos valores primitivos: recriar o <>…</> a cada poll
-  // dava um elemento novo e reconciliava o Indicador das Falhas à toa.
-  // Deps por primitivos de propósito (não o objeto `pior`/`prev`, que troca de
-  // identidade a cada poll): assim o memo segura entre polls com dados iguais.
+  // ReactNode memoized on the primitive values: recreating the <>…</> on every
+  // poll gave a new element and reconciled the Failures Indicador for nothing.
+  // Deps on primitives on purpose (not the `pior`/`prev` object, which changes
+  // identity on every poll): this way the memo holds between polls with equal data.
   const descFalhas: ReactNode = useMemo(() => pior && pior.failure_count > 0
     ? <>{formatarInteiro(pior.failure_count)} delas em <span className="font-medium text-foreground">«{pior.workflow_name ?? pior.workflow_hash.slice(0, 8)}»</span></>
     : falhas === 0 ? "nenhuma no período"
@@ -106,8 +106,8 @@ export function Indicadores({ metrics, dias, carregando, periodo }: Props) {
     ? `${formatarInteiro(pior.failure_count)} delas em «${pior.workflow_name ?? pior.workflow_hash.slice(0, 8)}»`
     : typeof descFalhas === "string" ? descFalhas : ""
 
-  // Depois de TODOS os hooks acima (regras dos hooks): a 1ª carga sem métricas
-  // mostra o esqueleto.
+  // After ALL the hooks above (rules of hooks): the 1st load without metrics
+  // shows the skeleton.
   if (!metrics && carregando) {
     return (
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-busy="true" aria-label="Indicadores carregando">
@@ -199,9 +199,9 @@ function SeloDeTendencia({ t }: { t: Tendencia }) {
 }
 
 /**
- * Memoizado: o poll da faixa Agora troca `metrics` a cada 30 s e os quatro
- * cards só devem reconciliar quando o número deles muda de verdade. As séries
- * chegam memoizadas do pai por isso.
+ * Memoized: the Now strip's poll replaces `metrics` every 30 s and the four
+ * cards should only reconcile when their number really changes. The series
+ * arrive memoized from the parent for that reason.
  */
 const Indicador = memo(function Indicador({
   titulo, icone: Icone, valor, complemento, corDoValor, tendencia, descricao, serie, corDaSerie, rotulo,
@@ -214,7 +214,7 @@ const Indicador = memo(function Indicador({
   tendencia?: Tendencia | null
   descricao: ReactNode
   serie?: number[]
-  /** Classe de texto: o sparkline pinta com `currentColor`, então a cor vem do tema. */
+  /** Text class: the sparkline paints with `currentColor`, so the color comes from the theme. */
   corDaSerie?: string
   rotulo: string
 }) {
@@ -234,7 +234,7 @@ const Indicador = memo(function Indicador({
         {tendencia && <SeloDeTendencia t={tendencia} />}
         {complemento && <span className="text-xs font-medium text-muted-foreground">{complemento}</span>}
       </div>
-      {/* Espaço à direita para o sparkline não passar por cima do texto. */}
+      {/* Space on the right so the sparkline does not run over the text. */}
       <p className={cn("min-w-0 text-xs text-muted-foreground", temSerie && "sm:pr-24")}>{descricao}</p>
       {temSerie && (
         <div className={cn("pointer-events-none absolute right-3 bottom-3 hidden w-[84px] sm:block", corDaSerie)}>

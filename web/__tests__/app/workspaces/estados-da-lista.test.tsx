@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react"
 
-// Contratos da tela de workspaces que já quebraram uma vez e ficam guardados:
+// Contracts of the workspaces screen that already broke once and are kept guarded:
 //
-// 1. FALHA DE CARGA NÃO É LISTA VAZIA. Com erro e zero workspaces, a tela não
-//    pode afirmar nada sobre os dados — "Nenhum workspace encontrado" convida a
-//    criar o primeiro justamente para quem já tem dez.
-// 2. A ação primária (criar) mora no cabeçalho da página, como nas demais telas.
-// 3. O EXECUTOR do workspace ativo é trocável direto no painel, sem passar por
-//    "Configurar"; os demais mostram o executor por texto, sem seletor.
-// 4. O ATIVO é o painel de destaque; os outros ficam na fileira com "Usar".
-// 5. A POLÍTICA de execução chega junto: um grupo (dois principais) ou um
-//    fallback não cabe no seletor rápido — o painel resume e manda ao editor.
+// 1. A LOAD FAILURE IS NOT AN EMPTY LIST. With an error and zero workspaces, the screen
+//    cannot claim anything about the data — "Nenhum workspace encontrado" invites
+//    creating the first one precisely for someone who already has ten.
+// 2. The primary action (create) lives in the page header, as on the other screens.
+// 3. The active workspace's EXECUTOR can be switched directly in the panel, without going
+//    through "Configurar"; the others show the executor as text, with no selector.
+// 4. The ACTIVE one is the highlight panel; the others sit in the row with "Usar".
+// 5. The execution POLICY comes along: a group (two principals) or a
+//    fallback does not fit in the quick selector — the panel summarizes and sends to the editor.
 
 vi.mock("next-auth/react", () => ({
   useSession: () => ({ data: { user: { id_hash: "u-1" } } }),
@@ -46,8 +46,8 @@ vi.mock("@/context/WorkspaceContext", () => ({
   hasMinRole: (papel: string | null) => papel === "owner" || papel === "admin",
 }))
 
-// O painel lateral tem fetches próprios que não são o objeto deste teste; o
-// dublê só registra COM QUE workspace e EM QUE seção foi aberto.
+// The side panel has its own fetches that are not the subject of this test; the
+// double only records WITH WHICH workspace and IN WHICH section it was opened.
 vi.mock("@/app/components/workspace/settings-sheet", () => ({
   WorkspaceSettingsSheet: (p: { workspace: { id_hash: string } | null; initialSection?: string }) => (
     <div data-testid="painel" data-ws={p.workspace?.id_hash ?? ""} data-secao={p.initialSection ?? ""} />
@@ -68,7 +68,7 @@ function ws(id: string, name: string, my_role = "owner"): Ws {
   return { id_hash: id, name, description: null, owner_id: "u-1", is_default: false, my_role }
 }
 
-/** Lista com o ativo escolhido — a tela só mostra o painel quando `current` está na lista. */
+/** List with the chosen active one — the screen only shows the panel when `current` is in the list. */
 function lista(ativo: number, ...todos: Ws[]) {
   estado.workspaces = todos
   estado.current = todos[ativo] ?? null
@@ -103,7 +103,7 @@ describe("workspaces — estados da lista", () => {
     expect(screen.getByText("Nenhum workspace encontrado")).toBeTruthy()
     expect(screen.getByText("Crie seu primeiro workspace para organizar workflows e colaborar com sua equipe.")).toBeTruthy()
     expect(screen.getByRole("button", { name: "Criar workspace" })).toBeTruthy()
-    // O vazio é um convite, não uma falha: nada de alerta.
+    // The empty state is an invitation, not a failure: no alert.
     expect(screen.queryByRole("alert")).toBeNull()
   })
 
@@ -161,7 +161,7 @@ describe("workspaces — executor", () => {
     lista(0, ws("ws-a", "Alfa"))
     render(<WorkspacesPage />)
 
-    // Uma única chamada de lista de executores serve a tela inteira.
+    // A single executor-list call serves the whole screen.
     await waitFor(() => expect(getMyAgents).toHaveBeenCalledTimes(1))
     expect(getWorkspacePolicy).toHaveBeenCalledWith("ws-a")
     expect(await screen.findByLabelText(/Executor de Alfa/i)).toBeTruthy()
@@ -186,7 +186,7 @@ describe("workspaces — executor", () => {
     render(<WorkspacesPage />)
 
     expect(await screen.findByText("prod-01")).toBeTruthy()
-    // O ativo (pool) mostra o pool no seletor e a fileira de Gama por texto.
+    // The active one (pool) shows the pool in the selector and Gama's row as text.
     expect((await screen.findAllByText("Pool compartilhado")).length).toBeGreaterThanOrEqual(2)
     expect(screen.queryByLabelText(/Executor de Beta/i)).toBeNull()
     expect(screen.queryByLabelText(/Executor de Gama/i)).toBeNull()
@@ -199,7 +199,7 @@ describe("workspaces — executor", () => {
     render(<WorkspacesPage />)
 
     await waitFor(() => expect(getWorkspacePolicy).toHaveBeenCalledWith("ws-a"))
-    // Afirmar "pool" aqui seria mentir sobre para onde as execuções vão.
+    // Claiming "pool" here would be lying about where the runs go.
     expect(screen.queryByText(/Pool compartilhado/)).toBeNull()
     expect(await screen.findByText(/não foi possível ler o executor/i)).toBeTruthy()
   })
@@ -213,7 +213,7 @@ describe("workspaces — executor", () => {
     await waitFor(() => expect(getMyAgents).toHaveBeenCalled())
     expect(await screen.findByText("sem executores")).toBeTruthy()
     expect(screen.queryByText(/indisponível/i)).toBeNull()
-    // A fileira diz que não leu, em vez de afirmar pool.
+    // The row says it did not read, instead of claiming pool.
     expect(await screen.findByText("Executor não lido")).toBeTruthy()
   })
 })
@@ -251,7 +251,7 @@ describe("workspaces — política de execução", () => {
 
   it("com a flag desligada, o seletor segue o ponteiro legado e a política aparece como prévia", async () => {
     lista(0, ws("ws-a", "Alfa"), ws("ws-b", "Beta"))
-    // Dois principais gravados pelo editor (prévia), ponteiro legado ainda no pool.
+    // Two principals saved by the editor (preview), legacy pointer still on the pool.
     const previa = isolada({
       primary: [membro({ name: "prod-01" }), membro({ id_hash: "ex-2", name: "prod-02" })],
       available_primary: 2, policy_routing_enabled: false, target_executor_id: null,
@@ -260,7 +260,7 @@ describe("workspaces — política de execução", () => {
     getWorkspacePolicy.mockResolvedValue({ status: 200, success: true, data: previa } as any)
     render(<WorkspacesPage />)
 
-    // O grupo NÃO toma o painel: o seletor continua lá, no pool (o legado).
+    // The group does NOT take over the panel: the selector is still there, on the pool (the legacy one).
     expect(await screen.findByLabelText(/Executor de Alfa/i)).toBeTruthy()
     expect(screen.queryByText("2 executores")).toBeNull()
     expect(screen.getAllByText(/Isolado · prévia/).length).toBeGreaterThan(0)
@@ -282,8 +282,8 @@ describe("workspaces — política de execução", () => {
     render(<WorkspacesPage />)
     await screen.findByLabelText(/Executor de Alfa/i)
 
-    // O Radix Select não abre no jsdom; o contrato testado é o do componente:
-    // escolher o pool com dedicado → diálogo → confirmar → gravação.
+    // Radix Select does not open in jsdom; the contract tested is the component's:
+    // choosing the pool with a dedicated one → dialog → confirm → save.
     const { WorkspaceHero } = await import("@/app/components/workspace/workspace-hero")
     const onTrocar = vi.fn()
     cleanup()

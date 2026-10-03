@@ -70,7 +70,7 @@ export default function PayloadSchemaEditor({ field, values, setNodeField }: Pay
     return jsonSchemaToFields(parsed)
   })
 
-  // Sincroniza mudanças para o nó
+  // Syncs changes to the node
   const syncToNode = useCallback((updated: SchemaField[]) => {
     setFields(updated)
     setNodeField(field.name, fieldsToJsonSchema(updated) as unknown as string)
@@ -82,7 +82,7 @@ export default function PayloadSchemaEditor({ field, values, setNodeField }: Pay
     if (!raw) return
     const parsed = typeof raw === "string" ? (() => { try { return JSON.parse(raw) } catch { return null } })() : raw
     const fromSchema = jsonSchemaToFields(parsed)
-    // Evita loop: só atualiza se realmente diferente
+    // Avoids a loop: only updates if actually different
     if (JSON.stringify(fromSchema) !== JSON.stringify(fields)) {
       setFields(fromSchema)
     }

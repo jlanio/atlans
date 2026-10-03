@@ -10,11 +10,11 @@ _GEOJSON_TYPES = ("FeatureCollection", "Feature")
 
 
 def _try_geojson_to_gdf(obj):
-    """Tenta converter um objeto (dict ou string) em GeoDataFrame se for GeoJSON.
+    """Tries to convert an object (dict or string) into a GeoDataFrame if it is GeoJSON.
 
-    Busca recursivamente: primeiro o objeto raiz, depois valores string/dict
-    dentro do dict (1 nível de profundidade).
-    Retorna GeoDataFrame ou None.
+    Searches recursively: first the root object, then string/dict values
+    inside the dict (1 level deep).
+    Returns a GeoDataFrame or None.
     """
     import geopandas as gpd
 
@@ -34,13 +34,13 @@ def _try_geojson_to_gdf(obj):
         except (json.JSONDecodeError, ValueError):
             return None
 
-    # 2) Dict raiz é GeoJSON?
+    # 2) Is the root dict GeoJSON?
     if isinstance(obj, dict):
         gdf = _convert(obj)
         if gdf is not None:
             return gdf
 
-        # 3) Varre valores do dict procurando GeoJSON (string ou dict aninhado)
+        # 3) Scans the dict's values looking for GeoJSON (string or nested dict)
         for value in obj.values():
             candidate = value
             if isinstance(value, str):
@@ -100,12 +100,12 @@ class WebhookTrigger(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
-        # Configuração
+        # Configuration
         field = (self.parameters.get('payloadField') or '').strip()
 
-        # Resolução do payload:
-        #   - field definido → lê de inputs[field] (caller envelopa)
-        #   - field vazio    → inputs ja eh o payload (default p/ webhook HTTP)
+        # Payload resolution:
+        #   - field set    → reads from inputs[field] (the caller wraps it)
+        #   - field empty  → inputs already is the payload (default for HTTP webhooks)
         raw = inputs.get(field) if field else inputs
 
         if raw is None:
@@ -120,7 +120,7 @@ class WebhookTrigger(BaseNode):
         else:
             payload = {field or 'payload': raw}
 
-        # Valida payload contra o schema definido pelo usuario (se houver)
+        # Validates the payload against the user-defined schema (if any)
         schema = self.parameters.get('payload_schema')
         if schema and isinstance(schema, dict) and schema.get("properties"):
             from jsonschema import Draft7Validator
@@ -134,8 +134,8 @@ class WebhookTrigger(BaseNode):
                     f"Payload invalido — {len(parts)} erros: " + "; ".join(parts)
                 )
 
-        # Auto-detecção recursiva: converte GeoJSON para GeoDataFrame
-        # Funciona com GeoJSON no raiz, em campo string ou dict aninhado
+        # Recursive auto-detection: converts GeoJSON to a GeoDataFrame
+        # Works with GeoJSON at the root, in a string field or in a nested dict
         try:
             gdf = _try_geojson_to_gdf(payload)
             if gdf is not None:

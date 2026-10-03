@@ -1,9 +1,9 @@
 /**
- * Selo que distingue, na listagem, um workflow feito para ser CHAMADO por outro.
+ * Badge that distinguishes, in the listing, a workflow made to be CALLED by another.
  *
- * A diferença não é decorativa: um sub-fluxo em geral não tem gatilho próprio,
- * e o botão de executar do card dispara um run que não faz o esperado. Sem o
- * selo, os dois tipos de projeto são o mesmo card.
+ * The difference is not decorative: a sub-workflow generally has no trigger of its own,
+ * and the card's run button fires a run that does not do what is expected. Without the
+ * badge, both kinds of project are the same card.
  */
 import { describe, it, expect, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
@@ -19,7 +19,7 @@ describe("SeloSubFluxo", () => {
   })
 
   it("o texto de ajuda avisa sobre o gatilho ausente", () => {
-    // É a parte acionável: explica por que executar pela lista não resolve.
+    // It is the actionable part: it explains why running from the list does not help.
     render(<SeloSubFluxo workflow={{ is_subworkflow: true }} />)
     expect(screen.getByTitle(/não ter gatilho próprio/)).toBeInTheDocument()
   })
@@ -30,8 +30,8 @@ describe("SeloSubFluxo", () => {
   })
 
   it("não aparece quando o campo não veio", () => {
-    // Backend anterior a este campo, ou resposta de cache: ausência não pode
-    // marcar todo projeto como sub-fluxo.
+    // A backend older than this field, or a cached response: absence must not
+    // mark every project as a sub-workflow.
     render(<SeloSubFluxo workflow={{}} />)
     expect(screen.queryByText("Sub-fluxo")).not.toBeInTheDocument()
   })

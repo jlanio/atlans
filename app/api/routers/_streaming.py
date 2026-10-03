@@ -1,16 +1,16 @@
 # app/api/routers/_streaming.py
-"""Utilitario de streaming SSE compartilhado entre os roteadores do assistente.
+"""SSE streaming utility shared between the assistant routers.
 
-`com_batimento` intercala `: ping` no silencio de um gerador SSE. O risco de um
-SSE atras de proxy nao e o erro, e o SILENCIO: undici derruba aos 300 s, a
-Cloudflare por volta de 100 s. Uma execucao longa (o assistente montando e
-rodando um fluxo) pode ficar minutos sem um quadro. O `: ping` e um comentario
-SSE — o decodificador ignora a linha que comeca com `:`.
+`com_batimento` interleaves `: ping` into the silence of an SSE generator. The risk of
+an SSE stream behind a proxy is not the error, it is the SILENCE: undici drops it at
+300 s, Cloudflare at around 100 s. A long execution (the assistant building and
+running a workflow) can go minutes without a frame. `: ping` is an SSE comment
+— the decoder ignores a line that starts with `:`.
 
-Vive aqui, e nao dentro de um roteador, porque as DUAS superficies do assistente
-precisam do MESMO batimento: o editor em /assistente e a Home em /assistente. O /assistente
-ja o tinha; o /assistente/editor ficava calado e um turno longo derrubava a conexao no
-proxy antes do primeiro quadro.
+It lives here, and not inside a router, because BOTH assistant surfaces need the
+SAME heartbeat: the editor at /assistente and Home at /assistente. /assistente
+already had it; /assistente/editor stayed quiet and a long turn dropped the connection
+at the proxy before the first frame.
 """
 from __future__ import annotations
 
@@ -22,11 +22,11 @@ from typing import AsyncIterator
 async def com_batimento(
     gerador: AsyncIterator[bytes], intervalo: float = 15.0
 ) -> AsyncIterator[bytes]:
-    """Cede o que o `gerador` emite e, a cada `intervalo` de silencio, um `: ping`.
+    """Yields what `gerador` emits and, after each `intervalo` of silence, a `: ping`.
 
-    O `gerador` ja emite bytes com o enquadramento SSE (`event:`/`data:`); o ping
-    e um comentario, entao nao vira quadro no cliente. O `intervalo` e parametro
-    para os testes poderem forcar o timeout sem esperar 15 s de relogio.
+    `gerador` already emits bytes with SSE framing (`event:`/`data:`); the ping
+    is a comment, so it does not become a frame on the client. `intervalo` is a
+    parameter so the tests can force the timeout without waiting 15 s of wall clock.
     """
     fila: asyncio.Queue = asyncio.Queue()
 
@@ -34,7 +34,7 @@ async def com_batimento(
         try:
             async for item in gerador:
                 await fila.put(("dado", item))
-        except Exception as exc:  # pragma: no cover - o gerador ja trata os seus
+        except Exception as exc:  # pragma: no cover - the generator already handles its own
             await fila.put(("erro", exc))
         finally:
             await fila.put(("fim", None))

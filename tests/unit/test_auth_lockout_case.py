@@ -1,14 +1,14 @@
 """
-Lockout de login insensivel a caixa.
+Case-insensitive login lockout.
 
-Regressao: a busca do usuario usa `ident.lower()`, mas a chave de lockout usava
-o `ident` cru. `Admin`, `admin` e `ADMIN` resolvem a MESMA conta e sao baldes de
-lockout DISTINTOS — o bloqueio por conta (defesa contra botnet distribuido)
-nunca dispara, bastando variar a caixa a cada tentativa.
+Regression: the user lookup uses `ident.lower()`, but the lockout key used the
+raw `ident`. `Admin`, `admin` and `ADMIN` resolve to the SAME account and are
+DISTINCT lockout buckets — the per-account lockout (defense against a
+distributed botnet) never fires, as long as the case varies on each attempt.
 
-Testamos o invariante direto: duas tentativas falhas com caixas diferentes
-caem no MESMO balde. Duas requisicoes so, deterministico, dentro do rate-limit
-por IP de 5/min.
+We test the invariant directly: two failed attempts with different cases land
+in the SAME bucket. Only two requests, deterministic, within the per-IP rate
+limit of 5/min.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock
@@ -18,11 +18,11 @@ from tests.unit._mcp_harness import RedisFalso
 
 @pytest.fixture
 def login_client(client):
-    """client do conftest + get_db/get_redis do auth_router sobrescritos.
+    """The conftest's client + auth_router's get_db/get_redis overridden.
 
-    O usuario nunca e encontrado (scalar_one_or_none -> None), entao toda
-    tentativa cai no caminho de falha que chama _record_failed — exatamente o
-    ponto onde a chave de lockout e derivada.
+    The user is never found (scalar_one_or_none -> None), so every attempt
+    falls into the failure path that calls _record_failed — exactly the point
+    where the lockout key is derived.
     """
     from app.main import app
     from app.api.dependencies import get_db
@@ -64,8 +64,8 @@ async def test_tentativas_com_caixas_diferentes_compartilham_o_balde(login_clien
 
 @pytest.mark.asyncio
 async def test_conta_bloqueada_barra_mesmo_com_caixa_diferente(login_client):
-    """Se a conta ja esta bloqueada (balde normalizado), variar a caixa nao
-    contorna o 429."""
+    """If the account is already locked (normalized bucket), varying the case
+    doesn't get around the 429."""
     client, fake_redis = login_client
     fake_redis.dados["login_locked:admin"] = "1"
     fake_redis.ttls["login_locked:admin"] = 900

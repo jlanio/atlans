@@ -1,22 +1,23 @@
 # tests/unit/test_workflow_access.py
 """
-`app/core/authorization/workflow_access.py` — a casa das guardas de acesso.
+`app/core/authorization/workflow_access.py` — the home of the access guards.
 
-As regras saíram de `app/api/dependencies.py` para um módulo sem `Depends`,
-porque o servidor MCP (docs/specs/mcp-server.md §1) precisa das MESMAS regras
-sem uma request FastAPI. Cada teste aqui fixa uma decisão que as dependencies
-já tomavam — e que um "refactor" poderia trocar sem quebrar nenhuma rota:
+The rules moved out of `app/api/dependencies.py` into a module without
+`Depends`, because the MCP server (docs/specs/mcp-server.md §1) needs the SAME
+rules without a FastAPI request. Each test here pins down a decision the
+dependencies already made — and that a "refactor" could change without breaking
+any route:
 
-- 404 ANTES de 403: workflow inexistente ou na lixeira não revela se o id
-  existe em outro workspace;
-- recurso sem workspace é 403 (não 404);
-- a execução se autoriza pelo workspace DO RUN, não pelo atual do workflow;
-- `owner` está acima de `admin`, e o dono é dono mesmo se também for membro;
-- workspace na lixeira não dá papel nem entra na lista, para dono ou membro.
+- 404 BEFORE 403: a workflow that does not exist or is in the trash does not
+  reveal whether the id exists in another workspace;
+- a resource without a workspace is 403 (not 404);
+- a run is authorized by the run's OWN workspace, not the workflow's current one;
+- `owner` ranks above `admin`, and the owner is the owner even if also a member;
+- a workspace in the trash grants no role and is not listed, for owner or member.
 
-Banco de verdade (SQLite em memória, só as tabelas envolvidas): as guardas
-são consultas, e um mock de `db.execute` provaria apenas que o mock devolve o
-que se mandou devolver.
+Real database (in-memory SQLite, only the tables involved): the guards are
+queries, and a mock of `db.execute` would only prove that the mock returns what
+it was told to return.
 """
 from __future__ import annotations
 
@@ -55,13 +56,13 @@ async def db():
 
 
 async def _semear(sessao) -> None:
-    """Três workspaces, cinco pessoas.
+    """Three workspaces, five people.
 
-    ws-a    dono u-dono (que TAMBÉM aparece como membro "viewer" — o dono vence);
-            u-editor é editor, u-viewer é viewer.
-    ws-b    dono u-outro; u-dono é só viewer aqui.
-    ws-lixo dono u-dono, na lixeira; u-editor é admin — ninguém tem papel nele.
-    u-fora  não está em lugar nenhum.
+    ws-a    owner u-dono (who ALSO appears as a "viewer" member — the owner wins);
+            u-editor is an editor, u-viewer is a viewer.
+    ws-b    owner u-outro; u-dono is only a viewer here.
+    ws-lixo owner u-dono, in the trash; u-editor is admin — nobody has a role in it.
+    u-fora  is nowhere.
     """
     from app.models.user import User
     from app.models.workspace import Workspace
@@ -93,7 +94,7 @@ def _workflow(id_hash: str, workspace_id: str, apagado: bool = False) -> Workflo
 
 
 class _CrudFalso:
-    """`crud.get_by_hash` como o real: devolve o ORM cru ou None, nunca levanta."""
+    """`crud.get_by_hash` like the real one: returns the raw ORM object or None, never raises."""
 
     def __init__(self, por_hash: dict):
         self._por_hash = por_hash
@@ -105,10 +106,10 @@ class _CrudFalso:
 
 
 class _ServicoFalso:
-    """Só o que `carregar_workflow_acessivel` usa: `get_workflow_by_hash` e `crud.get_by_hash`.
+    """Only what `carregar_workflow_acessivel` uses: `get_workflow_by_hash` and `crud.get_by_hash`.
 
-    `decifrado` marca a definition como o service real faria (atribui em
-    `wf.definition`), para o teste distinguir os dois caminhos.
+    `decifrado` marks the definition as the real service would (assigning to
+    `wf.definition`), so the test can tell the two paths apart.
     """
 
     def __init__(self, *workflows: Workflow):
@@ -131,7 +132,7 @@ def _status(exc: pytest.ExceptionInfo) -> int:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Papéis
+# Roles
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_hierarquia_owner_acima_de_admin():
@@ -145,12 +146,12 @@ def test_hierarquia_owner_acima_de_admin():
 def test_papel_nulo_ou_desconhecido_nunca_alcanca_minimo():
     assert not wa.tem_papel_minimo(None, "viewer")
     assert not wa.tem_papel_minimo("superuser", "viewer")
-    # mínimo fora da lista também é "não" — nunca uma exceção
+    # a minimum outside the list is also a "no" — never an exception
     assert not wa.tem_papel_minimo("owner", "deus")
 
 
 def test_exigir_papel_403_com_a_mensagem_padrao_ou_a_da_rota():
-    wa.exigir_papel("owner", "admin")          # não levanta
+    wa.exigir_papel("owner", "admin")          # does not raise
     with pytest.raises(HTTPException) as exc:
         wa.exigir_papel("viewer", "editor")
     assert _status(exc) == 403
@@ -182,8 +183,8 @@ def test_verify_workspace_access_fora_e_dentro():
 
 @pytest.mark.asyncio
 async def test_listar_workspace_ids_dono_ou_membro_nunca_lixeira(db):
-    assert set(await wa.listar_workspace_ids(db, "u-dono")) == {"ws-a", "ws-b"}     # ws-lixo é dele, e não entra
-    assert set(await wa.listar_workspace_ids(db, "u-editor")) == {"ws-a"}           # admin do ws-lixo, e não entra
+    assert set(await wa.listar_workspace_ids(db, "u-dono")) == {"ws-a", "ws-b"}     # ws-lixo is theirs, and it is not included
+    assert set(await wa.listar_workspace_ids(db, "u-editor")) == {"ws-a"}           # admin of ws-lixo, and it is not included
     assert await wa.listar_workspace_ids(db, "u-fora") == []
 
 
@@ -195,9 +196,9 @@ async def test_listar_workspace_ids_nao_duplica_dono_que_tambem_e_membro(db):
 
 @pytest.mark.asyncio
 async def test_papel_no_workspace_dono_vence_membro_e_lixeira_nao_tem_papel(db):
-    assert await wa.get_workspace_member_role(db, "ws-a", "u-dono") == "owner"      # também é "viewer" na tabela
+    assert await wa.get_workspace_member_role(db, "ws-a", "u-dono") == "owner"      # also a "viewer" in the table
     assert await wa.get_workspace_member_role(db, "ws-a", "u-editor") == "editor"
-    assert await wa.get_workspace_member_role(db, "ws-b", "u-dono") == "viewer"     # dono de A é só viewer em B
+    assert await wa.get_workspace_member_role(db, "ws-b", "u-dono") == "viewer"     # owner of A is only a viewer in B
     assert await wa.get_workspace_member_role(db, "ws-a", "u-fora") is None
     assert await wa.get_workspace_member_role(db, "ws-lixo", "u-dono") is None
     assert await wa.get_workspace_member_role(db, "ws-lixo", "u-editor") is None
@@ -205,7 +206,7 @@ async def test_papel_no_workspace_dono_vence_membro_e_lixeira_nao_tem_papel(db):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Workflows e execuções
+# Workflows and runs
 # ══════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
@@ -236,8 +237,8 @@ async def test_carregar_workflow_fora_do_workspace_e_403(db):
 
 @pytest.mark.asyncio
 async def test_workflow_na_lixeira_e_404_mesmo_para_o_dono_e_antes_do_403(db):
-    """404 antes de 403: quem está fora do workspace recebe a MESMA resposta
-    que o dono — o id apagado não denuncia em que workspace viveu."""
+    """404 before 403: someone outside the workspace gets the SAME response as
+    the owner — the deleted id does not reveal which workspace it lived in."""
     servico = _ServicoFalso(_workflow("wf-apagado", "ws-a", apagado=True))
     for usuario in ("u-dono", "u-fora"):
         with pytest.raises(HTTPException) as exc:
@@ -247,7 +248,7 @@ async def test_workflow_na_lixeira_e_404_mesmo_para_o_dono_e_antes_do_403(db):
 
 @pytest.mark.asyncio
 async def test_workflow_de_workspace_na_lixeira_e_403(db):
-    """O workflow existe e não foi apagado, mas o workspace foi: sem papel, 403."""
+    """The workflow exists and was not deleted, but the workspace was: no role, 403."""
     servico = _ServicoFalso(_workflow("wf-lixo", "ws-lixo"))
     with pytest.raises(HTTPException) as exc:
         await wa.carregar_workflow_acessivel(servico, db, "wf-lixo", "u-dono")
@@ -256,9 +257,10 @@ async def test_workflow_de_workspace_na_lixeira_e_403(db):
 
 @pytest.mark.asyncio
 async def test_carregar_workflow_sem_decifrar_vem_cru_do_crud_com_as_mesmas_regras(db):
-    """`decifrar=False` (o caminho do MCP) não passa por `get_workflow_by_hash`:
-    a definition fica como está no banco — cifrada — e nada dirty na sessão.
-    As regras de acesso são as mesmas: 404 para inexistente/apagado, 403 fora."""
+    """`decifrar=False` (the MCP path) does not go through `get_workflow_by_hash`:
+    the definition stays as it is in the database — encrypted — and nothing is
+    dirty in the session. The access rules are the same: 404 for
+    nonexistent/deleted, 403 outside."""
     cifrada = {"nodes": [{"properties": {"connectionString": "enc:abc"}}]}
     wf_ok = _workflow("wf-1", "ws-a")
     wf_ok.definition = cifrada
@@ -266,8 +268,8 @@ async def test_carregar_workflow_sem_decifrar_vem_cru_do_crud_com_as_mesmas_regr
 
     wf, papel = await wa.carregar_workflow_acessivel(servico, db, "wf-1", "u-editor", decifrar=False)
     assert (wf.id_hash, papel) == ("wf-1", "editor")
-    assert wf.definition == cifrada                     # nem tocou
-    assert servico.decifrados == []                     # get_workflow_by_hash não foi chamado
+    assert wf.definition == cifrada                     # not even touched
+    assert servico.decifrados == []                     # get_workflow_by_hash was not called
     assert servico.crud.chamadas == ["wf-1"]
 
     with pytest.raises(HTTPException) as exc:
@@ -290,7 +292,7 @@ async def test_carregar_workflow_sem_decifrar_vem_cru_do_crud_com_as_mesmas_regr
 
 @pytest.mark.asyncio
 async def test_papel_da_execucao_e_do_workspace_do_run_nao_do_workflow(db):
-    """Workflow movido de ws-b para ws-a: o histórico de ws-b continua de ws-b."""
+    """Workflow moved from ws-b to ws-a: ws-b's history still belongs to ws-b."""
     run = SimpleNamespace(workspace_id="ws-b", workflow_hash="wf-1")
     assert await wa.papel_no_workspace_do_run(db, run, "u-editor") is None     # editor em A, nada em B
     assert await wa.papel_no_workspace_do_run(db, run, "u-dono") == "viewer"   # dono de A, viewer em B
@@ -298,7 +300,7 @@ async def test_papel_da_execucao_e_do_workspace_do_run_nao_do_workflow(db):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Uma implementação só: dependencies.py re-exporta, não copia
+# A single implementation: dependencies.py re-exports, does not copy
 # ══════════════════════════════════════════════════════════════════════════════
 
 def test_dependencies_reexporta_as_mesmas_funcoes():
@@ -312,7 +314,7 @@ def test_dependencies_reexporta_as_mesmas_funcoes():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Papel mínimo: `exigir_papel_no_workspace` e a dependência `workflow_com_papel`
+# Minimum role: `exigir_papel_no_workspace` and the `workflow_com_papel` dependency
 # ══════════════════════════════════════════════════════════════════════════════
 
 @pytest.mark.asyncio
@@ -331,7 +333,7 @@ async def test_exigir_papel_no_workspace_devolve_o_papel_ou_403(db):
 
 @pytest.mark.asyncio
 async def test_exigir_papel_no_workspace_nao_distingue_fora_inexistente_e_lixeira(db):
-    """Os três dão o MESMO 403: distinguir deixaria enumerar workspaces alheios."""
+    """All three give the SAME 403: telling them apart would allow enumerating other people's workspaces."""
     respostas = set()
     for ws, usuario in (("ws-a", "u-fora"), ("ws-nao-existe", "u-dono"), ("ws-lixo", "u-editor")):
         with pytest.raises(HTTPException) as exc:
@@ -342,8 +344,8 @@ async def test_exigir_papel_no_workspace_nao_distingue_fora_inexistente_e_lixeir
 
 @pytest.mark.asyncio
 async def test_workflow_com_papel_declara_o_minimo_e_confere_depois_do_acesso(db):
-    """A dependência das rotas `/workflows/{id_hash}`: 404 e 403 de acesso vêm de
-    `carregar_workflow_acessivel` (nessa ordem), e só então o papel."""
+    """The dependency of the `/workflows/{id_hash}` routes: the access 404 and 403
+    come from `carregar_workflow_acessivel` (in that order), and only then the role."""
     from app.api import dependencies as deps
 
     exige_editor = deps.workflow_com_papel("editor", "Só editor.")
@@ -362,7 +364,7 @@ async def test_workflow_com_papel_declara_o_minimo_e_confere_depois_do_acesso(db
         await _resolver(exige_editor, "wf-1", "u-viewer")
     assert (_status(exc), exc.value.detail) == (403, "Só editor.")
     with pytest.raises(HTTPException) as exc:
-        await _resolver(exige_editor, "wf-apagado", "u-viewer")    # 404 antes do papel
+        await _resolver(exige_editor, "wf-apagado", "u-viewer")    # 404 before the role
     assert _status(exc) == 404
 
     so_pertencer = deps.workflow_com_papel(None)
@@ -372,7 +374,7 @@ async def test_workflow_com_papel_declara_o_minimo_e_confere_depois_do_acesso(db
 
 @pytest.mark.asyncio
 async def test_dependencies_delegam_para_o_modulo(db):
-    """As dependencies FastAPI são invólucros: mesmo resultado, chamadas sem `Depends`."""
+    """The FastAPI dependencies are wrappers: same result, called without `Depends`."""
     from app.api import dependencies as deps
 
     usuario = SimpleNamespace(id_hash="u-dono")

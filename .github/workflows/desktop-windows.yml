@@ -1,13 +1,13 @@
 # .github/workflows/desktop-windows.yml
 #
-# Build e publicação do app desktop (Windows x64).
+# Build and release of the desktop app (Windows x64).
 #
-# Trigger: push de tag `desktop/v*` (ex.: desktop/v2.0.0).
-# Saída:   GitHub Release com o instalador NSIS, o `.blockmap` e o `latest.yml`.
+# Trigger: push of a `desktop/v*` tag (e.g.: desktop/v2.0.0).
+# Output:  GitHub Release with the NSIS installer, the `.blockmap` and `latest.yml`.
 #
-# Os três artefatos são obrigatórios: sem `latest.yml` o electron-updater não
-# encontra a versão nova, e sem o `.blockmap` ele rebaixa os ~180 MB inteiros em
-# vez de só os blocos alterados.
+# All three artifacts are required: without `latest.yml` electron-updater does not
+# find the new version, and without the `.blockmap` it re-downloads the whole ~180 MB
+# instead of only the changed blocks.
 
 name: Executor Desktop (Windows) — Build & Release
 
@@ -29,12 +29,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 60
 
-    # O contexto `secrets` NAO existe em `if:` — o GitHub recusa o arquivo
-    # inteiro com "Unrecognized named-value: 'secrets'", e o workflow nem chega
-    # a rodar. Espelhar num `env` do job resolve, porque `env` VALE em `if:`.
+    # The `secrets` context does NOT exist in `if:` — GitHub rejects the whole
+    # file with "Unrecognized named-value: 'secrets'", and the workflow never
+    # even runs. Mirroring it into a job `env` solves it, because `env` IS valid in `if:`.
     #
-    # Guarda so a presenca, nunca o valor de um segredo real: os segredos em si
-    # vao direto para o `env` do passo que os usa.
+    # It stores only the presence, never the value of a real secret: the secrets
+    # themselves go straight into the `env` of the step that uses them.
     env:
       ASSINATURA_LIGADA: ${{ secrets.ATLANS_SIGN_PROVIDER != '' }}
 
@@ -49,19 +49,19 @@ jobs:
           cache: npm
           cache-dependency-path: desktop/package-lock.json
 
-      # ── Cache do tarball do CPython ────────────────────────────────────────
-      # Só o tarball (~40 MB), que o `python:fetch` confere pelo SHA-256 do
-      # python-runtime.json antes de usar: um cache adulterado não passa.
+      # ── CPython tarball cache ──────────────────────────────────────────────
+      # Only the tarball (~40 MB), which `python:fetch` checks against the SHA-256 in
+      # python-runtime.json before use: a tampered cache does not get through.
       #
-      # O runtime MONTADO não vem de cache. Ele vai, assinado, para a máquina do
-      # usuário, e uma entrada do cache do Actions pode ser envenenada por
-      # código que rode em qualquer job da main: um runtime com pip e pacotes
-      # alterados passaria pelo `pip install` como "já satisfeito" (arquivo já
-      # instalado não é conferido pelo hash) e iria para o instalador. Então ele
-      # é remontado a cada release, do tarball conferido e do lock com hash. (O
-      # cache antigo, de `resources/python` já podado, nem servia num acerto:
-      # o `fetch` saía cedo sem baixar o tarball, e o `build`, achando o
-      # runtime sem pip, falhava por não ter de onde re-extrair.)
+      # The ASSEMBLED runtime does not come from cache. It goes, signed, to the
+      # user's machine, and an Actions cache entry can be poisoned by
+      # code running in any job on main: a runtime with altered pip and packages
+      # would pass `pip install` as "already satisfied" (an already installed
+      # file is not checked against the hash) and end up in the installer. So it
+      # is reassembled on every release, from the checked tarball and the hashed
+      # lock. (The old cache, of an already pruned `resources/python`, did not even
+      # work on a hit: `fetch` exited early without downloading the tarball, and
+      # `build`, finding the runtime without pip, failed with nowhere to re-extract from.)
       - name: Cache do tarball do CPython
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
@@ -72,8 +72,8 @@ jobs:
         working-directory: desktop
         run: npm ci
 
-      # O `fetch` confere o SHA-256 do tarball (do cache ou baixado) e extrai o
-      # runtime limpo; o `build` instala o lock com --require-hashes e poda.
+      # `fetch` checks the tarball's SHA-256 (cached or downloaded) and extracts the
+      # clean runtime; `build` installs the lock with --require-hashes and prunes.
       - name: Baixar o CPython
         working-directory: desktop
         run: npm run python:fetch
@@ -82,9 +82,9 @@ jobs:
         working-directory: desktop
         run: npm run python:build
 
-      # `executor/` e `flow/` mudam a cada commit — e é justamente o import de
-      # `flow` via o sys.path hack de job_executor.py que quebra quando alguém
-      # mexe na árvore.
+      # `executor/` and `flow/` change on every commit — and it is precisely the
+      # `flow` import through job_executor.py's sys.path hack that breaks when
+      # someone touches the tree.
       - name: Copiar executor/ e flow/
         working-directory: desktop
         run: npm run payload:stage
@@ -93,9 +93,9 @@ jobs:
         working-directory: desktop
         run: npm run python:smoke
 
-      # Prova a ponte inteira: spawn real, NDJSON pelo stdout, comando pelo
-      # stdin. Não precisa de servidor — o executor falha na fase 0 e o teste
-      # verifica que a falha chega como evento `state: failed` com causa.
+      # Proves the whole bridge: real spawn, NDJSON over stdout, commands over
+      # stdin. It needs no server — the executor fails at phase 0 and the test
+      # checks that the failure arrives as a `state: failed` event with a cause.
       - name: Smoke do supervisor
         working-directory: desktop
         run: npm run smoke:supervisor
@@ -106,22 +106,22 @@ jobs:
           npm run typecheck
           npm test
 
-      # Assina um binário de mentira com um certificado autoassinado e confere a
-      # assinatura resultante. Roda SEM segredo nenhum, e é o que garante que o
-      # hook de assinatura continua funcional enquanto ele é um no-op — o risco
-      # aqui nunca foi técnico, foi de cronograma: descobrir que o hook quebrou
-      # no dia em que o certificado chega.
+      # Signs a fake binary with a self-signed certificate and checks the
+      # resulting signature. Runs with NO secrets at all, and it is what ensures the
+      # signing hook keeps working while it is a no-op — the risk here was
+      # never technical, it was about schedule: finding out the hook broke
+      # on the day the certificate arrives.
       - name: Autoteste do hook de assinatura
         working-directory: desktop
         run: npm run sign:selftest
 
-      # O build do app (tsc, esbuild, vite, tailwind — código de terceiros) roda
-      # SEM segredo nenhum no ambiente. O token de escrita e os segredos de
-      # assinatura só entram no passo seguinte, que é só o electron-builder.
-      # Antes os dois iam juntos no `npm run dist`.
-      # O servidor e a UI que o app grava no executável vêm das variáveis do
-      # repositório (Settings → Secrets and variables → Actions → Variables): o
-      # código não traz os de instalação nenhuma, e o build falha sem eles
+      # The app build (tsc, esbuild, vite, tailwind — third-party code) runs
+      # with NO secrets at all in the environment. The write token and the signing
+      # secrets only come in at the next step, which is electron-builder alone.
+      # They used to go together in `npm run dist`.
+      # The server and UI the app bakes into the executable come from the
+      # repository variables (Settings → Secrets and variables → Actions → Variables):
+      # the code ships those of no installation, and the build fails without them
       # (desktop/scripts/enderecos.mjs).
       - name: Compilar o app
         working-directory: desktop
@@ -134,32 +134,32 @@ jobs:
         working-directory: desktop
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Assinatura de código. Sem os segredos, `build/sign.cjs` é no-op e o
-          # instalador sai funcional porém não assinado (SmartScreen alerta).
-          # Um fork sem segredos continua conseguindo buildar — é por isso que
-          # nada aqui é obrigatório.
+          # Code signing. Without the secrets, `build/sign.cjs` is a no-op and the
+          # installer comes out functional but unsigned (SmartScreen warns).
+          # A fork without secrets can still build — that is why
+          # nothing here is required.
           #
-          # Para Azure Trusted Signing / DigiCert KeyLocker, use PROVIDER=dlib e
-          # aponte ATLANS_SIGNTOOL para o signtool do SDK: o que vem no
-          # winCodeSign do electron-builder não conhece `/dlib`.
+          # For Azure Trusted Signing / DigiCert KeyLocker, use PROVIDER=dlib and
+          # point ATLANS_SIGNTOOL to the SDK's signtool: the one in electron-builder's
+          # winCodeSign does not know `/dlib`.
           ATLANS_SIGN_PROVIDER: ${{ secrets.ATLANS_SIGN_PROVIDER }}
           ATLANS_SIGN_PFX: ${{ secrets.ATLANS_SIGN_PFX }}
           ATLANS_SIGN_PFX_PASSWORD: ${{ secrets.ATLANS_SIGN_PFX_PASSWORD }}
           ATLANS_SIGN_DLIB: ${{ secrets.ATLANS_SIGN_DLIB }}
           ATLANS_SIGN_DLIB_METADATA: ${{ secrets.ATLANS_SIGN_DLIB_METADATA }}
           ATLANS_SIGNTOOL: ${{ secrets.ATLANS_SIGNTOOL }}
-          # O feed do auto-update é o deste repositório: cada fork publica nas
-          # próprias releases, e o app instalado busca atualização nelas
-          # (desktop/electron-builder.yml). Por env, e não por `-c.publish.*`
-          # na linha de comando: o pwsh deste runner parte `-c.publish.owner=x`
-          # no primeiro ponto, e o electron-builder recebia `-c` e `.publish...`.
+          # The auto-update feed is this repository's: each fork publishes to its
+          # own releases, and the installed app looks for updates there
+          # (desktop/electron-builder.yml). Via env, not via `-c.publish.*`
+          # on the command line: this runner's pwsh splits `-c.publish.owner=x`
+          # at the first dot, and electron-builder received `-c` and `.publish...`.
           ATLANS_RELEASES_DONO: ${{ github.repository_owner }}
           ATLANS_RELEASES_REPO: ${{ github.event.repository.name }}
         run: npm run empacotar
 
-      # Só quando a assinatura estava ligada: um instalador que DEVERIA sair
-      # assinado e sai sem assinatura chega ao usuário com o aviso do
-      # SmartScreen, e ninguém percebe até o primeiro chamado de suporte.
+      # Only when signing was on: an installer that SHOULD come out
+      # signed and comes out unsigned reaches the user with the
+      # SmartScreen warning, and nobody notices until the first support ticket.
       - name: Conferir a assinatura do instalador
         if: env.ASSINATURA_LIGADA == 'true'
         working-directory: desktop
@@ -185,9 +185,9 @@ jobs:
             desktop/dist-installer/latest.yml
           retention-days: 14
 
-      # O texto da release sai de um passo: o parágrafo do SmartScreen só vale
-      # para um build sem assinatura, e a expressão do `body:` não condiciona
-      # um bloco inteiro.
+      # The release text comes from a step: the SmartScreen paragraph only applies
+      # to an unsigned build, and the `body:` expression cannot make a whole
+      # block conditional.
       - name: Montar o texto da release
         if: startsWith(github.ref, 'refs/tags/desktop/v') || inputs.publicar
         shell: pwsh

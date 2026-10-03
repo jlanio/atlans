@@ -1,15 +1,18 @@
 # tests/unit/test_admin_assistente_router.py
-"""`/admin/assistente/modelo` — trocar o modelo com o catálogo na frente.
+"""`/admin/assistente/modelo` — changing the model with the catalog up front.
 
-O que estes testes prendem:
+What these tests pin down:
 
-1. **Só admin.** O router inteiro está sob `require_admin`.
-2. **Provedor fora do ar não derruba a tela.** Sem catálogo, o admin ainda
-   precisa ver o que está em uso e poder voltar ao padrão.
-3. **Id inválido é 400 na hora**, não erro na próxima conversa de cada usuário.
-4. **O modelo é sondado antes de salvar**, e o «voltar ao padrão» nunca.
-5. **Uma extensão soma campos ao painel** (uma de planos soma a cota e o custo,
-   com testes na pasta dela) e recebe os parâmetros da URL que o núcleo não lê.
+1. **Admin only.** The whole router is under `require_admin`.
+2. **A provider that is down does not take down the screen.** Without a
+   catalog, the admin still needs to see what is in use and be able to go
+   back to the default.
+3. **An invalid id is a 400 right away**, not an error on every user's next
+   conversation.
+4. **The model is probed before saving**, and "back to default" never is.
+5. **An extension adds fields to the panel** (a plans extension adds the quota
+   and the cost, with tests in its folder) and receives the URL parameters
+   the core does not read.
 """
 from unittest.mock import patch
 
@@ -36,8 +39,8 @@ async def test_usuario_comum_nao_entra(client, mock_current_user):
 
 
 async def test_provedor_fora_do_ar_nao_derruba_a_tela(api):
-    """Sem catálogo o admin ainda precisa ver o que está em uso e poder voltar
-    ao padrão — responder 500 aqui trancaria a única saída."""
+    """Without a catalog the admin still needs to see what is in use and be able
+    to go back to the default — answering 500 here would lock the only exit."""
     client, _ = api
     with com_catalogo(erro=openrouter.ErroDoOpenRouter("fora do ar", status=503)):
         r = await client.get("/admin/assistente/modelo")
@@ -50,8 +53,8 @@ async def test_provedor_fora_do_ar_nao_derruba_a_tela(api):
 
 
 async def test_o_catalogo_vem_da_base_configurada_com_a_chave(api):
-    """Fora do OpenRouter (um gateway, um vLLM com chave), o catálogo é o do
-    servidor configurado, e ele pede a mesma chave da conversa."""
+    """Outside OpenRouter (a gateway, a vLLM with a key), the catalog is the
+    configured server's, and it requires the same key as the conversation."""
     client, _ = api
     visto: dict = {}
 
@@ -105,8 +108,8 @@ async def test_id_invalido_e_400_e_nao_erro_na_proxima_conversa(api):
 
 
 async def test_campo_desconhecido_e_recusado(api):
-    """`extra=forbid`: preço e teto são do servidor. Aceitar um campo a mais em
-    silêncio é o primeiro passo para alguém tentar mandar um deles."""
+    """`extra=forbid`: price and ceiling belong to the server. Silently accepting
+    an extra field is the first step toward someone trying to send one of them."""
     client, _ = api
     with com_catalogo():
         r = await client.put("/admin/assistente/modelo",
@@ -114,10 +117,10 @@ async def test_campo_desconhecido_e_recusado(api):
     assert r.status_code == 422
 
 
-# ── O painel sem extensões, e com uma ────────────────────────────────────────
+# ── The panel without extensions, and with one ──────────────────────────────
 
 async def test_sem_extensoes_o_painel_e_o_modelo_e_o_catalogo(api, registro_de_teste):
-    """A distribuição livre: nada de cota nem custo por plano."""
+    """The free distribution: no quota or per-plan cost."""
     client, _ = api
     with com_catalogo():
         r = await client.get("/admin/assistente/modelo")
@@ -143,21 +146,21 @@ async def test_uma_extensao_soma_campos_e_recebe_os_parametros_da_url(api, regis
     assert r.json()["economia"] == {"teto": 42}
     assert vistos[0] == {"modelo": ASSISTENTE_MODELO, "catalogo": ["a/barato", "a/caro"],
                          "simular": "a/caro", "consulta": {"simular": "a/caro", "faixa": "7"}}
-    # A resposta do PUT é o painel inteiro também, sem simulação.
+    # The PUT response is the whole panel too, with no simulation.
     assert trocado.json()["economia"] == {"teto": 42}
     assert vistos[1]["simular"] is None and vistos[1]["consulta"] == {}
 
 
-# ── A sonda do modelo ────────────────────────────────────────────────────────
+# ── The model probe ──────────────────────────────────────────────────────────
 #
-# O caso real, de produção: um admin escolheu `deepseek/...:batch` no painel —
-# um id que ESTÁ no catálogo do provedor mas pertence ao endpoint de batch. O
-# provedor respondeu «cannot be used with the chat/completions endpoint», e o
-# assistente passou a dar «não consegui falar com o modelo» para TODOS os
-# usuários, enquanto quem trocou não viu nada.
+# The real production case: an admin chose `deepseek/...:batch` in the panel —
+# an id that IS in the provider's catalog but belongs to the batch endpoint.
+# The provider answered "cannot be used with the chat/completions endpoint",
+# and the assistant started giving "não consegui falar com o modelo" (couldn't
+# reach the model) to ALL users, while whoever made the change saw nothing.
 #
-# A tela oferecia uma escolha que não podia funcionar. A sonda é o que move a
-# recusa do provedor para o momento do clique, com as palavras dele.
+# The screen offered a choice that could not work. The probe is what moves the
+# provider's refusal to the moment of the click, in its own words.
 
 _RECUSA_DO_BATCH = (
     "OpenRouter respondeu 404: deepseek/deepseek-v4-flash-vision-exp:batch cannot be "
@@ -166,14 +169,14 @@ _RECUSA_DO_BATCH = (
 
 
 async def test_modelo_que_o_provedor_recusa_nao_e_salvo(api):
-    """400 no clique, com a mensagem do provedor — e nada muda."""
+    """400 on the click, with the provider's message — and nothing changes."""
     client, _ = api
     from app.services.openrouter import ErroDoOpenRouter
 
     with com_catalogo(sonda=ErroDoOpenRouter(_RECUSA_DO_BATCH, status=404)):
         r = await client.put("/admin/assistente/modelo", json={"modelo": "a/caro"})
         assert r.status_code == 400
-        # A mensagem do PROVEDOR chega inteira: é ela que diz o que fazer.
+        # The PROVIDER's message arrives in full: it is what says what to do.
         assert "chat/completions" in r.json()["message"]
         assert "não foi salvo" in r.json()["message"]
 
@@ -183,12 +186,12 @@ async def test_modelo_que_o_provedor_recusa_nao_e_salvo(api):
 
 
 async def test_sonda_que_nao_responde_tambem_bloqueia(api):
-    """O erro caro é o outro.
+    """The costly error is the other one.
 
-    Deixar passar um modelo não verificado quebra o produto para todo mundo;
-    barrar uma troca legítima durante uma instabilidade custa tentar de novo.
-    Mas a mensagem separa os dois casos — «recusou» e «não deu para conferir»
-    pedem ações diferentes de quem está na tela.
+    Letting an unverified model through breaks the product for everyone;
+    blocking a legitimate change during instability costs a retry. But the
+    message tells the two cases apart — "refused" and "could not check" call
+    for different actions from whoever is on the screen.
     """
     client, _ = api
     with com_catalogo(sonda=TimeoutError("estourou")):
@@ -199,16 +202,16 @@ async def test_sonda_que_nao_responde_tambem_bloqueia(api):
 
 
 async def test_voltar_ao_padrao_NUNCA_e_sondado(api):
-    """A saída de emergência não pode depender do provedor.
+    """The emergency exit cannot depend on the provider.
 
-    Se ele estiver fora do ar com um modelo ruim salvo, sondar o «voltar ao
-    padrão» trancaria a porta justamente na hora em que ela é necessária.
+    If it is down with a bad model saved, probing "back to default" would lock
+    the door precisely when it is needed.
     """
     client, _ = api
     with com_catalogo():
         await client.put("/admin/assistente/modelo", json={"modelo": "a/caro"})
 
-    # Agora o provedor recusa TUDO — e mesmo assim o padrão volta.
+    # Now the provider refuses EVERYTHING — and even so the default comes back.
     from app.services.openrouter import ErroDoOpenRouter
 
     with com_catalogo(sonda=ErroDoOpenRouter("provedor fora do ar", status=503)):
@@ -219,11 +222,12 @@ async def test_voltar_ao_padrao_NUNCA_e_sondado(api):
 
 
 async def test_a_sonda_manda_a_MESMA_forma_da_conversa():
-    """Sondar com uma forma diferente da real não provaria nada.
+    """Probing with a shape different from the real one would prove nothing.
 
-    É a forma que o provedor recusa: são as ferramentas que um modelo sem
-    suporte rejeita, e é o `max_tokens` que um modelo de teto baixo recusa.
-    Uma sonda «leve» aprovaria modelos que quebram na primeira conversa.
+    It is the shape that the provider refuses: it is the tools that a model
+    without support rejects, and it is the `max_tokens` that a model with a
+    low ceiling refuses. A "light" probe would approve models that break on
+    the first conversation.
     """
     import httpx
 
@@ -236,8 +240,8 @@ async def test_a_sonda_manda_a_MESMA_forma_da_conversa():
         import json as _json
 
         visto.update(_json.loads(pedido.content))
-        # Um stream realista: um pedaço de texto e o fim. O que a sonda quer
-        # saber já foi respondido no 200.
+        # A realistic stream: a piece of text and the end. What the probe wants
+        # to know was already answered by the 200.
         return httpx.Response(
             200, headers={"Content-Type": "text/event-stream"},
             content=(
@@ -261,11 +265,11 @@ async def test_a_sonda_manda_a_MESMA_forma_da_conversa():
 
 
 async def test_stream_esquisito_NAO_bloqueia_a_troca():
-    """O provedor aceitou — é só isso que a sonda pergunta.
+    """The provider accepted — that is all the probe asks.
 
-    Um stream que abre com 200 e termina sem quadro útil é detalhe de
-    transmissão, e a conversa real lida com ele. Barrar a troca por causa disso
-    seria a sonda reprovando um modelo que funciona.
+    A stream that opens with 200 and ends without a useful frame is a
+    transmission detail, and the real conversation deals with it. Blocking the
+    change because of that would be the probe failing a model that works.
     """
     import httpx
 
@@ -282,7 +286,7 @@ async def test_stream_esquisito_NAO_bloqueia_a_troca():
 
 
 async def test_a_sonda_levanta_o_que_o_provedor_respondeu():
-    """Sem tradução no meio: a mensagem do provedor é o que ajuda a decidir."""
+    """No translation in between: the provider's message is what helps decide."""
     import httpx
 
     from app.services import openrouter

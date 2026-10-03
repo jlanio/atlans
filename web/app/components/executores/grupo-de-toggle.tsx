@@ -4,14 +4,14 @@ import type { IconType } from "react-icons"
 import { cn } from "@/lib/utils"
 
 /**
- * Grupo de toggle padrão do contrato (§1): `role="group"` com botões
- * `aria-pressed`, moldura `inline-flex h-8 rounded-md border bg-card`, divisória
- * `border-l first:border-l-0`, ativo `bg-accent`, foco `ring-[3px] ring-ring/50`
- * e alvo ≥40px no telefone (`max-md:h-10`).
+ * The contract's standard toggle group (§1): `role="group"` with
+ * `aria-pressed` buttons, `inline-flex h-8 rounded-md border bg-card` frame,
+ * `border-l first:border-l-0` divider, active `bg-accent`, focus
+ * `ring-[3px] ring-ring/50` and a ≥40px target on phones (`max-md:h-10`).
  *
- * Substitui os dois controles segmentados ad-hoc que a tela tinha (tipo e
- * status), que usavam pílulas `bg-muted` com `shadow-sm` — fora do padrão das
- * telas irmãs. O componente é genérico no tipo do valor para servir aos dois.
+ * Replaces the two ad-hoc segmented controls the screen had (type and
+ * status), which used `bg-muted` pills with `shadow-sm` — outside the pattern
+ * of the sibling screens. The component is generic over the value type to serve both.
  */
 export function GrupoDeToggle<T extends string>({ rotulo, valor, onChange, opcoes }: {
   rotulo: string

@@ -1,10 +1,10 @@
 # tests/unit/test_workspace_policy_router.py
 """
-Endpoints da política de execução (spec §9) e do piso (§4.5, Q10).
+Endpoints for the execution policy (spec §9) and the floor (§4.5, Q10).
 
-A garantia vem das dependencies/gates dos handlers; estes testes falham se um
-endpoint for movido para fora do gate — como test_admin_workspaces_router faz
-para a lixeira.
+The guarantee comes from the handlers' dependencies/gates; these tests fail if an
+endpoint is moved outside the gate — as test_admin_workspaces_router does
+for the trash.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def _saida():
     )
 
 
-# ── inclusão de membro ────────────────────────────────────────────────────────
+# ── member inclusion ──────────────────────────────────────────────────────────
 
 async def test_viewer_nao_inclui_membro(db_override):
     client, _ = db_override
@@ -83,7 +83,7 @@ async def test_erro_de_politica_vira_422_com_mensagem(db_override):
                AsyncMock(side_effect=WorkspacePolicyError("'pool-a' pertence ao pool compartilhado"))):
         resp = await client.post("/workspaces/ws-test-001/executors/pool-a?tier=1")
     assert resp.status_code == 422
-    # Exceções de domínio saem pelo handler global: {"error": code, "message": detail}.
+    # Domain exceptions go out through the global handler: {"error": code, "message": detail}.
     corpo = resp.json()
     assert corpo["error"] == "workspace_policy_invalid"
     assert "pool compartilhado" in corpo["message"]
@@ -130,7 +130,7 @@ async def test_leitura_devolve_a_politica_com_a_flag(db_override):
     assert corpo["mode"] == "pool" and corpo["policy_routing_enabled"] is False
 
 
-# ── piso do admin da plataforma ──────────────────────────────────────────────
+# ── platform admin floor ─────────────────────────────────────────────────────
 
 async def test_piso_negado_para_usuario_comum(client):
     resp = await client.put("/admin/workspaces/ws-test-001/isolation-floor", json={"floor": "no_pool"})
@@ -156,7 +156,7 @@ async def test_piso_pelo_admin_forca_terminal_e_avisa(db_override, mock_current_
 
 
 async def test_piso_sem_principal_nao_avisa(db_override, mock_current_user):
-    # "Passou a ser isolado" só faz sentido para quem tem executor dedicado.
+    # "Became isolated" only makes sense for someone with a dedicated executor.
     client, db = db_override
     mock_current_user.role = "admin"; mock_current_user.username = "admin-test"
     ws = _ws(); ws.fallback_terminal = "pool"
@@ -173,8 +173,8 @@ async def test_piso_sem_principal_nao_avisa(db_override, mock_current_user):
 
 
 async def test_admin_lista_a_politica_de_todos_os_workspaces(db_override, mock_current_user):
-    """Tela de admin "Piso de isolamento": uma linha por workspace vivo, com o
-    modo derivado das CONTAGENS dos níveis — sem carregar executores."""
+    """Admin screen "Piso de isolamento" (isolation floor): one row per live workspace, with the
+    mode derived from the tier COUNTS — without loading executors."""
     client, db = db_override
     mock_current_user.role = "admin"; mock_current_user.username = "admin-test"
 
@@ -196,7 +196,7 @@ async def test_admin_lista_a_politica_de_todos_os_workspaces(db_override, mock_c
     assert linhas["ws-1"]["mode"] == "dedicated_pool"
     assert linhas["ws-1"]["primary_count"] == 2 and linhas["ws-1"]["fallback_count"] == 1
     assert linhas["ws-1"]["owner_username"] == "jl"
-    # Sem principal e sob piso: isolado com zero executores, terminal efetivo fail.
+    # No principal and under the floor: isolated with zero executors, effective terminal fail.
     assert linhas["ws-2"]["mode"] == "isolated"
     assert linhas["ws-2"]["effective_terminal"] == "fail" and linhas["ws-2"]["primary_count"] == 0
     assert linhas["ws-2"]["owner_username"] is None

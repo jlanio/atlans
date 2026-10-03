@@ -1,18 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, cleanup, waitFor, fireEvent, within } from "@testing-library/react"
 
-// Editor da política de execução (painel do workspace, seção "Execução").
-// Contratos da spec §9 que a tela promete:
+// Execution policy editor (workspace panel, "Execução" section).
+// Contracts from spec §9 that the screen promises:
 //
-// 1. FALHAR é o padrão — e é o que aparece selecionado num Isolado.
-// 2. Sob piso do administrador da plataforma, o pool nem é oferecido, e o
-//    motivo está escrito.
-// 3. Escolher o pool pede CONFIRMAÇÃO antes de gravar: muda onde os dados rodam.
-// 4. Com a flag de roteamento desligada, o editor se declara PRÉVIA — antes de
-//    qualquer outra coisa — e diz o que vale hoje.
-// 5. O pool não é um nível: executores compartilhados não são candidatos.
-// 6. Remover o ÚLTIMO principal pede confirmação: leva a reserva e devolve o
-//    workspace ao pool.
+// 1. FAIL is the default — and it's what appears selected in an Isolated workspace.
+// 2. Under a platform administrator floor, the pool isn't even offered, and the
+//    reason is written out.
+// 3. Choosing the pool asks for CONFIRMATION before saving: it changes where the data runs.
+// 4. With the routing flag off, the editor declares itself a PREVIEW — before
+//    anything else — and says what applies today.
+// 5. The pool is not a tier: shared executors are not candidates.
+// 6. Removing the LAST primary asks for confirmation: it takes the fallback with
+//    it and returns the workspace to the pool.
 
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
@@ -28,7 +28,7 @@ vi.mock("@/utils/createToast", () => ({
   createToast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }))
 
-// A carga da seção é o `useFetchData`, que espera a sessão autenticada.
+// The section loads through `useFetchData`, which waits for the authenticated session.
 vi.mock("next-auth/react", () => ({ useSession: () => ({ status: "authenticated" }) }))
 
 import { GisFlowService } from "@/service/GisFlowService"
@@ -93,7 +93,7 @@ describe("editor da política — último recurso", () => {
 
     fireEvent.click(within(dialogo).getByRole("button", { name: "Permitir o pool" }))
     await waitFor(() => expect(setFallback).toHaveBeenCalledWith("ws-a", "pool"))
-    // A política gravada é a que o servidor devolveu: a seleção acompanha.
+    // The saved policy is the one the server returned: the selection follows it.
     await waitFor(() =>
       expect(screen.getByRole("radio", { name: /Usar o pool/ }).getAttribute("aria-checked")).toBe("true"))
   })
@@ -102,7 +102,7 @@ describe("editor da política — último recurso", () => {
     abrir()
     const grupo = await screen.findByRole("radiogroup")
     fireEvent.keyDown(grupo, { key: "ArrowRight" })
-    // Vai para o pool → passa pela confirmação, não grava direto.
+    // Going to the pool → goes through the confirmation, doesn't save directly.
     expect(await screen.findByRole("dialog")).toBeTruthy()
     expect(setFallback).not.toHaveBeenCalled()
   })

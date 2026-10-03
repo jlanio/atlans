@@ -1,50 +1,50 @@
 # app/core/constants.py
 """
-Constantes globais do Atlas Studio.
-Centraliza magic strings e valores fixos usados em múltiplos módulos.
+Global constants of Atlas Studio.
+Centralizes magic strings and fixed values used across multiple modules.
 """
 from flow.utils.fuso import fuso_padrao_do_agendamento
 
 # ── node_stats ────────────────────────────────────────────────────────────────
-# Chave reservada dentro do JSON node_stats para metadados globais da execução.
-# Formato: WorkflowRun.node_stats["__run_meta__"] = {"retry_count": int, ...}
+# Reserved key inside the node_stats JSON for run-wide metadata.
+# Format: WorkflowRun.node_stats["__run_meta__"] = {"retry_count": int, ...}
 NODE_STATS_RUN_META_KEY = "__run_meta__"
 
-# Nó interno publicado ao final de cada execução para sinalizar conclusão ao WebSocket.
+# Internal node published at the end of each run to signal completion to the WebSocket.
 WORKFLOW_COMPLETE_NODE = "__workflow_complete__"
 
 # ── Redis TTLs (em segundos) ──────────────────────────────────────────────────
-REDIS_TTL_1H  = 3_600       # 1 hora — cache de workflows, tokens
-REDIS_TTL_24H = 86_400      # 24 horas — idempotência de execução, refresh tokens
+REDIS_TTL_1H  = 3_600       # 1 hour — workflow cache, tokens
+REDIS_TTL_24H = 86_400      # 24 hours — run idempotency, refresh tokens
 
 # ── Security headers ──────────────────────────────────────────────────────────
 HSTS_MAX_AGE = 31_536_000   # 1 ano — Strict-Transport-Security max-age
 
 
-# ── Agendamento ───────────────────────────────────────────────────────────────
-# O fuso que vale quando o agendamento nao diz qual e o seu.
+# ── Scheduling ────────────────────────────────────────────────────────────────
+# The timezone that applies when the schedule does not say which one is its own.
 #
-# Havia TRES respostas para essa pergunta, e elas discordavam: o no
-# `ScheduleTrigger` mandava um fuso fixo, o schema `ScheduleBase` usava outro
-# (mesmo offset, nome diferente) e a coluna nula caia em
-# **UTC** dentro do agendador — quatro horas de diferenca, em silencio, entre o
-# que a tela mostrava e a hora em que o cron disparava.
+# There were THREE answers to that question, and they disagreed: the
+# `ScheduleTrigger` node sent a fixed timezone, the `ScheduleBase` schema used another
+# (same offset, different name) and the null column fell back to
+# **UTC** inside the scheduler — four hours of difference, silently, between
+# what the screen showed and the time the cron fired.
 #
-# Agora e um valor so, e os tres pontos o importam. Ele vem do ambiente
-# (AGENDAMENTO_FUSO_PADRAO, lido em `flow/utils/fuso.py`, que o no tambem usa),
-# com UTC quando a instalacao nao o define.
+# Now it is a single value, and all three places import it. It comes from the environment
+# (AGENDAMENTO_FUSO_PADRAO, read in `flow/utils/fuso.py`, which the node also uses),
+# with UTC when the installation does not set it.
 #
-# Trocar o valor de uma instalacao que ja tem agendamentos NAO e detalhe:
-# `timezone` entra no `_mesma_configuracao` (`app/core/scheduling/hooks.py`),
-# entao o proximo save de cada workflow agendado sem fuso explicito recria o
-# schedule — o que zera o `next_run_at` e pula a ocorrencia do dia. Por isso o
-# valor se define antes de criar agendamentos, e um deploy pode conferir que
-# ele esta no .env antes de subir.
+# Changing the value on an installation that already has schedules is NOT a detail:
+# `timezone` is part of `_mesma_configuracao` (`app/core/scheduling/hooks.py`),
+# so the next save of each scheduled workflow without an explicit timezone recreates the
+# schedule — which resets `next_run_at` and skips that day's occurrence. That is why the
+# value is set before creating schedules, and a deploy can check that
+# it is in the .env before starting up.
 FUSO_PADRAO_DO_AGENDAMENTO = fuso_padrao_do_agendamento()
 
-# Teto de eventos guardados no histórico de um run (`workflow:{run}:history`).
-# O rpush era ilimitado: um executor comprometido (ou com bug) podia empurrar
-# mensagens de até 16 MB em loop e estourar a memória do Redis — que também
-# guarda presença, blacklist de tokens e contadores de rate limit. O frontend só
-# reconstrói o canvas com os eventos recentes, então truncar o início é seguro.
+# Ceiling on events kept in a run's history (`workflow:{run}:history`).
+# The rpush was unbounded: a compromised (or buggy) executor could push
+# messages of up to 16 MB in a loop and blow up Redis's memory — which also
+# holds presence, the token blacklist and rate limit counters. The frontend only
+# rebuilds the canvas from the recent events, so truncating the start is safe.
 MAX_EVENTOS_NO_HISTORICO = 5000

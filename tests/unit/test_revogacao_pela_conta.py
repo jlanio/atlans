@@ -1,20 +1,22 @@
-"""Suspender ou excluir a conta derruba os executores dela — sem mexer nos
-níveis da política dos workspaces.
+"""Suspending or deleting the account drops its executors — without touching the
+tiers of the workspaces' policy.
 
-A revogação de um executor estava escrita em quatro lugares, e a da conta fazia
-só o UPDATE do status e a blacklist do cert: a sessão aberta ficava até a vigia
-de revogação passar. Agora a conta usa a mesma revogação do DELETE do executor
-(status, cert, blacklist, `control: revoked` e close 4403 depois do commit).
+Executor revocation was written in four places, and the account's only did the
+status UPDATE and the cert blacklist: the open session stayed until the
+revocation watcher came by. Now the account uses the same revocation as the
+executor DELETE (status, cert, blacklist, `control: revoked` and close 4403
+after the commit).
 
-O que a conta NÃO faz é tirar o executor dos níveis: ele pode estar no nível
-principal de workspaces de outros donos, e esvaziá-lo à força apagava a reserva
-e o terminal — o workspace Isolado virava pool compartilhado e a configuração do
-dono se perdia, mesmo com a conta reativada depois. Fica no nível, como manda a
-spec (executor-isolation-routing §4.4), e o despacho o pula. Tirar dos níveis é
-do DELETE do executor e do "revogar todos" do operador.
+What the account does NOT do is remove the executor from the tiers: it may be in
+the primary tier of workspaces of other owners, and forcibly emptying it deleted
+the fallback and the terminal — the Isolated workspace became a shared pool and
+the owner's configuration was lost, even if the account was reactivated later.
+It stays in the tier, as the spec says (executor-isolation-routing §4.4), and
+dispatch skips it. Removing from the tiers belongs to the executor DELETE and to
+the operator's "revoke all".
 
-Banco de verdade (SQLite): o que importa é o que sobra gravado — o nível, o
-status, a auditoria.
+Real database (SQLite): what matters is what remains stored — the tier, the
+status, the audit.
 """
 from __future__ import annotations
 
@@ -39,8 +41,8 @@ from app.services import executor_service
 
 @asynccontextmanager
 async def _banco():
-    """SQLite com o que a revogação toca. `executors` usa JSONB, que o SQLite
-    não compila: vai uma cópia da tabela com JSON (ver `banco_de_executores`)."""
+    """SQLite with what the revocation touches. `executors` uses JSONB, which SQLite
+    does not compile: a copy of the table with JSON is used (see `banco_de_executores`)."""
     executores = Executor.__table__.to_metadata(MetaData())
     for coluna in executores.columns:
         if isinstance(coluna.type, JSONB):
@@ -59,8 +61,8 @@ async def _banco():
 
 
 async def _semear(Sessao):
-    """A conta da ana tem a máquina dela, que é o ÚNICO executor do nível
-    principal de ws-1 (da bia) e divide o de ws-2 com outro executor."""
+    """Ana's account has her machine, which is the ONLY executor in the primary
+    tier of ws-1 (Bia's) and shares the one of ws-2 with another executor."""
     async with Sessao() as db:
         db.add_all([
             User(id_hash="u-ana", username="ana", email="ana@x.test", hashed_password="x"),
@@ -80,7 +82,7 @@ async def _semear(Sessao):
 
 @pytest.fixture
 def efeitos(monkeypatch):
-    """O que sai do banco: blacklist, e-mail aos donos e o WebSocket."""
+    """What leaves the database: blacklist, e-mail to the owners and the WebSocket."""
     registro = MagicMock()
     registro.send_json = AsyncMock(return_value=True)
     registro.disconnect_executor = AsyncMock(return_value=True)
@@ -138,13 +140,13 @@ async def test_a_conta_revogada_derruba_o_executor_e_mantem_os_niveis(efeitos, a
             )).all()
 
     assert (status, serial) == ("revoked", None)
-    # Os níveis de ws-1 e ws-2 (da bia) ficam: o despacho pula o executor
-    # revogado e segue a cadeia; nada de detach nem de aviso de nível esvaziado.
+    # The tiers of ws-1 and ws-2 (Bia's) stay: dispatch skips the revoked executor
+    # and follows the chain; no detach and no emptied-tier notice.
     assert sorted(niveis) == ["ws-1", "ws-2"]
     assert auditoria == []
     assert all(c.args[0] == [] for c in efeitos["aviso"].call_args_list)
 
-    # A sessão aberta cai na hora, como no DELETE do executor.
+    # The open session drops right away, as in the executor DELETE.
     registro = efeitos["registro"]
     registro.send_json.assert_awaited_once()
     destino, mensagem = registro.send_json.await_args.args
@@ -158,10 +160,10 @@ async def test_a_conta_revogada_derruba_o_executor_e_mantem_os_niveis(efeitos, a
 @pytest.mark.asyncio
 @pytest.mark.parametrize("acao, motivo", ACOES)
 async def test_suspender_a_conta_nao_rebaixa_o_workspace_isolado_de_outro_dono(efeitos, acao, motivo):
-    """ws-1 (da bia) é Isolado: principal [ex-ana], reserva [ex-outro], terminal
-    `fail`. Com o detach forçado da conta, o principal esvaziava, a reserva e o
-    terminal eram apagados e o workspace passava a mandar jobs ao pool
-    compartilhado."""
+    """ws-1 (Bia's) is Isolated: primary [ex-ana], fallback [ex-outro], terminal
+    `fail`. With the account's forced detach, the primary was emptied, the fallback
+    and the terminal were deleted and the workspace started sending jobs to the
+    shared pool."""
     from app.services import workspace_executor_service as politica
 
     async with _banco() as Sessao:
@@ -186,8 +188,8 @@ async def test_suspender_a_conta_nao_rebaixa_o_workspace_isolado_de_outro_dono(e
 
 @pytest.mark.asyncio
 async def test_revogar_todos_do_operador_tira_dos_niveis_e_avisa_os_donos(efeitos, monkeypatch):
-    """O "revogar todos" é ação explícita sobre os executores: como o DELETE
-    forçado, sai dos níveis e o dono do nível principal esvaziado é avisado."""
+    """The "revoke all" is an explicit action on the executors: like the forced
+    DELETE, it leaves the tiers and the owner of the emptied primary tier is notified."""
     from types import SimpleNamespace
 
     from app.api.routers import admin_users_router as R
@@ -213,8 +215,8 @@ async def test_revogar_todos_do_operador_tira_dos_niveis_e_avisa_os_donos(efeito
 
 @pytest.mark.asyncio
 async def test_nada_sai_do_banco_se_o_commit_falha(efeitos):
-    """Blacklist, e-mail e o close 4403 (terminal para o executor) só depois do
-    commit: um rollback não pode deixar o executor derrubado e ativo no banco."""
+    """Blacklist, e-mail and close 4403 (terminal for the executor) only after the
+    commit: a rollback must not leave the executor dropped yet active in the database."""
     async with _banco() as Sessao:
         await _semear(Sessao)
         async with Sessao() as db:
@@ -229,7 +231,7 @@ async def test_nada_sai_do_banco_se_o_commit_falha(efeitos):
     efeitos["aviso"].assert_not_called()
 
 
-# ── O DELETE do executor passa pela mesma revogação ──────────────────────────
+# ── The executor DELETE goes through the same revocation ─────────────────────
 
 async def _revogar_pela_rota(Sessao, *, force):
     from types import SimpleNamespace

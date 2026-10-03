@@ -5,19 +5,19 @@ import type { ExtensaoDoWeb, PropsDoEnvoltorioDoPainel } from "@/extensoes"
 import type { IPainelDoModelo } from "@/service/types"
 
 /**
- * A seção que troca o modelo do assistente, no núcleo: o modelo em uso, o
- * catálogo e o salvar. O que uma extensão soma a ela (a conta dos planos, por
- * exemplo) tem testes na pasta da extensão; aqui, o núcleo sozinho e o encaixe.
+ * The section that switches the assistant's model, in the core: the model in use, the
+ * catalog and saving. What an extension adds to it (the plans' accounting, for
+ * example) has tests in the extension's folder; here, the core alone and the slot.
  *
- * O que se protege:
+ * What is protected:
  *
- * 1. **Escolher não salva.** Salvar ao passar o mouse numa lista trocaria o
- *    modelo de produção.
- * 2. **Preço desconhecido não vira zero.** Zero lê como «de graça».
- * 3. **Provedor fora do ar não derruba a tela**: o admin ainda vê o que está
- *    em uso e pode voltar ao padrão.
- * 4. **O encaixe**: um envoltório de extensão cerca o seletor, sabe o que foi
- *    escolhido e divide com o núcleo o «salvando».
+ * 1. **Choosing does not save.** Saving on hovering over a list would switch the
+ *    production model.
+ * 2. **An unknown price does not become zero.** Zero reads as "free".
+ * 3. **A provider being down does not bring the screen down**: the admin still sees what is
+ *    in use and can go back to the default.
+ * 4. **The slot**: an extension wrapper surrounds the selector, knows what was
+ *    chosen and shares the "saving" state with the core.
  */
 
 const svc = vi.hoisted(() => ({ trocarModelo: vi.fn() }))
@@ -25,8 +25,8 @@ vi.mock("@/service/GisFlowService", () => ({ GisFlowService: svc }))
 vi.mock("@/utils/createToast", () => ({
   createToast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), loading: vi.fn(), warning: vi.fn() },
 }))
-// O núcleo sozinho, como na distribuição livre; um teste pendura uma extensão
-// de mentira.
+// The core alone, as in the free distribution; one test hangs a fake
+// extension on it.
 const registro = vi.hoisted(() => ({ EXTENSOES: [] as ExtensaoDoWeb[] }))
 vi.mock("@/extensoes", async (original) => ({ ...(await original<typeof import("@/extensoes")>()), EXTENSOES: registro.EXTENSOES }))
 
@@ -40,7 +40,7 @@ const CATALOGO = [
   { id: "a/sem-preco", nome: "Sem preço", entrada_por_milhao: null, saida_por_milhao: null, contexto: null },
 ]
 
-/** O painel como o servidor o manda sem extensão nenhuma. */
+/** The panel as the server sends it with no extension at all. */
 function painel(over: Partial<IPainelDoModelo> = {}): IPainelDoModelo {
   return {
     atual: {
@@ -113,8 +113,8 @@ describe("o seletor do núcleo", () => {
   })
 
   it("provedor fora do ar não derruba a tela", () => {
-    // Sem catálogo o admin ainda precisa ver o que está em uso e poder voltar
-    // ao padrão — esconder tudo trancaria a única saída.
+    // Without a catalog the admin still needs to see what is in use and be able to go back
+    // to the default — hiding everything would lock the only way out.
     render(<ModeloDoAssistente painel={painel({
       catalogo: [], catalogo_indisponivel: "ErroDoOpenRouter",
       atual: { modelo: "a/caro", origem: "banco", definido_por: "jose",
@@ -130,7 +130,7 @@ describe("o seletor do núcleo", () => {
 })
 
 describe("o encaixe das extensões", () => {
-  /** Um envoltório de mentira que expõe o que recebeu. */
+  /** A fake wrapper that exposes what it received. */
   const recebido: { atual: PropsDoEnvoltorioDoPainel | null } = { atual: null }
   function Envoltorio(props: PropsDoEnvoltorioDoPainel) {
     recebido.atual = props
@@ -170,9 +170,9 @@ describe("o encaixe das extensões", () => {
   })
 
   it("um envoltório que não carrega não derruba a tela: o seletor e o «Voltar ao padrão» ficam", async () => {
-    // O pedaço carregado sob demanda pode não chegar (rede, ou um deploy no
-    // meio, que apaga os pedaços antigos). Sem o limite, o erro subia até a
-    // raiz e o app inteiro desmontava — com a saída de emergência junto.
+    // The chunk loaded on demand may not arrive (network, or a deploy in the
+    // middle, which deletes the old chunks). Without the boundary, the error bubbled up to the
+    // root and the whole app unmounted — with the emergency exit along with it.
     const erro = vi.spyOn(console, "error").mockImplementation(() => {})
     const Quebrado = lazy<typeof Envoltorio>(() => Promise.reject(new Error("ChunkLoadError: Loading chunk 123 failed.")))
     registro.EXTENSOES.push({ nome: "teste", painelDoModelo: { Envoltorio: Quebrado } })

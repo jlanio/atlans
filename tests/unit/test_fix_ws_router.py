@@ -1,15 +1,15 @@
 # tests/unit/test_fix_ws_router.py
 """
-Testes das correcoes do WS de executores (router + registry de conexoes).
+Tests for the fixes to the executors' WS (router + connection registry).
 
-Cobre:
-  B1  — orfaos so falham quando o executor realmente sumiu
-  S3  — coercao/clamp de `capacity`
-  S5  — allowlist e teto de `system_info`
-  S10 — teto de bytes e rate limit de `node_event`
-  P1  — memo de autorizacao run->executor
-  S6  — envelope do relay amarrado a canal/executor/nonce/tempo
-  B14 — liberacao de presenca por CAS
+Covers:
+  B1  — orphans only fail when the executor has really gone away
+  S3  — coercion/clamping of `capacity`
+  S5  — allowlist and ceiling for `system_info`
+  S10 — byte ceiling and rate limit for `node_event`
+  P1  — run->executor authorization memo
+  S6  — relay envelope bound to channel/executor/nonce/time
+  B14 — presence release via CAS
 """
 import asyncio
 import json
@@ -33,7 +33,7 @@ from flow.utils.publisher.reducao import (
 
 
 class _FakeConn:
-    """Substituto minimo de ExecutorConnection para os testes do router."""
+    """Minimal stand-in for ExecutorConnection for the router tests."""
 
     def __init__(self, max_concurrent=4, max_queue=50):
         self.max_concurrent_limit = max_concurrent
@@ -52,7 +52,7 @@ def fake_conn(monkeypatch):
 # ── S3: capacity ──────────────────────────────────────────────────────────────
 
 def test_capacity_dict_em_contador_e_rejeitada(fake_conn):
-    """O payload que derrubava o POST /execute da plataforma inteira."""
+    """The payload that brought down POST /execute for the entire platform."""
     cap, errors = P._sanitize_capacity("ex-1", {
         "queued": {"n": 0}, "running": 0, "max_concurrent": 4, "max_queue": 50,
     })
@@ -86,7 +86,7 @@ def test_capacity_string_numerica_e_coagida(fake_conn):
 
 
 def test_capacity_e_clampada_pelos_limites_do_banco(fake_conn):
-    """Declarar max_queue=10**9 nao pode atrair todos os jobs do pool."""
+    """Declaring max_queue=10**9 must not attract every job in the pool."""
     cap, errors = P._sanitize_capacity("ex-1", {
         "queued": 0, "running": 0, "max_concurrent": 10 ** 9, "max_queue": 10 ** 9,
     })
@@ -135,7 +135,7 @@ def test_system_info_trunca_strings_longas():
 
 
 def test_system_info_volumoso_nao_e_persistido():
-    """15 MB por reconexao: nada fora da allowlist sobrevive."""
+    """15 MB per reconnection: nothing outside the allowlist survives."""
     payload = {f"campo_{i}": "x" * 1000 for i in range(5000)}
     assert P._sanitize_system_info("ex-1", payload) is None
     assert len(json.dumps(P._sanitize_system_info("ex-1", {**payload, "hostname": "h"}))) < 512
@@ -151,18 +151,18 @@ def test_node_event_de_log_e_limitado_na_faixa_baixa(monkeypatch):
         if P._node_event_allowed("ex-1", log_msg)
     )
     assert allowed == P._NODE_EVENT_RATE_LIMIT
-    # Janela nova libera de novo (sem derrubar a conexao).
+    # A new window frees it up again (without dropping the connection).
     P._rate_state[("ex-1", "node_event:log")]["window_start"] -= P._RATE_WINDOW * 2
     assert P._node_event_allowed("ex-1", log_msg) is True
 
 
 def test_lifecycle_nao_e_descartado_pela_cota_de_log(monkeypatch):
-    """O bug: 300 nos = 600 eventos lifecycle em rajada estouravam os 200/s e o
-    canvas ficava com metade do grafo girando para sempre."""
+    """The bug: 300 nodes = 600 lifecycle events in a burst blew past the 200/s and the
+    canvas was left with half the graph spinning forever."""
     monkeypatch.setattr(P, "_rate_state", {})
     for _ in range(P._NODE_EVENT_RATE_LIMIT * 3):
         P._node_event_allowed("ex-1", {"kind": "debug"})
-    # Mesmo com a cota de log esgotada, todo `completed` de no passa.
+    # Even with the log quota exhausted, every node `completed` gets through.
     for i in range(600):
         assert P._node_event_allowed("ex-1", {
             "kind": "lifecycle", "node": f"n{i}", "status": "completed",
@@ -191,7 +191,7 @@ def test_buckets_nao_compartilham_cota(monkeypatch):
     for _ in range(P._JOB_RESULT_RATE_LIMIT):
         assert P._rate_allowed("ex-1", "job_result", P._JOB_RESULT_RATE_LIMIT) is True
     assert P._rate_allowed("ex-1", "job_result", P._JOB_RESULT_RATE_LIMIT) is False
-    # Outro bucket do mesmo executor segue livre.
+    # Another bucket of the same executor stays free.
     assert P._node_event_allowed("ex-1", {"kind": "lifecycle"}) is True
 
 
@@ -220,11 +220,11 @@ def test_truncagem_preserva_campos_de_controle():
 
 
 def test_estouro_por_extra_pesado_preserva_output_columns():
-    """Degradação por chave: o peso (traceback/debug/stdout/drift) cai primeiro.
+    """Per-key degradation: the heavy stuff (traceback/debug/stdout/drift) goes first.
 
-    Antes o estouro reduzia direto aos campos de controle e o `extra` inteiro
-    sumia — inclusive `output_columns`, a sugestão de coluna do editor, que é
-    exatamente o que um `completed` de tabela larga carrega de útil.
+    Before, an overflow cut straight down to the control fields and the whole `extra`
+    vanished — including `output_columns`, the editor's column suggestion, which is
+    exactly the useful thing a wide-table `completed` carries.
     """
     colunas = {"result": [f"col_{i}" for i in range(200)]}
     event = {
@@ -255,7 +255,7 @@ def test_estouro_por_extra_pesado_preserva_output_columns():
 
 
 def test_error_gigante_do_evento_e_truncado_preservando_o_extra():
-    """`error` também é campo pesado: truncá-lo evita jogar fora o extra leve."""
+    """`error` is also a heavy field: truncating it avoids throwing away the light extra."""
     event = {
         "run_id": "run-1", "node": "n1", "status": "failed", "kind": "lifecycle",
         "level": "error", "timestamp": 123.0, "error": "e" * 100_000,
@@ -273,14 +273,14 @@ def test_error_gigante_do_evento_e_truncado_preservando_o_extra():
 
 
 def test_estouro_extremo_ainda_cai_para_campos_de_controle():
-    """Se nem o evento degradado cabe, o teto continua garantia: só controle."""
+    """If not even the degraded event fits, the ceiling is still a guarantee: control only."""
     event = {
         "run_id": "run-1", "node": "n1", "status": "completed", "kind": "lifecycle",
         "level": "info", "timestamp": 123.0,
         "extra": {
             "traceback": "tb",
-            # output_columns hostil, maior que o próprio teto: preservá-lo
-            # deixaria o "truncado" maior que o original.
+            # hostile output_columns, larger than the ceiling itself: preserving it
+            # would make the "truncated" version larger than the original.
             "output_columns": {"r": ["c" * 60] * 3_000},
         },
     }
@@ -345,10 +345,10 @@ async def _async_false(*_a, **_kw):
     return False
 
 
-# ── S10 (parte 2): job_result tambem tem teto de bytes e rate limit ──────────
+# ── S10 (part 2): job_result also has a byte ceiling and rate limit ──────────
 
 def test_error_gigante_do_job_result_e_truncado():
-    """15 MB iam crus para WorkflowRun.error_message (Text, sem limite)."""
+    """15 MB went raw into WorkflowRun.error_message (Text, no limit)."""
     capped, _ = P._cap_job_result("ex-1", {
         "job_id": "j1", "status": "error", "error": "A" * 15_000_000,
     })
@@ -378,7 +378,7 @@ def test_stats_gigante_preserva_chaves_de_controle():
 
 
 def test_stats_com_chave_de_controle_gigante_marca_control_dropped():
-    """Sem __control_dropped__ o BRPOP do webhook_router ficaria no timeout."""
+    """Without __control_dropped__ the webhook_router's BRPOP would sit until the timeout."""
     stats = {"__response__": {"body": "z" * (P._MAX_JOB_STATS_BYTES + 1000)}}
     capped, _ = P._cap_job_result("ex-1", {"job_id": "j1", "status": "ok", "stats": stats})
     assert capped["stats"]["__control_dropped__"] is True
@@ -404,8 +404,8 @@ def test_job_result_pequeno_passa_intacto():
 
 
 def test_stats_serializado_uma_vez_e_reaproveitado():
-    """O JSON devolvido tem que ser o MESMO que vai para a fila run_results —
-    sem isso o caller refazia um dumps de ate 4 MB, sincrono, no event loop."""
+    """The returned JSON must be the SAME one that goes to the run_results queue —
+    without that the caller redid a dumps of up to 4 MB, synchronously, on the event loop."""
     stats = {"n1": {"rows": 3}, "__response__": {"status": 200}}
     capped, stats_json = P._cap_job_result("ex-1", {
         "job_id": "j1", "status": "ok", "stats": stats,
@@ -419,7 +419,7 @@ def test_stats_ausente_devolve_objeto_vazio():
 
 
 class _FakeRedis:
-    """Captura tudo que o handler manda para o Redis."""
+    """Captures everything the handler sends to Redis."""
 
     def __init__(self):
         self.writes: list[str] = []
@@ -466,8 +466,8 @@ class _FakeRedis:
 
 @pytest.fixture
 def sem_banco(monkeypatch):
-    """O calculo de duracao abre uma sessao real; nos testes ela falha rapido e
-    o handler segue (o bloco ja e tolerante a erro de DB)."""
+    """The duration calculation opens a real session; in the tests it fails fast and
+    the handler continues (the block is already tolerant of DB errors)."""
 
     class _SemDB:
         async def __aenter__(self):
@@ -489,8 +489,8 @@ def _snapshot_de(executor_id="ex-1", status="running", start_time=None):
 
 
 async def test_job_result_gigante_nao_chega_cru_ao_redis(monkeypatch, fake_conn):
-    """Todos os destinos duradouros (results, run_results, history, publish)
-    tem que receber o payload ja contido."""
+    """All durable destinations (results, run_results, history, publish)
+    must receive the already-contained payload."""
     rc = _FakeRedis()
     monkeypatch.setattr(P, "_rate_state", {})
     monkeypatch.setattr(RES, "_query_run_snapshot", _snapshot_de())
@@ -505,7 +505,7 @@ async def test_job_result_gigante_nao_chega_cru_ao_redis(monkeypatch, fake_conn)
     assert rc.writes, "nada foi publicado"
     for payload in rc.writes:
         assert len(payload) < 1_000_000, f"payload de {len(payload)} bytes foi para o Redis"
-        json.loads(payload)  # a emenda do `stats` tem que produzir JSON valido
+        json.loads(payload)  # splicing in `stats` must produce valid JSON
     juntos = "".join(rc.writes)
     assert "A" * (P._MAX_JOB_ERROR_CHARS + 100) not in juntos
 
@@ -529,7 +529,7 @@ async def test_job_result_le_o_run_uma_unica_vez(monkeypatch, fake_conn):
 
 
 async def test_job_result_de_run_alheio_e_rejeitado(monkeypatch, fake_conn):
-    """Fail-closed cross-tenant: host de outro executor nao pode ser sobrescrito."""
+    """Cross-tenant fail-closed: another executor's host must not be overwritten."""
     rc = _FakeRedis()
     monkeypatch.setattr(P, "_rate_state", {})
     monkeypatch.setattr(RES, "_query_run_snapshot", _snapshot_de("ex-2"))
@@ -539,12 +539,12 @@ async def test_job_result_de_run_alheio_e_rejeitado(monkeypatch, fake_conn):
         "job_id": "run-1", "run_id": "run-1", "status": "ok",
     })
     assert rc.writes == []
-    # A recusa fica memorizada para o flood nao virar um SELECT por tentativa.
+    # The refusal is memoized so the flood does not turn into one SELECT per attempt.
     assert fake_conn.run_auth_cache["run-1"][0] is False
 
 
 async def test_job_result_sem_host_e_rejeitado(monkeypatch, fake_conn):
-    """host NULL (run inexistente ou ainda sem dispatch) continua fail-closed."""
+    """NULL host (nonexistent run or not yet dispatched) stays fail-closed."""
     rc = _FakeRedis()
 
     async def _sem_linha(_run_id):
@@ -559,7 +559,7 @@ async def test_job_result_sem_host_e_rejeitado(monkeypatch, fake_conn):
 
 
 async def test_job_result_de_run_terminal_e_ignorado(monkeypatch, fake_conn):
-    """Replay do outbox nao pode transformar um 'failed' em 'success'."""
+    """An outbox replay must not turn a 'failed' into a 'success'."""
     rc = _FakeRedis()
     monkeypatch.setattr(P, "_rate_state", {})
     monkeypatch.setattr(RES, "_query_run_snapshot", _snapshot_de(status="failed"))
@@ -572,8 +572,8 @@ async def test_job_result_de_run_terminal_e_ignorado(monkeypatch, fake_conn):
 
 
 async def test_job_result_de_run_cancelado_e_ignorado(monkeypatch, fake_conn):
-    """Um run cancelado pelo usuario ja e terminal: um job_result posterior
-    (reentrega ou executor comprometido) nao pode ressuscita-lo como success."""
+    """A run cancelled by the user is already terminal: a later job_result
+    (redelivery or compromised executor) must not resurrect it as success."""
     rc = _FakeRedis()
     monkeypatch.setattr(P, "_rate_state", {})
     monkeypatch.setattr(RES, "_query_run_snapshot", _snapshot_de(status="cancelled"))
@@ -586,7 +586,7 @@ async def test_job_result_de_run_cancelado_e_ignorado(monkeypatch, fake_conn):
 
 
 async def test_job_result_com_banco_fora_abre_cooldown(monkeypatch, fake_conn):
-    """Um blip do Postgres nao pode virar uma tentativa de checkout por evento."""
+    """A Postgres blip must not turn into one checkout attempt per event."""
     rc = _FakeRedis()
 
     async def _explode(_run_id):
@@ -616,8 +616,8 @@ async def test_job_result_tem_rate_limit(monkeypatch, fake_conn):
         await RES._handle_job_result("ex-1", {
             "job_id": "run-1", "run_id": "run-1", "status": "error", "error": "x",
         })
-    # O descarte acontece ANTES da autorizacao: e o custo em SELECTs que o
-    # flood explora.
+    # The discard happens BEFORE authorization: the cost in SELECTs is what the
+    # flood exploits.
     assert len(vistos) == P._JOB_RESULT_RATE_LIMIT
 
 
@@ -652,14 +652,14 @@ async def test_run_auth_memoriza_negativa(monkeypatch, fake_conn):
 
 
 async def test_erro_de_banco_nega_sem_repetir_a_consulta(monkeypatch, fake_conn):
-    """Erro de DB continua NEGANDO e NAO vira memo (o veredito e transitorio),
-    mas durante o cooldown nao se abre sessao nova por evento — era assim que um
-    soluco de 1 minuto no Postgres virava desconexao em massa de executores."""
+    """A DB error still DENIES and does NOT become a memo (the verdict is transient),
+    but during the cooldown no new session is opened per event — that is how a
+    1-minute hiccup in Postgres turned into a mass disconnection of executors."""
     calls = []
 
     async def _fake_query(executor_id, run_id):
         calls.append(run_id)
-        return None  # falha de DB
+        return None  # DB failure
 
     monkeypatch.setattr(RES, "_query_run_belongs_to_agent", _fake_query)
 
@@ -668,15 +668,15 @@ async def test_erro_de_banco_nega_sem_repetir_a_consulta(monkeypatch, fake_conn)
     assert len(calls) == 1
     assert "run-1" not in fake_conn.run_auth_cache
 
-    # Passado o cooldown, volta a tentar — a retomada tem que ser rapida.
+    # Once the cooldown passes, it tries again — recovery has to be fast.
     fake_conn.db_auth_cooldown_until = 0.0
     assert await RES._run_belongs_to_agent("ex-1", "run-1") is False
     assert len(calls) == 2
 
 
 async def test_consulta_de_autorizacao_tem_timeout(monkeypatch, fake_conn):
-    """Esperar POOL_TIMEOUT (30s) no caminho quente do WS deixa o heartbeat sem
-    leitura e o servidor derruba um executor saudavel."""
+    """Waiting POOL_TIMEOUT (30s) on the WS hot path leaves the heartbeat unread
+    and the server drops a healthy executor."""
     monkeypatch.setattr(RES, "_RUN_AUTH_QUERY_TIMEOUT", 0.01)
 
     async def _travada(executor_id, run_id):
@@ -690,7 +690,7 @@ async def test_consulta_de_autorizacao_tem_timeout(monkeypatch, fake_conn):
 
 
 async def test_run_auth_nao_cruza_executores(monkeypatch):
-    """O memo vive na conexao: um executor nunca herda o veredito de outro."""
+    """The memo lives on the connection: an executor never inherits another's verdict."""
     conns = {"ex-1": _FakeConn(), "ex-2": _FakeConn()}
     monkeypatch.setattr(executor_registry, "get", conns.get)
 
@@ -720,7 +720,7 @@ def test_forget_run_auth_limpa_o_memo(fake_conn):
     assert "run-1" not in fake_conn.run_auth_cache
 
 
-# ── B1: orfaos so falham se o executor sumiu de verdade ──────────────────────
+# ── B1: orphans only fail if the executor really went away ───────────────────
 
 @pytest.fixture
 def sem_espera(monkeypatch):
@@ -731,7 +731,7 @@ def sem_espera(monkeypatch):
 
 
 async def test_blip_de_rede_nao_falha_runs_em_voo(monkeypatch, sem_espera):
-    """Reconexao no MESMO worker: os runs em voo tem que sobreviver."""
+    """Reconnection on the SAME worker: in-flight runs must survive."""
     chamou = []
     monkeypatch.setattr(ORF, "_fail_orphan_runs", lambda aid: chamou.append(aid))
     monkeypatch.setattr(executor_registry, "get", lambda _aid: _FakeConn())
@@ -758,8 +758,8 @@ async def test_reconexao_em_outro_worker_nao_falha_runs(monkeypatch, sem_espera)
 
 
 async def test_redis_indisponivel_na_checagem_nao_destroi_runs(monkeypatch, sem_espera):
-    """'Nao sei' != 'sumiu'. Um blip do pool no instante da checagem destruia
-    justamente os runs que a carencia existe para salvar."""
+    """'I don't know' != 'gone'. A pool blip at the moment of the check destroyed
+    precisely the runs the grace period exists to save."""
     chamou = []
 
     async def _fail(aid):
@@ -786,7 +786,7 @@ async def test_presence_tri_estado_devolve_none_em_erro_de_redis(monkeypatch):
     monkeypatch.setattr(C, "_get_redis", _boom)
     monkeypatch.setattr(C, "_reset_redis_singleton", _noop)
     assert await C._redis_presence_or_unknown("ex-1") is None
-    # O wrapper booleano continua fail-closed para quem decide dispatch.
+    # The boolean wrapper stays fail-closed for whoever decides on dispatch.
     assert await C._redis_check_presence("ex-1") is False
 
 
@@ -807,7 +807,7 @@ async def test_executor_sumido_de_fato_falha_os_runs(monkeypatch, sem_espera):
     assert chamou == ["ex-1"]
 
 
-# ── S6: envelope do relay ────────────────────────────────────────────────────
+# ── S6: relay envelope ───────────────────────────────────────────────────────
 
 def test_envelope_de_relay_abre_no_canal_certo():
     env = C.build_relay_envelope('{"type":"job"}', executor_id="ex-1")
@@ -818,7 +818,7 @@ def test_envelope_de_relay_abre_no_canal_certo():
 
 
 def test_envelope_nao_pode_ser_replicado_em_outro_executor():
-    """Republicar um control/revoked no canal de cada executor derrubava a frota."""
+    """Republishing a control/revoked on every executor's channel took down the fleet."""
     env = C.build_relay_envelope('{"type":"control","action":"revoked"}', executor_id="ex-1")
     assert C.open_signed_envelope(
         env, channel_label="Relay", executor_id="ex-2", audience=C._AUDIENCE_RELAY,
@@ -851,7 +851,7 @@ def test_envelope_nao_pode_ser_reapresentado():
 
 
 def test_envelope_velho_e_recusado():
-    """Envelope capturado ontem nao pode continuar valido (assinatura legitima)."""
+    """An envelope captured yesterday must not stay valid (legitimate signature)."""
     payload = '{"type":"control","action":"revoked"}'
     ts = f"{time.time() - (C._RELAY_FRESHNESS_WINDOW + 10):.3f}"
     nonce = "n" * 32
@@ -877,19 +877,19 @@ def test_envelope_adulterado_e_recusado():
 
 
 def test_nonces_expirados_saem_sem_evictar_validos(monkeypatch):
-    """Purga por prefixo: com o TTL fixo, expirado e sempre o comeco do dict."""
+    """Prefix purge: with a fixed TTL, the expired entries are always the start of the dict."""
     monkeypatch.setattr(C, "_seen_relay_nonces", {})
     agora = time.monotonic()
     for i in range(10):
-        C._seen_relay_nonces[f"velho-{i}|ex-1"] = agora - 1  # ja vencidos
+        C._seen_relay_nonces[f"velho-{i}|ex-1"] = agora - 1  # already expired
     assert C._nonce_already_seen("novo", "ex-1") is False
     assert not [k for k in C._seen_relay_nonces if k.startswith("velho-")]
     assert "novo|ex-1" in C._seen_relay_nonces
 
 
 def test_evicao_de_nonce_valido_grita(monkeypatch, caplog):
-    """O cache irmao do executor loga; este descartava em silencio absoluto e o
-    operador nao tinha como saber que o anti-replay estava desligado."""
+    """The executor's sibling cache logs; this one discarded in absolute silence and
+    the operator had no way of knowing that anti-replay was off."""
     monkeypatch.setattr(C, "_RELAY_NONCE_MAX", 8)
     monkeypatch.setattr(C, "_seen_relay_nonces", {})
     monkeypatch.setattr(
@@ -897,7 +897,7 @@ def test_evicao_de_nonce_valido_grita(monkeypatch, caplog):
     )
     agora = time.monotonic()
     for i in range(8):
-        C._seen_relay_nonces[f"vivo-{i}|ex-1"] = agora + 999  # todos ainda validos
+        C._seen_relay_nonces[f"vivo-{i}|ex-1"] = agora + 999  # all still valid
 
     with caplog.at_level("ERROR"):
         assert C._nonce_already_seen("novo", "ex-1") is False
@@ -914,10 +914,10 @@ def test_envelope_sem_assinatura_e_recusado():
     ) is None
 
 
-# ── B14: presenca por CAS ────────────────────────────────────────────────────
+# ── B14: presence via CAS ────────────────────────────────────────────────────
 
 async def test_release_presence_respeita_o_dono_atual(monkeypatch):
-    """Worker perdedor nao pode apagar a presenca da sessao viva de outro worker."""
+    """A losing worker must not delete the presence of another worker's live session."""
     store = {
         C._presence_key("ex-1"): "1",
         C._conn_owner_key("ex-1"): "token-do-worker-B",
@@ -965,9 +965,9 @@ async def test_renew_presence_e_fail_open_em_erro_de_redis(monkeypatch):
 
     monkeypatch.setattr(C, "_get_redis", _boom)
     monkeypatch.setattr(C, "_reset_redis_singleton", _noop)
-    # Tri-estado: None = "nao consegui perguntar". Continua fail-open no que
-    # importa (o WS de um executor saudavel nao cai por blip de Redis), mas nao
-    # se passa mais por "renovei" — quem chama reagenda a tentativa.
+    # Tri-state: None = "could not ask". Still fail-open where it
+    # matters (a healthy executor's WS does not drop over a Redis blip), but it no
+    # longer passes for "renewed" — the caller reschedules the attempt.
     assert await C._redis_renew_presence("ex-1", "tok") is None
 
 
@@ -984,16 +984,16 @@ def test_capacidade_inicial_respeita_o_default():
     assert conn.is_full() is False
 
 
-# Sanity: o handler nao deve mais depender de asyncio.sleep real nos testes.
+# Sanity: the handler should no longer depend on a real asyncio.sleep in the tests.
 def test_grace_period_configurado():
     assert ORF._DISCONNECT_GRACE_SECONDS > 0
     assert isinstance(asyncio.Queue, type)
 
 
-# ── P0: fila por conexao, coalescencia e flush no teardown ───────────────────
+# ── P0: per-connection queue, coalescing and flush on teardown ───────────────
 
 class _PipeGravador:
-    """Pipeline que registra os comandos enfileirados e quantas vezes executou."""
+    """Pipeline that records the enqueued commands and how many times it executed."""
 
     def __init__(self, log: list, execucoes: list):
         self.log = log
@@ -1038,8 +1038,8 @@ class _RedisGravador:
 
 
 async def test_lote_de_node_events_vira_um_unico_pipeline(monkeypatch, fake_conn):
-    """64 eventos custavam 64 round-trips Redis serializados no loop de
-    recepcao — era o que segurava o job_result final atras da telemetria."""
+    """64 events cost 64 serialized Redis round-trips in the receive
+    loop — that is what held the final job_result behind the telemetry."""
     rc = _RedisGravador()
     monkeypatch.setattr(RES, "_run_belongs_to_agent", _async_true)
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
@@ -1055,7 +1055,7 @@ async def test_lote_de_node_events_vira_um_unico_pipeline(monkeypatch, fake_conn
     assert len(rpushes) == 1 and len(rpushes[0][2]) == 64
     publishes = [c for c in rc.log if c[0] == "publish"]
     assert len(publishes) == 64
-    # A ordem dentro do run e a de chegada — o canvas reconstroi o grafo por ela.
+    # The order within the run is arrival order — the canvas rebuilds the graph from it.
     assert [json.loads(p[2])["node"] for p in publishes] == [f"n{i}" for i in range(64)]
 
 
@@ -1074,7 +1074,7 @@ async def test_lote_agrupa_por_run_sem_misturar(monkeypatch, fake_conn):
 
 
 async def test_lote_nao_publica_run_alheio(monkeypatch, fake_conn):
-    """A autorizacao e por run, uma vez por lote — agrupar nao pode afrouxa-la."""
+    """Authorization is per run, once per batch — grouping must not loosen it."""
     rc = _RedisGravador()
 
     async def _belongs(_aid, run_id):
@@ -1091,8 +1091,8 @@ async def test_lote_nao_publica_run_alheio(monkeypatch, fake_conn):
 
 
 async def test_drenadora_preserva_a_ordem_entre_node_event_e_job_result(monkeypatch, fake_conn):
-    """Se os dois caminhos drenassem em paralelo, o __workflow_complete__ podia
-    ultrapassar os ultimos eventos de no."""
+    """If both paths drained in parallel, __workflow_complete__ could
+    overtake the last node events."""
     ordem: list[str] = []
 
     async def _publica(_aid, msgs):
@@ -1115,8 +1115,8 @@ async def test_drenadora_preserva_a_ordem_entre_node_event_e_job_result(monkeypa
 
 
 async def test_drenadora_faz_flush_antes_de_encerrar(monkeypatch, fake_conn):
-    """Sem o flush no teardown do WS, os ultimos eventos do run se perdem e o
-    painel do usuario gira para sempre num run que ja terminou."""
+    """Without the flush on WS teardown, the run's last events are lost and the
+    user's panel spins forever on a run that has already finished."""
     publicados: list[dict] = []
 
     async def _publica(_aid, msgs):
@@ -1132,7 +1132,7 @@ async def test_drenadora_faz_flush_antes_de_encerrar(monkeypatch, fake_conn):
 
 
 async def test_drenadora_sobrevive_a_erro_de_um_handler(monkeypatch, fake_conn):
-    """Um job_result problematico nao pode matar a drenagem do resto da conexao."""
+    """A problematic job_result must not kill the draining of the rest of the connection."""
     publicados: list[dict] = []
 
     async def _publica(_aid, msgs):
@@ -1165,7 +1165,7 @@ def test_sync_event_tem_rate_limit(monkeypatch):
 
 
 def test_sync_event_terminal_nao_e_descartado(monkeypatch):
-    """Perder o sync_complete deixa a barra de progresso presa para sempre."""
+    """Losing sync_complete leaves the progress bar stuck forever."""
     monkeypatch.setattr(P, "_rate_state", {})
     for _ in range(P._SYNC_EVENT_RATE_LIMIT + 50):
         P._sync_event_allowed("ex-1", {"event": "file_uploaded"})
@@ -1173,11 +1173,11 @@ def test_sync_event_terminal_nao_e_descartado(monkeypatch):
 
 
 def test_sync_error_nao_e_isento_do_rate_limit(monkeypatch):
-    """`sync_error`/`conflict_detected` sao emitidos POR ARQUIVO.
+    """`sync_error`/`conflict_detected` are emitted PER FILE.
 
-    Isenta-los devolvia integralmente o flood que o teto existe para conter:
-    um GeoSync de milhares de arquivos com o MinIO fora do ar virava milhares de
-    mensagens isentas, que enchiam a fila da conexao.
+    Exempting them brought back in full the flood the ceiling exists to contain:
+    a GeoSync of thousands of files with MinIO down turned into thousands of
+    exempt messages, which filled the connection's queue.
     """
     monkeypatch.setattr(P, "_rate_state", {})
     permitidos = sum(
@@ -1190,7 +1190,7 @@ def test_sync_error_nao_e_isento_do_rate_limit(monkeypatch):
 
 
 def test_balde_de_problema_nao_consome_a_cota_do_progresso(monkeypatch):
-    """Uma rajada de erro nao pode parar a barra de progresso, nem o contrario."""
+    """A burst of errors must not stop the progress bar, nor the other way around."""
     monkeypatch.setattr(P, "_rate_state", {})
     for i in range(P._SYNC_PROBLEM_RATE_LIMIT + 200):
         P._sync_event_allowed("ex-1", {"event": "sync_error", "dataset": f"d{i}"})
@@ -1236,7 +1236,7 @@ def _rc_fixo(monkeypatch, rc):
         return rc
 
     monkeypatch.setattr(C, "_get_redis", _get_rc)
-    # Registry proprio: outro teste da suite substitui o singleton do modulo.
+    # Own registry: another test in the suite replaces the module's singleton.
     return C.ExecutorConnectionRegistry()
 
 
@@ -1250,7 +1250,7 @@ async def test_ack_limpa_em_um_round_trip(monkeypatch):
 
 
 async def test_ack_de_impostor_continua_recusado(monkeypatch):
-    """SEG: o ACK so limpa jobs despachados para ESTE executor."""
+    """SEC: the ACK only clears jobs dispatched to THIS executor."""
     rc = _RedisEval("ex-2|123.4")
     reg = _rc_fixo(monkeypatch, rc)
     assert await reg.clear_pending_ack(
@@ -1266,10 +1266,10 @@ async def test_ack_de_job_desconhecido_devolve_none(monkeypatch):
     ) is None
 
 
-# ── P: renovacao de presenca com throttle ────────────────────────────────────
+# ── P: throttled presence renewal ────────────────────────────────────────────
 
 async def test_presenca_nao_renova_a_cada_mensagem(monkeypatch):
-    """Eram 2 EVAL por capacity (a cada 10s) para um TTL de 120s."""
+    """There were 2 EVALs per capacity (every 10s) for a 120s TTL."""
     renovacoes = []
 
     async def _renew(executor_id, token):
@@ -1281,7 +1281,7 @@ async def test_presenca_nao_renova_a_cada_mensagem(monkeypatch):
     conn = C.ExecutorConnection(executor_id="ex-1", websocket=None)
     reg._connections["ex-1"] = conn
 
-    for _ in range(12):  # ~2 minutos de capacity a cada 10s
+    for _ in range(12):  # ~2 minutes of capacity every 10s
         await reg.update_capacity("ex-1", dict(C._DEFAULT_CAPACITY))
     assert renovacoes == []
 
@@ -1291,17 +1291,17 @@ async def test_presenca_nao_renova_a_cada_mensagem(monkeypatch):
 
 
 async def test_falha_de_redis_nao_conta_como_renovacao(monkeypatch):
-    """A12: um blip de Redis virava 'renovei' por um intervalo inteiro.
+    """A12: a Redis blip turned into 'renewed' for an entire interval.
 
-    Combinado com o fail-open de `_redis_renew_presence`, a chave de presenca
-    (TTL 120s) expirava com o WebSocket vivo e o `orphan_runs_watchdog` matava
-    runs que estavam progredindo.
+    Combined with the fail-open of `_redis_renew_presence`, the presence key
+    (TTL 120s) expired with the WebSocket alive and `orphan_runs_watchdog` killed
+    runs that were making progress.
     """
     tentativas = []
 
     async def _renew(executor_id, token):
         tentativas.append(executor_id)
-        return None  # Redis fora: nao consegui perguntar
+        return None  # Redis down: could not ask
 
     monkeypatch.setattr(C, "_redis_renew_presence", _renew)
     reg = C.ExecutorConnectionRegistry()
@@ -1312,15 +1312,15 @@ async def test_falha_de_redis_nao_conta_como_renovacao(monkeypatch):
     await reg.update_capacity("ex-1", dict(C._DEFAULT_CAPACITY))
     assert tentativas == ["ex-1"]
 
-    # A falha NAO carimbou renovacao: passados poucos segundos ja tentamos de
-    # novo, em vez de esperar o intervalo inteiro com a chave envelhecendo.
+    # The failure did NOT stamp a renewal: a few seconds later we already try
+    # again, instead of waiting the whole interval with the key aging.
     conn.last_presence_renew -= C._PRESENCE_RENEW_RETRY_INTERVAL
     await reg.update_capacity("ex-1", dict(C._DEFAULT_CAPACITY))
     assert tentativas == ["ex-1", "ex-1"]
 
 
 async def test_renovacao_confirmada_carimba_o_throttle(monkeypatch):
-    """O throttle continua valendo quando a renovacao de fato aconteceu."""
+    """The throttle still applies when the renewal actually happened."""
     tentativas = []
 
     async def _renew(executor_id, token):
@@ -1334,13 +1334,13 @@ async def test_renovacao_confirmada_carimba_o_throttle(monkeypatch):
 
     conn.last_presence_renew -= C._PRESENCE_RENEW_INTERVAL + 1
     await reg.update_capacity("ex-1", dict(C._DEFAULT_CAPACITY))
-    # Uma renovacao confirmada zera o relogio: a proxima mensagem nao repete.
+    # A confirmed renewal resets the clock: the next message does not repeat it.
     await reg.update_capacity("ex-1", dict(C._DEFAULT_CAPACITY))
     assert tentativas == ["ex-1"]
 
 
 async def test_perda_de_posse_ainda_derruba_o_ws_duplicado(monkeypatch):
-    """False (outro worker e o dono) continua fechando esta sessao."""
+    """False (another worker is the owner) still closes this session."""
     async def _renew(_executor_id, _token):
         return False
 
@@ -1363,26 +1363,26 @@ async def test_perda_de_posse_ainda_derruba_o_ws_duplicado(monkeypatch):
 
 
 def test_folga_de_renovacao_cobre_mais_de_uma_falha():
-    """Com TTL/3 uma unica renovacao perdida ja encostava no vencimento."""
+    """With TTL/3 a single missed renewal already brushed up against expiry."""
     assert C._PRESENCE_TTL / C._PRESENCE_RENEW_INTERVAL >= 4
 
 
-# -- A1: job_result nunca e descartado pela fila da conexao -------------------
+# -- A1: job_result is never discarded by the connection queue ----------------
 
 def _node_event(i):
-    """Sem `kind` — o default do produtor, que conta como CICLO DE VIDA."""
+    """No `kind` — the producer's default, which counts as LIFECYCLE."""
     return ("node_event", {"run_id": "run-1", "node": f"n{i}"}, 10)
 
 
 def _stdout_event(i):
-    """Telemetria: e so isto que pode ser sacrificado quando a fila enche."""
+    """Telemetry: this is the only thing that may be sacrificed when the queue fills up."""
     return ("node_event", {"run_id": "run-1", "node": f"n{i}", "kind": "stdout"}, 10)
 
 
 async def test_job_result_nao_e_descartado_com_a_fila_cheia(monkeypatch):
-    """job_result NUNCA e descartado: com a fila cheia vai INLINE na hora. Antes
-    tentava abrir vaga sacrificando telemetria; agora vai direto ao inline — mais
-    simples e igualmente sem perda. Perde-lo penduraria o run em 'running'."""
+    """job_result is NEVER discarded: with the queue full it goes INLINE right away. Before,
+    it tried to open a slot by sacrificing telemetry; now it goes straight inline —
+    simpler and equally lossless. Losing it would leave the run hanging in 'running'."""
     inbox = IB._InboxQueue(maxsize=4)
     for i in range(4):
         inbox.put_nowait(_stdout_event(i))
@@ -1398,20 +1398,20 @@ async def test_job_result_nao_e_descartado_com_a_fila_cheia(monkeypatch):
         "ex-1", inbox, descartes, "job_result", {"job_id": "j1"}, 10,
     )
 
-    # Processado inline; nao enfileirado, e a telemetria da fila fica intacta
-    # (nao sacrificamos telemetria para abrir vaga — o inline ja resolve).
+    # Processed inline; not enqueued, and the queue's telemetry stays intact
+    # (we do not sacrifice telemetry to open a slot — inline already solves it).
     assert processados == ["j1"]
     assert inbox.qsize() == 4
     assert descartes["total"] == 0
 
 
 async def test_telemetria_continua_sendo_descartada_com_a_fila_cheia():
-    """A otimizacao nao e desfeita: STDOUT em fila cheia continua caindo.
+    """The optimization is not undone: STDOUT on a full queue is still dropped.
 
-    Antes este teste mandava um node_event SEM `kind` e exigia que ele fosse
-    descartado — ou seja, codificava o proprio bug: `kind` ausente e o default
-    do produtor para ciclo de vida, e era assim que o `completed` de um no
-    sumia. Agora o descarte vale so para quem se declara telemetria.
+    Before, this test sent a node_event WITHOUT `kind` and required it to be
+    discarded — that is, it encoded the bug itself: a missing `kind` is the producer's
+    default for lifecycle, and that is how a node's `completed`
+    vanished. Now the discard only applies to whoever declares itself telemetry.
     """
     inbox = IB._InboxQueue(maxsize=2)
     for i in range(2):
@@ -1427,7 +1427,7 @@ async def test_telemetria_continua_sendo_descartada_com_a_fila_cheia():
 
 
 async def test_job_result_sem_telemetria_para_descartar_vai_inline(monkeypatch):
-    """Ultimo recurso do contrato: bloquear o loop custa menos que perder o run."""
+    """The contract's last resort: blocking the loop costs less than losing the run."""
     inbox = IB._InboxQueue(maxsize=2)
     inbox.put_nowait(("job_result", {"job_id": "a"}, 10))
     inbox.put_nowait(("job_result", {"job_id": "b"}, 10))
@@ -1441,15 +1441,15 @@ async def test_job_result_sem_telemetria_para_descartar_vai_inline(monkeypatch):
         "ex-1", inbox, IB._novo_contador_de_descartes(), "job_result", {"job_id": "c"}, 10,
     )
     assert processados == ["c"]
-    assert inbox.qsize() == 2  # os dois anteriores continuam na fila
+    assert inbox.qsize() == 2  # the two previous ones are still in the queue
 
 
-# -- A38: cancelar a drenadora nao pode cortar um commit dividido -------------
+# -- A38: cancelling the drainer must not cut a split commit ------------------
 
 async def test_cancelar_a_drenadora_nao_corta_o_job_result_no_meio(monkeypatch):
-    """A38: um cancel entre o lpush de `run_results` e o publish do
-    `__workflow_complete__` deixava o run terminal no banco e o canvas girando
-    para sempre."""
+    """A38: a cancel between the lpush to `run_results` and the publish of
+    `__workflow_complete__` left the run terminal in the database and the canvas spinning
+    forever."""
     fases = []
     entrou = asyncio.Event()
     libera = asyncio.Event()
@@ -1471,18 +1471,18 @@ async def test_cancelar_a_drenadora_nao_corta_o_job_result_no_meio(monkeypatch):
     await asyncio.sleep(0)
     assert fases == ["inicio"]
 
-    # A gravacao segue viva e blindada: o teardown espera por ela.
+    # The write stays alive and shielded: the teardown waits for it.
     assert inflight
     libera.set()
     await asyncio.wait(set(inflight), timeout=1)
     assert fases == ["inicio", "fim"]
 
 
-# -- A39: cooldown de banco nao pode comer job_result -------------------------
+# -- A39: a database cooldown must not eat job_result -------------------------
 
 async def test_cooldown_de_banco_nao_descarta_job_result(monkeypatch, fake_conn):
-    """A39: um erro transitorio de DB armava 2s de cooldown e TODOS os
-    job_result daquela janela sumiam — cada um pendurando um run."""
+    """A39: a transient DB error armed a 2s cooldown and ALL the
+    job_results in that window vanished — each one leaving a run hanging."""
     rc = _FakeRedis()
     fake_conn.db_auth_cooldown_until = time.monotonic() + 60
     monkeypatch.setattr(P, "_rate_state", {})
@@ -1496,7 +1496,7 @@ async def test_cooldown_de_banco_nao_descarta_job_result(monkeypatch, fake_conn)
 
 
 async def test_leitura_do_run_retenta_falha_transitoria(monkeypatch, fake_conn):
-    """Reinicio de pgbouncer (~200ms) nao pode custar o resultado do run."""
+    """A pgbouncer restart (~200ms) must not cost the run's result."""
     rc = _FakeRedis()
     tentativas = []
 
@@ -1519,14 +1519,14 @@ async def test_leitura_do_run_retenta_falha_transitoria(monkeypatch, fake_conn):
 
 
 async def test_job_result_perdido_fecha_o_run_em_vez_de_pendura_lo(monkeypatch, fake_conn):
-    """Contrato: se o resultado for de fato perdido, o run vira falho — nunca
-    fica em 'running' para sempre."""
+    """Contract: if the result is actually lost, the run becomes failed — it never
+    stays in 'running' forever."""
     rc = _FakeRedis()
 
     async def _explode(_run_id):
         raise RuntimeError("pool esgotado")
 
-    # Posse ja provada por node_events anteriores deste mesmo run.
+    # Ownership already proven by earlier node_events of this same run.
     fake_conn.run_auth_cache["run-1"] = (True, time.monotonic() + 60)
     monkeypatch.setattr(P, "_rate_state", {})
     monkeypatch.setattr(RES, "_JOB_RESULT_DB_RETRY_DELAY", 0.0)
@@ -1537,13 +1537,13 @@ async def test_job_result_perdido_fecha_o_run_em_vez_de_pendura_lo(monkeypatch, 
 
     juntos = [json.loads(w) for w in rc.writes]
     assert any(p.get("task_id") == "run-1" and p.get("status") == "failed" for p in juntos)
-    # E o canvas recebe a conclusao, senao o painel gira para sempre.
+    # And the canvas receives the completion, otherwise the panel spins forever.
     assert any(p.get("node") == "__workflow_complete__" for p in juntos)
 
 
 async def test_run_alheio_nao_e_fechado_com_o_banco_fora(monkeypatch, fake_conn):
-    """SEG: sem posse provada, banco fora continua fail-closed — um executor
-    comprometido nao pode falhar runs de outro tenant durante o incidente."""
+    """SEC: without proven ownership, a database outage stays fail-closed — a compromised
+    executor must not fail another tenant's runs during the incident."""
     rc = _FakeRedis()
 
     async def _explode(_run_id):
@@ -1559,8 +1559,8 @@ async def test_run_alheio_nao_e_fechado_com_o_banco_fora(monkeypatch, fake_conn)
 
 
 async def test_teardown_resgata_job_result_que_ficou_na_fila(monkeypatch):
-    """A drenadora cancelada deixa a fila cheia: telemetria pode sumir, o
-    resultado nao — ele e a ultima mensagem do run."""
+    """The cancelled drainer leaves the queue full: telemetry may vanish, the
+    result may not — it is the run's last message."""
     inbox = IB._InboxQueue(maxsize=10)
     inbox.put_nowait(("node_event", {"run_id": "run-1", "node": "n1"}, 10))
     inbox.put_nowait(("job_result", {"job_id": "run-1", "run_id": "run-1"}, 10))
@@ -1575,7 +1575,7 @@ async def test_teardown_resgata_job_result_que_ficou_na_fila(monkeypatch):
 
 
 async def test_resgate_que_falha_fecha_o_run(monkeypatch, fake_conn):
-    """Se nem o resgate funcionar, o run vira falho — nunca fica em 'running'."""
+    """If not even the rescue works, the run becomes failed — it never stays in 'running'."""
     rc = _FakeRedis()
     inbox = IB._InboxQueue(maxsize=10)
     inbox.put_nowait(("job_result", {"job_id": "run-1", "run_id": "run-1"}, 10))
@@ -1592,13 +1592,13 @@ async def test_resgate_que_falha_fecha_o_run(monkeypatch, fake_conn):
     assert any(p.get("task_id") == "run-1" and p.get("status") == "failed" for p in juntos)
 
 
-# ── Back-pressure: ciclo de vida nunca e descartado ─────────────────────────
+# ── Back-pressure: lifecycle is never discarded ─────────────────────────────
 #
-# O MR de desempenho trocou o `await _handle_node_event(...)` inline por uma
-# fila com descarte. Sob pressao, o `completed` de um no passou a cair no MESMO
-# `return` de uma linha de stdout — e o no ficava girando para sempre no canvas,
-# com o run ja concluido no banco e no log do executor. Estes testes travam a
-# regra que devolve a garantia: so telemetria pode ser perdida.
+# The performance MR replaced the inline `await _handle_node_event(...)` with a
+# queue with discarding. Under pressure, a node's `completed` started falling into the
+# SAME `return` as a stdout line — and the node kept spinning forever on the canvas,
+# with the run already completed in the database and in the executor's log. These
+# tests lock in the rule that restores the guarantee: only telemetry may be lost.
 
 def _ev(node: str, *, kind: str = "lifecycle", status: str = "completed") -> tuple:
     return ("node_event", {"run_id": "r", "node": node, "kind": kind, "status": status}, 10)
@@ -1609,11 +1609,11 @@ def _nos_na_fila(inbox) -> list:
 
 
 async def test_lifecycle_e_descartado_com_a_fila_cheia():
-    """Contrato NOVO: sob fila cheia, o ciclo de vida e descartavel como a
-    telemetria. Perder um `completed` degrada honestamente — o no vira 'unknown'
-    no fim do run (completeExecution) e o watchdog do cliente recupera o canal.
-    Nao vale back-pressure aqui: a causa real do travamento era de transporte
-    (Safari), hoje coberta por heartbeat+watchdog."""
+    """NEW contract: under a full queue, lifecycle is discardable just like
+    telemetry. Losing a `completed` degrades honestly — the node becomes 'unknown'
+    at the end of the run (completeExecution) and the client's watchdog recovers the channel.
+    Back-pressure does not apply here: the real cause of the hang was transport
+    (Safari), now covered by heartbeat+watchdog."""
     inbox = IB._InboxQueue(maxsize=2)
     inbox.put_nowait(_ev("n1", kind="stdout", status="log"))
     inbox.put_nowait(_ev("n2", kind="stdout", status="log"))
@@ -1624,13 +1624,13 @@ async def test_lifecycle_e_descartado_com_a_fila_cheia():
         {"run_id": "r", "node": "n3", "kind": "lifecycle", "status": "completed"}, 10,
     )
 
-    # Descartado: nao furou a fila nem esperou vaga.
+    # Discarded: did not jump the queue or wait for a slot.
     assert _nos_na_fila(inbox) == ["n1", "n2"]
     assert descartes["total"] == 1
 
 
 async def test_stdout_continua_descartavel_com_a_fila_cheia():
-    """A fila existe para absorver telemetria — ela segue sendo o que cai."""
+    """The queue exists to absorb telemetry — it is still what gets dropped."""
     inbox = IB._InboxQueue(maxsize=2)
     inbox.put_nowait(_ev("n1"))
     inbox.put_nowait(_ev("n2"))
@@ -1645,7 +1645,7 @@ async def test_stdout_continua_descartavel_com_a_fila_cheia():
     assert descartes["total"] == 1
 
 
-# ── sync_complete: o único que ainda paga back-pressure ─────────────────────
+# ── sync_complete: the only one that still pays back-pressure ───────────────
 
 async def test_sync_complete_espera_vaga_em_vez_de_ser_descartado():
     inbox = IB._InboxQueue(maxsize=1)

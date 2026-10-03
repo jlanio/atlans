@@ -1,19 +1,19 @@
 // web/app/components/home/i18n/secoes/entrada.ts
 //
-// Os textos da ENTRADA — o modal de login/cadastro sobre o globo e os painéis
-// de recuperar, redefinir e verificar —, agrupados pelo componente que os
-// mostra. O português é o texto de sempre, byte a byte.
+// The SIGN-IN texts — the login/sign-up modal over the globe and the recover,
+// reset and verify panels —, grouped by the component that shows them. The
+// Portuguese is the usual text, byte for byte.
 //
-// As recusas FIXAS do servidor (credencial inválida, conta bloqueada, e-mail
-// não verificado, usuário já em uso, token inválido, "link reenviado") têm
-// aqui o seu texto: em inglês e espanhol a tela o escolhe pelo status (e pelo
-// `X-Error-Code`); em português segue a mensagem do servidor, a de sempre. O
-// que não é recusa do servidor (o limite por conexão, o proxy fora do ar) tem
-// o seu próprio texto — ver entrada/recusas.ts. O que o servidor
-// escreve caso a caso (a validação campo a campo) aparece como veio. Os componentes de
-// `components/auth` (campo de senha, medidor de força, bloco de erro) leem o
-// grupo `auth` daqui — hoje só a entrada da Home os usa, e fora da Home o
-// escopo do idioma os mantém em português.
+// The server's FIXED rejections (invalid credential, locked account, unverified
+// e-mail, username already taken, invalid token, "link reenviado") have their
+// text here: in English and Spanish the screen picks it by status (and by
+// `X-Error-Code`); in Portuguese the server message applies, as always. What is
+// not a server rejection (the per-connection limit, the proxy down) has its own
+// text — see entrada/recusas.ts. What the server writes case by case (the
+// field-by-field validation) shows up as it came. The components in
+// `components/auth` (password field, strength meter, error block) read the
+// `auth` group from here — today only the Home sign-in uses them, and outside
+// the Home the language scope keeps them in Portuguese.
 
 export const pt = {
   modal: {
@@ -50,10 +50,10 @@ export const pt = {
     naoTemConta: "Não tem conta?",
     criarConta: "Criar conta",
     erroAoIniciarSessao: "Erro ao iniciar sessão. Tente novamente.",
-    /** Quando o servidor recusa sem mandar mensagem. */
+    /** When the server rejects without sending a message. */
     erroAoEntrar: "Erro ao tentar fazer login.",
     semConexao: "Sem conexão com o servidor. Verifique sua rede.",
-    // As recusas fixas do POST /auth/login (em português vale a do servidor).
+    // The fixed rejections of POST /auth/login (in Portuguese the server's applies).
     credenciaisInvalidas: "Credenciais inválidas.",
     emailNaoVerificado: "E-mail não verificado. Verifique sua caixa de entrada ou solicite um novo link.",
     contaIndisponivel: "Esta conta não pode entrar. Entre em contato com o administrador.",
@@ -61,12 +61,12 @@ export const pt = {
       minutos
         ? `Conta bloqueada por excesso de tentativas. Tente novamente em ${minutos} ${minutos === 1 ? "minuto" : "minutos"}.`
         : "Conta bloqueada por excesso de tentativas. Tente novamente mais tarde.",
-    /** O limite por conexão (o 429 do limitador, não o bloqueio da conta). */
+    /** The per-connection limit (the limiter's 429, not the account lockout). */
     muitasTentativas: "Muitas tentativas de login desta conexão. Aguarde um minuto e tente de novo.",
   },
   formularioDeCadastro: {
     usuario: "Usuário",
-    /** O `title` do campo: a regra que o `pattern` confere. */
+    /** The field's `title`: the rule the `pattern` checks. */
     regraDoUsuario: "Apenas letras minúsculas, números e underscore (_)",
     exemploDeUsuario: "letras minúsculas, números e _",
     email: "E-mail",

@@ -1,26 +1,28 @@
 # tests/unit/test_attribute_join.py
 """
-Join por atributo — casa duas entradas por uma coluna-chave.
+Join by attribute — matches two inputs by a key column.
 
-O catalogo nao tinha isso: `Merge` mescla branches do fluxo, `Aggregate` empilha
-linhas, `SpatialJoin` casa por geometria. Trazer a populacao de uma tabela para
-a malha de setores pelo codigo do setor so era possivel escrevendo um script.
+The catalog didn't have this: `Merge` merges workflow branches, `Aggregate`
+stacks rows, `SpatialJoin` matches by geometry. Bringing the population from a
+table onto the census tract grid by tract code was only possible by writing a
+script.
 
-Os testes se concentram no que FALHA EM SILENCIO num merge, que e onde este no
-ganha o direito de existir em vez de o usuario chamar `pd.merge` num
+The tests focus on what FAILS SILENTLY in a merge, which is where this node earns
+the right to exist instead of the user calling `pd.merge` in a
 PythonScript:
 
-  MULTIPLICA    chave repetida em B duplica as feicoes de A, e o run termina em
-                verde com mais feicoes do que entrou.
+  MULTIPLIES    a repeated key in B duplicates A's features, and the run ends
+                green with more features than went in.
 
-  NAO CASA      chave texto de um lado e numero do outro nao casa NADA, e o
-                pandas nao reclama — a coluna inteira volta nula.
+  NO MATCH      a text key on one side and a number on the other matches
+                NOTHING, and pandas doesn't complain — the whole column comes
+                back null.
 
-  RENOMEIA      coluna de mesmo nome nos dois lados vira `_x`/`_y`, e o no
-                seguinte procura uma coluna que nao existe mais.
+  RENAMES       a column with the same name on both sides becomes `_x`/`_y`, and
+                the next node looks for a column that no longer exists.
 
-  PERDE O TIPO  `B.merge(A)` devolve DataFrame comum: geometria e CRS somem e os
-                nos espaciais seguintes falham.
+  LOSES TYPE    `B.merge(A)` returns a plain DataFrame: geometry and CRS vanish
+                and the following spatial nodes fail.
 """
 import asyncio
 
@@ -68,17 +70,17 @@ def _rodar(no, A, B):
 # ── O caminho feliz ──────────────────────────────────────────────────────────
 
 def test_traz_so_a_coluna_pedida(A, B):
-    """Recortar B ANTES do merge e o que impede colunas nao pedidas de entrarem
-    de carona — e nomes iguais aos de A de virarem `_x`/`_y`."""
+    """Slicing B BEFORE the merge is what keeps unrequested columns from tagging
+    along — and names equal to A's from becoming `_x`/`_y`."""
     r = _rodar(_no(), A, B)
     assert "populacao" in r.columns
     assert "renda" not in r.columns
 
 
 def test_preserva_geometria_e_crs(A, B):
-    """`A.merge(b)`, e nao `b.merge(A)`: chamado a partir do GeoDataFrame o
-    resultado continua GeoDataFrame. Ao contrario viraria DataFrame comum e os
-    nos espaciais seguintes falhariam com 'sem geometria'."""
+    """`A.merge(b)`, not `b.merge(A)`: called from the GeoDataFrame, the result
+    stays a GeoDataFrame. The other way around it would become a plain DataFrame
+    and the following spatial nodes would fail with 'sem geometria' (no geometry)."""
     r = _rodar(_no(), A, B)
     assert isinstance(r, gpd.GeoDataFrame)
     assert r.crs == A.crs
@@ -88,7 +90,7 @@ def test_preserva_geometria_e_crs(A, B):
 def test_vazio_traz_todas_as_colunas_menos_a_chave(A, B):
     r = _rodar(_no(columns=""), A, B)
     assert {"populacao", "renda"} <= set(r.columns)
-    # A chave nao e duplicada.
+    # The key is not duplicated.
     assert list(r.columns).count("cod") == 1
 
 
@@ -96,11 +98,11 @@ def test_chave_com_nome_diferente_nos_dois_lados(A):
     b = pd.DataFrame({"setor": ["001", "002"], "populacao": [10, 20]})
     r = _rodar(_no(keyB="setor"), A, b)
     assert r.loc[r["cod"] == "001", "populacao"].iloc[0] == 10
-    # A chave de B nao sobra como coluna extra.
+    # B's key is not left over as an extra column.
     assert "setor" not in r.columns
 
 
-# ── Feicao sem par ───────────────────────────────────────────────────────────
+# ── Unmatched feature ────────────────────────────────────────────────────────
 
 def test_left_mantem_feicao_sem_correspondencia(A, B):
     r = _rodar(_no(how="left"), A, B)
@@ -127,7 +129,7 @@ def _b_duplicado():
 
 
 def test_duplicata_interrompe_por_padrao(A):
-    """Sem isto, 3 feicoes entram e 4 saem — e nada na tela indica."""
+    """Without this, 3 features go in and 4 come out — and nothing on the screen shows it."""
     with pytest.raises(ValueError) as e:
         _rodar(_no(), A, _b_duplicado())
     msg = str(e.value)
@@ -152,11 +154,11 @@ def test_duplicata_com_todas_multiplica_de_proposito(A):
     assert len(r) == 4
 
 
-# ── Os erros que o pandas nao daria ──────────────────────────────────────────
+# ── The errors pandas wouldn't raise ─────────────────────────────────────────
 
 def test_tipos_diferentes_interrompem(A):
-    """Texto de um lado e numero do outro nao casa NADA e o pandas nao avisa: a
-    coluna volta inteira nula e parece 'nenhum registro bateu'."""
+    """Text on one side and number on the other matches NOTHING and pandas doesn't
+    warn: the column comes back entirely null and looks like 'no record matched'."""
     b = pd.DataFrame({"cod": [1, 2, 3], "populacao": [10, 20, 30]})
     with pytest.raises(ValueError) as e:
         _rodar(_no(), A, b)
@@ -165,8 +167,8 @@ def test_tipos_diferentes_interrompem(A):
 
 
 def test_coluna_que_ja_existe_em_A_interrompe(A):
-    """Sem isto o pandas produz `nome_x`/`nome_y` e o proximo no procura uma
-    coluna que deixou de existir."""
+    """Without this pandas produces `nome_x`/`nome_y` and the next node looks for a
+    column that no longer exists."""
     b = pd.DataFrame({"cod": ["001"], "nome": ["outro"]})
     with pytest.raises(ValueError) as e:
         _rodar(_no(columns="nome"), A, b)
@@ -188,8 +190,8 @@ def test_mensagens_dizem_o_que_esta_disponivel(A, B, params, trecho):
 # ── Entradas ─────────────────────────────────────────────────────────────────
 
 def test_B_pode_ser_tabela_sem_geometria(A, B):
-    """O caso NORMAL: uma planilha de populacao, o retorno de uma consulta SQL.
-    `get_input_gdf` da classe base exigiria GeoDataFrame e recusaria."""
+    """The NORMAL case: a population spreadsheet, the result of an SQL query.
+    The base class's `get_input_gdf` would require a GeoDataFrame and refuse."""
     assert not isinstance(B, gpd.GeoDataFrame)
     r = _rodar(_no(), A, B)
     assert len(r) == 3
@@ -203,21 +205,21 @@ def test_entrada_nao_conectada_diz_o_que_chegou(A):
 
 
 def test_declara_duas_portas_de_entrada():
-    """E o que faz o canvas desenhar dois pontos de conexao e o editor preencher
-    o `to_key` da aresta. Um no sem portas declaradas recebe as duas arestas na
-    MESMA chave e perde uma delas."""
+    """It is what makes the canvas draw two connection points and the editor fill
+    in the edge's `to_key`. A node without declared ports receives both edges on
+    the SAME key and loses one of them."""
     d = NODE_REGISTRY["AttributeJoin"].description()
     assert [p["name"] for p in d["inputs"]] == ["layerA", "layerB"]
 
 
-# ── Defeitos achados na revisao da semana ────────────────────────────────────
+# ── Defects found in the week's review ───────────────────────────────────────
 
 def test_sem_par_nao_conta_nulo_legitimo_de_B(A):
-    """REGRESSAO: o "sem correspondência" era inferido de a coluna trazida estar
-    nula — o que conta como falta de par toda linha em que B tem NULO de
-    verdade. O log mandava procurar um problema de chave que não existe.
+    """REGRESSION: "no match" was inferred from the brought-in column being
+    null — which counts as unmatched every row where B has a genuine NULL. The
+    log sent people looking for a key problem that doesn't exist.
 
-    Aqui as tres chaves casam; dois valores de `populacao` sao nulos em B.
+    Here all three keys match; two `populacao` values are null in B.
     """
     B = pd.DataFrame({"cod": ["001", "002", "003"], "populacao": [None, None, 50]})
     no = _no(how="left", columns="populacao")
@@ -228,49 +230,49 @@ def test_sem_par_nao_conta_nulo_legitimo_de_B(A):
 
 
 def test_sem_par_continua_contando_quem_nao_casou(A, B):
-    """A contagem certa nao pode virar sempre zero: em B a chave '003' nao
-    existe, e essa feicao de A fica mesmo sem par."""
+    """The correct count must not always become zero: key '003' doesn't exist in B,
+    and that feature of A really is left unmatched."""
     no = _no(how="left")
     _rodar(no, A, B)
     assert any("1 sem correspondência" in linha for linha in no.logs), no.logs
 
 
 def test_pedir_a_propria_chave_de_B_em_columns(A):
-    """REGRESSAO: `columns` com o nome da chave de B duplicava a coluna no
-    recorte, `b[key_b]` deixava de ser Series, e a checagem de duplicata
-    quebrava com "'DataFrame' object has no attribute 'unique'" — um erro
-    interno, sem relacao com o que a pessoa pediu.
+    """REGRESSION: `columns` with B's key name duplicated the column in the
+    slice, `b[key_b]` stopped being a Series, and the duplicate check broke
+    with "'DataFrame' object has no attribute 'unique'" — an internal error,
+    unrelated to what the person asked for.
     """
     B = pd.DataFrame({"codigo": ["001", "002", "003"], "populacao": [1, 2, 3]})
     resultado = _rodar(_no(keyB="codigo", columns="codigo,populacao"), A, B)
 
     assert "populacao" in resultado.columns
-    # A chave de B nao volta como coluna: ja esta em A, com o nome de la.
+    # B's key doesn't come back as a column: it is already in A, under A's name.
     assert "codigo" not in resultado.columns
     assert list(resultado["populacao"]) == [1, 2, 3]
 
 
 def test_a_marca_interna_do_join_nao_vaza_para_a_saida(A, B):
-    """O `indicator` do merge e detalhe de implementacao: uma coluna a mais na
-    saida iria parar em tudo que vier depois — inclusive num arquivo salvo."""
+    """The merge's `indicator` is an implementation detail: an extra column in the
+    output would end up in everything downstream — including a saved file."""
     resultado = _rodar(_no(), A, B)
     assert not [c for c in resultado.columns if c.startswith("__")]
 
 
 def test_continua_geodataframe_depois_da_marca(A, B):
-    """A marca e removida DEPOIS do reempacotamento; o drop nao pode rebaixar o
-    resultado a DataFrame comum."""
+    """The marker is removed AFTER the repackaging; the drop must not demote the
+    result to a plain DataFrame."""
     resultado = _rodar(_no(), A, B)
     assert isinstance(resultado, gpd.GeoDataFrame)
     assert resultado.crs == A.crs
 
 
-# ── O campo de colunas virou lista de fichas ─────────────────────────────────
+# ── The columns field became a list of chips ─────────────────────────────────
 
 @pytest.mark.parametrize("guardado,esperado", [
     ('["populacao","renda"]', ["populacao", "renda"]),   # formato novo (JSON)
-    (["populacao", "renda"], ["populacao", "renda"]),    # lista de verdade
-    ("populacao, renda", ["populacao", "renda"]),        # formato ANTIGO, ja salvo
+    (["populacao", "renda"], ["populacao", "renda"]),    # a real list
+    ("populacao, renda", ["populacao", "renda"]),        # OLD format, already saved
     ("populacao", ["populacao"]),
     ("", []),
     (None, []),
@@ -278,30 +280,30 @@ def test_continua_geodataframe_depois_da_marca(A, B):
     ("  populacao ,, renda  ", ["populacao", "renda"]),
 ])
 def test_colunas_pedidas_aceita_os_dois_formatos(guardado, esperado):
-    """O campo passou a gravar JSON, mas as definitions ja salvas tem texto com
-    virgulas. Ler os dois e o que dispensa migrar a definition de todo workflow
-    que use o no — e colar "a, b, c" continua sendo o caminho rapido no campo
-    novo."""
+    """The field now stores JSON, but already-saved definitions have comma-separated
+    text. Reading both is what avoids migrating the definition of every workflow
+    that uses the node — and pasting "a, b, c" is still the quick path in the new
+    field."""
     from flow.nodes.action.attribute_join import _colunas_pedidas
     assert _colunas_pedidas(guardado) == esperado
 
 
 def test_json_quebrado_nao_engole_o_valor():
-    """Cair no formato de texto e melhor que devolver vazio: vazio significa
-    'traga todas as colunas', que e o oposto do que a pessoa pediu."""
+    """Falling back to the text format is better than returning empty: empty means
+    'bring all columns', which is the opposite of what the person asked for."""
     from flow.nodes.action.attribute_join import _colunas_pedidas
     assert _colunas_pedidas('["populacao", renda') == ['["populacao"', 'renda']
 
 
 def test_o_no_funciona_com_a_lista_em_json(A, B):
-    """Ponta a ponta: o valor que a tela grava tem de chegar ao merge."""
+    """End to end: the value the screen stores has to reach the merge."""
     resultado = _rodar(_no(columns='["populacao"]'), A, B)
     assert "populacao" in resultado.columns
     assert "renda" not in resultado.columns
 
 
 def test_o_no_continua_funcionando_com_o_formato_antigo(A, B):
-    """Workflow salvo antes da mudanca do campo nao pode mudar de comportamento."""
+    """A workflow saved before the field change must not change behavior."""
     resultado = _rodar(_no(columns="populacao"), A, B)
     assert "populacao" in resultado.columns
     assert "renda" not in resultado.columns

@@ -12,8 +12,8 @@ interface OutputPreviewProps {
 type OutputTab = "status" | "schema"
 
 /**
- * Painel direito — mostra saída do nó selecionado.
- * Tabs: Status (última execução) | Schema (campos declarados).
+ * Right panel — shows the selected node's output.
+ * Tabs: Status (last execution) | Schema (declared fields).
  */
 const OutputPreview = ({ nodeFound }: OutputPreviewProps) => {
   const statusWorkflow = useWorkflowExecutionStore(s => s.statusWorkflow)
@@ -23,9 +23,9 @@ const OutputPreview = ({ nodeFound }: OutputPreviewProps) => {
     n => n.id === nodeFound.id
   )
 
-  // As saídas configuradas, e não as do catálogo: no Script Python elas vêm de
-  // `output_vars`, e o painel mostrava sempre "result" mesmo depois de a pessoa
-  // ter renomeado as variáveis do próprio script.
+  // The configured outputs, not the catalog's: in the Python Script they come
+  // from `output_vars`, and the panel always showed "result" even after the
+  // person had renamed the script's own variables.
   const staticFields = saidasDoNo(nodeFound.data)
 
   const statusColorMap = STATUS_COLOR_MAP
@@ -62,7 +62,7 @@ const OutputPreview = ({ nodeFound }: OutputPreviewProps) => {
         </button>
       </div>
 
-      {/* Conteúdo da aba Status */}
+      {/* Content of the Status tab */}
       {tab === "status" && (
         <div className="flex flex-col gap-3 p-4 overflow-y-auto">
           {nodeStatus ? (
@@ -109,7 +109,7 @@ const OutputPreview = ({ nodeFound }: OutputPreviewProps) => {
         </div>
       )}
 
-      {/* Conteúdo da aba Schema */}
+      {/* Content of the Schema tab */}
       {tab === "schema" && (
         <div className="flex flex-col gap-2 p-4 overflow-y-auto">
           {staticFields.length === 0 ? (

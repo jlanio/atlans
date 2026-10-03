@@ -1,21 +1,22 @@
-"""A corrida de `version_number` em `create_version`.
+"""The `version_number` race in `create_version`.
 
-O número da versão é read-modify-write — lê o máximo e soma 1 — e a UNIQUE
-`uq_workflow_version` é a única árbitra. Dois saves simultâneos do mesmo
-workflow leem o mesmo máximo e o segundo INSERT viola; antes deste conserto a
-violação subia como erro inesperado e o trabalho de quem salvou virava um 500.
+The version number is read-modify-write — it reads the max and adds 1 — and the
+UNIQUE `uq_workflow_version` is the only arbiter. Two simultaneous saves of the
+same workflow read the same max and the second INSERT violates it; before this
+fix the violation surfaced as an unexpected error and the saver's work turned
+into a 500.
 
-Por que estes testes NÃO usam `asyncio.gather`: o SQLite em memória é
-`StaticPool` (o dialeto aiosqlite devolve StaticPool para qualquer URL que não
-seja arquivo, mesmo sem `poolclass=` explícito), então todas as sessões
-compartilham UMA conexão e duas corrotinas "concorrentes" são serializadas. A
-intercalação `SELECT max / SELECT max / INSERT / INSERT` não acontece, e um
-teste desses passaria por construção sem provar nada.
+Why these tests do NOT use `asyncio.gather`: the in-memory SQLite is a
+`StaticPool` (the aiosqlite dialect returns StaticPool for any URL that is not a
+file, even without an explicit `poolclass=`), so all sessions share ONE
+connection and two "concurrent" coroutines are serialized. The
+`SELECT max / SELECT max / INSERT / INSERT` interleaving does not happen, and
+such a test would pass by construction without proving anything.
 
-O que se faz em lugar disso: a linha colidente é plantada de verdade no banco, e
-a PRIMEIRA leitura do máximo devolve um valor velho — que é exatamente o que a
-sessão perdedora enxerga na janela entre o seu SELECT e o INSERT da vencedora. A
-constraint que dispara é a real, não um erro fabricado.
+What is done instead: the colliding row is actually planted in the database,
+and the FIRST read of the max returns a stale value — which is exactly what the
+losing session sees in the window between its SELECT and the winner's INSERT.
+The constraint that fires is the real one, not a fabricated error.
 """
 import pytest
 import pytest_asyncio
@@ -49,18 +50,18 @@ async def db():
 
 
 async def _plantar(db, *numeros):
-    """As versões que a sessão VENCEDORA já gravou."""
+    """The versions the WINNING session has already written."""
     for n in numeros:
         db.add(WorkflowVersion(workflow_hash=HASH, version_number=n, definition={"n": n}))
     await db.commit()
 
 
 class _MaximoVelho:
-    """Faz as N primeiras leituras do máximo devolverem um valor defasado.
+    """Makes the first N reads of the max return a stale value.
 
-    É o que a sessão perdedora de fato enxerga: ela leu antes de a vencedora
-    commitar. Só a leitura é falsificada — o INSERT vai ao banco real e viola a
-    constraint real.
+    That is what the losing session actually sees: it read before the winner
+    committed. Only the read is faked — the INSERT goes to the real database and
+    violates the real constraint.
     """
 
     def __init__(self, db, valor=0, vezes=1):
@@ -97,10 +98,10 @@ class TestReconvergencia:
 
     @pytest.mark.asyncio
     async def test_colisao_de_numero_reconverge_em_vez_de_levantar(self, db):
-        """O perdedor da corrida relê o máximo e leva o número seguinte.
+        """The loser of the race rereads the max and takes the next number.
 
-        Contra o código de hoje: a IntegrityError escapa de `create_version` e
-        sobe até o handler global, que responde 500 — e o save some.
+        Against today's code: the IntegrityError escapes `create_version` and
+        goes up to the global handler, which responds 500 — and the save is lost.
         """
         await _plantar(db, 1)
         crud = WorkflowCRUD(db)
@@ -118,13 +119,13 @@ class TestReconvergencia:
 
     @pytest.mark.asyncio
     async def test_o_retry_rele_o_maximo_em_vez_de_incrementar_o_que_falhou(self, db):
-        """Incrementar o número que falhou colidiria de novo com o vizinho.
+        """Incrementing the number that failed would collide with the neighbor again.
 
-        Com 1..5 plantadas e um máximo velho de 0: relendo, a segunda tentativa
-        vê 5 e grava 6. Incrementando, ela tentaria 2, depois 3, e esgotaria as
-        três tentativas sem gravar nada. O número final é o que distingue as
-        duas implementações — e é por isso que este teste planta cinco linhas e
-        não uma.
+        With 1..5 planted and a stale max of 0: by rereading, the second attempt
+        sees 5 and writes 6. By incrementing, it would try 2, then 3, and
+        exhaust the three attempts without writing anything. The final number
+        is what tells the two implementations apart — and that is why this test
+        plants five rows and not one.
         """
         await _plantar(db, 1, 2, 3, 4, 5)
         crud = WorkflowCRUD(db)
@@ -136,16 +137,16 @@ class TestReconvergencia:
 
     @pytest.mark.asyncio
     async def test_a_violacao_nao_escapa_do_savepoint(self, db):
-        """A transação do CHAMADOR sobrevive à colisão e ainda commita.
+        """The CALLER's transaction survives the collision and still commits.
 
-        É a diferença entre consertar e mascarar. No PostgreSQL uma violação
-        envenena a transação inteira, e esta roda dentro da transação de outra
-        pessoa — que ainda vai commitar trabalho não relacionado. Sem o
-        SAVEPOINT, capturar o erro só troca o 500 por um `PendingRollbackError`
-        no commit seguinte.
+        It is the difference between fixing and masking. In PostgreSQL a
+        violation poisons the whole transaction, and this one runs inside
+        someone else's transaction — which will still commit unrelated work.
+        Without the SAVEPOINT, catching the error only swaps the 500 for a
+        `PendingRollbackError` on the next commit.
 
-        Mutação que este teste mata: trocar `async with db.begin_nested()` por
-        um `try` solto em volta do `flush()`.
+        Mutation this test kills: replacing `async with db.begin_nested()` with
+        a bare `try` around `flush()`.
         """
         await _plantar(db, 1)
         crud = WorkflowCRUD(db)
@@ -153,8 +154,8 @@ class TestReconvergencia:
         with _MaximoVelho(db, valor=0, vezes=1):
             await crud.create_version(HASH, {"x": 1})
 
-        # O trabalho que o chamador faria depois — no move, o UPDATE em
-        # `schedules` e o DELETE em `artifacts`; aqui, uma linha qualquer.
+        # The work the caller would do afterwards — in move, the UPDATE on
+        # `schedules` and the DELETE on `artifacts`; here, any row.
         db.add(Workflow(id_hash="outro", name="depois da colisao", definition={}, workspace_id="ws"))
         await db.commit()
 
@@ -164,10 +165,10 @@ class TestReconvergencia:
 
     @pytest.mark.asyncio
     async def test_tentativas_esgotadas_viram_conflito_de_dominio(self, db):
-        """Três colisões seguidas param de ser azar — e 409 é honesto, 500 não.
+        """Three collisions in a row stop being bad luck — and 409 is honest, 500 is not.
 
-        O máximo velho é devolvido sempre, então toda tentativa recalcula o
-        mesmo número e colide. O cliente recebe algo acionável em vez de
+        The stale max is always returned, so every attempt recomputes the same
+        number and collides. The client gets something actionable instead of
         "Unexpected error occurred".
         """
         await _plantar(db, 1)
@@ -183,11 +184,11 @@ class TestReconvergencia:
 
     @pytest.mark.asyncio
     async def test_integrityerror_de_outra_constraint_nao_e_engolida(self, db):
-        """Só a colisão de versão reconverge; o resto sobe.
+        """Only the version collision reconverges; everything else surfaces.
 
-        Sem o filtro, uma FK quebrada (ou qualquer outra violação) viraria um
-        laço de três tentativas idênticas terminando num 409 que mente sobre a
-        causa.
+        Without the filter, a broken FK (or any other violation) would turn into
+        a loop of three identical attempts ending in a 409 that lies about the
+        cause.
         """
         crud = WorkflowCRUD(db)
         original = db.flush
@@ -208,8 +209,8 @@ class TestReconvergencia:
 
 
 class TestReconhecimentoDaViolacao:
-    """O filtro tem de reconhecer as DUAS mensagens — é o que faz o conserto
-    valer nos testes e em produção ao mesmo tempo."""
+    """The filter has to recognize BOTH messages — that is what makes the fix hold
+    in tests and in production at the same time."""
 
     def _erro(self, texto):
         return IntegrityError("INSERT ...", {}, Exception(texto))

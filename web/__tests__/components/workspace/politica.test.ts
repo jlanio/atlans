@@ -83,7 +83,7 @@ describe("politicaEmAlerta", () => {
   it("membro inativo alerta sempre; cadeia sem ninguém online só com o roteamento ligado", () => {
     expect(politicaEmAlerta(isolada({ primary: [membro({ status: "inactive" })] }))).toBe(true)
     expect(politicaEmAlerta(isolada({ available_primary: 0 }))).toBe(true)
-    // Com a flag desligada o legado ainda cai no pool: "vai falhar" seria mentira.
+    // With the flag off, legacy still falls to the pool: "will fail" would be a lie.
     expect(politicaEmAlerta(isolada({ available_primary: 0, policy_routing_enabled: false }))).toBe(false)
     expect(politicaEmAlerta(isolada())).toBe(false)
   })

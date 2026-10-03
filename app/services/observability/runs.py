@@ -1,6 +1,6 @@
 # app/services/observability/runs.py
-# Lógica de negócio e consultas de observabilidade extraídas do router.
-# Contrato com a web: docs/specs/metrics-history.md (§3).
+# Business logic and observability queries extracted from the router.
+# Contract with the web app: docs/specs/metrics-history.md (§3).
 
 
 from sqlalchemy import select
@@ -15,15 +15,15 @@ from app.models.workspace import Workspace
 from app.services.observability.escopo import _iso
 from app.services.observability.frota import _executor_id_do_host, _nomes_de_usuarios, _nomes_de_workspaces, _resolve_agent_names
 
-# ── Serializacao de runs ──────────────────────────────────────────────────────
+# ── Run serialization ─────────────────────────────────────────────────────────
 
-# Colunas que a listagem de execucoes realmente usa. `select(WorkflowRun)`
-# trazia a entidade inteira — incluindo o JSON `node_stats`, que guarda os
-# stats por no de todos os nos do fluxo e chega a megabytes — so para ler
-# `retry_count`, um inteiro que a serializacao extrai e o resto e descartado.
-# O tempo da lista passava a depender do TAMANHO dos workflows executados, nao
-# do numero de linhas mostradas. `retry_count` agora sai por expressao JSON no
-# proprio SQL; o blob fica no banco.
+# Columns the run listing actually uses. `select(WorkflowRun)`
+# brought the whole entity — including the `node_stats` JSON, which stores the
+# per-node stats of every node in the workflow and reaches megabytes — only to read
+# `retry_count`, an integer the serialization extracts, with the rest discarded.
+# The list's time came to depend on the SIZE of the executed workflows, not
+# on the number of rows shown. `retry_count` now comes out via a JSON expression in
+# the SQL itself; the blob stays in the database.
 _RUN_LIST_COLUMNS = (
     WorkflowRun.task_id,
     WorkflowRun.id,
@@ -57,31 +57,31 @@ def _serialize_run(
     user_names: dict | None = None,
     admin: bool = False,
 ) -> dict:
-    """Serialização canônica de WorkflowRun — evita duplicação entre endpoints.
+    """Canonical WorkflowRun serialization — avoids duplication across endpoints.
 
-    `workflow_meta`, quando presente, deve ser o dict retornado por
-    `_resolve_workflow_meta` (mapeando `workflow_hash -> meta`). Dele sai
-    `workflow_name` para qualquer usuario no escopo; `workflow_active` e
-    `owner_username` so entram com `admin=True` (spec §3.5) — e o default e
-    a visao de membro, para que um chamador que esqueca o argumento erre
-    para o lado de NAO vazar. O
-    `workspace_id` e o DO RUN (o tenant que de fato produziu a execucao), e o
-    nome vem de `workspace_names`; a meta do workflow so serve de nome quando
-    aponta para o mesmo workspace.
+    `workflow_meta`, when present, must be the dict returned by
+    `_resolve_workflow_meta` (mapping `workflow_hash -> meta`). From it comes
+    `workflow_name` for any user in scope; `workflow_active` and
+    `owner_username` only go in with `admin=True` (spec §3.5) — and the default is
+    the member view, so that a caller who forgets the argument errs
+    on the side of NOT leaking. The
+    `workspace_id` is the RUN's (the tenant that actually produced the run), and the
+    name comes from `workspace_names`; the workflow meta only serves as the name when
+    it points to the same workspace.
     """
     host = r.host or None
     executor_id = _executor_id_do_host(host)
     executor_name = (agent_names or {}).get(executor_id) if executor_id else None
     if executor_id:
-        # Formato historico do `agent_host` ("nome@sufixo"); a web tem
-        # `executor_name` para o texto amigavel.
+        # Historical `agent_host` format ("name@suffix"); the web app has
+        # `executor_name` for the friendly text.
         agent_host = f"{executor_name}@{executor_id[-5:]}" if executor_name else host
     else:
         agent_host = host
 
-    # Aceita tanto a entidade WorkflowRun (detalhe do run, que precisa mesmo do
-    # node_stats) quanto a Row de colunas projetadas das listagens, onde
-    # `retry_count` ja veio extraido pelo SQL.
+    # Accepts both the WorkflowRun entity (run detail, which really needs
+    # node_stats) and the Row of projected columns from the listings, where
+    # `retry_count` already came extracted by the SQL.
     retry_count = getattr(r, "retry_count", None)
     if retry_count is None:
         retry_count = (
@@ -102,11 +102,11 @@ def _serialize_run(
         "error_message":    r.error_message,
         "retry_count":      retry_count,
         "agent_host":       agent_host,
-        # Nível da política em que rodou ("primary" | "fallback" | "pool");
-        # nulo em runs anteriores à coluna — a tela esconde o badge.
+        # Policy tier it ran in ("primary" | "fallback" | "pool");
+        # null in runs older than the column — the screen hides the badge.
         "dispatch_tier":    getattr(r, "dispatch_tier", None),
-        # Campos do redesenho do Historico (spec §3.5). Nulos em runs
-        # anteriores a migracao — a web mostra "—".
+        # Fields of the History redesign (spec §3.5). Null in runs
+        # older than the migration — the web app shows "—".
         "executor_id":      executor_id,
         "executor_name":    executor_name,
         "trigger_source":   getattr(r, "trigger_source", None),
@@ -116,9 +116,9 @@ def _serialize_run(
         "schedule_id":      getattr(r, "schedule_id", None),
         "workspace_id":     workspace_id,
         "workspace_name":   (workspace_names or {}).get(workspace_id) if workspace_id else None,
-        # Origem do FLUXO ("usuario" | "assistente"), nao do disparo — e o que
-        # pinta o selo do assistente nas listas. Nula quando o workflow foi
-        # deletado permanentemente (sem meta).
+        # Origin of the WORKFLOW ("usuario" | "assistente"), not of the trigger — it is what
+        # paints the assistant badge in the lists. Null when the workflow was
+        # permanently deleted (no meta).
         "workflow_origem":  None,
     }
     if include_workflow_hash:
@@ -143,23 +143,23 @@ def _serialize_run(
 async def _resolve_workflow_meta(
     db: AsyncSession, workflow_hashes: list[str]
 ) -> dict[str, dict]:
-    """Busca em batch metadados dos workflows (nome, dono, workspace).
+    """Batch-fetches workflow metadata (name, owner, workspace).
 
-    Evita N+1 no serializer de runs. Retorna um dict `{workflow_hash:
+    Avoids N+1 in the run serializer. Returns a dict `{workflow_hash:
     {workflow_name, workflow_active, owner_username, workspace_id,
-    workspace_name}}` — chaves ausentes quando o workflow foi deletado
-    permanentemente. `owner_username` / `workspace_name` podem ser None em
-    legado (users deletados). Quem serializa para usuario comum descarta os
-    campos admin-only (`_serialize_run(admin=False)`).
+    workspace_name}}` — keys missing when the workflow was permanently
+    deleted. `owner_username` / `workspace_name` can be None in
+    legacy data (deleted users). Whoever serializes for a regular user discards the
+    admin-only fields (`_serialize_run(admin=False)`).
     """
     hashes = [h for h in set(workflow_hashes) if isinstance(h, str)]
     if not hashes:
         return {}
 
-    # `select_from(Workflow)` explicito: sem isso, SQLAlchemy pode
-    # escolher User ou Workspace como FROM base (o select tem colunas
-    # das 3 tabelas), fazendo com que os outerjoin fiquem "invertidos"
-    # e retornem NULL sempre para username/workspace_name.
+    # Explicit `select_from(Workflow)`: without it, SQLAlchemy may
+    # pick User or Workspace as the base FROM (the select has columns
+    # from the 3 tables), making the outerjoins "inverted"
+    # and always returning NULL for username/workspace_name.
     result = await db.execute(
         select(
             Workflow.id_hash.label("id_hash"),
@@ -190,9 +190,9 @@ async def _resolve_workflow_meta(
 
 
 async def _contexto_dos_runs(db: AsyncSession, runs) -> dict:
-    """Os quatro lookups em lote que a serializacao de uma pagina de runs
-    precisa — um SELECT ... IN cada (executores, workflows, workspaces,
-    usuarios), independentemente do numero de linhas."""
+    """The four batch lookups that serializing a page of runs
+    needs — one SELECT ... IN each (executors, workflows, workspaces,
+    users), regardless of the number of rows."""
     return {
         "agent_names":     await _resolve_agent_names(db, runs),
         "workflow_meta":   await _resolve_workflow_meta(db, [r.workflow_hash for r in runs]),

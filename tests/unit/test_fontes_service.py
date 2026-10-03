@@ -1,11 +1,11 @@
 # tests/unit/test_fontes_service.py
-"""O serviço do catálogo de fontes: sondagem, chave, busca, fusão, validação,
-aprendizado, verificação por endpoint e importação do Vault.
+"""The source catalog service: probing, key, search, merge, validation,
+learning, per-endpoint verification and Vault import.
 
-Banco de verdade em memória (SQLite, só a tabela `fontes_de_dados`) — a busca
-por `LIKE`, a ordenação e o upsert são exatamente o que se quer provar, e um
-mock de `db.execute` só provaria o mock. A rede é dublada em DOIS pontos, os
-únicos por onde o serviço sai: `validate_url_ssrf` e `safe_httpx_request`.
+A real in-memory database (SQLite, only the `fontes_de_dados` table) — the `LIKE`
+search, the ordering and the upsert are exactly what we want to prove, and a
+mock of `db.execute` would only prove the mock. The network is doubled at TWO points,
+the only ones through which the service goes out: `validate_url_ssrf` and `safe_httpx_request`.
 """
 from __future__ import annotations
 
@@ -83,7 +83,7 @@ async def fabrica():
 
 @pytest.fixture
 def sem_rede(monkeypatch):
-    """Nenhum teste daqui sai para a internet — quem sondar sem dublê quebra."""
+    """No test here goes out to the internet — whoever probes without a double breaks."""
     async def _proibido(*a, **k):
         raise AssertionError("sondagem sem dublê")
     monkeypatch.setattr(fs, "safe_httpx_request", _proibido)
@@ -91,7 +91,7 @@ def sem_rede(monkeypatch):
 
 
 def _rede(monkeypatch, respostas: dict[str, str | Exception]):
-    """`safe_httpx_request` dublado: escolhe a resposta pelo pedaço da URL."""
+    """`safe_httpx_request` doubled: picks the response by a piece of the URL."""
     monkeypatch.setattr(fs, "validate_url_ssrf", lambda url: ("1.2.3.4", "host"))
 
     async def _falso(method, url, **kw):
@@ -118,7 +118,7 @@ async def _upsert(db, **kw):
     return fonte, desfecho
 
 
-# ── Forma: URL, chave, texto de busca, sinônimos ─────────────────────────────
+# ── Shape: URL, key, search text, synonyms ───────────────────────────────────
 
 
 def test_normalizar_url_normaliza_como_o_no_e_recusa_o_que_nunca_e_fonte():
@@ -151,10 +151,10 @@ def test_termos_expandem_por_sinonimos_padrao_e_do_vault():
     fs.definir_sinonimos({"Cadastro Ambiental Rural": ["CAR", "imóveis rurais"]})
     try:
         termos = fs.termos_da_consulta("focos de calor")
-        assert len(termos) == 2  # "focos" e "calor"; "de" é conectivo
+        assert len(termos) == 2  # "focos" and "calor"; "de" is a connective
         assert {"focos de calor", "queimadas", "hotspot"} <= termos[0]
         assert "calor" in termos[1] and "focos de calor" in termos[1]
-        # Do Vault, nos dois sentidos.
+        # From the Vault, in both directions.
         assert "car" in fs.sinonimos_de("cadastro ambiental rural")
         assert "cadastro ambiental rural" in fs.sinonimos_de("CAR")
         assert fs.termos_da_consulta("  ") == []
@@ -201,7 +201,7 @@ def test_parsear_describe_feature_type_le_a_sequence_e_acha_a_geometria():
     assert esquema["geometry_column"] == "the_geom" and esquema["geometry_type"] == "MultiPolygon"
 
 
-# ── A rede, traduzida em códigos fechados ─────────────────────────────────────
+# ── The network, translated into closed codes ─────────────────────────────────
 
 
 @pytest.mark.parametrize(
@@ -247,7 +247,7 @@ async def test_listar_camadas_e_sondar_com_camada(monkeypatch):
         {"name": "Funai:aldeias_pontos", "title": "Aldeias"},
         {"name": "Funai:tis_poligonais", "title": "Terras indígenas (poligonais)"},
     ]
-    sondagem = await fs.sondar_wfs(FUNAI, "tis_poligonais")  # sem o prefixo: única → acha
+    sondagem = await fs.sondar_wfs(FUNAI, "tis_poligonais")  # without the prefix: unique → found
     assert sondagem.camada.name == "Funai:tis_poligonais"
     assert sondagem.esquema["crs"] == "EPSG:4674" and sondagem.esquema["bbox"] == [-73.99, -33.75, -28.84, 5.27]
     assert sondagem.esquema["geometry_type"] == "MultiPolygon"
@@ -265,16 +265,16 @@ async def test_servidor_sem_camadas(monkeypatch):
     assert exc.value.codigo == "sem_camadas" and exc.value.como_http()[0] == 404
 
 
-# ── A listagem com a credencial do nó (o seletor de camadas do editor) ────────
+# ── Listing with the node's credential (the editor's layer picker) ────────────
 
 
 @pytest.fixture
 def fio(monkeypatch):
-    """O pedido que sai de verdade: `safe_httpx_request` real, só o envio dublado.
+    """The request that actually goes out: the real `safe_httpx_request`, only the send doubled.
 
-    Dublar `safe_httpx_request` inteiro esconderia justo o que importa aqui — o
-    `params` do httpx TROCA a query da URL, e o GetCapabilities sairia sem
-    `service` e `request` sem nenhum teste perceber.
+    Doubling the whole `safe_httpx_request` would hide exactly what matters here — httpx's
+    `params` REPLACES the URL's query, and the GetCapabilities would go out without
+    `service` and `request` without any test noticing.
     """
     import flow.utils.geo_helpers as geo
 
@@ -285,7 +285,7 @@ def fio(monkeypatch):
     async def _send(self, request, **kw):
         import logging
         enviados.append(request)
-        logging.getLogger("httpx").info("HTTP Request: %s %s", request.method, request.url)  # como o httpx
+        logging.getLogger("httpx").info("HTTP Request: %s %s", request.method, request.url)  # like httpx
         return httpx.Response(200, text=CAPS_2, request=request)
 
     monkeypatch.setattr(httpx.AsyncClient, "send", _send)
@@ -303,7 +303,7 @@ async def test_authkey_na_url_vai_junto_da_query_do_getcapabilities(fio, caplog)
     auth = autenticacao_wfs(None, {"type": "geoserver_authkey", "token": "a+b/c=d&e"})
     with caplog.at_level(logging.INFO, logger="httpx"):
         camadas = await fs.listar_camadas_wfs(FUNAI, auth=auth)
-    assert "authkey=***" in caplog.text and "a%2Bb%2Fc%3Dd%26e" not in caplog.text  # o log do httpx
+    assert "authkey=***" in caplog.text and "a%2Bb%2Fc%3Dd%26e" not in caplog.text  # httpx's log
     assert [c["name"] for c in camadas] == ["Funai:aldeias_pontos", "Funai:tis_poligonais"]
     (pedido,) = fio
     esperado = {"service": "WFS", "request": "GetCapabilities", "version": "2.0.0", "authkey": "a+b/c=d&e"}  # pragma: allowlist secret
@@ -337,7 +337,7 @@ async def test_sem_credencial_o_pedido_sai_anonimo(fio):
     assert _query(pedido) == {"service": "WFS", "request": "GetCapabilities", "version": "2.0.0"}
 
 
-# ── Upsert e fusão ────────────────────────────────────────────────────────────
+# ── Upsert and merge ──────────────────────────────────────────────────────────
 
 
 async def test_upsert_cria_e_depois_atualiza_pela_chave(fabrica, sem_rede):
@@ -347,7 +347,7 @@ async def test_upsert_cria_e_depois_atualiza_pela_chave(fabrica, sem_rede):
         assert fonte.propriedades["url"] == FUNAI and fonte.propriedades["typeName"] == "Funai:tis_poligonais"
         mesma, desfecho = await _upsert(db, url=FUNAI + "?service=WFS", titulo="Outro título")
         assert desfecho == "updated" and mesma.id == fonte.id
-        assert mesma.titulo == "Terras indígenas (poligonais)"  # o vazio é preenchido; o escrito, não
+        assert mesma.titulo == "Terras indígenas (poligonais)"  # the empty one is filled in; the written one is not
         assert (await db.execute(select(FonteDeDados))).scalars().all().__len__() == 1
 
 
@@ -356,7 +356,7 @@ async def test_aprendida_nao_rebaixa_nem_ressuscita_e_conta_uso_so_no_primeiro_f
         fonte, _ = await _upsert(db)
         _, desfecho = await _upsert(db, origem="aprendida", estado="ok", contar_uso=True, propriedades={})
         assert desfecho == "updated" and fonte.origem == "vault" and fonte.usos == 1
-        assert fonte.propriedades["sortBy"] == "gid"  # a execução não traz sortBy; o Vault trouxe, fica
+        assert fonte.propriedades["sortBy"] == "gid"  # the run does not bring sortBy; the Vault did, so it stays
         await _upsert(db, origem="aprendida", contar_uso=False)
         assert fonte.usos == 1
 
@@ -405,22 +405,22 @@ async def test_buscar_respeita_o_escopo_e_expande_sinonimos(fabrica, sem_rede):
         await _semear(db)
         itens, total = await fs.buscar(db, [WS], query="queimadas")
         assert total == 1 and itens[0].type_name == "queimadas:focos_24h"
-        # Sinônimo: "focos de calor" acha a fonte de "queimadas".
+        # Synonym: "focos de calor" finds the "queimadas" source.
         itens, _ = await fs.buscar(db, [WS], query="focos de calor")
         assert [i.type_name for i in itens] == ["queimadas:focos_24h"]
-        # Sem acento e sem caixa. As duas linhas da FUNAI casam (a descrição de
-        # ambas diz "Terras indígenas"); a que está `ok` vem primeiro.
+        # No accents and no case. Both FUNAI rows match (the description of
+        # both says "Terras indígenas"); the `ok` one comes first.
         itens, _ = await fs.buscar(db, [WS], query="TERRAS indigenas")
         assert [i.type_name for i in itens] == ["Funai:tis_poligonais", "Funai:aldeias_pontos"]
-        # Nome de coluna também conta: só tis_poligonais tem `gid`.
+        # Column names count too: only tis_poligonais has `gid`.
         itens, _ = await fs.buscar(db, [WS], query="gid")
         assert [i.type_name for i in itens] == ["Funai:tis_poligonais"]
-        # A fonte do OUTRO workspace não aparece; a da plataforma aparece para todos.
+        # The OTHER workspace's source does not show up; the platform's shows up for everyone.
         itens, total = await fs.buscar(db, [WS], query=None)
         assert total == 3 and "privada:x" not in {i.type_name for i in itens}
         itens, total = await fs.buscar(db, None, query=None)
-        assert total == 2  # só plataforma
-        # AND entre termos: "focos indígenas" não casa com nada.
+        assert total == 2  # platform only
+        # AND between terms: "focos indígenas" matches nothing.
         assert (await fs.buscar(db, [WS], query="focos indígenas"))[1] == 0
 
 
@@ -428,7 +428,7 @@ async def test_buscar_ordena_ok_antes_de_falhando_e_por_prioridade(fabrica, sem_
     async with fabrica() as db:
         await _semear(db)
         itens, _ = await fs.buscar(db, [WS], query="FUNAI")
-        # aldeias tem prioridade 1 mas está falhando: `ok` vem primeiro.
+        # aldeias has priority 1 but is failing: `ok` comes first.
         assert [i.type_name for i in itens] == ["Funai:tis_poligonais", "Funai:aldeias_pontos"]
         itens, _ = await fs.buscar(db, [WS], state="falhando")
         assert [i.type_name for i in itens] == ["Funai:aldeias_pontos"]
@@ -444,15 +444,15 @@ async def test_obter_e_trecho_do_no(fabrica, sem_rede):
         fonte = (await fs.buscar(db, [WS], query="tis_poligonais"))[0][0]
         assert (await fs.obter(db, fonte.id_hash, [WS])).id == fonte.id
         privada = (await fs.buscar(db, [WS_OUTRO], query="privada"))[0][0]
-        assert await fs.obter(db, privada.id_hash, [WS]) is None  # fora do escopo
+        assert await fs.obter(db, privada.id_hash, [WS]) is None  # out of scope
         trecho = fs.trecho_do_no(fonte)
         assert trecho == {
             "name": "WFS", "type": "datasource",
             "properties": {"url": FUNAI, "typeName": "Funai:tis_poligonais", "sortBy": "gid"},
-        }  # `version` fica de fora: o nó ainda não a declara
+        }  # `version` is left out: the node does not declare it yet
 
 
-# ── Validação sem rede ────────────────────────────────────────────────────────
+# ── Validation without network ────────────────────────────────────────────────
 
 DESCRITORES = {"WFS": {"source_kind": "wfs"}, "Buffer": {}}
 
@@ -478,7 +478,7 @@ async def test_conferir_fontes_avisa_desconhecida_e_falhando_e_cala_a_catalogada
         assert por_no["nova"]["code"] == "unknown_source" and "search_sources" in por_no["nova"]["message"]
         assert por_no["falha"]["code"] == "failing_source" and "não consta" in por_no["falha"]["message"]
         assert all(a["severity"] == "warning" and a["edge"] is None for a in avisos)
-        # Do outro workspace a fonte privada NÃO conta.
+        # From the other workspace the private source does NOT count.
         avisos = await fs.conferir_fontes_da_definicao(db, [_no("x", "https://geoserver.exemplo.gov.br/ows", "queimadas:focos_24h")], DESCRITORES, WS_OUTRO)
         assert [a["code"] for a in avisos] == ["unknown_source"]
 
@@ -516,15 +516,15 @@ async def test_aprender_de_execucao_registra_so_os_completos_com_o_esquema_do_ru
             "columns": [{"name": "gid", "type": None, "xsd": None, "nullable": True}, {"name": "uf_sigla", "type": None, "xsd": None, "nullable": True}],
             "columns_source": "run", "crs": "EPSG:4674", "bbox": [-61.6, -18.0, -50.2, -7.3], "feature_count": 84,
         }
-        # Reentrega: não conta o uso de novo.
+        # Redelivery: does not count the use again.
         await fs.aprender_de_execucao(db, run, stats, definition, first_close=False)
         await db.commit()
         assert fonte.usos == 1
 
 
 async def test_camada_lida_com_credencial_nao_entra_no_catalogo(fabrica, sem_rede):
-    """Protegida: a verificação diária a sondaria sem a chave, e o trecho pronto
-    a ofereceria a quem não tem acesso."""
+    """Protected: the daily verification would probe it without the key, and the ready-made
+    snippet would offer it to someone who has no access."""
     definition = {"nodes": [
         {"id": "f1", "name": "WFS", "properties": {"url": FUNAI, "typeName": "Funai:restrita",
                                                      "credential_id": "3f2a7c18-5b90-4c2e-9a44-1d6f8e2b7c05"}},
@@ -538,9 +538,9 @@ async def test_camada_lida_com_credencial_nao_entra_no_catalogo(fabrica, sem_red
 
 
 async def test_credencial_so_em_data_properties_tambem_nao_ensina(fabrica, sem_rede):
-    """O resolver e o executor leem `data.properties` primeiro; o catálogo lia
-    `properties` primeiro. Com a credencial só num deles, a execução saía
-    autenticada e a camada protegida entrava no catálogo."""
+    """The resolver and the executor read `data.properties` first; the catalog read
+    `properties` first. With the credential in only one of them, the run went out
+    authenticated and the protected layer entered the catalog."""
     definition = {"nodes": [
         {"id": "f1", "name": "WFS",
          "properties": {"url": FUNAI, "typeName": "Funai:restrita"},
@@ -554,8 +554,8 @@ async def test_credencial_so_em_data_properties_tambem_nao_ensina(fabrica, sem_r
 
 
 async def test_execucao_com_filtro_ou_bbox_nao_ensina_extensao_nem_contagem(fabrica, sem_rede):
-    """O recorte de uma pergunta (uf = 'MT', um bbox) não é a camada: a extensão e
-    a contagem dele não sobrescrevem as da fonte. As colunas continuam valendo."""
+    """A question's slice (uf = 'MT', a bbox) is not the layer: its extent and
+    count do not overwrite the source's. The columns still apply."""
     definition = {"nodes": [
         {"id": "f1", "name": "WFS", "properties": {"url": FUNAI, "typeName": "Funai:tis_poligonais",
                                                      "cqlFilter": "uf_sigla = 'MT'"}},
@@ -577,15 +577,15 @@ async def test_execucao_com_filtro_ou_bbox_nao_ensina_extensao_nem_contagem(fabr
             "columns": [{"name": "gid", "type": None, "xsd": None, "nullable": True}, {"name": "uf_sigla", "type": None, "xsd": None, "nullable": True}],
             "columns_source": "run", "crs": "EPSG:4674",
         }
-        assert "cqlFilter" not in tis.propriedades  # o filtro é da pergunta, não da fonte
+        assert "cqlFilter" not in tis.propriedades  # the filter belongs to the question, not to the source
         aldeias = await fs.obter_por_chave(db, fs.chave_da_fonte(WS, "wfs", FUNAI, "Funai:aldeias_pontos"))
         assert aldeias.esquema == {"crs": "EPSG:4674"}
 
 
 async def test_bbox_que_chega_por_aresta_tambem_e_recorte(fabrica, sem_rede):
-    """ComputeBoundingBox → WFS: o nó lê `inputs["bbox_string"]` com o campo
-    `bbox` vazio, e a execução é um recorte igual ao do campo preenchido."""
-    import flow.nodes.spatial.compute_bbox  # noqa: F401 — registra o nó (a aresta sem chaves precisa do descriptor)
+    """ComputeBoundingBox → WFS: the node reads `inputs["bbox_string"]` with the
+    `bbox` field empty, and the run is a slice just like one with the field filled in."""
+    import flow.nodes.spatial.compute_bbox  # noqa: F401 — registers the node (the edge without keys needs the descriptor)
 
     definition = {
         "nodes": [
@@ -596,8 +596,8 @@ async def test_bbox_que_chega_por_aresta_tambem_e_recorte(fabrica, sem_rede):
         ],
         "edges": [
             {"source": "c", "target": "f1", "from_key": "bbox_string"},
-            {"source": "c", "target": "f2"},  # sem chaves: entra tudo o que o ComputeBoundingBox produz
-            {"source": "c", "target": "f3", "from_key": "minx", "to_key": "x"},  # outra porta: não é recorte
+            {"source": "c", "target": "f2"},  # no keys: everything ComputeBoundingBox produces goes in
+            {"source": "c", "target": "f3", "from_key": "minx", "to_key": "x"},  # another port: not a slice
         ],
     }
     espacial = {"crs": "EPSG:4674", "bbox": [-61.6, -18.0, -50.2, -7.3], "feature_count": 84}
@@ -619,7 +619,7 @@ async def test_bbox_que_chega_por_aresta_tambem_e_recorte(fabrica, sem_rede):
         assert outra.esquema == {"crs": "EPSG:4674", "bbox": [-61.6, -18.0, -50.2, -7.3], "feature_count": 84}
 
 
-# ── Verificação por endpoint ──────────────────────────────────────────────────
+# ── Per-endpoint verification ─────────────────────────────────────────────────
 
 
 async def test_verificar_endpoint_marca_todas_as_linhas_da_url_com_um_pedido(fabrica, monkeypatch):
@@ -637,7 +637,7 @@ async def test_verificar_endpoint_marca_todas_as_linhas_da_url_com_um_pedido(fab
         assert linhas["Funai:aldeias_pontos"].estado == "ok" and linhas["Funai:aldeias_pontos"].ultimo_erro is None
         assert linhas["Funai:sumida"].estado == "falhando" and "não consta" in linhas["Funai:sumida"].ultimo_erro
         assert all(f.verificada_em is not None for f in linhas.values())
-        # Outra URL não foi tocada.
+        # Another URL was not touched.
         outra = (await fs.buscar(db, [WS], query="queimadas"))[0][0]
         assert outra.verificada_em is None
         assert sorted(u for u, _ in await fs.endpoints_para_verificar(db)) == sorted([FUNAI, "https://geoserver.exemplo.gov.br/ows"])
@@ -653,7 +653,7 @@ async def test_endpoint_fora_do_ar_marca_tudo_falhando(fabrica, monkeypatch):
             assert f.estado == "falhando" and "Timeout" in f.ultimo_erro
 
 
-# ── Importação do Vault ───────────────────────────────────────────────────────
+# ── Vault import ──────────────────────────────────────────────────────────────
 
 
 async def test_importar_pasta_cria_reimporta_sem_escrever_atualiza_e_remove(fabrica, sem_rede, tmp_path):
@@ -663,18 +663,18 @@ async def test_importar_pasta_cria_reimporta_sem_escrever_atualiza_e_remove(fabr
         resumo = await fs.importar_pasta(db, pasta)
         assert (resumo.criadas, resumo.atualizadas, resumo.iguais, resumo.removidas) == (12, 0, 0, 0)
         assert resumo.ignoradas == {"sem_endpoint_wfs": 2} and resumo.erros == []
-        # Os sinônimos do Vault entraram na busca.
+        # The Vault synonyms made it into the search.
         assert "hotspot" in fs.sinonimos_de("focos de calor")
         fonte = await fs.obter_por_chave(db, fs.chave_da_fonte(None, "wfs", FUNAI, "Funai:tis_poligonais"))
         assert fonte.origem == "vault" and fonte.estado == "nao_verificada" and fonte.workspace_id is None
         assert fonte.propriedades["sortBy"] == "gid" and fonte.esquema["columns_source"] == "vault"
         assert fonte.vault_hash and fonte.busca
 
-        # Reimportar a mesma pasta: só leitura.
+        # Reimporting the same folder: read-only.
         de_novo = await fs.importar_pasta(db, pasta)
         assert (de_novo.criadas, de_novo.atualizadas, de_novo.iguais) == (0, 0, 12)
 
-        # O estado que o catálogo aprendeu sobrevive a uma atualização da nota.
+        # The state the catalog learned survives an update to the note.
         fonte.estado, fonte.usos = "ok", 3
         await db.commit()
         camadas = pasta / "FUNAI" / "Camadas.md"
@@ -689,7 +689,7 @@ async def test_importar_pasta_cria_reimporta_sem_escrever_atualiza_e_remove(fabr
         await db.refresh(fonte)
         assert fonte.titulo == "TIs (poligonais)" and fonte.estado == "ok" and fonte.usos == 3
 
-        # O que sumiu do Vault sai do catálogo (soft delete); o resto fica.
+        # What disappeared from the Vault leaves the catalog (soft delete); the rest stays.
         shutil.rmtree(pasta / "IBGE")
         removida = await fs.importar_pasta(db, pasta)
         assert removida.removidas == 2 and removida.iguais == 10
@@ -702,32 +702,33 @@ async def test_importar_pasta_inexistente_e_por_workspace(fabrica, sem_rede):
         assert resumo.erros and resumo.criadas == 0
         resumo = await fs.importar_pasta(db, VAULT / "FUNAI" and VAULT, workspace_id=WS)
         assert resumo.criadas == 12
-        assert (await fs.buscar(db, None, query=None))[1] == 0  # nada na plataforma
+        assert (await fs.buscar(db, None, query=None))[1] == 0  # nothing on the platform
         assert (await fs.buscar(db, [WS], query=None))[1] == 12
 
 
-# ── O estouro que apagava 75 % do catálogo ───────────────────────────────────
+# ── The overflow that wiped 75 % of the catalog ──────────────────────────────
 #
-# Em produção a importação morria no registro 6.779 com
-# `StringDataRightTruncationError`: 48 dos 25.492 registros do catálogo real têm
-# `titulo` acima de 255 caracteres (indicadores do IBGE chegam a 276), e a
-# coluna era `VARCHAR(255)`. Como o commit é por lote de 500, a exceção levava
-# junto o lote inteiro e abortava o resto — ficavam 6.500 registros no banco e um
-# ERROR no log. O assistente ficava sem três quartos das camadas, em silêncio.
+# In production the import died at record 6,779 with
+# `StringDataRightTruncationError`: 48 of the 25,492 records in the real catalog have a
+# `titulo` over 255 characters (IBGE indicators reach 276), and the
+# column was `VARCHAR(255)`. Since the commit is per batch of 500, the exception took
+# the whole batch down with it and aborted the rest — 6,500 records were left in the
+# database and an ERROR in the log. The assistant was missing three quarters of the
+# layers, silently.
 #
-# O conserto tem duas camadas, e estes testes prendem as duas.
+# The fix has two layers, and these tests pin down both.
 
 
 async def test_titulo_longo_nao_derruba_a_importacao(fabrica, sem_rede, tmp_path):
-    """A camada 1: `titulo` virou TEXT, então o texto entra inteiro.
+    """Layer 1: `titulo` became TEXT, so the text goes in whole.
 
-    O caso é o real — 276 caracteres, o tamanho do maior título do catálogo de
-    produção.
+    The case is the real one — 276 characters, the length of the longest title in the
+    production catalog.
     """
     pasta = tmp_path / "vault"
     shutil.copytree(VAULT, pasta)
-    # `.strip()` porque o parser do Vault apara as pontas — sem isso o teste
-    # compararia com um espaço final que nunca chega ao banco.
+    # `.strip()` because the Vault parser trims the ends — without it the test
+    # would compare against a trailing space that never reaches the database.
     comprido = ("Indicador 17.19.2 — " + "proporção de países " * 13).strip()
     assert len(comprido) > 255, "a premissa do teste caiu"
 
@@ -742,18 +743,18 @@ async def test_titulo_longo_nao_derruba_a_importacao(fabrica, sem_rede, tmp_path
 
     async with fabrica() as db:
         resumo = await fs.importar_pasta(db, pasta)
-        # Todas as 12 entram: nenhuma foi levada junto pelo registro comprido.
+        # All 12 go in: none was taken down by the long record.
         assert (resumo.criadas, resumo.erros) == (12, [])
         fonte = await fs.obter_por_chave(db, fs.chave_da_fonte(None, "wfs", FUNAI, "Funai:tis_poligonais"))
         assert fonte.titulo == comprido, "o título tem de entrar INTEIRO, sem corte"
 
 
 async def test_rotulo_longo_e_cortado_em_vez_de_derrubar_o_lote(fabrica, sem_rede, tmp_path):
-    """A camada 2, para os campos de EXIBIÇÃO.
+    """Layer 2, for the DISPLAY fields.
 
-    `instituicao` e `grupo` continuam limitados no banco. Cortá-los perde a
-    cauda de um rótulo — a fonte continua funcionando e continua sendo achada.
-    Deixá-los estourar perderia o catálogo inteiro, que é o que acontecia.
+    `instituicao` and `grupo` are still limited in the database. Cutting them loses the
+    tail of a label — the source keeps working and keeps being found.
+    Letting them overflow would lose the whole catalog, which is what used to happen.
     """
     limite = fs._limite("instituicao")
     assert limite is not None
@@ -780,12 +781,12 @@ async def test_rotulo_longo_e_cortado_em_vez_de_derrubar_o_lote(fabrica, sem_red
 
 
 async def test_type_name_longo_PULA_o_registro_em_vez_de_cortar(fabrica, sem_rede, tmp_path):
-    """A camada 2, para os campos FUNCIONAIS — e é aqui que cortar seria pior.
+    """Layer 2, for the FUNCTIONAL fields — and this is where cutting would be worse.
 
-    O `type_name` vai literalmente na consulta WFS, e a `chave` deriva dele.
-    Um `type_name` cortado é uma fonte que aponta para uma camada inexistente:
-    ela entra no catálogo, é achada pela busca, e falha só quando alguém a usa.
-    Melhor pular e dizer por quê.
+    `type_name` goes literally into the WFS query, and `chave` derives from it.
+    A truncated `type_name` is a source pointing to a nonexistent layer:
+    it enters the catalog, is found by search, and only fails when someone uses it.
+    Better to skip it and say why.
     """
     pasta = tmp_path / "vault"
     shutil.copytree(VAULT, pasta)
@@ -803,18 +804,18 @@ async def test_type_name_longo_PULA_o_registro_em_vez_de_cortar(fabrica, sem_red
 
     async with fabrica() as db:
         resumo = await fs.importar_pasta(db, pasta)
-        # As outras 11 entraram: o registro ruim não levou ninguém junto.
+        # The other 11 went in: the bad record did not take anyone down with it.
         assert resumo.criadas == 11
         assert len(resumo.erros) == 1
         assert "type_name" in resumo.erros[0] and "pulado" in resumo.erros[0]
-        # E ele NÃO entrou cortado.
+        # And it did NOT go in truncated.
         achadas, _ = await fs.buscar(db, None, query="absurdo")
         assert achadas == []
 
 
 async def test_o_limite_vem_da_COLUNA_e_nao_de_uma_constante():
-    """Uma constante copiada aqui divergiria no dia em que a coluna mudasse — e
-    a divergência apareceria como o mesmo estouro que a guarda impede."""
+    """A constant copied here would diverge the day the column changed — and
+    the divergence would show up as the same overflow the guard prevents."""
     assert fs._limite("instituicao") == FonteDeDados.__table__.c["instituicao"].type.length
-    # `titulo` é TEXT: sem limite, e por isso fora da guarda de corte.
+    # `titulo` is TEXT: no limit, and therefore outside the truncation guard.
     assert fs._limite("titulo") is None

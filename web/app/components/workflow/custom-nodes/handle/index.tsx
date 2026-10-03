@@ -6,20 +6,20 @@ import { cn } from "@/lib/utils"
 import { corDoTom, tomDoHandle } from "../../utils/exec-colors"
 
 /**
- * Porta de um nó do canvas — o ponto de onde a aresta sai e onde ela chega.
+ * A canvas node's port — the point where the edge leaves and where it arrives.
  *
- * Nasceu de dois arquivos gêmeos de 17 linhas (`source.tsx` e `target.tsx`) que
- * divergiam justamente onde não deviam: a saída era um círculo de 6px e a
- * entrada um retângulo de 8×12, sem intenção declarada em lugar nenhum, e ambos
- * cravavam `!bg-white` — no tema escuro a porta virava o elemento de maior
- * contraste do canvas, mais forte que o título do nó.
+ * It was born from two twin 17-line files (`source.tsx` and `target.tsx`) that
+ * diverged exactly where they shouldn't: the output was a 6px circle and the
+ * input an 8×12 rectangle, with no intent declared anywhere, and both hard-coded
+ * `!bg-white` — in the dark theme the port became the highest-contrast element on
+ * the canvas, stronger than the node title.
  *
- * Aqui a forma diz a DIREÇÃO (saída é pino cheio, entrada é soquete vazado), o
- * traço diz o ESTADO (livre é tracejado) e a cor vem do mesmo vocabulário de
- * execução da aresta. As regras visuais moram em `globals.css`, sob
- * `.react-flow__handle.rf-handle`: é preciso especificidade maior que a do
- * próprio React Flow, e resolver isso com `!important` em classe utilitária era
- * o que impedia o chamador de sobrescrever qualquer coisa.
+ * Here the shape says the DIRECTION (output is a solid pin, input is a hollow
+ * socket), the stroke says the STATE (free is dashed) and the color comes from the
+ * same execution vocabulary as the edge. The visual rules live in `globals.css`,
+ * under `.react-flow__handle.rf-handle`: it needs higher specificity than React
+ * Flow's own, and solving that with `!important` on a utility class was what
+ * kept the caller from overriding anything.
  */
 
 export type DirecaoDaPorta = "saida" | "entrada"
@@ -28,23 +28,23 @@ interface PortaProps
   extends Omit<HandleProps, "type" | "position">,
     Omit<HTMLAttributes<HTMLDivElement>, "id"> {
   direcao: DirecaoDaPorta
-  /** Porta sem aresta ligada.
+  /** Port with no edge attached.
    *
-   *  Quem carregava essa informação era só o stub "+" ao lado, que o LOD esconde
-   *  no zoom afastado — a informação sumia junto. */
+   *  The only thing that carried this information was the "+" stub beside it,
+   *  which LOD hides when zoomed out — the information went away with it. */
   livre?: boolean
 }
 
 const Porta = ({ direcao, livre, className, style, ...props }: PortaProps) => {
   const saida = direcao === "saida"
-  // `true`/`false` do Conditional nascem verde/vermelho e ASSIM FICAM: a porta
-  // diz qual ramo ela é, e a aresta diz o que aconteceu com ele. Ver o
-  // comentário de `--rf-handle-tom` em globals.css para o porquê de a porta não
-  // acompanhar o status do nó.
+  // The Conditional's `true`/`false` are born green/red and STAY THAT WAY: the port
+  // says which branch it is, and the edge says what happened to it. See the
+  // comment on `--rf-handle-tom` in globals.css for why the port doesn't
+  // follow the node status.
   //
-  // Só na SAÍDA: o mapa descreve ramos de roteamento, que são saídas do
-  // Conditional. Aplicado à entrada, um nó de portas dinâmicas com uma entrada
-  // chamada `true` ganharia um soquete verde anunciando um ramo que não existe.
+  // Only on the OUTPUT: the map describes routing branches, which are the
+  // Conditional's outputs. Applied to the input, a dynamic-port node with an input
+  // named `true` would get a green socket announcing a branch that doesn't exist.
   const ramo = saida ? tomDoHandle(props.id) : undefined
 
   return (
@@ -58,10 +58,10 @@ const Porta = ({ direcao, livre, className, style, ...props }: PortaProps) => {
         ...style,
       }}
       className={cn(
-        // `z-10` vem dos dois arquivos que este substituiu, e não é decorativo:
-        // `.exec-card` é `isolate`, e o `::after` que desenha o anel de execução
-        // é gerado por último — em `z-index: auto` ele pinta POR CIMA das
-        // portas, cortando cada uma ao meio durante um run.
+        // `z-10` comes from the two files this one replaced, and isn't decorative:
+        // `.exec-card` is `isolate`, and the `::after` that draws the execution ring
+        // is generated last — at `z-index: auto` it paints ON TOP of the
+        // ports, cutting each one in half during a run.
         "rf-handle z-10",
         saida ? "rf-handle-saida" : "rf-handle-entrada",
         className,
@@ -70,12 +70,12 @@ const Porta = ({ direcao, livre, className, style, ...props }: PortaProps) => {
   )
 }
 
-/** Saída do nó — pino cheio, à direita. */
+/** Node output — solid pin, on the right. */
 export const HandleSource = (props: Omit<PortaProps, "direcao">) => (
   <Porta {...props} direcao="saida" />
 )
 
-/** Entrada do nó — soquete vazado, à esquerda. */
+/** Node input — hollow socket, on the left. */
 export const HandleTarget = (props: Omit<PortaProps, "direcao">) => (
   <Porta {...props} direcao="entrada" />
 )

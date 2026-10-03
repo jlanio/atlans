@@ -2,17 +2,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react"
 
 /**
- * Regressoes dos modais de credencial. O caso mais grave e o primeiro:
+ * Regressions of the credential modals. The most serious case is the first:
  *
- * O backend faz `self.data = {...}` no encrypt_and_store — SUBSTITUI o blob de
- * segredos inteiro, sem merge — e so pula a re-encriptacao quando `data` chega
- * vazio. Logo um `data` PARCIAL e destrutivo: se a busca dos segredos falhasse e
- * o usuario salvasse, os outros campos eram apagados, e `_build_postgres_dsn`
- * preenchia o que faltava com defaults, gerando `postgresql://:@localhost:5432/`.
- * Uma credencial plausivel e quebrada, que so falha na execucao do workflow.
+ * The backend does `self.data = {...}` in encrypt_and_store — it REPLACES the whole
+ * secrets blob, with no merge — and only skips re-encryption when `data` arrives
+ * empty. So a PARTIAL `data` is destructive: if fetching the secrets failed and
+ * the user saved, the other fields were wiped, and `_build_postgres_dsn`
+ * filled in what was missing with defaults, producing `postgresql://:@localhost:5432/`.
+ * A plausible but broken credential, which only fails when the workflow runs.
  *
- * Por isso o modal de editar tem que bloquear o Salvar enquanto os segredos nao
- * chegam, e continuar bloqueado se a busca falhar.
+ * That is why the edit modal has to block Save while the secrets have not
+ * arrived, and stay blocked if the fetch fails.
  */
 
 const getCredentialTypes = vi.fn()
@@ -54,8 +54,8 @@ const TIPO_PG = {
   ],
 }
 
-// Valor fake dos segredos nas fixtures. Centralizado num ponto só para o
-// detect-secrets nao acusar cada `password: "..."` espalhado pelos testes.
+// Fake value of the secrets in the fixtures. Centralized in a single place so
+// detect-secrets does not flag each `password: "..."` scattered across the tests.
 const SEGREDO_FAKE = "s3cr3t" // pragma: allowlist secret
 
 import { Dialog } from "@/app/components/ui/dialog"
@@ -79,7 +79,7 @@ afterEach(() => cleanup())
 
 describe("ConfigureCredential — bloqueio contra perda de segredo", () => {
   it("mantem o Salvar desabilitado enquanto os segredos nao carregam", async () => {
-    // Promise que nunca resolve: simula a busca em voo.
+    // A Promise that never resolves: simulates the fetch in flight.
     getCredentialData.mockReturnValue(new Promise(() => {}))
     renderConfigure()
 
@@ -91,7 +91,7 @@ describe("ConfigureCredential — bloqueio contra perda de segredo", () => {
     getCredentialData.mockResolvedValue({ error: { message: "falha de rede" } })
     renderConfigure()
 
-    // O aviso precisa ser role=alert para ser anunciado.
+    // The warning needs to be role=alert to be announced.
     const aviso = await screen.findByRole("alert")
     expect(aviso.textContent).toMatch(/não foi possível carregar/i)
 
@@ -108,8 +108,8 @@ describe("ConfigureCredential — bloqueio contra perda de segredo", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /salvar/i })).not.toBeDisabled()
     })
-    // E os campos do schema aparecem, nao o editor livre (que mostraria os
-    // valores em texto claro).
+    // And the schema fields show up, not the free-form editor (which would show the
+    // values in plain text).
     expect(screen.getByLabelText(/host/i)).toBeInTheDocument()
   })
 })
@@ -122,9 +122,9 @@ describe("Modais de credencial — botao de teste estavel", () => {
       </Dialog>,
     )
 
-    // Antes ele so era montado quando `data` tinha chave, entao aparecia e
-    // desaparecia enquanto o usuario digitava, deslocando os outros botoes e
-    // entrando/saindo da ordem de tabulacao.
+    // Before, it was only mounted when `data` had a key, so it appeared and
+    // disappeared while the user typed, shifting the other buttons and
+    // entering/leaving the tab order.
     const testar = await screen.findByRole("button", { name: /testar credencial/i })
     expect(testar).toBeDisabled()
   })
@@ -152,9 +152,9 @@ describe("Resultado do teste — nao pode piscar e desaparecer", () => {
 
     fireEvent.click(testar)
 
-    // O efeito que invalida o resultado depende do valor SERIALIZADO de `data`.
-    // Se dependesse do objeto (form.watch devolve referencia nova por render),
-    // ele limparia o banner no render seguinte ao proprio teste.
+    // The effect that invalidates the result depends on the SERIALIZED value of `data`.
+    // If it depended on the object (form.watch returns a new reference per render),
+    // it would clear the banner on the render right after the test itself.
     const banner = await screen.findByRole("status")
     expect(banner.textContent).toMatch(/ok/i)
 
@@ -165,9 +165,9 @@ describe("Resultado do teste — nao pode piscar e desaparecer", () => {
 
 describe("Correcoes de revisao", () => {
   it("mascara o valor no editor livre MAS oferece como revelar", async () => {
-    // Mascarar sem toggle deixaria a edicao as cegas: era o efeito colateral de
-    // uma correcao de seguranca aplicada pela metade.
-    getCredentialTypes.mockResolvedValue({ data: [] })   // sem catalogo -> editor livre
+    // Masking without a toggle would leave editing blind: it was the side effect of
+    // a security fix applied halfway.
+    getCredentialTypes.mockResolvedValue({ data: [] })   // no catalog -> free-form editor
     getCredentialData.mockResolvedValue({
       data: { ...CREDENCIAL, data: { token_custom: SEGREDO_FAKE } },
     })

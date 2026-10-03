@@ -3,10 +3,10 @@
 import { TbCheck, TbX } from "react-icons/tb";
 import { useTextos } from "@/app/components/home/i18n";
 
-/* Medidor de força da senha (cadastro e redefinição). Regras atendidas em verde
-   (literal de status, permitido); as pendentes usavam `text-muted-foreground` —
-   único token do tema que vazava para dentro da cena escura da autenticação —
-   trocado por `auth-muted`, a cor de apoio do próprio padrão auth. */
+/* Password strength meter (sign-up and reset). Rules met in green (status
+   literal, allowed); the pending ones used `text-muted-foreground` — the only
+   theme token that leaked into the dark authentication scene — replaced by
+   `auth-muted`, the supporting color of the auth pattern itself. */
 export function AuthPasswordStrength({ password }: { password: string }) {
   const t = useTextos().entrada.auth.regrasDaSenha;
   const rules = [

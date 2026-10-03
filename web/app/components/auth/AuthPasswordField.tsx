@@ -7,13 +7,13 @@ import { Label } from "@/app/components/ui/label";
 import { TbAlertCircle, TbEye, TbEyeOff } from "react-icons/tb";
 import { useTextos } from "@/app/components/home/i18n";
 
-/* Campo de senha padronizado (login, cadastro, redefinição): mostrar/ocultar +
-   aviso de Caps Lock. Antes só o login tinha os dois; cadastro e redefinição
-   usavam `<Input type="password">` cru. Concentrar aqui garante paridade e uma
-   fonte única para o comportamento.
+/* Standardized password field (login, sign-up, reset): show/hide + Caps Lock
+   warning. Before, only login had both; sign-up and reset used a raw
+   `<Input type="password">`. Concentrating it here guarantees parity and a
+   single source for the behavior.
 
-   `labelRight` acomoda o "Esqueceu a senha?" do login; `children` acomoda o
-   medidor de força e o aviso de divergência que ficam sob o campo. */
+   `labelRight` accommodates login's "Esqueceu a senha?"; `children`
+   accommodates the strength meter and the mismatch warning that sit under the field. */
 interface AuthPasswordFieldProps {
   id: string;
   label: string;
@@ -43,10 +43,10 @@ export function AuthPasswordField({
   const [show, setShow] = useState(false);
   const [capsLock, setCapsLock] = useState(false);
 
-  // Caps Lock é lido do EVENTO, não de um estado global: não existe API para
-  // consultar a tecla, só `getModifierState` durante um evento de teclado. Fica
-  // no campo de senha porque é lá que a maiúscula involuntária não aparece na
-  // tela — a falha que o usuário não consegue diagnosticar sozinho.
+  // Caps Lock is read from the EVENT, not from a global state: there is no API to
+  // query the key, only `getModifierState` during a keyboard event. It lives in
+  // the password field because that is where the involuntary uppercase does not
+  // show on screen — the failure the user cannot diagnose alone.
   function sincronizarCapsLock(e: React.KeyboardEvent<HTMLInputElement>) {
     setCapsLock(e.getModifierState?.("CapsLock") ?? false);
   }
@@ -59,8 +59,8 @@ export function AuthPasswordField({
         </Label>
         {labelRight}
       </div>
-      {/* O botão fica DENTRO da moldura do campo, e o input ganha `pr-11` para o
-          texto não correr por baixo dele. */}
+      {/* The button sits INSIDE the field's frame, and the input gets `pr-11` so
+          the text does not run under it. */}
       <div className="relative">
         <Input
           id={id}
@@ -80,9 +80,9 @@ export function AuthPasswordField({
           type="button"
           onClick={() => setShow((v) => !v)}
           disabled={disabled}
-          // `tabIndex={-1}`: quem navega por teclado quer sair da senha direto
-          // para o botão de enviar, não parar num controle que só muda a
-          // exibição. Alvo de 40px (h-10 w-10) para o toque no telefone.
+          // `tabIndex={-1}`: keyboard users want to go from the password straight
+          // to the submit button, not stop at a control that only changes the
+          // display. A 40px target (h-10 w-10) for touch on the phone.
           tabIndex={-1}
           aria-label={show ? t.ocultarSenha : t.mostrarSenha}
           className="absolute right-1 top-1/2 -translate-y-1/2 flex h-10 w-10 items-center justify-center rounded-md text-white/45 transition-colors hover:text-white/80 disabled:opacity-40"

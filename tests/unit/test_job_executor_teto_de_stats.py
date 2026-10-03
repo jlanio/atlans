@@ -1,13 +1,13 @@
 # tests/unit/test_job_executor_teto_de_stats.py
-"""Degraus do teto de 8 KB por stat de nó (executor/job_executor.py).
+"""Steps of the 8 KB ceiling per node stat (executor/job_executor.py).
 
-`output_columns` alimenta a sugestão de nome de coluna do editor. O corte
-antigo o descartava POR INTEIRO no primeiro estouro — quanto mais larga a
-tabela, mais certeira a perda, exatamente onde a sugestão mais vale. Os testes
-fixam a escada de degradação: mensagem de erro truncada → cada lista de
-colunas truncada às primeiras _MAX_STAT_COLUNAS_POR_PORTA → colunas
-descartadas → só os campos essenciais. Cada degrau só executa se o anterior
-não bastou.
+`output_columns` feeds the editor's column-name suggestion. The old cut
+discarded it ENTIRELY on the first overflow — the wider the table, the more
+certain the loss, exactly where the suggestion is worth the most. The tests
+pin the degradation ladder: error message truncated → each column list
+truncated to the first _MAX_STAT_COLUNAS_POR_PORTA → columns
+discarded → only the essential fields. Each step only runs if the previous one
+was not enough.
 """
 import json
 
@@ -42,10 +42,10 @@ def _stat_base(**extras) -> dict:
 
 
 def test_colunas_largas_sao_truncadas_e_nao_descartadas():
-    """Tabela de censo: o stat estoura só de nomes de coluna.
+    """Census table: the stat overflows from column names alone.
 
-    O comportamento antigo descartava output_columns inteiro; agora as
-    primeiras _MAX_STAT_COLUNAS_POR_PORTA de CADA porta sobrevivem.
+    The old behavior discarded output_columns entirely; now the
+    first _MAX_STAT_COLUNAS_POR_PORTA of EACH port survive.
     """
     colunas = [f"variavel_censitaria_{i:04d}" for i in range(200)]
     stat = _stat_base(output_columns={"result": list(colunas), "aux": list(colunas)})
@@ -57,14 +57,14 @@ def test_colunas_largas_sao_truncadas_e_nao_descartadas():
     assert reduzido["__truncated__"] is True, "o corte usa a flag por stat existente"
     assert reduzido["output_columns"]["result"] == colunas[:_MAX_STAT_COLUNAS_POR_PORTA]
     assert reduzido["output_columns"]["aux"] == colunas[:_MAX_STAT_COLUNAS_POR_PORTA]
-    # Sem item-marcador dentro da lista: cada entrada vira sugestão clicável.
+    # No marker item inside the list: each entry becomes a clickable suggestion.
     assert all(c in colunas for c in reduzido["output_columns"]["result"])
-    # O stat original do executor não pode ser mutado pelo corte.
+    # The executor's original stat must not be mutated by the cut.
     assert len(stat["output_columns"]["result"]) == 200
 
 
 def test_erro_gigante_e_truncado_sem_custar_as_colunas():
-    """Degrau 1: se truncar a mensagem de erro basta, as colunas ficam intactas."""
+    """Step 1: if truncating the error message is enough, the columns stay intact."""
     colunas = [f"col_{i}" for i in range(30)]
     stat = _stat_base(error="x" * 20_000, output_columns={"result": list(colunas)})
     assert _tamanho(stat) > _MAX_NODE_STAT_BYTES
@@ -78,13 +78,13 @@ def test_erro_gigante_e_truncado_sem_custar_as_colunas():
 
 
 def test_colunas_caem_por_inteiro_so_quando_nem_truncadas_cabem():
-    """Degrau 3: lastro alheio ocupa quase todo o teto — truncar não basta, descartar sim."""
+    """Step 3: unrelated ballast takes up almost the whole ceiling — truncating is not enough, discarding is."""
     colunas = [f"col_{i:04d}" for i in range(_MAX_STAT_COLUNAS_POR_PORTA * 2)]
     stat = _stat_base(output_columns={"result": colunas})
     sem_colunas = dict(stat)
     sem_colunas.pop("output_columns")
-    # Dimensionado para: sem colunas cabe (com ~200 bytes de folga para a chave
-    # do lastro e a flag), mas nem as 50 primeiras colunas (~550 bytes) cabem.
+    # Sized so that: without columns it fits (with ~200 bytes of slack for the
+    # ballast key and the flag), but not even the first 50 columns (~550 bytes) fit.
     stat["lastro"] = "z" * (_MAX_NODE_STAT_BYTES - _tamanho(sem_colunas) - 200)
     assert _tamanho(stat) > _MAX_NODE_STAT_BYTES
 
@@ -93,12 +93,12 @@ def test_colunas_caem_por_inteiro_so_quando_nem_truncadas_cabem():
     assert _tamanho(reduzido) <= _MAX_NODE_STAT_BYTES
     assert "output_columns" not in reduzido
     assert reduzido["__truncated__"] is True
-    # Parou no degrau do descarte: não colapsou para os campos essenciais.
+    # Stopped at the discard step: did not collapse to the essential fields.
     assert "lastro" in reduzido
 
 
 def test_ultimo_recurso_continua_sendo_so_os_campos_essenciais():
-    """Degrau 4: nem o pop resolve — sobra o mínimo que desenha a linha no painel."""
+    """Step 4: not even the pop solves it — what remains is the minimum that draws the row in the panel."""
     stat = _stat_base(
         lastro="z" * (_MAX_NODE_STAT_BYTES * 2),
         output_columns={"result": [f"col_{i}" for i in range(120)]},
@@ -114,7 +114,7 @@ def test_ultimo_recurso_continua_sendo_so_os_campos_essenciais():
 
 
 def test_limitar_node_stats_entrega_as_colunas_truncadas_ao_resultado():
-    """O caminho real (job_result → servidor) recebe o stat degradado, não podado."""
+    """The real path (job_result → server) receives the degraded stat, not a pruned one."""
     colunas = [f"variavel_censitaria_{i:04d}" for i in range(200)]
     node_stats = {"n1": _stat_base(
         output_columns={"result": list(colunas), "aux": list(colunas)},

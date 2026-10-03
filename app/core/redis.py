@@ -1,23 +1,23 @@
 # app/core/redis.py
 """
-Pool Redis centralizado para o Atlas Studio.
+Centralized Redis pool for Atlas Studio.
 
-Uso:
-    # No lifespan (main.py):
+Usage:
+    # In the lifespan (main.py):
     from app.core.redis import init_redis, close_redis
     await init_redis()
 
-    # Em qualquer serviço:
+    # In any service:
     from app.core.redis import get_redis_pool
     redis = get_redis_pool()
     await redis.get("chave")
 
-    # Contador de rate limit / cota numa janela de tempo:
+    # Rate limit / quota counter over a time window:
     from app.core.redis import contar_na_janela
     contagem, ttl = await contar_na_janela("ratelimit:x:chave", 60)
 
-Nota: executor_connections.py e run_result_consumer.py mantêm conexões
-próprias intencionalmente (pub/sub persistente e brpop bloqueante).
+Note: executor_connections.py and run_result_consumer.py keep their own
+connections on purpose (persistent pub/sub and blocking brpop).
 """
 import redis.asyncio as aioredis
 
@@ -27,7 +27,7 @@ _pool: aioredis.Redis | None = None
 
 
 def get_redis_pool() -> aioredis.Redis:
-    """Retorna o pool Redis global. Deve ser inicializado via init_redis() no lifespan."""
+    """Return the global Redis pool. Must be initialized via init_redis() in the lifespan."""
     if _pool is None:
         raise RuntimeError(
             "Redis pool não inicializado. "
@@ -37,24 +37,24 @@ def get_redis_pool() -> aioredis.Redis:
 
 
 async def init_redis() -> aioredis.Redis:
-    """Inicializa o pool Redis global. Chamado uma vez no startup."""
+    """Initialize the global Redis pool. Called once at startup."""
     global _pool
     _pool = aioredis.from_url(REDIS_URL, decode_responses=True)
     return _pool
 
 
 def new_pubsub_client() -> aioredis.Redis:
-    """Cliente Redis DEDICADO para uma assinatura pub/sub de longa duração.
+    """DEDICATED Redis client for a long-lived pub/sub subscription.
 
-    Um assinante segura a conexão enquanto o run inteiro dura. Vindo de um pool
-    com teto (o WS de logs tinha um pool próprio de 20), o N-ésimo espectador
-    recebia MaxConnectionsError e o painel fechava sem explicação nenhuma —
-    intermitente, sumindo sozinho quando alguém fechava uma aba. Aqui cada
-    assinante ganha a própria conexão, sem teto: o custo é um socket por painel
-    aberto, que é o que o pub/sub exige de qualquer forma.
+    A subscriber holds the connection for as long as the whole run lasts. Coming
+    from a pool with a ceiling (the logs WS had its own pool of 20), the Nth
+    viewer got MaxConnectionsError and the panel closed with no explanation at
+    all — intermittently, going away on its own when someone closed a tab. Here
+    each subscriber gets its own connection, with no ceiling: the cost is one
+    socket per open panel, which is what pub/sub demands anyway.
 
-    Comandos pontuais (GET/LRANGE) continuam no pool global — este cliente é só
-    para o subscribe. O chamador DEVE fechar com `await client.aclose()`.
+    One-off commands (GET/LRANGE) stay on the global pool — this client is only
+    for the subscribe. The caller MUST close it with `await client.aclose()`.
     """
     return aioredis.from_url(REDIS_URL, decode_responses=True)
 
@@ -67,27 +67,27 @@ async def contar_na_janela(
     deslizante: bool = False,
     redis: aioredis.Redis | None = None,
 ) -> tuple[int, int]:
-    """Soma `incremento` ao contador `chave` e devolve (contagem, ttl em segundos).
+    """Add `incremento` to the counter `chave` and return (count, ttl in seconds).
 
-    É o contador de todo rate limit e cota por janela da API. `INCRBY`, `EXPIRE`
-    e `TTL` saem numa transação só (MULTI/EXEC): ou os três acontecem, ou
-    nenhum. Com dois comandos soltos — `INCR` e, se o contador voltou a 1,
-    `EXPIRE` —, perder o segundo (o processo cai entre os dois, a conexão
-    quebra, o SSE é cancelado no meio) deixava a chave SEM PRAZO: o contador
-    nunca zerava e, ao cruzar o teto, o IP, o executor, a família de refresh ou
-    o usuário ficavam bloqueados para sempre.
+    It is the counter behind every per-window rate limit and quota in the API.
+    `INCRBY`, `EXPIRE` and `TTL` go out in a single transaction (MULTI/EXEC):
+    either all three happen, or none. With two loose commands — `INCR` and, if
+    the counter went back to 1, `EXPIRE` —, losing the second (the process dies
+    between the two, the connection breaks, the SSE is cancelled midway) left
+    the key with NO EXPIRY: the counter never reset and, once over the ceiling,
+    the IP, the executor, the refresh family or the user stayed blocked forever.
 
-    Janela fixa (o padrão): `EXPIRE ... NX` só arma o prazo de uma chave que não
-    tem nenhum — na primeira contagem, ou numa chave que ficou sem prazo antes
-    desta função existir —, e nunca empurra um prazo que já corre: senão a
-    janela não fecharia enquanto houvesse tráfego. O `NX` exige Redis 7 (o
-    compose usa `redis:7-alpine`).
+    Fixed window (the default): `EXPIRE ... NX` only sets the expiry of a key
+    that has none — on the first count, or on a key left without an expiry
+    before this function existed —, and never pushes back an expiry already
+    running: otherwise the window would never close while there was traffic.
+    `NX` requires Redis 7 (compose uses `redis:7-alpine`).
 
-    `deslizante=True` renova o prazo a cada contagem: a janela só fecha depois
-    de `janela_s` segundos SEM contagem (o bloqueio de login por conta).
+    `deslizante=True` renews the expiry on every count: the window only closes
+    after `janela_s` seconds with NO count (the per-account login lockout).
 
-    `redis`: um cliente já em mãos; sem ele, o pool global. Erros do Redis
-    sobem para o chamador, que decide se degrada aberto ou fechado.
+    `redis`: a client already at hand; without one, the global pool. Redis
+    errors propagate to the caller, which decides whether to fail open or closed.
     """
     rc = redis if redis is not None else get_redis_pool()
     async with rc.pipeline(transaction=True) as pipe:

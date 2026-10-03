@@ -1,8 +1,9 @@
 # tests/unit/test_webhook_no_executor.py
 """
-Webhook sem executor (spec §6, §7.3): 503 GENÉRICO ao chamador anônimo — sem
-nomes de executores, contagens ou política — com `Retry-After`, sem criar run,
-e sem consumir a chave de idempotência (o reenvio tenta de verdade).
+Webhook with no executor (spec §6, §7.3): a GENERIC 503 to the anonymous
+caller — no executor names, counts or policy — with `Retry-After`, without
+creating a run, and without consuming the idempotency key (the resend really
+tries again).
 """
 from __future__ import annotations
 
@@ -45,15 +46,15 @@ async def test_503_generico_com_retry_after(servico_sem_executor):
     assert resp.headers.get("retry-after") == "60"
     corpo = resp.json()
     assert corpo["message"] == "Execução temporariamente indisponível para este workflow."
-    # nada da frota vaza para o anônimo
+    # nothing about the fleet leaks to the anonymous caller
     texto = resp.text
     assert "geo-01" not in texto and "isolado" not in texto.lower() and "dedicad" not in texto.lower()
     service.start_analysis.assert_awaited_once()
 
 
 async def test_reenvio_com_a_mesma_chave_tenta_de_novo(servico_sem_executor):
-    """A chave de idempotência só é gravada após um dispatch bem-sucedido
-    (workflow_service.py, passo 7): dois 503 seguidos = duas tentativas reais."""
+    """The idempotency key is only written after a successful dispatch
+    (workflow_service.py, step 7): two 503s in a row = two real attempts."""
     client, service = servico_sem_executor
     for _ in range(2):
         resp = await client.post("/webhook/execute/wf-1", json={}, headers={"Idempotency-Key": "abc"})

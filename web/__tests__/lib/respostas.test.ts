@@ -1,9 +1,10 @@
 /**
- * `dadoOuAviso` — a leitura única da `IResponse` do serviço nas telas do editor.
+ * `dadoOuAviso` — the single reading of the service's `IResponse` on the editor screens.
  *
- * O serviço nunca rejeita (a falha volta em `res.error`), então é aqui, e não num
- * `catch`, que a falha vira aviso. E o retorno distingue "não sei" (`null`) de
- * "vazio" (a lista vazia que o servidor mandou).
+ * The service never rejects (the failure comes back in `res.error`), so it's
+ * here, and not in a `catch`, that the failure becomes a warning. And the return
+ * value distinguishes "don't know" (`null`) from "empty" (the empty list the
+ * server sent).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 

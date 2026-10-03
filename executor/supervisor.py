@@ -1,23 +1,24 @@
 # executor/supervisor.py
 """
-Watchdog do processo supervisor.
+Supervisor process watchdog.
 
-Quando o executor e iniciado por um supervisor externo — o app desktop —, o
-supervisor passa o proprio PID em `EXECUTOR_SUPERVISOR_PID`. Se ele morrer sem
-encerrar o filho (usuario matando o app pelo Gerenciador de Tarefas, crash do
-Electron), o executor ficaria vivo, orfao e invisivel: sem janela, sem tray, e
-ainda segurando a conexao WebSocket com o mesmo EXECUTOR_ID. Da proxima vez que
-o app subisse, o servidor veria DUAS conexoes do mesmo executor.
+When the executor is started by an external supervisor — the desktop app —,
+the supervisor passes its own PID in `EXECUTOR_SUPERVISOR_PID`. If it dies
+without shutting down the child (user killing the app through Task Manager,
+Electron crash), the executor would stay alive, orphaned and invisible: no
+window, no tray, and still holding the WebSocket connection with the same
+EXECUTOR_ID. The next time the app started, the server would see TWO
+connections from the same executor.
 
-A alternativa canonica no Windows seria um Job Object com
-`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, que mata o filho junto com o pai. Foi
-descartada porque exige modulo nativo (`node-gyp`, rebuild a cada versao do
-Electron, assinatura do `.node`) para resolver o que 60 linhas resolvem —
-`psutil` ja e dependencia do executor, usada por `sysinfo.py`.
+The canonical alternative on Windows would be a Job Object with
+`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`, which kills the child along with the
+parent. It was discarded because it requires a native module (`node-gyp`, a
+rebuild for every Electron version, signing the `.node`) to solve what 60
+lines solve — `psutil` is already an executor dependency, used by `sysinfo.py`.
 
-O encerramento e ORDENADO: dispara o mesmo `shutdown_event` de um SIGTERM, entao
-jobs em andamento sao drenados e resultados confirmados. Matar na hora perderia
-trabalho ja feito.
+The shutdown is ORDERLY: it fires the same `shutdown_event` as a SIGTERM, so
+jobs in progress are drained and results confirmed. Killing on the spot would
+lose work already done.
 """
 from __future__ import annotations
 
@@ -32,10 +33,10 @@ VAR_PID = "EXECUTOR_SUPERVISOR_PID"
 
 
 def pid_configurado() -> int | None:
-    """PID do supervisor, ou None se o executor nao foi iniciado por um.
+    """The supervisor's PID, or None if the executor was not started by one.
 
-    Rodar `python -m executor` na mao nao define a variavel, entao o watchdog
-    simplesmente nao sobe — nao ha nada para vigiar.
+    Running `python -m executor` by hand doesn't set the variable, so the
+    watchdog simply doesn't start — there is nothing to watch.
     """
     bruto = (os.getenv(VAR_PID) or "").strip()
     if not bruto:
@@ -51,12 +52,12 @@ def pid_configurado() -> int | None:
 
 
 class MonitorSupervisor:
-    """Verifica periodicamente se o supervisor continua vivo.
+    """Periodically checks whether the supervisor is still alive.
 
-    Compara PID **e** `create_time()`. So o PID nao basta: o sistema operacional
-    reaproveita numeros de processo, e um PID reciclado por outro programa faria
-    o watchdog concluir que o supervisor esta vivo quando ha muito morreu — o
-    orfao que ele existe para evitar.
+    Compares the PID **and** `create_time()`. The PID alone is not enough: the
+    operating system reuses process numbers, and a PID recycled by another
+    program would make the watchdog conclude the supervisor is alive when it
+    died long ago — the orphan it exists to prevent.
     """
 
     def __init__(self, pid: int, *, intervalo: float = INTERVALO_S) -> None:
@@ -66,7 +67,7 @@ class MonitorSupervisor:
         self._criado_em: float | None = None
 
     def vincular(self) -> bool:
-        """Fixa a identidade do supervisor. False se ele ja nao existe."""
+        """Pins the supervisor's identity. False if it no longer exists."""
         try:
             import psutil
         except ImportError:
@@ -91,18 +92,18 @@ class MonitorSupervisor:
         try:
             if not proc.is_running():
                 return False
-            # Zumbi ainda "roda" para o is_running(); nao serve de supervisor.
+            # A zombie still "runs" as far as is_running() is concerned; it doesn't count as a supervisor.
             import psutil
             if proc.status() == psutil.STATUS_ZOMBIE:
                 return False
             return proc.create_time() == self._criado_em
         except Exception:
-            # NoSuchProcess, AccessDenied num processo que virou de outro dono —
-            # todos significam "o supervisor que eu conhecia se foi".
+            # NoSuchProcess, AccessDenied on a process now owned by someone else —
+            # all mean "the supervisor I knew is gone".
             return False
 
     async def vigiar(self, ao_morrer) -> None:
-        """Loop ate o supervisor sumir; entao chama `ao_morrer` uma unica vez."""
+        """Loops until the supervisor disappears; then calls `ao_morrer` exactly once."""
         while True:
             await asyncio.sleep(self._intervalo)
             if not self.vivo():
@@ -124,8 +125,8 @@ def criar_task(ao_morrer, *, intervalo: float = INTERVALO_S) -> asyncio.Task | N
         return None
     monitor = MonitorSupervisor(pid, intervalo=intervalo)
     if not monitor.vincular():
-        # O supervisor morreu entre o spawn e este ponto. Encerrar ja e o certo:
-        # ninguem vai consumir o canal NDJSON nem parar este processo depois.
+        # The supervisor died between the spawn and this point. Shutting down now is
+        # right: nobody will consume the NDJSON channel or stop this process later.
         ao_morrer()
         return None
     logger.info("Watchdog do supervisor ativo (PID %d, a cada %.0fs).", pid, intervalo)

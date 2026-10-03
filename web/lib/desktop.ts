@@ -1,15 +1,15 @@
 // web/lib/desktop.ts
 //
-// Acesso à ponte read-only exposta pelo app desktop (Electron) em
-// `window.atlansDesktop` — ver desktop/src/preload/web.ts.
+// Access to the read-only bridge exposed by the desktop app (Electron) at
+// `window.atlansDesktop` — see desktop/src/preload/web.ts.
 //
-// No navegador comum a ponte NÃO existe: tudo aqui degrada para `null`, e a UI
-// que a consome (o selo do executor) simplesmente não renderiza. É o único
-// ponto de acoplamento com o desktop, e é feature-detect puro — nenhum campo é
-// assumido sem checar.
+// In a regular browser the bridge does NOT exist: everything here degrades to
+// `null`, and the UI that consumes it (the executor badge) simply does not
+// render. It is the only coupling point with the desktop, and it is pure
+// feature detection — no field is assumed without checking.
 
-/** Espelha `StatusExecutorLocal` de desktop/src/shared/executor-status.ts.
- *  Duplicado de propósito: são dois pacotes sem código compartilhado. */
+/** Mirrors `StatusExecutorLocal` from desktop/src/shared/executor-status.ts.
+ *  Duplicated on purpose: they are two packages with no shared code. */
 export type EstadoExecutorLocal = 'online' | 'ocupado' | 'offline' | 'sem-vinculo'
 
 export interface StatusExecutorLocal {
@@ -27,7 +27,7 @@ interface PonteDesktop {
   aoMudarStatus: (fn: (s: StatusExecutorLocal) => void) => () => void
 }
 
-/** A ponte do desktop, ou `null` fora dele. */
+/** The desktop bridge, or `null` outside of it. */
 export function ponteDesktop(): PonteDesktop | null {
   if (typeof window === 'undefined') return null
   const p = (window as unknown as { atlansDesktop?: PonteDesktop }).atlansDesktop

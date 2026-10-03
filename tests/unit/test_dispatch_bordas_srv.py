@@ -1,22 +1,22 @@
 # tests/unit/test_dispatch_bordas_srv.py
 """
-Bordas do despacho que as otimizacoes de latencia expuseram.
+Dispatch edge cases that the latency optimizations exposed.
 
-Tres invariantes que nenhum teste cobria:
+Three invariants no test covered:
 
-A14 — o fail-fast de "nenhum executor disponivel" (503) NAO pode preceder a
-      autenticacao do chamador de webhook: um anonimo passaria a sondar o estado
-      da frota de execucao do tenant antes de qualquer 401/403.
+A14 — the "no executor available" fail-fast (503) must NOT precede the
+      authentication of the webhook caller: an anonymous caller could probe the
+      state of the tenant's execution fleet before any 401/403.
 
-A15 — 'pending' nao prova que o job nao saiu. Se o worker que despachou morre
-      entre o `send_job` e o commit de pending->running, o run fica 'pending'
-      com o executor rodando o fluxo de verdade; cancelar tem de avisar o host
-      gravado, senao a API responde "cancelado" e o fluxo termina mandando
-      e-mails e gravando dados.
+A15 — 'pending' does not prove the job did not go out. If the worker that
+      dispatched dies between `send_job` and the pending->running commit, the run
+      stays 'pending' with the executor really running the workflow; canceling
+      has to notify the stored host, otherwise the API answers "cancelado"
+      (canceled) and the workflow finishes sending e-mails and writing data.
 
-A40 — o cache de nodes desabilitados e por PROCESSO e a producao roda 4 workers:
-      sem a epoca no Redis, um node desabilitado pelo admin continua sendo
-      despachado pelos outros workers (e vai no envelope do job) ate o TTL vencer.
+A40 — the disabled-nodes cache is per PROCESS and production runs 4 workers:
+      without the epoch in Redis, a node disabled by the admin keeps being
+      dispatched by the other workers (and goes in the job envelope) until the TTL expires.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ TOKEN = "token-do-webhook"
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# A14 — precedencia: autenticar antes de falar sobre a frota
+# A14 — precedence: authenticate before talking about the fleet
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _requisicao(authorization: str | None) -> MagicMock:
@@ -51,7 +51,7 @@ def _definicao_com_gatilho_protegido() -> dict:
 
 
 def _servico_sem_executor():
-    """WorkflowService cujo pool de executores esta vazio (503 garantido)."""
+    """WorkflowService whose executor pool is empty (503 guaranteed)."""
     from app.services.workflow_service import WorkflowService
 
     wf = MagicMock()
@@ -77,7 +77,7 @@ async def _disparar_sem_executor(service, resolver_credenciais, **kwargs):
     with (
         patch("app.services.disabled_nodes_service.disabled_names",
               new=AsyncMock(return_value=set())),
-        # O dispatch importa dentro da funcao — o patch tem de ser na origem.
+        # The dispatch imports inside the function — the patch has to be at the source.
         patch("flow.utils.workflow_contract.collect_subworkflow_definitions_recursive",
               new=AsyncMock(return_value={})),
         patch("app.services.workflow_service.resolve_credentials_from_ids",
@@ -90,10 +90,10 @@ class TestOrdemAutenticacaoAntesDoFailFast:
 
     @pytest.mark.asyncio
     async def test_anonimo_recebe_401_e_nao_sonda_a_frota(self):
-        """Sem header nenhum: 401 do token, e `_resolve_candidates` nem roda.
+        """No header at all: 401 from the token, and `_resolve_candidates` does not even run.
 
-        Antes o mesmo chamador levava 503 com a mensagem literal sobre o pool
-        de executores — oraculo sobre a infraestrutura do tenant.
+        Before, the same caller got a 503 with the literal message about the
+        executor pool — an oracle on the tenant's infrastructure.
         """
         service = _servico_sem_executor()
         resolver = AsyncMock(return_value={"cred-1": {"type": "webhook_token", "token": TOKEN}})
@@ -119,7 +119,7 @@ class TestOrdemAutenticacaoAntesDoFailFast:
 
     @pytest.mark.asyncio
     async def test_token_certo_continua_recebendo_o_fail_fast(self):
-        """O fail-fast nao foi removido — so reposicionado depois do token."""
+        """The fail-fast was not removed — only moved after the token."""
         service = _servico_sem_executor()
         resolver = AsyncMock(return_value={"cred-1": {"type": "webhook_token", "token": TOKEN}})
 
@@ -129,14 +129,14 @@ class TestOrdemAutenticacaoAntesDoFailFast:
             )
 
         assert service._resolve_candidates.await_count == 1
-        # E antes do despacho, obviamente.
+        # And before the dispatch, obviously.
         assert service._dispatch_job.await_count == 0
 
     @pytest.mark.asyncio
     async def test_disparo_ja_autenticado_aborta_antes_de_resolver_credenciais(self):
-        """O ganho de latencia preservado: quem ja se autenticou (botao
-        Executar, retry, cron) recebe o 503 sem o servidor colecionar sub-fluxos
-        nem decifrar credencial nenhuma."""
+        """The latency gain preserved: whoever has already authenticated (Executar
+        button, retry, cron) gets the 503 without the server collecting
+        sub-workflows or decrypting any credential."""
         service = _servico_sem_executor()
         resolver = AsyncMock(return_value={})
 
@@ -182,9 +182,9 @@ class TestCancelarRunPendente:
 
     @pytest.mark.asyncio
     async def test_pendente_com_host_avisa_o_executor(self):
-        """O cenario do worker morto entre `send_job` e o commit: o executor JA
-        tem o job, o run ficou 'pending' para sempre. Sem este aviso a API
-        responde "cancelado" e o fluxo roda ate o fim."""
+        """The scenario of the worker dying between `send_job` and the commit: the
+        executor ALREADY has the job, the run stayed 'pending' forever. Without
+        this notice the API answers "cancelado" and the workflow runs to the end."""
         from app.services import workflow_execution_service as svc
 
         run = _run()
@@ -196,10 +196,11 @@ class TestCancelarRunPendente:
             patch.object(svc, "executor_registry", registry),
             patch("app.core.run_result_consumer.account_terminal_run", new=AsyncMock()),
         ):
-            # `como_admin=True` não é atalho preguiçoso: estes casos são sobre a MECÂNICA
-            # do cancelamento (pendente × entregue, corrida com o dispatch), e montar
-            # associação de workspace em cada um só afastaria o teste do que ele mede.
-            # A autorização tem cobertura própria em test_fixes_seguranca_opcao_c.py.
+            # `como_admin=True` is not a lazy shortcut: these cases are about the MECHANICS
+            # of cancellation (pending × delivered, race with the dispatch), and
+            # building a workspace association in each one would only pull the test
+            # away from what it measures. Authorization has its own coverage in
+            # test_fixes_seguranca_opcao_c.py.
             outcome = await svc.cancel_run(db, "job-1", user_id="irrelevante", como_admin=True)
 
         assert outcome == "cancelled"
@@ -228,8 +229,8 @@ class TestCancelarRunPendente:
 
     @pytest.mark.asyncio
     async def test_executor_offline_nao_desfaz_o_cancelamento_local(self):
-        """O aviso e best-effort: o run ja foi fechado no banco e o usuario
-        precisa da confirmacao mesmo com o executor fora do ar."""
+        """The notice is best-effort: the run was already closed in the database and
+        the user needs the confirmation even with the executor offline."""
         from app.services import workflow_execution_service as svc
 
         run = _run()
@@ -248,8 +249,8 @@ class TestCancelarRunPendente:
 
     @pytest.mark.asyncio
     async def test_dispatch_venceu_a_corrida_segue_pelo_caminho_normal(self):
-        """rowcount 0: o run virou 'running' no meio. Vale o pedido ao executor,
-        que responde "requested"."""
+        """rowcount 0: the run became 'running' in the meantime. The request to the
+        executor applies, which answers "requested"."""
         from app.services import workflow_execution_service as svc
 
         run = _run()
@@ -275,11 +276,11 @@ class TestCancelarRunPendente:
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# A40 — invalidacao do cache de nodes desabilitados entre workers
+# A40 — invalidation of the disabled-nodes cache across workers
 # ══════════════════════════════════════════════════════════════════════════════
 
 class _RedisFake:
-    """So o par GET/INCR da chave de epoca."""
+    """Only the GET/INCR pair of the epoch key."""
 
     def __init__(self, epoca: str | None = None):
         self.epoca = epoca
@@ -307,7 +308,7 @@ class TestInvalidacaoEntreWorkers:
 
     @pytest.mark.asyncio
     async def test_epoca_estavel_nao_volta_ao_banco(self):
-        """O ganho que motivou o cache: nada muda, nenhum SELECT novo."""
+        """The gain that motivated the cache: nothing changes, no new SELECT."""
         from app.services import disabled_nodes_service as svc
 
         redis = _RedisFake("7")
@@ -323,9 +324,9 @@ class TestInvalidacaoEntreWorkers:
 
     @pytest.mark.asyncio
     async def test_node_desabilitado_em_outro_worker_aparece_na_leitura_seguinte(self):
-        """O caso que importa: o admin desabilitou pelo worker 1; este processo
-        tem cache quente e TTL longe de vencer. Sem a epoca, ele seguiria
-        despachando o node (e mandando a lista velha no envelope do job)."""
+        """The case that matters: the admin disabled it through worker 1; this process
+        has a warm cache and a TTL far from expiring. Without the epoch, it would
+        keep dispatching the node (and sending the old list in the job envelope)."""
         from app.services import disabled_nodes_service as svc
 
         redis = _RedisFake("7")
@@ -391,8 +392,8 @@ class TestInvalidacaoEntreWorkers:
 
     @pytest.mark.asyncio
     async def test_redis_fora_do_ar_degrada_para_o_ttl_local(self):
-        """Redis indisponivel nao pode derrubar o dispatch: volta a valer o teto
-        de defasagem antigo, sem SELECT por disparo."""
+        """Redis being unavailable must not take down the dispatch: the old staleness
+        ceiling applies again, with no SELECT per trigger."""
         from app.services import disabled_nodes_service as svc
 
         leitura = AsyncMock(return_value={})

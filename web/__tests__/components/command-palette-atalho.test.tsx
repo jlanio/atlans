@@ -2,20 +2,20 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { cleanup, render, screen, fireEvent, act } from "@testing-library/react"
 
 /**
- * O ATALHO da paleta. Até aqui a paleta só tinha teste puro (`itensVisiveis`) —
- * o Ctrl+K, o toggle e o comportamento com a sessão carregando não tinham
- * cobertura nenhuma, e é justamente o atalho que vira o portão da Home.
+ * The palette SHORTCUT. Until now the palette only had a pure test (`itensVisiveis`) —
+ * Ctrl+K, the toggle and the behavior while the session is loading had no
+ * coverage at all, and it is precisely the shortcut that becomes the Home's gate.
  *
- * Molde: `shell-sidebar.test.tsx` (pathname mutável) + `home-sidebar.test.tsx`
- * (sessão mutável, inclusive `status: "loading"`).
+ * Template: `shell-sidebar.test.tsx` (mutable pathname) + `home-sidebar.test.tsx`
+ * (mutable session, including `status: "loading"`).
  */
 const ctx = vi.hoisted(() => ({
   pathname: "/" as string | null,
   papel: undefined as string | undefined,
-  // ESTÁVEL entre renders, como o `useRouter` de verdade. Um objeto novo a cada
-  // render trocaria a identidade do `loadItems` (`useCallback` com `router` nas
-  // deps), que é dependência do efeito de abertura — e o efeito se realimentaria
-  // num laço infinito que só existe no teste.
+  // STABLE across renders, like the real `useRouter`. A new object on every
+  // render would change the identity of `loadItems` (`useCallback` with `router` in its
+  // deps), which is a dependency of the open effect — and the effect would feed itself
+  // in an infinite loop that only exists in the test.
   router: { push: (..._a: unknown[]) => {} },
 }))
 
@@ -45,7 +45,7 @@ vi.mock("@/app/stores/workflowCatalogStore", () => ({
 
 import CommandPalette from "@/app/components/command-palette"
 
-/** Ctrl+K como o navegador o entrega: no `window`, que é onde o listener mora. */
+/** Ctrl+K as the browser delivers it: on `window`, which is where the listener lives. */
 function ctrlK() {
   fireEvent.keyDown(window, { key: "k", ctrlKey: true })
 }
@@ -68,7 +68,7 @@ describe("Ctrl+K — o portão da Home", () => {
   })
 
   it("e nem chega a buscar os fluxos", async () => {
-    // O GET saía a cada Ctrl+K. Sem abrir, `loadItems` não roda.
+    // The GET went out on every Ctrl+K. Without opening, `loadItems` does not run.
     render(<CommandPalette />)
     act(() => ctrlK())
     await act(async () => {})
@@ -90,8 +90,8 @@ describe("Ctrl+K — o portão da Home", () => {
   })
 
   it("sessão carregando na Home: não abre (falha FECHADA)", () => {
-    // `data` nulo enquanto o `useSession` resolve. Errar para o lado de abrir
-    // piscaria uma paleta que some no render seguinte.
+    // `data` is null while `useSession` resolves. Erring on the side of opening
+    // would flash a palette that disappears on the next render.
     ctx.papel = undefined
     render(<CommandPalette />)
     act(() => ctrlK())
@@ -99,7 +99,7 @@ describe("Ctrl+K — o portão da Home", () => {
   })
 
   it("Esc fecha mesmo quando o portão está fechado", () => {
-    // Fechar nunca depende de regra: um Esc preso é pior que qualquer portão.
+    // Closing never depends on a rule: a stuck Esc is worse than any gate.
     ctx.pathname = "/projects"
     render(<CommandPalette />)
     act(() => ctrlK())
@@ -109,7 +109,7 @@ describe("Ctrl+K — o portão da Home", () => {
   })
 
   it("aberta fora da Home, chegar na Home a fecha", () => {
-    // Navegação client-side para `/` com a paleta aberta.
+    // Client-side navigation to `/` with the palette open.
     ctx.pathname = "/projects"
     const { rerender } = render(<CommandPalette />)
     act(() => ctrlK())

@@ -1,5 +1,5 @@
-// Mapa de estilos visuais por tipo de nó — fonte única de verdade.
-// Usado pelo IconRoot (cards no canvas) e NodeConfigModal (header do modal).
+// Map of visual styles per node type — single source of truth.
+// Used by IconRoot (cards on the canvas) and NodeConfigModal (modal header).
 
 export const TYPE_STYLES: Record<string, { stripe: string; bg: string; icon: string; label: string }> = {
   trigger:    { stripe: "bg-violet-500",  bg: "bg-violet-500/10",  icon: "text-violet-500",  label: "text-violet-400"  },
@@ -10,13 +10,13 @@ export const TYPE_STYLES: Record<string, { stripe: string; bg: string; icon: str
   control:    { stripe: "bg-orange-400",  bg: "bg-orange-400/10",  icon: "text-orange-400",  label: "text-orange-300"  },
 }
 
-/** Nome e descrição de cada tipo, em português.
+/** Name and description of each type, in Portuguese.
  *
- *  Estavam escritos três vezes — no cabeçalho do drawer, na lista de nós e nos
- *  cartões de categoria — e já divergiam: "Fontes de dados" num lugar, "Fontes"
- *  no outro. Ficam aqui junto das cores porque respondem à mesma pergunta ("o
- *  que este tipo é"), e porque foi a separação delas que deixou as três cópias
- *  se afastarem sem ninguém notar. */
+ *  They were written three times — in the drawer header, in the node list and
+ *  in the category cards — and already diverged: "Fontes de dados" in one
+ *  place, "Fontes" in another. They live here next to the colors because they
+ *  answer the same question ("what this type is"), and because separating them
+ *  is what let the three copies drift apart without anyone noticing. */
 export const TYPE_INFO: Record<string, { nome: string; descricao: string }> = {
   trigger:    { nome: "Triggers",         descricao: "Inicia o workflow" },
   action:     { nome: "Ações",            descricao: "Transformações e operações" },
@@ -26,7 +26,7 @@ export const TYPE_INFO: Record<string, { nome: string; descricao: string }> = {
   control:    { nome: "Controle",         descricao: "Lógica e fluxo condicional" },
 }
 
-/** Nome de exibição do tipo, com recuo para o próprio identificador. */
+/** Display name of the type, falling back to the identifier itself. */
 export const nomeDoTipo = (tipo: string): string =>
   (Object.prototype.hasOwnProperty.call(TYPE_INFO, tipo) ? TYPE_INFO[tipo]?.nome : undefined)
   ?? tipo.charAt(0).toUpperCase() + tipo.slice(1)
@@ -38,14 +38,14 @@ export const DEFAULT_STYLE = {
   label: "text-muted-foreground",
 }
 
-/** Descrição do tipo, vazia para o que o mapa não conhece. */
+/** Description of the type, empty for what the map does not know. */
 export const descricaoDoTipo = (tipo: string): string =>
   (Object.prototype.hasOwnProperty.call(TYPE_INFO, tipo) ? TYPE_INFO[tipo]?.descricao : undefined) ?? ""
 
-/** Estilo do tipo, com recuo para o neutro.
+/** The type's style, falling back to neutral.
  *
- *  `TYPE_STYLES[t] ?? DEFAULT_STYLE` lia pela cadeia de protótipo: um tipo vindo
- *  da API chamado `constructor` devolvia a função `Object`, que é truthy — o
- *  `??` não disparava e `estilo.bg` saía `undefined`. */
+ *  `TYPE_STYLES[t] ?? DEFAULT_STYLE` read through the prototype chain: a type
+ *  coming from the API named `constructor` returned the `Object` function, which
+ *  is truthy — the `??` did not fire and `estilo.bg` came out `undefined`. */
 export const estiloDoTipo = (tipo: string) =>
   Object.prototype.hasOwnProperty.call(TYPE_STYLES, tipo) ? TYPE_STYLES[tipo] : DEFAULT_STYLE

@@ -9,7 +9,7 @@ import { plural } from "@/lib/formatos"
 interface DeleteCredentialProps {
   deleteCredentialId: string | undefined
   setDeleteCredentialId: Dispatch<SetStateAction<string | undefined>>
-  /** Nº de nós de workflow que referenciam a credencial (0 = não exibe aviso). */
+  /** Number of workflow nodes that reference the credential (0 = no warning shown). */
   usageCount?: number
 }
 
@@ -19,8 +19,8 @@ const DeleteCredential = ({ deleteCredentialId, setDeleteCredentialId, usageCoun
 
   async function handleConfirm() {
     if (!deleteCredentialId) return
-    // O retorno era ignorado: em 403/409/rede o item desaparecia da lista e
-    // reaparecia no próximo refresh, sem nenhuma mensagem.
+    // The return value was ignored: on 403/409/network the item disappeared from the
+    // list and reappeared on the next refresh, without any message.
     const res = await GisFlowService.deleteCredentialById(deleteCredentialId)
     if (res?.error) {
       createToast.error("Erro ao excluir credencial!", res.error.message)
@@ -30,17 +30,18 @@ const DeleteCredential = ({ deleteCredentialId, setDeleteCredentialId, usageCoun
       ...prev,
       credentials: prev.credentials.filter(c => c.id !== deleteCredentialId)
     }))
-    // Sem invalidar, o canvas seguiria oferecendo por até 5 min uma credencial
-    // que não existe mais — e o nó salvo com ela falharia só na execução.
+    // Without invalidating, the canvas would keep offering for up to 5 min a
+    // credential that no longer exists — and the node saved with it would only
+    // fail at execution.
     useWorkflowCatalogStore.getState().invalidarCredenciais()
 
     createToast.success("Credencial excluída", name || undefined)
     setDeleteCredentialId(undefined)
   }
 
-  // Aviso discreto (uma linha muted, não um painel de alerta): informa que a
-  // exclusão afeta nós que usam a credencial, sem transformar a confirmação
-  // rotineira num susto.
+  // Discreet warning (a muted line, not an alert panel): it says that the
+  // deletion affects nodes using the credential, without turning the routine
+  // confirmation into a scare.
   const note = usageCount > 0
     ? `Em uso em ${plural(usageCount, "nó", "nós")} de workflow — deixarão de resolver esta credencial.`
     : undefined

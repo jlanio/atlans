@@ -1,33 +1,34 @@
 # app/extensoes/__init__.py
 """
-Extensões: o que uma instalação pode ter além do núcleo.
+Extensions: what an installation can have beyond the core.
 
-Cada subpacote de `app/extensoes/` é uma extensão — os planos pagos, na
-instalação que vende assinaturas, são uma. O núcleo NUNCA importa uma extensão
-pelo nome: na primeira chamada a `registro()`, cada subpacote é importado e a
-função `registrar(registro)` dele pendura no `Registro` o que a extensão traz.
-Sem extensão nenhuma — a distribuição livre —, cada ponto de encaixe tem um
-padrão no núcleo, e nada falta.
+Each subpackage of `app/extensoes/` is an extension — the paid plans, in the
+installation that sells subscriptions, are one. The core NEVER imports an
+extension by name: on the first call to `registro()`, each subpackage is
+imported and its `registrar(registro)` function hangs on the `Registro` what
+the extension brings. With no extension at all — the free distribution —, each
+plug-in point has a default in the core, and nothing is missing.
 
-  rotas              APIRouters incluídos depois dos do núcleo
-  tarefas_de_fundo   (nome, fábrica) somadas às do lifespan (`app/main.py`)
-  plano_e_teto       o plano e o teto de tokens do assistente de uma pessoa
-                     (padrão: nenhum plano, e o teto de `app/mcp/cotas.py`)
-  assinaturas_ativas se a tela oferece contratar um plano (padrão: não)
-  templates          pastas de modelos de e-mail, consultadas depois da do núcleo
-  painel_do_modelo   campos a mais no painel de admin do modelo do assistente
+  rotas              APIRouters included after the core's
+  tarefas_de_fundo   (name, factory) added to the lifespan's (`app/main.py`)
+  plano_e_teto       a person's plan and assistant token ceiling
+                     (default: no plan, and the ceiling from `app/mcp/cotas.py`)
+  assinaturas_ativas whether the screen offers subscribing to a plan (default: no)
+  templates          email template folders, consulted after the core's
+  painel_do_modelo   extra fields in the admin panel for the assistant's model
 
-Os modelos SQLAlchemy de uma extensão moram em `<extensão>/modelos`, e entram no
-`Base.metadata` por `importar_modelos()` (chamada em `app/models/__init__.py`).
-As tabelas deles, em `<extensão>/schema.sql` (DROP + CREATE, como o
-`scripts/init_schema.sql` do núcleo): a base zero do alembic roda cada um,
-depois do script do núcleo (`esquemas()`).
+An extension's SQLAlchemy models live in `<extensão>/modelos`, and enter
+`Base.metadata` through `importar_modelos()` (called in `app/models/__init__.py`).
+Their tables, in `<extensão>/schema.sql` (DROP + CREATE, like the core's
+`scripts/init_schema.sql`): the alembic zero base runs each one, after the
+core's script (`esquemas()`).
 
-ATLANS_SEM_EXTENSOES=1 ignora as extensões presentes: é como os testes provam
-que o núcleo anda sozinho. Uma extensão presente que não importa derruba o
-arranque — sumir em silêncio com a cobrança seria pior.
+ATLANS_SEM_EXTENSOES=1 ignores the extensions present: that is how the tests
+prove the core runs on its own. An extension that is present but fails to
+import brings startup down — silently vanishing along with billing would be
+worse.
 
-Só a biblioteca padrão aqui: `app/models/__init__.py` importa este módulo.
+Only the standard library here: `app/models/__init__.py` imports this module.
 """
 from __future__ import annotations
 
@@ -39,10 +40,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-# (plano | None, teto) de uma pessoa. Recebe `user_id` e, por nome, `db` e `redis`.
+# A person's (plan | None, ceiling). Receives `user_id` and, by name, `db` and `redis`.
 PlanoETeto = Callable[..., Awaitable[tuple[str | None, int]]]
-# Campos a mais no painel do modelo. Recebe `db` e, por nome, `atual`, `catalogo`,
-# `simular` e `consulta` (os parâmetros da URL); devolve o que somar ao painel.
+# Extra fields in the model panel. Receives `db` and, by name, `atual`, `catalogo`,
+# `simular` and `consulta` (the URL parameters); returns what to add to the panel.
 ContribuicaoAoPainel = Callable[..., Awaitable[dict[str, Any]]]
 TarefaDeFundo = tuple[str, Callable[[], Awaitable[object]]]
 
@@ -57,8 +58,8 @@ class Registro:
     rotas: list[Any] = field(default_factory=list)
     tarefas_de_fundo: list[TarefaDeFundo] = field(default_factory=list)
     plano_e_teto: PlanoETeto | None = None
-    # Uma função, e não um booleano: o valor depende da configuração da
-    # extensão, lida quando a tela pergunta.
+    # A function, not a boolean: the value depends on the extension's
+    # configuration, read when the screen asks.
     assinaturas_ativas: Callable[[], bool] = field(default=_nenhuma)
     templates: list[Path] = field(default_factory=list)
     painel_do_modelo: list[ContribuicaoAoPainel] = field(default_factory=list)
@@ -68,7 +69,7 @@ _registro: Registro | None = None
 
 
 def desligadas() -> bool:
-    """ATLANS_SEM_EXTENSOES: o núcleo sozinho, mesmo com extensões no disco."""
+    """ATLANS_SEM_EXTENSOES: the core alone, even with extensions on disk."""
     return os.getenv("ATLANS_SEM_EXTENSOES", "").strip().lower() in ("1", "true", "sim", "yes", "on")
 
 
@@ -82,7 +83,7 @@ def _nomes() -> list[str]:
 
 
 def registro() -> Registro:
-    """O registro das extensões presentes, montado na primeira chamada."""
+    """The registry of the extensions present, assembled on the first call."""
     global _registro
     if _registro is None:
         novo = Registro()
@@ -98,22 +99,22 @@ def registro() -> Registro:
 
 
 def importar_modelos() -> None:
-    """Importa `<extensão>/modelos` de cada extensão que o tiver."""
+    """Imports `<extensão>/modelos` from each extension that has it."""
     for nome in _nomes():
         alvo = f"{__name__}.{nome}.modelos"
         try:
             importlib.import_module(alvo)
         except ModuleNotFoundError as exc:
-            # Só a ausência do PRÓPRIO `modelos` é normal (extensão sem tabelas).
+            # Only the absence of its OWN `modelos` is normal (an extension without tables).
             if exc.name != alvo:
                 raise
 
 
 def esquemas() -> list[Path]:
-    """O `schema.sql` de cada extensão presente que tem tabelas, em ordem de nome.
+    """The `schema.sql` of each present extension that has tables, in name order.
 
-    Sem importar a extensão: a base zero do alembic roda isto, e o que ela
-    precisa é o arquivo, não o código.
+    Without importing the extension: the alembic zero base runs this, and what
+    it needs is the file, not the code.
     """
     achados = []
     for nome in _nomes():

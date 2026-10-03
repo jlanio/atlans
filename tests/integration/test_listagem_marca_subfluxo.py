@@ -1,17 +1,19 @@
 # tests/integration/test_listagem_marca_subfluxo.py
 """
-A listagem de projetos distingue um sub-fluxo de um workflow comum.
+The project listing distinguishes a sub-workflow from a regular workflow.
 
-Um sub-fluxo existe para ser CHAMADO por outro: declara `SubWorkflowOutput` e,
-em geral, nao tem gatilho proprio. Na lista ele era indistinguivel — mesmo card,
-mesmo botao de executar, que dispara um run que nao faz o que se espera.
+A sub-workflow exists to be CALLED by another: it declares `SubWorkflowOutput`
+and, in general, has no trigger of its own. In the list it was
+indistinguishable — same card, same run button, which fires a run that does
+not do what one expects.
 
-A marca e uma expressao SQL sobre a coluna `definition`, do mesmo feitio da que
-ja existe para `has_publish_map`: sem coluna nova, sem migration, e sem trazer o
-JSON inteiro para o Python a cada listagem.
+The flag is an SQL expression over the `definition` column, in the same style
+as the one that already exists for `has_publish_map`: no new column, no
+migration, and without pulling the whole JSON into Python on every listing.
 
-O teste sobe a tabela real num SQLite de memoria e roda a consulta de verdade —
-uma asercao sobre o texto do SQL nao provaria que a coluna sai preenchida.
+The test brings up the real table in an in-memory SQLite and runs the real
+query — an assertion on the SQL text would not prove the column comes out
+filled in.
 """
 import pytest
 import pytest_asyncio
@@ -72,10 +74,11 @@ async def test_marca_quem_declara_saida_de_subfluxo(db):
 
 @pytest.mark.asyncio
 async def test_um_pai_que_apenas_chama_nao_e_marcado(db):
-    """Quem CHAMA um sub-fluxo continua sendo um workflow comum na lista.
+    """A workflow that CALLS a sub-workflow is still a regular workflow in the list.
 
-    A marca responde "este pode ser chamado por outro", e nao "este usa
-    outros" — sao coisas diferentes, e o pai tem gatilho e roda sozinho.
+    The flag answers "this one can be called by another", not "this one uses
+    others" — those are different things, and the parent has a trigger and
+    runs on its own.
     """
     pai = {"nodes": [
         {"id": "t", "name": "WebhookTrigger"},
@@ -88,7 +91,7 @@ async def test_um_pai_que_apenas_chama_nao_e_marcado(db):
 
 @pytest.mark.asyncio
 async def test_definition_vazia_nao_quebra_a_listagem(db):
-    # Workflow recem-criado, ainda sem nenhum node.
+    # Freshly created workflow, still without any node.
     await _semear(db, ("novo", {"nodes": [], "edges": []}))
 
     assert (await _por_hash(db))["novo"].is_subworkflow is False
@@ -97,15 +100,16 @@ async def test_definition_vazia_nao_quebra_a_listagem(db):
 @pytest.mark.asyncio
 @pytest.mark.parametrize("definition", [{}, {"edges": []}], ids=["vazia", "sem_a_chave_nodes"])
 async def test_definition_sem_nodes_nao_derruba_a_resposta(db, definition):
-    """REGRESSAO: sem a chave `nodes`, o `->>` devolve NULL, o LIKE propaga
-    NULL, e o Pydantic recusa None num campo `bool`.
+    """REGRESSION: without the `nodes` key, `->>` returns NULL, LIKE propagates
+    NULL, and Pydantic rejects None in a `bool` field.
 
-    O estrago nao era a linha errada: era GET /workflows/ inteiro respondendo
-    500 — a tela de Projetos em branco por causa de UM workflow malformado. A
-    coluna e `nullable=False`, mas nada garante o formato de dentro do JSON.
+    The damage was not the wrong row: it was all of GET /workflows/ responding
+    500 — the Projects screen blank because of ONE malformed workflow. The
+    column is `nullable=False`, but nothing guarantees the shape inside the JSON.
 
-    A validacao pelo schema e o que prova o caso: ler o atributo da linha
-    devolvia None sem reclamar, e o erro so aparecia ao serializar.
+    Validation through the schema is what proves the case: reading the row's
+    attribute returned None without complaint, and the error only appeared on
+    serialization.
     """
     await _semear(db, ("torto", definition))
 
@@ -117,7 +121,7 @@ async def test_definition_sem_nodes_nao_derruba_a_resposta(db, definition):
 
 @pytest.mark.asyncio
 async def test_a_marca_convive_com_has_publish_map(db):
-    """As duas expressoes leem a MESMA coluna; uma nao pode mascarar a outra."""
+    """Both expressions read the SAME column; one must not mask the other."""
     dos_dois = {"nodes": [
         {"id": "out", "name": "SubWorkflowOutput"},
         {"id": "m", "name": "PublishMap"},

@@ -1,27 +1,27 @@
 """
-Taxonomia de erro.
+Error taxonomy.
 
-Classifica uma falha numa CATEGORIA estável para o servidor decidir o que fazer
-com ela (mostrar ao usuário, reentregar a outro executor, mandar para a
-dead-letter) — em vez de tratar toda falha como uma string opaca.
+Classifies a failure into a stable CATEGORY so the server can decide what to do
+with it (show it to the user, redeliver to another executor, send it to the
+dead-letter) — instead of treating every failure as an opaque string.
 
-Vive em `flow/` porque é usada nos dois níveis: o job inteiro (executor/) e cada
-nó individual (flow/executor/core.py, que publica a categoria no evento para o
-painel de execução dizer "não adianta repetir, corrija a entrada").
+Lives in `flow/` because it is used at both levels: the whole job (executor/) and
+each individual node (flow/executor/core.py, which publishes the category in the
+event so the run panel can say "retrying won't help, fix the input").
 
-Categorias e semântica de retry:
+Categories and retry semantics:
 
-  user       — input/configuração inválidos (ex.: coluna ausente, CRS faltando);
-               o usuário precisa corrigir.            → NÃO retryable
-  validation — reprovado na validação de segurança do job.   → NÃO retryable
-  timeout    — excedeu o tempo limite.                → retryable (pode ser transitório)
-  resource   — sem recursos (memória).                → NÃO retryable como está
-               (precisa de dado menor ou executor maior)
-  transient  — falha operacional/infra (rede, conexão).      → retryable
-  internal   — inesperado/desconhecido.               → terminal (não reentregar às cegas)
+  user       — invalid input/configuration (e.g. missing column, missing CRS);
+               the user must fix it.                  → NOT retryable
+  validation — rejected by the job's security validation.    → NOT retryable
+  timeout    — exceeded the time limit.               → retryable (may be transient)
+  resource   — out of resources (memory).             → NOT retryable as is
+               (needs smaller data or a larger executor)
+  transient  — operational/infra failure (network, connection). → retryable
+  internal   — unexpected/unknown.                    → terminal (don't redeliver blindly)
 
-`retryable` é derivado da categoria — é a dica que a futura lógica de reentrega
-usa para decidir re-despachar vs. dead-letter.
+`retryable` is derived from the category — it is the hint the future redelivery
+logic uses to decide between re-dispatch and dead-letter.
 """
 import asyncio
 
@@ -41,11 +41,11 @@ def is_retryable(category: str) -> bool:
 
 
 def _chain(exc: BaseException):
-    """Percorre a exceção e sua cadeia (__cause__/__context__) sem repetir.
+    """Walks the exception and its chain (__cause__/__context__) without repeating.
 
-    Os nós envolvem o erro original num RuntimeError (`raise RuntimeError(...)
-    from e`), então a causa raiz (ex.: MemoryError da interseção) fica no
-    __cause__ — precisa olhar a cadeia, não só o topo."""
+    Nodes wrap the original error in a RuntimeError (`raise RuntimeError(...)
+    from e`), so the root cause (e.g. MemoryError from the intersection) sits in
+    __cause__ — the chain must be inspected, not just the top."""
     seen: set[int] = set()
     cur: BaseException | None = exc
     while cur is not None and id(cur) not in seen:
@@ -55,16 +55,16 @@ def _chain(exc: BaseException):
 
 
 def classify_error(exc: BaseException) -> str:
-    """Retorna a categoria (string) da falha, olhando a cadeia de exceções."""
+    """Returns the failure's category (string), inspecting the exception chain."""
     types = tuple(type(e) for e in _chain(exc))
 
     def has(*cls: type) -> bool:
         return any(issubclass(t, cls) for t in types)
 
-    # Ordem importa: do mais específico/informativo para o genérico.
+    # Order matters: from most specific/informative to generic.
     if has(MemoryError):
         return "resource"
-    # asyncio.TimeoutError é alias de TimeoutError no 3.11+ (o executor roda 3.12).
+    # asyncio.TimeoutError is an alias of TimeoutError in 3.11+ (the executor runs 3.12).
     if has(asyncio.TimeoutError, TimeoutError):
         return "timeout"
     if has(ConnectionError):

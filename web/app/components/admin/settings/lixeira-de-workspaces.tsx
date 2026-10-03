@@ -1,7 +1,7 @@
 "use client"
 
-// Seção «Lixeira de workspaces» das Configurações do admin: restaurar ou
-// descartar definitivamente o REGISTRO (os bytes já saíram no soft delete).
+// "Lixeira de workspaces" (workspace trash) section of the admin Settings:
+// restore or permanently discard the RECORD (the bytes already left on soft delete).
 
 import { useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
@@ -16,15 +16,16 @@ import { CABECALHO_DE_COLUNAS, CELULA_COM_ROTULO, DESTAQUE_DA_FICHA, LINHA_EMPIL
 import { formatarInteiro, formatarQuando, plural } from "@/lib/formatos"
 import { VazioEmCirculo } from "./estados"
 
-// ── Lixeira de workspaces ──────────────────────────────────────────────────────
+// ── Workspace trash ────────────────────────────────────────────────────────────
 
 /**
- * Descarte definitivo do REGISTRO do workspace — não confundir com a purga da
- * seção Armazenamento, que apaga bytes. Aqui os arquivos já se foram: o soft
- * delete purga o Drive na hora e expira os artefatos. O que sobra é a linha.
+ * Permanent discard of the workspace RECORD — not to be confused with the purge
+ * in the Storage section, which deletes bytes. Here the files are already gone:
+ * the soft delete purges the Drive at once and expires the artifacts. What is
+ * left is the row.
  *
- * Type-to-confirm no cliente + `confirm` revalidado no servidor: o botão fica
- * ao lado de cada linha da tabela, e agora sobre workspaces de outros usuários.
+ * Type-to-confirm on the client + `confirm` revalidated on the server: the button
+ * sits next to each table row, and now over other users' workspaces.
  */
 function PurgeWorkspaceDialog({ ws, onClose, onPurged }: {
   ws: IWorkspaceTrash
@@ -38,7 +39,7 @@ function PurgeWorkspaceDialog({ ws, onClose, onPurged }: {
   })
 
   return (
-    // Enquanto exclui, as saídas ficam travadas pelo `DeleteDialog`.
+    // While deleting, the exits are locked by `DeleteDialog`.
     <Dialog open onOpenChange={open => { if (!open) onClose() }}>
       <DeleteDialog
         title="Excluir workspace permanentemente"
@@ -98,8 +99,8 @@ function RestoreWorkspaceDialog({ ws, onClose, onRestored }: {
           </DialogDescription>
         </DialogHeader>
 
-        {/* O admin restaura, avisa o dono, e o dono assume que voltou tudo.
-            Por isso o aviso vem ANTES de confirmar, não só no toast. */}
+        {/* The admin restores, tells the owner, and the owner assumes everything
+            came back. That is why the notice comes BEFORE confirming, not only in the toast. */}
         <div className="rounded-md border border-amber-500/30 bg-amber-50 p-3 text-xs dark:bg-amber-500/10">
           <div className="flex items-start gap-2">
             <TbAlertTriangle className="mt-0.5 shrink-0 text-amber-500" aria-hidden="true" />

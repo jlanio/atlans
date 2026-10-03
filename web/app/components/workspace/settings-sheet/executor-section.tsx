@@ -25,34 +25,34 @@ import {
 interface Props {
   workspaceId: string
   canManage: boolean
-  /** Sinaliza política em alerta (membro inativo, cadeia sem ninguém online) para a navegação. */
+  /** Flags a policy in alert (inactive member, chain with no one online) for the navigation. */
   onAlertChange?: (hasAlert: boolean) => void
 }
 
-/** Uma operação em voo por vez: incluir/remover/terminal se atropelariam na mesma política. */
+/** One operation in flight at a time: add/remove/terminal would trample each other on the same policy. */
 type Operacao = `incluir:${string}` | `remover:${string}` | "terminal"
 
 /**
- * Editor da política de execução do workspace
+ * Editor for the workspace's execution policy
  * (docs/specs/executor-isolation-routing.md, §9).
  *
- * Três blocos: os executores principais, a reserva opcional e o último
- * recurso — o que acontece quando nenhum deles está disponível: falhar
- * (padrão) ou o pool. Escolher o pool pede confirmação porque muda onde os
- * DADOS rodam; sob piso do administrador da plataforma ela nem é oferecida.
- * Remover o último principal também pede confirmação: apaga a reserva e
- * devolve o workspace ao pool.
+ * Three blocks: the primary executors, the optional fallback and the last
+ * resort — what happens when none of them is available: fail (default) or the
+ * pool. Choosing the pool asks for confirmation because it changes where the
+ * DATA runs; under a platform administrator's floor it is not even offered.
+ * Removing the last primary also asks for confirmation: it erases the fallback
+ * and returns the workspace to the pool.
  *
- * Enquanto o servidor não roteia pela política (flag desligada), o editor é
- * uma prévia e diz isso ANTES de qualquer outra coisa: prometer isolamento
- * que a próxima execução não tem seria pior do que não ter a tela.
+ * While the server does not route by the policy (flag off), the editor is a
+ * preview and says so BEFORE anything else: promising isolation that the next
+ * run does not have would be worse than not having the screen at all.
  */
 export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props) {
-  // A carga é o `useFetchData`: cargas concorrentes (Atualizar duas vezes,
-  // tentar de novo, trocar de workspace) — só a mais recente escreve, e a
-  // anterior chegando depois não troca uma política recém-lida por um
-  // instantâneo velho. A guarda de geração, que esta seção escrevia à mão, é a
-  // dele. `firstLoad` é o skeleton; na recarga a política fica na tela.
+  // Loading is `useFetchData`: concurrent loads (Refresh twice, retry,
+  // switching workspaces) — only the most recent writes, and an earlier one
+  // arriving later does not swap a freshly read policy for a stale snapshot.
+  // The generation guard, which this section used to write by hand, is its
+  // job. `firstLoad` is the skeleton; on reload the policy stays on screen.
   const { data, loading, firstLoad, error, refetch: load, setData } = useFetchData(
     async () => {
       const [polRes, myRes] = await Promise.all([
@@ -62,8 +62,8 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
       if (polRes.error || !polRes.data || myRes.error) {
         return { error: { message: polRes.error?.message ?? myRes.error?.message } }
       }
-      // Mantém todos (inclui pending/revoked): é a lista que diz o NOME do
-      // ponteiro legado na prévia e o porquê de não haver candidatos.
+      // Keeps all of them (including pending/revoked): it is the list that gives
+      // the NAME of the legacy pointer in the preview and why there are no candidates.
       return { data: { politica: polRes.data, executores: myRes.data ?? [] } }
     },
     "Não foi possível carregar a política de execução.",
@@ -71,7 +71,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
   )
   const politica = data?.politica ?? null
   const executores = useMemo<IExecutor[]>(() => data?.executores ?? [], [data])
-  /** A política que uma gravação devolveu (ou a releitura): troca só ela. */
+  /** The policy a write returned (or the re-read): replaces only that. */
   const setPolitica = (nova: IWorkspacePolicy) => setData(atual => atual && { ...atual, politica: nova })
   const [operacao, setOperacao] = useState<Operacao | null>(null)
   const [confirmarPool, setConfirmarPool] = useState(false)
@@ -85,12 +85,12 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
   const emVigor = politica?.policy_routing_enabled === true
   const sufixoPrevia = emVigor ? "" : " (vale quando o roteamento por política for ativado)"
 
-  /** Relê só a política — o DELETE responde 204, sem a política recalculada. */
+  /** Re-reads only the policy — DELETE answers 204, without the recomputed policy. */
   async function relerPolitica(): Promise<IWorkspacePolicy | null> {
     const res = await GisFlowService.getWorkspacePolicy(workspaceId)
     if (res.error || !res.data) {
-      // A remoção deu certo; só a releitura falhou. O toast de sucesso já
-      // saiu — a tela pede uma recarga em vez de virar um erro inteiro.
+      // The removal succeeded; only the re-read failed. The success toast already
+      // went out — the screen asks for a reload instead of turning into a full error.
       createToast.error("Não foi possível reler a política", "Clique em Atualizar.")
       return null
     }
@@ -118,8 +118,8 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
   function pedirRemocao(membro: IPolicyMember) {
     if (!politica) return
     const ultimoPrincipal = membro.tier === 1 && politica.primary.length === 1
-    // O último principal derruba a reserva e devolve o workspace ao pool: é
-    // a direção sensível (nada → tudo em máquinas compartilhadas).
+    // The last primary takes down the fallback and returns the workspace to the
+    // pool: it is the sensitive direction (nothing → everything on shared machines).
     if (ultimoPrincipal) { setConfirmarRemocao(membro); return }
     remover(membro)
   }
@@ -136,8 +136,8 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
       createToast.error("Erro ao remover o executor", res.error.message)
       return
     }
-    // Esvaziar o principal derruba a reserva junto (spec §4.3): só a
-    // releitura mostra o que sobrou.
+    // Emptying the primary takes the fallback down with it (spec §4.3): only the
+    // re-read shows what is left.
     await relerPolitica()
     setOperacao(null)
     if (eraUltimoPrincipal) {
@@ -174,16 +174,16 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
   const naPolitica = new Set(
     [...(politica?.primary ?? []), ...(politica?.fallback ?? [])].map(m => m.id_hash),
   )
-  // Candidatos: os MEUS executores dedicados ativos que ainda não estão em
-  // nível algum. O pool não é um nível (spec Q3): `is_default` fica de fora.
+  // Candidates: MY active dedicated executors that are not in any tier yet.
+  // The pool is not a tier (spec Q3): `is_default` is left out.
   const dedicados = executores.filter(e => !e.is_default)
   const candidatos = dedicados.filter(e => e.status === "active" && !naPolitica.has(e.id_hash))
   const temPrincipal = (politica?.primary.length ?? 0) > 0
   const sobPiso = politica?.isolation_floor === "no_pool"
   const ocupado = operacao !== null
 
-  // Nome do ponteiro legado, para a prévia dizer o que vale HOJE. Entre aspas:
-  // um executor chamado "executor" deixava a frase sem sentido.
+  // Name of the legacy pointer, so the preview says what holds TODAY. In quotes:
+  // an executor named "executor" left the sentence meaningless.
   const nomeLegado = politica?.target_executor_id
     ? executores.find(e => e.id_hash === politica.target_executor_id)?.name
     : undefined
@@ -193,8 +193,8 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
       : "um executor que não está mais na sua lista (removido ou sem acesso)")
     : "o pool compartilhado"
 
-  // Compartilhado sem candidato: uma mensagem só, em vez de cinco blocos
-  // desabilitados. A tela inteira do editor pressupõe um dedicado.
+  // Shared with no candidate: a single message, instead of five disabled
+  // blocks. The whole editor screen presupposes a dedicated executor.
   const semNadaParaEditar = politica?.mode === "pool" && candidatos.length === 0 && !sobPiso
 
   return (
@@ -213,9 +213,9 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
             {!canManage && " Apenas administradores podem alterar."}
           </>
         }
-        // Duas ações largas (o link "Gerenciar executores" + Atualizar) no
-        // canto superior direito espremiam o título num painel estreito;
-        // descem para uma linha própria, abaixo da descrição.
+        // Two wide actions (the "Gerenciar executores" link + Atualizar) in the
+        // top-right corner squeezed the title in a narrow panel; they move down
+        // to a line of their own, below the description.
         actionBelow
         action={
           <div className="flex items-center gap-1">
@@ -223,8 +223,8 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
               variant="ghost"
               size="icon"
               onClick={load}
-              // Travado durante uma gravação: recarregar no meio de uma troca
-              // sobrescrevia o valor em voo e o toast de sucesso mentia.
+              // Locked during a write: reloading in the middle of a change overwrote
+              // the in-flight value and the success toast lied.
               disabled={loading || ocupado}
               aria-label="Atualizar política"
               title="Atualizar"
@@ -245,7 +245,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
       >
         {politica && (
           <div className="space-y-5">
-            {/* ── Prévia: ANTES de tudo, porque muda o sentido de tudo ──── */}
+            {/* ── Preview: BEFORE everything, because it changes the meaning of everything ── */}
             {!emVigor && (
               <p
                 role="note"
@@ -334,7 +334,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
               </div>
             ) : (
               <>
-                {/* ── Níveis ─────────────────────────────────────────────── */}
+                {/* ── Tiers ──────────────────────────────────────────────── */}
                 <Nivel
                   titulo="Executores principais"
                   rotulo="principal"
@@ -366,7 +366,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
                   </p>
                 )}
 
-                {/* ── Último recurso ─────────────────────────────────────── */}
+                {/* ── Last resort ────────────────────────────────────────── */}
                 {temPrincipal && (
                   <div className="space-y-1.5">
                     <div className="flex items-baseline justify-between gap-2">
@@ -452,7 +452,7 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
         )}
       </SheetSection>
 
-      {/* Confirmação: "pool" muda onde os DADOS deste workspace podem rodar. */}
+      {/* Confirmation: "pool" changes where this workspace's DATA can run. */}
       <Dialog open={confirmarPool} onOpenChange={setConfirmarPool}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -470,8 +470,8 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
         </DialogContent>
       </Dialog>
 
-      {/* Confirmação: o último principal leva a reserva junto e devolve o
-          workspace ao pool. */}
+      {/* Confirmation: the last primary takes the fallback with it and returns
+          the workspace to the pool. */}
       <Dialog open={confirmarRemocao !== null} onOpenChange={o => { if (!o) setConfirmarRemocao(null) }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -497,13 +497,13 @@ export function ExecutorSection({ workspaceId, canManage, onAlertChange }: Props
   )
 }
 
-// ── Peças ────────────────────────────────────────────────────────────────────
+// ── Pieces ───────────────────────────────────────────────────────────────────
 
 function Nivel({
   titulo, rotulo, membros, disponiveis, vazio, canManage, ocupado, operacao, onRemover,
 }: {
   titulo: string
-  /** Como o nível é chamado no rótulo do botão de remover. */
+  /** How the tier is named in the remove button's label. */
   rotulo: string
   membros: IPolicyMember[]
   disponiveis: number
@@ -576,9 +576,9 @@ function Nivel({
 }
 
 /**
- * Ponto de presença em três estados: online, offline e SEM SINAL (Redis fora
- * ou reconectando). O terceiro existe para não pintar "offline" um executor
- * que só não pôde ser consultado.
+ * Three-state presence dot: online, offline and NO SIGNAL (Redis down or
+ * reconnecting). The third exists so as not to paint "offline" an executor
+ * that simply could not be queried.
  */
 function PontoDePresenca({ online }: { online: boolean | null }) {
   const texto = online === true ? "online" : online === false ? "offline" : "sem sinal"
@@ -598,9 +598,9 @@ function PontoDePresenca({ online }: { online: boolean | null }) {
 }
 
 /**
- * Carga do executor, como ele a publica: é o que dá sentido a "online" — um
- * executor online e cheio não recebe o próximo job agora. Some quando não há
- * capacidade publicada (offline, sem sinal, versão antiga).
+ * The executor's load, as it publishes it: this is what gives meaning to
+ * "online" — an online, full executor does not get the next job now. Hidden
+ * when no capacity is published (offline, no signal, old version).
  */
 function Carga({ capacidade }: { capacidade: Capacidade }) {
   const texto = descreverCapacidade(capacidade)
@@ -633,9 +633,9 @@ const OPCOES: { valor: PolicyTerminal; titulo: string; descricao: string }[] = [
 ]
 
 /**
- * Grupo de rádio de verdade: setas movem a escolha, um só ponto de tabulação.
- * Cartões em vez de bolinhas porque cada opção precisa de uma frase de
- * consequência — mas o teclado tem de funcionar como num rádio.
+ * A real radio group: arrows move the choice, a single tab stop.
+ * Cards instead of dots because each option needs a sentence about its
+ * consequence — but the keyboard has to work as in a radio.
  */
 function GrupoDeTerminal({
   labelledBy, selecionado, disabled, poolBloqueado, detalhePool, onEscolher,

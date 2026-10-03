@@ -1,15 +1,15 @@
 # tests/unit/test_ca_bundle_trust_store.py
 """
-Trust store do executor: CAs publicas + CA interna, nunca a interna sozinha.
+Executor trust store: public CAs + internal CA, never the internal one alone.
 
-Regressao do bug em que `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE` apontavam so para
-`atlans-root.crt`. Como essas env vars SUBSTITUEM o trust store do processo (nao
-somam), todo HTTPS de saida para servidor publico quebrava dentro dos nos de
-workflow com `unable to get local issuer certificate` — reportado no no WFS
-contra geoportal.example.org, cujo cert Let's Encrypt e valido.
+Regression of the bug where `SSL_CERT_FILE`/`REQUESTS_CA_BUNDLE` pointed only to
+`atlans-root.crt`. Since those env vars REPLACE the process's trust store (they
+don't add to it), every outbound HTTPS to a public server broke inside workflow
+nodes with `unable to get local issuer certificate` — reported on the WFS node
+against geoportal.example.org, whose Let's Encrypt cert is valid.
 
-Cobre tambem o lado do no: cadeia TLS invalida nao e falha transiente, entao
-nao pode consumir o ciclo de retries nem vazar a mensagem crua do urllib3.
+Also covers the node side: an invalid TLS chain is not a transient failure, so
+it must not consume the retry cycle nor leak urllib3's raw message.
 """
 import datetime
 import os
@@ -26,9 +26,9 @@ from cryptography.x509.oid import NameOID
 
 
 def _cert_pem(cn: str) -> bytes:
-    """Root CA autoassinada. `basicConstraints CA:TRUE` nao e detalhe cosmetico:
-    OpenSSL so contabiliza em `x509_ca` o que esta marcado como CA, e sem isso o
-    bundle carregaria mas nao serviria como ancora de confianca."""
+    """Self-signed root CA. `basicConstraints CA:TRUE` is not a cosmetic detail:
+    OpenSSL only counts in `x509_ca` what is marked as a CA, and without it the
+    bundle would load but wouldn't serve as a trust anchor."""
     key = Ed25519PrivateKey.generate()
     nome = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     agora = datetime.datetime.now(datetime.timezone.utc)
@@ -47,7 +47,7 @@ def _cert_pem(cn: str) -> bytes:
 
 @pytest.fixture
 def root_cert(tmp_path):
-    """CA interna ja gravada, como o bootstrap a encontra num boot subsequente."""
+    """Internal CA already written, as bootstrap finds it on a subsequent boot."""
     p = tmp_path / "certs" / "atlans-root.crt"
     p.parent.mkdir(parents=True)
     p.write_bytes(_cert_pem("Atlans Internal Root CA"))
@@ -74,11 +74,11 @@ _TRUST_VARS = ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE")
 
 @pytest.fixture(autouse=True)
 def _clean_trust_env():
-    """Isola as env vars de trust store, na entrada E na saida.
+    """Isolates the trust store env vars, on entry AND on exit.
 
-    monkeypatch nao basta: `_set_env` escreve em os.environ direto, e uma var que
-    nao existia no inicio do teste nao fica registrada para restauracao — ela
-    vazaria para os testes seguintes (test_enrollment_tls le REQUESTS_CA_BUNDLE).
+    monkeypatch isn't enough: `_set_env` writes to os.environ directly, and a var
+    that didn't exist at the start of the test isn't registered for restoration —
+    it would leak into the following tests (test_enrollment_tls reads REQUESTS_CA_BUNDLE).
     """
     antes = {v: os.environ.get(v) for v in _TRUST_VARS}
     for v in _TRUST_VARS:
@@ -101,7 +101,7 @@ def _count_certs(payload: bytes) -> int:
 
 
 def test_bundle_combina_publicas_e_interna(root_cert, fake_certifi):
-    """O arquivo publicado no env tem as CAs publicas E a interna."""
+    """The file published in the env has the public CAs AND the internal one."""
     from executor import _ca_bootstrap
 
     bundle = _ca_bootstrap._ensure_combined_bundle(root_cert)
@@ -111,9 +111,9 @@ def test_bundle_combina_publicas_e_interna(root_cert, fake_certifi):
     assert _count_certs(payload) == 3, "2 publicas + 1 interna"
     assert root_cert.read_bytes().strip() in payload
     assert fake_certifi.read_bytes().strip() in payload
-    # Precisa ser parseavel como trust store de verdade, nao so texto concatenado.
-    # SSLContext cru em vez de create_default_context(): este ja carrega o trust
-    # store do SO e a contagem viraria "3 + o que a maquina tiver".
+    # It has to be parseable as a real trust store, not just concatenated text.
+    # A raw SSLContext instead of create_default_context(): the latter already
+    # loads the OS trust store and the count would become "3 + whatever the machine has".
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
     ctx.load_verify_locations(cafile=str(bundle))
     assert ctx.cert_store_stats()["x509_ca"] == 3
@@ -137,7 +137,7 @@ def test_set_env_publica_as_tres_variaveis(root_cert, fake_certifi):
 
 
 def test_bundle_regravado_quando_root_cert_muda(root_cert, fake_certifi):
-    """Renovacao da CA interna precisa refletir no bundle derivado."""
+    """Renewal of the internal CA must be reflected in the derived bundle."""
     from executor import _ca_bootstrap
 
     bundle = _ca_bootstrap._ensure_combined_bundle(root_cert)
@@ -165,8 +165,8 @@ def test_bundle_nao_reescreve_sem_mudanca(root_cert, fake_certifi):
 
 
 def test_cert_dir_read_only_cai_para_tmpdir(root_cert, fake_certifi, monkeypatch, tmp_path):
-    """O compose oferece montar ./executor-certs:/data/certs:ro — o bundle e
-    derivado, entao gravar no tmpdir e suficiente e melhor que degradar."""
+    """The compose file offers mounting ./executor-certs:/data/certs:ro — the bundle is
+    derived, so writing it to the tmpdir is enough and better than degrading."""
     from executor import _ca_bootstrap
 
     tmpdir = tmp_path / "tmpdir"
@@ -189,7 +189,7 @@ def test_cert_dir_read_only_cai_para_tmpdir(root_cert, fake_certifi, monkeypatch
 
 
 def test_sem_certifi_usa_cafile_do_sistema(root_cert, monkeypatch, tmp_path):
-    """Sem certifi instalado, o trust store do SO ainda precisa entrar no bundle."""
+    """Without certifi installed, the OS trust store still has to get into the bundle."""
     import builtins
 
     from executor import _ca_bootstrap
@@ -217,8 +217,8 @@ def test_sem_certifi_usa_cafile_do_sistema(root_cert, monkeypatch, tmp_path):
 
 
 def test_sem_ca_publica_nenhuma_degrada_para_root(root_cert, monkeypatch):
-    """Sem material publico o executor ainda fala com agents.atlans.example.org; o
-    WARNING e que precisa explicar por que HTTPS publico vai falhar."""
+    """Without public material the executor still talks to agents.atlans.example.org;
+    it is the WARNING that has to explain why public HTTPS is going to fail."""
     from executor import _ca_bootstrap
 
     monkeypatch.setattr(_ca_bootstrap, "_public_ca_pem", lambda: (None, "none"))
@@ -232,7 +232,7 @@ def test_sem_ca_publica_nenhuma_degrada_para_root(root_cert, monkeypatch):
 
 
 def test_ssl_cert_file_externo_nao_e_sobrescrito(root_cert, fake_certifi, monkeypatch):
-    """Override do operador continua vencendo — regra documentada do modulo."""
+    """The operator's override still wins — a documented rule of the module."""
     from executor import _ca_bootstrap
 
     monkeypatch.setenv("SSL_CERT_FILE", "/opt/corp/ca.pem")
@@ -242,7 +242,7 @@ def test_ssl_cert_file_externo_nao_e_sobrescrito(root_cert, fake_certifi, monkey
 
 
 def test_bootstrap_reusa_cert_existente_e_publica_bundle(root_cert, fake_certifi, monkeypatch):
-    """Caminho real do container: cert ja em EXECUTOR_CERT_DIR, sem download."""
+    """The container's real path: cert already in EXECUTOR_CERT_DIR, no download."""
     from executor import _ca_bootstrap
 
     monkeypatch.setenv("EXECUTOR_CERT_DIR", str(root_cert.parent))
@@ -257,7 +257,7 @@ def test_bootstrap_reusa_cert_existente_e_publica_bundle(root_cert, fake_certifi
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Lado do no: cadeia invalida nao e falha transiente
+# Node side: an invalid chain is not a transient failure
 # ══════════════════════════════════════════════════════════════════════════════
 
 
@@ -277,7 +277,7 @@ def test_detecta_erro_de_cadeia_embrulhado():
     except ConnectionError as embrulhado:
         assert is_tls_verify_error(embrulhado)
 
-    # Texto sem tipo (o caso do urllib3, que stringifica a causa).
+    # Untyped text (urllib3's case, which stringifies the cause).
     assert is_tls_verify_error(
         RuntimeError("Caused by SSLError(SSLCertVerificationError(1, '[SSL: "
                      "CERTIFICATE_VERIFY_FAILED] ...'))")
@@ -293,7 +293,7 @@ def test_nao_confunde_falha_transiente():
 
 
 def test_ciclo_de_causas_nao_trava():
-    """__context__ circular nao pode virar loop infinito no meio de um run."""
+    """A circular __context__ must not turn into an infinite loop in the middle of a run."""
     from flow.utils.geo_helpers import is_tls_verify_error
 
     a, b = RuntimeError("a"), RuntimeError("b")
@@ -304,7 +304,7 @@ def test_ciclo_de_causas_nao_trava():
 
 
 def test_wfs_nao_retenta_erro_de_certificado(monkeypatch):
-    """3 tentativas com backoff so fazem o usuario esperar pelo mesmo erro."""
+    """3 attempts with backoff only make the user wait for the same error."""
     import flow.nodes.datasource.wfs as wfs
 
     chamadas = []
@@ -336,8 +336,8 @@ def test_wfs_nao_retenta_erro_de_certificado(monkeypatch):
 
 
 async def test_safe_httpx_request_traduz_erro_de_certificado(monkeypatch):
-    """Os nos HTTP (GET/POST/Request) e o webhook passam todos por aqui: a
-    traducao fica no helper para nao ser reimplementada em cada no."""
+    """The HTTP nodes (GET/POST/Request) and the webhook all go through here: the
+    translation lives in the helper so it isn't reimplemented in each node."""
     import httpx
 
     import flow.utils.geo_helpers as gh
@@ -379,7 +379,7 @@ async def test_safe_httpx_request_nao_mascara_outros_erros(monkeypatch):
 
 
 def test_wfs_ainda_retenta_falha_transiente(monkeypatch):
-    """A correcao nao pode desligar o retry legitimo."""
+    """The fix must not turn off the legitimate retry."""
     import flow.nodes.datasource.wfs as wfs
 
     chamadas = []

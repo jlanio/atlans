@@ -1,33 +1,33 @@
-# Pre-commit hooks para o repo atlans.
+# Pre-commit hooks for the atlans repo.
 #
-# Setup local (uma vez por clone), no ambiente onde você roda o `git commit`
-# (Linux, macOS ou Windows; o ambiente do backend, com os dois locks, já serve):
+# Local setup (once per clone), in the environment where you run `git commit`
+# (Linux, macOS or Windows; the backend environment, with both locks, will do):
 #   pip install --require-hashes -r requirements-dev.txt
 #   pre-commit install
 #
-# Depois disso, todo `git commit` roda os hooks abaixo automaticamente.
-# Para rodar manualmente em todos os arquivos:
+# After that, every `git commit` runs the hooks below automatically.
+# To run them manually on all files:
 #   pre-commit run --all-files
 #
-# Todos os hooks são `repo: local` com `language: system`: rodam as
-# ferramentas do requirements-dev.txt — pre-commit, detect-secrets e
-# pre-commit-hooks travados, com hash e com a quarentena de 14 dias (ver
-# CONTRIBUTING, "Dependências Python"). Um hook de repositório remoto, mesmo
-# fixado por SHA, trava só o código do hook: o ambiente que o pre-commit monta
-# para ele resolve as dependências no PyPI na hora, na versão mais nova do dia
-# e sem hash — medido: entravam idna e urllib3 publicados havia menos de 14
-# dias. E é justamente na máquina de quem commita que esse código roda.
-# Os ids, entradas e filtros abaixo são os dos `.pre-commit-hooks.yaml`
-# originais (detect-secrets v1.5.0, pre-commit-hooks v5.0.0).
+# All hooks are `repo: local` with `language: system`: they run the
+# tools from requirements-dev.txt — pre-commit, detect-secrets and
+# pre-commit-hooks pinned, with hashes and the 14-day quarantine (see
+# CONTRIBUTING, "Python dependencies (hashed locks)"). A remote repository hook,
+# even pinned by SHA, pins only the hook's code: the environment pre-commit builds
+# for it resolves dependencies on PyPI on the spot, at that day's newest version
+# and without hashes — measured: idna and urllib3 published less than 14 days
+# earlier were coming in. And it is precisely on the committer's machine that this code runs.
+# The ids, entries and filters below are those of the original
+# `.pre-commit-hooks.yaml` (detect-secrets v1.5.0, pre-commit-hooks v5.0.0).
 #
-# CI (.github/workflows/ci.yml) roda `detect-secrets scan` como safety
-# net — pega commits de devs que esqueceram o install local.
+# CI (.github/workflows/ci.yml) runs `detect-secrets scan` as a safety
+# net — it catches commits from devs who forgot the local install.
 #
-# Pra regerar o baseline depois de revisar um hit novo:
+# To regenerate the baseline after reviewing a new hit:
 #   detect-secrets scan --baseline .secrets.baseline
-# No Windows, prefixe com PYTHONUTF8=1: sem isso o Python abre os
-# arquivos em cp1252, engasga nos que tem acento e os pula em silencio —
-# o baseline sai sem eles e o CI (Linux, UTF-8) acusa como hits novos.
+# On Windows, prefix it with PYTHONUTF8=1: without it Python opens the
+# files in cp1252, chokes on those with accents and silently skips them —
+# the baseline comes out without them and CI (Linux, UTF-8) flags them as new hits.
 
 repos:
   - repo: local
@@ -39,10 +39,10 @@ repos:
         language: system
         files: .*
         args: ['--baseline', '.secrets.baseline']
-        # Locks de package manager: cheios de hashes que dao falso
-        # positivo. .secrets.baseline: self-reference. catalogo/: 22 MB de
-        # markdown gerado (nomes de camada, URLs publicas de WFS) — so ruido
-        # para o scanner; o baseline exclui a pasta pelo mesmo filtro.
+        # Package manager locks: full of hashes that give false
+        # positives. .secrets.baseline: self-reference. catalogo/: 22 MB of
+        # generated markdown (layer names, public WFS URLs) — just noise
+        # for the scanner; the baseline excludes the folder with the same filter.
         exclude: |
           (?x)^(
             package-lock\.json|
@@ -52,7 +52,7 @@ repos:
             catalogo/.*
           )$
 
-      # ── Higiene basica de arquivos ────────────────────────────────────
+      # ── Basic file hygiene ────────────────────────────────────────────
       - id: trailing-whitespace
         name: trim trailing whitespace
         entry: trailing-whitespace-fixer
@@ -72,8 +72,8 @@ repos:
         entry: check-yaml
         language: system
         types: [yaml]
-        # docker-compose usa !reset e outras tags — check-yaml valida
-        # sintaxe padrao, entao pulamos compose files. Outros YMLs sim.
+        # docker-compose uses !reset and other tags — check-yaml validates
+        # standard syntax, so we skip compose files. Other YMLs, yes.
         exclude: docker-compose.*\.yml
       - id: check-added-large-files
         name: check for added large files
@@ -81,7 +81,7 @@ repos:
         language: system
         stages: [pre-commit, pre-push, manual]
         args: ['--maxkb=1024']  # >1MB bloqueia (usar Git LFS se preciso)
-        # catalogo/: o Atributos.md do IBGE tem 4 MB de tabelas (9.759 camadas).
+        # catalogo/: IBGE's Atributos.md has 4 MB of tables (9,759 layers).
         exclude: ^catalogo/
       - id: check-merge-conflict
         name: check for merge conflicts

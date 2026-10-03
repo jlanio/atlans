@@ -1,27 +1,27 @@
 # app/services/openrouter.py
 """
-O cliente do OpenRouter — o ÚNICO módulo que conhece o formato de rede do modelo.
+The OpenRouter client — the ONLY module that knows the model's wire format.
 
-O assistente (`assistente_service.conversar`) fala com o modelo por uma fronteira só:
-`ClienteOpenRouter.transmitir(...)`. Ela recebe o transcrito no formato do
-projeto e devolve, em stream, os pedaços de texto e de raciocínio (`Delta`) e,
-por último, a resposta inteira (`Resposta`) — também no formato do projeto.
-Nada fora daqui sabe o que é um `chat.completion.chunk`, um `tool_calls` ou um
-`reasoning_details`. Trocar de provedor de novo é reescrever ESTE módulo, e
-mais nada: o laço, a cota, o portão de escrita, o replay e a confirmação por
-clique não mudam.
+The assistant (`assistente_service.conversar`) talks to the model through a single boundary:
+`ClienteOpenRouter.transmitir(...)`. It receives the transcript in the project's
+format and returns, as a stream, the text and reasoning chunks (`Delta`) and,
+last, the whole response (`Resposta`) — also in the project's format.
+Nothing outside this module knows what a `chat.completion.chunk`, a `tool_calls` or a
+`reasoning_details` is. Switching providers again means rewriting THIS module, and
+nothing else: the loop, the quota, the write gate, the replay and the click
+confirmation do not change.
 
-**Por que a API nativa do OpenRouter (chat completions) e não uma camada de
-compatibilidade.** O OpenRouter é um roteador: o mesmo pedido serve um modelo
-da Anthropic, da OpenAI, do Google ou um aberto, e o operador troca de modelo
-editando `ASSISTENTE_MODELO`. A API nativa é a que ele documenta, mede e mantém
-para todos eles; uma camada de compatibilidade com o formato de outro
-fornecedor é um subconjunto que envelhece por fora. O preço é este módulo:
-~400 linhas que traduzem o transcrito e remontam o stream.
+**Why OpenRouter's native API (chat completions) and not a compatibility
+layer.** OpenRouter is a router: the same request serves a model
+from Anthropic, OpenAI, Google or an open one, and the operator switches models by
+editing `ASSISTENTE_MODELO`. The native API is the one it documents, measures and
+maintains for all of them; a compatibility layer with another vendor's format is
+a subset that ages on the outside. The price is this module:
+~400 lines that translate the transcript and reassemble the stream.
 
-**O formato do transcrito é do PROJETO, não do provedor.** Ele é o que o
-Redis (editor) e o Postgres (Home) guardam, o que o replay lê e o que a
-confirmação por clique casa pelo `tool_use_id`:
+**The transcript format belongs to the PROJECT, not the provider.** It is what
+Redis (editor) and Postgres (Home) store, what the replay reads and what the
+click confirmation matches by `tool_use_id`:
 
     {"role": "user", "content": "o que a pessoa escreveu"}
     {"role": "assistant", "content": [
@@ -33,30 +33,30 @@ confirmação por clique casa pelo `tool_use_id`:
         {"type": "tool_result", "tool_use_id": "call_…", "content": "...", "is_error": false},
     ]}
 
-Na ida, `montar_mensagens` traduz isso para `system`/`user`/`assistant`
-(`tool_calls`)/`tool`; na volta, o acumulador remonta os `chunks` do SSE nos
-três blocos acima. O `reasoning_details` viaja VERBATIM nos dois sentidos: é o
-que o OpenRouter pede para o modelo continuar o raciocínio de uma volta de
-ferramenta para a seguinte (e, nos modelos da Anthropic, é obrigatório na
-última mensagem do assistente quando ela pede ferramenta). Um bloco `thinking`
-antigo — do tempo em que o transcrito vinha de outra API e carregava uma
-`signature` — não tem `reasoning_details` e é simplesmente omitido na ida: o
-que já foi pensado em turnos passados não é necessário, e reenviá-lo num
-formato que o provedor não reconhece derrubaria a conversa inteira.
+On the way out, `montar_mensagens` translates that into `system`/`user`/`assistant`
+(`tool_calls`)/`tool`; on the way back, the accumulator reassembles the SSE `chunks` into
+the three blocks above. `reasoning_details` travels VERBATIM in both directions: it is
+what OpenRouter asks for so the model can continue its reasoning from one tool
+round to the next (and, on Anthropic models, it is mandatory in the
+last assistant message when that message requests a tool). An old `thinking`
+block — from the time when the transcript came from another API and carried a
+`signature` — has no `reasoning_details` and is simply omitted on the way out: what
+was already thought in past turns is not needed, and resending it in a
+format the provider does not recognize would bring down the whole conversation.
 
-**O que o cliente garante ao laço:**
+**What the client guarantees the loop:**
 
-- `Delta("texto")`/`Delta("pensando")` saem na ordem em que chegam, e a
-  `Resposta` é sempre o último item — ou uma exceção `ErroDoOpenRouter`, nunca
-  uma resposta pela metade. Um stream que morre no meio é exceção, não sucesso
-  truncado: o laço não grava o que não chegou inteiro.
-- `Resposta.parada` é o `finish_reason` normalizado pelo OpenRouter: `stop`,
-  `tool_calls`, `length` (cortada por `max_tokens`) ou `content_filter`
-  (recusa). `error` vira exceção.
-- Falha de rede, 429 e 5xx ANTES do corpo começar são retentados
-  (`TENTATIVAS`); um 400 com `reasoning_details` no pedido é retentado UMA vez
-  sem eles — se o provedor recusar o raciocínio guardado, a conversa perde o
-  raciocínio antigo, não a conversa.
+- `Delta("texto")`/`Delta("pensando")` come out in the order they arrive, and the
+  `Resposta` is always the last item — or an `ErroDoOpenRouter` exception, never
+  a half response. A stream that dies midway is an exception, not a truncated
+  success: the loop does not store what did not arrive whole.
+- `Resposta.parada` is the `finish_reason` normalized by OpenRouter: `stop`,
+  `tool_calls`, `length` (cut off by `max_tokens`) or `content_filter`
+  (refusal). `error` becomes an exception.
+- Network failures, 429 and 5xx BEFORE the body starts are retried
+  (`TENTATIVAS`); a 400 with `reasoning_details` in the request is retried ONCE
+  without them — if the provider refuses the stored reasoning, the conversation loses the
+  old reasoning, not the conversation.
 """
 from __future__ import annotations
 
@@ -76,27 +76,27 @@ logger = get_logger("app.assistente.openrouter")
 URL_PADRAO = "https://openrouter.ai/api/v1"
 CAMINHO = "/chat/completions"
 
-# Tentativas de ABRIR a conversa (até os cabeçalhos da resposta). Depois que o
-# corpo começou a chegar não há retentativa: o que já saiu no SSE não pode ser
-# desdito, e o laço trata a queda como `modelo_indisponivel`.
+# Attempts to OPEN the conversation (up to the response headers). Once the
+# body has started arriving there is no retry: what already went out on the SSE cannot be
+# unsaid, and the loop treats the drop as `modelo_indisponivel`.
 TENTATIVAS = 3
 RETENTAVEIS = frozenset({408, 429, 500, 502, 503, 504})
 ESPERA_MAXIMA_S = 10.0
 
-# Streaming com `max_tokens` grande leva minutos; o que vale é o silêncio ENTRE
-# dois pedaços (`read`), e o OpenRouter manda comentários `: OPENROUTER PROCESSING`
-# enquanto o provedor ainda não começou a responder.
+# Streaming with a large `max_tokens` takes minutes; what matters is the silence BETWEEN
+# two chunks (`read`), and OpenRouter sends `: OPENROUTER PROCESSING` comments
+# while the provider has not started answering yet.
 TEMPO_LIMITE = httpx.Timeout(connect=30.0, read=180.0, write=60.0, pool=30.0)
 
-# O que o modelo lê num resultado de ferramenta que falhou. O formato de rede
-# não tem a bandeira `is_error`; sem o prefixo, uma recusa de escopo e um
-# resultado normal chegariam iguais.
+# What the model reads in a tool result that failed. The wire format
+# has no `is_error` flag; without the prefix, a scope refusal and a
+# normal result would arrive looking the same.
 PREFIXO_DE_ERRO = "[erro] "
 
 
 @dataclass(frozen=True)
 class Delta:
-    """Um pedaço do stream: `texto` (o que o modelo escreve) ou `pensando` (o raciocínio)."""
+    """A stream chunk: `texto` (what the model writes) or `pensando` (the reasoning)."""
 
     tipo: str
     texto: str
@@ -104,7 +104,7 @@ class Delta:
 
 @dataclass(frozen=True)
 class Resposta:
-    """A resposta inteira, remontada, no formato do projeto."""
+    """The whole response, reassembled, in the project's format."""
 
     blocos: list[dict[str, Any]]
     parada: str
@@ -114,8 +114,8 @@ class Resposta:
 
 
 class ErroDoOpenRouter(Exception):
-    """Falha ao falar com o OpenRouter. A mensagem é para o LOG; o laço mostra à
-    pessoa só a classe — o texto do provedor pode carregar URL e cabeçalho."""
+    """Failure talking to OpenRouter. The message is for the LOG; the loop shows the
+    person only the class — the provider's text may carry a URL and headers."""
 
     def __init__(self, mensagem: str, *, status: int | None = None, codigo: Any = None) -> None:
         super().__init__(mensagem)
@@ -123,23 +123,23 @@ class ErroDoOpenRouter(Exception):
         self.codigo = codigo
 
 
-# ── A ida: do transcrito ao pedido ───────────────────────────────────────────
+# ── Outbound: from transcript to request ─────────────────────────────────────
 
 
 def e_openrouter(base_url: str | None) -> bool:
-    """A base é a do OpenRouter?
+    """Is the base URL OpenRouter's?
 
-    `usage`, `reasoning` e `cache_control` são parâmetros DELE. Uma API que só
-    segue a da OpenAI pode recusar campo desconhecido (a própria OpenAI
-    recusa), e não manda o `usage` no stream sem `stream_options`: a cota de
-    tokens não contaria nada. Para essas, o pedido leva só o formato padrão.
+    `usage`, `reasoning` and `cache_control` are ITS parameters. An API that only
+    follows OpenAI's may refuse an unknown field (OpenAI itself
+    refuses), and does not send `usage` in the stream without `stream_options`: the token
+    quota would count nothing. For those, the request carries only the standard format.
     """
     host = (urlsplit(base_url or URL_PADRAO).hostname or "").lower()
     return host == "openrouter.ai" or host.endswith(".openrouter.ai")
 
 
 def ferramenta(nome: str, descricao: str | None, parametros: dict[str, Any] | None) -> dict[str, Any]:
-    """Uma ferramenta no formato de rede (`function`), a partir do `input_schema` do MCP."""
+    """A tool in the wire format (`function`), built from the MCP's `input_schema`."""
     return {
         "type": "function",
         "function": {
@@ -160,10 +160,10 @@ def montar_pedido(
     esforco: str | None,
     openrouter: bool = True,
 ) -> dict[str, Any]:
-    """O corpo do POST /chat/completions. Puro: é o que os testes conferem.
+    """The body of POST /chat/completions. Pure: it is what the tests check.
 
-    `openrouter=False` (ver `e_openrouter`) tira os parâmetros próprios do
-    OpenRouter e pede o `usage` do jeito da API da OpenAI.
+    `openrouter=False` (see `e_openrouter`) drops OpenRouter's own parameters
+    and asks for `usage` the way the OpenAI API does.
     """
     corpo: dict[str, Any] = {
         "model": modelo,
@@ -172,19 +172,19 @@ def montar_pedido(
         "stream": True,
     }
     if openrouter:
-        # `usage.include` põe a contagem (e o custo em créditos) no último
-        # quadro do stream. É a fonte da cota.
+        # `usage.include` puts the count (and the cost in credits) in the last
+        # frame of the stream. It is the quota's source.
         corpo["usage"] = {"include": True}
     else:
-        # O mesmo último quadro com o `usage`, no formato da API da OpenAI
-        # (e do vLLM, do LiteLLM, do Ollama). Sem ele, a cota não conta nada.
+        # The same last frame with `usage`, in the OpenAI API format
+        # (and vLLM's, LiteLLM's, Ollama's). Without it, the quota counts nothing.
         corpo["stream_options"] = {"include_usage": True}
     if ferramentas:
         corpo["tools"] = list(ferramentas)
     if esforco and openrouter:
-        # O raciocínio do modelo, no parâmetro unificado do OpenRouter: ele o
-        # traduz para o que cada família aceita (pensamento adaptativo, esforço,
-        # orçamento). Modelo sem raciocínio ignora.
+        # The model's reasoning, in OpenRouter's unified parameter: it
+        # translates it into what each family accepts (adaptive thinking, effort,
+        # budget). A model without reasoning ignores it.
         corpo["reasoning"] = {"effort": esforco}
     return corpo
 
@@ -192,20 +192,20 @@ def montar_pedido(
 def montar_mensagens(
     sistema: list[dict[str, Any]], conversa: list[dict[str, Any]], *, cache: bool = True,
 ) -> list[dict[str, Any]]:
-    """O transcrito do projeto virando `messages`.
+    """The project's transcript turned into `messages`.
 
-    `cache=False` (fora do OpenRouter) não marca ponto de corte nenhum, e o
-    `system` vai como texto simples, que toda API compatível aceita.
+    `cache=False` (outside OpenRouter) marks no breakpoint at all, and the
+    `system` goes as plain text, which every compatible API accepts.
 
-    O `system` vai como lista de partes de texto para os pontos de corte de
-    cache (`cache_control`) sobreviverem — é assim que o OpenRouter repassa o
-    cache de prompt aos provedores que o têm; os outros ignoram o campo.
+    The `system` goes as a list of text parts so the cache breakpoints
+    (`cache_control`) survive — that is how OpenRouter passes the
+    prompt cache on to the providers that have it; the others ignore the field.
 
-    O segundo ponto de corte vai na ÚLTIMA mensagem humana (o texto da pessoa,
-    ou a sintética de confirmação da Home). Ele fecha um prefixo que é o mesmo
-    em TODAS as voltas de ferramenta deste turno: sistema, ferramentas, o
-    histórico e a pergunta. O que fica fora são só as chamadas e resultados do
-    turno atual.
+    The second breakpoint goes on the LAST human message (the person's text,
+    or Home's synthetic confirmation). It closes a prefix that is the same
+    across ALL tool rounds of this turn: system, tools, the
+    history and the question. What is left out is only the current turn's calls and
+    results.
     """
     mensagens: list[dict[str, Any]] = []
     if sistema and cache:
@@ -234,14 +234,14 @@ def montar_mensagens(
 def _parte_de_texto(bloco: dict[str, Any]) -> dict[str, Any]:
     parte: dict[str, Any] = {"type": "text", "text": str(bloco.get("text") or "")}
     if bloco.get("cache_control"):
-        # Só o tipo: o TTL é decisão do provedor por trás do roteador, e um campo
-        # que ele não conhece é risco de recusa a cada conversa.
+        # Only the type: the TTL is the decision of the provider behind the router, and a field
+        # it does not know is a risk of refusal on every conversation.
         parte["cache_control"] = {"type": "ephemeral"}
     return parte
 
 
 def _e_humana(mensagem: dict[str, Any]) -> bool:
-    """Texto de gente (ou a sintética do servidor) — não uma lista de `tool_result`."""
+    """Human text (or the server's synthetic one) — not a list of `tool_result`s."""
     if mensagem.get("role") != "user":
         return False
     conteudo = mensagem.get("content")
@@ -260,7 +260,7 @@ def _indice_da_ultima_mensagem_humana(conversa: list[dict[str, Any]]) -> int | N
 
 
 def _da_pessoa(conteudo: Any, *, marcar_cache: bool) -> list[dict[str, Any]]:
-    """Uma mensagem `user` do transcrito: texto da pessoa, ou resultados de ferramenta."""
+    """A `user` message from the transcript: the person's text, or tool results."""
     if isinstance(conteudo, str):
         return [_mensagem_humana(conteudo, marcar_cache)]
     if not isinstance(conteudo, list):
@@ -311,13 +311,13 @@ def _texto_do_resultado(bloco: dict[str, Any]) -> str:
 
 
 def _do_assistente(conteudo: Any) -> dict[str, Any] | None:
-    """Uma mensagem do modelo: texto + `tool_calls` + `reasoning_details` verbatim.
+    """A model message: text + `tool_calls` + `reasoning_details` verbatim.
 
-    `None` quando ela não tem texto nem chamada — só raciocínio, ou nada (um
-    corte por `length` ainda pensando; uma recusa sem saída). Mandá-la como
-    `content: ""` é recusa certa do provedor, e recusa que o plano B do 400 não
-    conserta: a conversa ficaria presa para sempre. O que já foi pensado em
-    turnos passados não é necessário, e a omissão não muda nada para o modelo.
+    `None` when it has neither text nor a call — only reasoning, or nothing (a
+    `length` cutoff while still thinking; a refusal with no output). Sending it as
+    `content: ""` is a certain refusal from the provider, and one the 400 plan B does not
+    fix: the conversation would be stuck forever. What was already thought in
+    past turns is not needed, and the omission changes nothing for the model.
     """
     if isinstance(conteudo, str):
         return {"role": "assistant", "content": conteudo} if conteudo.strip() else None
@@ -343,8 +343,8 @@ def _do_assistente(conteudo: Any) -> dict[str, Any] | None:
                 }
             )
         elif tipo == "thinking":
-            # Só o que veio do OpenRouter. Um bloco antigo (com `signature` e sem
-            # `reasoning_details`) fica no transcrito para o replay e não vai.
+            # Only what came from OpenRouter. An old block (with `signature` and without
+            # `reasoning_details`) stays in the transcript for the replay and is not sent.
             guardados = bloco.get("reasoning_details")
             if isinstance(guardados, list):
                 detalhes.extend(d for d in guardados if isinstance(d, dict))
@@ -361,14 +361,14 @@ def _do_assistente(conteudo: Any) -> dict[str, Any] | None:
 
 
 def _argumentos_como_texto(argumentos: Any) -> str:
-    """O `input` de um `tool_use` como a string JSON de `function.arguments`.
+    """The `input` of a `tool_use` as the JSON string of `function.arguments`.
 
-    Só um OBJETO vai como está. O texto cru de uma chamada cortada por
-    `max_tokens` (o que `_argumentos` devolve quando o JSON não fecha) fica no
-    transcrito para o replay, mas na ida vira `{}`: reenviado como veio, seria
-    JSON inválido em toda volta seguinte, e o provedor recusaria a conversa
-    inteira. O `tool_result` de erro emparelhado já disse ao modelo que aquela
-    chamada não aconteceu.
+    Only an OBJECT goes as is. The raw text of a call cut off by
+    `max_tokens` (what `_argumentos` returns when the JSON does not close) stays in the
+    transcript for the replay, but on the way out becomes `{}`: resent as it came, it would be
+    invalid JSON on every following round, and the provider would refuse the whole
+    conversation. The paired error `tool_result` already told the model that that
+    call did not happen.
     """
     if isinstance(argumentos, dict):
         return json.dumps(argumentos, ensure_ascii=False, default=str)
@@ -383,26 +383,26 @@ def _tem_raciocinio(corpo: dict[str, Any]) -> bool:
 
 
 def _sem_raciocinio(corpo: dict[str, Any]) -> dict[str, Any]:
-    """O mesmo pedido sem os `reasoning_details` — o plano B do 400."""
+    """The same request without the `reasoning_details` — the 400 plan B."""
     mensagens = [
         {k: v for k, v in m.items() if k != "reasoning_details"} for m in corpo.get("messages") or []
     ]
     return {**corpo, "messages": mensagens}
 
 
-# ── A volta: do SSE à resposta ───────────────────────────────────────────────
+# ── Inbound: from SSE to response ────────────────────────────────────────────
 
 
 async def _linhas(resposta: httpx.Response) -> AsyncIterator[str]:
-    """As linhas do corpo, quebradas SÓ em `\\n`, `\\r\\n` e `\\r` — os três
-    terminadores que a especificação do SSE define.
+    """The body's lines, split ONLY on `\\n`, `\\r\\n` and `\\r` — the three
+    terminators the SSE specification defines.
 
-    `aiter_lines()` do httpx não serve: ele quebra como `str.splitlines()`, o
-    que inclui U+2028, U+2029 e U+0085 — caracteres válidos SEM escape dentro
-    de uma string JSON. Um modelo que os emitisse (ecoando um nome de fluxo,
-    um texto vindo da web) teria o quadro cortado no meio, e o turno inteiro
-    morreria em `quadro ilegível`. Quebrar nos bytes é seguro: em UTF-8 os
-    bytes 0x0A e 0x0D nunca aparecem dentro de um caractere multibyte.
+    httpx's `aiter_lines()` does not work: it splits like `str.splitlines()`, which
+    includes U+2028, U+2029 and U+0085 — characters that are valid UNESCAPED inside
+    a JSON string. A model that emitted them (echoing a workflow name,
+    a text coming from the web) would have the frame cut in the middle, and the whole turn
+    would die with `quadro ilegível` (unreadable frame). Splitting on bytes is safe: in UTF-8
+    the bytes 0x0A and 0x0D never appear inside a multibyte character.
     """
     resto = b""
     async for pedaco in resposta.aiter_bytes():
@@ -415,7 +415,7 @@ async def _linhas(resposta: httpx.Response) -> AsyncIterator[str]:
             fim = min(i for i in (i_n, i_r) if i >= 0)
             if resto[fim : fim + 1] == b"\r":
                 if fim + 1 >= len(resto):
-                    # Pode ser um `\r\n` partido entre dois pedaços: espera o próximo.
+                    # It may be a `\r\n` split across two chunks: wait for the next one.
                     break
                 salto = 2 if resto[fim + 1 : fim + 2] == b"\n" else 1
             else:
@@ -429,12 +429,12 @@ async def _linhas(resposta: httpx.Response) -> AsyncIterator[str]:
 
 
 async def _eventos_sse(resposta: httpx.Response) -> AsyncIterator[dict[str, Any]]:
-    """Os quadros `data:` do stream, já decodificados. Para no `[DONE]`.
+    """The stream's `data:` frames, already decoded. Stops at `[DONE]`.
 
-    Linhas que começam com `:` são comentários — o OpenRouter manda
-    `: OPENROUTER PROCESSING` como sinal de vida enquanto espera o provedor.
-    Um evento pode ter várias linhas `data:` (juntam-se com `\\n`, como manda a
-    especificação) e termina numa linha em branco.
+    Lines starting with `:` are comments — OpenRouter sends
+    `: OPENROUTER PROCESSING` as a sign of life while it waits for the provider.
+    An event may have several `data:` lines (joined with `\\n`, as the
+    specification says) and ends at a blank line.
     """
     dados: list[str] = []
     async for linha in _linhas(resposta):
@@ -470,7 +470,7 @@ def _decodificar(carga: str) -> dict[str, Any]:
 
 
 def _texto_de(valor: Any) -> str:
-    """`content`/`reasoning` de um delta: string, ou lista de partes de texto."""
+    """`content`/`reasoning` of a delta: a string, or a list of text parts."""
     if isinstance(valor, str):
         return valor
     if isinstance(valor, list):
@@ -488,11 +488,11 @@ def _inteiro(valor: Any) -> int:
 
 
 def _uso_do_projeto(cru: Any) -> dict[str, Any]:
-    """O `usage` do OpenRouter nas chaves do projeto.
+    """OpenRouter's `usage` in the project's keys.
 
-    `prompt_tokens` já INCLUI o que veio do cache — `cached_tokens` é um recorte
-    dele, informativo. Por isso a cota soma só entrada + saída (ver `Uso` no
-    laço). `cost` vem em créditos (dólares) quando `usage.include` está ligado.
+    `prompt_tokens` already INCLUDES what came from the cache — `cached_tokens` is a
+    subset of it, informational. That is why the quota sums only input + output (see `Uso` in
+    the loop). `cost` comes in credits (dollars) when `usage.include` is on.
     """
     cru = cru if isinstance(cru, dict) else {}
     entrada = cru.get("prompt_tokens_details") or {}
@@ -515,12 +515,12 @@ _avisou_sem_uso = False
 
 
 def _avisar_sem_uso() -> None:
-    """Uma vez por processo: a resposta chegou sem `usage`.
+    """Once per process: the response arrived without `usage`.
 
-    Sem a contagem, a cota diária do assistente não cobra o turno — o teto
-    deixa de valer em silêncio. Acontece com um servidor que ignora o
-    `stream_options.include_usage` (versões antigas de alguns servidores
-    locais). Uma vez basta: repetir a cada turno afogaria o log.
+    Without the count, the assistant's daily quota does not charge the turn — the ceiling
+    silently stops applying. It happens with a server that ignores
+    `stream_options.include_usage` (old versions of some local
+    servers). Once is enough: repeating it every turn would drown the log.
     """
     global _avisou_sem_uso
     if _avisou_sem_uso:
@@ -534,15 +534,15 @@ def _avisar_sem_uso() -> None:
 
 
 class _Acumulador:
-    """Remonta os `chunks` de UMA resposta. Cada chamada a `absorver` devolve os
-    deltas visíveis daquele quadro; `resposta()` fecha a conta.
+    """Reassembles the `chunks` of ONE response. Each call to `absorver` returns the
+    visible deltas of that frame; `resposta()` settles the account.
 
-    Chamadas de ferramenta chegam por `index`: o `id` e o `name` no primeiro
-    pedaço, os `arguments` gota a gota. `reasoning_details` chega do mesmo jeito
-    — um item por pedaço, com o `index` do bloco a que pertence e o texto
-    parcial; a `signature` (quando o modelo tem) vem no último. Juntar por
-    índice reconstrói o que o provedor gerou, e é isso que volta na próxima
-    volta.
+    Tool calls arrive by `index`: the `id` and the `name` in the first
+    chunk, the `arguments` drop by drop. `reasoning_details` arrives the same way
+    — one item per chunk, with the `index` of the block it belongs to and the partial
+    text; the `signature` (when the model has one) comes in the last one. Joining by
+    index rebuilds what the provider generated, and that is what goes back on the next
+    round.
     """
 
     def __init__(self) -> None:
@@ -595,7 +595,7 @@ class _Acumulador:
             return
         indice = chamada.get("index")
         if not isinstance(indice, int):
-            # Sem índice: um `id` novo abre outra chamada; sem `id`, é a última.
+            # No index: a new `id` opens another call; without an `id`, it is the last one.
             if chamada.get("id") or not self.chamadas:
                 indice = len(self.chamadas)
             else:
@@ -620,11 +620,11 @@ class _Acumulador:
         if isinstance(indice, int):
             chave: tuple[str, Any] = (tipo, indice)
         elif item.get("id"):
-            # Sem índice mas com `id` (o raciocínio criptografado de alguns
-            # provedores): itens distintos, nunca fundidos num só.
+            # No index but with an `id` (the encrypted reasoning of some
+            # providers): distinct items, never merged into one.
             chave = (tipo, f"id:{item['id']}")
         else:
-            # Sem índice e sem `id`: pedaços do mesmo bloco.
+            # No index and no `id`: chunks of the same block.
             chave = (tipo, None)
         atual = self.detalhes.get(chave)
         if atual is None:
@@ -664,11 +664,11 @@ class _Acumulador:
                 }
             )
 
-        # O OpenRouter sempre manda um `finish_reason` antes do `[DONE]`. Sem
-        # ele, o que chegou não é uma resposta: é um 200 de gateway com HTML,
-        # ou um stream que fechou antes do último quadro. Inferir "stop" aqui
-        # gravaria uma mensagem vazia do assistente e emitiria um `fim` ok —
-        # exatamente a resposta pela metade que este módulo promete não dar.
+        # OpenRouter always sends a `finish_reason` before `[DONE]`. Without
+        # it, what arrived is not a response: it is a gateway 200 with HTML,
+        # or a stream that closed before the last frame. Inferring "stop" here
+        # would store an empty assistant message and emit an ok `fim` —
+        # exactly the half response this module promises not to give.
         if self.parada is None:
             raise ErroDoOpenRouter("o stream terminou sem finish_reason")
         parada = self.parada
@@ -686,10 +686,10 @@ class _Acumulador:
 
 
 def _argumentos(pedacos: list[str]) -> Any:
-    """O argumento da chamada: um objeto quando o JSON fecha; senão, o texto cru.
+    """The call's argument: an object when the JSON closes; otherwise, the raw text.
 
-    O texto cru NÃO é um objeto, e o laço trata isso como erro de chamada — o
-    modelo lê "refaça" em vez de a ferramenta receber metade de uma definição.
+    The raw text is NOT an object, and the loop treats it as a call error — the
+    model reads "redo it" instead of the tool receiving half a definition.
     """
     texto = "".join(pedacos).strip()
     if not texto:
@@ -713,7 +713,7 @@ def _espera(tentativa: int, retry_after: str | None = None) -> float:
 
 
 async def _ler_erro(resposta: httpx.Response) -> tuple[Any, str]:
-    """`(code, message)` do envelope de erro do OpenRouter, ou o corpo cru encurtado."""
+    """`(code, message)` from OpenRouter's error envelope, or the raw body, shortened."""
     try:
         bruto = await resposta.aread()
     finally:
@@ -728,11 +728,11 @@ async def _ler_erro(resposta: httpx.Response) -> tuple[Any, str]:
     return None, str(corpo)[:300]
 
 
-# O pool de conexões do processo, criado na primeira conversa e reaproveitado
-# por todas. Abrir um `AsyncClient` por chamada custava um handshake TCP+TLS
-# com o openrouter.ai a cada volta de ferramenta — de seis a doze por conversa.
-# A API roda num único event loop por worker, então um pool por processo é
-# seguro; os testes injetam o próprio `http` e nunca chegam aqui.
+# The process's connection pool, created on the first conversation and reused
+# by all of them. Opening an `AsyncClient` per call cost a TCP+TLS handshake
+# with openrouter.ai on every tool round — six to twelve per conversation.
+# The API runs a single event loop per worker, so one pool per process is
+# safe; the tests inject their own `http` and never get here.
 _http_compartilhado: httpx.AsyncClient | None = None
 
 
@@ -745,35 +745,35 @@ def _http_padrao() -> httpx.AsyncClient:
 
 CAMINHO_DOS_MODELOS = "/models"
 
-# O catálogo é grande e muda devagar. Este limite existe para o pedido não ficar
-# pendurado numa tela de admin: ele não é caminho de conversa, e falhar rápido
-# ali é melhor que um spinner de três minutos.
+# The catalog is large and changes slowly. This limit exists so the request does not hang
+# on an admin screen: it is not a conversation path, and failing fast
+# there is better than a three-minute spinner.
 TEMPO_LIMITE_DO_CATALOGO = httpx.Timeout(connect=10.0, read=20.0, write=10.0, pool=10.0)
 
 
 async def listar_modelos(
     *, base_url: str = URL_PADRAO, chave: str | None = None, http: httpx.AsyncClient | None = None,
 ) -> list[dict[str, Any]]:
-    """O catálogo do provedor, com os preços já em dólares por MILHÃO de tokens.
+    """The provider's catalog, with prices already in dollars per MILLION tokens.
 
-    **Por que um módulo e não um método do cliente:** isto não é uma conversa.
-    Não tem esforço de raciocínio nem stream, e quem chama é uma tela de admin —
-    amarrá-lo ao cliente por conversa obrigaria a inventar uma conversa para
-    listar preços. A `chave` é opcional: o catálogo do OpenRouter é público.
+    **Why a module and not a client method:** this is not a conversation.
+    It has no reasoning effort nor stream, and the caller is an admin screen —
+    tying it to the per-conversation client would mean inventing a conversation to
+    list prices. The `chave` is optional: OpenRouter's catalog is public.
 
-    A API devolve o preço **por token**, em string (`"0.000003"`). Quem lê uma
-    tabela de custo pensa em milhão, e converter na borda é o que evita cada
-    chamador multiplicar por um milhão do seu jeito — e algum deles esquecer.
-    Preço ausente ou ilegível vira `None`, nunca zero: um modelo "de graça" na
-    tabela de custo é pior que um modelo sem preço.
+    The API returns the price **per token**, as a string (`"0.000003"`). Whoever reads a
+    cost table thinks in millions, and converting at the edge is what keeps each
+    caller from multiplying by a million in their own way — and one of them forgetting.
+    A missing or unreadable price becomes `None`, never zero: a "free" model in the
+    cost table is worse than a model with no price.
     """
     base = (base_url or URL_PADRAO).rstrip("/")
     if base.endswith(CAMINHO):
         base = base[: -len(CAMINHO)]
     cliente = http if http is not None else _http_padrao()
-    # Outros servidores compatíveis (um gateway, um vLLM com chave) pedem no
-    # catálogo a mesma chave da conversa. Sem preço na resposta (um servidor
-    # local), as colunas de custo ficam `None`.
+    # Other compatible servers (a gateway, a vLLM with a key) require on the
+    # catalog the same key as the conversation. With no price in the response (a local
+    # server), the cost columns stay `None`.
     cabecalhos = {"Accept": "application/json"}
     if chave:
         cabecalhos["Authorization"] = f"Bearer {chave}"
@@ -808,7 +808,7 @@ async def listar_modelos(
 
 
 def _por_milhao(valor: Any) -> float | None:
-    """Preço por token → por milhão. `None` quando não dá para saber."""
+    """Price per token → per million. `None` when there is no way to know."""
     if valor is None or valor == "":
         return None
     try:
@@ -818,8 +818,8 @@ def _por_milhao(valor: Any) -> float | None:
 
 
 class ClienteOpenRouter:
-    """Um cliente por conversa, sobre o pool compartilhado do processo. Com
-    `http` injetado (testes), usa o que veio e não toca no pool."""
+    """One client per conversation, on top of the process's shared pool. With
+    an injected `http` (tests), uses what it was given and does not touch the pool."""
 
     def __init__(
         self,
@@ -835,9 +835,9 @@ class ClienteOpenRouter:
         if not chave:
             raise ValueError("LLM_API_KEY vazia: o assistente não pode falar com o modelo.")
         self._chave = chave
-        # `base_url` é a BASE (`.../api/v1`); o caminho é daqui. Mas quem
-        # configura a URL completa do endpoint não pode ser punido com
-        # `/chat/completions/chat/completions` em todo pedido.
+        # `base_url` is the BASE (`.../api/v1`); the path is ours. But whoever
+        # configures the endpoint's full URL must not be punished with
+        # `/chat/completions/chat/completions` on every request.
         base = (base_url or URL_PADRAO).rstrip("/")
         self._url = base if base.endswith(CAMINHO) else base + CAMINHO
         self._openrouter = e_openrouter(base)
@@ -853,8 +853,8 @@ class ClienteOpenRouter:
             "Content-Type": "application/json",
             "Accept": "text/event-stream",
         }
-        # Atribuição do app no painel do OpenRouter: só quando a instalação
-        # quer (ASSISTENTE_ATRIBUICAO), e quem chama passa título e referer.
+        # App attribution in the OpenRouter dashboard: only when the installation
+        # wants it (ASSISTENTE_ATRIBUICAO), and the caller passes the title and referer.
         if self._titulo:
             cabecalhos["X-Title"] = self._titulo
         if self._referer:
@@ -871,7 +871,7 @@ class ClienteOpenRouter:
         max_tokens: int,
         esforco: str | None = "high",
     ) -> AsyncIterator[Delta | Resposta]:
-        """Uma chamada ao modelo, em stream. Cede `Delta`s e, por último, a `Resposta`."""
+        """One call to the model, streamed. Yields `Delta`s and, last, the `Resposta`."""
         corpo = montar_pedido(
             modelo=modelo,
             sistema=sistema,
@@ -899,9 +899,9 @@ class ClienteOpenRouter:
             await resposta.aclose()
 
     async def _abrir(self, http: httpx.AsyncClient, corpo: dict[str, Any]) -> httpx.Response:
-        """O POST, até os cabeçalhos. Retenta rede/429/5xx; um 400 com raciocínio
-        guardado é refeito uma vez sem ele. Devolve a resposta com o corpo ainda
-        por ler (stream)."""
+        """The POST, up to the headers. Retries network/429/5xx; a 400 with stored
+        reasoning is redone once without it. Returns the response with the body still
+        unread (stream)."""
         tentativa = 0
         ja_tirou_raciocinio = False
         while True:
@@ -938,10 +938,10 @@ class ClienteOpenRouter:
             )
 
 
-# A ferramenta da sonda. Uma basta: a pergunta é «este modelo aceita ferramentas
-# de algum jeito?», e a resposta não muda com quantas nem quais. Ela é declarada
-# aqui, e não montada do servidor MCP, porque a sonda roda numa tela de admin —
-# não há escopo de conversa nem workspace para montar o catálogo real.
+# The probe's tool. One is enough: the question is "does this model accept tools
+# in any way?", and the answer does not change with how many or which. It is declared
+# here, and not built from the MCP server, because the probe runs on an admin screen —
+# there is no conversation scope nor workspace to build the real catalog.
 _FERRAMENTA_DA_SONDA: dict[str, Any] = {
     "type": "function",
     "function": {
@@ -963,33 +963,33 @@ async def sondar_modelo(
     referer: str | None = None,
     titulo: str | None = None,
 ) -> None:
-    """Este modelo consegue rodar o assistente? Levanta `ErroDoOpenRouter` se não.
+    """Can this model run the assistant? Raises `ErroDoOpenRouter` if not.
 
-    **Existe porque «está no catálogo» não quer dizer «serve».** O catálogo do
-    provedor traz algumas centenas de modelos, e entre eles há variantes que o
-    endpoint de conversa recusa por completo (as `:batch`, que respondem
-    «cannot be used with the chat/completions endpoint»), modelos sem suporte a
-    ferramentas — e o assistente manda as 42 em toda chamada — e modelos cujo
-    teto de saída é menor que o nosso `max_tokens`. Salvar um deles derrubava o
-    assistente para TODOS os usuários, com uma mensagem genérica, enquanto quem
-    trocou não via nada.
+    **It exists because "it is in the catalog" does not mean "it works".** The provider's
+    catalog carries a few hundred models, and among them are variants that the
+    conversation endpoint refuses outright (the `:batch` ones, which respond
+    "cannot be used with the chat/completions endpoint"), models without tool
+    support — and the assistant sends all 42 on every call — and models whose
+    output ceiling is lower than our `max_tokens`. Saving one of them brought down the
+    assistant for ALL users, with a generic message, while whoever
+    switched saw nothing.
 
-    **O único teste confiável de «serve» é chamar.** Filtrar por campos do
-    catálogo exigiria adivinhar quais campos existem e manter essa adivinhação
-    em dia; uma chamada real responde certo sobre todos os casos de uma vez,
-    inclusive os que ninguém previu — como a variante de batch, que não estava
-    em nenhuma lista de suspeitos.
+    **The only reliable test of "it works" is calling it.** Filtering by catalog
+    fields would require guessing which fields exist and keeping that guess
+    up to date; a real call answers correctly about every case at once,
+    including the ones nobody foresaw — like the batch variant, which was not
+    on any list of suspects.
 
-    O pedido tem a FORMA da conversa de verdade — as mesmas ferramentas,
-    o mesmo `max_tokens`, o mesmo esforço de raciocínio — porque é a forma que
-    o provedor recusa. Só o conteúdo é mínimo: uma mensagem curta, e a leitura
-    para no primeiro pedaço. O custo é de alguns tokens, e `max_tokens` é um
-    TETO, não uma meta: pedir 64 k não gasta 64 k.
+    The request has the SHAPE of the real conversation — the same tools,
+    the same `max_tokens`, the same reasoning effort — because it is the shape that
+    the provider refuses. Only the content is minimal: a short message, and reading
+    stops at the first chunk. The cost is a few tokens, and `max_tokens` is a
+    CEILING, not a target: asking for 64 k does not spend 64 k.
     """
     cliente = ClienteOpenRouter(chave, base_url=base_url, http=http, referer=referer, titulo=titulo,
-                                # Sem retentativas: a sonda é uma pergunta, não
-                                # um trabalho. Um 429 aqui é resposta — este
-                                # modelo não está disponível para nós agora.
+                                # No retries: the probe is a question, not
+                                # a job. A 429 here is an answer — this
+                                # model is not available to us right now.
                                 tentativas=1)
     fluxo = cliente.transmitir(
         modelo=modelo,
@@ -1000,17 +1000,17 @@ async def sondar_modelo(
         esforco=esforco,
     )
     try:
-        # O primeiro pedaço basta: se o provedor fosse recusar, teria recusado
-        # ao ABRIR o stream. Ler até o fim só gastaria tokens à toa.
+        # The first chunk is enough: if the provider were going to refuse, it would have refused
+        # on OPENING the stream. Reading to the end would only waste tokens.
         async for _ in fluxo:
             break
     except ErroDoOpenRouter as exc:
-        # `status` só existe quando a recusa veio do HTTP — é ela que responde
-        # «este modelo serve?». Sem `status`, o provedor ACEITOU o pedido e o
-        # stream terminou de um jeito que esta função não tem por que julgar
-        # (nenhum quadro, `finish_reason` ausente): a pergunta da sonda é sobre
-        # a configuração, não sobre a resposta. Barrar aqui trancaria a troca
-        # por um detalhe de transmissão que a conversa real lida sozinha.
+        # `status` only exists when the refusal came from HTTP — it is what answers
+        # "does this model work?". Without `status`, the provider ACCEPTED the request and the
+        # stream ended in a way this function has no business judging
+        # (no frame, missing `finish_reason`): the probe's question is about
+        # the configuration, not the response. Blocking here would lock the switch
+        # over a transmission detail that the real conversation handles on its own.
         if exc.status is None:
             logger.info(
                 "Assistente: sonda de %s aceita — o provedor respondeu, e o stream "

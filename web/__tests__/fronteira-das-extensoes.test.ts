@@ -1,23 +1,24 @@
 /**
- * O núcleo do web anda sem as extensões (`web/extensoes/<nome>`), e a
- * distribuição livre não as traz. É o par do teste do servidor
- * (`tests/unit/test_fronteira_das_extensoes.py`), com dois jeitos de quebrar:
+ * The web core runs without the extensions (`web/extensoes/<nome>`), and the
+ * free distribution doesn't ship them. It's the counterpart of the server test
+ * (`tests/unit/test_fronteira_das_extensoes.py`), with two ways to break:
  *
- *   IMPORT     um arquivo do núcleo (ou um teste dele) importa uma extensão
- *              pelo nome, ou a cita num `vi.mock`;
- *   REGISTRO   no modo núcleo (`npm run test:nucleo`), o registro não está
- *              vazio — e a suíte inteira estaria testando outra coisa.
+ *   IMPORT     a core file (or one of its tests) imports an extension by
+ *              name, or mentions it in a `vi.mock`;
+ *   REGISTRY   in core mode (`npm run test:nucleo`), the registry isn't
+ *              empty — and the whole suite would be testing something else.
  *
- * O núcleo fala com as extensões só pelo registro (`@/extensoes`). Quem lista
- * as presentes é `extensoes/instaladas.ts`, o único arquivo autorizado a
- * citá-las pelo nome; a distribuição livre o troca pela lista vazia. A prova
- * definitiva é o job «Frontend sem extensões» do CI, que APAGA as extensões
- * (`scripts/sem_extensoes.sh`) e roda tipos, testes e build; este teste é o
- * aviso rápido, na suíte de todo dia.
+ * The core talks to the extensions only through the registry (`@/extensoes`).
+ * What lists the present ones is `extensoes/instaladas.ts`, the only file
+ * allowed to name them; the free distribution swaps it for the empty list. The
+ * definitive proof is the CI job «Frontend sem extensões» (frontend without
+ * extensions), which DELETES the extensions (`scripts/sem_extensoes.sh`) and
+ * runs types, tests and build; this test is the quick warning, in the everyday
+ * suite.
  *
- * Os especificadores saem da árvore sintática do TypeScript, e não de uma
- * expressão regular: um comentário entre o `from` e o caminho, ou o comentário
- * mágico de um `import()`, passava pela regex.
+ * The specifiers come from the TypeScript syntax tree, not from a regular
+ * expression: a comment between the `from` and the path, or the magic comment
+ * of an `import()`, got past the regex.
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -29,13 +30,13 @@ const PASTAS_FORA = new Set(["node_modules", ".next", "public", "out", "build", 
 const CODIGO = /\.(ts|tsx|js|jsx|mjs|cjs)$/
 const METODOS_DO_VI = new Set(["mock", "doMock", "unmock", "importActual", "importMock"])
 
-/** `extensoes/<nome>/…` e `__tests__/extensoes/…` são das extensões. */
+/** `extensoes/<nome>/…` and `__tests__/extensoes/…` belong to the extensions. */
 function daExtensao(relativo: string): boolean {
   const partes = relativo.split("/")
   return (partes[0] === "extensoes" && partes.length > 2) || (partes[0] === "__tests__" && partes[1] === "extensoes")
 }
 
-// Este arquivo cita extensões de mentira de propósito, nos exemplos do detector.
+// This file mentions fake extensions on purpose, in the detector's examples.
 const ESTE = path.relative(WEB, __filename).split(path.sep).join("/")
 
 function arquivosDoNucleo(pasta = WEB): string[] {
@@ -51,8 +52,8 @@ function arquivosDoNucleo(pasta = WEB): string[] {
   return achados
 }
 
-/** Os módulos que um arquivo cita: imports e exports (de tipo também), `import()`,
- *  `import("…")` em tipo, `require` e os `vi.mock` e parentes. */
+/** The modules a file references: imports and exports (type-only too), `import()`,
+ *  `import("…")` in types, `require` and `vi.mock` and its relatives. */
 export function especificadores(texto: string, arquivo: string): string[] {
   const tipo = /\.[jt]sx$/.test(arquivo) ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   const fonte = ts.createSourceFile(arquivo, texto, ts.ScriptTarget.Latest, false, tipo)
@@ -83,10 +84,10 @@ export function especificadores(texto: string, arquivo: string): string[] {
   return achados
 }
 
-/** O que o núcleo pode alcançar dentro de `extensoes/`: o registro, que são os
- *  arquivos soltos na raiz da pasta (as subpastas são as extensões, e o corte
- *  da distribuição livre apaga só elas). A lista das instaladas fica de fora:
- *  só o próprio registro a lê. */
+/** What the core may reach inside `extensoes/`: the registry, which is the
+ *  loose files at the folder's root (the subfolders are the extensions, and
+ *  the free distribution's cut deletes only them). The list of installed ones
+ *  is excluded: only the registry itself reads it. */
 const DO_REGISTRO = new Set([
   "extensoes",
   ...fs.readdirSync(path.join(WEB, "extensoes"), { withFileTypes: true })
@@ -95,7 +96,7 @@ const DO_REGISTRO = new Set([
     .filter(alvo => alvo !== "extensoes/instaladas"),
 ])
 
-/** Os alvos de `extensoes/` que um arquivo do núcleo cita sem poder. */
+/** The `extensoes/` targets that a core file references without being allowed to. */
 export function citacoesProibidas(texto: string, arquivo: string): string[] {
   const proibidas: string[] = []
   for (const especificador of especificadores(texto, arquivo)) {
@@ -106,7 +107,7 @@ export function citacoesProibidas(texto: string, arquivo: string): string[] {
     alvo = alvo.replace(/\.(tsx?|jsx?|mjs)$/, "").replace(/\/index$/, "")
     if (alvo !== "extensoes" && !alvo.startsWith("extensoes/")) continue
     if (DO_REGISTRO.has(alvo)) continue
-    // O registro, e só ele, lê a lista das instaladas.
+    // The registry, and only it, reads the list of installed ones.
     if (arquivo === "extensoes/index.ts" && alvo === "extensoes/instaladas") continue
     proibidas.push(especificador)
   }
@@ -115,7 +116,7 @@ export function citacoesProibidas(texto: string, arquivo: string): string[] {
 
 describe("a fronteira entre o núcleo e as extensões", () => {
   it("o detector enxerga os jeitos de citar uma extensão", () => {
-    const ouro = "ouro" // uma extensão de mentira
+    const ouro = "ouro" // a fake extension
     const ve = (codigo: string, arquivo = "app/a.tsx") => citacoesProibidas(codigo, arquivo)
 
     expect(ve(`import x from "@/extensoes/${ouro}/store"`)).toHaveLength(1)
@@ -138,7 +139,7 @@ describe("a fronteira entre o núcleo e as extensões", () => {
 
   it("nenhum arquivo do núcleo cita uma extensão pelo nome", () => {
     const arquivos = arquivosDoNucleo()
-    // O teste enxerga o núcleo: a casca e o registro estão na lista.
+    // The test sees the core: the shell and the registry are in the list.
     expect(arquivos).toContain("app/components/sidebar/user-sidebar.tsx")
     expect(arquivos).toContain("extensoes/index.ts")
     expect(arquivos).not.toContain(ESTE)

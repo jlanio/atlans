@@ -20,7 +20,7 @@ pytestmark = pytest.mark.skipif(not _AVAILABLE, reason="SubWorkflowNode indispon
 
 
 def _valid_child_definition() -> dict:
-    """Definicao minima de sub-workflow valido (com Input + Output)."""
+    """Minimal valid sub-workflow definition (with Input + Output)."""
     return {
         "nodes": [
             {"id": "in",  "name": "SubWorkflowInput"},
@@ -58,16 +58,16 @@ def _make_node(
     # context default popula _subworkflow_definitions via resolver (se passado).
     ctx = dict(context) if context else {}
     if resolver is not None:
-        # Resolver retorna a definicao OU levanta ValueError. Populamos o
-        # snapshot do envelope simulando o que o servidor faria. Se o resolver
-        # levantar, gravamos snapshot vazio — _fetch_definition_from_snapshot
-        # vai falhar com "nao foi pre-resolvido pelo servidor" como esperado.
+        # The resolver returns the definition OR raises ValueError. We populate the
+        # envelope snapshot simulating what the server would do. If the resolver
+        # raises, we store an empty snapshot — _fetch_definition_from_snapshot
+        # will fail with "nao foi pre-resolvido pelo servidor" as expected.
         try:
             snapshot = {workflow_hash: resolver(workflow_hash, workspace_id)}
         except ValueError:
             snapshot = {}
-        # Preserva _subworkflow_definitions ja existentes no context (se algum
-        # teste setou explicitamente).
+        # Preserves _subworkflow_definitions already in the context (if some
+        # test set them explicitly).
         existing = ctx.get("_subworkflow_definitions") or {}
         existing.update(snapshot)
         ctx["_subworkflow_definitions"] = existing
@@ -101,8 +101,8 @@ class TestLoopDetection:
 
     @pytest.mark.asyncio
     async def test_no_loop_when_target_is_new(self):
-        """Sem loop -> tenta resolver definicao do snapshot do envelope."""
-        # Snapshot vazio: SubWorkflowNode vai falhar com mensagem do snapshot.
+        """No loop -> tries to resolve the definition from the envelope snapshot."""
+        # Empty snapshot: SubWorkflowNode will fail with the snapshot message.
         node = _make_node(
             workflow_hash="A",
             context={"_subflow_ancestors": {"B"}, "_subworkflow_definitions": {}},
@@ -112,12 +112,12 @@ class TestLoopDetection:
 
 
 def _async_run(returns=None, sleep=None, capture=None, capture_flag=False):
-    """Dublê de `WorkflowExecutor.run` — corrotina.
+    """Double of `WorkflowExecutor.run` — a coroutine.
 
-    A implementação passou a aguardar `child.run(...)` no MESMO event loop
-    (antes: `asyncio.to_thread(run_sync)`, que criava loop novo em thread).
-    Com isso o `wait_for` cancela de verdade, então o dublê precisa ser
-    cancelável — `asyncio.sleep`, não `time.sleep`.
+    The implementation now awaits `child.run(...)` on the SAME event loop
+    (before: `asyncio.to_thread(run_sync)`, which created a new loop in a thread).
+    With that, `wait_for` really cancels, so the double has to be
+    cancellable — `asyncio.sleep`, not `time.sleep`.
     """
     async def _run(**kwargs):
         if capture is not None:
@@ -134,12 +134,12 @@ class TestTimeout:
 
     @pytest.mark.asyncio
     async def test_timeout_raises_runtime_error_quickly(self):
-        """Sub-workflow que demora mais que timeout falha em ~timeout segundos."""
+        """A sub-workflow that takes longer than the timeout fails in ~timeout seconds."""
 
         def slow_resolver(hash_, ws_id):
-            # Retorna definicao minima (vazia) — o WorkflowExecutor com
-            # nenhum node termina rapido, mas vamos fazer run() travar
-            # via patch abaixo.
+            # Returns a minimal (empty) definition — the WorkflowExecutor with
+            # no nodes finishes quickly, but we make run() hang
+            # via the patch below.
             return _valid_child_definition()
 
         node = _make_node(
@@ -148,7 +148,7 @@ class TestTimeout:
             resolver=slow_resolver,
         )
 
-        # Patch run() para dormir muito mais que o timeout.
+        # Patch run() to sleep much longer than the timeout.
         with patch("flow.executor.WorkflowExecutor") as mock_executor_cls:
             mock_executor = MagicMock()
             mock_executor.context = {}
@@ -165,11 +165,12 @@ class TestTimeout:
 
     @pytest.mark.asyncio
     async def test_timeout_de_um_no_do_filho_nao_vira_timeout_do_sub_fluxo(self):
-        """O PythonScript do filho levanta o TimeoutError embutido quando o
-        script estoura o prazo DELE. Do 3.11 em diante ele é o mesmo
-        `asyncio.TimeoutError`, e o erro virava "excedeu o timeout de 300s,
-        aumente timeoutSeconds" — o conselho errado. Tem de sair como erro do
-        filho, com a causa."""
+        """The child's PythonScript raises the built-in TimeoutError when the
+        script exceeds ITS OWN deadline. From 3.11 on it is the same
+        `asyncio.TimeoutError`, and the error became "excedeu o timeout de 300s,
+        aumente timeoutSeconds" (exceeded the 300s timeout, increase
+        timeoutSeconds) — the wrong advice. It has to come out as the child's
+        error, with the cause."""
         node = _make_node(workflow_hash="B", timeout_seconds=300,
                           resolver=lambda h, w: _valid_child_definition())
 
@@ -203,9 +204,9 @@ class TestMessages:
 
     @pytest.mark.asyncio
     async def test_hash_not_in_snapshot_raises_helpful_message(self):
-        """Hash nao incluido no snapshot do envelope: mensagem orienta operador
-        sobre as causas (nao existe / desativado / outro workspace) e sugere
-        re-salvar o workflow chamador."""
+        """Hash not included in the envelope snapshot: the message guides the operator
+        on the causes (does not exist / deactivated / other workspace) and suggests
+        re-saving the calling workflow."""
         node = _make_node(
             workflow_hash="ghost",
             context={"_subworkflow_definitions": {}},
@@ -220,7 +221,7 @@ class TestCancellation:
 
     @pytest.mark.asyncio
     async def test_cancelled_error_propagates(self):
-        """Cancel da task do pai -> CancelledError nao virá RuntimeError."""
+        """Cancelling the parent's task -> CancelledError does not become RuntimeError."""
 
         def slow_resolver(hash_, ws_id):
             return _valid_child_definition()
@@ -234,7 +235,7 @@ class TestCancellation:
             mock_executor_cls.return_value = mock_executor
 
             task = asyncio.create_task(node.execute({}))
-            await asyncio.sleep(0.05)  # da chance do to_thread comecar
+            await asyncio.sleep(0.05)  # gives to_thread a chance to start
             task.cancel()
 
             with pytest.raises(asyncio.CancelledError):
@@ -247,7 +248,7 @@ class TestInputsMapping:
 
     @pytest.mark.asyncio
     async def test_empty_mapping_passes_all_inputs(self):
-        """inputsMapping vazio -> todos os inputs do pai vao para o filho."""
+        """Empty inputsMapping -> all of the parent's inputs go to the child."""
         captured: dict = {}
 
         def resolver(hash_, ws_id):
@@ -267,7 +268,7 @@ class TestInputsMapping:
 
     @pytest.mark.asyncio
     async def test_mapping_translates_keys(self):
-        """inputsMapping {'a': 'src_a'} -> filho recebe 'a' com valor de 'src_a'."""
+        """inputsMapping {'a': 'src_a'} -> the child receives 'a' with the value of 'src_a'."""
         captured: dict = {}
 
         def resolver(hash_, ws_id):
@@ -296,8 +297,8 @@ class TestDisabledNodes:
 
     @pytest.mark.asyncio
     async def test_child_with_disabled_node_is_blocked(self):
-        """Sub-fluxo cuja definicao contem node desabilitado pelo admin falha
-        com mensagem clara, ANTES de instanciar o executor."""
+        """A sub-workflow whose definition contains a node disabled by the admin fails
+        with a clear message, BEFORE instantiating the executor."""
 
         def resolver(hash_, ws_id):
             return {
@@ -319,7 +320,7 @@ class TestDisabledNodes:
 
     @pytest.mark.asyncio
     async def test_child_without_disabled_nodes_runs(self):
-        """Snapshot vazio nao bloqueia nada."""
+        """An empty snapshot blocks nothing."""
 
         captured: dict = {}
 
@@ -345,8 +346,8 @@ class TestDisabledNodes:
 
     @pytest.mark.asyncio
     async def test_disabled_nodes_snapshot_propagates_to_grandchild(self):
-        """Cadeia A→B→C: snapshot do envelope do servidor (em A) deve chegar
-        ao executor de B, que por sua vez propaga para C."""
+        """Chain A→B→C: the server's envelope snapshot (in A) must reach B's
+        executor, which in turn propagates it to C."""
         injected_context: dict = {}
 
         def resolver(hash_, ws_id):
@@ -369,8 +370,8 @@ class TestDisabledNodes:
 
             await node.execute({})
 
-        # O sub-executor (de B) recebeu o snapshot. Quando ele instanciar
-        # outro SubWorkflow para C, este vai validar contra esse set.
+        # The sub-executor (B's) received the snapshot. When it instantiates
+        # another SubWorkflow for C, that one will validate against this set.
         assert injected_context.get("_disabled_nodes") == {"SendEmail"}
 
 
@@ -380,7 +381,7 @@ class TestAncestorPropagation:
 
     @pytest.mark.asyncio
     async def test_child_executor_inherits_ancestors_plus_self(self):
-        """Filho recebe set de ancestrais com o hash atual incluido."""
+        """The child receives the set of ancestors with the current hash included."""
         injected_context: dict = {}
 
         def resolver(hash_, ws_id):
@@ -416,8 +417,8 @@ class TestBasicValidation:
 
     @pytest.mark.asyncio
     async def test_non_dict_inputs_mapping_raises(self):
-        """List em inputsMapping e rejeitada (pelo validate() do BaseNode antes
-        do check custom do node — ambos resultam em ValueError com 'inputsMapping')."""
+        """A list in inputsMapping is rejected (by BaseNode's validate() before the
+        node's custom check — both result in a ValueError with 'inputsMapping')."""
         node = SubWorkflowNode(
             node_id="n1",
             parameters={
@@ -431,22 +432,22 @@ class TestBasicValidation:
             await node.execute({})
 
 
-# ── Contrato de saida via SubWorkflowOutput ─────────────────────────────────
+# ── Output contract via SubWorkflowOutput ───────────────────────────────────
 
 class TestSubWorkflowOutputContract:
-    """Quando o workflow filho usa SubWorkflowOutput, o pai recebe outputs
-    com chaves nomeadas (utilizaveis no canvas) em vez do dict de UUIDs."""
+    """When the child workflow uses SubWorkflowOutput, the parent receives outputs
+    with named keys (usable on the canvas) instead of the dict of UUIDs."""
 
     @pytest.mark.asyncio
     async def test_uses_subworkflow_output_when_present(self):
-        """final_outputs do filho contem __subworkflow_output__: usa esse dict."""
+        """The child's final_outputs contain __subworkflow_output__: uses that dict."""
 
         def resolver(hash_, ws_id):
             return _valid_child_definition()
 
         node = _make_node(workflow_hash="CHILD", resolver=resolver)
 
-        # Simula execucao: child final_outputs com 2 nodes — um deles tem
+        # Simulates execution: child final_outputs with 2 nodes — one of them has
         # __subworkflow_output__.
         child_final_outputs = {
             "uuid-wfs": {"output": "<gdf>"},
@@ -461,26 +462,26 @@ class TestSubWorkflowOutputContract:
 
             result = await node.execute({})
 
-        # subWorkflowResult deve ser o dict PUBLICO (nao final_outputs cru)
+        # subWorkflowResult must be the PUBLIC dict (not the raw final_outputs)
         assert result["subWorkflowResult"] == {"focos": "<gdf>", "total": 26}
         # Chaves nomeadas spread
         assert result["focos"] == "<gdf>"
         assert result["total"] == 26
-        # UUIDs do final_outputs NAO devem vazar
+        # UUIDs from final_outputs must NOT leak
         assert "uuid-wfs" not in result
         assert "uuid-output-node" not in result
 
     @pytest.mark.asyncio
     async def test_raises_when_output_node_didnt_run(self):
-        """Contrato passa (definition tem SubWorkflowOutput) mas o node nao
-        executou (branch excluiu) — RuntimeError explicativo."""
+        """The contract passes (definition has SubWorkflowOutput) but the node did not
+        execute (a branch excluded it) — explanatory RuntimeError."""
 
         def resolver(hash_, ws_id):
             return _valid_child_definition()
 
         node = _make_node(workflow_hash="NORUN", resolver=resolver)
 
-        # Simula final_outputs SEM __subworkflow_output__ (output node ficou de fora)
+        # Simulates final_outputs WITHOUT __subworkflow_output__ (the output node was left out)
         child_final_outputs = {"uuid-wfs": {"output": "<gdf>"}}
 
         with patch("flow.executor.WorkflowExecutor") as mock_executor_cls:
@@ -494,8 +495,8 @@ class TestSubWorkflowOutputContract:
 
     @pytest.mark.asyncio
     async def test_subworkflow_output_node_strips_internal_keys(self):
-        """SubWorkflowOutput nao deve vazar chaves __artifact__ / __response__
-        para o caller — sao metadados internos do node anterior."""
+        """SubWorkflowOutput must not leak __artifact__ / __response__ keys
+        to the caller — they are internal metadata of the previous node."""
         from flow.nodes.outputs.sub_workflow_output import SubWorkflowOutput
 
         node = SubWorkflowOutput(node_id="out", parameters={})
@@ -524,17 +525,18 @@ class TestSubWorkflowOutputContract:
 # ── Contrato: SubWorkflowOutput obrigatorio, SubWorkflowInput opcional ──────
 
 class TestSubWorkflowContract:
-    """Só a SAÍDA é obrigatória.
+    """Only the OUTPUT is mandatory.
 
-    SubWorkflowOutput define o valor de retorno — sem ele o pai não tem o que
-    consumir, e não adotamos o "último node executado" do n8n (implícito e
-    ambíguo com ramos). Já SubWorkflowInput é opcional: um sub-fluxo pode não
-    receber nada (fonte fixa, parâmetros internos), e exigi-lo era burocracia.
+    SubWorkflowOutput defines the return value — without it the parent has
+    nothing to consume, and we did not adopt n8n's "last executed node"
+    (implicit and ambiguous with branches). SubWorkflowInput, on the other hand, is
+    optional: a sub-workflow may receive nothing (fixed source, internal
+    parameters), and requiring it was red tape.
     """
 
     @pytest.mark.asyncio
     async def test_missing_input_is_allowed(self):
-        """Sub-fluxo sem entry point roda — só não recebe dados do pai."""
+        """A sub-workflow without an entry point runs — it just receives no data from the parent."""
         def resolver(hash_, ws_id):
             return {
                 "nodes": [{"id": "out", "name": "SubWorkflowOutput"}],
@@ -555,8 +557,8 @@ class TestSubWorkflowContract:
 
     @pytest.mark.asyncio
     async def test_multiple_outputs_raises(self):
-        """Dois SubWorkflowOutput tornam o retorno ambíguo: extract_contract une
-        as portas de todos, mas collect_subworkflow_output devolve o primeiro."""
+        """Two SubWorkflowOutputs make the return ambiguous: extract_contract merges
+        the ports of all of them, but collect_subworkflow_output returns the first."""
         def resolver(hash_, ws_id):
             return {
                 "nodes": [
@@ -585,7 +587,7 @@ class TestSubWorkflowContract:
 
     @pytest.mark.asyncio
     async def test_missing_both_reports_only_output(self):
-        """Sem nenhum dos dois, o erro cita só o que de fato falta: a saída."""
+        """With neither of the two, the error cites only what is actually missing: the output."""
         def resolver(hash_, ws_id):
             return {"nodes": [{"id": "wfs", "name": "WFS"}], "edges": []}
 

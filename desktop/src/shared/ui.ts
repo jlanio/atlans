@@ -1,52 +1,54 @@
 // desktop/src/shared/ui.ts
 //
-// A interface web do Atlans — a origem que o app desktop passa a exibir como
-// janela principal.
+// The Atlans web interface — the origin the desktop app now displays as its
+// main window.
 //
-// Mesma disciplina de servidor.ts: a origem é FIXA. A janela web navega DENTRO
-// de si mesma apenas nesta origem (e na API do produto); qualquer outra vai
-// para o navegador do sistema. Deixar a origem editável em runtime daria a uma
-// página aberta ali a chance de se passar pela UI do Atlans com o preload —
-// mínimo, mas ainda assim próprio — que injetamos nela.
+// Same discipline as servidor.ts: the origin is FIXED. The web window navigates
+// WITHIN itself only on this origin (and on the product's API); any other goes
+// to the system browser. Leaving the origin editable at runtime would give a
+// page opened there the chance to pass itself off as the Atlans UI with the
+// preload — minimal, but still ours — that we inject into it.
 //
-// O override por ambiente (ATLANS_UI_URL) é lido no processo MAIN, nunca aqui:
-// este módulo é importado também pelo renderer em sandbox, onde `process` não
-// existe — tocar em `process.env` no topo pintaria a janela e não montaria
-// nada (ver a guarda em vite.config.ts).
+// The environment override (ATLANS_UI_URL) is read in the MAIN process, never
+// here: this module is also imported by the sandboxed renderer, where `process`
+// does not exist — touching `process.env` at the top would paint the window and
+// mount nothing (see the guard in vite.config.ts).
 
 /**
- * A UI da instalação. Fixa, gravada pelo build (ATLANS_DESKTOP_UI_URL, ver
- * scripts/enderecos.mjs); o override de staging/local mora no main.
+ * The installation's UI. Fixed, written by the build (ATLANS_DESKTOP_UI_URL,
+ * see scripts/enderecos.mjs); the staging/local override lives in main.
  */
 declare const __ATLANS_UI_URL__: string
 export const UI_URL: string = __ATLANS_UI_URL__
 
-/** Host de {@link UI_URL}. */
+/** Host of {@link UI_URL}. */
 export const UI_HOST = new URL(UI_URL).hostname
 
 /**
- * Hosts que navegam DENTRO da janela web: a UI e a sua API — o mesmo produto.
+ * Hosts that navigate INSIDE the web window: the UI and its API — the same
+ * product.
  *
- * A API entra porque um download ou callback pode levar o frame de topo até
- * ela; chamadas comuns são `fetch` e nem disparam navegação. Origens de
- * terceiros (documentação, links "abrir no site") são externas de propósito:
- * abrir no navegador deixa o usuário ver para onde vai.
+ * The API is included because a download or callback may take the top frame to
+ * it; ordinary calls are `fetch` and do not even trigger navigation.
+ * Third-party origins (documentation, "abrir no site" links) are external on
+ * purpose: opening them in the browser lets the user see where they are going.
  *
- * Login não é exceção: a UI web autentica por credencial (NextAuth,
- * provider Credentials) com cookie de sessão same-origin — não há redirect de
- * OAuth de terceiros a acomodar, então a regra pode ser estrita sem tirar o
- * usuário do app durante o acesso.
+ * Login is no exception: the web UI authenticates by credential (NextAuth,
+ * Credentials provider) with a same-origin session cookie — there is no
+ * third-party OAuth redirect to accommodate, so the rule can be strict without
+ * taking the user out of the app during sign-in.
  */
 export function hostsInternos(uiHost: string = UI_HOST): string[] {
   return [uiHost, `api.${uiHost}`]
 }
 
 /**
- * A URL é da própria UI (navega dentro) ou externa (vai para o navegador)?
+ * Is the URL the UI's own (navigates inside) or external (goes to the browser)?
  *
- * Função pura — a decisão fica testável sem Electron. Recusa por padrão tudo
- * que não seja HTTPS num dos {@link hostsInternos}; `protocolos` só afrouxa
- * para `http:` quando o main aponta a janela para um staging local.
+ * Pure function — the decision is testable without Electron. Rejects by default
+ * anything that is not HTTPS on one of the {@link hostsInternos}; `protocolos`
+ * only relaxes to `http:` when the main process points the window at a local
+ * staging.
  */
 export function ehOrigemInterna(
   bruta: string,
@@ -64,17 +66,17 @@ export function ehOrigemInterna(
   return hosts.includes(url.hostname)
 }
 
-/** Esquemas que podem ir ao navegador do sistema via `shell.openExternal`. */
+/** Schemes that may go to the system browser via `shell.openExternal`. */
 const ESQUEMAS_EXTERNOS = ['https:', 'http:', 'mailto:']
 
 /**
- * Um destino EXTERNO é seguro para entregar ao `shell.openExternal`?
+ * Is an EXTERNAL target safe to hand to `shell.openExternal`?
  *
- * `openExternal` repassa o destino ao handler do SO, então o esquema precisa
- * ser barrado: um XSS ou um redirect na página remota poderia disparar `file:`,
- * `smb:` (UNC → vazamento de hash NTLM no Windows) ou o próprio `atlans://`
- * (deep link de enrollment). Só passam http(s) e mailto — o que um link normal
- * precisa; qualquer outro esquema é recusado.
+ * `openExternal` hands the target to the OS handler, so the scheme must be
+ * blocked: an XSS or a redirect in the remote page could fire `file:`, `smb:`
+ * (UNC → NTLM hash leak on Windows) or `atlans://` itself (enrollment deep
+ * link). Only http(s) and mailto get through — what a normal link needs; any
+ * other scheme is rejected.
  */
 export function ehExternoSeguro(bruta: string): boolean {
   let url: URL

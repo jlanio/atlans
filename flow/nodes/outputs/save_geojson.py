@@ -63,7 +63,7 @@ class SaveGeoJSON(BaseNode):
                     'default': '',
                     'description': 'Token Bearer para proteger o download. Sem credencial, o artefato e publico.',
                     'credential_types': ['webhook_token'],
-                    # Nao ha download a proteger num artefato que fica no executor.
+                    # There is no download to protect on an artifact that stays on the executor.
                     'visibleWhen': {'field': 'localidade', 'in': ['herdar']},
                 },
                 propriedade_localidade(),
@@ -77,7 +77,7 @@ class SaveGeoJSON(BaseNode):
         credential_id = self.get_param('credential_id', '') or None
         localidade, quem = resolver_localidade(self.get_param('localidade', None))
         if localidade == EXECUTOR:
-            # Nao ha download a proteger num artefato que fica no executor.
+            # There is no download to protect on an artifact that stays on the executor.
             credential_id = None
         label = self.derive_label(self.get_param('label', ''), output_path)
         workspace_id, _ = self.require_execution_context()
@@ -85,7 +85,7 @@ class SaveGeoJSON(BaseNode):
         # Obtem o GeoDataFrame
         data = self.get_first_gdf(inputs)
 
-        # Reprojeta e serializa para GeoJSON string (sem tocar no GDF do pai)
+        # Reprojects and serializes to a GeoJSON string (without touching the parent's GDF)
         geojson_str = await asyncio.to_thread(gdf_para_geojson, data, crs)
         content = geojson_str.encode('utf-8')
         features = len(data)
@@ -100,7 +100,7 @@ class SaveGeoJSON(BaseNode):
                 fh.write(geojson_str)
             self.log(f"Arquivo salvo localmente: {file_path}")
 
-        # Upload para MinIO
+        # Upload to MinIO
         safe_label = slugify_label(label)
         filename = f"{safe_label}.geojson"
 

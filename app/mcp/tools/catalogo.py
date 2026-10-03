@@ -1,5 +1,5 @@
 # app/mcp/tools/catalogo.py
-"""Tools de catalogo. As guardas de cada uma estão em app/mcp/guardas.py."""
+"""Catalog tools. The guards for each one are in app/mcp/guardas.py."""
 from __future__ import annotations
 
 from mcp.server.mcpserver import Context
@@ -12,13 +12,14 @@ from app.mcp.escopo import escopo_da_chamada, exigir_escopo
 from app.mcp.tools.base import ferramenta
 from app.services.node_service import NodeService
 
-# O prefixo do resource equivalente. A tool e o resource entregam o MESMO texto;
-# devolver o URI junto evita que quem integra tenha de montá-lo por conta.
+# The prefix of the equivalent resource. The tool and the resource deliver the
+# SAME text; returning the URI along with it saves the integrator from having to
+# build it on their own.
 URI_DO_GUIA = "atlans://guide/authoring/{topic}"
 
 
 async def _definicoes():
-    """O catálogo de nós vigente — já sem os nós desabilitados pela plataforma."""
+    """The current node catalog — already without the nodes disabled by the platform."""
     async with infra.sessao() as db:
         return await NodeService().list_nodes(db)
 
@@ -27,12 +28,12 @@ async def _definicoes():
 async def search_nodes(
     ctx: Context, query: str | None = None, type: str | None = None
 ) -> dict:
-    """Índice compacto dos nós disponíveis.
+    """Compact index of the available nodes.
 
-    Devolve nome, tipo, uma linha de descrição e se o nó exige credencial — o
-    suficiente para escolher. A ficha de configuração vem depois, por
-    `describe_node`: o catálogo inteiro em detalhe passa de 70 KB e não cabe no
-    orçamento de contexto de uma conversa.
+    Returns name, type, a one-line description and whether the node requires a
+    credential — enough to choose. The configuration sheet comes afterwards,
+    through `describe_node`: the whole catalog in detail exceeds 70 KB and does
+    not fit in a conversation's context budget.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -46,13 +47,14 @@ async def search_nodes(
     }
 
 
-# O teto de fichas por chamada. Protege o contexto da conversa (a ficha
-# completa é grande) sem devolver o modelo para o padrão de uma volta por nó.
+# The ceiling of sheets per call. It protects the conversation's context (the
+# full sheet is large) without pushing the model back to the one-round-per-node
+# pattern.
 TETO_DE_FICHAS = 8
 
 
 def _achar(definicoes, pedido: str):
-    """A MESMA resolução do caminho antigo: nome ou apelido, na ordem do catálogo."""
+    """The SAME resolution as the old path: name or alias, in catalog order."""
     for d in definicoes:
         if d.name == pedido or (d.alias and d.alias == pedido):
             return d
@@ -61,20 +63,20 @@ def _achar(definicoes, pedido: str):
 
 @ferramenta
 async def describe_node(ctx: Context, name: str | list[str], brief: bool = True) -> dict:
-    """A ficha de um nó — ou de VÁRIOS numa chamada só.
+    """The sheet of one node — or of SEVERAL in a single call.
 
-    `name` aceita um nome ou uma LISTA de nomes (até 8): peça as fichas de
-    todos os nós do fluxo de uma vez, em vez de gastar uma rodada por nó.
-    `brief=true` (o padrão) traz o essencial para configurar. `brief=false`
-    traz a ficha completa do catálogo — use quando a propriedade procurada não
-    aparecer no resumo.
+    `name` accepts a name or a LIST of names (up to 8): ask for the sheets of
+    all the workflow's nodes at once, instead of spending one round per node.
+    `brief=true` (the default) brings the essentials for configuring.
+    `brief=false` brings the full catalog sheet — use it when the property
+    you are looking for does not appear in the summary.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
 
     if isinstance(name, list):
-        # Deduplicado preservando a ordem: o modelo repete nome sem perceber, e
-        # duas fichas iguais só queimariam contexto.
+        # Deduplicated preserving order: the model repeats names without
+        # noticing, and two identical sheets would only burn context.
         pedidos = list(dict.fromkeys(n for n in (str(item).strip() for item in name) if n))
         if not pedidos:
             raise erro(
@@ -87,14 +89,15 @@ async def describe_node(ctx: Context, name: str | list[str], brief: bool = True)
 
         definicoes = await _definicoes()
         fichas: list[dict] = []
-        # Nome desconhecido NÃO derruba o lote: as fichas achadas voltam e
-        # `not_found` nomeia as que faltaram — o modelo corrige só o que errou,
-        # sem pagar outra rodada pelas que acertou. Um nó desabilitado responde
-        # igual a um inexistente, como no caminho de um nome só.
+        # An unknown name does NOT bring down the batch: the sheets found come
+        # back and `not_found` names the ones that were missing — the model
+        # fixes only what it got wrong, without paying another round for the
+        # ones it got right. A disabled node answers the same as a nonexistent
+        # one, as on the single-name path.
         nao_achados: list[str] = []
-        # Dedupe também por RESOLUÇÃO: nome e apelido do mesmo nó na lista
-        # devolveriam a mesma ficha duas vezes — o gasto de contexto que este
-        # teto existe para evitar.
+        # Dedupe also by RESOLUTION: a name and an alias of the same node in
+        # the list would return the same sheet twice — the context spending
+        # this ceiling exists to avoid.
         descritos: set[str] = set()
         for pedido in pedidos:
             d = _achar(definicoes, pedido)
@@ -122,9 +125,9 @@ async def describe_node(ctx: Context, name: str | list[str], brief: bool = True)
     if d is not None:
         return descrever(d, brief=brief)
 
-    # Nome desconhecido é `not_found`, e não uma lista de sugestões: o índice
-    # já existe em `search_nodes`, e um nó desabilitado pela plataforma tem de
-    # responder igual a um nó inexistente.
+    # An unknown name is `not_found`, and not a list of suggestions: the
+    # index already exists in `search_nodes`, and a node disabled by the
+    # platform has to answer the same as a nonexistent node.
     raise erro(
         "not_found",
         f"Nenhum nó chamado '{procurado}' está disponível.",
@@ -134,10 +137,10 @@ async def describe_node(ctx: Context, name: str | list[str], brief: bool = True)
 
 @ferramenta
 async def get_authoring_guide(ctx: Context, topic: str) -> dict:
-    """O guia de autoria de fluxos, por tópico.
+    """The workflow authoring guide, by topic.
 
-    Um tópico por chamada, de propósito: o guia inteiro de uma vez desperdiça
-    contexto com o que não se vai usar naquela tarefa.
+    One topic per call, on purpose: the whole guide at once wastes context on
+    what will not be used in that task.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
@@ -153,9 +156,9 @@ async def get_authoring_guide(ctx: Context, topic: str) -> dict:
             topics=list(guia.TOPICOS),
         ) from exc
     except OSError as exc:
-        # O tópico existe na lista mas o arquivo não pôde ser lido: é defeito de
-        # implantação, não pedido inválido — e o cliente precisa saber que o
-        # conteúdo não está lá, sem receber o caminho do arquivo.
+        # The topic exists in the list but the file could not be read: that is a
+        # deployment defect, not an invalid request — and the client needs to
+        # know the content is not there, without receiving the file path.
         raise erro(
             "unavailable",
             f"O guia do tópico '{pedido}' não está disponível nesta instalação.",
@@ -179,7 +182,7 @@ _SOMENTE_LEITURA = ToolAnnotations(
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="search_nodes",
         title="Buscar nós",

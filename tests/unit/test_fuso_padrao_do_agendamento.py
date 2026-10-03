@@ -1,14 +1,15 @@
 # tests/unit/test_fuso_padrao_do_agendamento.py
 """
-O fuso padrão dos agendamentos vem do ambiente, e é UTC sem ele.
+The default schedule time zone comes from the environment, and is UTC without it.
 
-Antes era um fuso fixo (UTC-4) no servidor, no nó e na tela: toda instalação
-agendava, sem dizer, no fuso de quem escreveu o código. Agora a instalação o define
-em AGENDAMENTO_FUSO_PADRAO (lido em `flow/utils/fuso.py`), e o servidor, o nó e
-o schema leem o MESMO valor — divergir recriaria os agendamentos no próximo save.
+Before, it was a fixed time zone (UTC-4) in the server, the node and the screen: every
+installation scheduled, without saying so, in the time zone of whoever wrote the code. Now
+the installation defines it in AGENDAMENTO_FUSO_PADRAO (read in `flow/utils/fuso.py`), and
+the server, the node and the schema read the SAME value — diverging would recreate the
+schedules on the next save.
 
-(Os testes rodam com `America/La_Paz` definido no conftest, de propósito:
-ver lá. Aqui cada caso define ou apaga a variável.)
+(The tests run with `America/La_Paz` set in the conftest, on purpose:
+see there. Here each case sets or deletes the variable.)
 """
 from __future__ import annotations
 
@@ -38,12 +39,12 @@ def test_um_fuso_iana_vale(monkeypatch):
 
 @pytest.mark.parametrize("valor", [
     "Marte/Olympus", "../etc/passwd", "UTC-3",
-    # Achados da revisão: uma pasta da base abria um diretório (IsADirectoryError
-    # cru), e arquivos que não são fuso eram aceitos — o navegador não os conhece.
+    # Review findings: a folder in the database opened a directory (raw IsADirectoryError),
+    # and files that are not time zones were accepted — the browser does not know them.
     "America", "localtime", "posixrules", "Factory",
 ])
 def test_um_valor_que_nao_e_fuso_para_o_arranque(monkeypatch, valor):
-    """Valendo UTC em silêncio, um erro de digitação deslocaria os agendamentos."""
+    """Silently falling back to UTC, a typo would shift the schedules."""
     monkeypatch.setenv("AGENDAMENTO_FUSO_PADRAO", valor)
     with pytest.raises(ValueError, match="AGENDAMENTO_FUSO_PADRAO"):
         fuso.fuso_padrao_do_agendamento()
@@ -62,7 +63,7 @@ def test_a_api_nao_sobe_com_um_fuso_invalido():
     ("Europe/Lisbon", "Europe/Lisbon"),
 ])
 def test_servidor_no_e_schema_dizem_o_mesmo_fuso(valor, esperado):
-    """O valor é lido no import: cada caso roda num processo próprio."""
+    """The value is read at import: each case runs in its own process."""
     codigo = (
         "from app.core.constants import FUSO_PADRAO_DO_AGENDAMENTO as c\n"
         "from app.schemas.schedule import ScheduleBase\n"

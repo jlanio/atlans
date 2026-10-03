@@ -5,8 +5,8 @@ import {
   normalizarArtefato, normalizarArquivoDoDrive, type ItemDoAcervo,
 } from "@/app/components/home/artefatos/normalizar"
 
-/** Qual das duas fontes caiu com a outra de pé — a degradação é por fonte, e
- *  cada metade precisa do seu aviso (antes só o Drive tinha). */
+/** Which of the two sources went down while the other stayed up — degradation
+ *  is per source, and each half needs its own notice (before, only Drive had one). */
 export interface AvisosDoAcervo {
   artefatos: boolean
   drive: boolean
@@ -14,20 +14,20 @@ export interface AvisosDoAcervo {
 
 export interface UseAcervo {
   itens: ItemDoAcervo[]
-  /** Só a PRIMEIRA carga (o esqueleto). Recarga não volta a ligá-lo. */
+  /** Only the FIRST load (the skeleton). A reload does not turn it back on. */
   carregando: boolean
-  /** Recarga em voo sobre a lista já na tela — vira `aria-busy`, não esqueleto. */
+  /** Reload in flight over the list already on screen — becomes `aria-busy`, not a skeleton. */
   atualizando: boolean
-  /** Já houve uma carga aceita. O bloco de erro só toma a lista antes disso (§3). */
+  /** An accepted load has already happened. The error block only takes over the list before that (§3). */
   jaCarregou: boolean
-  /** Só quando AMBAS as fontes falham. */
+  /** Only when BOTH sources fail. */
   erro: string | null
   avisos: AvisosDoAcervo
-  /** Quantos itens o servidor diz existir nas duas fontes somadas; `null` quando
-   *  uma delas falhou e não dá para somar. */
+  /** How many items the server says exist across both sources combined; `null`
+   *  when one of them failed and they cannot be added up. */
   total: number | null
   recarregar: () => void
-  /** Remove (otimista) o item da lista após o backend confirmar. */
+  /** Removes (optimistically) the item from the list after the backend confirms. */
   remover: (item: ItemDoAcervo) => Promise<boolean>
 }
 
@@ -36,16 +36,18 @@ const LIMITE = 200
 const SEM_AVISOS: AvisosDoAcervo = { artefatos: false, drive: false }
 
 /**
- * O acervo do workspace atual: artefatos de execução + arquivos do Drive na
- * mesma lista (decisão 8). Dois endpoints prontos, com auth própria — o merge é
- * no cliente, via `Promise.allSettled`, para que a falha de UMA fonte não derrube
- * a outra (o Drive fora do ar não some com os artefatos). Ordena por data, mais
- * recente primeiro. Sem workspace ativo, lista vazia.
+ * The current workspace's collection: run artifacts + Drive files in the same
+ * list (decision 8). Two ready-made endpoints, each with its own auth — the merge
+ * happens on the client, via `Promise.allSettled`, so that the failure of ONE
+ * source does not take down the other (Drive being down does not make the
+ * artifacts vanish). Sorted by date, most recent first. With no active
+ * workspace, an empty list.
  *
- * Precedência de estados do §3 do padrão de telas: uma recarga que falha NÃO
- * apaga o que já está na tela. Os `set` de lista só acontecem quando ao menos
- * uma fonte respondeu; no fracasso total sobra o `erro`, que a lista mostra como
- * aviso âmbar quando já havia conteúdo e como bloco só na primeira carga.
+ * State precedence from §3 of the screen patterns: a reload that fails does NOT
+ * erase what is already on screen. The list `set`s only happen when at least
+ * one source responded; on total failure only `erro` is left, which the list
+ * shows as an amber notice when there was already content and as a block only
+ * on the first load.
  */
 export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
   const [itens, setItens] = useState<ItemDoAcervo[]>([])
@@ -56,9 +58,9 @@ export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
   const [avisos, setAvisos] = useState<AvisosDoAcervo>(SEM_AVISOS)
   const [total, setTotal] = useState<number | null>(null)
   const geracao = useRef(0)
-  // Espelha `jaCarregou` para o callback decidir esqueleto × `aria-busy` sem
-  // entrar nas dependências (o `recarregar` precisa ser estável para o efeito
-  // não relançar a cada carga).
+  // Mirrors `jaCarregou` so the callback can decide skeleton × `aria-busy`
+  // without entering the dependencies (`recarregar` must be stable so the
+  // effect does not re-fire on every load).
   const jaCarregouRef = useRef(false)
 
   const recarregar = useCallback(() => {
@@ -91,8 +93,8 @@ export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
         for (const f of resDrive.value.data.items) acervo.push(normalizarArquivoDoDrive(f))
       }
       if (artOk || driveOk) {
-        // Mais recente primeiro; sem data por último. `ordenadoEm` é a última
-        // escrita de conteúdo no Drive — a mesma ordem que /drive mostra.
+        // Most recent first; undated last. `ordenadoEm` is the last content
+        // write in Drive — the same order /drive shows.
         acervo.sort((x, y) => (y.ordenadoEm ?? "").localeCompare(x.ordenadoEm ?? ""))
         setItens(acervo)
         setErro(null)
@@ -100,7 +102,7 @@ export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
         jaCarregouRef.current = true
         setJaCarregou(true)
       } else {
-        // Fracasso total: mantém a lista anterior (§3) e só sinaliza a falha.
+        // Total failure: keep the previous list (§3) and only signal the failure.
         setErro("Não foi possível carregar o acervo.")
       }
       setAvisos({ artefatos: !artOk && driveOk, drive: artOk && !driveOk })
@@ -109,9 +111,10 @@ export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
     })
   }, [workspaceId])
 
-  // Trocar de workspace é uma lista NOVA: zera o que havia e o esqueleto volta.
-  // O `recarregar` só muda de identidade quando o `workspaceId` muda, então este
-  // efeito não dispara na recarga manual (o botão "Tentar de novo").
+  // Switching workspaces is a NEW list: clear what was there and the skeleton
+  // comes back. `recarregar` only changes identity when `workspaceId` changes,
+  // so this effect does not fire on a manual reload (the "Tentar de novo" (try
+  // again) button).
   useEffect(() => {
     jaCarregouRef.current = false
     setJaCarregou(false)
@@ -126,8 +129,8 @@ export function useAcervo(workspaceId: string | null | undefined): UseAcervo {
       : await GisFlowService.deleteDriveFile(item.id)
     if (res.success) {
       setItens((atual) => atual.filter((i) => i.chave !== item.chave))
-      // O total vem do servidor e alimenta o "mostrando N de M": sem descontar,
-      // a linha de corte passaria a mentir logo após uma exclusão.
+      // The total comes from the server and feeds the "showing N of M": without
+      // subtracting, the cutoff line would start lying right after a deletion.
       setTotal((t) => (t == null ? t : Math.max(0, t - 1)))
       return true
     }

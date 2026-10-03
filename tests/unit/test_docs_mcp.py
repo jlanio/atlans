@@ -1,24 +1,25 @@
 # tests/unit/test_docs_mcp.py
 """
-`docs/mcp.md` nao envelhece em relacao ao que a tela e o servidor entregam.
+`docs/mcp.md` does not go stale relative to what the screen and the server deliver.
 
-Os snippets de conexao existem em dois lugares de proposito: a tela de criacao
-de token (`CLIENTES`, em `create-token.tsx`) mostra o comando na hora em que o
-segredo aparece, e o `docs/mcp.md` e a fonte unica para quem conecta depois.
-Duplicacao e a escolha certa aqui — o usuario nao deveria precisar abrir o
-outro lugar — mas duplicacao sem verificacao vira divergencia: o dia em que a
-URL ou a forma do header mudar, um dos dois fica mentindo.
+The connection snippets exist in two places on purpose: the token creation
+screen (`CLIENTES`, in `create-token.tsx`) shows the command at the moment the
+secret appears, and `docs/mcp.md` is the single source for whoever connects
+later. Duplication is the right choice here — the user should not need to open
+the other place — but duplication without verification becomes divergence: the
+day the URL or the header shape changes, one of the two is lying.
 
-Entao este teste le o TSX com regex (nao ha runtime de TypeScript aqui) e exige
-que cada snippet apareca *verbatim* no documento; que nenhum deles carregue um
-segredo de verdade (`atl_pat_` + 43 chars — copiar um comando do documento nao
-pode vazar token de ninguem); e que toda tool registrada em `app/mcp/guardas.py`
-tenha uma linha na tabela de ferramentas do documento — o inverso nao e
-verificado, porque o documento anuncia tools do PR seguinte marcadas como tal.
+So this test reads the TSX with regex (there is no TypeScript runtime here) and
+requires each snippet to appear *verbatim* in the document; that none of them
+carries a real secret (`atl_pat_` + 43 chars — copying a command from the
+document must not leak anyone's token); and that every tool registered in
+`app/mcp/guardas.py` has a row in the document's tools table — the reverse is not
+checked, because the document announces tools from the next PR marked as such.
 
-O exemplo de erro da secao "Erros" tambem e conferido contra o servidor: ele
-cita o `hint` de `forbidden_scope` verbatim, e esse hint ja mandou qualquer um
-"gerar um token em /settings/tokens" — pagina que so o administrador alcanca.
+The error example in the "Errors" section is also checked against the server: it
+quotes the `hint` of `forbidden_scope` verbatim, and that hint once sent everyone
+to "gerar um token em /settings/tokens" (generate a token at /settings/tokens) —
+a page only the administrator can reach.
 """
 from __future__ import annotations
 
@@ -33,12 +34,12 @@ DOC = RAIZ / "docs" / "mcp.md"
 TSX = RAIZ / "web" / "app" / "components" / "tokens" / "dialog-content" / "create-token.tsx"
 GUARDAS = RAIZ / "app" / "mcp" / "guardas.py"
 
-# `atl_pat_` seguido dos 43 chars urlsafe do segredo real (app/core/authorization/pat.py).
+# `atl_pat_` followed by the real secret's 43 urlsafe chars (app/core/authorization/pat.py).
 SEGREDO = re.compile(r"atl_pat_[A-Za-z0-9_-]{43}")
 
-# Os snippets sao literais de string simples ou um JSON.stringify de um objeto
-# literal; a tabela de tool -> guarda e um dict de `"nome": Guarda(...)`.
-# O dominio de exemplo de docs/mcp.md: a tela usa o da instalacao.
+# The snippets are plain string literals or a JSON.stringify of an object
+# literal; the tool -> guard table is a dict of `"nome": Guarda(...)`.
+# The example domain of docs/mcp.md: the screen uses the installation's.
 URL_DO_DOC = "https://atlans.example.org/mcp"
 _SNIPPET_SIMPLES = re.compile(r"^\s*snippet:\s*'([^']*)',\s*$", re.MULTILINE)
 _ENTRADA_GUARDA = re.compile(r'^\s*"([a-z][a-z0-9_]*)"\s*:\s*Guarda\(', re.MULTILINE)
@@ -51,18 +52,18 @@ def _doc() -> str:
 
 
 def _snippets_da_tela() -> list[str]:
-    """Os `snippet:` de `CLIENTES`, com as escapadas do TSX ja resolvidas.
+    """The `snippet:` entries of `CLIENTES`, with the TSX escapes already resolved.
 
-    Os snippets da tela levam o marcador `URL_DO_MCP` (a tela o troca pela
-    origem da pagina); o documento os traz com o dominio de exemplo `URL_DO_DOC`.
-    O snippet do `mcp.json` nao e literal: e um `JSON.stringify(..., null, 2)`
-    do mesmo objeto, reconstruido aqui para comparar com o bloco do documento sem
-    depender de rodar JavaScript.
+    The screen's snippets carry the `URL_DO_MCP` marker (the screen replaces it
+    with the page's origin); the document has them with the example domain
+    `URL_DO_DOC`. The `mcp.json` snippet is not a literal: it is a
+    `JSON.stringify(..., null, 2)` of the same object, rebuilt here to compare
+    with the document's block without depending on running JavaScript.
     """
     fonte = TSX.read_text(encoding="utf-8")
     marcador = re.search(r'export const URL_DO_MCP\s*=\s*"([^"]+)"', fonte)
     assert marcador, "URL_DO_MCP deixou de ser exportado de create-token.tsx"
-    # Unica escapada possivel num literal de aspas simples do TSX.
+    # The only possible escape in a single-quoted TSX literal.
     simples = [
         s.replace("\\'", "'").replace(marcador.group(1), URL_DO_DOC)
         for s in _SNIPPET_SIMPLES.findall(fonte)
@@ -91,7 +92,7 @@ def test_cada_snippet_da_tela_aparece_no_documento():
 
 
 def test_nenhum_snippet_carrega_um_segredo():
-    """Comando copiado do documento (ou da tela) nunca pode vazar um token."""
+    """A command copied from the document (or the screen) can never leak a token."""
     for origem, texto in (("docs/mcp.md", _doc()), ("create-token.tsx", TSX.read_text(encoding="utf-8"))):
         achados = SEGREDO.findall(texto)
         assert not achados, f"{origem} tem o que parece um segredo de PAT: {achados}"
@@ -112,7 +113,7 @@ def test_toda_tool_registrada_esta_na_tabela_do_documento():
 
 
 def test_o_exemplo_de_erro_do_documento_e_o_que_o_servidor_devolve():
-    """O bloco JSON de `forbidden_scope` do documento, byte a byte o do servidor."""
+    """The document's `forbidden_scope` JSON block, byte for byte the server's."""
     from mcp.server.mcpserver.exceptions import ToolError
 
     from app.mcp.escopo import exigir_escopo

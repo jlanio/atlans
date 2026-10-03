@@ -1,13 +1,13 @@
 # flow/utils/circuit_breaker.py
 """
-Circuit Breaker para chamadas HTTP externas dos nós de fluxo.
+Circuit Breaker for the workflow nodes' external HTTP calls.
 
-Estados:
-  CLOSED    — funcionamento normal, chamadas passam normalmente.
-  OPEN      — circuito aberto, chamadas bloqueadas. Aguarda recovery_timeout.
-  HALF_OPEN — modo teste: permite uma chamada; se falhar → OPEN, se ok → CLOSED.
+States:
+  CLOSED    — normal operation, calls go through normally.
+  OPEN      — circuit open, calls blocked. Waits for recovery_timeout.
+  HALF_OPEN — test mode: allows one call; if it fails → OPEN, if ok → CLOSED.
 
-Uso:
+Usage:
     from flow.utils.circuit_breaker import get_circuit_breaker
 
     breaker = get_circuit_breaker("api.example.com")
@@ -22,7 +22,7 @@ logger = get_logger(__name__)
 
 
 class CircuitOpenError(RuntimeError):
-    """Lançado quando o circuito está OPEN e a chamada é bloqueada."""
+    """Raised when the circuit is OPEN and the call is blocked."""
     pass
 
 
@@ -55,9 +55,9 @@ class CircuitBreaker:
 
     async def call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
         """
-        Executa `func` com proteção do circuit breaker.
-        func pode ser síncrono ou assíncrono; funções síncronas são executadas
-        em thread separada via asyncio.to_thread para não bloquear o event loop.
+        Runs `func` under circuit breaker protection.
+        func may be sync or async; sync functions are run in a separate
+        thread via asyncio.to_thread so as not to block the event loop.
         """
         async with self._lock:
             if self._state == self.OPEN:
@@ -116,11 +116,11 @@ class CircuitBreaker:
                         self.name, self._success_count,
                     )
             elif self._state == self.CLOSED:
-                # Decaimento gradual de falhas em caso de sucesso
+                # Gradual decay of failures on success
                 self._failure_count = max(0, self._failure_count - 1)
 
 
-# ── Registry global (por processo worker) ─────────────────────────────────────
+# ── Global registry (per worker process) ──────────────────────────────────────
 
 _registry: dict[str, CircuitBreaker] = {}
 
@@ -131,7 +131,7 @@ def get_circuit_breaker(
     recovery_timeout: float = 60.0,
     success_threshold: int = 2,
 ) -> CircuitBreaker:
-    """Retorna (ou cria) um CircuitBreaker compartilhado pelo nome."""
+    """Returns (or creates) a CircuitBreaker shared by name."""
     if name not in _registry:
         _registry[name] = CircuitBreaker(
             name=name,

@@ -1,55 +1,55 @@
 # executor/config.py
 """
-Configuracoes do executor carregadas via variaveis de ambiente.
+Executor settings loaded from environment variables.
 
-Variaveis obrigatorias:
-  EXECUTOR_ID                  — UUID do executor (obtido na criacao pelo admin)
-  EXECUTOR_SERVER_URL          — host dos executores da instalacao (wss://...).
-                                 Sem padrao: o enroll a grava no .env.
+Required variables:
+  EXECUTOR_ID                  — executor UUID (obtained when the admin creates it)
+  EXECUTOR_SERVER_URL          — the installation's executors host (wss://...).
+                                 No default: enroll writes it to .env.
 
-Credenciais (cert mTLS) sao persistidas em EXECUTOR_CERT_DIR (default ./certs/).
-Cada executor deve fazer enrollment uma unica vez (o comando pronto sai da tela
-de matricula da instalacao):
+Credentials (mTLS cert) are persisted in EXECUTOR_CERT_DIR (default ./certs/).
+Each executor must enroll exactly once (the ready-made command comes from the
+installation's enrollment screen):
   python -m executor enroll --otp=<OTP_FORNECIDO_PELO_ADMIN> --server=https://agents.<dominio>
 
-Variaveis opcionais:
-  SERVER_SIGNING_PUBLIC_KEY    — base64 da chave publica Ed25519 do servidor.
-                                 Override do operador: sem ela vale a chave
-                                 fixada no enrollment (ver executor/server_key.py)
-  EXECUTOR_CERT_DIR            — diretorio para cert.pem/chain.pem/ca.pem/key.pem (default: ./certs)
-  EXECUTOR_PRIVATE_KEY         — base64 da chave privada X25519 (envelope encryption)
-                              Se nao fornecida, lida de EXECUTOR_PRIVATE_KEY_PATH
-  EXECUTOR_PRIVATE_KEY_PATH    — caminho da chave privada X25519
-  EXECUTOR_VERSION             — versao do software fora da imagem Docker (padrao: "1.0.0";
-                                 na imagem vale a gravada no build — executor/versao.py)
-  EXECUTOR_MAX_CONCURRENT      — execucoes simultaneas (padrao: 4)
-  EXECUTOR_MAX_QUEUE_SIZE      — fila local maxima (padrao: 50)
-  EXECUTOR_JOB_TIMEOUT         — timeout por job em segundos (padrao: 3600)
-  EXECUTOR_RECONNECT_MAX_DELAY — delay maximo de reconnect em segundos (padrao: 15)
-  NONCE_CACHE_TTL           — TTL do cache anti-replay em segundos (padrao: 600)
-  EXECUTOR_MAX_JOB_EXPIRY_SECONDS — teto da duracao declarada do envelope
-                                 (expires_at - issued_at), padrao 900s
-  EXECUTOR_CLOCK_SKEW_SECONDS  — folga de relogio na checagem de expiracao
-                                 (padrao: 300s)
-  EXECUTOR_MAX_CLOCK_SKEW_SECONDS — teto RIGIDO de deriva do relogio local
-                                 (padrao: 900s). Acima dele todo job/comando e
-                                 recusado apontando o NTP, em vez de aceito: com
-                                 deriva grande a janela de aceitacao passa do TTL
-                                 do cache de nonce e o anti-replay para de valer.
-                                 Subir este valor exige subir NONCE_CACHE_TTL
-                                 junto — ha teste do invariante.
-                                 As quatro sao lidas dentro de
-                                 executor/job_validator.py, junto do comentario
-                                 que explica o porque de cada valor.
-  EXECUTOR_HOST_ALIASES        — mapeamento de hostnames "db=localhost:5433,..."
-  EXECUTOR_DASHBOARD           — auto|on|off|json (ver o bloco do painel abaixo)
-  EXECUTOR_SUPERVISOR_PID      — PID de quem iniciou este processo (o app
-                                 desktop). Definido pelo supervisor, nunca a
-                                 mao. Liga o watchdog de executor/supervisor.py,
-                                 que encerra o executor de forma ordenada se o
-                                 supervisor morrer, e desliga o auto-restart
-                                 interno — com supervisor, religar e trabalho
-                                 dele.
+Optional variables:
+  SERVER_SIGNING_PUBLIC_KEY    — base64 of the server's Ed25519 public key.
+                                 Operator override: without it, the key
+                                 pinned at enrollment applies (see executor/server_key.py)
+  EXECUTOR_CERT_DIR            — directory for cert.pem/chain.pem/ca.pem/key.pem (default: ./certs)
+  EXECUTOR_PRIVATE_KEY         — base64 of the X25519 private key (envelope encryption)
+                              If not provided, read from EXECUTOR_PRIVATE_KEY_PATH
+  EXECUTOR_PRIVATE_KEY_PATH    — path of the X25519 private key
+  EXECUTOR_VERSION             — software version outside the Docker image (default: "1.0.0";
+                                 in the image the one written at build applies — executor/versao.py)
+  EXECUTOR_MAX_CONCURRENT      — concurrent executions (default: 4)
+  EXECUTOR_MAX_QUEUE_SIZE      — maximum local queue (default: 50)
+  EXECUTOR_JOB_TIMEOUT         — per-job timeout in seconds (default: 3600)
+  EXECUTOR_RECONNECT_MAX_DELAY — maximum reconnect delay in seconds (default: 15)
+  NONCE_CACHE_TTL           — TTL of the anti-replay cache in seconds (default: 600)
+  EXECUTOR_MAX_JOB_EXPIRY_SECONDS — ceiling on the envelope's declared duration
+                                 (expires_at - issued_at), default 900s
+  EXECUTOR_CLOCK_SKEW_SECONDS  — clock slack in the expiration check
+                                 (default: 300s)
+  EXECUTOR_MAX_CLOCK_SKEW_SECONDS — HARD ceiling on local clock drift
+                                 (default: 900s). Above it every job/command is
+                                 refused, pointing at NTP, instead of accepted: with
+                                 large drift the acceptance window exceeds the TTL
+                                 of the nonce cache and anti-replay stops holding.
+                                 Raising this value requires raising NONCE_CACHE_TTL
+                                 along with it — there is a test for the invariant.
+                                 The four are read inside
+                                 executor/job_validator.py, alongside the comment
+                                 that explains the reason for each value.
+  EXECUTOR_HOST_ALIASES        — hostname mapping "db=localhost:5433,..."
+  EXECUTOR_DASHBOARD           — auto|on|off|json (see the panel block below)
+  EXECUTOR_SUPERVISOR_PID      — PID of whoever started this process (the desktop
+                                 app). Set by the supervisor, never by
+                                 hand. Turns on the watchdog in executor/supervisor.py,
+                                 which shuts the executor down in an orderly way if the
+                                 supervisor dies, and turns off the internal
+                                 auto-restart — with a supervisor, restarting is its
+                                 job.
 """
 import os
 from pathlib import Path
@@ -63,57 +63,57 @@ from executor.versao import versao_do_executor
 _env_path = os.getenv("EXECUTOR_ENV_PATH") or str(Path(__file__).parent / ".env")
 load_dotenv(dotenv_path=_env_path)
 
-# Desabilita os drivers OGR VRT no GDAL ANTES de qualquer import de geopandas/
-# pyogrio (o GDAL le GDAL_SKIP quando registra os drivers). Sem isto, um arquivo
-# ou resposta WFS com conteudo <OGRVRTDataSource> faz o GDAL ler arquivo local
-# do executor (cert mTLS, credenciais) ou fazer SSRF via /vsicurl. A leitura de
-# arquivos tambem recusa VRT pelo conteudo (flow/utils/leitura_geo.py); isto e a
-# defesa em profundidade que cobre ate o VRT embutido em .zip.
+# Disables the OGR VRT drivers in GDAL BEFORE any import of geopandas/
+# pyogrio (GDAL reads GDAL_SKIP when it registers the drivers). Without this, a file
+# or WFS response with <OGRVRTDataSource> content makes GDAL read a local file
+# on the executor (mTLS cert, credentials) or do SSRF via /vsicurl. File reading
+# also refuses VRT by content (flow/utils/leitura_geo.py); this is the
+# defense in depth that covers even a VRT embedded in a .zip.
 _gdal_skip = {s for s in os.environ.get("GDAL_SKIP", "").split(",") if s}
 os.environ["GDAL_SKIP"] = ",".join(sorted(_gdal_skip | {"OGR_VRT", "VRT"}))
 
 
-# Numeros do ambiente sao lidos por executor/_ambiente.py (ler_int/ler_float):
-# valor invalido vira o padrao com aviso, nunca ValueError no import. Este
-# modulo roda ANTES de o logging estar configurado, entao os avisos ficam
-# retidos la ate configure_logging() chamar flush_startup_warnings() — o nome
-# que executor/logging_setup.py importa daqui.
+# Numbers from the environment are read by executor/_ambiente.py (ler_int/ler_float):
+# an invalid value becomes the default with a warning, never a ValueError at import. This
+# module runs BEFORE logging is configured, so the warnings are held
+# there until configure_logging() calls flush_startup_warnings() — the name
+# that executor/logging_setup.py imports from here.
 flush_startup_warnings = emitir_avisos_adiados
 
 
-# URL do servidor. Sem padrao: um executor nunca fala com uma instalacao que
-# ninguem escolheu. O enroll grava o valor no .env (ver executor/enrollment.py).
+# Server URL. No default: an executor never talks to an installation that
+# nobody chose. Enroll writes the value to .env (see executor/enrollment.py).
 SERVER_URL: str = os.getenv("EXECUTOR_SERVER_URL", "").strip()
 
-# Leitura TOLERANTE: abortar no import matava o processo com ValueError antes de
-# main() rodar, e antes do canal com o supervisor subir — a falha chegava como
-# traceback cru, sem dizer o que fazer. A exigencia mora em assert_configured(),
-# chamada dentro de main() depois de o canal estar de pe.
+# TOLERANT read: aborting at import killed the process with ValueError before
+# main() ran, and before the channel with the supervisor came up — the failure arrived
+# as a raw traceback, without saying what to do. The requirement lives in
+# assert_configured(), called inside main() once the channel is up.
 EXECUTOR_ID:                 str = os.getenv("EXECUTOR_ID", "").strip()
 SERVER_SIGNING_PUBLIC_KEY: str = os.getenv("SERVER_SIGNING_PUBLIC_KEY", "")
 
-# ── Diretorio do cert mTLS ────────────────────────────────────────────────────
+# ── mTLS cert directory ───────────────────────────────────────────────────────
 _default_cert_dir = "/data/certs" if os.path.isdir("/data") else "./certs"
 EXECUTOR_CERT_DIR: str = os.getenv("EXECUTOR_CERT_DIR", _default_cert_dir)
 
-# Paths dos arquivos individuais dentro do cert dir.
+# Paths of the individual files inside the cert dir.
 EXECUTOR_CERT_PATH:  str = str(Path(EXECUTOR_CERT_DIR) / "cert.pem")
 EXECUTOR_CA_PATH:    str = str(Path(EXECUTOR_CERT_DIR) / "ca.pem")
 EXECUTOR_KEY_PATH:   str = str(Path(EXECUTOR_CERT_DIR) / "key.pem")
-# Chave privada X25519 para decriptar envelopes de jobs (gerada no enroll).
+# X25519 private key to decrypt job envelopes (generated at enroll).
 EXECUTOR_X25519_KEY_PATH: str = str(Path(EXECUTOR_CERT_DIR) / "x25519_key.pem")
 
-# Retrocompat: o codigo de envelope decryption ainda le EXECUTOR_PRIVATE_KEY_PATH.
+# Backward compat: the envelope decryption code still reads EXECUTOR_PRIVATE_KEY_PATH.
 EXECUTOR_PRIVATE_KEY:      str | None = os.getenv("EXECUTOR_PRIVATE_KEY")
 EXECUTOR_PRIVATE_KEY_PATH: str = os.getenv("EXECUTOR_PRIVATE_KEY_PATH", EXECUTOR_X25519_KEY_PATH)
 
 
 def _cleanup_renewal_orphans() -> None:
     """
-    Remove arquivos `.new` orfaos em EXECUTOR_CERT_DIR. Eles ficam quando o
-    enroll ou o renewal (enrollment._persistir_bundle) escreve os `<nome>.new`
-    mas o processo morre antes do `os.replace` atomico. Sem cleanup, acumulam
-    para sempre. Threshold de 10 min evita corrida com um renewal em curso.
+    Removes orphan `.new` files in EXECUTOR_CERT_DIR. They are left behind when
+    enroll or renewal (enrollment._persistir_bundle) writes the `<nome>.new` files
+    but the process dies before the atomic `os.replace`. Without cleanup, they pile up
+    forever. The 10 min threshold avoids racing with a renewal in progress.
     """
     import time as _time
     cert_dir = Path(EXECUTOR_CERT_DIR)
@@ -130,11 +130,11 @@ def _cleanup_renewal_orphans() -> None:
 
 def assert_configured() -> None:
     """
-    Verifica as variaveis obrigatorias antes de iniciar.
+    Checks the required variables before starting.
 
-    Antes isso era um `_require()` em tempo de import, que matava o processo
-    com ValueError antes de main() rodar. Agora a checagem e explicita e
-    acontece dentro de main(), depois de o canal com o supervisor subir.
+    This used to be a `_require()` at import time, which killed the process
+    with ValueError before main() ran. Now the check is explicit and
+    happens inside main(), after the channel with the supervisor comes up.
     """
     if not SERVER_URL:
         raise SystemExit(
@@ -147,9 +147,9 @@ def assert_configured() -> None:
             f"\n  (.env esperado em {_env_path})\n"
         )
     if not EXECUTOR_ID:
-        # Esta e a mensagem que o usuario ve quando o executor nao consegue
-        # subir. Ela precisa dizer o que FAZER, e nao so o que falta — e os dois
-        # caminhos abaixo funcionam em todos os ambientes onde o executor roda.
+        # This is the message the user sees when the executor cannot
+        # start. It must say what to DO, not only what is missing — and both
+        # paths below work in every environment where the executor runs.
         raise SystemExit(
             "\n  Variavel obrigatoria nao definida: EXECUTOR_ID\n"
             "\n  Enrollment (funciona em qualquer ambiente):\n"
@@ -164,8 +164,8 @@ def assert_configured() -> None:
 
 def assert_enrolled() -> None:
     """
-    Verifica que o executor foi enrolado antes de iniciar.
-    Chamado por executor/main.py para falhar rapido com mensagem clara.
+    Checks that the executor has been enrolled before starting.
+    Called by executor/main.py to fail fast with a clear message.
     """
     _cleanup_renewal_orphans()
     cert_path = Path(EXECUTOR_CERT_PATH)
@@ -177,41 +177,41 @@ def assert_enrolled() -> None:
             f"  (cert.pem esperado em {cert_path})\n"
         )
 
-# Na imagem Docker vale a versao gravada no build, acima do .env (ver
-# executor/versao.py); fora dela, EXECUTOR_VERSION — o desktop a define.
+# In the Docker image the version written at build applies, over the .env (see
+# executor/versao.py); outside it, EXECUTOR_VERSION — the desktop app sets it.
 EXECUTOR_VERSION:            str = versao_do_executor()
 _versao_no_env = (os.getenv("EXECUTOR_VERSION") or "").strip()
-# O 1.0.0 e o do .env.example que toda instalacao antiga tem: nao e escolha.
+# The 1.0.0 is the one from the .env.example every old installation has: not a choice.
 if _versao_no_env and _versao_no_env not in (EXECUTOR_VERSION, "1.0.0"):
     avisar(
         "EXECUTOR_VERSION=%s ignorada: vale a versao gravada na imagem (%s).",
         _versao_no_env, EXECUTOR_VERSION,
     )
-# Minimo 1 porque zero nao falha, funciona errado: executor sem worker, fila que
-# nunca aceita, job que estoura na hora (ver executor/_ambiente.py::ler_int).
-# Maximos sao defensivos: valores absurdos (256 workers, fila de 100k) derrubam
-# o host antes de o operador perceber que digitou errado. A tela de Ajustes do
-# app desktop espelha padroes e faixas destas tres em desktop/src/shared/limites.ts
-# — o teste de la le ESTAS linhas e falha se os dois lados divergirem.
+# Minimum 1 because zero does not fail, it works wrong: an executor with no worker, a queue
+# that never accepts, a job that times out immediately (see executor/_ambiente.py::ler_int).
+# Maximums are defensive: absurd values (256 workers, a 100k queue) bring down
+# the host before the operator notices the typo. The desktop app's Settings
+# screen mirrors the defaults and ranges of these three in desktop/src/shared/limites.ts
+# — the test there reads THESE lines and fails if the two sides diverge.
 MAX_CONCURRENT:           int = ler_int("EXECUTOR_MAX_CONCURRENT", 4, minimo=1, maximo=256)
 MAX_QUEUE_SIZE:           int = ler_int("EXECUTOR_MAX_QUEUE_SIZE", 50, minimo=1, maximo=10_000)
 JOB_TIMEOUT:              int = ler_int("EXECUTOR_JOB_TIMEOUT", 3600, minimo=1)
-# 15s, e nao 60s: o teto existe contra thundering herd numa queda longa, mas com
-# 60s um deploy do servidor (Traefik devolvendo 404/502 por alguns segundos)
-# tirava o executor do painel por ate um minuto DEPOIS de tudo ja ter voltado —
-# tempo em que o dispatch roteia para outro executor ou responde "nenhum executor
-# disponivel". O jitter de 50-100% ja dispersa a frota o bastante.
+# 15s, and not 60s: the ceiling exists against a thundering herd in a long outage, but with
+# 60s a server deploy (Traefik returning 404/502 for a few seconds)
+# kept the executor off the panel for up to a minute AFTER everything was back —
+# time during which dispatch routes to another executor or answers "nenhum executor
+# disponivel" (no executor available). The 50-100% jitter already spreads the fleet enough.
 RECONNECT_MAX_DELAY:      int = ler_int("EXECUTOR_RECONNECT_MAX_DELAY", 15, minimo=1, maximo=3600)
 NONCE_CACHE_TTL:          int = ler_int("NONCE_CACHE_TTL", 600, minimo=1)
 
-# Workspace fixo para GeoSync (opcional — se não definido, auto-detecta do servidor)
+# Fixed workspace for GeoSync (optional — if not set, auto-detected from the server)
 WORKSPACE_ID:       str | None = os.getenv("EXECUTOR_WORKSPACE_ID") or None
 
 
 def _parse_host_aliases(raw: str) -> dict[str, str]:
     """
-    Converte EXECUTOR_HOST_ALIASES para dict {hostname_interno: host_externo_com_porta}.
-    Formato: "db=localhost:5433,redis=localhost:6379"
+    Converts EXECUTOR_HOST_ALIASES to a dict {hostname_interno: host_externo_com_porta}.
+    Format: "db=localhost:5433,redis=localhost:6379"
     """
     aliases: dict[str, str] = {}
     for part in raw.split(","):
@@ -224,63 +224,63 @@ def _parse_host_aliases(raw: str) -> dict[str, str]:
 
 HOST_ALIASES: dict[str, str] = _parse_host_aliases(os.getenv("EXECUTOR_HOST_ALIASES", ""))
 
-# Diretório base onde o executor salva artefatos gerados pelos nós de output.
-# O Electron define EXECUTOR_ARTIFACTS_DIR apontando para a pasta escolhida pelo usuário.
+# Base directory where the executor saves artifacts generated by output nodes.
+# Electron sets EXECUTOR_ARTIFACTS_DIR pointing to the folder chosen by the user.
 ARTIFACTS_DIR: str = os.getenv(
     "EXECUTOR_ARTIFACTS_DIR",
     str(Path.home() / "AtlansExecutor" / "artifacts"),
 )
 
 # ── Logging ────────────────────────────────────────────────────────────────────
-# LOG_LEVEL, LOG_COLOR, LOG_FILE_AGENT e LOG_FILE_WORKFLOW nao moram aqui: quem
-# as le, direto do ambiente, e o configure_logging() de executor/logging_setup.py
-# — na hora de configurar, e nao no import, para nao depender da ordem de import.
+# LOG_LEVEL, LOG_COLOR, LOG_FILE_AGENT and LOG_FILE_WORKFLOW do not live here: what
+# reads them, directly from the environment, is configure_logging() in executor/logging_setup.py
+# — at configuration time, not at import, so as not to depend on import order.
 
 
 def _default_log_dir() -> str:
-    """`<pai de ARTIFACTS_DIR>/logs`, seguindo a convencao de ~/AtlansExecutor.
+    """`<pai de ARTIFACTS_DIR>/logs`, following the ~/AtlansExecutor convention.
 
-    No Docker, EXECUTOR_ARTIFACTS_DIR=/data/artifacts vira /data/logs — dentro
-    do volume que ja e persistente. Se o pai for a raiz do sistema de arquivos
-    (ARTIFACTS_DIR mal configurado), cai no home para nao tentar escrever em /.
+    In Docker, EXECUTOR_ARTIFACTS_DIR=/data/artifacts becomes /data/logs — inside
+    the volume that is already persistent. If the parent is the filesystem root
+    (ARTIFACTS_DIR misconfigured), falls back to home so as not to try writing to /.
     """
     pai = Path(ARTIFACTS_DIR).parent
-    if pai == pai.parent:  # chegou na raiz — nao e lugar de gravar log
+    if pai == pai.parent:  # reached the root — not a place to write logs
         return str(Path.home() / "AtlansExecutor" / "logs")
     return str(pai / "logs")
 
 
 LOG_DIR: str = os.getenv("EXECUTOR_LOG_DIR") or _default_log_dir()
 
-# ── Painel ao vivo / canal com o supervisor ──────────────────────────────────
-# EXECUTOR_DASHBOARD e lida direto do ambiente pelo gate do painel
-# (`should_enable_from_process` em executor/dashboard/__init__.py):
-# auto  — liga o painel rich se o terminal for interativo e o `rich` existir
-# on    — forca o painel rich (util para quem sabe o que esta fazendo)
-# off   — nenhum dos dois; mantem o log linha a linha no console
-# json  — canal NDJSON no stdout, para um supervisor (o app desktop).
-#         Nunca e inferido: emitir JSON no stdout de quem esperava log humano
-#         quebraria o consumidor em silencio. Ver executor/dashboard/json_runtime.py
-#         para o formato dos eventos e a lista de comandos aceitos no stdin.
+# ── Live panel / channel with the supervisor ─────────────────────────────────
+# EXECUTOR_DASHBOARD is read directly from the environment by the panel gate
+# (`should_enable_from_process` in executor/dashboard/__init__.py):
+# auto  — turns on the rich panel if the terminal is interactive and `rich` exists
+# on    — forces the rich panel (useful for those who know what they are doing)
+# off   — neither of the two; keeps the line-by-line log on the console
+# json  — NDJSON channel on stdout, for a supervisor (the desktop app).
+#         Never inferred: emitting JSON on the stdout of something expecting human logs
+#         would break the consumer silently. See executor/dashboard/json_runtime.py
+#         for the event format and the list of commands accepted on stdin.
 DASHBOARD_INTERVAL: float = ler_float("EXECUTOR_DASHBOARD_INTERVAL", 1.0, minimo=0.25)
 
-# ── GeoSync — sincronizacao de pastas locais com o Drive do Workspace ─────────
-# Pastas separadas por virgula. Vazio = sync desabilitado.
+# ── GeoSync — sync of local folders with the Workspace Drive ──────────────────
+# Comma-separated folders. Empty = sync disabled.
 SYNC_DIRS: str = os.getenv("EXECUTOR_SYNC_DIRS", "")
-# Os padroes abaixo valem quando a linha falta no .env. O .env.example — semente
-# de toda instalacao nova — grava bidirectional e 10s de proposito; o app desktop
-# grava o modo que a tela mostra e sempre 10s (desktop/src/shared/geosync.ts,
-# com teste contra estas linhas).
+# The defaults below apply when the line is missing from .env. The .env.example — the seed
+# of every new installation — writes bidirectional and 10s on purpose; the desktop app
+# writes the mode the screen shows and always 10s (desktop/src/shared/geosync.ts,
+# with a test against these lines).
 SYNC_INTERVAL: int = ler_int("EXECUTOR_SYNC_INTERVAL", 30, minimo=1)  # segundos
 # upload | download | bidirectional | catalog
 #
-# `upload` e o padrao seguro: nada que aconteca no Drive apaga ou sobrescreve
-# arquivo local (ver o gate de modo em sync/manager.py::_process_drive_event).
+# `upload` is the safe default: nothing that happens in the Drive deletes or overwrites
+# a local file (see the mode gate in sync/manager.py::_process_drive_event).
 #
-# `catalog` e para dado pessoal (LGPD): o executor registra o dataset no Drive —
-# nome, tipo, tamanho, CRS, bbox, contagem de feicoes — e o CONTEUDO nunca sai
-# desta maquina. Os arquivos so podem ser lidos por workflows que rodem neste
-# mesmo executor; o download pela plataforma nao existe.
+# `catalog` is for personal data (LGPD): the executor registers the dataset in the Drive —
+# name, type, size, CRS, bbox, feature count — and the CONTENT never leaves
+# this machine. The files can only be read by workflows that run on this
+# same executor; download through the platform does not exist.
 SYNC_MODE: str = os.getenv("EXECUTOR_SYNC_MODE", "upload")
 SYNC_CONFLICT_STRATEGY: str = os.getenv("EXECUTOR_SYNC_CONFLICT_STRATEGY", "remote-wins")  # local-wins | remote-wins | keep-both
 SYNC_TRIGGERS: str = os.getenv("EXECUTOR_SYNC_TRIGGERS", "")

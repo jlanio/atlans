@@ -1,22 +1,22 @@
 # executor/_ambiente.py
 """
-Leitura de numeros do ambiente do executor — o ponto unico.
+Reading numbers from the executor's environment — the single place.
 
-Valor invalido no `.env` (nao numerico, ou fora da faixa) e erro de digitacao,
-nao intencao: vira o padrao, com um aviso dizendo qual variavel e qual valor, e
-NUNCA derruba o import. Havia duas copias deste leitor (executor/config.py e
-executor/sync/sync_config.py, com contratos diferentes) e cinco
-`int(os.getenv(...))` crus em job_validator.py e renewal.py — com eles, um
-`EXECUTOR_CLOCK_SKEW_SECONDS=abc` matava o processo com ValueError no import,
-antes de main() rodar e antes de o canal com o supervisor subir.
+An invalid value in `.env` (non-numeric, or out of range) is a typo, not
+intent: it falls back to the default, with a warning naming the variable and the
+value, and NEVER crashes the import. There used to be two copies of this reader
+(executor/config.py and executor/sync/sync_config.py, with different contracts)
+and five raw `int(os.getenv(...))` calls in job_validator.py and renewal.py — with
+them, an `EXECUTOR_CLOCK_SKEW_SECONDS=abc` killed the process with ValueError at
+import, before main() ran and before the channel with the supervisor came up.
 
-O aviso e ADIADO enquanto o logging nao esta configurado: executor/config.py e
-importado antes de configure_logging(), e um aviso emitido ali cairia no
-logging.lastResort (stderr cru, sem formato — com o painel ligado, lixo por
-cima do desenho). Ele fica retido ate configure_logging() chamar
-emitir_avisos_adiados() (via executor.config.flush_startup_warnings). Dali em
-diante os avisos saem DIRETO: job_validator, renewal e sync_config sao
-importados depois do boot, e nao haveria outro flush para entrega-los.
+The warning is DEFERRED while logging is not configured: executor/config.py is
+imported before configure_logging(), and a warning emitted there would land in
+logging.lastResort (raw stderr, unformatted — with the panel on, garbage drawn
+over the display). It is held until configure_logging() calls
+emitir_avisos_adiados() (via executor.config.flush_startup_warnings). From then
+on warnings go out DIRECTLY: job_validator, renewal and sync_config are
+imported after boot, and there would be no other flush to deliver them.
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ _logging_pronto = False
 
 
 def avisar(msg: str, *args) -> None:
-    """Aviso de configuracao: retido ate o logging subir, direto depois."""
+    """Configuration warning: held until logging comes up, direct afterwards."""
     if _logging_pronto:
         logger.warning(msg, *args)
     else:
@@ -39,7 +39,7 @@ def avisar(msg: str, *args) -> None:
 
 
 def emitir_avisos_adiados() -> None:
-    """Emite os avisos retidos, agora que ha handlers de verdade."""
+    """Emits the held warnings, now that there are real handlers."""
     global _logging_pronto
     for msg, args in _AVISOS_ADIADOS:
         logger.warning(msg, *args)
@@ -52,13 +52,13 @@ def _faixa(minimo, maximo) -> str:
 
 
 def ler_int(nome: str, padrao: int, minimo: int = 1, maximo: int | None = None) -> int:
-    """Inteiro do ambiente dentro de [minimo, maximo]; fora disso, o padrao com aviso.
+    """Integer from the environment within [minimo, maximo]; outside it, the default with a warning.
 
-    Ausente ou em branco e o padrao, sem aviso. A faixa existe porque o valor
-    absurdo nao falha — ele funciona errado: `EXECUTOR_MAX_CONCURRENT=0` subia o
-    executor SEM worker nenhum, online, reportando capacity 0 (e por isso o
-    PREFERIDO pelo scheduler least-loaded do servidor), dando ACK nos jobs e
-    nunca executando — runs presos em 'running' para sempre.
+    Missing or blank means the default, with no warning. The range exists because an
+    absurd value does not fail — it works wrong: `EXECUTOR_MAX_CONCURRENT=0` brought
+    the executor up with NO worker at all, online, reporting capacity 0 (and therefore
+    PREFERRED by the server's least-loaded scheduler), ACKing jobs and
+    never executing them — runs stuck in 'running' forever.
     """
     bruto = os.getenv(nome)
     if bruto is None or not bruto.strip():
@@ -76,7 +76,7 @@ def ler_int(nome: str, padrao: int, minimo: int = 1, maximo: int | None = None) 
 
 
 def ler_float(nome: str, padrao: float, minimo: float, maximo: float | None = None) -> float:
-    """Versao float de ler_int. `nan` e `inf` nao sao numero para este fim."""
+    """Float version of ler_int. `nan` and `inf` are not numbers for this purpose."""
     bruto = os.getenv(nome)
     if bruto is None or not bruto.strip():
         return padrao

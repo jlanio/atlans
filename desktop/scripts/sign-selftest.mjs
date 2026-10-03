@@ -1,20 +1,20 @@
 // desktop/scripts/sign-selftest.mjs
 //
-// Prova que `build/sign.cjs` assina de verdade — hoje, sem comprar nada.
+// Proves that `build/sign.cjs` really signs — today, without buying anything.
 //
-// O risco real da assinatura de código não é técnico, é de CRONOGRAMA: o hook
-// fica anos como no-op, alguém compra o certificado no dia da entrega, liga as
-// variáveis e aí descobre que o signtool não é encontrado, que o `.pfx` em
-// base64 não decodifica, que faltava o `/as`. Isso vira uma noite perdida no
-// pior dia possível.
+// The real risk of code signing is not technical, it is SCHEDULE: the hook
+// sits as a no-op for years, someone buys the certificate on delivery day,
+// sets the variables and only then discovers that signtool is not found, that
+// the base64 `.pfx` does not decode, that `/as` was missing. That turns into a
+// lost night on the worst possible day.
 //
-// Este script gera um certificado AUTOASSINADO, roda o hook de verdade contra
-// um executável de mentira e verifica a assinatura resultante. O único trecho
-// que ele não exercita é o `/dlib` do provedor em nuvem — que é justamente o
-// que depende do certificado comprado. Todo o resto é o mesmo caminho.
+// This script generates a SELF-SIGNED certificate, runs the real hook against
+// a dummy executable and verifies the resulting signature. The only part it
+// does not exercise is the cloud provider's `/dlib` — which is precisely what
+// depends on the purchased certificate. Everything else is the same path.
 //
-// O certificado é temporário e some no fim; nada é instalado no repositório de
-// certificados confiáveis da máquina.
+// The certificate is temporary and goes away at the end; nothing is installed
+// into the machine's trusted certificate store.
 //
 //   npm run sign:selftest
 import { execFileSync } from 'node:child_process'
@@ -26,16 +26,16 @@ import { log, ok, step } from './lib.mjs'
 
 const DESKTOP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-/** Erro visível sem encerrar o processo — o `finally` ainda precisa limpar. */
+/** Visible error without exiting the process — the `finally` still needs to clean up. */
 const falha = (msg) => log(` ERRO  ${msg}`)
 
 /**
- * Um PE sem assinatura e fora dos catálogos do Windows.
+ * An unsigned PE outside Windows' catalogs.
  *
- * `esbuild.exe` é dependência de build deste projeto, então está sempre
- * presente. `node.exe` é a reserva: maior, mas igualmente fora de catálogo.
+ * `esbuild.exe` is a build dependency of this project, so it is always
+ * present. `node.exe` is the fallback: larger, but equally outside any catalog.
  */
-/** O arquivo que o electron-builder invoca — exercitar outro não provaria nada. */
+/** The file electron-builder invokes — exercising another one would prove nothing. */
 const CAMINHO_HOOK = path.join(DESKTOP, 'build', 'sign.cjs').split(path.sep).join('/')
 
 function binarioDeTeste() {
@@ -64,29 +64,30 @@ function ps(script) {
 /** Carrega o hook — interop CJS→ESM entrega `module.exports` em `.default`. */
 const hook = await import(`file://${CAMINHO_HOOK}`).then((m) => m.default ?? m)
 
-// ── 0. Existe signtool nesta máquina? ────────────────────────────────────────
-// O runner do GitHub traz o SDK do Windows, mas o cache do electron-builder só
-// aparece depois do primeiro `npm run dist` — que roda DEPOIS deste autoteste.
-// Se nenhum dos dois estiver lá, não há o que exercitar.
+// ── 0. Is there a signtool on this machine? ──────────────────────────────────
+// The GitHub runner ships the Windows SDK, but the electron-builder cache only
+// shows up after the first `npm run dist` — which runs AFTER this self-test.
+// If neither is there, there is nothing to exercise.
 //
-// Sem assinatura configurada isso é AVISO: o build sai não assinado de qualquer
-// forma, e derrubar a release por causa disso seria desproporcional. Com
-// assinatura configurada é ERRO — o `npm run dist` adiante falharia pelo mesmo
-// motivo, e falhar aqui custa 40 minutos a menos.
+// With no signing configured this is a WARNING: the build comes out unsigned
+// anyway, and bringing down the release because of it would be
+// disproportionate. With signing configured it is an ERROR — the `npm run dist`
+// later on would fail for the same reason, and failing here costs 40 minutes
+// less.
 /**
- * Encerra segundo a REGRA DE PROPORÇÃO deste autoteste.
+ * Exits according to this self-test's PROPORTIONALITY RULE.
  *
- * Ele é um canário de uma capacidade que ainda não está em uso: hoje o build
- * sai não assinado de qualquer forma. Enquanto `ATLANS_SIGN_PROVIDER` não
- * estiver definido, um problema do PRÓPRIO autoteste — SDK ausente, provedor de
- * certificado do Windows indisponível no runner, o que for — não pode derrubar
- * a release. Vira aviso, e o build segue.
+ * It is a canary for a capability that is not in use yet: today the build
+ * comes out unsigned anyway. As long as `ATLANS_SIGN_PROVIDER` is not defined,
+ * a problem with the self-test ITSELF — SDK missing, Windows certificate
+ * provider unavailable on the runner, whatever — must not bring down the
+ * release. It becomes a warning, and the build goes on.
  *
- * Com a assinatura configurada, o mesmo problema é erro: o `npm run dist`
- * adiante falharia pelo mesmo motivo, e falhar aqui custa 40 minutos a menos.
+ * With signing configured, the same problem is an error: the `npm run dist`
+ * later on would fail for the same reason, and failing here costs 40 minutes less.
  *
- * Sem esta regra, o autoteste protege algo que ninguém usa e bloqueia o que
- * todo mundo espera.
+ * Without this rule, the self-test protects something nobody uses and blocks
+ * what everybody is waiting for.
  */
 function encerrar(houveFalha, motivo) {
   const exigido = Boolean(process.env.ATLANS_SIGN_PROVIDER)
@@ -110,7 +111,7 @@ if (signtool === 'signtool.exe' && !fs.existsSync(signtool)) {
 
 let falhou = false
 try {
-  // ── 1. Certificado descartável ─────────────────────────────────────────────
+  // ── 1. Throwaway certificate ───────────────────────────────────────────────
   step('Gerando certificado autoassinado de teste')
   ps(`
     $ErrorActionPreference = 'Stop'
@@ -132,39 +133,39 @@ try {
   `)
   ok(`pfx em ${pfx}`)
 
-  // ── 2. Um executável para assinar ──────────────────────────────────────────
-  // Precisa ser um PE VÁLIDO (o signtool recusa arquivo vazio) e que NÃO esteja
-  // num catálogo do Windows.
+  // ── 2. An executable to sign ───────────────────────────────────────────────
+  // It must be a VALID PE (signtool refuses an empty file) and one that is NOT
+  // in a Windows catalog.
   //
-  // A primeira versão usava `cmd.exe` e o teste passou a MENTIR: binários do
-  // sistema são assinados por CATÁLOGO, e o `Get-AuthenticodeSignature` prefere
-  // a assinatura do catálogo à embutida. Saía `status=Valid, subject=CN=
-  // Microsoft Windows` mesmo depois de assinarmos — e, pior, o arquivo NÃO
-  // assinado também aparecia como válido, o que faria o teste aprovar um hook
-  // quebrado. O `esbuild.exe` do node_modules é PE de terceiro, sem catálogo e
-  // sem assinatura própria.
+  // The first version used `cmd.exe` and the test started to LIE: system
+  // binaries are signed by CATALOG, and `Get-AuthenticodeSignature` prefers the
+  // catalog signature over the embedded one. It reported `status=Valid, subject=CN=
+  // Microsoft Windows` even after we signed it — and, worse, the UNSIGNED file
+  // also showed up as valid, which would make the test approve a broken hook.
+  // The `esbuild.exe` from node_modules is a third-party PE, with no catalog
+  // and no signature of its own.
   fs.copyFileSync(binarioDeTeste(), alvo)
 
-  // ── 3. O HOOK DE VERDADE ───────────────────────────────────────────────────
-  // Nada de reimplementar a chamada aqui: o que precisa ser exercitado é
-  // exatamente o arquivo que o electron-builder invoca.
+  // ── 3. THE REAL HOOK ───────────────────────────────────────────────────────
+  // No reimplementing the call here: what needs to be exercised is exactly the
+  // file electron-builder invokes.
   step('Executando build/sign.cjs')
   process.env.ATLANS_SIGN_PROVIDER = 'pfx'
   process.env.ATLANS_SIGN_PFX = pfx
   process.env.ATLANS_SIGN_PFX_PASSWORD = SENHA
 
-  // Interop CJS→ESM: `import()` de um CommonJS entrega `module.exports` em
-  // `.default`, e o hook exporta `exports.default` — então o alvo fica em
-  // `.default.default`. O electron-builder chega nele por `require(f).default`,
-  // que é o primeiro nível. Aceitar os dois evita que o autoteste passe a
-  // testar a interop em vez do hook.
+  // CJS→ESM interop: `import()` of a CommonJS module delivers `module.exports`
+  // in `.default`, and the hook exports `exports.default` — so the target ends
+  // up in `.default.default`. electron-builder reaches it via
+  // `require(f).default`, which is the first level. Accepting both keeps the
+  // self-test from ending up testing the interop instead of the hook.
   const assinar = typeof hook === 'function' ? hook : hook.default
   await assinar({ path: alvo })
   ok('hook executou sem erro')
 
-  // ── 4. A assinatura existe mesmo? ──────────────────────────────────────────
-  // "Não estourou" não é prova de nada: um signtool que não fez nada também
-  // não estoura.
+  // ── 4. Does the signature really exist? ────────────────────────────────────
+  // "It didn't blow up" proves nothing: a signtool that did nothing doesn't
+  // blow up either.
   step('Verificando a assinatura no arquivo')
   const info = ps(`
     $s = Get-AuthenticodeSignature -FilePath '${alvo}'
@@ -175,9 +176,9 @@ try {
   `)
   console.log(info.split('\n').map((l) => `      ${l}`).join('\n'))
 
-  // `UnknownError` é o esperado: o certificado é autoassinado e a cadeia não é
-  // confiável nesta máquina. O que importa é que HÁ uma assinatura, com o
-  // sujeito certo. `NotSigned` seria a falha real.
+  // `UnknownError` is expected: the certificate is self-signed and the chain is
+  // not trusted on this machine. What matters is that there IS a signature,
+  // with the right subject. `NotSigned` would be the real failure.
   if (/status=NotSigned/.test(info)) {
     falha('O arquivo continua SEM assinatura — o hook não fez nada.')
     falhou = true
@@ -185,24 +186,24 @@ try {
     falha('Assinado, mas por outro certificado que não o do teste.')
     falhou = true
   } else if (!/timestamp=sim/.test(info)) {
-    // Sem carimbo, a assinatura morre com o certificado e todo instalador já
-    // distribuído volta a ser "editor desconhecido".
+    // Without a timestamp, the signature dies with the certificate and every
+    // installer already distributed goes back to "unknown publisher".
     falha('Assinado SEM carimbo de tempo — a assinatura expiraria junto com o certificado.')
     falhou = true
   } else {
     ok('assinatura presente, com carimbo de tempo e o certificado esperado')
   }
 
-  // ── 5. O no-op continua sendo no-op ────────────────────────────────────────
+  // ── 5. The no-op is still a no-op ──────────────────────────────────────────
   step('Sem ATLANS_SIGN_PROVIDER o hook não deve fazer nada')
   delete process.env.ATLANS_SIGN_PROVIDER
   const alvoLimpo = path.join(tmp, 'limpo.exe')
   fs.copyFileSync(binarioDeTeste(), alvoLimpo)
   await assinar({ path: alvoLimpo })
 
-  // Verifica pelo SIGNATÁRIO, e não por `NotSigned`: se um dia o binário de
-  // teste vier assinado pelo fornecedor, `NotSigned` deixaria de valer e o
-  // teste falharia por um motivo que não é o dele.
+  // Checks by SIGNER, not by `NotSigned`: if some day the test binary comes
+  // signed by its vendor, `NotSigned` would no longer hold and the test would
+  // fail for a reason that is not its own.
   const limpo = ps(`"subject=" + (Get-AuthenticodeSignature -FilePath '${alvoLimpo}').SignerCertificate.Subject`)
   if (/Atlans Autoteste/.test(limpo)) {
     falha('O hook assinou sem provedor configurado.')

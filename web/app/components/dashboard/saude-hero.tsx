@@ -11,23 +11,23 @@ import { type ResumoDaAtencao, type TomDeSaude, veredito } from "./saude"
 interface Props {
   now: INowBlock | null | undefined
   tom: TomDeSaude
-  /** Contagem por tipo da lista "Precisa de atenção" (via `montarAtencao` no `index`); o veredito cita "N workflows falhando" sem reimplementar `top_failing`. */
+  /** Count per type of the "Precisa de atenção" list (via `montarAtencao` in `index`); the verdict cites "N workflows falhando" without reimplementing `top_failing`. */
   resumo: ResumoDaAtencao
-  /** Escopo tem workflows mas nenhuma execução: o calmo vira "nada rodando ainda" (§3.10). */
+  /** Scope has workflows but no run: the calm state becomes "nada rodando ainda" (§3.10). */
   semExecucoes: boolean
   escopo: EstadoDoEscopo
-  /** Workspace ativo quando escopado; `null` no "todos". O `index` o usa ao rotear. */
+  /** Active workspace when scoped; `null` in "todos". `index` uses it when routing. */
   workspaceId: string | null
-  /** 1ª carga: sem `now` ainda, a linha vira esqueleto em vez de "sem leitura". */
+  /** 1st load: with no `now` yet, the line becomes a skeleton instead of "sem leitura". */
   carregando: boolean
   onVerEmAndamento: () => void
   onAbrirPresa: (runId: string) => void
 }
 
 /**
- * A cor por tom, com as MESMAS classes que `StatusBadge` e `agora-faixa` já
- * usam — nada de hex solto, para os dois temas seguirem coerentes: verde
- * (calmo), âmbar (atenção), vermelho (crítico).
+ * Color per tone, with the SAME classes that `StatusBadge` and `agora-faixa`
+ * already use — no loose hex, so both themes stay consistent: green
+ * (calm), amber (attention), red (critical).
  */
 const CORES: Record<TomDeSaude, { friso: string; texto: string }> = {
   calmo: { friso: "bg-green-500", texto: "text-green-700 dark:text-green-400" },
@@ -36,27 +36,28 @@ const CORES: Record<TomDeSaude, { friso: string; texto: string }> = {
 }
 
 /**
- * Faixa de Saúde do topo do Dashboard (docs/specs/dashboard.md §3.4). O que a
- * tela responde primeiro: "está tudo bem agora?".
+ * Health strip at the top of the Dashboard (docs/specs/dashboard.md §3.4). What
+ * the screen answers first: "is everything fine right now?".
  *
- * No CALMO, uma linha verde fina (friso de 4px + check + veredito + a mesma
- * linha "agora" do Histórico) — não um cartão grande, que gritaria por atenção
- * que não é preciso dar. Na ATENÇÃO/CRÍTICO, o envelope `rounded-xl` ganha o
- * friso grosso e o brilho difuso do `workspace-hero`, e o veredito vem em duas
- * partes ("Precisa de você:" + os 1–2 motivos mais graves).
+ * In CALM, a thin green line (4px stripe + check + verdict + the same "agora"
+ * line as History) — not a big card, which would shout for attention that
+ * isn't needed. In ATTENTION/CRITICAL, the `rounded-xl` envelope gets the
+ * thick stripe and the diffuse glow of `workspace-hero`, and the verdict comes
+ * in two parts ("Precisa de você:" + the 1–2 most serious reasons).
  *
- * A linha de itens ("N em andamento · 1 presa há X · Executores N de M") é a
- * `ItensAgora` extraída de `agora-faixa.tsx`: a mesma lógica de "some o que é
- * zero", sem duplicar. "Ver em andamento" e a presa clicável sobem como
- * callbacks — quem roteia (com `&workspace=` quando escopado) é o `index`.
+ * The item line ("N em andamento · 1 presa há X · Executores N de M") is the
+ * `ItensAgora` extracted from `agora-faixa.tsx`: the same "hide what is zero"
+ * logic, without duplicating it. "Ver em andamento" and the clickable stuck run
+ * bubble up as callbacks — the one that routes (with `&workspace=` when scoped)
+ * is `index`.
  */
 export function SaudeHero({ now, tom, resumo, semExecucoes, carregando, onVerEmAndamento, onAbrirPresa }: Props) {
   const cor = CORES[tom]
   const frase = veredito(now, tom, resumo, semExecucoes)
   const calmo = tom === "calmo"
 
-  // Corpo comum aos dois estados: os itens do instante e o atalho para a
-  // tabela filtrada por "em andamento".
+  // Body shared by both states: the items of the moment and the shortcut to
+  // the table filtered by "em andamento" (in progress).
   const corpo = (
     <div className="flex flex-1 flex-wrap items-center gap-x-3.5 gap-y-2">
       {now ? (
@@ -78,7 +79,7 @@ export function SaudeHero({ now, tom, resumo, semExecucoes, carregando, onVerEmA
   )
 
   if (calmo) {
-    // Linha fina: o friso de 4px à esquerda, o check e o veredito numa frase só.
+    // Thin line: the 4px stripe on the left, the check and the verdict in a single sentence.
     return (
       <section
         aria-labelledby="saude-titulo"
@@ -96,8 +97,8 @@ export function SaudeHero({ now, tom, resumo, semExecucoes, carregando, onVerEmA
     )
   }
 
-  // Atenção/crítico: o envelope grande, com friso grosso e o veredito em duas
-  // partes. A cor de identidade entra só como friso — sem o brilho difuso.
+  // Attention/critical: the big envelope, with a thick stripe and the verdict in
+  // two parts. The identity color only comes in as the stripe — without the diffuse glow.
   const [prefixo, motivos] = partesDoVeredito(frase)
   return (
     <section
@@ -125,9 +126,9 @@ export function SaudeHero({ now, tom, resumo, semExecucoes, carregando, onVerEmA
 }
 
 /**
- * Quebra o veredito no primeiro ": " — "Precisa de você:" pinta com a cor do
- * tom, os motivos ficam em texto normal. Sem o separador (frase única), tudo
- * vai no prefixo.
+ * Splits the verdict at the first ": " — "Precisa de você:" is painted in the
+ * tone's color, the reasons stay in normal text. Without the separator (a
+ * single sentence), everything goes into the prefix.
  */
 function partesDoVeredito(frase: string): [string, string | null] {
   const i = frase.indexOf(": ")

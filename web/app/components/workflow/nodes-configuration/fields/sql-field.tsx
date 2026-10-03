@@ -1,8 +1,8 @@
 "use client"
 
 import { FieldLabel } from "./field-label"
-// `Label` continua em uso nos parametros nomeados da consulta, que nao vem do
-// schema do no e por isso nao passam pelo FieldLabel.
+// `Label` is still used for the query's named parameters, which don't come
+// from the node schema and therefore don't go through FieldLabel.
 import { Label } from "@/app/components/ui/label"
 import { Input } from "@/app/components/ui/input"
 import { useCallback, useMemo, useRef, useState } from "react"
@@ -11,15 +11,15 @@ import dynamic from "next/dynamic"
 import { extrairPlaceholders } from "@/lib/sql-literals"
 import type { FieldProps } from "./types"
 
-// Lazy-load Monaco — pesa ~2.5MB e só é necessário quando o sql-field monta.
+// Lazy-load Monaco — it weighs ~2.5MB and is only needed when sql-field mounts.
 const MonacoCodeEditor = dynamic(() => import("./monaco-code-editor"), {
   ssr: false,
   loading: () => <div className="w-full h-44 animate-pulse rounded-md bg-[#272822]" />,
 })
 
 type SqlFieldProps = FieldProps<{
-  /** Nome do campo de queryParams associado (ex: "queryParams"). Quando
-   *  fornecido, renderiza inputs nomeados para cada :placeholder da query. */
+  /** Name of the associated queryParams field (e.g. "queryParams"). When
+   *  provided, renders named inputs for each :placeholder in the query. */
   paramsFieldName?: string
 }>
 
@@ -41,13 +41,13 @@ const SqlField = ({ field, values, setNodeField, paramsFieldName }: SqlFieldProp
 
   const sqlValue = String(values?.[field.name] ?? "")
 
-  // Placeholders encontrados na query. `extrairPlaceholders` ignora o que está
-  // dentro de string ou comentário — antes o regex varria o texto cru, e
-  // `WHERE obs = 'urgente:revisar'` fazia o painel oferecer um `:revisar` que
-  // não existe (e o backend recusava a consulta inteira por causa dele).
+  // Placeholders found in the query. `extrairPlaceholders` ignores what is
+  // inside strings or comments — before, the regex scanned the raw text, and
+  // `WHERE obs = 'urgente:revisar'` made the panel offer a `:revisar` that
+  // doesn't exist (and the backend rejected the whole query because of it).
   const paramNames = useMemo(() => extrairPlaceholders(sqlValue), [sqlValue])
 
-  // Valores atuais dos params (object guardado como valor do campo paramsFieldName)
+  // Current param values (object stored as the value of the paramsFieldName field)
   const currentParams: Record<string, string> = useMemo(() => {
     if (!paramsFieldName) return {}
     const raw = values?.[paramsFieldName]
@@ -62,17 +62,17 @@ const SqlField = ({ field, values, setNodeField, paramsFieldName }: SqlFieldProp
     if (!paramsFieldName) return
     const atuais = { ...currentParams, [name]: value }
 
-    // Só sobrevivem os placeholders que a query PEDE agora. Antes a gravação
-    // era um `{...currentParams, [name]: value}` puro, e nada nunca saía: quem
-    // renomeava `:bairro` para `:cidade` deixava o `bairro` na definição salva
-    // para sempre — invisível na tela, mas gravado no workflow e em todo o
-    // histórico de versões, com o valor que tivesse dentro.
+    // Only the placeholders the query asks for NOW survive. Before, the write
+    // was a plain `{...currentParams, [name]: value}`, and nothing ever left:
+    // whoever renamed `:bairro` to `:cidade` left `bairro` in the saved
+    // definition forever — invisible on screen, but written to the workflow and
+    // to the whole version history, with whatever value it held.
     //
-    // A poda acontece ao editar um VALOR, não ao editar o SQL. Podar a cada
-    // tecla do editor apagaria o valor de `:bairro` no instante em que a query
-    // dissesse `:bairr` — o usuário perderia o que digitou no meio de uma
-    // renomeação. Editando valores, a query já está na forma que ele quis, e o
-    // que fica salvo passa a ser exatamente o que está na tela.
+    // Pruning happens when editing a VALUE, not when editing the SQL. Pruning
+    // on every editor keystroke would erase the value of `:bairro` the instant
+    // the query said `:bairr` — the user would lose what they typed in the
+    // middle of a rename. When editing values, the query is already in the
+    // shape they wanted, and what gets saved becomes exactly what is on screen.
     const next: Record<string, string> = {}
     for (const chave of paramNames) {
       if (chave in atuais) next[chave] = atuais[chave]
@@ -100,7 +100,7 @@ const SqlField = ({ field, values, setNodeField, paramsFieldName }: SqlFieldProp
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
     >
-      {/* `htmlFor={null}`: o Monaco e de terceiros e nao expoe id. */}
+      {/* `htmlFor={null}`: Monaco is third-party and doesn't expose an id. */}
       <FieldLabel field={field} htmlFor={null} />
 
       <MonacoCodeEditor
@@ -112,7 +112,7 @@ const SqlField = ({ field, values, setNodeField, paramsFieldName }: SqlFieldProp
         minHeight={120}
       />
 
-      {/* Painel de snippets SQL */}
+      {/* SQL snippets panel */}
       <div className="rounded-md border bg-muted/40 px-3 py-2 flex flex-col gap-2 text-xs">
         <div className="flex flex-wrap items-center gap-1">
           <span className="text-muted-foreground shrink-0 flex items-center gap-1">

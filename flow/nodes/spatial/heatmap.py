@@ -12,11 +12,11 @@ logger = get_logger(__name__)
 @register_node
 class HeatmapNode(BaseNode):
     """
-    Gera um grid de heatmap (estimativa de densidade via KDE) como um
-    GeoDataFrame de polígonos retangulares, cada um com um valor de
-    densidade relativa calculado a partir dos centroides das feições de entrada.
+    Generates a heatmap grid (density estimate via KDE) as a
+    GeoDataFrame of rectangular polygons, each with a relative density
+    value computed from the centroids of the input features.
 
-    O KDE é calculado com numpy (kernel gaussiano).
+    The KDE is computed with numpy (Gaussian kernel).
     """
 
     @classmethod
@@ -70,10 +70,10 @@ class HeatmapNode(BaseNode):
         if bandwidth <= 0:
             raise ValueError(f"bandwidth deve ser positivo. Recebido: {bandwidth}.")
 
-        # Obtém o GeoDataFrame de entrada via helper da classe base
+        # Gets the input GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
 
-        # Filtra geometrias válidas
+        # Keeps valid geometries
         valid_gdf = gdf[gdf.geometry.notnull() & ~gdf.geometry.is_empty].copy()
         if valid_gdf.empty:
             raise ValueError(
@@ -94,7 +94,7 @@ class HeatmapNode(BaseNode):
         source_crs = valid_gdf.crs
 
         def _heatmap(df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
-            # Extrai coordenadas dos centroides
+            # Extracts the centroid coordinates
             centroids = df.geometry.centroid
             cx = centroids.x.values.astype(np.float64)
             cy = centroids.y.values.astype(np.float64)
@@ -106,7 +106,7 @@ class HeatmapNode(BaseNode):
             x_range = xmax - xmin
             y_range = ymax - ymin
 
-            # Evita bbox degenerada (todos os pontos iguais)
+            # Avoids a degenerate bbox (all points identical)
             if x_range == 0:
                 x_range = 1.0
                 xmin -= 0.5
@@ -116,13 +116,13 @@ class HeatmapNode(BaseNode):
                 ymin -= 0.5
                 ymax += 0.5
 
-            # Cria centros das células do grid
+            # Creates the grid cell centers
             xs = np.linspace(xmin, xmax, resolution)
             ys = np.linspace(ymin, ymax, resolution)
             xx, yy = np.meshgrid(xs, ys)
             grid_points = np.vstack([xx.ravel(), yy.ravel()])  # shape (2, N)
 
-            # Avalia o KDE gaussiano nos centros do grid
+            # Evaluates the Gaussian KDE at the grid centers
             bw_h = bandwidth * 0.5 * (
                 np.std(cx) + np.std(cy)
             )
@@ -139,12 +139,12 @@ class HeatmapNode(BaseNode):
             kernels = np.exp(-0.5 * sq_dist / (bw_h ** 2))  # (G, P)
             density_values = kernels.sum(axis=1)  # (G,)
 
-            # Normaliza para [0, 1]
+            # Normalizes to [0, 1]
             d_max = density_values.max()
             if d_max > 0:
                 density_values = density_values / d_max
 
-            # Constrói GeoDataFrame de células do grid
+            # Builds a GeoDataFrame of grid cells
             cell_width = x_range / resolution
             cell_height = y_range / resolution
 
@@ -154,8 +154,8 @@ class HeatmapNode(BaseNode):
             gx = grid_points[0]  # (G,)
             gy = grid_points[1]  # (G,)
 
-            # PERF: shapely.box vetorizado sobre os arrays da grade — evita
-            # resolution² chamadas box() em loop Python.
+            # PERF: vectorized shapely.box over the grid arrays — avoids
+            # resolution² box() calls in a Python loop.
             polygons = shapely.box(gx - half_w, gy - half_h, gx + half_w, gy + half_h)
 
             result = gpd.GeoDataFrame(

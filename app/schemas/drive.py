@@ -17,18 +17,18 @@ class WorkspaceFileOut(BaseModel):
     status:        str = "confirmed"
     created_at:    datetime
     updated_at:    Optional[datetime] = None
-    # Ultima escrita de CONTEUDO — e por ela que a listagem ordena. `updated_at`
-    # muda com qualquer update da linha (renomear, por exemplo), entao exibi-lo
-    # como "ultima escrita" nao explicava a ordem que o usuario via.
+    # Last CONTENT write — it is what the listing sorts by. `updated_at` changes
+    # with any update of the row (renaming, for example), so showing it as
+    # "last write" did not explain the order the user saw.
     content_written_at: Optional[datetime] = None
 
-    # Localidade do conteúdo (LGPD). 'minio' é o caso de sempre; 'executor'
-    # significa que os bytes nunca saíram da máquina do executor — o download
-    # pela plataforma não existe, e a UI precisa dizer isso ANTES do clique.
+    # Content locality (LGPD). 'minio' is the usual case; 'executor' means the
+    # bytes never left the executor's machine — download through the platform
+    # does not exist, and the UI needs to say so BEFORE the click.
     content_location: str = "minio"
     content_executor_id: Optional[str] = None
-    # CRS, bbox, feature_count, columns, geometry_type. No modo catálogo é a
-    # única coisa que o servidor sabe sobre o conteúdo.
+    # CRS, bbox, feature_count, columns, geometry_type. In catalog mode it is the
+    # only thing the server knows about the content.
     spatial_metadata: Optional[dict] = None
 
     class Config:
@@ -40,7 +40,7 @@ class WorkspaceFileList(BaseModel):
     total: int
 
 
-# ── Configurações globais ─────────────────────────────────────────────────────
+# ── Global settings ───────────────────────────────────────────────────────────
 
 class PlatformFileSettingsOut(BaseModel):
     max_size_mb: int
@@ -54,7 +54,7 @@ class PlatformFileSettingsUpdate(BaseModel):
     max_size_mb: int = Field(..., ge=1, le=10240, description="Tamanho máximo em MB")
 
 
-# ── Extensões permitidas ──────────────────────────────────────────────────────
+# ── Allowed extensions ────────────────────────────────────────────────────────
 
 class AllowedExtensionOut(BaseModel):
     extension:  str
@@ -72,19 +72,19 @@ class AllowedExtensionCreate(BaseModel):
 # ── Executor endpoints (schemas estritos: extra='forbid' bloqueia keys desconhecidos) ──
 
 class ExecutorRegisterRequest(BaseModel):
-    """Registro de dataset que PERMANECE no disco do executor (GeoSync catálogo).
+    """Record of a dataset that STAYS on the executor's disk (GeoSync catalog).
 
-    Não há upload: o servidor guarda só o catálogo. Deliberadamente não existe
-    campo de caminho de arquivo — o executor reencontra o dataset pelo próprio
-    manifesto de sync, e um caminho do sistema de arquivos do usuário não tem
-    por que existir no banco do servidor.
+    There is no upload: the server keeps only the catalog. There is
+    deliberately no file path field — the executor finds the dataset again
+    through its own sync manifest, and a path from the user's file system has
+    no reason to exist in the server's database.
     """
     model_config = ConfigDict(extra="forbid")
     filename: str = Field(..., min_length=1, max_length=512)
     workspace_id: Optional[str] = Field(default=None, max_length=128)
     size: int = Field(..., ge=0, le=10 * 1024**3)
-    # Nome do dataset no manifesto local do executor. Volta para ele na leitura
-    # como pista de diagnóstico; não é usado para montar caminho.
+    # Dataset name in the executor's local manifest. It goes back to it on read
+    # as a diagnostic hint; it is not used to build a path.
     dataset_name: Optional[str] = Field(default=None, max_length=512)
     spatial_metadata: dict = Field(default_factory=dict)
 

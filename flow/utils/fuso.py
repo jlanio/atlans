@@ -1,14 +1,14 @@
 # flow/utils/fuso.py
 """
-O fuso padrão dos agendamentos: o que vale quando o agendamento não diz o seu.
+The default time zone for schedules: the one that applies when a schedule does not state its own.
 
-Vem do ambiente (AGENDAMENTO_FUSO_PADRAO), com UTC quando ninguém o definiu. Mora
-em `flow/` porque os dois lados precisam do MESMO valor e só este pacote é
-comum aos dois: o nó ScheduleTrigger (o executor empacota `flow/` sem `app/`) e
-o servidor (`app/core/constants.py`). Divergir faria o próximo save de cada
-workflow agendado recriar o schedule — ver a constante no servidor.
+Comes from the environment (AGENDAMENTO_FUSO_PADRAO), with UTC when nobody set it. Lives
+in `flow/` because both sides need the SAME value and only this package is
+shared by both: the ScheduleTrigger node (the executor packages `flow/` without `app/`) and
+the server (`app/core/constants.py`). Diverging would make the next save of each
+scheduled workflow recreate the schedule — see the constant on the server.
 
-Só a biblioteca padrão: o módulo é importado no arranque dos dois processos.
+Standard library only: the module is imported at startup of both processes.
 """
 from __future__ import annotations
 
@@ -17,18 +17,18 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 FUSO_DE_RESERVA = "UTC"
 
-# Arquivos da base de fusos que o zoneinfo abre, mas que não são fuso: o
-# navegador não os conhece, e a tela mostraria um fuso que não sabe desenhar.
+# Files in the time zone database that zoneinfo opens but that are not time zones:
+# the browser does not know them, and the screen would show a zone it cannot draw.
 _NAO_SAO_FUSOS = frozenset({"localtime", "posixrules", "Factory"})
 
 
 def fuso_padrao_do_agendamento() -> str:
-    """AGENDAMENTO_FUSO_PADRAO (um fuso IANA), ou UTC quando vazia.
+    """AGENDAMENTO_FUSO_PADRAO (an IANA time zone), or UTC when empty.
 
-    Um valor que não é fuso PARA o arranque, em vez de cair em UTC: numa
-    instalação com agendamentos, um erro de digitação valendo UTC recriaria, no
-    próximo save, cada agendamento sem fuso explícito — horas fora do lugar, sem
-    nada que explicasse. Como a origem CORS inválida em `app/core/config.py`.
+    A value that is not a time zone STOPS startup, instead of falling back to UTC: in an
+    installation with schedules, a typo meaning UTC would recreate, on the
+    next save, every schedule without an explicit time zone — hours out of place, with
+    nothing to explain it. Like the invalid CORS origin in `app/core/config.py`.
     """
     valor = os.getenv("AGENDAMENTO_FUSO_PADRAO", "").strip()
     if not valor:
@@ -40,7 +40,7 @@ def fuso_padrao_do_agendamento() -> str:
         raise erro
     try:
         ZoneInfo(valor)
-    # OSError: um nome de pasta da base ("America") abre um diretório.
+    # OSError: a folder name in the database ("America") opens a directory.
     except (ZoneInfoNotFoundError, ValueError, OSError) as exc:
         raise erro from exc
     return valor

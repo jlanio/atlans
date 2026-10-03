@@ -25,9 +25,9 @@ export default function WorkspaceSwitcher() {
   const [open, setOpen] = useState(false);
 
   const userId = session?.user?.id_hash ?? null;
-  // Mesma regra do WorkspaceBadge: `my_role` distingue os cinco papéis, e a
-  // comparação por `owner_id` fica como reserva. Sem isso, um admin de um
-  // workspace compartilhado aparecia como "Convidado" em todas as linhas.
+  // Same rule as WorkspaceBadge: `my_role` distinguishes the five roles, and the
+  // `owner_id` comparison remains as a fallback. Without it, an admin of a
+  // shared workspace showed up as "Convidado" (Guest) on every row.
   function papelDe(ws: { my_role: string | null; owner_id: string | null }) {
     const dono =
       ws.my_role === "owner" || !!(ws.owner_id && userId && ws.owner_id === userId);
@@ -37,22 +37,23 @@ export default function WorkspaceSwitcher() {
     };
   }
 
-  // Ao selecionar um workspace no dropdown, redireciona para /projects.
-  // Objetivo: mostrar imediatamente os workflows do workspace novo — evita
-  // que o usuario troque estando em /observability e nao veja mudanca visivel
-  // alem do header. Se ja estava em /projects, o router.push nao muda a URL mas
-  // o useEffect da lista re-fetcha via dependencia em current.id_hash
+  // When a workspace is selected in the dropdown, redirects to /projects.
+  // Goal: immediately show the new workspace's workflows — avoids the user
+  // switching while on /observability and seeing no visible change beyond the
+  // header. If already on /projects, router.push does not change the URL but
+  // the list's useEffect refetches via its dependency on current.id_hash
   // (projects/index.tsx:127).
   //
-  // /workflow/[id] nao entra mais nessa lista: la o cabecalho nao e renderizado
-  // (ver FULLSCREEN_ROUTES em app-header) e este seletor nao esta montado. Quem
-  // precisa trocar sai do editor — trocar no meio de uma edicao a descartaria.
+  // /workflow/[id] is no longer in this list: there the header is not rendered
+  // (see FULLSCREEN_ROUTES in app-header) and this picker is not mounted.
+  // Whoever needs to switch leaves the editor — switching mid-edit would
+  // discard it.
   //
-  // A excecao e /workspaces: la a troca JA tem efeito visivel (o card ativo
-  // muda), e quem esta configurando um workspace era jogado para fora da tela
-  // no meio da tarefa. A Home (/) e o mesmo caso: a lista de Artefatos re-escopa
-  // por current.id_hash na hora, entao empurrar para /projects tiraria a pessoa
-  // do globo sem ganho — a mudanca ja aparece onde ela esta.
+  // The exception is /workspaces: there the switch ALREADY has a visible effect
+  // (the active card changes), and someone configuring a workspace was thrown
+  // off the screen mid-task. Home (/) is the same case: the Artifacts list
+  // re-scopes by current.id_hash right away, so pushing to /projects would take
+  // the person off the globe for no gain — the change already shows where they are.
   const handleSelect = (wsId: string) => {
     const ws = workspaces.find((w) => w.id_hash === wsId);
     if (!ws) return;
@@ -64,30 +65,30 @@ export default function WorkspaceSwitcher() {
   return (
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        {/* Botão comum, não `SidebarMenuButton`: o seletor saiu da sidebar e
-            agora vive no cabeçalho, onde o primitivo da sidebar traria largura
-            total e altura de item de menu. */}
+        {/* A plain button, not `SidebarMenuButton`: the picker left the sidebar and
+            now lives in the header, where the sidebar primitive would bring full
+            width and a menu item's height. */}
         <button
           type="button"
-          // O nome do workspace vem do WorkspaceBadge, mas `aria-label` no botão
-          // SUBSTITUI o conteúdo no cálculo do nome acessível: com um rótulo
-          // fixo, quem usa leitor de tela ouvia "clique para trocar" e nunca
-          // qual workspace estava ativo — a única coisa que este cabeçalho
-          // existe para dizer.
+          // The workspace name comes from WorkspaceBadge, but `aria-label` on the
+          // button REPLACES the content in the accessible name computation: with
+          // a fixed label, screen reader users heard "clique para trocar" and
+          // never which workspace was active — the only thing this header
+          // exists to say.
           aria-label={
             current
               ? `Workspace ativo: ${current.name}. Clique para trocar.`
               : "Nenhum workspace ativo. Clique para escolher."
           }
-          // `app-region-no-drag`: no app desktop o AppHeader arrasta a janela;
-          // este botão precisa seguir clicável. Sem efeito no navegador.
+          // `app-region-no-drag`: in the desktop app the AppHeader drags the window;
+          // this button must stay clickable. No effect in the browser.
           className="app-region-no-drag flex min-w-0 max-w-xs items-center gap-2 rounded-md px-2 py-1 text-left transition-colors hover:bg-accent focus-visible:ring-ring data-[state=open]:bg-accent focus-visible:ring-2 focus-visible:outline-none"
         >
-          {/* Chip de identidade LIGADO: a cor determinística do workspace é o
-              sinal mais rápido de "em que escopo estou" — e este cabeçalho
-              existe justamente para responder isso antes de uma ação
-              destrutiva. Antes ficava desligado por parecer redundante ao lado
-              do nome; a cor, porém, é reconhecível num relance que o texto não. */}
+          {/* Identity chip ON: the workspace's deterministic color is the
+              fastest signal of "which scope am I in" — and this header exists
+              precisely to answer that before a destructive action. It used to
+              be off because it looked redundant next to the name; the color,
+              however, is recognizable at a glance in a way the text is not. */}
           <WorkspaceBadge
             workspace={current}
             size="md"
@@ -102,17 +103,17 @@ export default function WorkspaceSwitcher() {
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        // Largura própria, não a do gatilho: no cabeçalho o botão encolhe até o
-        // nome do workspace, e amarrar o menu a ele espremia a lista a ponto de
-        // cortar os nomes. Cresce com o conteúdo até um teto que ainda cabe na
-        // tela do telefone.
-        // O mínimo também cede na tela estreita: `min-width` vence `max-width`,
-        // então um `min-w-72` cru estouraria de novo abaixo de ~312px.
+        // Its own width, not the trigger's: in the header the button shrinks to the
+        // workspace name, and tying the menu to it squeezed the list to the point
+        // of cutting the names. It grows with the content up to a ceiling that
+        // still fits on a phone screen.
+        // The minimum also gives way on narrow screens: `min-width` beats
+        // `max-width`, so a raw `min-w-72` would overflow again below ~312px.
         className="min-w-[min(18rem,calc(100vw-1.5rem))] max-w-[min(24rem,calc(100vw-1.5rem))] rounded-lg"
         align="start"
         sideOffset={4}
-        // Sem folga de colisão o menu encostava na borda do telefone e comia o
-        // próprio padding — o papel do último workspace ficava cortado na tela.
+        // Without collision padding the menu touched the phone's edge and ate its
+        // own padding — the last workspace's role was cut off on screen.
         collisionPadding={12}
       >
         <DropdownMenuLabel className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -126,10 +127,10 @@ export default function WorkspaceSwitcher() {
             <DropdownMenuItem
               key={ws.id_hash}
               onSelect={() => handleSelect(ws.id_hash)}
-              // `data-active` não era lido por CSS nenhum: o workspace ativo
-              // não tinha marca alguma na lista. Marca agora com superfície,
-              // peso, um check E a barra terracota à esquerda — o mesmo idioma
-              // de "atual" do item ativo da sidebar A.
+              // `data-active` was not read by any CSS: the active workspace had no
+              // mark at all in the list. It is now marked with surface, weight,
+              // a check AND the terracotta bar on the left — the same "current"
+              // idiom as sidebar A's active item.
               className={cn(
                 "gap-2",
                 isActive &&
@@ -137,9 +138,9 @@ export default function WorkspaceSwitcher() {
               )}
             >
               <WorkspaceBadge workspace={ws} size="sm" />
-              {/* `truncate` precisa ficar no elemento que contém o TEXTO: no
-                  contêiner flex ele não recorta nada, e o nome longo avançava
-                  por cima do check e do papel em vez de virar reticências. */}
+              {/* `truncate` must sit on the element that contains the TEXT: on the
+                  flex container it clips nothing, and the long name ran over
+                  the check and the role instead of turning into an ellipsis. */}
               <span className="flex min-w-0 flex-1 items-center gap-1">
                 {ws.is_default && <TbHome className="size-3 shrink-0 text-muted-foreground" />}
                 <span className="truncate">{ws.name}</span>

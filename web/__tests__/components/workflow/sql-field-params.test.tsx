@@ -1,19 +1,19 @@
 /**
- * Painel "Parametros detectados" do editor SQL.
+ * The SQL editor's "Parametros detectados" (detected parameters) panel.
  *
- * O componente é CONTROLADO: `values` vem do modal e `setNodeField` escreve de
- * volta. A gravação era um `{...currentParams, [name]: value}` puro e nada
- * nunca saía do objeto: quem renomeava `:bairro` para `:cidade` deixava o
- * `bairro` na definição salva para sempre — invisível na tela, mas gravado no
- * workflow e em todo o histórico de versões, com o valor que tivesse dentro.
+ * The component is CONTROLLED: `values` comes from the modal and `setNodeField`
+ * writes back. The write was a plain `{...currentParams, [name]: value}` and
+ * nothing ever left the object: whoever renamed `:bairro` to `:cidade` left
+ * `bairro` in the saved definition forever — invisible on the screen, but saved
+ * in the workflow and in the whole version history, with whatever value it held.
  */
 import { useState } from "react"
 import { render, screen, fireEvent } from "@testing-library/react"
 import { describe, it, expect, vi } from "vitest"
 import SqlField from "@/app/components/workflow/nodes-configuration/fields/sql-field"
 
-// O Monaco pesa ~2.5MB e é carregado por `next/dynamic`; aqui só precisamos do
-// painel de parâmetros, então um textarea simples basta.
+// Monaco weighs ~2.5MB and is loaded through `next/dynamic`; here we only need
+// the parameters panel, so a plain textarea is enough.
 vi.mock("@/app/components/workflow/nodes-configuration/fields/monaco-code-editor", () => ({
   default: ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
     <textarea aria-label="sql" value={value} onChange={e => onChange(e.target.value)} />
@@ -69,11 +69,11 @@ describe("SqlField — parâmetros detectados", () => {
         params={{ bairro: "Centro" }}
       />,
     )
-    // Renomeia o placeholder na query...
+    // Renames the placeholder in the query...
     fireEvent.change(screen.getByLabelText("sql"), {
       target: { value: "SELECT * FROM t WHERE c = :cidade" },
     })
-    // ...e preenche o novo. É neste momento que a poda acontece.
+    // ...and fills in the new one. This is the moment the pruning happens.
     fireEvent.change(screen.getByPlaceholderText("Valor para :cidade"), {
       target: { value: "Recife" },
     })
@@ -96,9 +96,9 @@ describe("SqlField — parâmetros detectados", () => {
   })
 
   it("editar o SQL sozinho não apaga valor nenhum", () => {
-    // A poda é ao gravar VALOR, não a cada tecla do editor: podar aqui apagaria
-    // `:bairro` no instante em que a query dissesse `:bairr`, no meio de uma
-    // renomeação.
+    // Pruning happens when a VALUE is written, not on every editor keystroke:
+    // pruning here would erase `:bairro` the instant the query said `:bairr`, in
+    // the middle of a rename.
     render(
       <Anfitriao sql="SELECT * FROM t WHERE b = :bairro" params={{ bairro: "Centro" }} />,
     )

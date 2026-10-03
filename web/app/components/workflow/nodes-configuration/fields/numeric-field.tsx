@@ -8,9 +8,9 @@ type NumericFieldProps = FieldProps<{
 }>
 
 /**
- * Campo numérico unificado (substitui number-field e integer-field).
- * Variant "integer" arredonda no onChange e usa step=1 visual; "number" deixa
- * o usuario digitar decimais livremente.
+ * Unified numeric field (replaces number-field and integer-field).
+ * The "integer" variant rounds in onChange and uses a visual step=1; "number"
+ * lets the user type decimals freely.
  */
 const NumericField = ({ field, values, setNodeField, variant = "number" }: NumericFieldProps) => {
   const isInt = variant === "integer"

@@ -1,5 +1,5 @@
 # app/crud/executor_crud.py
-"""Operações de acesso a dados para Executor — sem lógica de negócio."""
+"""Data access operations for Executor — no business logic."""
 from datetime import datetime
 
 from sqlalchemy import or_, select, update
@@ -14,7 +14,7 @@ class ExecutorCRUD:
         self.db = db
 
     async def get(self, executor_id: str, include_deleted: bool = False) -> Executor | None:
-        """Busca executor por id_hash."""
+        """Fetches an executor by id_hash."""
         q = select(Executor).where(Executor.id_hash == executor_id)
         if not include_deleted:
             q = q.where(Executor.deleted_at.is_(None))
@@ -22,13 +22,13 @@ class ExecutorCRUD:
         return result.scalar_one_or_none()
 
     async def list(self) -> list[Executor]:
-        """Lista executores ativos (não deletados), do mais recente para o mais antigo."""
+        """Lists active (not deleted) executors, from newest to oldest."""
         q = select(Executor).where(Executor.deleted_at.is_(None)).order_by(Executor.created_at.desc())
         result = await self.db.execute(q)
         return list(result.scalars().all())
 
     async def get_any(self, executor_id: str) -> Executor | None:
-        """Busca executor por id_hash incluindo deletados (para delete/revoke)."""
+        """Fetches an executor by id_hash including deleted ones (for delete/revoke)."""
         result = await self.db.execute(select(Executor).where(Executor.id_hash == executor_id))
         return result.scalar_one_or_none()
 
@@ -40,8 +40,8 @@ class ExecutorCRUD:
             await self.db.commit()
 
     async def touch_last_seen_if_later(self, executor_id: str, visto_em: datetime) -> None:
-        """Grava `visto_em` só se for posterior ao `last_seen_at` atual, num
-        UPDATE só (a condição e a escrita são atômicas)."""
+        """Writes `visto_em` only if it is later than the current `last_seen_at`, in
+        a single UPDATE (the condition and the write are atomic)."""
         await self.db.execute(
             update(Executor)
             .where(Executor.id_hash == executor_id)

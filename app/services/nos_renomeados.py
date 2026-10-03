@@ -1,20 +1,20 @@
 # app/services/nos_renomeados.py
-"""Reescreve as definições salvas que ainda usam nomes antigos de nós.
+"""Rewrites saved definitions that still use old node names.
 
-A renomeação de 27/07 (`DriveTrigger` → `DataInput`, `ArtifactOutput` →
-`DataOutput`, commit ff11c196) foi feita "sem shim" e não migrou os fluxos
-salvos. Em 25/09 dois estavam quebrados: o TESTE_BPA, agendado, falhando todo
-dia na partida com "Node 'DriveTrigger' não encontrado", e o Geoserver.
+The 07-27 rename (`DriveTrigger` → `DataInput`, `ArtifactOutput` →
+`DataOutput`, commit ff11c196) was done "without a shim" and did not migrate the saved
+workflows. On 09-25 two were broken: TESTE_BPA, scheduled, failing every
+day at startup with "Node 'DriveTrigger' não encontrado" (not found), and Geoserver.
 
-Não é uma revisão do Alembic de propósito: a F3 fixou uma revisão única (ver
-tests/unit/test_base_zero.py) e reabrir a cadeia é decisão do dono. É um
-comando idempotente do CLI — simula por padrão, grava com `--aplicar`:
+It is deliberately not an Alembic revision: F3 pinned a single revision (see
+tests/unit/test_base_zero.py) and reopening the chain is the owner's decision. It is an
+idempotent CLI command — dry run by default, writes with `--aplicar`:
 
     docker compose --profile prod exec -T api-prod python -m app.cli migrar-nos
     docker compose --profile prod exec -T api-prod python -m app.cli migrar-nos --aplicar
 
-O mapa de nomes mora em `flow.nodes.contrato.NOMES_ANTIGOS`, junto das
-mensagens que o citam.
+The name map lives in `flow.nodes.contrato.NOMES_ANTIGOS`, next to the
+messages that cite it.
 """
 from __future__ import annotations
 
@@ -24,21 +24,21 @@ import re
 from flow.core.aliases import resolve_alias
 from flow.nodes.contrato import NOMES_ANTIGOS
 
-# Saídas que mudaram de nome junto com o nó. Só o `DataInput` mudou uma: o
-# `drive_file_id` do metadata do `DriveTrigger` virou `file_id`. O `DataOutput`
-# manteve as quatro saídas do `ArtifactOutput`.
+# Outputs that were renamed along with the node. Only `DataInput` changed one:
+# `DriveTrigger`'s metadata `drive_file_id` became `file_id`. `DataOutput`
+# kept the four outputs of `ArtifactOutput`.
 _SAIDAS_RENOMEADAS = {"DriveTrigger": {"drive_file_id": "file_id"}}
 
 
 def _propriedades_novas(antigo: str, props: dict) -> dict:
-    """O que muda nas propriedades além do nome.
+    """What changes in the properties besides the name.
 
-    `ArtifactOutput` era público quando NÃO tinha credencial e protegido quando
-    tinha. No `DataOutput` o padrão é `isPublic=True` e a credencial só vale com
-    `isPublic=False` — renomear sem gravar isso tornaria PÚBLICO o download de
-    um artefato que era protegido. `destination` virou `context` (mesmos
-    valores). `DriveTrigger` lia do Drive: `context='drive'` explícito, para não
-    depender do default do `DataInput`.
+    `ArtifactOutput` was public when it had NO credential and protected when
+    it had one. In `DataOutput` the default is `isPublic=True` and the credential only
+    applies with `isPublic=False` — renaming without writing that would make the download
+    of an artifact that was protected PUBLIC. `destination` became `context` (same
+    values). `DriveTrigger` read from Drive: explicit `context='drive'`, so as not to
+    depend on `DataInput`'s default.
     """
     props = dict(props)
     if antigo == "ArtifactOutput":
@@ -53,12 +53,12 @@ def _propriedades_novas(antigo: str, props: dict) -> dict:
 
 
 def _padrao_de_saida(alias: str, antiga: str) -> re.Pattern:
-    """`Alias.metadata.<antiga>` numa expressão, nas formas que o Jinja aceita:
-    `$Alias...`/`{{ Alias... }}`, com `.metadata` ou `['metadata']`, e a chave
-    como atributo, `['<antiga>']` ou `.get('<antiga>')`. O lookbehind impede
-    casar o alias como sufixo de outro nome (`MeuDriveTrigger`) ou como
-    atributo (`x.DriveTrigger`). O que escapa daqui (via `named.`, `nodes[...]`,
-    entrada mapeada, código Python) sai em `sobras_para_revisar`."""
+    """`Alias.metadata.<antiga>` in an expression, in the forms Jinja accepts:
+    `$Alias...`/`{{ Alias... }}`, with `.metadata` or `['metadata']`, and the key
+    as an attribute, `['<antiga>']` or `.get('<antiga>')`. The lookbehind prevents
+    matching the alias as a suffix of another name (`MeuDriveTrigger`) or as an
+    attribute (`x.DriveTrigger`). What escapes this (via `named.`, `nodes[...]`,
+    mapped input, Python code) comes out in `sobras_para_revisar`."""
     a, k = re.escape(alias), re.escape(antiga)
     return re.compile(
         rf"(?<![\w.])(?P<base>\$?{a}(?:\.metadata|\[(?P<q1>['\"])metadata(?P=q1)\]))"
@@ -76,8 +76,8 @@ def _trocar_chave(m: re.Match, nova: str) -> str:
 
 
 def _reescrever_saidas(valor, padroes: list[tuple[re.Pattern, str, str]]):
-    """Aplica as trocas de saída em toda string de `valor` (dicts e listas
-    inclusive). Devolve (novo valor, {(antiga, nova) aplicadas})."""
+    """Applies the output renames to every string in `valor` (dicts and lists
+    included). Returns (new value, {(old, new) applied})."""
     if isinstance(valor, str):
         feitas = set()
         for padrao, antiga, nova in padroes:
@@ -97,19 +97,19 @@ def _reescrever_saidas(valor, padroes: list[tuple[re.Pattern, str, str]]):
 
 
 def migrar_definicao(definicao) -> tuple[object, list[tuple[str, str, str]]]:
-    """Devolve (definição reescrita, trocas [(node_id, antigo, novo)]).
+    """Returns (rewritten definition, changes [(node_id, old, new)]).
 
-    Sem troca, devolve o MESMO objeto (quem chama não regrava nada). O nome pode
-    estar no topo do nó (o formato salvo pelo editor) ou em `data.name`.
+    With no change, returns the SAME object (the caller rewrites nothing). The name can
+    be at the top of the node (the format the editor saves) or in `data.name`.
 
-    Os OUTROS nós citam este pelo alias (`$DriveTrigger.metadata.original_name`).
-    Sem alias customizado válido — o caso comum: o editor grava o rótulo do
-    catálogo, "Drive de arquivos", que tem espaço — o alias é o próprio `name`,
-    e trocar o nome quebraria essas expressões: `{{ }}` com "undefined" e o
-    `$Alias` pior, seguindo como TEXTO até o nó. Por isso o nome antigo fica
-    fixado como alias (o título do nó no editor passa a mostrá-lo). E a saída
-    que mudou de nome (`metadata.drive_file_id` → `metadata.file_id`) é
-    reescrita nas expressões que apontam para o nó migrado.
+    The OTHER nodes cite this one by alias (`$DriveTrigger.metadata.original_name`).
+    Without a valid custom alias — the common case: the editor saves the catalog
+    label, "Drive de arquivos", which has a space — the alias is the `name` itself,
+    and changing the name would break those expressions: `{{ }}` with "undefined" and
+    `$Alias` worse, passing through as TEXT to the node. That is why the old name is
+    pinned as the alias (the node's title in the editor starts showing it). And the output
+    that was renamed (`metadata.drive_file_id` → `metadata.file_id`) is
+    rewritten in the expressions that point to the migrated node.
     """
     if not isinstance(definicao, dict) or not isinstance(definicao.get("nodes"), list):
         return definicao, []
@@ -165,9 +165,9 @@ def _textos(valor):
 
 
 def sobras_para_revisar(definicao) -> list[str]:
-    """Ids dos nós que ainda citam uma saída renomeada depois da migração —
-    formas que a reescrita não alcança com segurança (`named.X`, `nodes['id']`,
-    entrada mapeada, código Python). Quem roda o comando revisa à mão."""
+    """Ids of the nodes that still cite a renamed output after the migration —
+    forms the rewrite cannot reach safely (`named.X`, `nodes['id']`,
+    mapped input, Python code). Whoever runs the command reviews them by hand."""
     if not isinstance(definicao, dict) or not isinstance(definicao.get("nodes"), list):
         return []
     antigas = {antiga for saidas in _SAIDAS_RENOMEADAS.values() for antiga in saidas}
@@ -186,11 +186,11 @@ def sobras_para_revisar(definicao) -> list[str]:
 
 
 async def migrar_nos(db, *, aplicar: bool) -> list[dict]:
-    """Varre workflows e versões salvas. Devolve uma linha por definição que
-    muda (ou mudaria, sem `aplicar`).
+    """Scans workflows and saved versions. Returns one line per definition that
+    changes (or would change, without `aplicar`).
 
-    As versões entram porque restaurar uma versão antiga traria o nome antigo
-    de volta — e o fluxo quebraria de novo, sem ninguém entender por quê.
+    Versions are included because restoring an old version would bring the old name
+    back — and the workflow would break again, with nobody understanding why.
     """
     from sqlalchemy import String, cast, or_, select
 
@@ -199,7 +199,7 @@ async def migrar_nos(db, *, aplicar: bool) -> list[dict]:
 
     relatorio: list[dict] = []
     for modelo, rotulo in ((Workflow, "workflow"), (WorkflowVersion, "versao")):
-        # Filtro barato no banco (texto do JSON); a decisão fina é do Python.
+        # Cheap filter in the database (JSON text); the fine decision is Python's.
         texto = cast(modelo.definition, String)
         filtro = or_(*[texto.like(f'%"{nome}"%') for nome in NOMES_ANTIGOS])
         linhas = (await db.execute(select(modelo).where(filtro))).scalars().all()
@@ -223,12 +223,12 @@ async def migrar_nos(db, *, aplicar: bool) -> list[dict]:
 
 
 async def nomes_antigos_desabilitados(db) -> list[str]:
-    """Nomes antigos que o admin deixou desabilitados.
+    """Old names the admin left disabled.
 
-    O mapa `disabled_nodes` é por nome, e este comando NÃO transfere a marca
-    para o nó novo: desabilitar o `DataOutput` hoje pararia também os fluxos que
-    o usam desde 27/07. Quem decide é o admin — o comando só avisa que, depois
-    da migração, os fluxos com o nó antigo voltam a rodar.
+    The `disabled_nodes` map is by name, and this command does NOT transfer the mark
+    to the new node: disabling `DataOutput` today would also stop the workflows that
+    have used it since 07-27. The admin decides — the command only warns that, after
+    the migration, the workflows with the old node run again.
     """
     from app.services.disabled_nodes_service import list_disabled
 

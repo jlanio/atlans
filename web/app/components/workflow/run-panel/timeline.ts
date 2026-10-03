@@ -1,12 +1,12 @@
 import { INodeStatusWorkFlow } from "@/context/useFlowContext"
 import { RunEvent, RunOutcome } from "@/app/stores/workflowExecutionStore"
 
-/** Id de nó sintético que o backend usa para sinalizar o fim do run. */
+/** Synthetic node id the backend uses to signal the end of the run. */
 export const WF_COMPLETE = "__workflow_complete__"
 
-/** `unknown`: o run terminou e o término deste nó nunca chegou — ver
- *  `StatusNodeStatusWorkFlow` em useFlowContext. É distinto de `pending`
- *  (não começou) e de `running` (está acontecendo agora). */
+/** `unknown`: the run ended and this node's completion never arrived — see
+ *  `StatusNodeStatusWorkFlow` in useFlowContext. Distinct from `pending`
+ *  (not started) and from `running` (happening now). */
 export type NodeRunStatus = "pending" | "running" | "completed" | "failed" | "unknown"
 
 export interface NodePrint {
@@ -21,25 +21,26 @@ export interface NodeProblem {
   retryable?: boolean | null
 }
 
-/** Um nó do workflow visto como uma ÚNICA linha que evolui de estado.
+/** A workflow node seen as a SINGLE row that evolves in state.
  *
- * O painel antigo empilhava dois eventos por nó (`started` e depois
- * `completed`), então um workflow de 30 nós virava 60 linhas que apenas
- * repetiam a animação do canvas e afogavam prints e erros.
+ * The old panel stacked two events per node (`started` and then
+ * `completed`), so a 30-node workflow became 60 rows that merely
+ * repeated the canvas animation and drowned prints and errors.
  */
 export interface NodeRun {
   nodeId: string
-  /** Nó do canvas que esta linha representa. Igual a `nodeId` para os nós do
-   *  fluxo; para um nó de dentro de sub-fluxo é o nó SubWorkflow que o chamou —
-   *  o único ponto do canvas que existe para focar, destacar ou configurar. */
+  /** Canvas node this row represents. Equal to `nodeId` for the workflow's own
+   *  nodes; for a node inside a sub-workflow it is the SubWorkflow node that
+   *  called it — the only point on the canvas there is to focus, highlight or
+   *  configure. */
   canvasNodeId: string
-  /** Preenchido quando a linha veio de dentro de um sub-fluxo: nome do nó
-   *  SubWorkflow no canvas do pai. */
+  /** Filled when the row came from inside a sub-workflow: name of the
+   *  SubWorkflow node on the parent's canvas. */
   subFlow: string | null
   name: string
   type: string
   status: NodeRunStatus
-  /** ms desde o início do run — responde "quanto tempo até chegar aqui". */
+  /** ms since the start of the run — answers "how long until we got here". */
   startOffsetMs: number | null
   startedAt: number | null
   durationMs: number | null
@@ -50,7 +51,7 @@ export interface NodeRun {
   debug: Record<string, string> | null
   prints: NodePrint[]
   problem: NodeProblem | null
-  /** Ordem de início; nós ainda não iniciados vão para o fim. */
+  /** Start order; nodes not yet started go to the end. */
   order: number
 }
 
@@ -70,7 +71,7 @@ export interface RunTimeline {
   }
 }
 
-/** Nome legível de um nó do canvas (o evento traz `node_name`; o canvas, alias). */
+/** Readable name of a canvas node (the event carries `node_name`; the canvas, alias). */
 function canvasNodeLabel(node: INodeStatusWorkFlow): string {
   const data = (node as { data?: { alias?: string; name?: string } }).data
   return data?.alias || data?.name || node.id
@@ -105,14 +106,15 @@ const CANVAS_STATUS: Record<string, NodeRunStatus> = {
   unknown:   "unknown",
 }
 
-/** Semeia a linha do tempo com o estado que o canvas já conhece.
+/** Seeds the timeline with the state the canvas already knows.
  *
- * O estado por nó no canvas é acumulado mensagem a mensagem e NÃO passa por
- * rotação — enquanto a lista de eventos tem teto (aqui e no histórico do Redis,
- * limitado a 5000). Num run que imprime muito, os eventos de ciclo de vida mais
- * antigos somem, e derivar só deles faria um nó concluído reaparecer como
- * "aguardando", contradizendo o próprio canvas. Partindo do canvas, os eventos
- * apenas enriquecem (offset, saídas, prints, traceback) o que já é verdade.
+ * The per-node state on the canvas is accumulated message by message and does
+ * NOT go through rotation — whereas the event list has a ceiling (here and in
+ * the Redis history, capped at 5000). In a run that prints a lot, the oldest
+ * lifecycle events disappear, and deriving from them alone would make a
+ * completed node reappear as "aguardando" (waiting), contradicting the canvas
+ * itself. Starting from the canvas, the events only enrich (offset, outputs,
+ * prints, traceback) what is already true.
  */
 function seedFromCanvas(node: INodeStatusWorkFlow, order: number): NodeRun {
   const run = emptyNodeRun(node.id, canvasNodeLabel(node), canvasNodeType(node), order)
@@ -129,10 +131,11 @@ function seedFromCanvas(node: INodeStatusWorkFlow, order: number): NodeRun {
 }
 
 /**
- * Converte o fluxo cronológico de eventos numa linha do tempo por nó.
+ * Converts the chronological event stream into a per-node timeline.
  *
- * `canvasNodes` entra para que nós ainda não executados apareçam como
- * "aguardando" — o painel mostra o grafo inteiro, não só o que já emitiu evento.
+ * `canvasNodes` comes in so that nodes not yet executed show up as
+ * "aguardando" (waiting) — the panel shows the whole graph, not only what has
+ * already emitted an event.
  */
 export function buildTimeline(
   events: RunEvent[],
@@ -146,10 +149,10 @@ export function buildTimeline(
     byId.set(node.id, seedFromCanvas(node, Number.MAX_SAFE_INTEGER))
   }
 
-  // Início do run: registrado na store quando o primeiro evento chega, e não
-  // lido de `events[0]` — a lista tem rotação, e ao descartar o começo TODOS os
-  // offsets passariam a ser relativos ao evento sobrevivente mais antigo.
-  // Timestamps vêm do backend, então isto também vale no replay de re-anexação.
+  // Run start: recorded in the store when the first event arrives, and not
+  // read from `events[0]` — the list rotates, and once the beginning is dropped
+  // ALL offsets would become relative to the oldest surviving event.
+  // Timestamps come from the backend, so this also holds for the re-attach replay.
   const startTs = runStartedTs ?? (events.length > 0 ? events[0].ts : null)
 
   const workflow: RunTimeline["workflow"] = {
@@ -179,11 +182,11 @@ export function buildTimeline(
 
     let run = byId.get(nodeId)
     if (!run) {
-      // Nó que emitiu evento mas não está no canvas: um nó de DENTRO de um
-      // sub-fluxo, publicado com o id prefixado `pai::filho`. A linha entra na
-      // lista amarrada ao nó SubWorkflow do pai — sem isso ela mostrava o id
-      // cru, não dizia que era de outro fluxo, e clicar nela era um no-op
-      // silencioso (`focusNode` não acha o id no canvas).
+      // A node that emitted an event but is not on the canvas: a node INSIDE a
+      // sub-workflow, published with the prefixed id `pai::filho`. The row joins
+      // the list tied to the parent's SubWorkflow node — without that it showed
+      // the raw id, did not say it came from another workflow, and clicking it
+      // was a silent no-op (`focusNode` does not find the id on the canvas).
       const pai = ev.subworkflow_parent ?? null
       run = emptyNodeRun(
         nodeId,
@@ -201,11 +204,11 @@ export function buildTimeline(
     if (ev.node_type) run.type = ev.node_type
 
     if (ev.kind === "stdout") {
-      // O executor agrega a saída em janelas de ~200 ms, então um evento traz
-      // VÁRIAS linhas em `lines` — uma linha de painel por item. `lines` é a
-      // única fonte: o executor parou de repetir o mesmo texto em `message`
-      // porque a duplicação estourava o teto de 64 KB do evento e o lote inteiro
-      // chegava aqui reduzido aos campos de controle, sem saída nenhuma.
+      // The executor aggregates output in ~200 ms windows, so one event carries
+      // SEVERAL lines in `lines` — one panel row per item. `lines` is the
+      // only source: the executor stopped repeating the same text in `message`
+      // because the duplication blew through the event's 64 KB ceiling and the
+      // whole batch arrived here reduced to the control fields, with no output.
       const offset = offsetOf(ev.ts)
       if (ev.lines) {
         for (const linha of ev.lines) run.prints.push({ offsetMs: offset, text: linha })
@@ -229,16 +232,16 @@ export function buildTimeline(
 
     if (ev.status === "completed" || ev.status === "failed") {
       run.status = ev.status === "failed" ? "failed" : "completed"
-      // Não zera o que o canvas já sabia: um evento sem `duration_ms` apagaria
-      // a duração semeada.
+      // Does not wipe what the canvas already knew: an event without `duration_ms`
+      // would erase the seeded duration.
       if (ev.duration_ms != null) run.durationMs = ev.duration_ms
       if (ev.output_keys) run.outputKeys = ev.output_keys
       if (ev.cache_hit !== undefined) run.cacheHit = !!ev.cache_hit
       if (ev.branch_result !== undefined) run.branchResult = ev.branch_result
       if (ev.schema_drift) run.schemaDrift = ev.schema_drift
       if (run.order === Number.MAX_SAFE_INTEGER) run.order = order++
-      // Nó que terminou sem `started` observado (replay truncado): reconstrói
-      // o início a partir do fim menos a duração, para não perder o offset.
+      // A node that finished with no observed `started` (truncated replay):
+      // rebuilds the start from the end minus the duration, to keep the offset.
       if (run.startOffsetMs == null) {
         run.startOffsetMs = Math.max(0, offsetOf(ev.ts) - (ev.duration_ms ?? 0))
       }
@@ -258,8 +261,8 @@ export function buildTimeline(
     return a.name.localeCompare(b.name)
   })
 
-  // Passe único: seis varreduras separadas sobre a lista de nós custavam caro
-  // porque isto roda a cada atualização do painel durante o run.
+  // Single pass: six separate sweeps over the node list were expensive
+  // because this runs on every panel update during the run.
   const counts = { total: nodes.length, done: 0, failed: 0, running: 0, pending: 0, unknown: 0 }
   const problems: NodeRun[] = []
   let totalPrints = 0
@@ -269,9 +272,9 @@ export function buildTimeline(
     if (node.status === "completed") counts.done++
     else if (node.status === "failed") counts.failed++
     else if (node.status === "running") counts.running++
-    // `unknown` tem contador próprio: somado a `pending`, a barra de progresso
-    // do painel nunca fecharia num run já terminado, e o número contradiria o
-    // canvas, que mostra o nó como resolvido-sem-resposta.
+    // `unknown` has its own counter: added to `pending`, the panel's progress bar
+    // would never close on an already finished run, and the number would
+    // contradict the canvas, which shows the node as resolved-without-answer.
     else if (node.status === "unknown") counts.unknown++
     else counts.pending++
 
@@ -286,15 +289,16 @@ export function buildTimeline(
 }
 
 /**
- * Resumo para a BARRA do painel, sem tocar na lista de eventos.
+ * Summary for the panel BAR, without touching the event list.
  *
- * Com o painel recolhido o único consumidor da linha do tempo é a barra de
- * 34px, que precisa de contagens, status, nó mais lento e nó em execução —
- * nada disso exige percorrer os até 2000 eventos, alocar prints nem ordenar.
- * Reconstruir tudo oito vezes por segundo era CPU que nunca chegava à tela.
+ * With the panel collapsed the only consumer of the timeline is the 34px bar,
+ * which needs counts, status, slowest node and running node — none of that
+ * requires walking up to 2000 events, allocating prints or sorting.
+ * Rebuilding everything eight times per second was CPU that never reached the
+ * screen.
  *
- * O desfecho do run (duração total, erro) vem da store, que o registra a O(1)
- * quando o evento `__workflow_complete__` chega.
+ * The run's outcome (total duration, error) comes from the store, which records
+ * it in O(1) when the `__workflow_complete__` event arrives.
  */
 export function buildHudTimeline(
   canvasNodes: INodeStatusWorkFlow[],
@@ -339,7 +343,7 @@ export function buildHudTimeline(
   }
 }
 
-/** Renderiza a timeline como texto puro — usado por "copiar tudo" e "baixar". */
+/** Renders the timeline as plain text — used by "copy all" and "download". */
 export function timelineToText(timeline: RunTimeline, runId: string | null): string {
   const lines: string[] = []
   lines.push(`# Execução ${runId ?? "(sem id)"}`)
@@ -350,8 +354,8 @@ export function timelineToText(timeline: RunTimeline, runId: string | null): str
   for (const node of timeline.nodes) {
     const offset = node.startOffsetMs != null ? `+${(node.startOffsetMs / 1000).toFixed(2)}s` : "—"
     const duration = node.durationMs != null ? `${node.durationMs.toFixed(0)}ms` : "—"
-    // O recuo mantém no texto colado a mesma leitura da tela: dá para ver o
-    // que aconteceu dentro do sub-fluxo sem confundir com os nós do pai.
+    // The indentation keeps the pasted text reading like the screen: you can see
+    // what happened inside the sub-workflow without mixing it up with the parent's nodes.
     const dentro = node.subFlow ? `  ↳ [${node.subFlow}] ` : "  "
     lines.push(`${offset.padStart(8)}${dentro}${node.status.padEnd(9)} ${node.name}  (${node.type}) ${duration}`)
     for (const print of node.prints) {

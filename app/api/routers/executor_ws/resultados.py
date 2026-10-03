@@ -1,7 +1,7 @@
 # app/api/routers/executor_ws/resultados.py
 """
-Resultados e eventos de run: autorização run→executor, gravação do
-job_result, publicação de node_events e eventos de sync.
+Run results and events: run→executor authorization, writing the
+job_result, publishing node_events and sync events.
 """
 import asyncio
 import json
@@ -15,8 +15,8 @@ from sqlalchemy import select
 from app.core.executor_connections import executor_registry
 from app.core.constants import REDIS_TTL_1H
 from app.core.db import get_session_async
-# Dono das chaves do histórico/canal, do pipeline que grava eventos e do JSON
-# do `__workflow_complete__`. Pelo módulo, como em `fechamento_de_run`.
+# Owner of the history/channel keys, of the pipeline that writes events and of
+# the `__workflow_complete__` JSON. Through the module, as in `fechamento_de_run`.
 from app.services import run_events_service
 from flow.utils.protocolo_ws import (
     STATS_CONTROLE_DESCARTADO,
@@ -41,81 +41,81 @@ from .protocolo import (
 )
 
 def _desfecho(job_status: str, is_cancelled: bool, *, ok: str) -> str:
-    """Traduz o desfecho de um job para o vocabulario de quem le.
+    """Translates a job's outcome into the reader's vocabulary.
 
-    A queda (`cancelled` antes de `failed`) e a mesma nos dois consumidores e
-    estava copiada em dois pontos deste arquivo; a diferenca real e so o nome do
-    caso de sucesso — a linha de `WorkflowRun` diz "success", o evento de ciclo
-    de vida do painel diz "completed" —, por isso ele e parametro explicito e
-    nao um default.
+    The fall-through (`cancelled` before `failed`) is the same in both consumers
+    and was copied in two places in this file; the real difference is only the
+    name of the success case — the `WorkflowRun` row says "success", the panel's
+    lifecycle event says "completed" —, which is why it is an explicit parameter
+    and not a default.
 
-    A ORDEM importa: um job cancelado chega com status != "ok", e testar
-    `is_cancelled` depois de "ok" e antes de "failed" e o que impede um
-    cancelamento de ser reportado como falha ao usuario.
+    The ORDER matters: a cancelled job arrives with status != "ok", and testing
+    `is_cancelled` after "ok" and before "failed" is what prevents a
+    cancellation from being reported to the user as a failure.
     """
     if job_status == "ok":
         return ok
     return "cancelled" if is_cancelled else "failed"
 
-# TTLs do memo de autorização run→executor (ver _run_belongs_to_agent).
-# Positivo é longo porque o vínculo run→host é IMUTÁVEL depois do dispatch;
-# negativo é curto para que um executor malicioso em loop não gere um SELECT
-# por tentativa e, ao mesmo tempo, um vínculo criado logo depois seja visto.
+# TTLs of the run→executor authorization memo (see _run_belongs_to_agent).
+# Positive is long because the run→host binding is IMMUTABLE after dispatch;
+# negative is short so that a malicious executor in a loop does not generate a
+# SELECT per attempt and, at the same time, a binding created right after is seen.
 _RUN_AUTH_TTL_OK = 3600.0
 
 _RUN_AUTH_TTL_DENY = 5.0
 
 _RUN_AUTH_CACHE_MAX = 2048
 
-# Teto de espera da query de autorização. Esperar POOL_TIMEOUT (30s) por uma
-# conexão do pool no caminho quente do WS nunca é a resposta certa: o loop de
-# recepção fica parado, o heartbeat não é lido e o servidor derruba um executor
-# saudável por timeout — e aí `_fail_orphan_runs` mata runs que estavam vivos.
+# Wait ceiling for the authorization query. Waiting POOL_TIMEOUT (30s) for a
+# pool connection on the WS hot path is never the right answer: the receive
+# loop stalls, the heartbeat is not read and the server drops a healthy
+# executor on timeout — and then `_fail_orphan_runs` kills runs that were alive.
 _RUN_AUTH_QUERY_TIMEOUT = 3.0
 
-# Circuit breaker de banco degradado. O veredito `None` (falha de DB) não é
-# memorizado de propósito — é transitório —, mas sem nenhuma trava cada
-# node_event de uma rajada abria sessão nova e podia esperar o pool inteiro.
-# Durante o cooldown negamos na hora, custo zero: o mesmo veredito de hoje.
+# Degraded-database circuit breaker. The `None` verdict (DB failure) is not
+# memoized on purpose — it is transient —, but without any lock each node_event
+# in a burst opened a new session and could wait for the whole pool.
+# During the cooldown we deny right away, at zero cost: the same verdict as today.
 #
-# Vale SÓ para node_event. O job_result ignora o cooldown (ver
-# `_handle_job_result`): ele é dado de negócio, não é reenviado pelo executor e
-# sua perda pendura o run — não pode ser vítima de uma trava criada para conter
-# telemetria.
+# Applies ONLY to node_event. The job_result ignores the cooldown (see
+# `_handle_job_result`): it is business data, it is not resent by the executor
+# and losing it leaves the run hanging — it cannot fall victim to a lock created
+# to contain telemetry.
 _RUN_AUTH_DB_COOLDOWN = 2.0
 
-# Retentativas da leitura do run no caminho do job_result. Cobre o failover
-# curto (pgbouncer reiniciando, réplica trocando) sem transformar a drenadora
-# numa fila de esperas longas.
+# Retries of the run read on the job_result path. Covers a short failover
+# (pgbouncer restarting, replica switching) without turning the drainer into a
+# queue of long waits.
 _JOB_RESULT_DB_RETRIES = 3
 
 _JOB_RESULT_DB_RETRY_DELAY = 0.25
 
-# Acima deste tamanho de frame, as serializações do job_result vão para uma
-# thread: um `stats` de MB congelava o event loop do worker INTEIRO (outros
-# executores paravam de ser lidos, requests HTTP em voo travavam) por dezenas de
-# ms. Abaixo dele, o overhead do to_thread seria maior que o próprio dumps.
+# Above this frame size, the job_result serializations go to a thread: a
+# multi-MB `stats` froze the worker's ENTIRE event loop (other executors stopped
+# being read, in-flight HTTP requests stalled) for tens of ms. Below it, the
+# to_thread overhead would be larger than the dumps itself.
 _JSON_OFFLOAD_THRESHOLD = 256 * 1024
 
 async def _dumps(obj, *, offload: bool) -> str:
-    """json.dumps que sai do event loop quando o payload é grande.
+    """json.dumps that leaves the event loop when the payload is large.
 
-    Um `stats` de MB serializado inline parava TODO o worker — outros
-    executores deixavam de ser lidos e requests HTTP em voo travavam junto. Para
-    payload pequeno o custo do to_thread seria maior que o do próprio dumps, daí
-    o interruptor explícito em vez de uma heurística interna.
+    A multi-MB `stats` serialized inline stopped the WHOLE worker — other
+    executors were no longer read and in-flight HTTP requests stalled along with
+    it. For a small payload the to_thread cost would be larger than the dumps
+    itself, hence the explicit switch instead of an internal heuristic.
     """
     if offload:
         return await asyncio.to_thread(json.dumps, obj)
     return json.dumps(obj)
 
 async def _register_webhook_response_artifact(run_id: str, executor_id: str, body_ref: dict) -> None:
-    """Cria linha Artifact para body de webhook guardado no MinIO, com expires_at
-    baseado em artifact_retention_days (mesma política dos demais artefatos).
+    """Creates an Artifact row for a webhook body stored in MinIO, with expires_at
+    based on artifact_retention_days (same policy as the other artifacts).
 
-    O cleanup global (app/core/artifact_cleanup.py) remove o objeto do MinIO e
-    a linha do DB quando expires_at é atingido. O webhook_router tenta apagar
-    imediatamente após streaming; este registro é a rede de segurança para órfãos.
+    The global cleanup (app/core/artifact_cleanup.py) removes the MinIO object and
+    the DB row when expires_at is reached. The webhook_router tries to delete it
+    right after streaming; this record is the safety net for orphans.
     """
     from datetime import timedelta
     from app.core.run_result_consumer import _get_retention_days
@@ -139,13 +139,13 @@ async def _register_webhook_response_artifact(run_id: str, executor_id: str, bod
             logger.warning("Webhook response sem workspace_id (run=%s) — artifact não registrado.", run_id)
             return
 
-        # A s3_key vem CRUA do executor, que é uma máquina sob controle do
-        # usuário. Sem este guard, um executor respondia com
-        # `body_ref.s3_key = "drive/<workspace_alheio>/<arquivo>"` e o servidor
-        # criava um Artifact — sem credential_id, portanto de download PÚBLICO —
-        # apontando para o objeto de outro tenant; o expires_at ainda fazia o
-        # purge apagá-lo depois. Mesmo vetor que run_result_consumer já fecha
-        # para pins e artefatos de nó; este caminho tinha ficado de fora.
+        # The s3_key comes RAW from the executor, which is a machine under the
+        # user's control. Without this guard, an executor answered with
+        # `body_ref.s3_key = "drive/<workspace_alheio>/<arquivo>"` and the server
+        # created an Artifact — with no credential_id, hence PUBLIC download —
+        # pointing to another tenant's object; the expires_at even made the
+        # purge delete it later. Same vector run_result_consumer already closes
+        # for pins and node artifacts; this path had been left out.
         from fastapi import HTTPException
         from app.api.routers.executor_drive_router import _validate_agent_s3_key
         try:
@@ -180,40 +180,42 @@ async def _register_webhook_response_artifact(run_id: str, executor_id: str, bod
         await db.commit()
 
 async def _record_job_ack(executor_id: str, job_id: str | None, status: str) -> None:
-    """Confirmação de recebimento: tira o job dos pendentes de ACK e promove o
-    run de 'pending' para 'running'.
+    """Receipt confirmation: removes the job from those pending ACK and promotes
+    the run from 'pending' to 'running'.
 
-    Chamado quando o executor envia {type: "ack", job_id, status}. A ausência
-    de ACK após send_job é rastreada via executor_registry.overdue_acks().
+    Called when the executor sends {type: "ack", job_id, status}. The absence
+    of an ACK after send_job is tracked via executor_registry.overdue_acks().
 
-    A PROMOÇÃO é o que fecha o buraco do run preso em "Na fila": o dispatch só
-    grava 'running' depois que `send_job` retorna, então um worker que morre
-    nessa janela deixava 'pending' para sempre um job que o executor recebeu e
-    está rodando. O ACK é a prova de entrega vinda do outro lado — e chega por
-    qualquer worker, inclusive depois da morte de quem despachou. O UPDATE é
-    condicional ('pending' e o host deste executor): não ressuscita run
-    cancelado nem terminal, e um ACK de outro executor não promove nada.
+    The PROMOTION is what closes the hole of the run stuck in "Na fila" (queued):
+    dispatch only writes 'running' after `send_job` returns, so a worker that
+    dies in that window left 'pending' forever a job the executor received and
+    is running. The ACK is the proof of delivery coming from the other side — and
+    it arrives through any worker, even after the death of the one that
+    dispatched. The UPDATE is conditional ('pending' and this executor's host): it
+    does not resurrect a cancelled or terminal run, and an ACK from another
+    executor promotes nothing.
 
-    SEG: o ACK só limpa jobs despachados para ESTE executor. Sem o vínculo,
-    qualquer executor podia confirmar o job de outro e cegar o monitor de
-    jobs perdidos.
+    SEC: the ACK only clears jobs dispatched to THIS executor. Without the
+    binding, any executor could confirm another's job and blind the lost-jobs
+    monitor.
     """
     if not job_id:
         return
     who = await executor_registry.clear_pending_ack(job_id, expected_executor_id=executor_id)
     if who:
         logger.debug("ACK recebido: job=%s status=%s executor=%s", job_id, status, who)
-    # A promoção é um UPDATE + COMMIT no Postgres por ACK: sem teto, um executor
-    # com bug (ou hostil) prendia uma conexão do banco em loop. O teto é o do
-    # job_result — um ACK por job, muito abaixo disso no tráfego honesto. Um ACK
-    # acima dele só perde a promoção; o inventário a faz no minuto seguinte.
+    # The promotion is one UPDATE + COMMIT in Postgres per ACK: without a ceiling, a
+    # buggy (or hostile) executor would tie up a database connection in a loop. The
+    # ceiling is the job_result's — one ACK per job, far below that in honest
+    # traffic. An ACK above it only loses the promotion; the inventory does it the
+    # next minute.
     if not _rate_allowed(executor_id, "ack", _JOB_RESULT_RATE_LIMIT):
         return
     try:
         await _promover_para_running(executor_id, job_id)
     except Exception as exc:
-        # Best-effort: o dispatch vivo promove sozinho, e a varredura dos não
-        # entregues fecha o que ficar para trás.
+        # Best-effort: a live dispatch promotes on its own, and the undelivered
+        # sweep closes whatever is left behind.
         logger.warning(
             "ACK do job '%s' (executor '%s'): falha ao promover para 'running': %s",
             job_id, executor_id, exc,
@@ -221,11 +223,11 @@ async def _record_job_ack(executor_id: str, job_id: str | None, status: str) -> 
 
 
 async def _promover_para_running(executor_id: str, job_ids) -> int:
-    """'pending' → 'running' para jobs que ESTE executor confirmou ter. Devolve
-    quantos runs mudaram.
+    """'pending' → 'running' for jobs THIS executor confirmed it has. Returns
+    how many runs changed.
 
-    Condicional em status e host: um run cancelado, terminal ou despachado para
-    outro executor fica como está.
+    Conditional on status and host: a cancelled run, a terminal one or one
+    dispatched to another executor stays as it is.
     """
     from sqlalchemy import update as sa_update
 
@@ -254,18 +256,18 @@ async def _promover_para_running(executor_id: str, job_ids) -> int:
     return result.rowcount or 0
 
 async def _query_run_belongs_to_agent(executor_id: str, run_id: str) -> bool | None:
-    """SELECT que confere WorkflowRun.host == 'executor:{executor_id}'.
+    """SELECT that checks WorkflowRun.host == 'executor:{executor_id}'.
 
-    Retorna True/False, ou None quando a consulta em si falhou (erro de DB) —
-    o caller trata como negado, mas NÃO memoriza um resultado que veio de uma
-    indisponibilidade transitória.
+    Returns True/False, or None when the query itself failed (DB error) —
+    the caller treats it as denied, but does NOT memoize a result that came from
+    a transient unavailability.
 
-    FAIL-CLOSED: run inexistente ou com host NULL é rejeitado. A versão anterior
-    retornava True nesses casos ("benefício da dúvida"), herdado de quando o
-    INSERT do run era assíncrono via fila Redis. Como o dispatcher hoje persiste
-    run + host de forma síncrona antes de enviar o job, aquele fail-open virou
-    pura superfície de ataque: permitia a um executor qualquer reivindicar o run
-    de outro tenant durante a janela em que host ainda era NULL.
+    FAIL-CLOSED: a nonexistent run or one with a NULL host is rejected. The
+    previous version returned True in those cases ("benefit of the doubt"),
+    inherited from when the run's INSERT was asynchronous via a Redis queue. Since
+    the dispatcher now persists run + host synchronously before sending the job,
+    that fail-open became pure attack surface: it allowed any executor to claim
+    another tenant's run during the window in which host was still NULL.
     """
     from app.models.models import WorkflowRun
     try:
@@ -291,15 +293,15 @@ async def _query_run_belongs_to_agent(executor_id: str, run_id: str) -> bool | N
                 )
             return ok
     except Exception as exc:
-        # Em falha de DB, fail-closed para proteger cross-tenant.
+        # On DB failure, fail-closed to protect against cross-tenant access.
         logger.error("Erro ao validar propriedade de run '%s' pelo executor '%s': %s", run_id, executor_id, exc)
         return None
 
 def _store_run_auth(cache: dict, run_id: str, authorized: bool, now: float) -> None:
     """Memoriza o veredito com TTL, mantendo o cache limitado."""
     if len(cache) >= _RUN_AUTH_CACHE_MAX:
-        # Um executor malicioso pode inventar run_ids à vontade: purga expirados
-        # e, se ainda estiver cheio, descarta as entradas mais próximas de vencer.
+        # A malicious executor can make up run_ids at will: purges the expired ones
+        # and, if still full, drops the entries closest to expiring.
         for key, (_ok, deadline) in list(cache.items()):
             if deadline <= now:
                 cache.pop(key, None)
@@ -309,25 +311,25 @@ def _store_run_auth(cache: dict, run_id: str, authorized: bool, now: float) -> N
     cache[run_id] = (authorized, now + ttl)
 
 async def _run_belongs_to_agent(executor_id: str, run_id: str) -> bool:
-    """Valida que o WorkflowRun pertence ao executor_id que está reportando.
+    """Validates that the WorkflowRun belongs to the executor_id that is reporting.
 
-    Previne cross-tenant injection: um executor comprometido não pode manipular
-    runs de outro tenant/workspace enviando job_result ou node_event com
-    run_id arbitrário. O dispatcher seta WorkflowRun.host = f"executor:{executor_id}"
-    ANTES do send_job, então a autoria é sempre verificável.
+    Prevents cross-tenant injection: a compromised executor cannot manipulate
+    another tenant's/workspace's runs by sending a job_result or node_event with
+    an arbitrary run_id. The dispatcher sets WorkflowRun.host = f"executor:{executor_id}"
+    BEFORE send_job, so authorship is always verifiable.
 
-    PERF: o veredito é memorizado NA CONEXÃO do executor. Antes havia sessão +
-    SELECT + teardown POR EVENTO para revalidar um vínculo run→host que é
-    IMUTÁVEL depois do dispatch — com POOL_PRE_PING são ~2 round-trips por
-    evento, então um workflow de 100 nós custava 400-600 round-trips e 200-300
-    checkouts do pool, SERIALIZADOS no loop de recepção (job_result e heartbeat
-    ficavam na fila atrás dos eventos).
+    PERF: the verdict is memoized ON THE executor's CONNECTION. Before, there was
+    a session + SELECT + teardown PER EVENT to revalidate a run→host binding that
+    is IMMUTABLE after dispatch — with POOL_PRE_PING that is ~2 round-trips per
+    event, so a 100-node workflow cost 400-600 round-trips and 200-300 pool
+    checkouts, SERIALIZED in the receive loop (job_result and heartbeat sat in
+    the queue behind the events).
 
-    O memo NÃO é um bypass: ele só guarda o resultado de uma verificação já
-    feita para AQUELE PAR (executor_id, run_id) — vive dentro do
-    `ExecutorConnection`, portanto nunca cruza executores e desaparece no
-    unregister. Vereditos NEGATIVOS também são memorizados (TTL curto) para que
-    um executor malicioso em loop não gere um SELECT por tentativa.
+    The memo is NOT a bypass: it only stores the result of a check already
+    performed for THAT PAIR (executor_id, run_id) — it lives inside the
+    `ExecutorConnection`, so it never crosses executors and disappears on
+    unregister. NEGATIVE verdicts are memoized too (short TTL) so that a
+    malicious executor in a loop does not generate a SELECT per attempt.
     """
     conn = executor_registry.get(executor_id)
     cache = conn.run_auth_cache if conn is not None else None
@@ -338,7 +340,7 @@ async def _run_belongs_to_agent(executor_id: str, run_id: str) -> bool:
         if memo is not None and memo[1] > now:
             return memo[0]
 
-    # Banco degradado: nega sem abrir sessão. Ver `_RUN_AUTH_DB_COOLDOWN`.
+    # Degraded database: denies without opening a session. See `_RUN_AUTH_DB_COOLDOWN`.
     if conn is not None and conn.db_auth_cooldown_until > now:
         return False
 
@@ -354,8 +356,8 @@ async def _run_belongs_to_agent(executor_id: str, run_id: str) -> bool:
         )
         verdict = None
     if verdict is None:
-        # Erro/timeout de DB: nega agora e abre o cooldown para que a rajada
-        # seguinte não vire N tentativas de checkout do pool.
+        # DB error/timeout: denies now and opens the cooldown so that the next
+        # burst does not turn into N pool checkout attempts.
         if conn is not None:
             conn.db_auth_cooldown_until = now + _RUN_AUTH_DB_COOLDOWN
         return False
@@ -364,25 +366,25 @@ async def _run_belongs_to_agent(executor_id: str, run_id: str) -> bool:
     return verdict
 
 def _forget_run_auth(executor_id: str, run_id: str) -> None:
-    """Invalida o memo de um run — chamado quando o job_result dele chega."""
+    """Invalidates a run's memo — called when its job_result arrives."""
     conn = executor_registry.get(executor_id)
     if conn is not None:
         conn.run_auth_cache.pop(run_id, None)
 
 async def _query_run_snapshot(run_id: str):
-    """Lê host, status e start_time do WorkflowRun numa ÚNICA query.
+    """Reads the WorkflowRun's host, status and start_time in a SINGLE query.
 
-    Os três vereditos do job_result (pertence a este executor? já é terminal?
-    quanto durou?) vinham de três funções independentes, cada uma com sua
-    própria sessão: 3 checkouts do pool + 3 pre-pings + 3 SELECTs para ler a
-    MESMA linha — e o terceiro carregava o ORM inteiro, incluindo `node_stats`
-    (JSON) e `error_message` (Text) da execução anterior, para usar só o
-    `start_time`. Sob concorrência isso disputava o pool com o tráfego HTTP e
-    atrasava visivelmente o "concluído" na UI.
+    The job_result's three verdicts (does it belong to this executor? is it
+    already terminal? how long did it take?) came from three independent
+    functions, each with its own session: 3 pool checkouts + 3 pre-pings + 3
+    SELECTs to read the SAME row — and the third loaded the whole ORM object,
+    including `node_stats` (JSON) and `error_message` (Text) from the previous
+    execution, to use only `start_time`. Under concurrency this competed for the
+    pool with HTTP traffic and visibly delayed "concluído" (done) in the UI.
 
-    Devolve `(host, status, start_time)`, ou None quando a linha não existe.
-    LEVANTA em falha de banco de propósito: o caller precisa distinguir "run
-    inexistente" (rejeição memorizável) de "banco fora" (cooldown, sem memo).
+    Returns `(host, status, start_time)`, or None when the row does not exist.
+    RAISES on database failure on purpose: the caller needs to tell "nonexistent
+    run" (memoizable rejection) apart from "database down" (cooldown, no memo).
     """
     from app.models.models import WorkflowRun
     async with get_session_async() as db:
@@ -394,12 +396,12 @@ async def _query_run_snapshot(run_id: str):
         return result.first()
 
 def _posse_ja_provada(executor_id: str, run_id: str) -> bool:
-    """True quando o memo desta conexão já provou que o run é deste executor.
+    """True when this connection's memo has already proven the run is this executor's.
 
-    Serve aos caminhos em que o job_result não pôde ser processado e precisamos
-    fechar o run: sem uma prova de posse, um executor comprometido fecharia runs
-    de outro tenant mandando job_result com run_id arbitrário justamente durante
-    uma indisponibilidade do banco.
+    Serves the paths in which the job_result could not be processed and we need
+    to close the run: without proof of ownership, a compromised executor could
+    close another tenant's runs by sending a job_result with an arbitrary run_id
+    precisely during a database outage.
     """
     conn = executor_registry.get(executor_id)
     if conn is None:
@@ -408,18 +410,18 @@ def _posse_ja_provada(executor_id: str, run_id: str) -> bool:
     return memo is not None and memo[0] and memo[1] > time.monotonic()
 
 async def _fechar_run_inconclusivo(executor_id: str, run_id: str, motivo: str) -> None:
-    """Fecha como FALHO um run cujo job_result não pôde ser processado.
+    """Closes as FAILED a run whose job_result could not be processed.
 
-    PORQUÊ: o executor apaga a linha do outbox assim que o `send_text` retorna,
-    então um job_result descartado aqui não volta nunca. Sem este fechamento o
-    WorkflowRun fica em 'running' para sempre — a presença do executor continua
-    saudável, então o `orphan_runs_watchdog` (que só age quando a presença some)
-    jamais reconcilia —, o painel do usuário gira indefinidamente e o BRPOP do
-    webhook síncrono estoura em timeout. Falho/inconclusivo é ruim; preso em
-    'running' é pior.
+    WHY: the executor deletes the outbox row as soon as `send_text` returns, so
+    a job_result dropped here never comes back. Without this closing the
+    WorkflowRun stays in 'running' forever — the executor's presence stays
+    healthy, so the `orphan_runs_watchdog` (which only acts when presence goes
+    away) never reconciles —, the user's panel spins indefinitely and the
+    synchronous webhook's BRPOP times out. Failed/inconclusive is bad; stuck in
+    'running' is worse.
 
-    SEG: só chame com a posse do run por ESTE executor já provada
-    (`_posse_ja_provada` ou snapshot lido).
+    SEC: only call it with ownership of the run by THIS executor already proven
+    (`_posse_ja_provada` or a snapshot read).
     """
     from datetime import datetime as _dt, timezone as _tz
 
@@ -436,8 +438,8 @@ async def _fechar_run_inconclusivo(executor_id: str, run_id: str, motivo: str) -
             "retryable":        True,
             "end_time":         agora.isoformat(),
             "duration_seconds": None,
-            # `stats` vazio de propósito: o consumer preserva os stats parciais
-            # já acumulados no run em vez de apagá-los.
+            # Empty `stats` on purpose: the consumer preserves the partial stats
+            # already accumulated on the run instead of wiping them.
             "stats":            {},
         })
         # O evento carimba o MESMO instante do `end_time` acima.
@@ -448,12 +450,12 @@ async def _fechar_run_inconclusivo(executor_id: str, run_id: str, motivo: str) -
         )
         webhook_key = f"webhook_response:{run_id}"
         rc = get_redis_pool()
-        # Tudo num pipeline só: não pode existir estado intermediário em que o
-        # banco fecha o run mas a UI nunca recebe o evento de conclusão.
+        # All in a single pipeline: there can be no intermediate state in which the
+        # database closes the run but the UI never receives the completion event.
         async with rc.pipeline(transaction=False) as pipe:
             pipe.lpush("run_results", resultado)
             run_events_service.anexar_eventos(pipe, run_id, [evento])
-            # Desbloqueia o webhook síncrono, que senão espera o timeout inteiro.
+            # Unblocks the synchronous webhook, which otherwise waits for the whole timeout.
             pipe.lpush(webhook_key, json.dumps({
                 "job_status": "error", "error": mensagem, "response": None,
             }))
@@ -470,11 +472,11 @@ async def _fechar_run_inconclusivo(executor_id: str, run_id: str, motivo: str) -
         )
 
 async def _ler_snapshot_com_retentativa(run_id: str):
-    """Lê o snapshot do run insistindo um pouco antes de desistir.
+    """Reads the run's snapshot, insisting a little before giving up.
 
-    O caminho do job_result não tem segunda chance: perder o resultado por um
-    reinício de pgbouncer de 200ms pendurava o run. Duas retentativas curtas
-    cobrem o failover típico sem virar espera longa dentro da drenadora.
+    The job_result path has no second chance: losing the result to a 200ms
+    pgbouncer restart left the run hanging. Two short retries cover the typical
+    failover without turning into a long wait inside the drainer.
     """
     ultimo_erro: Exception | None = None
     for tentativa in range(_JOB_RESULT_DB_RETRIES):
@@ -489,17 +491,18 @@ async def _ler_snapshot_com_retentativa(run_id: str):
     raise ultimo_erro  # type: ignore[misc]
 
 async def _descartar_por_rate_limit(executor_id: str, job_id, msg: dict) -> None:
-    """Descarta o job_result que passou do teto — sem pendurar o run.
+    """Drops the job_result that went over the ceiling — without leaving the run hanging.
 
-    ERROR e não WARNING porque descartar um job_result legítimo pendura o run
-    até o watchdog — se isto aparecer, o teto está errado ou há abuso.
+    ERROR and not WARNING because dropping a legitimate job_result leaves the run
+    hanging until the watchdog — if this shows up, the ceiling is wrong or there
+    is abuse.
     """
     logger.error(
         "Executor '%s': job_result do job '%s' descartado por rate limit (>%d/%.0fs).",
         executor_id, job_id, _JOB_RESULT_RATE_LIMIT, _RATE_WINDOW,
     )
-    # Descartado é descartado, mas o run não pode ficar em 'running' para
-    # sempre por causa disso — fecha como falho quando a posse já está provada.
+    # Dropped is dropped, but the run cannot stay in 'running' forever
+    # because of it — closes it as failed when ownership is already proven.
     run_descartado = msg.get("run_id") or job_id
     if _posse_ja_provada(executor_id, run_descartado):
         await _fechar_run_inconclusivo(
@@ -507,22 +510,23 @@ async def _descartar_por_rate_limit(executor_id: str, job_id, msg: dict) -> None
         )
 
 async def _ler_veredito(executor_id: str, job_id, run_id):
-    """Posse e idempotência do job_result, numa ÚNICA leitura do WorkflowRun.
+    """Ownership and idempotency of the job_result, in a SINGLE read of the WorkflowRun.
 
-    Os três vereditos — pertence a este executor? já é terminal? quanto durou?
-    — saem da mesma linha. Devolve essa linha, `(host, status, start_time)`,
-    quando o resultado deve ser gravado; None quando ele é descartado: run de
-    outro executor (recusa memorizada), banco fora (cooldown armado e o run
-    fechado como falho se a posse já estava provada) ou run já terminal.
+    The three verdicts — does it belong to this executor? is it already
+    terminal? how long did it take? — come from the same row. Returns that row,
+    `(host, status, start_time)`, when the result must be written; None when it
+    is dropped: another executor's run (memoized refusal), database down
+    (cooldown armed and the run closed as failed if ownership was already
+    proven) or a run that is already terminal.
     """
     conn = executor_registry.get(executor_id)
     cache = conn.run_auth_cache if conn is not None else None
     agora = time.monotonic()
 
-    # O memo só entra aqui como atalho de RECUSA: um veredito positivo não
-    # dispensa a query (precisamos de status e start_time da mesma linha), mas o
-    # negativo precisa continuar barato para que um executor em loop não gere um
-    # SELECT por tentativa.
+    # The memo only comes in here as a REFUSAL shortcut: a positive verdict does
+    # not spare the query (we need status and start_time from the same row), but
+    # the negative one must stay cheap so that an executor in a loop does not
+    # generate a SELECT per attempt.
     memo = cache.get(run_id) if cache is not None else None
     if memo is not None and memo[1] > agora and not memo[0]:
         logger.warning(
@@ -530,36 +534,36 @@ async def _ler_veredito(executor_id: str, job_id, run_id):
             executor_id, run_id,
         )
         return None
-    # O cooldown de banco NÃO vale aqui de propósito. Ele existe para a
-    # telemetria (node_event: alto volume, barata de perder); aplicá-lo ao
-    # job_result transformava um erro transitório de 200ms (reinício de
-    # pgbouncer, failover de réplica) na perda de TODOS os resultados dos 2s
-    # seguintes daquela conexão — e cada perda pendura um run em 'running' para
-    # sempre. Um job_result por job, com teto de _JOB_RESULT_RATE_LIMIT/s, é
-    # custo desprezível em SELECTs.
+    # The database cooldown does NOT apply here on purpose. It exists for
+    # telemetry (node_event: high volume, cheap to lose); applying it to the
+    # job_result turned a transient 200ms error (pgbouncer restart, replica
+    # failover) into the loss of ALL results of the following 2s on that
+    # connection — and each loss leaves a run hanging in 'running' forever. One
+    # job_result per job, capped at _JOB_RESULT_RATE_LIMIT/s, is a negligible
+    # cost in SELECTs.
     try:
         linha = await _ler_snapshot_com_retentativa(run_id)
     except Exception as exc:
-        # Fail-closed na ESCRITA do resultado: sem provar a posse do run não há
-        # como aceitá-lo. O cooldown segue sendo armado para conter a rajada de
-        # node_event que vem atrás.
+        # Fail-closed on WRITING the result: without proving ownership of the run
+        # there is no way to accept it. The cooldown is still armed to contain
+        # the node_event burst coming behind it.
         logger.error(
             "Não foi possível ler o run '%s' para o job_result do executor '%s': %s "
             "— resultado descartado (fail-closed).", run_id, executor_id, exc,
         )
         if conn is not None:
             conn.db_auth_cooldown_until = time.monotonic() + _RUN_AUTH_DB_COOLDOWN
-        # Se a posse já estava provada por eventos anteriores deste mesmo run,
-        # fechamos como falho: o executor não reenvia job_result.
+        # If ownership was already proven by previous events of this same run,
+        # we close it as failed: the executor does not resend job_result.
         if _posse_ja_provada(executor_id, run_id):
             await _fechar_run_inconclusivo(
                 executor_id, run_id, f"banco indisponível ({exc})",
             )
         return None
 
-    # FAIL-CLOSED: run inexistente ou com host NULL é rejeitado — durante a
-    # janela em que host ainda era NULL, um executor qualquer podia reivindicar
-    # o run de outro tenant.
+    # FAIL-CLOSED: a nonexistent run or one with a NULL host is rejected — during
+    # the window in which host was still NULL, any executor could claim another
+    # tenant's run.
     host = linha[0] if linha is not None else None
     if host != f"executor:{executor_id}":
         logger.warning(
@@ -570,17 +574,17 @@ async def _ler_veredito(executor_id: str, job_id, run_id):
             _store_run_auth(cache, run_id, False, agora)
         return None
 
-    # O job_result é a última mensagem do run: o memo de autorização não serve
-    # mais para nada e sai daqui em vez de esperar o TTL.
+    # The job_result is the run's last message: the authorization memo is of no
+    # further use and leaves here instead of waiting for the TTL.
     _forget_run_auth(executor_id, run_id)
 
-    # ── Idempotência: run terminal não aceita updates ────────────────────
-    # Cenário: network partition > heartbeat_timeout → _fail_orphan_runs marca
-    # o run como failed. Executor termina depois e faz replay pelo outbox; o
-    # estado "failed" não deve virar "success" retroativamente.
-    # `cancelled` entra pela mesma razão: uma vez que o usuário cancelou e o
-    # estado terminal foi gravado, um job_result posterior (reentrega, ou um
-    # executor comprometido) não pode ressuscitar o run como success/failed.
+    # ── Idempotency: a terminal run does not accept updates ──────────────
+    # Scenario: network partition > heartbeat_timeout → _fail_orphan_runs marks
+    # the run as failed. The executor finishes later and replays from the outbox;
+    # the "failed" state must not retroactively become "success".
+    # `cancelled` is included for the same reason: once the user has cancelled
+    # and the terminal state was written, a later job_result (redelivery, or a
+    # compromised executor) cannot resurrect the run as success/failed.
     if linha[1] in ("success", "failed", "cancelled"):
         logger.info(
             "Job '%s' (run '%s'): run já está em estado terminal — resultado ignorado (idempotência).",
@@ -591,28 +595,28 @@ async def _ler_veredito(executor_id: str, job_id, run_id):
 
 @dataclass(frozen=True)
 class _ResultadoDoJob:
-    """O desfecho que o executor reportou, já na taxonomia do servidor.
+    """The outcome the executor reported, already in the server's taxonomy.
 
-    Lido UMA vez do job_result contido e usado por todos os destinos — a chave
-    efêmera, a fila `run_results`, o webhook síncrono e o
-    `__workflow_complete__`. Os três últimos recalculavam, cada um, o mesmo
+    Read ONCE from the contained job_result and used by all destinations — the
+    ephemeral key, the `run_results` queue, the synchronous webhook and the
+    `__workflow_complete__`. The last three each recomputed the same
     `msg.get("error") if job_status != "ok"`.
     """
 
     job_status: object    # o status cru do executor: "ok", "error", "cancelled"…
     cancelado: bool
-    falhou: bool          # nem "ok" nem cancelado
+    falhou: bool          # neither "ok" nor cancelled
     error_category: object
     retryable: bool
-    erro: object          # o `error` do executor quando o job não terminou "ok"
+    erro: object          # the executor's `error` when the job did not finish "ok"
 
 def _ler_resultado(executor_id: str, job_id, msg: dict) -> _ResultadoDoJob:
-    """Classifica o desfecho do job e registra o recebimento no log."""
+    """Classifies the job's outcome and logs the receipt."""
     job_status = msg.get("status", "unknown")
-    # Cancelamento não é falha: o usuário pediu para parar. Tem status próprio
-    # para não poluir a taxa de erro nem aparecer como "falhou" no painel.
+    # Cancellation is not failure: the user asked to stop. It has its own status
+    # so it does not pollute the error rate nor show up as "falhou" (failed) in the panel.
     cancelado = job_status == "cancelled"
-    # Taxonomia de erro (flow.utils.error_taxonomy): categoria estável + retryable.
+    # Error taxonomy (flow.utils.error_taxonomy): stable category + retryable.
     falhou = job_status != "ok" and not cancelado
     resultado = _ResultadoDoJob(
         job_status=job_status,
@@ -634,17 +638,17 @@ def _ler_resultado(executor_id: str, job_id, msg: dict) -> _ResultadoDoJob:
 async def _persistir_resultado(
     executor_id: str, job_id, msg: dict, resultado: _ResultadoDoJob,
 ) -> None:
-    """Chave efêmera `executor:{id}:results:{job}` (TTL 300 s) com o resumo.
+    """Ephemeral key `executor:{id}:results:{job}` (TTL 300 s) with the summary.
 
-    Vai ANTES da fila `run_results`: a reconciliação do inventário
-    (`orfaos.py`) a lê para não dar como perdido o job cujo resultado acabou de
-    chegar.
+    Goes BEFORE the `run_results` queue: the inventory reconciliation
+    (`orfaos.py`) reads it so as not to consider lost a job whose result has
+    just arrived.
     """
     from app.core.redis import get_redis_pool
 
     try:
         rc = get_redis_pool()
-        # Sanitiza dados antes de persistir — remove campos que podem conter credenciais
+        # Sanitizes data before persisting — removes fields that may contain credentials
         sanitized_msg = {
             "job_id": msg.get("job_id"),
             "status": msg.get("status"),
@@ -659,9 +663,9 @@ async def _persistir_resultado(
         logger.error("Erro ao persistir resultado do job '%s' no Redis: %s", job_id, exc)
 
 def _medir_duracao(inicio) -> tuple[float | None, float | None]:
-    """`(duration_seconds, duration_ms)` desde o `start_time` do run, ou `(None, None)`.
+    """`(duration_seconds, duration_ms)` since the run's `start_time`, or `(None, None)`.
 
-    O `start_time` já veio na leitura do veredito; naive é lido como UTC.
+    The `start_time` already came in the verdict read; naive is read as UTC.
     """
     from datetime import datetime as _dt, timezone as _tz
 
@@ -676,34 +680,34 @@ async def _notificar_consumer(
     executor_id: str, run_id, resultado: _ResultadoDoJob, duration_seconds,
     stats_json: str, executor_ip: str | None,
 ) -> None:
-    """Enfileira o resultado em `run_results`, de onde o consumer fecha o run no banco."""
+    """Enqueues the result in `run_results`, from where the consumer closes the run in the database."""
     from datetime import datetime as _dt, timezone as _tz
 
     from app.core.redis import get_redis_pool
 
     try:
-        # AWARE, com offset explicito. `utcnow().isoformat()` produzia uma
-        # string SEM offset; o consumer fazia fromisoformat e entregava um
-        # datetime naive para WorkflowRun.end_time, que e timestamptz. O
-        # Postgres entao assumia o fuso da sessao (TZ=America/Cuiaba nos
-        # containers) e convertia para UTC, gravando o fim 4h no futuro —
-        # toda execucao aparecia com ~4h de duracao quando a UI subtraia
-        # end_time - start_time. O duration_seconds sempre esteve certo, por
-        # comparar dois datetimes aware (`_medir_duracao`).
+        # AWARE, with an explicit offset. `utcnow().isoformat()` produced a
+        # string WITHOUT an offset; the consumer did fromisoformat and handed
+        # a naive datetime to WorkflowRun.end_time, which is timestamptz.
+        # Postgres then assumed the session's time zone (TZ=America/Cuiaba in
+        # the containers) and converted to UTC, writing the end 4h in the
+        # future — every execution showed ~4h of duration when the UI
+        # subtracted end_time - start_time. duration_seconds was always
+        # right, since it compares two aware datetimes (`_medir_duracao`).
         end_ts = _dt.now(_tz.utc).isoformat()
-        # `stats` já foi serializado uma única vez em `_cap_job_result` (até
-        # 4 MB): repetir o dumps aqui era a segunda das três serializações
-        # que congelavam o event loop a cada workflow pesado que terminava.
-        # Montamos o envelope só com as chaves leves e emendamos a string
-        # pronta — o dict literal nunca é vazio, então o `[:-1]` sempre corta
-        # a chave de fechamento.
-        # O IP da conexão vai junto: só este worker o tem. O consumer de
-        # run_results roda nos quatro workers e, procurando no registro
-        # local, gravava `executor_ip` vazio em ~3 de cada 4 execuções.
-        # É o servidor quem escreve a chave, fora do `stats` — o executor
-        # não tem como declarar o próprio IP. `executor_ip` é o da conexão
-        # que recebeu o frame (a fila da sessão o carrega); o registro só
-        # entra para quem chama sem ele.
+        # `stats` was already serialized a single time in `_cap_job_result` (up
+        # to 4 MB): repeating the dumps here was the second of the three
+        # serializations that froze the event loop every time a heavy
+        # workflow finished. We build the envelope with only the light keys
+        # and splice in the ready string — the dict literal is never empty,
+        # so the `[:-1]` always cuts the closing brace.
+        # The connection's IP goes along: only this worker has it. The
+        # run_results consumer runs on all four workers and, looking it up in
+        # the local registry, wrote an empty `executor_ip` in ~3 out of 4
+        # executions. It is the server that writes the key, outside `stats` —
+        # the executor has no way to declare its own IP. `executor_ip` is that
+        # of the connection that received the frame (the session's queue
+        # carries it); the registry only comes in for callers without it.
         _head = json.dumps({
             "task_id":          run_id,
             "status":           _desfecho(resultado.job_status, resultado.cancelado, ok="success"),
@@ -723,21 +727,21 @@ async def _notificar_consumer(
 async def _notificar_webhook(
     run_id, stats: dict, resposta, resultado: _ResultadoDoJob, *, offload: bool,
 ) -> None:
-    """Destrava o webhook síncrono (ResponseNode ou falha).
+    """Unblocks the synchronous webhook (ResponseNode or failure).
 
-    O webhook_router aguarda via BRPOP em `webhook_response:{run}` se o workflow
-    tem ResponseNode. Também notificamos em caso de erro para evitar que o
-    webhook fique preso no timeout.
+    The webhook_router waits via BRPOP on `webhook_response:{run}` if the workflow
+    has a ResponseNode. We also notify on error to keep the webhook from getting
+    stuck until the timeout.
     """
     from app.core.redis import get_redis_pool
 
-    # Marcas da truncagem de `stats` — a do protocolo, que o executor aplica
-    # antes de enviar e `_cap_job_result` reaplica na entrada.
+    # Markers of the `stats` truncation — the protocol's, which the executor
+    # applies before sending and `_cap_job_result` reapplies on entry.
     truncado = stats.get(STATS_TRUNCADO) is True
     controle_descartado = stats.get(STATS_CONTROLE_DESCARTADO) is True
-    # Se o payload foi truncado e até as chaves de controle sumiram, o webhook
-    # não tem como receber a resposta — publicamos erro explícito para
-    # desbloquear o BRPOP em vez de deixar o caller em timeout.
+    # If the payload was truncated and even the control keys are gone, the webhook
+    # has no way to receive the response — we publish an explicit error to
+    # unblock the BRPOP instead of leaving the caller to time out.
     if truncado and resposta is None and controle_descartado:
         job_status = "error"
         erro = (
@@ -751,8 +755,8 @@ async def _notificar_webhook(
 
     if resposta is not None or job_status != "ok":
         try:
-            # O body inline do ResponseNode vai até 1 MB: acima do limiar
-            # esta serialização também sai do event loop.
+            # The ResponseNode's inline body goes up to 1 MB: above the threshold
+            # this serialization also leaves the event loop.
             payload = await _dumps(
                 {
                     "job_status": job_status,
@@ -768,15 +772,15 @@ async def _notificar_webhook(
             logger.error("Erro ao publicar webhook_response para run '%s': %s", run_id, exc)
 
 async def _registrar_body(run_id, executor_id: str, resposta) -> None:
-    """Artifact para o body que o ResponseNode subiu direto ao MinIO.
+    """Artifact for the body the ResponseNode uploaded straight to MinIO.
 
-    Garante uma linha com expires_at para o cleanup global remover o objeto
-    caso o delete imediato pós-streaming do webhook_router falhe (órfão).
+    Ensures a row with expires_at so the global cleanup removes the object
+    in case the webhook_router's immediate post-streaming delete fails (orphan).
     """
     body_ref = (resposta or {}).get("body_ref") if isinstance(resposta, dict) else None
-    # Fora do formato (executor defeituoso ou comprometido), o `.get` levantava
-    # aqui, fora do try, e o `__workflow_complete__` não saía: o run fechava no
-    # banco e o painel aberto nunca sabia.
+    # Out of format (defective or compromised executor), the `.get` raised
+    # here, outside the try, and the `__workflow_complete__` did not go out: the
+    # run closed in the database and the open panel never knew.
     if isinstance(body_ref, dict) and body_ref.get("s3_key"):
         try:
             await _register_webhook_response_artifact(run_id, executor_id, body_ref)
@@ -784,23 +788,23 @@ async def _registrar_body(run_id, executor_id: str, resposta) -> None:
             logger.error("Falha ao registrar Artifact de webhook response (run=%s): %s", run_id, exc)
 
 async def _publicar_conclusao(run_id, resultado: _ResultadoDoJob, duration_ms) -> None:
-    """Publica o `__workflow_complete__` do job no histórico e no canal do run.
+    """Publishes the job's `__workflow_complete__` to the run's history and channel.
 
-    É o fim que o painel vê. Os runs que o SERVIDOR fecha, sem job_result,
-    publicam pelo `run_events_service.publicar_conclusao`, com o evento montado
-    no mesmo lugar (`evento_de_conclusao`), só que sem `duration_ms`: o servidor
-    não mede a duração do que ele fecha.
+    It is the end the panel sees. The runs the SERVER closes, without a
+    job_result, publish through `run_events_service.publicar_conclusao`, with the
+    event built in the same place (`evento_de_conclusao`), only without
+    `duration_ms`: the server does not measure the duration of what it closes.
     """
     from app.core.redis import get_redis_pool
 
     try:
-        # O nível sai do status: "failed" ⇔ falha (`resultado.falhou`).
+        # The level comes from the status: "failed" ⇔ failure (`resultado.falhou`).
         evento = run_events_service.evento_de_conclusao(
             run_id,
             _desfecho(resultado.job_status, resultado.cancelado, ok="completed"),
             erro=resultado.erro,
-            # Taxonomia do job inteiro — o painel usa para dizer se vale
-            # repetir a execução ou se o usuário precisa corrigir a entrada.
+            # Taxonomy of the whole job — the panel uses it to say whether it is
+            # worth repeating the execution or the user needs to fix the input.
             extra={
                 "error_category": resultado.error_category,
                 "retryable":      resultado.retryable,
@@ -818,25 +822,26 @@ async def _handle_job_result(
     executor_id: str, msg: dict, frame_bytes: int = 0, executor_ip: str | None = None,
 ):
     """
-    Processa o resultado de um job reportado pelo executor.
+    Processes the result of a job reported by the executor.
 
-    Confere o run no banco e leva o desfecho a cada destino, na ordem abaixo. A
-    chave efêmera do resultado vive 300 s; quem grava o run no banco é o
-    consumer da fila `run_results`.
+    Checks the run in the database and takes the outcome to each destination, in
+    the order below. The result's ephemeral key lives 300 s; the one that writes
+    the run to the database is the consumer of the `run_results` queue.
 
-    LIMITES: rate limit e teto de bytes, iguais em espírito aos do node_event.
-    Sem eles, `error` e `stats` iam crus para a fila `run_results` (sem TTL), o
-    histórico do run e o Postgres — e o loop custava só 3 SELECTs por iteração.
+    LIMITS: rate limit and byte ceiling, equal in spirit to node_event's.
+    Without them, `error` and `stats` went raw to the `run_results` queue (no
+    TTL), the run's history and Postgres — and the loop cost only 3 SELECTs per
+    iteration.
 
-    ORDEM dos efeitos, que é contrato: leitura do run (`_ler_veredito`) →
-    chave efêmera do resultado (`_persistir_resultado`) → fila `run_results`
+    ORDER of the effects, which is a contract: run read (`_ler_veredito`) →
+    the result's ephemeral key (`_persistir_resultado`) → `run_results` queue
     (`_notificar_consumer`) → `webhook_response` (`_notificar_webhook`) →
-    Artifact do body (`_registrar_body`) → `__workflow_complete__`
-    (`_publicar_conclusao`). Cada destino tem o seu try: a falha de um não
-    impede os seguintes.
+    the body's Artifact (`_registrar_body`) → `__workflow_complete__`
+    (`_publicar_conclusao`). Each destination has its own try: one failing does
+    not prevent the following ones.
 
-    `frame_bytes` é o tamanho do frame que trouxe esta mensagem. Serve só para
-    decidir se as serializações grandes vão para uma thread — ver
+    `frame_bytes` is the size of the frame that brought this message. It only
+    serves to decide whether the large serializations go to a thread — see
     `_JSON_OFFLOAD_THRESHOLD`.
     """
     job_id = msg.get("job_id")
@@ -844,23 +849,23 @@ async def _handle_job_result(
         logger.warning("Executor '%s' enviou job_result sem job_id.", executor_id)
         return
 
-    # Antes da autorização de propósito: é o custo em SELECTs que o flood explora.
+    # Before the authorization on purpose: it is the cost in SELECTs that the flood exploits.
     if not _rate_allowed(executor_id, "job_result", _JOB_RESULT_RATE_LIMIT):
         await _descartar_por_rate_limit(executor_id, job_id, msg)
         return
 
-    # `stats` pode ter MB: acima do limiar, a medição do teto (que serializa)
-    # sai do event loop para não congelar o worker inteiro.
+    # `stats` can be megabytes: above the threshold, measuring the ceiling (which
+    # serializes) leaves the event loop so as not to freeze the whole worker.
     offload = frame_bytes > _JSON_OFFLOAD_THRESHOLD
     if offload:
         msg, stats_json = await asyncio.to_thread(_cap_job_result, executor_id, msg)
     else:
         msg, stats_json = _cap_job_result(executor_id, msg)
 
-    # Fallback para job_id: o servidor define run_id == job_id ao despachar ao
-    # executor; se a falha ocorreu antes da descriptografia (ex: assinatura
-    # inválida), run_id não estará presente no resultado, mas job_id é
-    # suficiente para localizar o WorkflowRun.
+    # Fallback to job_id: the server sets run_id == job_id when dispatching to the
+    # executor; if the failure happened before decryption (e.g. invalid
+    # signature), run_id will not be present in the result, but job_id is
+    # enough to locate the WorkflowRun.
     run_id = msg.get("run_id") or job_id
 
     linha = await _ler_veredito(executor_id, job_id, run_id)
@@ -873,7 +878,7 @@ async def _handle_job_result(
     await _notificar_consumer(
         executor_id, run_id, resultado, duration_seconds, stats_json, executor_ip,
     )
-    # O ResponseNode devolve o body do webhook síncrono dentro de `stats`.
+    # The ResponseNode returns the synchronous webhook's body inside `stats`.
     stats = msg.get("stats") or {}
     resposta = stats.get("__response__")
     await _notificar_webhook(run_id, stats, resposta, resultado, offload=offload)
@@ -881,17 +886,17 @@ async def _handle_job_result(
     await _publicar_conclusao(run_id, resultado, duration_ms)
 
 def _serialize_node_event(executor_id: str, msg: dict) -> str:
-    """Serializa o node_event já contido pelo teto de bytes.
+    """Serializes the node_event already contained by the byte ceiling.
 
-    LIMITE: sem ele, um executor com bug (ou comprometido) empurra 16 MB por
-    frame direto para o Redis, que no compose não tem maxmemory — cresce até o
-    OOM-kill e leva junto dispatch, auth e o consumer de resultados.
+    LIMIT: without it, a buggy (or compromised) executor pushes 16 MB per
+    frame straight into Redis, which has no maxmemory in the compose — it grows
+    until the OOM-kill and takes dispatch, auth and the results consumer with it.
 
-    A redução é a do protocolo (flow/utils/publisher/reducao.py), a mesma que o
-    executor já aplica antes de enviar: aqui ela é defesa, e um evento que o
-    executor reduziu passa intacto.
+    The reduction is the protocol's (flow/utils/publisher/reducao.py), the same
+    one the executor already applies before sending: here it is a defense, and an
+    event the executor has reduced passes through intact.
     """
-    # Remove o campo "type" — o canal Redis espera o evento sem ele
+    # Removes the "type" field — the Redis channel expects the event without it
     event = {k: v for k, v in msg.items() if k != "type"}
     payload = json.dumps(event)
 
@@ -906,20 +911,21 @@ def _serialize_node_event(executor_id: str, msg: dict) -> str:
 
 async def _publish_node_events(executor_id: str, msgs: list[dict]) -> None:
     """
-    Republica um LOTE de eventos de nós no Redis pub/sub, no mesmo canal que o
-    log_workflows_router.py escuta. É assim que o frontend recebe atualizações
-    visuais em tempo real quando o workflow roda num executor externo.
+    Republishes a BATCH of node events on Redis pub/sub, on the same channel that
+    log_workflows_router.py listens to. That is how the frontend receives visual
+    updates in real time when the workflow runs on an external executor.
 
-    PERF: o lote inteiro sai num ÚNICO pipeline — os eventos são agrupados por
-    run e cada run gasta um `rpush` variádico + um `ltrim` + um `expire` + os
-    `publish`. Antes era 1 round-trip Redis POR EVENTO, emitido de dentro do
-    loop de recepção: numa rajada de fan-out alto o job_result final e o
-    heartbeat ficavam presos atrás de centenas de idas ao Redis. Com o lote de
-    até `_INBOX_COALESCE_MAX`, a mesma rajada custa um round-trip.
+    PERF: the whole batch goes out in a SINGLE pipeline — the events are grouped
+    by run and each run spends one variadic `rpush` + one `ltrim` + one `expire`
+    + the `publish`es. Before, it was 1 Redis round-trip PER EVENT, issued from
+    inside the receive loop: in a high fan-out burst the final job_result and the
+    heartbeat got stuck behind hundreds of trips to Redis. With a batch of up to
+    `_INBOX_COALESCE_MAX`, the same burst costs one round-trip.
 
-    SEG: run_id é validado contra executor_id — executor não pode injetar
-    eventos em runs que não lhe pertencem (cross-tenant). A validação é por run
-    (memorizada na conexão), não por evento, então agrupar não a afrouxa.
+    SEC: run_id is validated against executor_id — an executor cannot inject
+    events into runs that do not belong to it (cross-tenant). The validation is
+    per run (memoized on the connection), not per event, so grouping does not
+    loosen it.
     """
     from app.core.redis import get_redis_pool
 
@@ -957,17 +963,17 @@ async def _publish_node_events(executor_id: str, msgs: list[dict]) -> None:
 
 async def _handle_sync_event(executor_id: str, msg: dict):
     """
-    Publica eventos de sync do executor no Redis para consumo pelo frontend.
-    Canal: executor:{executor_id}:sync_events
+    Publishes the executor's sync events to Redis for consumption by the frontend.
+    Channel: executor:{executor_id}:sync_events
 
-    PERF: publish + hset + expire saem num único pipeline — eram três `await`
-    soltos, e o emissor manda um evento por transição de ARQUIVO. Num GeoSync de
-    milhares de arquivos isso gastava 3 round-trips por arquivo, em série, junto
-    com os node_events dos workflows que rodavam no mesmo executor.
+    PERF: publish + hset + expire go out in a single pipeline — they were three
+    loose `await`s, and the emitter sends one event per FILE transition. In a
+    GeoSync of thousands of files that took 3 round-trips per file, in series,
+    along with the node_events of the workflows running on the same executor.
 
-    LIMITE: o dicionário do evento copia qualquer `**kwargs` que o emissor tenha
-    colocado, sem teto. Acima de `_MAX_SYNC_EVENT_BYTES` o evento é reduzido aos
-    campos que a UI realmente usa.
+    LIMIT: the event dictionary copies any `**kwargs` the emitter may have put
+    in, with no ceiling. Above `_MAX_SYNC_EVENT_BYTES` the event is reduced to
+    the fields the UI actually uses.
     """
     from app.core.redis import get_redis_pool
 
@@ -996,7 +1002,7 @@ async def _handle_sync_event(executor_id: str, msg: dict):
         rc = get_redis_pool()
         async with rc.pipeline(transaction=False) as pipe:
             pipe.publish(channel, payload)
-            # Salva estado atual para consulta
+            # Saves the current state for lookup
             pipe.hset(status_key, mapping={
                 "last_event": str(msg.get("event", ""))[:TETO_POR_CAMPO],
                 "dataset": str(msg.get("dataset", ""))[:TETO_POR_CAMPO],

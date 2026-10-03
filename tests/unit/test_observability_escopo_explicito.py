@@ -1,23 +1,23 @@
 # tests/unit/test_observability_escopo_explicito.py
-"""Escopo explícito na observabilidade (docs/specs/mcp-server.md §6.12).
+"""Explicit scope in observability (docs/specs/mcp-server.md §6.12).
 
-Os services de observabilidade deduziam a visão total do próprio objeto
-`User` (`role == "admin"`). Para a REST isso era indistinguível de uma regra
-de borda; para o servidor MCP é um furo: um PAT de admin restrito a um
-workspace atravessaria o escopo do token só porque o `User` carrega o papel.
+The observability services inferred the full view from the `User` object
+itself (`role == "admin"`). For REST this was indistinguishable from an edge
+rule; for the MCP server it is a hole: an admin PAT restricted to one
+workspace would cross the token's scope just because the `User` carries the role.
 
-Agora a visão total é um argumento — `como_admin` — que só a borda que
-confirmou o papel liga (o router REST, via `e_admin_global`). Estes testes
-fixam os quatro lados disso:
+Now the full view is an argument — `como_admin` — that only the edge that
+confirmed the role turns on (the REST router, via `e_admin_global`). These
+tests pin down the four sides of that:
 
-- um `User` admin SEM `como_admin` recebe o filtro de workspace, e o filtro
-  vai na própria query (o SQL é inspecionado, como em
+- an admin `User` WITHOUT `como_admin` gets the workspace filter, and the
+  filter goes into the query itself (the SQL is inspected, as in
   `test_observability_run_scope.py`);
-- com `como_admin=True` não há filtro;
-- `_serialize_run` erra para o lado de não vazar: sem `admin=True`, nada de
+- with `como_admin=True` there is no filter;
+- `_serialize_run` errs on the side of not leaking: without `admin=True`, no
   `workflow_active`/`owner_username`;
-- a chave do cache distingue a visão total da de membro e leva o usuário;
-- o router passa `como_admin=True` só quando o usuário é admin global.
+- the cache key tells the full view apart from the member view and includes the user;
+- the router passes `como_admin=True` only when the user is a global admin.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ from app.services.observability_service import (
 )
 
 
-# ── Dublês ───────────────────────────────────────────────────────────────────
+# ── Test doubles ─────────────────────────────────────────────────────────────
 
 def _user(role="admin", id_hash="usr-1"):
     u = MagicMock()
@@ -63,8 +63,8 @@ def _resultado(*, linha=None, linhas=None, escalar=None):
 
 
 def _db(*respostas):
-    """Sessão dublê: devolve `respostas` na ordem e, esgotadas, resultados
-    vazios."""
+    """Session double: returns `respostas` in order and, once exhausted, empty
+    results."""
     fila = list(respostas)
 
     async def _execute(stmt):
@@ -76,9 +76,9 @@ def _db(*respostas):
 
 
 def _where(db, chamada=0) -> str:
-    """Só o WHERE da query executada — a lista do SELECT também cita
-    `workspace_id`, e olhar o SQL inteiro daria falso-positivo. Sem filtro
-    nenhum a query não tem WHERE, e isso vale como "vazio"."""
+    """Only the WHERE of the executed query — the SELECT list also mentions
+    `workspace_id`, and looking at the whole SQL would give a false positive.
+    With no filter at all the query has no WHERE, and that counts as "empty"."""
     partes = str(db.execute.await_args_list[chamada].args[0]).split("WHERE", 1)
     return partes[1] if len(partes) > 1 else ""
 
@@ -107,11 +107,11 @@ def test_e_admin_global_le_o_papel():
     assert e_admin_global(SimpleNamespace()) is False
 
 
-# ── Filtros: o papel do User não basta ───────────────────────────────────────
+# ── Filters: the User's role is not enough ───────────────────────────────────
 
 def test_admin_sem_como_admin_recebe_o_filtro_de_workspace():
-    """O `User` admin cru é o que o MCP entrega ao service; sem `como_admin`
-    ele tem de ser tratado como membro dos workspaces do escopo."""
+    """The raw admin `User` is what MCP hands to the service; without `como_admin`
+    it must be treated as a member of the workspaces in scope."""
     run_f = _run_filter(_user("admin"), ["ws-1"])
     wf_f = _wf_filter(_user("admin"), ["ws-1"])
 
@@ -120,11 +120,11 @@ def test_admin_sem_como_admin_recebe_o_filtro_de_workspace():
 
 
 def test_com_como_admin_nao_ha_filtro_mesmo_para_usuario_comum():
-    """O argumento manda, não o papel: quem chama com `como_admin=True` já
-    confirmou o papel na borda."""
+    """The argument rules, not the role: whoever calls with `como_admin=True` has
+    already confirmed the role at the edge."""
     assert _run_filter(_user("admin"), ["ws-1"], como_admin=True) == []
     assert _wf_filter(_user("admin"), ["ws-1"], como_admin=True) == []
-    # Simetricamente, o service não "rebaixa" pelo papel do objeto.
+    # Symmetrically, the service does not "downgrade" based on the object's role.
     assert _run_filter(_user("user"), ["ws-1"], como_admin=True) == []
 
 
@@ -134,9 +134,9 @@ def test_como_admin_e_somente_nomeado():
 
 
 async def test_resolver_escopo_recusa_workspace_fora_do_escopo_para_admin_cru():
-    """Antes o admin filtrava qualquer workspace sem consultar o banco; agora
-    isso exige `como_admin=True`. Sem ele, `workspace_id` fora da lista é o
-    mesmo 403 que qualquer membro recebe."""
+    """Before, the admin filtered any workspace without querying the database; now
+    that requires `como_admin=True`. Without it, a `workspace_id` outside the list
+    is the same 403 any member gets."""
     with pytest.raises(WorkspaceAccessDeniedError):
         await _resolver_escopo(_db(), _user("admin"), ["ws-1"], workspace_id="ws-2")
 
@@ -150,8 +150,8 @@ async def test_resolver_escopo_recusa_workspace_fora_do_escopo_para_admin_cru():
 
 
 async def test_detalhe_do_run_filtra_pelo_workspace_para_admin_sem_como_admin():
-    """O recorte vai na própria query: com o dublê devolvendo qualquer linha,
-    uma checagem em Python passaria mesmo se o WHERE tivesse parado de filtrar."""
+    """The slice goes into the query itself: with the double returning any row,
+    a check in Python would pass even if the WHERE had stopped filtering."""
     db = _db(_resultado(escalar=None))
 
     with pytest.raises(RunNotFoundError):
@@ -182,9 +182,9 @@ async def test_lista_de_runs_filtra_para_admin_sem_como_admin():
 
 
 async def test_eventos_do_run_repassam_como_admin_ao_detalhe():
-    """`get_run_events` reusa a checagem de acesso do detalhe; o argumento
-    tem de chegar lá, senão o admin da REST perderia o log de runs de
-    workspaces que não são os dele."""
+    """`get_run_events` reuses the detail's access check; the argument
+    has to reach it, or the REST admin would lose the log of runs from
+    workspaces that are not theirs."""
     with patch.object(ObservabilityService, "get_run_detail", AsyncMock(return_value={})) as detalhe, \
          patch("app.core.redis.get_redis_pool") as pool:
         pool.return_value.lrange = AsyncMock(return_value=[])
@@ -193,12 +193,12 @@ async def test_eventos_do_run_repassam_como_admin_ao_detalhe():
     assert detalhe.await_args.kwargs["como_admin"] is True
 
 
-# ── Frota e bloco "agora" ────────────────────────────────────────────────────
+# ── Fleet and the "now" block ────────────────────────────────────────────────
 
 async def test_frota_do_admin_cru_e_a_acessivel_e_nao_toda_a_ativa():
-    """Sem `como_admin`, mesmo o admin enxerga só os executores acessíveis
-    (pool padrão + workspaces dele + atribuídos) — a frota inteira não é
-    consultada no banco."""
+    """Without `como_admin`, even the admin sees only the accessible executors
+    (default pool + their workspaces + assigned) — the whole fleet is not
+    queried in the database."""
     acessiveis = [{"id_hash": "ex-1", "name": "a", "status": "active"}]
     db = _db()
     with patch("app.services.user_executor_service.get_user_accessible_agents",
@@ -249,7 +249,7 @@ def _linha_de_run():
 
 
 def test_serialize_run_por_default_nao_devolve_os_campos_admin_only():
-    """Um chamador que esqueça o argumento erra para o lado de não vazar."""
+    """A caller that forgets the argument errs on the side of not leaking."""
     meta = {"wf-1": {
         "workflow_name": "Integração", "workflow_active": True, "owner_username": "ana",
         "workspace_id": "ws-1", "workspace_name": "Um",
@@ -263,28 +263,28 @@ def test_serialize_run_por_default_nao_devolve_os_campos_admin_only():
     assert admin["workflow_active"] is True and admin["owner_username"] == "ana"
 
 
-# ── Chave de cache ───────────────────────────────────────────────────────────
+# ── Cache key ────────────────────────────────────────────────────────────────
 
 def test_chave_de_cache_distingue_visao_total_de_membro_e_leva_o_usuario():
-    """O mesmo admin com e sem `como_admin` (REST × MCP) não pode compartilhar
-    a resposta cacheada: a visão total ficaria 45 s no cache e seria servida
-    a um PAT restrito a um workspace. E o usuário entra na chave em ambas as
-    visões — não existe mais um balde global "admin"."""
+    """The same admin with and without `como_admin` (REST × MCP) cannot share
+    the cached response: the full view would sit 45 s in the cache and be served
+    to a PAT restricted to one workspace. And the user goes into the key in both
+    views — there is no longer a global "admin" bucket."""
     membro = _metrics_cache_key("metrics", _user("admin", "a"), ["ws-1"], 30)
     total = _metrics_cache_key("metrics", _user("admin", "a"), ["ws-1"], 30, como_admin=True)
     total_de_outro = _metrics_cache_key("metrics", _user("admin", "b"), ["ws-1"], 30, como_admin=True)
 
     assert membro != total
     assert total != total_de_outro
-    # Determinística para o mesmo escopo, e o papel do objeto não entra.
+    # Deterministic for the same scope, and the object's role does not go in.
     assert total == _metrics_cache_key("metrics", _user("user", "a"), ["ws-1"], 30, como_admin=True)
 
 
 def test_o_que_entra_no_hash_da_chave_e_o_escopo_e_o_usuario():
-    """Não existe mais o balde global "admin".
+    """There is no longer a global "admin" bucket.
 
-    A chave em si é hexadecimal — afirmar sobre o texto dela não prova nada.
-    O que se fixa aqui é a ENTRADA do hash: `todos:<user_id>:<workspaces>`.
+    The key itself is hexadecimal — asserting on its text proves nothing.
+    What is pinned down here is the hash INPUT: `todos:<user_id>:<workspaces>`.
     """
     vistos: list[str] = []
     sha256_real = hashlib.sha256
@@ -305,7 +305,7 @@ def test_chave_de_cache_como_admin_e_somente_nomeado():
         _metrics_cache_key("metrics", _user("admin"), [], 30, True)  # type: ignore[misc]
 
 
-# ── Router: `como_admin` só para admin global ────────────────────────────────
+# ── Router: `como_admin` only for global admin ───────────────────────────────
 
 _ROTAS = [
     ("get_metrics", "/observability/metrics", {}),
@@ -321,7 +321,7 @@ _ROTAS = [
 
 @pytest.fixture
 def api(client):
-    """Cliente com `get_db` dublê; cada teste escolhe o usuário autenticado."""
+    """Client with a double `get_db`; each test picks the authenticated user."""
     from app.api.dependencies import get_current_user, get_db
     from app.main import app
 
@@ -346,8 +346,8 @@ def api(client):
 @pytest.mark.parametrize("metodo, caminho, params", _ROTAS)
 @pytest.mark.parametrize("papel, esperado", [("admin", True), ("user", False)])
 async def test_router_passa_como_admin_so_para_admin_global(api, metodo, caminho, params, papel, esperado):
-    """A REST continua idêntica — admin global vê tudo — porque é o ROUTER
-    que declara a visão, em todas as oito rotas."""
+    """REST stays identical — a global admin sees everything — because it is the
+    ROUTER that declares the view, in all eight routes."""
     from app.api.routers import observability_router as R
 
     usuario = _user(papel, "usr-test-001")

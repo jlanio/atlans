@@ -8,28 +8,28 @@ interface EntityCardProps {
   description?: string | null
   onClick?: () => void
   actions?: React.ReactNode
-  /** Selo colado ao título — para o que o item É, e não para o que se faz com
-   *  ele. Ações ficam em `actions`, do outro lado do card. */
+  /** Badge attached to the title — for what the item IS, not for what you do
+   *  with it. Actions go in `actions`, on the other side of the card. */
   badge?: React.ReactNode
   leading?: React.ReactNode
-  /** Linha(s) de apoio abaixo da descrição — chips, contagens, datas. Fica na
-   *  coluna do texto (quebra linha, não trunca), ao contrário de `actions`,
-   *  que é `shrink-0` e espremeria o título se levasse muitos selos. */
+  /** Supporting line(s) below the description — chips, counts, dates. Stays in
+   *  the text column (wraps, doesn't truncate), unlike `actions`, which is
+   *  `shrink-0` and would squeeze the title if it carried many badges. */
   meta?: React.ReactNode
   onTitleDoubleClick?: (e: React.MouseEvent) => void
 }
 
 export function EntityCard({ title, description, onClick, actions, badge, leading, meta, onTitleDoubleClick }: EntityCardProps) {
   return (
-    // Entrada por CSS (tw-animate-css), como no PageRoot: tira o framer-motion
-    // do chunk da rota de Credenciais. O `exit` era código morto — não há
-    // AnimatePresence em volta desta lista para animar a saída.
+    // Entrance via CSS (tw-animate-css), as in PageRoot: takes framer-motion
+    // out of the Credentials route chunk. The `exit` was dead code — there is
+    // no AnimatePresence around this list to animate the exit.
     <div
       onClick={onClick}
-      // Empilha no telefone. `actions` costuma trazer dois ou três selos além
-      // do menu, e com tudo na mesma linha o conjunto era `shrink-0` enquanto
-      // o título encolhia: em 360px sobravam poucas dezenas de pixels para o
-      // nome do item — justamente o que distingue um card do outro.
+      // Stacks on the phone. `actions` usually carries two or three badges besides
+      // the menu, and with everything on the same line the group was `shrink-0`
+      // while the title shrank: at 360px only a few dozen pixels were left for
+      // the item name — precisely what tells one card from another.
       className="animate-in fade-in slide-in-from-bottom-1 duration-200 flex flex-col sm:flex-row w-full justify-between px-3 py-3.5 rounded-lg cursor-pointer gap-2 sm:gap-0 transition-[transform,box-shadow,background-color] hover:bg-accent/40 hover:shadow-md hover:-translate-y-[1px] active:translate-y-0 border bg-card text-card-foreground shadow-xs"
     >
       <div className="flex flex-row min-w-0 flex-1">
@@ -40,10 +40,10 @@ export function EntityCard({ title, description, onClick, actions, badge, leadin
         )}
 
         <div className="flex flex-col justify-center gap-0.5 flex-1 min-w-0 px-2">
-          {/* truncate: o container já é min-w-0, mas sem isto o título longo
-              quebrava em várias linhas e a altura do card destoava do skeleton. */}
-          {/* O título trunca; o selo não. Sem `min-w-0` no título a flex box
-              se recusa a encolhê-lo e o selo é empurrado para fora do card. */}
+          {/* truncate: the container is already min-w-0, but without this a long title
+              wrapped onto several lines and the card height clashed with the skeleton. */}
+          {/* The title truncates; the badge doesn't. Without `min-w-0` on the title the
+              flex box refuses to shrink it and the badge is pushed out of the card. */}
           <div className="flex items-center gap-1.5 min-w-0">
             <CardTitle
               className="text-sm font-medium truncate min-w-0"
@@ -57,10 +57,10 @@ export function EntityCard({ title, description, onClick, actions, badge, leadin
         </div>
       </div>
 
-      {/* gap-2, não gap-4: o espaço entre badges e menu era maior que o espaço
-          ENTRE os cards (gap-3), invertendo a hierarquia visual.
-          `pl-10` no telefone alinha os selos com o texto, e não com a borda do
-          card, deixando claro que pertencem ao item de cima. */}
+      {/* gap-2, not gap-4: the space between badges and menu was larger than the space
+          BETWEEN the cards (gap-3), inverting the visual hierarchy.
+          `pl-10` on the phone aligns the badges with the text, not with the card
+          edge, making it clear they belong to the item above. */}
       {actions && (
         <div
           className="flex items-center gap-2 shrink-0 flex-wrap pl-10 sm:pl-0"

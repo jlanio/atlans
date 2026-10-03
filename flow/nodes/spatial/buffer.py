@@ -11,11 +11,11 @@ logger = get_logger(__name__)
 @register_node
 class BufferNode(BaseNode):
     """
-    Aplica buffer nas geometrias de um GeoDataFrame.
-    A distância pode ser informada em metros ou em graus decimais: se o CRS da
-    camada usar outra unidade, ela é reprojetada para o cálculo e o resultado
-    volta ao CRS de entrada.
-    Suporta estilos de extremidade e junção, e valida entradas geométricas.
+    Applies a buffer to the geometries of a GeoDataFrame.
+    The distance can be given in meters or in decimal degrees: if the layer's
+    CRS uses another unit, the layer is reprojected for the computation and the
+    result goes back to the input CRS.
+    Supports cap and join styles, and validates geometric inputs.
     """
 
     @classmethod
@@ -95,12 +95,12 @@ class BufferNode(BaseNode):
         join_style = self.parameters['joinStyle']
         quad_segs = self.get_param_int('quadSegs')
 
-        # Obtém o GeoDataFrame de entrada via helper da classe base
+        # Gets the input GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
 
         require_crs(gdf)
 
-        # capStyle/joinStyle/distanceUnit já validados contra as options pelo self.validate().
+        # capStyle/joinStyle/distanceUnit already validated against the options by self.validate().
 
         if unit == 'degrees' and abs(distance) > 10:
             logger.warning(
@@ -108,10 +108,10 @@ class BufferNode(BaseNode):
                 "Confirme se a unidade escolhida é a desejada."
             )
 
-        # Filtra geometrias inválidas
-        # `is_valid` faz uma checagem GEOS por geometria — O(n) que rodava no
-        # event loop ANTES de qualquer to_thread (o resto do trabalho pesado ja
-        # ia). Vai para thread tambem.
+        # Filters out invalid geometries
+        # `is_valid` does one GEOS check per geometry — an O(n) that ran on the
+        # event loop BEFORE any to_thread (the rest of the heavy work already
+        # went there). It goes to a thread too.
         gdf_valid = await asyncio.to_thread(
             lambda: gdf[gdf.geometry.notnull() & gdf.geometry.is_valid & ~gdf.geometry.is_empty]
         )
@@ -121,7 +121,7 @@ class BufferNode(BaseNode):
         if len(gdf_valid) < len(gdf):
             logger.warning(f"{len(gdf) - len(gdf_valid)} feições inválidas foram descartadas.")
 
-        # Reprojeta se a unidade escolhida não for a do CRS da camada
+        # Reprojects if the chosen unit is not the one of the layer's CRS
         original_crs = gdf.crs
         try:
             work_crs = await asyncio.to_thread(working_crs_for_unit, gdf_valid, unit)
@@ -146,8 +146,8 @@ class BufferNode(BaseNode):
         try:
             def _buffer(df: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
                 with warnings.catch_warnings():
-                    # Buffer em CRS geográfico é uma escolha explícita do usuário
-                    # quando a unidade é 'degrees' — o aviso do GeoPandas não se aplica.
+                    # A buffer in a geographic CRS is an explicit user choice
+                    # when the unit is 'degrees' — the GeoPandas warning does not apply.
                     if unit == 'degrees':
                         warnings.filterwarnings(
                             "ignore", message=".*Geometry is in a geographic CRS.*"
@@ -166,7 +166,7 @@ class BufferNode(BaseNode):
             logger.error(f"Erro ao aplicar buffer: {e}")
             raise RuntimeError(f"Erro no buffer: {e}")
 
-        # Volta ao CRS de entrada para o node ser transparente no pipeline
+        # Back to the input CRS so the node is transparent in the pipeline
         if work_crs is not None:
             try:
                 result = await asyncio.to_thread(lambda df: df.to_crs(original_crs), result)

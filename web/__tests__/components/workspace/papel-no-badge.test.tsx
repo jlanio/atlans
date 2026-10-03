@@ -2,10 +2,10 @@ import { describe, it, expect, afterEach } from "vitest"
 import { render, screen, cleanup } from "@testing-library/react"
 import { WorkspaceBadge } from "@/app/components/workspace/workspace-badge"
 
-// O papel era derivado de `owner_id === currentUserId`, o que só sabe responder
-// "dono ou não": admin, operador e editor caíam todos em "Convidado". Depois que
-// o cabeçalho passou a exibir só nome + papel, esse rótulo virou metade do que a
-// barra diz — e dizer "Convidado" a um admin é simplesmente errado.
+// The role was derived from `owner_id === currentUserId`, which can only answer
+// "owner or not": admin, operator and editor all fell into "Convidado" (guest).
+// Once the header started showing only name + role, that label became half of
+// what the bar says — and telling an admin "Convidado" is simply wrong.
 
 const base = { id_hash: "ws-1", name: "Bacia do Paranapanema", description: null, is_default: false }
 

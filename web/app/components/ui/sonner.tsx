@@ -12,9 +12,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       style={
         {
-          // O sonner injeta `font-family: ui-sans-serif, system-ui…` no
-          // toaster, fora de qualquer layer — um utilitário não vence. Inline,
-          // o toast herda a fonte do app (a Inter) como o resto da página.
+          // sonner injects `font-family: ui-sans-serif, system-ui…` on the
+          // toaster, outside any layer — a utility can't beat it. Inline,
+          // the toast inherits the app font (Inter) like the rest of the page.
           fontFamily: "inherit",
           "--normal-bg": "var(--popover)",
           "--normal-text": "var(--popover-foreground)",

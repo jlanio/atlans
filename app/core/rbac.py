@@ -1,14 +1,14 @@
 # app/core/rbac.py
 """
-RBAC (Role-Based Access Control) granular para o Atlas Studio.
+Granular RBAC (Role-Based Access Control) for Atlas Studio.
 
-Hierarquia de roles (do menor para o maior):
-  viewer   → leitura de workflows, observabilidade, runs
-  editor   → viewer + criar/editar/deletar workflows e credenciais
-  operator → editor + executar workflows e gerenciar agendamentos
-  admin    → operator + workers, node templates, usuários, configurações
+Role hierarchy (lowest to highest):
+  viewer   → read workflows, observability, runs
+  editor   → viewer + create/edit/delete workflows and credentials
+  operator → editor + execute workflows and manage schedules
+  admin    → operator + workers, node templates, users, settings
 
-Uso nos routers:
+Usage in routers:
     from app.core.rbac import require_role, Role
 
     @router.post("/execute")
@@ -26,14 +26,14 @@ class Role(IntEnum):
     ADMIN    = 4
 
 
-# Constantes de role como strings — use para _has_min_workspace_role e guards manuais
+# Role constants as strings — use for _has_min_workspace_role and manual guards
 ROLE_VIEWER   = "viewer"
 ROLE_EDITOR   = "editor"
 ROLE_OPERATOR = "operator"
 ROLE_ADMIN    = "admin"
 ROLE_OWNER    = "owner"
 
-# Mapeamento string → nível numérico
+# String → numeric level mapping
 ROLE_LEVELS: dict[str, Role] = {
     ROLE_VIEWER:   Role.VIEWER,
     ROLE_EDITOR:   Role.EDITOR,
@@ -44,10 +44,10 @@ ROLE_LEVELS: dict[str, Role] = {
 
 def require_role(minimum: Role):
     """
-    Factory de dependência FastAPI.
-    Garante que o usuário autenticado tem pelo menos o role especificado.
+    FastAPI dependency factory.
+    Ensures the authenticated user has at least the specified role.
 
-    Exemplo:
+    Example:
         async def my_endpoint(user=Depends(require_role(Role.EDITOR))):
     """
     from app.api.dependencies import get_current_user  # lazy — evita import circular

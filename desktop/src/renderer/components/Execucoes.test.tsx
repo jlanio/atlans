@@ -1,9 +1,9 @@
 // desktop/src/renderer/components/Execucoes.test.tsx
 //
-// A lista de execuções formata a duração com a MESMA função do Painel. A cópia
-// local que ela tinha arredondava DEPOIS de escolher a faixa: 59.97 s aparecia
-// como "60.0s" e 3599.7 s como "59m 60s" — valores que não existem no relógio,
-// e que o Painel já não mostrava.
+// The run list formats the duration with the SAME function as the Painel. The
+// local copy it had rounded AFTER choosing the range: 59.97 s appeared as
+// "60.0s" and 3599.7 s as "59m 60s" — values that do not exist on a clock, and
+// that the Painel no longer showed.
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { JobHistorico } from '../../main/state/store.js'
@@ -20,7 +20,7 @@ function rodando(elapsed_s: number): Snapshot {
   } as unknown as Snapshot
 }
 
-/** Os textos de duração da tela, na ordem em que aparecem. */
+/** The screen's duration texts, in the order they appear. */
 function duracoes(html: string): string[] {
   return [...html.matchAll(/>(\d+(?:\.\d)?s|\d+m \d+s|\d+h \d+m)</g)].map((m) => m[1]!)
 }

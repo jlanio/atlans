@@ -20,23 +20,24 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/workflow-groups", tags=["workflow-groups"])
 
 
-# ── Resolucao de workflows agrupaveis ────────────────────────────────────────
+# ── Resolution of groupable workflows ────────────────────────────────────────
 #
-# As quatro rotas que escrevem `Workflow.group_id` conferem o papel do usuario
-# no workspace do GRUPO. Resolver o workflow so pelo `id_hash` deixava um editor
-# arrastar workflow de OUTRO tenant para dentro do proprio grupo — e, em
-# seguida, zerar `group_id` em massa via DELETE. O casamento de workspace mora
-# aqui para nao poder divergir entre elas de novo.
+# The four routes that write `Workflow.group_id` check the user's role
+# in the GROUP's workspace. Resolving the workflow only by `id_hash` let an editor
+# drag a workflow from ANOTHER tenant into their own group — and then
+# zero out `group_id` in bulk via DELETE. The workspace matching lives
+# here so it cannot diverge between them again.
 #
-# `flag_ative` NAO entra no criterio, de proposito: agrupar e organizacao, nao
-# execucao, e um workflow desativado continua aparecendo na tela de Projetos.
-# Filtrar por ele fazia um item que o usuario acabara de marcar na lista sumir
-# do resultado — e, com a recusa explicita abaixo, derrubar a criacao inteira
-# com "nao encontrado". `deleted_at` entra: o que esta na lixeira nao e alvo.
+# `flag_ative` is NOT part of the criterion, on purpose: grouping is organization, not
+# execution, and a deactivated workflow still shows up on the Projects screen.
+# Filtering by it made an item the user had just checked in the list vanish
+# from the result — and, with the explicit refusal below, bring down the whole creation
+# with "nao encontrado" (not found). `deleted_at` is included: what is in the trash
+# is not a target.
 
 
 def _alvos_agrupaveis(workflow_ids, group) -> list:
-    """Condicoes que um workflow tem de satisfazer para entrar neste grupo."""
+    """Conditions a workflow must satisfy to enter this group."""
     return [
         Workflow.id_hash.in_(workflow_ids),
         Workflow.workspace_id == group.workspace_id,
@@ -45,12 +46,12 @@ def _alvos_agrupaveis(workflow_ids, group) -> list:
 
 
 def _recusar_ids_fora_do_grupo(pedidos, encontrados) -> None:
-    """404 para id inexistente, na lixeira ou de outro workspace.
+    """404 for an id that does not exist, is in the trash or belongs to another workspace.
 
-    Recusar, e nao ignorar em silencio: gravar so a parte conhecida deixaria a
-    tela e o banco divergentes — mesmo criterio de `reorder_groups`. A mensagem
-    nao distingue "nao existe" de "e de outro tenant", para nao virar um oraculo
-    de enumeracao de id_hash.
+    Refuse, rather than silently ignore: writing only the known part would leave the
+    screen and the database diverging — same criterion as `reorder_groups`. The message
+    does not distinguish "does not exist" from "belongs to another tenant", so as not
+    to become an id_hash enumeration oracle.
     """
     desconhecidos = set(pedidos) - {wf.id_hash for wf in encontrados}
     if desconhecidos:
@@ -60,19 +61,19 @@ def _recusar_ids_fora_do_grupo(pedidos, encontrados) -> None:
         )
 
 
-# ── Contagem dos grupos ──────────────────────────────────────────────────────
+# ── Group counts ─────────────────────────────────────────────────────────────
 #
-# `workflow_count` conta TODOS os workflows nao excluidos do grupo, e
-# `active_count` so os com `flag_ative`. Antes contava-se so os ativos, e a
-# tela dizia "2 workflows" num grupo de 3 quando um estava desativado — o
-# inativo continua na lista, entao a contagem tem de bater com o que se ve.
-# Uma agregacao so, com `sum(case …)` em vez de `count(*) FILTER`, para valer
-# igual no SQLite dos testes e no PostgreSQL.
+# `workflow_count` counts ALL non-deleted workflows in the group, and
+# `active_count` only those with `flag_ative`. Before, only the active ones were
+# counted, and the screen said "2 workflows" in a group of 3 when one was deactivated —
+# the inactive one stays in the list, so the count has to match what is seen.
+# A single aggregation, with `sum(case …)` instead of `count(*) FILTER`, so it works
+# the same in the tests' SQLite and in PostgreSQL.
 
 
 async def _contagens_por_grupo(db: AsyncSession, group_ids: list[str]) -> dict[str, tuple[int, int]]:
-    """id_hash do grupo -> (workflow_count, active_count). Grupo sem workflow
-    nao aparece no dict; quem le usa (0, 0)."""
+    """Group id_hash -> (workflow_count, active_count). A group without workflows
+    does not appear in the dict; the reader uses (0, 0)."""
     if not group_ids:
         return {}
     result = await db.execute(
@@ -88,8 +89,8 @@ async def _contagens_por_grupo(db: AsyncSession, group_ids: list[str]) -> dict[s
 
 
 async def _ler_grupo(db: AsyncSession, group: WorkflowGroup) -> WorkflowGroupRead:
-    """Serializa um grupo com as duas contagens — as rotas de um grupo so
-    (criar, atualizar) passam por aqui para nao divergirem da listagem."""
+    """Serializes a group with both counts — the single-group routes
+    (create, update) go through here so they do not diverge from the listing."""
     contagens = await _contagens_por_grupo(db, [group.id_hash])
     item = WorkflowGroupRead.model_validate(group)
     item.workflow_count, item.active_count = contagens.get(group.id_hash, (0, 0))
@@ -106,8 +107,8 @@ async def create_group(
 ):
     await exigir_papel_no_workspace(db, payload.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
-    # Fim da fila: sem isto todo grupo novo nasce em `position=0`, empatado
-    # com os que ja existem, e a ordem entre eles volta a depender do desempate.
+    # End of the line: without this every new group is born at `position=0`, tied
+    # with the existing ones, and the order among them again depends on the tiebreak.
     ultima = await db.execute(
         select(func.max(WorkflowGroup.position)).where(
             WorkflowGroup.workspace_id == payload.workspace_id
@@ -120,11 +121,11 @@ async def create_group(
         position=(ultima.scalar() or 0) + 1,
     )
     db.add(group)
-    await db.flush()  # gera id_hash antes de vincular workflows
+    await db.flush()  # generates id_hash before linking workflows
 
-    # Vincula workflows ao grupo. O filtro de workspace vive no `select` (e nao
-    # numa checagem depois) para valer igual nas quatro rotas que mexem em
-    # `Workflow.group_id` — era a divergencia que abria a escrita cross-tenant.
+    # Links workflows to the group. The workspace filter lives in the `select` (and not
+    # in a check afterwards) so it works the same in the four routes that touch
+    # `Workflow.group_id` — that was the divergence that opened cross-tenant writes.
     if payload.workflow_ids:
         result = await db.execute(
             select(Workflow).where(*_alvos_agrupaveis(payload.workflow_ids, group))
@@ -154,15 +155,15 @@ async def list_groups(
     else:
         stmt = select(WorkflowGroup).where(WorkflowGroup.workspace_id.in_(workspace_ids))
 
-    # `name` desempata: duas posicoes iguais (grupos criados antes da coluna
-    # existir, ou uma reordenacao interrompida) voltariam a sair em ordem
-    # indefinida, que e exatamente o defeito que a posicao veio resolver.
+    # `name` breaks ties: two equal positions (groups created before the column
+    # existed, or an interrupted reordering) would again come out in undefined
+    # order, which is exactly the defect the position came to fix.
     stmt = stmt.order_by(WorkflowGroup.position, WorkflowGroup.name)
 
     result = await db.execute(stmt)
     groups = result.scalars().all()
 
-    # As duas contagens de todos os grupos em uma query
+    # Both counts for all groups in one query
     contagens = await _contagens_por_grupo(db, [g.id_hash for g in groups])
 
     out = []
@@ -179,19 +180,19 @@ async def reorder_groups(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Grava a ordem dos grupos, na sequencia recebida.
+    """Saves the order of the groups, in the sequence received.
 
-    Declarada ANTES de `/{group_id}`: o FastAPI casa as rotas na ordem de
-    registro, e o path variavel engoliria "reorder" como se fosse um id.
+    Declared BEFORE `/{group_id}`: FastAPI matches routes in registration
+    order, and the variable path would swallow "reorder" as if it were an id.
     """
     result = await db.execute(
         select(WorkflowGroup).where(WorkflowGroup.id_hash.in_(payload.group_ids))
     )
     grupos = {g.id_hash: g for g in result.scalars().all()}
 
-    # Recusar, e nao ignorar em silencio: um id que nao existe ou e de outro
-    # workspace significa que a tela esta trabalhando com uma lista diferente
-    # da do banco, e gravar so a parte conhecida deixaria as duas divergentes.
+    # Refuse, rather than silently ignore: an id that does not exist or belongs to another
+    # workspace means the screen is working with a list different from the
+    # database's, and writing only the known part would leave the two diverging.
     desconhecidos = [gid for gid in payload.group_ids if gid not in grupos]
     if desconhecidos:
         raise HTTPException(
@@ -237,9 +238,9 @@ async def update_group(
     if payload.description is not None:
         group.description = payload.description
 
-    # Atualiza membros do grupo
+    # Updates the group's members
     if payload.workflow_ids is not None:
-        # Remove todos os workflows do grupo
+        # Removes all workflows from the group
         old_result = await db.execute(
             select(Workflow).where(
                 Workflow.group_id == group_id,
@@ -249,7 +250,7 @@ async def update_group(
         for wf in old_result.scalars().all():
             wf.group_id = None
 
-        # Adiciona os novos, pelo mesmo criterio de `create_group`.
+        # Adds the new ones, by the same criterion as `create_group`.
         if payload.workflow_ids:
             new_result = await db.execute(
                 select(Workflow).where(*_alvos_agrupaveis(payload.workflow_ids, group))
@@ -279,8 +280,8 @@ async def delete_group(
         raise HTTPException(status_code=404, detail="Grupo não encontrado")
     await exigir_papel_no_workspace(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
-    # Desvincula workflows antes de deletar. O filtro de workspace impede que
-    # apagar um grupo proprio mexa em workflow de outro tenant.
+    # Unlinks workflows before deleting. The workspace filter prevents
+    # deleting one's own group from touching another tenant's workflow.
     wf_result = await db.execute(
         select(Workflow).where(
             Workflow.group_id == group_id,
@@ -311,7 +312,7 @@ async def add_workflow_to_group(
         raise HTTPException(status_code=404, detail="Grupo não encontrado")
     await exigir_papel_no_workspace(db, group.workspace_id, current_user.id_hash, ROLE_EDITOR)
 
-    # Mesmo criterio das rotas em lote — ver `_alvos_agrupaveis`.
+    # Same criterion as the batch routes — see `_alvos_agrupaveis`.
     wf_result = await db.execute(
         select(Workflow).where(*_alvos_agrupaveis([workflow_id], group))
     )

@@ -1,13 +1,13 @@
 # executor/job_executor.py
 """
-Executor de jobs do executor.
+The executor's job runner.
 
-Responsabilidades:
-  1. Validar o job (job_validator.validate_job)
-  2. Descriptografar o payload em memória (executor/crypto.py)
-  3. Executar o flow/ localmente com timeout
-  4. Limpar referências sensíveis após execução
-  5. Retornar o resultado (dict) para envio ao servidor
+Responsibilities:
+  1. Validate the job (job_validator.validate_job)
+  2. Decrypt the payload in memory (executor/crypto.py)
+  3. Run flow/ locally with a timeout
+  4. Clear sensitive references after execution
+  5. Return the result (dict) to be sent to the server
 """
 import asyncio
 import json
@@ -25,66 +25,67 @@ from executor.job_validator import JobValidationError, validate_job
 
 logger = logging.getLogger(__name__)
 
-# ─── Setup de import do flow engine (1x no import do módulo) ──────────────────
-# O executor roda em um processo separado; flow/ está no diretório-pai. Antes, o
-# path era ajustado e o import era feito dentro de _run_workflow — isso causava
-# re-scan do registry de nós (~60 módulos via importlib) em cada job.
+# ─── Flow engine import setup (once, at module import) ────────────────────────
+# The executor runs in a separate process; flow/ is in the parent directory.
+# Before, the path was adjusted and the import was done inside _run_workflow —
+# that caused a re-scan of the node registry (~60 modules via importlib) on
+# every job.
 #
-# Fazendo aqui no top-level, o custo é pago uma vez no startup do executor e todo
-# job subsequente reusa o cache de módulos do Python.
+# Doing it here at top level, the cost is paid once at executor startup and every
+# subsequent job reuses Python's module cache.
 _AGENT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _AGENT_ROOT not in sys.path:
     sys.path.insert(0, _AGENT_ROOT)
 
-# ARTIFACT_DIR precisa estar no env ANTES de importar flow/nodes (o fallback local
-# de artefatos em flow/utils/artifact_helpers.py lê a variável). setdefault
-# preserva valor já set via docker-compose.
+# ARTIFACT_DIR must be in the env BEFORE importing flow/nodes (the local artifact
+# fallback in flow/utils/artifact_helpers.py reads the variable). setdefault
+# preserves a value already set via docker-compose.
 os.environ.setdefault("ARTIFACT_DIR", config.ARTIFACTS_DIR)
 
-# Imports do flow engine — feitos 1x no startup do executor em vez de por job.
+# Flow engine imports — done once at executor startup instead of per job.
 from flow.executor import WorkflowExecutor  # type: ignore  # noqa: E402
 from flow.executor.result_helpers import collect_artifacts, collect_response  # noqa: E402
 from executor.event_publisher import ExecutorEventPublisher  # noqa: E402
 
-# Chave privada carregada uma vez na inicialização do módulo
+# Private key loaded once at module initialization
 _agent_private_key = None
 
-# SEG: o cache anti-replay (`_nonce_seen`, em job_validator) é um check-and-set
-# num OrderedDict de módulo. Enquanto a validação rodava no event loop, o próprio
-# loop serializava esse par de operações de graça; agora ela roda no pool de
-# threads, e sem este lock dois jobs concorrentes poderiam intercalar checagem e
-# registro do MESMO nonce e ambos passarem — um replay aceito. O custo é nulo:
-# está fora do caminho de dados e a validação leva milissegundos.
+# SEC: the anti-replay cache (`_nonce_seen`, in job_validator) is a check-and-set
+# on a module-level OrderedDict. While validation ran on the event loop, the loop
+# itself serialized that pair of operations for free; now it runs in the thread
+# pool, and without this lock two concurrent jobs could interleave the check and
+# the registration of the SAME nonce and both pass — a replay accepted. The cost
+# is nil: it is off the data path and validation takes milliseconds.
 _VALIDACAO_LOCK = threading.Lock()
 
-# Pool DEDICADO ao plano de controle (validacao de assinatura + descriptografia
-# do envelope). NAO e o pool default do loop, que e onde rodam os nos — inclusive
-# o PythonScript, que executa codigo arbitrario do usuario.
+# Pool DEDICATED to the control plane (signature validation + envelope
+# decryption). It is NOT the loop's default pool, which is where the nodes run —
+# including PythonScript, which executes arbitrary user code.
 #
-# O motivo e concreto: `asyncio.to_thread` NAO cancela nada. Um PythonScript com
-# `while True: pass` (que passa pelo validate_code_ast) estoura o
-# `asyncio.wait_for` do no, libera o slot do job e deixa a THREAD viva para
-# sempre. Poucas execucoes assim ocupam todos os workers do pool default; se a
-# validacao morasse la, o executor parava de conseguir sequer ACEITAR ou RECUSAR
-# um job — nenhum node_event, nenhum job_result, o run pendurado em "running"
-# ate o servidor marca-lo como orfao. Aqui a recepcao de trabalho fica imune a
-# no travado.
+# The reason is concrete: `asyncio.to_thread` cancels NOTHING. A PythonScript with
+# `while True: pass` (which passes validate_code_ast) blows the node's
+# `asyncio.wait_for`, frees the job's slot and leaves the THREAD alive forever.
+# A few runs like that take up all the workers of the default pool; if
+# validation lived there, the executor could no longer even ACCEPT or REJECT
+# a job — no node_event, no job_result, the run hanging in "running" until the
+# server marks it as orphaned. Here, receiving work stays immune to a stuck
+# node.
 #
-# Dois workers bastam: a validacao leva milissegundos e e serializada pelo
-# _VALIDACAO_LOCK de qualquer forma.
+# Two workers are enough: validation takes milliseconds and is serialized by
+# _VALIDACAO_LOCK anyway.
 _CONTROL_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="atlas-ctrl")
 
 
 def _validar_e_descriptografar(message: dict) -> dict:
-    """Assinatura Ed25519 + anti-replay + descriptografia, fora do event loop.
+    """Ed25519 signature + anti-replay + decryption, off the event loop.
 
-    Roda inteiro numa thread (ver `execute_job`). Vale a pena mesmo com a GIL:
-    `verify`/`decrypt` do `cryptography` são OpenSSL e LIBERAM a GIL, então o
-    trabalho realmente sai do loop. Antes, um job com definição grande
-    (sub-fluxos pré-resolvidos + pinned_outputs) deixava o executor mudo por
-    centenas de milissegundos ANTES do primeiro node_event — e, com jobs em
-    rajada, as pausas se somavam na frente do heartbeat e dos eventos dos jobs
-    já em andamento.
+    Runs entirely in a thread (see `execute_job`). Worth it even with the GIL:
+    `cryptography`'s `verify`/`decrypt` are OpenSSL and RELEASE the GIL, so the
+    work really leaves the loop. Before, a job with a large definition
+    (pre-resolved sub-workflows + pinned_outputs) left the executor silent for
+    hundreds of milliseconds BEFORE the first node_event — and, with jobs in
+    bursts, the pauses added up ahead of the heartbeat and of the events of the
+    jobs already in progress.
     """
     with _VALIDACAO_LOCK:
         validate_job(message)
@@ -94,11 +95,11 @@ def _validar_e_descriptografar(message: dict) -> dict:
 
 
 def init_private_key():
-    """Carrega a chave privada X25519 do executor. Deve ser chamado no startup.
+    """Loads the executor's X25519 private key. Must be called at startup.
 
-    Usa `load_private_key` (somente leitura): se a chave do enrollment sumiu, o
-    startup falha alto com instrucao de refazer o enroll em vez de gerar um par
-    novo — que faria o executor subir "online" e derrubar 100% dos jobs.
+    Uses `load_private_key` (read-only): if the enrollment key is gone, startup
+    fails loudly with instructions to redo the enroll instead of generating a new
+    pair — which would make the executor come up "online" and fail 100% of jobs.
     """
     global _agent_private_key
     _agent_private_key = load_private_key(
@@ -109,14 +110,14 @@ def init_private_key():
 
 
 def _error_result(job_id, run_id, error: str, category: str, stats: dict | None = None) -> dict:
-    """Monta o resultado de falha com a taxonomia (category + retryable).
+    """Builds the failure result with the taxonomy (category + retryable).
 
-    `stats` carrega o que ja foi executado antes da falha (node_stats parciais +
-    __metrics__). Sem isso o servidor sobrescrevia node_stats com {} — o painel
-    perdia os nos que rodaram, workflow_run_metrics/node_run_metrics ficavam sem
-    linha nenhuma e, porque o upsert de UsageDaily vive dentro de
-    _persist_metrics, falha nenhuma era contabilizada: o dashboard mostrava taxa
-    de erro 0% permanente.
+    `stats` carries what had already run before the failure (partial node_stats +
+    __metrics__). Without it the server overwrote node_stats with {} — the panel
+    lost the nodes that had run, workflow_run_metrics/node_run_metrics got no
+    row at all and, because the UsageDaily upsert lives inside
+    _persist_metrics, no failure was counted: the dashboard showed a permanent
+    0% error rate.
     """
     from flow.utils.error_taxonomy import is_retryable
     return {
@@ -126,28 +127,29 @@ def _error_result(job_id, run_id, error: str, category: str, stats: dict | None 
     }
 
 
-# ── Tetos do payload de stats ────────────────────────────────────────────────
-# Limitar aqui, na ORIGEM, e nao na hora de serializar. `_dumps_result` media o
-# tamanho fazendo `json.dumps` do job_result INTEIRO (ate 16 MB) — e ate tres
-# vezes, quando estourava — dentro do event loop, justamente no instante em que
-# o workflow termina: heartbeat atrasava, os node_events dos outros jobs paravam
-# de subir e o `cancel` que o usuario acabou de clicar nao era lido. Com o
-# payload limitado por construcao, aquele caminho vira o que devia ter sido
-# desde sempre: uma rede de seguranca que na pratica nunca dispara.
+# ── Stats payload ceilings ───────────────────────────────────────────────────
+# Limit here, at the SOURCE, not at serialization time. `_dumps_result` measured
+# the size by doing `json.dumps` of the ENTIRE job_result (up to 16 MB) — and up
+# to three times, when it overflowed — inside the event loop, precisely at the
+# moment the workflow finishes: the heartbeat got delayed, the other jobs'
+# node_events stopped going up and the `cancel` the user had just clicked was
+# not read. With the payload bounded by construction, that path becomes what it
+# should have been all along: a safety net that in practice never fires.
 #
-# As chaves de controle (__response__/__artifacts__/__metrics__/
-# __updated_pinned_outputs__) NAO entram no corte: sem __response__ o BRPOP do
-# webhook sincrono fica preso, e as demais alimentam metricas e pins.
+# The control keys (__response__/__artifacts__/__metrics__/
+# __updated_pinned_outputs__) are NOT subject to the cut: without __response__
+# the synchronous webhook's BRPOP gets stuck, and the others feed metrics and pins.
 _MAX_NODE_STAT_BYTES  = 8 * 1024
 _MAX_NODE_STATS_BYTES = 4 * 1024 * 1024
 _MAX_STAT_ERROR_CHARS = 2_000
-# Teto REDUZIDO de colunas por porta quando o stat estoura _MAX_NODE_STAT_BYTES.
-# A origem ja corta em MAX_COLUNAS (200 — flow/executor/utils.py); descartar o
-# resto de uma vez era tudo-ou-nada: quanto mais larga a tabela, mais certo o
-# descarte, e o editor ficava sem sugestao de coluna exatamente onde ela mais
-# vale. As 50 primeiras cabem com folga no teto e ainda alimentam a sugestao.
+# REDUCED ceiling of columns per port when the stat exceeds _MAX_NODE_STAT_BYTES.
+# The source already cuts at MAX_COLUNAS (200 — flow/executor/utils.py); dropping
+# the rest all at once was all-or-nothing: the wider the table, the more certain
+# the drop, and the editor was left without column suggestions exactly where
+# they are worth the most. The first 50 fit comfortably under the ceiling and
+# still feed the suggestions.
 _MAX_STAT_COLUNAS_POR_PORTA = 50
-# Campos sem os quais a linha de node_run_metrics deixa de servir para o painel.
+# Fields without which the node_run_metrics row no longer serves the panel.
 _STAT_CAMPOS_ESSENCIAIS = (
     "node_name", "duration_ms", "status", "cache_hit", "started_at",
     "input_features", "output_features",
@@ -159,20 +161,20 @@ def _tamanho_json(obj) -> int:
     try:
         return len(json.dumps(obj, default=str))
     except Exception:
-        return _MAX_NODE_STAT_BYTES + 1  # ilegivel = trata como grande demais
+        return _MAX_NODE_STAT_BYTES + 1  # unreadable = treat as too large
 
 
 def _reduzir_stat_de_no(stat: dict) -> dict:
-    """Degrada o stat de um no em degraus, do corte mais barato ao mais cru.
+    """Degrades a node's stat in steps, from the cheapest cut to the crudest.
 
-    Ordem: (1) mensagem de erro truncada; (2) cada lista de output_columns
-    truncada as _MAX_STAT_COLUNAS_POR_PORTA primeiras; (3) output_columns
-    descartado; (4) so os campos essenciais. Cada degrau re-mede e para assim
-    que couber — descartar as colunas por inteiro, que era o primeiro corte,
-    virou penultimo recurso: elas alimentam a sugestao de coluna do editor.
-    O corte e marcado com o `__truncated__` do stat, como os demais; a lista
-    truncada NAO ganha item-marcador (mesma regra de `_colunas_das_saidas`:
-    a UI renderia o marcador como sugestao clicavel).
+    Order: (1) error message truncated; (2) each output_columns list truncated
+    to the first _MAX_STAT_COLUNAS_POR_PORTA; (3) output_columns dropped;
+    (4) only the essential fields. Each step re-measures and stops as soon as it
+    fits — dropping the columns entirely, which used to be the first cut,
+    became the second-to-last resort: they feed the editor's column suggestions.
+    The cut is flagged with the stat's `__truncated__`, like the others; the
+    truncated list does NOT get a marker item (same rule as `_colunas_das_saidas`:
+    the UI would render the marker as a clickable suggestion).
     """
     reduzido = dict(stat)
     reduzido["__truncated__"] = True
@@ -198,14 +200,14 @@ def _reduzir_stat_de_no(stat: dict) -> dict:
     reduzido.pop("output_columns", None)
     if _tamanho_json(reduzido) <= _MAX_NODE_STAT_BYTES:
         return reduzido
-    # Ultimo recurso: so o que o painel de nos precisa para desenhar a linha.
+    # Last resort: only what the nodes panel needs to draw the row.
     essencial = {k: reduzido.get(k) for k in _STAT_CAMPOS_ESSENCIAIS if k in reduzido}
     essencial["__truncated__"] = True
     return essencial
 
 
 def _limitar_node_stats(node_stats: dict) -> dict:
-    """Aplica teto por no e teto agregado ao node_stats, preservando a ordem."""
+    """Applies a per-node ceiling and an aggregate ceiling to node_stats, preserving order."""
     limitado: dict = {}
     total = 0
     omitidos = 0
@@ -237,16 +239,16 @@ def _limitar_node_stats(node_stats: dict) -> dict:
 
 def _collect_stats(executor, status: str) -> dict:
     """
-    Monta o dict de stats a partir do estado ATUAL do WorkflowExecutor.
+    Builds the stats dict from the CURRENT state of the WorkflowExecutor.
 
-    Usado tanto no caminho de sucesso quanto no de falha — em falha os dados sao
-    parciais (so os nos que chegaram a rodar), e parcial vale muito mais que
-    vazio: e o que alimenta o painel de nos e as tabelas *_run_metrics.
-    Cada coleta e isolada: um erro montando artefatos nao pode custar as metricas
-    (nem, no caminho de erro, mascarar a excecao original).
+    Used on both the success and the failure path — on failure the data is
+    partial (only the nodes that got to run), and partial is worth much more than
+    empty: it is what feeds the nodes panel and the *_run_metrics tables.
+    Each collection is isolated: an error building artifacts cannot cost the
+    metrics (nor, on the error path, mask the original exception).
 
-    O node_stats sai daqui JA limitado (ver `_limitar_node_stats`) — o tamanho do
-    job_result nao pode depender de quantos nos o workflow tem.
+    node_stats leaves here ALREADY bounded (see `_limitar_node_stats`) — the size
+    of job_result cannot depend on how many nodes the workflow has.
     """
     stats: dict = _limitar_node_stats(executor.node_stats)
 
@@ -260,18 +262,18 @@ def _collect_stats(executor, status: str) -> dict:
     except Exception as exc:
         logger.warning("Falha ao coletar artefatos/resposta (status=%s): %s", status, exc)
 
-    # Metricas de execucao (CPU, RAM, bytes, spatial). O status do run nao vai
-    # aqui: o servidor grava o do proprio WorkflowRun.
+    # Execution metrics (CPU, RAM, bytes, spatial). The run status does not go
+    # here: the server writes the WorkflowRun's own.
     try:
         stats["__metrics__"] = executor.metrics_collector.build_metrics()
     except Exception as exc:
         logger.warning("Falha ao coletar metricas (status=%s): %s", status, exc)
 
-    # Referencias S3 leves dos pins GRAVADOS NESTA RUN (auto-pin). Reportar
-    # `pinned_outputs` inteiro — como era feito — incluia as refs que vieram do
-    # servidor e apenas passaram pela run; o consumer re-deriva a s3_key com o
-    # task_id ATUAL, entao cada run corrompia as refs que nao regravou,
-    # apontando-as para objetos inexistentes (404 permanente no pin).
+    # Lightweight S3 references of the pins WRITTEN IN THIS RUN (auto-pin). Reporting
+    # the whole `pinned_outputs` — as was done — included the refs that came from
+    # the server and merely passed through the run; the consumer re-derives the
+    # s3_key with the CURRENT task_id, so every run corrupted the refs it did not
+    # rewrite, pointing them to nonexistent objects (permanent 404 on the pin).
     try:
         updated_pins = {nid: out for nid, out in getattr(executor, "updated_pin_refs", {}).items()
                         if out and isinstance(out, dict) and "__pin_s3_key__" in out}
@@ -285,13 +287,13 @@ def _collect_stats(executor, status: str) -> dict:
 
 def _partial_stats(holder: dict, status: str) -> dict:
     """
-    Stats parciais do executor que estava rodando quando o job morreu.
+    Partial stats of the executor that was running when the job died.
 
-    `holder` e preenchido por `_run_workflow` ANTES do `executor.run()`, entao o
-    WorkflowExecutor continua alcancavel mesmo quando a corrotina e destruida —
-    inclusive no timeout, em que o prazo (`asyncio.timeout`) a cancela e nada e
-    retornado. Vazio quando a falha aconteceu antes de existir executor
-    (validacao, decrypt, job_type desconhecido).
+    `holder` is filled by `_run_workflow` BEFORE `executor.run()`, so the
+    WorkflowExecutor remains reachable even when the coroutine is destroyed —
+    including on timeout, where the deadline (`asyncio.timeout`) cancels it and
+    nothing is returned. Empty when the failure happened before an executor
+    existed (validation, decrypt, unknown job_type).
     """
     executor = holder.get("executor")
     if executor is None:
@@ -305,46 +307,46 @@ def _partial_stats(holder: dict, status: str) -> dict:
 
 async def execute_job(message: dict, event_queue: asyncio.Queue | None = None) -> dict:
     """
-    Ponto de entrada principal para execução de um job.
+    Main entry point for executing a job.
 
-    Retorna dict com:
+    Returns a dict with:
       {
         "job_id":  str,
         "run_id":  str | None,
         "status":  "ok" | "error",
-        "output":  any,        # resultado do flow (se ok)
+        "output":  any,        # flow result (if ok)
         "stats":   dict,       # node_stats + __metrics__/__artifacts__/...
-        "error":   str | None, # mensagem de erro (se error)
+        "error":   str | None, # error message (if error)
       }
 
-    "stats" vem preenchido TAMBEM quando o job falha ou estoura o timeout (com
-    os nos que chegaram a rodar) — o servidor sobrescreve node_stats com o que
-    vier aqui e alimenta workflow_run_metrics/UsageDaily a partir de
-    __metrics__. So fica vazio quando a falha antecede a execucao (validacao,
-    descriptografia, job_type desconhecido).
+    "stats" comes filled ALSO when the job fails or hits the timeout (with
+    the nodes that got to run) — the server overwrites node_stats with whatever
+    comes here and feeds workflow_run_metrics/UsageDaily from
+    __metrics__. It is only empty when the failure precedes execution
+    (validation, decryption, unknown job_type).
     """
     envelope = message.get("envelope", {})
     job_id   = envelope.get("job_id", "?")
-    # run_id é extraído do payload descriptografado; até lá usa job_id como fallback,
-    # pois o servidor define run_id == job_id ao despachar para o executor.
+    # run_id is extracted from the decrypted payload; until then job_id is used as a
+    # fallback, since the server sets run_id == job_id when dispatching to the executor.
     run_id   = job_id
     payload  = None
-    # Holder mutavel: `_run_workflow` publica aqui o WorkflowExecutor assim que o
-    # cria, para que os caminhos de erro/timeout alcancem os stats parciais.
+    # Mutable holder: `_run_workflow` publishes the WorkflowExecutor here as soon as
+    # it creates it, so that the error/timeout paths can reach the partial stats.
     stats_holder: dict = {}
-    # Marcado antes do try, e nao logo antes do prazo: a duracao do log de
-    # conclusao inclui a validacao e a descriptografia.
+    # Taken before the try, not right before the deadline: the duration in the
+    # completion log includes validation and decryption.
     _t0 = time.monotonic()
 
     try:
-        # ── 1 e 2. Validação de segurança + descriptografia, numa thread ──────
-        # A ordem interna continua a mesma (assinatura → destinatário → prazo →
-        # nonce → decrypt): quem garante isso é `_validar_e_descriptografar`.
+        # ── 1 and 2. Security validation + decryption, in a thread ────────────
+        # The internal order stays the same (signature → recipient → deadline →
+        # nonce → decrypt): `_validar_e_descriptografar` is what guarantees it.
         logger.debug("Job '%s': validando assinatura e descriptografando payload.", job_id)
-        # run_in_executor(_CONTROL_POOL, ...) e nao asyncio.to_thread: to_thread
-        # cai no pool DEFAULT, o mesmo dos nos e do script do usuario. Ver
-        # _CONTROL_POOL — um PythonScript em laco infinito nao pode impedir o
-        # executor de aceitar/recusar o proximo job.
+        # run_in_executor(_CONTROL_POOL, ...) and not asyncio.to_thread: to_thread
+        # falls into the DEFAULT pool, the same one as the nodes and the user script.
+        # See _CONTROL_POOL — a PythonScript in an infinite loop cannot prevent the
+        # executor from accepting/rejecting the next job.
         payload = await asyncio.get_running_loop().run_in_executor(
             _CONTROL_POOL, _validar_e_descriptografar, message
         )
@@ -355,13 +357,13 @@ async def execute_job(message: dict, event_queue: asyncio.Queue | None = None) -
         logger.info("Job '%s': iniciando execução (type=%s, run_id=%s, timeout=%ds).",
                     job_id, job_type, run_id, config.JOB_TIMEOUT)
 
-        # ── 3. Execução com timeout ───────────────────────────────────────────
-        # `asyncio.timeout` e não `wait_for`: do Python 3.11 em diante
-        # `asyncio.TimeoutError` É o TimeoutError embutido, e um nó que levanta
-        # o dele (o prazo do PythonScript, um socket que expira) cairia no
-        # tratamento do prazo do JOB — "Job expirou após 3600s" no lugar da
-        # mensagem do nó. Só é o prazo do job se ele expirou; o resto sobe para
-        # o `except Exception`, como no 3.10.
+        # ── 3. Execution with timeout ─────────────────────────────────────────
+        # `asyncio.timeout` and not `wait_for`: from Python 3.11 onward
+        # `asyncio.TimeoutError` IS the built-in TimeoutError, and a node that
+        # raises its own (the PythonScript deadline, a socket that times out) would
+        # fall into the JOB deadline handling — "Job expirou após 3600s" (job
+        # expired after 3600s) instead of the node's message. It is only the job
+        # deadline if it expired; the rest goes up to `except Exception`, as in 3.10.
         prazo = asyncio.timeout(config.JOB_TIMEOUT)
         try:
             async with prazo:
@@ -378,8 +380,8 @@ async def execute_job(message: dict, event_queue: asyncio.Queue | None = None) -
                                  stats=_partial_stats(stats_holder, "timeout"))
         _elapsed = time.monotonic() - _t0
 
-        # _dispatch retorna {"result": ..., "stats": ...} para run_workflow;
-        # outros tipos podem retornar o valor direto — trata ambos os casos.
+        # _dispatch returns {"result": ..., "stats": ...} for run_workflow;
+        # other types may return the value directly — handles both cases.
         if isinstance(dispatch_result, dict) and "stats" in dispatch_result:
             output = dispatch_result.get("result")
             stats  = dispatch_result.get("stats") or {}
@@ -392,7 +394,7 @@ async def execute_job(message: dict, event_queue: asyncio.Queue | None = None) -
                 "stats": stats, "error": None}
 
     except JobValidationError as exc:
-        # Rejeitado antes de existir executor — nao ha stats parciais a coletar.
+        # Rejected before an executor existed — there are no partial stats to collect.
         logger.error("Job '%s' reprovado na validação de segurança: %s", job_id, exc)
         return _error_result(job_id, run_id, str(exc), "validation")
 
@@ -404,18 +406,18 @@ async def execute_job(message: dict, event_queue: asyncio.Queue | None = None) -
                              stats=_partial_stats(stats_holder, "error"))
 
     finally:
-        # ── 4. Limpeza de memória ─────────────────────────────────────────────
-        # Solta a referencia do executor para o payload descriptografado. NAO e
-        # um "apagar da memoria": sub-objetos ainda referenciados por nos que
-        # rodaram (ex: connectionString ja copiada para dentro de um node)
-        # continuam vivos. O que isso garante e que este dict nao segure sozinho
-        # o payload inteiro depois do job terminar.
+        # ── 4. Memory cleanup ─────────────────────────────────────────────────
+        # Drops the executor's reference to the decrypted payload. It is NOT
+        # "erasing from memory": sub-objects still referenced by nodes that ran
+        # (e.g. a connectionString already copied into a node) stay alive. What
+        # this guarantees is that this dict does not on its own hold the whole
+        # payload after the job finishes.
         #
-        # Nao chamamos gc.collect(): rodava geracao 2 em TODO job (inclusive nas
-        # saidas antecipadas por JobValidationError), na corrotina e segurando a
-        # GIL — travando as threads de to_thread dos jobs concorrentes — sem
-        # ganho algum, ja que o objeto grande (final_outputs) esta vivo no valor
-        # de retorno e o payload sai por refcount.
+        # We do not call gc.collect(): it ran generation 2 on EVERY job (including
+        # early exits via JobValidationError), in the coroutine and holding the
+        # GIL — stalling the to_thread threads of concurrent jobs — for no gain
+        # at all, since the large object (final_outputs) is alive in the return
+        # value and the payload goes away by refcount.
         if payload is not None:
             payload.clear()
             del payload
@@ -425,10 +427,10 @@ async def _dispatch(job_type: str, payload: dict, envelope: dict,
                     event_queue: asyncio.Queue | None = None,
                     stats_holder: dict | None = None) -> any:
     """
-    Roteia o job para o handler correto com base em job_type.
+    Routes the job to the correct handler based on job_type.
 
-    job_type suportados:
-      "run_workflow" — executa um workflow do flow/ engine localmente
+    Supported job_types:
+      "run_workflow" — runs a workflow of the flow/ engine locally
     """
     if job_type == "run_workflow":
         return await _run_workflow(payload, envelope, event_queue=event_queue,
@@ -439,9 +441,9 @@ async def _dispatch(job_type: str, payload: dict, envelope: dict,
 
 def _apply_host_aliases(conn_str: str) -> str:
     """
-    Reescreve hostname (e porta) de uma connection string usando HOST_ALIASES.
-    Ex: "postgresql+asyncpg://user:pass@db:5432/geobd"  # pragma: allowlist secret
-        com alias db=localhost:5433
+    Rewrites the hostname (and port) of a connection string using HOST_ALIASES.
+    E.g.: "postgresql+asyncpg://user:pass@db:5432/geobd"  # pragma: allowlist secret
+        with alias db=localhost:5433
      → "postgresql+asyncpg://user:pass@localhost:5433/geobd"  # pragma: allowlist secret
     """
     if not config.HOST_ALIASES or not conn_str:
@@ -451,7 +453,7 @@ def _apply_host_aliases(conn_str: str) -> str:
         internal_host = parsed.hostname
         if internal_host and internal_host in config.HOST_ALIASES:
             external = config.HOST_ALIASES[internal_host]
-            # Reconstrói netloc preservando userinfo (user:pass@)
+            # Rebuilds netloc preserving userinfo (user:pass@)
             netloc = parsed.netloc
             at_idx = netloc.rfind("@")
             userinfo = netloc[:at_idx + 1] if at_idx >= 0 else ""
@@ -470,9 +472,9 @@ def _apply_host_aliases(conn_str: str) -> str:
 
 def _rewrite_connection_strings(workflow_def: dict) -> None:
     """
-    Percorre os nós do workflow e aplica HOST_ALIASES em todos os connectionStrings.
-    Necessário quando o executor roda fora do Docker e as credenciais usam
-    hostnames internos (ex: 'db') que não são resolvíveis externamente.
+    Walks the workflow's nodes and applies HOST_ALIASES to all connectionStrings.
+    Needed when the executor runs outside Docker and the credentials use
+    internal hostnames (e.g. 'db') that are not resolvable externally.
     """
     if not config.HOST_ALIASES:
         return
@@ -487,25 +489,25 @@ async def _run_workflow(payload: dict, envelope: dict,
                         event_queue: asyncio.Queue | None = None,
                         stats_holder: dict | None = None) -> dict:
     """
-    Executa um workflow localmente usando o flow/ engine (WorkflowExecutor).
+    Runs a workflow locally using the flow/ engine (WorkflowExecutor).
 
-    `stats_holder` (opcional) recebe o WorkflowExecutor assim que ele e criado
-    — ver `_partial_stats`.
+    `stats_holder` (optional) receives the WorkflowExecutor as soon as it is
+    created — see `_partial_stats`.
 
-    O payload deve conter:
+    The payload must contain:
       {
-        "workflow_definition": dict,  — definição do DAG (nós, arestas, config)
-        "run_id":              str,   — UUID do WorkflowRun para reporting
-        "params":              dict,  — parâmetros de entrada (opcional)
-        "workspace_id":        str,   — workspace_id para isolamento (opcional)
-        "debug_mode":          bool,  — modo debug (opcional)
+        "workflow_definition": dict,  — DAG definition (nodes, edges, config)
+        "run_id":              str,   — WorkflowRun UUID for reporting
+        "params":              dict,  — input parameters (optional)
+        "workspace_id":        str,   — workspace_id for isolation (optional)
+        "debug_mode":          bool,  — debug mode (optional)
       }
     """
     workflow_def = payload.get("workflow_definition")
     if not workflow_def:
         raise ValueError("Payload sem 'workflow_definition'.")
 
-    # Reescreve hostnames internos do Docker nos connectionStrings (ex: db → localhost:5433)
+    # Rewrites internal Docker hostnames in connectionStrings (e.g. db → localhost:5433)
     _rewrite_connection_strings(workflow_def)
 
     params         = payload.get("params") or {}
@@ -515,11 +517,11 @@ async def _run_workflow(payload: dict, envelope: dict,
     debug_mode     = payload.get("debug_mode", False)
     pinned_outputs = payload.get("pinned_outputs") or {}
     pin_metadata   = payload.get("pin_metadata") or {}
-    # Snapshot dos nodes desabilitados no momento do despacho. Usado pelo
-    # SubWorkflowNode para validar sub-fluxos no executor sem consultar o DB.
+    # Snapshot of the nodes disabled at dispatch time. Used by
+    # SubWorkflowNode to validate sub-workflows on the executor without querying the DB.
     disabled_nodes = payload.get("disabled_nodes") or []
-    # Definitions de toda a cadeia de sub-workflows pre-resolvida pelo
-    # servidor (executor nao tem acesso ao DB).
+    # Definitions of the whole sub-workflow chain, pre-resolved by the
+    # server (the executor has no access to the DB).
     subworkflow_definitions = payload.get("subworkflow_definitions") or {}
 
     n_nodes = len(workflow_def.get("nodes", []))
@@ -544,10 +546,10 @@ async def _run_workflow(payload: dict, envelope: dict,
         subworkflow_definitions=subworkflow_definitions,
     )
 
-    # Publica o executor ANTES de rodar: se a corrotina morrer (excecao ou
-    # cancelamento pelo prazo do job, `asyncio.timeout`), ela nao retorna nada, e
-    # este e o unico caminho para `execute_job` alcancar os stats dos nos que
-    # ja tinham rodado.
+    # Publishes the executor BEFORE running: if the coroutine dies (exception or
+    # cancellation by the job deadline, `asyncio.timeout`), it returns nothing, and
+    # this is the only way for `execute_job` to reach the stats of the nodes that
+    # had already run.
     if stats_holder is not None:
         stats_holder["executor"] = executor
 

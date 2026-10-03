@@ -9,17 +9,17 @@ export const useTools = () => {
   const [toolState, setToolState] = useState<ToolState>('disable')
   const toolStateRef = useRef<ToolState>('disable')
 
-  // `useCallback` sem dependências: os pais repassam esta função dentro de
-  // `onMouseEnter`/`onMouseLeave` para o card do nó. Enquanto ela era declarada
-  // solta no corpo do hook, nascia com identidade nova a cada render e nenhuma
-  // memoização rio abaixo conseguia segurar nada.
+  // `useCallback` with no dependencies: the parents pass this function inside
+  // `onMouseEnter`/`onMouseLeave` down to the node card. While it was declared
+  // loose in the hook body, it was born with a new identity on every render and
+  // no memoization downstream could hold anything.
   const handleToolState = useCallback((state: ToolState) => {
     setToolState(state)
     toolStateRef.current = state
   }, [])
 
-  // O recolhimento tardio vira um timer cancelável: com o `await` de antes o
-  // temporizador sobrevivia ao desmonte do nó e ainda tentava um setState.
+  // The delayed collapse becomes a cancelable timer: with the earlier `await` the
+  // timer outlived the node's unmount and still attempted a setState.
   useEffect(() => {
     if (toolState !== 'leave') return
     const timer = setTimeout(() => {

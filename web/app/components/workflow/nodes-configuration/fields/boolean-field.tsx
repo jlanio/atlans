@@ -5,12 +5,12 @@ import type { FieldProps } from "./types"
 type BooleanFieldProps = FieldProps
 
 /**
- * Linha, e nao cartao.
+ * A row, not a card.
  *
- * Era o UNICO campo com `rounded-lg border p-3 shadow-sm` — todos os outros sao
- * rotulo e controle soltos. Numa lista mista os toggles viravam ancoras visuais
- * arbitrarias: a moldura sugeria importancia que o campo nao tem, e "Publico"
- * pesava mais na tela que "Destino", que governa o no inteiro.
+ * It was the ONLY field with `rounded-lg border p-3 shadow-sm` — all the others
+ * are a bare label and control. In a mixed list the toggles became arbitrary
+ * visual anchors: the frame suggested an importance the field doesn't have, and
+ * "Publico" weighed more on screen than "Destino", which governs the whole node.
  */
 const BooleanField = ({ field, values, setNodeField }: BooleanFieldProps) => (
   <div className="flex flex-row items-center justify-between gap-3">

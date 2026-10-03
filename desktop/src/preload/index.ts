@@ -1,15 +1,15 @@
 // desktop/src/preload/index.ts
 //
-// Unica ponte entre o renderer e o main.
+// The only bridge between the renderer and main.
 //
-// A janela roda com `contextIsolation: true`, `sandbox: true` e
-// `nodeIntegration: false`. O renderer NAO tem acesso a `require`, ao
-// filesystem nem ao `ipcRenderer` cru — so ao objeto montado aqui. Isso importa
-// mesmo com conteudo 100% local: o painel de log exibe texto vindo de nos de
-// workflow, que executam codigo arbitrario do usuario.
+// The window runs with `contextIsolation: true`, `sandbox: true` and
+// `nodeIntegration: false`. The renderer has NO access to `require`, to the
+// filesystem or to the raw `ipcRenderer` — only to the object built here. This
+// matters even with 100% local content: the log panel displays text coming
+// from workflow nodes, which run arbitrary user code.
 //
-// Nenhuma funcao aqui aceita nome de canal como parametro: se aceitasse, uma
-// falha de XSS no renderer poderia invocar qualquer handler do main.
+// No function here accepts a channel name as a parameter: if it did, an XSS
+// flaw in the renderer could invoke any handler in main.
 import { contextBridge, ipcRenderer } from 'electron'
 import { CANAIS } from '../shared/ipc.js'
 import type { AtlasApi } from '../shared/ipc.js'
@@ -19,9 +19,9 @@ import type { EstadoApp } from '../main/state/store.js'
 function assinar<T>(canal: string, fn: (dado: T) => void): () => void {
   const ouvinte = (_e: unknown, dado: T) => fn(dado)
   ipcRenderer.on(canal, ouvinte)
-  // Devolver o cancelamento nao e cortesia: sem ele, cada remontagem de
-  // componente no React acumula um ouvinte, e o Electron avisa de memory leak
-  // depois do decimo primeiro.
+  // Returning the unsubscribe is not a courtesy: without it, each React
+  // component remount accumulates a listener, and Electron warns of a memory
+  // leak after the eleventh.
   return () => ipcRenderer.removeListener(canal, ouvinte)
 }
 

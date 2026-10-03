@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest"
 import { act, cleanup, render, screen } from "@testing-library/react"
 
-// A página real; só o serviço, a sessão e o que não entra na conta são dublados.
+// The real page; only the service, the session and what does not matter here are doubled.
 const svc = vi.hoisted(() => ({
   getAgents: vi.fn(),
   getMyAgents: vi.fn(),
@@ -21,8 +21,8 @@ afterEach(() => { cleanup(); vi.restoreAllMocks() })
 const FALHA = { success: false, status: 500, error: { message: "fora do ar" } }
 
 it("1ª carga em erro: o auto-refresh tenta de novo sem tirar o cartão da tela (um anúncio só)", async () => {
-  // Cada busca fica pendente até o teste resolvê-la, como a rede de verdade:
-  // é no meio da busca que o skeleton aparecia no lugar do cartão.
+  // Each fetch stays pending until the test resolves it, like the real network:
+  // it is in the middle of the fetch that the skeleton used to appear in place of the card.
   const pendentes: ((r: unknown) => void)[] = []
   svc.getAgents.mockImplementation(() => new Promise(r => { pendentes.push(r) }))
   svc.getExecutorMetrics.mockResolvedValue(FALHA)
@@ -34,7 +34,7 @@ it("1ª carga em erro: o auto-refresh tenta de novo sem tirar o cartão da tela 
     return original(() => {}, 1_000_000)
   }) as typeof window.setInterval)
 
-  // Cada nó `role="alert"` inserido é um anúncio novo no leitor de tela.
+  // Each inserted `role="alert"` node is a new announcement in the screen reader.
   let insercoes = 0
   const observador = new MutationObserver(mutacoes => {
     for (const m of mutacoes) for (const n of m.addedNodes) {
@@ -52,7 +52,7 @@ it("1ª carga em erro: o auto-refresh tenta de novo sem tirar o cartão da tela 
   const tique = intervalos.find(i => i.ms === 15_000)!
   for (let k = 0; k < 3; k++) {
     await act(async () => { tique.fn() })
-    // Em voo: o mesmo cartão, sem skeleton.
+    // In flight: the same card, no skeleton.
     expect(screen.getByRole("alert")).toBe(cartao)
     expect(screen.queryByLabelText("Carregando os executores")).toBeNull()
     await act(async () => { pendentes.shift()!(FALHA) })
@@ -60,7 +60,7 @@ it("1ª carga em erro: o auto-refresh tenta de novo sem tirar o cartão da tela 
   }
   expect(svc.getAgents).toHaveBeenCalledTimes(4)
 
-  // A volta à aba também é recarga de fundo.
+  // Coming back to the tab is also a background reload.
   await act(async () => { document.dispatchEvent(new Event("visibilitychange")) })
   expect(screen.getByRole("alert")).toBe(cartao)
   await act(async () => { pendentes.shift()!(FALHA) })
@@ -69,7 +69,7 @@ it("1ª carga em erro: o auto-refresh tenta de novo sem tirar o cartão da tela 
   observador.disconnect()
   expect(insercoes).toBe(1)
 
-  // O servidor voltou: a lista toma o lugar do cartão, sem clique.
+  // The server is back: the list takes the card's place, with no click.
   await act(async () => { tique.fn() })
   await act(async () => { pendentes.shift()!({ success: true, status: 200, data: [] }) })
   expect(screen.queryByRole("alert")).toBeNull()

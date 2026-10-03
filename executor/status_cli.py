@@ -1,19 +1,19 @@
 # executor/status_cli.py
 """
-Subcomando `python -m executor status --json`.
+`python -m executor status --json` subcommand.
 
-Consulta `GET /executores/{id}/status` e imprime o resultado como um unico
-objeto JSON no stdout.
+Queries `GET /executores/{id}/status` and prints the result as a single JSON
+object on stdout.
 
-Existe para o app desktop poder listar os workspaces acessiveis sem que o lado
-Node reimplemente mTLS. A chamada exige o certificado do executor, o trust store
-da CA interna e a normalizacao de `wss://` para `https://` — tudo ja resolvido
-em `executor/utils.py` e `_ca_bootstrap.py`. Duplicar isso em TypeScript seria
-uma segunda implementacao de autenticacao para manter em dia, e a primeira a
-divergir quando a CA mudasse.
+Exists so the desktop app can list the accessible workspaces without the Node
+side reimplementing mTLS. The call requires the executor's certificate, the
+internal CA's trust store and the normalization of `wss://` to `https://` — all
+already solved in `executor/utils.py` and `_ca_bootstrap.py`. Duplicating that
+in TypeScript would be a second authentication implementation to keep up to
+date, and the first to diverge when the CA changed.
 
-E o mesmo dado que `main.py` usa para decidir o workspace do GeoSync, entao a
-tela do app mostra exatamente o que o executor vai enxergar no proximo boot.
+It is the same data `main.py` uses to decide the GeoSync workspace, so the app
+screen shows exactly what the executor will see on the next boot.
 """
 from __future__ import annotations
 
@@ -36,7 +36,7 @@ def _cli_main(argv: list[str]) -> int:
     )
     args = parser.parse_args(argv)
 
-    # Com --json o stdout e do JSON e de mais nada.
+    # With --json, stdout belongs to the JSON and nothing else.
     logging.basicConfig(
         level=logging.WARNING, format="%(levelname)s %(message)s",
         stream=sys.stderr if args.json else sys.stdout,
@@ -58,7 +58,7 @@ def _cli_main(argv: list[str]) -> int:
 
     if not config.EXECUTOR_ID:
         return _emitir({"ok": False, "codigo": "config", "erro": "EXECUTOR_ID nao definido."}, 1)
-    # Sem servidor nao ha a quem perguntar: e configuracao, e nao rede.
+    # Without a server there is no one to ask: it's configuration, not network.
     if not config.SERVER_URL:
         return _emitir({"ok": False, "codigo": "config", "erro": "EXECUTOR_SERVER_URL nao definido."}, 1)
 
@@ -81,8 +81,8 @@ def _cli_main(argv: list[str]) -> int:
         return _emitir({"ok": False, "codigo": "rede", "erro": f"{type(exc).__name__}: {exc}"}, 1)
 
     if r.status_code != 200:
-        # 404 aqui e o mesmo deny que derruba a conexao WebSocket com close 4404:
-        # o executor foi removido ou revogado no servidor.
+        # A 404 here is the same deny that drops the WebSocket connection with close
+        # 4404: the executor was removed or revoked on the server.
         codigo = "revoked" if r.status_code in (401, 403, 404) else "http"
         return _emitir(
             {"ok": False, "codigo": codigo,

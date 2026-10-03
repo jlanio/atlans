@@ -1,53 +1,53 @@
 # flow/nodes/control/change_detector.py
 """
-ChangeDetector — bifurcação que compara o input com a última execução.
+ChangeDetector — a fork that compares the input with the last run.
 
-Calcula um SHA-256 determinístico do input atual, troca-o atomicamente pelo
-hash da execução anterior no Redis do servidor, compara, e bifurca:
+Computes a deterministic SHA-256 of the current input, atomically swaps it with
+the previous run's hash in the server's Redis, compares, and forks:
 
-- `true`  (rotulado "Mudou")     → branch executado quando o input MUDOU
-                                    ou é a primeira execução (configurável).
-- `false` (rotulado "Sem mudança") → branch executado quando o input é
-                                    IDÊNTICO à última run.
+- `true`  (labeled "Mudou")     → branch executed when the input CHANGED
+                                    or it's the first run (configurable).
+- `false` (labeled "Sem mudança") → branch executed when the input is
+                                    IDENTICAL to the last run.
 
-Onde o hash vive
+Where the hash lives
 ----------------
-Redis no servidor — chave `change_detector:{wf|ws}:{scope_id}:{ident}`.
+Redis on the server — key `change_detector:{wf|ws}:{scope_id}:{ident}`.
 
-Como o executor acessa
+How the executor accesses it
 --------------------
-UMA chamada HTTP: `POST /internal/change-detector/{key}` grava o hash atual e
-devolve o anterior na mesma operação (SET ... GET atômico no Redis). Metade da
-latência do antigo par GET+PUT e, mais importante, sem a corrida em que duas
-runs simultâneas do mesmo workflow liam o mesmo hash antigo e AMBAS decidiam
-"Mudou". Autenticado por mTLS (cert client + `X-Forwarded-Tls-Client-Cert-Info`);
-o executor não tem acesso ao Redis do servidor.
+ONE HTTP call: `POST /internal/change-detector/{key}` writes the current hash and
+returns the previous one in the same operation (atomic SET ... GET in Redis). Half
+the latency of the old GET+PUT pair and, more importantly, without the race in
+which two simultaneous runs of the same workflow read the same old hash and BOTH
+decided "Mudou". Authenticated via mTLS (client cert + `X-Forwarded-Tls-Client-Cert-Info`);
+the executor has no access to the server's Redis.
 
-Comportamento em falha
+Behavior on failure
 ----------------------
-Configurável por `on_backend_error`:
-- `mudou` (default) — fail-closed: recomputa o que recomputaria de qualquer
-  jeito antes da feature existir. Nunca trata como `unchanged` por engano.
-- `sem_mudanca` — para fluxos com efeito colateral caro/irreversível a jusante
-  do branch "Mudou" (e-mail, publicação): um piscar de infra não dispara nada.
-- `falhar` — a run erra visivelmente em vez de decidir às cegas.
+Configurable via `on_backend_error`:
+- `mudou` (default) — fail-closed: recomputes what it would have recomputed
+  anyway before the feature existed. Never treats as `unchanged` by mistake.
+- `sem_mudanca` — for workflows with an expensive/irreversible side effect downstream
+  of the "Mudou" branch (email, publishing): an infra blip triggers nothing.
+- `falhar` — the run fails visibly instead of deciding blindly.
 
-O output `reason` diz POR QUE o branch saiu como saiu:
+The `reason` output says WHY the branch came out the way it did:
 `mudou | sem_mudanca | primeira_execucao | backend_indisponivel | tipo_nao_hashavel`.
 
-Higiene de estado
+State hygiene
 -----------------
-Deletar o workflow limpa as chaves `wf:*`; deletar o workspace limpa também as
-`ws:*` (workflow_service). Remover só o NÓ do canvas deixa a chave órfã até o
-TTL vencer (default 168h) — deliberado: rastrear diffs de definição a cada save
-não paga o custo de um cache que expira sozinho.
+Deleting the workflow clears the `wf:*` keys; deleting the workspace also clears the
+`ws:*` ones (workflow_service). Removing only the NODE from the canvas leaves the key
+orphaned until the TTL expires (default 168h) — deliberate: tracking definition diffs
+on every save doesn't pay off for a cache that expires on its own.
 
-Convenção de bifurcação
+Fork convention
 -----------------------
-Segue exatamente o padrão de `Conditional` (flow/nodes/control/conditional.py):
-output `{"branch": bool, ...}`, edges com `condition: bool`. O executor
-filtra `active_edges` por `condition == branch` e propaga skip ao branch
-perdedor via `_propagate_skip` — zero código novo na pipeline de execução.
+Follows exactly the pattern of `Conditional` (flow/nodes/control/conditional.py):
+output `{"branch": bool, ...}`, edges with `condition: bool`. The executor
+filters `active_edges` by `condition == branch` and propagates skip to the losing
+branch via `_propagate_skip` — zero new code in the execution pipeline.
 """
 import datetime as _dt
 import hashlib
@@ -73,40 +73,40 @@ _HASH_RE = re.compile(r"^[0-9a-f]{64}$")
 
 
 class ChangeDetectorTypeError(TypeError):
-    """Tipo do input nao tem canonizacao estavel — converter antes do node.
+    """Input type has no stable canonicalization — convert it before the node.
 
-    Levantada quando o input contem um objeto sem representacao deterministica
-    (ex: instancia de classe custom cujo repr() inclui o id() do heap, que muda
-    a cada execucao). Hashear isso produziria 'mudou' falso em toda run.
+    Raised when the input contains an object with no deterministic representation
+    (e.g.: an instance of a custom class whose repr() includes the heap id(), which
+    changes on every run). Hashing that would produce a false 'mudou' on every run.
     """
 
 
-# ── Hash determinístico do input ─────────────────────────────────────────────
+# ── Deterministic hash of the input ──────────────────────────────────────────
 
 def _stable_hash(
     value: Any,
     fields_filter: Iterable[str] | None = None,
     ignore_paths: Iterable[str] | None = None,
 ) -> str:
-    """SHA-256 hex lowercase de qualquer input, após canonização recursiva.
+    """Lowercase hex SHA-256 of any input, after recursive canonicalization.
 
-    A canonização garante que dois inputs semanticamente iguais produzam o
-    mesmo hash (ex: dict com chaves em ordem diferente, float com ruído de
-    precisão, DataFrame com mesmas linhas em ordem diferente).
+    Canonicalization ensures that two semantically equal inputs produce the
+    same hash (e.g.: a dict with keys in a different order, a float with precision
+    noise, a DataFrame with the same rows in a different order).
 
-    `ignore_paths` remove campos ANTES do hash — caminhos com ponto descem em
-    dicts aninhados e em listas de dicts, e o último segmento também remove
-    coluna de DataFrame. É o jeito de ignorar timestamps voláteis sem listar
-    todos os outros campos (que é o que `fields_filter`, de inclusão, exige).
+    `ignore_paths` removes fields BEFORE the hash — dotted paths descend into
+    nested dicts and into lists of dicts, and the last segment also removes a
+    DataFrame column. It's the way to ignore volatile timestamps without listing
+    all the other fields (which is what `fields_filter`, an inclusion filter, requires).
 
-    Levanta ChangeDetectorTypeError se o input contiver um tipo sem canonização
-    estável — melhor falhar claro do que gerar hash instável silenciosamente.
+    Raises ChangeDetectorTypeError if the input contains a type without stable
+    canonicalization — better to fail clearly than to silently produce an unstable hash.
     """
     value = _aplicar_ignorados(value, list(ignore_paths) if ignore_paths else None)
     canonical = _canonicalize(value, list(fields_filter) if fields_filter else None)
     if isinstance(canonical, bytes):
         return hashlib.sha256(canonical).hexdigest()
-    # Sem default= : todo tipo é tratado em _canonicalize ou levanta erro lá.
+    # No default= : every type is handled in _canonicalize or raises an error there.
     payload = json.dumps(canonical, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
@@ -127,13 +127,13 @@ def _aplicar_ignorados(value: Any, ignore_paths: list[str] | None) -> Any:
 
 
 def _sem_caminho(value: Any, path: list[str]) -> Any:
-    """Remove um caminho pontilhado sem MUTAR o input do usuário.
+    """Removes a dotted path without MUTATING the user's input.
 
-    Copia apenas ao longo do caminho afetado; ramos intactos são
-    compartilhados. Lista aplica o mesmo caminho a cada item (o caso
-    `items.timestamp` numa lista de registros). Em DataFrame o segmento
-    final é nome de coluna — `drop(errors="ignore")`, porque a coluna
-    ausente não é erro, é um input que já está como o filtro quer.
+    Copies only along the affected path; untouched branches are
+    shared. A list applies the same path to each item (the
+    `items.timestamp` case in a list of records). In a DataFrame the final
+    segment is a column name — `drop(errors="ignore")`, because a missing
+    column is not an error, it's an input that is already as the filter wants it.
     """
     if not path:
         return value
@@ -141,7 +141,7 @@ def _sem_caminho(value: Any, path: list[str]) -> Any:
 
     if _e_dataframe(value):
         if resto:
-            return value  # coluna é folha; caminho mais fundo não se aplica
+            return value  # a column is a leaf; a deeper path doesn't apply
         return value.drop(columns=[head], errors="ignore")
 
     if isinstance(value, dict):
@@ -161,12 +161,12 @@ def _sem_caminho(value: Any, path: list[str]) -> Any:
 
 
 def _canonicalize(value: Any, fields_filter: list[str] | None) -> Any:
-    """Reduz value a uma forma JSON-serializável estável."""
+    """Reduces value to a stable JSON-serializable form."""
     # 1. None / bool / int / str — primitivos passam direto.
     if value is None or isinstance(value, (bool, int, str)):
         return value
 
-    # 2. Float — normaliza precisão para evitar 0.1+0.2 != 0.3.
+    # 2. Float — normalizes precision to avoid 0.1+0.2 != 0.3.
     if isinstance(value, float):
         if value != value:  # NaN
             return "__NaN__"
@@ -174,16 +174,16 @@ def _canonicalize(value: Any, fields_filter: list[str] | None) -> Any:
             return "__inf__"
         if value == float("-inf"):
             return "__-inf__"
-        # 12 casas: resolução geográfica < 0.1mm em qualquer projeção típica.
+        # 12 decimal places: geographic resolution < 0.1mm in any typical projection.
         return round(value, 12)
 
     # 3. Bytes — prefixo discrimina de string ("abc" != b"abc").
     if isinstance(value, bytes):
         return b"\x00bytes\x00" + value
 
-    # 3b. Tipos comuns com representação canônica determinística.
-    # datetime/date/time → isoformat; subclasse de Enum precisa vir antes de
-    # int/str (mas primitivos já saíram acima — Enum puro cai aqui).
+    # 3b. Common types with a deterministic canonical representation.
+    # datetime/date/time → isoformat; an Enum subclass must come before
+    # int/str (but primitives already left above — a plain Enum lands here).
     if isinstance(value, Enum):
         return {"__enum__": f"{type(value).__module__}.{type(value).__name__}",
                 "name": value.name,
@@ -197,22 +197,22 @@ def _canonicalize(value: Any, fields_filter: list[str] | None) -> Any:
     if isinstance(value, PurePath):
         return {"__path__": value.as_posix()}
     if isinstance(value, Decimal):
-        # str() preserva precisão exata (ao contrário de float()).
+        # str() preserves exact precision (unlike float()).
         return {"__decimal__": str(value)}
 
-    # 4. GeoDataFrame — hash incremental (não materializa GB de WKB).
+    # 4. GeoDataFrame — incremental hash (doesn't materialize GBs of WKB).
     import geopandas as gpd  # type: ignore
     if isinstance(value, gpd.GeoDataFrame):
         return _hash_geodataframe(value)
 
-    # 5. DataFrame puro — pandas.util.hash_pandas_object é vetorizado.
+    # 5. Plain DataFrame — pandas.util.hash_pandas_object is vectorized.
     import pandas as pd  # type: ignore
     if isinstance(value, pd.DataFrame):
         return _hash_dataframe(value)
     if isinstance(value, pd.Series):
         return _hash_dataframe(value.to_frame())
 
-    # 6. dict — ordena por chave; filtro opcional aplica APENAS na raiz.
+    # 6. dict — sorts by key; the optional filter applies ONLY at the root.
     if isinstance(value, dict):
         if fields_filter:
             items = [(k, value[k]) for k in fields_filter if k in value]
@@ -226,10 +226,10 @@ def _canonicalize(value: Any, fields_filter: list[str] | None) -> Any:
     if isinstance(value, set):
         return sorted([_canonicalize(item, None) for item in value], key=str)
 
-    # 8. Tipo sem canonização estável → fail-fast. repr()/str() de objetos
-    # custom costuma incluir o id() do heap, que muda a cada run e produziria
-    # "mudou" falso. Melhor falhar claro: o workflow deve converter o objeto
-    # para dict/list/primitivos antes de passar ao ChangeDetector.
+    # 8. Type without stable canonicalization → fail-fast. repr()/str() of custom
+    # objects usually includes the heap id(), which changes on every run and would
+    # produce a false "mudou". Better to fail clearly: the workflow should convert the
+    # object to dict/list/primitives before passing it to ChangeDetector.
     type_path = f"{type(value).__module__}.{type(value).__name__}"
     raise ChangeDetectorTypeError(
         f"ChangeDetector: tipo '{type_path}' nao tem canonizacao estavel. "
@@ -239,24 +239,24 @@ def _canonicalize(value: Any, fields_filter: list[str] | None) -> Any:
 
 
 def _soma_u64(hashes) -> int:
-    """Soma modular 2^64 dos hashes de linha — agregador insensível à ordem.
+    """Modular 2^64 sum of the row hashes — an order-insensitive aggregator.
 
-    Substitui o XOR da v1: `h ^ h == 0`, então qualquer PAR de linhas idênticas
-    se anulava e trocar {x, x} por {y, y} passava como "sem mudança" (n_rows,
-    cols e dtypes iguais, xor igual). Na soma, duplicatas contribuem 2h — a
-    troca só passaria despercebida numa colisão de 64 bits.
+    Replaces v1's XOR: `h ^ h == 0`, so any PAIR of identical rows canceled
+    out and swapping {x, x} for {y, y} passed as "sem mudança" (n_rows,
+    cols and dtypes equal, xor equal). With the sum, duplicates contribute 2h — the
+    swap would only go unnoticed in a 64-bit collision.
     """
     import numpy as np  # type: ignore
     return int(np.asarray(hashes, dtype="uint64").sum(dtype="uint64"))
 
 
 def _hash_dataframe(df) -> dict:
-    """Assinatura compacta de DataFrame — vetorizado em C, não materializa.
+    """Compact DataFrame signature — vectorized in C, doesn't materialize.
 
-    Versão 2: agregador é soma modular (ver _soma_u64). Insensível à ordem das
-    linhas de propósito — queries paralelas podem reordenar entre runs sem que
-    isso seja "mudança real". O bump de versão invalida todos os hashes v1 uma
-    única vez após o deploy ("Mudou" espúrio, uma vez por workflow).
+    Version 2: the aggregator is a modular sum (see _soma_u64). Insensitive to row
+    order on purpose — parallel queries may reorder between runs without
+    that being a "real change". The version bump invalidates all v1 hashes once
+    after the deploy (a spurious "Mudou", once per workflow).
     """
     import pandas as pd  # type: ignore
     row_hashes = pd.util.hash_pandas_object(df, index=False)
@@ -295,14 +295,14 @@ def _hash_geodataframe(gdf) -> dict:
     }
 
 
-# ── Backend bridge: troca o hash no Redis via REST (uma operação) ────────────
+# ── Backend bridge: swaps the hash in Redis via REST (one operation) ────────
 
 def _validate_hash(raw: str | None, key: str) -> str | None:
-    """Aceita só SHA-256 hex (64 chars). Valor corrompido vira None (= primeira run).
+    """Accepts only hex SHA-256 (64 chars). A corrupted value becomes None (= first run).
 
-    Protege contra corruption no Redis ou colisão de chave que capture um valor
-    de outro formato — sem isso, a comparação falharia silenciosamente e o node
-    decidiria errado.
+    Protects against corruption in Redis or a key collision that captures a value
+    of another format — without it, the comparison would fail silently and the node
+    would decide wrong.
     """
     if raw is None:
         return None
@@ -317,11 +317,11 @@ def _validate_hash(raw: str | None, key: str) -> str | None:
 
 
 async def _swap_hash(key: str, hash_value: str, ttl_seconds: int) -> str | None:
-    """Grava `hash_value` para `key` e devolve o hash ANTERIOR (None = primeira).
+    """Writes `hash_value` for `key` and returns the PREVIOUS hash (None = first).
 
-    Uma operação atômica no servidor (SET ... GET do Redis): decisão e gravação
-    na mesma ida, sem a janela em que duas runs simultâneas liam o mesmo valor
-    antigo e ambas decidiam "Mudou". ttl_seconds=0 = sem expiração.
+    One atomic operation on the server (Redis SET ... GET): decision and write
+    in the same round trip, without the window in which two simultaneous runs read
+    the same old value and both decided "Mudou". ttl_seconds=0 = no expiration.
     """
     from flow.utils.executor_http import get_agent_http_config
     from flow.utils.http_retry import async_request_with_retry
@@ -336,8 +336,8 @@ async def _swap_hash(key: str, hash_value: str, ttl_seconds: int) -> str | None:
         label=f"change-detector SWAP {key}",
     )
     if resp.status_code != 200:
-        # 503/5xx persistente apos retry = backend indisponível. Propaga; o
-        # node decide conforme `on_backend_error`.
+        # Persistent 503/5xx after retry = backend unavailable. Propagates; the
+        # node decides according to `on_backend_error`.
         resp.raise_for_status()
     return _validate_hash(resp.json().get("previous_hash"), key)
 
@@ -380,15 +380,15 @@ class ChangeDetector(BaseNode):
                     "name":    "fields",
                     "label":   "Campos a hashar (inclusão)",
                     "type":    "chips",
-                    # O nó não declara portas (aceita o que for ligado, e com
-                    # várias entradas hasheia todas): '*' é a única sugestão
-                    # que faz sentido — as colunas que chegaram, de onde vierem.
+                    # The node declares no ports (it accepts whatever is connected, and with
+                    # several inputs it hashes all of them): '*' is the only suggestion
+                    # that makes sense — the columns that arrived, wherever they came from.
                     "suggest_columns": "*",
-                    # Default "" (e não []) de propósito: um executor com flow/
-                    # ANTERIOR ainda valida este campo como type "string" — uma
-                    # lista no default derrubava a run inteira só por o
-                    # workflow ter sido salvo na UI nova. "" passa lá e o
-                    # parser novo lê "" -> [].
+                    # Default "" (and not []) on purpose: an executor with an OLDER
+                    # flow/ still validates this field as type "string" — a
+                    # list in the default brought down the whole run just because the
+                    # workflow had been saved in the new UI. "" passes there and the
+                    # new parser reads "" -> [].
                     "default": "",
                     "description":
                         "Lista de campos do input dict a considerar — só a raiz. "
@@ -400,7 +400,7 @@ class ChangeDetector(BaseNode):
                     "label":   "Campos a ignorar",
                     "type":    "chips",
                     "suggest_columns": "*",
-                    # Default "" pela mesma compat de versão do campo acima.
+                    # Default "" for the same version compat as the field above.
                     "default": "",
                     "description":
                         "Campos removidos antes do hash. Aceita caminho com "
@@ -460,10 +460,10 @@ class ChangeDetector(BaseNode):
         }
 
     def _ttl_horas(self) -> int:
-        """TTL em horas, tolerante a campo limpo/ilegível — cai no default 168.
+        """TTL in hours, tolerant of a cleared/unreadable field — falls back to the default 168.
 
-        `get_param_int` levanta ValueError para ""/None, e derrubar a run
-        porque o usuário limpou um campo opcional é punição desproporcional.
+        `get_param_int` raises ValueError for ""/None, and bringing down the run
+        because the user cleared an optional field is a disproportionate punishment.
         """
         try:
             return max(self.get_param_int("ttl_hours", 168), 0)
@@ -482,17 +482,17 @@ class ChangeDetector(BaseNode):
         on_erro        = (self.get_param("on_backend_error", "mudou") or "mudou").strip().lower()
         ttl_hours      = self._ttl_horas()
 
-        # Campos de fichas: aceitam lista, JSON-string (o que a tela grava) e o
-        # CSV das definitions antigas.
+        # Chips fields: accept a list, a JSON string (what the screen writes) and the
+        # CSV of old definitions.
         fields_filter = colunas_pedidas(self.get_param("fields", [])) or None
         ignore_paths  = colunas_pedidas(self.get_param("ignore_fields", [])) or None
 
         node_id = self.node_id
 
-        # Uma entrada: hasheia o payload dela (convenção do projeto). Mais de
-        # uma: TODAS entram, ordenadas por nome — descartar as demais em
-        # silêncio (comportamento antigo) escondia mudança real de quem ligou
-        # duas fontes no detector.
+        # One input: hashes its payload (project convention). More than
+        # one: ALL of them go in, sorted by name — silently discarding the others
+        # (old behavior) hid a real change from whoever connected
+        # two sources to the detector.
         if len(inputs) > 1:
             logger.info(
                 "ChangeDetector(%s): %d entradas ligadas — todas entram no hash, ordenadas por nome.",
@@ -503,10 +503,10 @@ class ChangeDetector(BaseNode):
             data = next(iter(inputs.values())) if inputs else None
 
         def _resultado(branch: bool, prev, cur, reason: str) -> Dict[str, Any]:
-            # `output` PRIMEIRO, `branch` depois. A aresta de bifurcação nasce
-            # sem `from_key`, então o executor espalha este dict no nó seguinte
-            # e quem lê `next(iter(inputs.values()))` pegava o booleano em vez
-            # do dado que este nó existe para deixar passar adiante.
+            # `output` FIRST, `branch` after. The fork edge is created
+            # without `from_key`, so the executor spreads this dict into the next node
+            # and whoever reads `next(iter(inputs.values()))` got the boolean instead
+            # of the data this node exists to pass along.
             return {
                 "output":        data,
                 "previous_hash": prev,
@@ -515,9 +515,9 @@ class ChangeDetector(BaseNode):
                 "branch":        branch,
             }
 
-        # Calcula o hash. Tipo sem canonização estável (ChangeDetectorTypeError)
-        # ou qualquer falha inesperada → fail-safe (branch=True), com erro claro
-        # no log para o operador converter o input antes do node.
+        # Computes the hash. A type without stable canonicalization (ChangeDetectorTypeError)
+        # or any unexpected failure → fail-safe (branch=True), with a clear error
+        # in the log for the operator to convert the input before the node.
         try:
             current_hash = _stable_hash(data, fields_filter, ignore_paths)
         except ChangeDetectorTypeError as exc:
@@ -530,8 +530,8 @@ class ChangeDetector(BaseNode):
 
         if scope == "workspace":
             ident = shared_key_raw.strip() or node_id
-            # workspace_id ausente em workflow legado → fallback para workflow
-            # com warning, mantendo a feature funcional.
+            # workspace_id missing in a legacy workflow → fall back to workflow
+            # with a warning, keeping the feature functional.
             if workspace_id == "global":
                 logger.warning(
                     "ChangeDetector(%s): workspace_id ausente, fallback para escopo 'workflow'",
@@ -543,9 +543,9 @@ class ChangeDetector(BaseNode):
         else:  # "workflow"
             key = f"wf:{workflow_hash}:{node_id}"
 
-        # Troca o hash (grava o atual, recebe o anterior) numa operação só.
-        # Gravar mesmo em "sem mudança" é deliberado: refresh do TTL — workflow
-        # ativo nunca tem o hash expirando enquanto roda regularmente.
+        # Swaps the hash (writes the current one, receives the previous) in a single operation.
+        # Writing even on "sem mudança" is deliberate: it refreshes the TTL — an active
+        # workflow never has its hash expire while it runs regularly.
         ttl_seconds = ttl_hours * 3600
         try:
             previous_hash = await _swap_hash(key, current_hash, ttl_seconds)

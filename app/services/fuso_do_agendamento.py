@@ -1,16 +1,16 @@
 # app/services/fuso_do_agendamento.py
 """
-O fuso padrão dos agendamentos no nó ScheduleTrigger despachado.
+The default time zone of schedules in the dispatched ScheduleTrigger node.
 
-O `default` do campo `timezone` do nó é lido do ambiente de QUEM IMPORTA o nó
-(`flow/utils/fuso.py`): no servidor, `AGENDAMENTO_FUSO_PADRAO`; no executor,
-que não tem essa variável, UTC. O servidor agenda pelo dele, e o executor só
-repete os parâmetros na saída do nó (`info.timezone`) — e os dois divergiam
-num gatilho sem fuso explícito. Como faz com os fundos de mapa
-(`fundos_do_mapa.py`), o servidor preenche o fuso ao despachar: um
-ScheduleTrigger sem `timezone` (ou com ele vazio) sai com o fuso padrão da
-instalação, nas duas formas de propriedades (`properties`, a que o executor
-lê, e `data.properties`, a do canvas). Um fuso explícito no workflow fica.
+The `default` of the node's `timezone` field is read from the environment of WHOEVER
+IMPORTS the node (`flow/utils/fuso.py`): on the server, `AGENDAMENTO_FUSO_PADRAO`; on
+the executor, which does not have that variable, UTC. The server schedules by its own,
+and the executor only echoes the parameters in the node's output (`info.timezone`) —
+and the two diverged on a trigger without an explicit time zone. As it does with the
+map basemaps (`fundos_do_mapa.py`), the server fills in the time zone when dispatching: a
+ScheduleTrigger without `timezone` (or with it empty) goes out with the installation's
+default time zone, in both forms of properties (`properties`, the one the executor
+reads, and `data.properties`, the canvas's). An explicit time zone in the workflow stays.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ NO_DO_AGENDAMENTO = "ScheduleTrigger"
 
 
 def injetar_fuso_do_agendamento(definition: dict, fuso: str | None = None) -> dict:
-    """A definição com o fuso da instalação em cada ScheduleTrigger sem fuso (cópia, se mudar)."""
+    """The definition with the installation time zone in each ScheduleTrigger without one (a copy, if it changes)."""
     nos = definition.get("nodes") if isinstance(definition, dict) else None
     if not nos or not any(isinstance(n, dict) and n.get("name") == NO_DO_AGENDAMENTO for n in nos):
         return definition

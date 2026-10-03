@@ -7,7 +7,7 @@ import {
 import { plural } from "@/lib/formatos"
 import type { UploadErrorCode } from "@/service/types"
 
-// ── Classificação da falha de upload ──────────────────────────────────────────
+// ── Upload failure classification ─────────────────────────────────────────────
 
 export type UploadErrorType = "extension" | "size" | "empty" | "permission" | "other"
 
@@ -17,7 +17,7 @@ export interface UploadError {
   type:     UploadErrorType
 }
 
-/** A categoria de cada código de recusa do Drive (`error` do corpo). */
+/** The category of each Drive rejection code (`error` in the body). */
 const TIPO_DO_CODIGO: Record<UploadErrorCode, UploadErrorType> = {
   extension_not_allowed:     "extension",
   dangerous_inner_extension: "extension",
@@ -26,25 +26,26 @@ const TIPO_DO_CODIGO: Record<UploadErrorCode, UploadErrorType> = {
 }
 
 /**
- * Classifica a falha pelo que o backend devolveu: o status e o CÓDIGO (`error`
- * do corpo, que o `GisFlowService` entrega em `IResponse.error.code`). Nunca
- * pela frase — a regra antiga procurava "extensão"/"não permitida" no texto, e
- * o backend escreve sem acento: a recusa por extensão caía em "other".
+ * Classifies the failure by what the backend returned: the status and the CODE
+ * (`error` in the body, which `GisFlowService` delivers in `IResponse.error.code`).
+ * Never by the sentence — the old rule looked for "extensão"/"não permitida" in
+ * the text, and the backend writes without accents: the extension rejection
+ * fell into "other".
  *
- * O status vale antes do código: o 403 do papel e o 413 do teto lido pelo
- * router são `HTTPException`, sem código de domínio.
+ * The status counts before the code: the role 403 and the ceiling 413 read by
+ * the router are `HTTPException`, with no domain code.
  */
 export function classifyUploadError(status: number | undefined, codigo: string | undefined): UploadErrorType {
   if (status === 403) return "permission"
   if (status === 413) return "size"
-  // `hasOwn`, e não o índice cru: um código como "constructor" acharia o do protótipo.
+  // `hasOwn`, not the raw index: a code like "constructor" would find the prototype's.
   return codigo && Object.hasOwn(TIPO_DO_CODIGO, codigo) ? TIPO_DO_CODIGO[codigo as UploadErrorCode] : "other"
 }
 
 /**
- * Ícone, rótulo e cor de cada tipo de falha. As cores saíram dos literais
- * `text-orange-500`/`text-yellow-500` para pares de status com par escuro (§6),
- * então o rótulo lê nos dois temas em vez de sumir no fundo escuro.
+ * Icon, label and color of each failure type. The colors moved from the
+ * `text-orange-500`/`text-yellow-500` literals to status pairs with a dark pair
+ * (§6), so the label reads in both themes instead of vanishing on the dark background.
  */
 const ERROR_META: Record<UploadErrorType, { icon: React.ElementType; color: string }> = {
   extension:  { icon: TbFileOff,       color: "text-amber-600 dark:text-amber-400" },
@@ -54,7 +55,7 @@ const ERROR_META: Record<UploadErrorType, { icon: React.ElementType; color: stri
   other:      { icon: TbAlertTriangle, color: "text-destructive" },
 }
 
-/** Os textos do painel. Padrão: o português do Drive; a Home traduzida passa os dela. */
+/** The panel's texts. Default: the Drive's Portuguese; the translated Home passes its own. */
 export interface TextosDoResultado {
   enviados: (n: number) => string
   falhas: (n: number) => string
@@ -75,7 +76,7 @@ export const TEXTOS_DO_RESULTADO_PT: TextosDoResultado = {
   },
 }
 
-/** Painel de resultado do último envio: quantos foram, o que falhou e por quê. */
+/** Result panel of the last upload: how many went through, what failed and why. */
 export function ResultadoDoUpload({
   sucessos, erros, onFechar, textos = TEXTOS_DO_RESULTADO_PT,
 }: { sucessos: number; erros: UploadError[]; onFechar: () => void; textos?: TextosDoResultado }) {

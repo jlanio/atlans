@@ -1,13 +1,13 @@
 /**
- * Os formatadores da Home por idioma: o português é o de `lib/formatos` (a Home
- * em português não muda um byte), inglês e espanhol espelham a granularidade.
+ * The Home's formatters per language: Portuguese is the one from `lib/formatos` (the Home
+ * in Portuguese does not change a byte), English and Spanish mirror the granularity.
  */
 import { describe, it, expect } from "vitest"
 import { FORMATOS } from "@/app/components/home/i18n/formatos"
 import { formatarInteiro, formatarQuando } from "@/lib/formatos"
 import { textosDe } from "@/app/components/home/i18n"
 
-// Meio-dia local de uma quarta: longe da meia-noite, "hoje" e "ontem" são estáveis.
+// Local noon on a Wednesday: far from midnight, "today" and "yesterday" are stable.
 const AGORA = new Date(2026, 8, 23, 12, 0, 0)
 const iso = (d: Date) => d.toISOString()
 const menos = (min: number) => iso(new Date(AGORA.getTime() - min * 60_000))

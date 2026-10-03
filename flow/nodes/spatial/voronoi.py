@@ -1,6 +1,6 @@
 # flow/nodes/spatial/voronoi.py
 """
-Nó Voronoi — gera diagrama de Voronoi (polígonos de Thiessen) a partir de pontos.
+Voronoi node — generates a Voronoi diagram (Thiessen polygons) from points.
 """
 import asyncio
 import geopandas as gpd

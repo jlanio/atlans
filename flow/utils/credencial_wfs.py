@@ -1,18 +1,18 @@
 # flow/utils/credencial_wfs.py
 #
-# A credencial de um serviço WFS, de `http_auth` (o que o servidor injeta ao
-# resolver a credencial salva — ver app/services/credential_resolver.py) até o
-# que assina cada pedido: a chave do módulo authkey do GeoServer, como
-# parâmetro da URL (o padrão dele) ou como cabeçalho, ou usuário e senha (Basic,
-# a credencial "wfs").
+# The credential of a WFS service, from `http_auth` (what the server injects when
+# resolving the saved credential — see app/services/credential_resolver.py) to
+# what signs each request: the key of GeoServer's authkey module, as a URL
+# parameter (its default) or as a header, or username and password (Basic,
+# the "wfs" credential).
 #
-# Mora aqui, e não no nó, porque três lados leem a MESMA credencial e têm de
-# aceitar e recusar as mesmas coisas: o nó WFS, no executor (pelo owslib), a
-# listagem de camadas do editor, no servidor (`GET /nodes/wfs/layers`, pelo
-# httpx), e a tela de Credenciais, ao gravar e ao "Testar" (ver
-# app/services/credential_service.py). Cópias das regras divergiriam na
-# primeira mudança — e o editor listaria com uma credencial que a execução
-# recusa, ou a tela gravaria uma que ninguém consegue usar.
+# Lives here, and not in the node, because three sides read the SAME credential
+# and must accept and reject the same things: the WFS node, on the executor (via
+# owslib), the editor's layer listing, on the server (`GET /nodes/wfs/layers`, via
+# httpx), and the Credentials screen, on save and on "Testar" (see
+# app/services/credential_service.py). Copies of the rules would diverge at the
+# first change — and the editor would list with a credential the run
+# rejects, or the screen would save one that nobody can use.
 import base64
 import hashlib
 import json
@@ -22,26 +22,26 @@ from typing import Any
 from urllib.parse import quote, quote_plus
 
 _NOME_DA_CHAVE_RE = re.compile(r"[A-Za-z0-9_.-]{1,64}")
-# Cabeçalhos que decidem o destino ou o enquadramento do pedido: a chave no
-# lugar de um deles mandaria o pedido a outro virtual host, ou o quebraria.
+# Headers that decide the request's destination or framing: the key in place
+# of one of them would send the request to another virtual host, or break it.
 _CABECALHOS_RESERVADOS = {"host", "content-length", "transfer-encoding", "connection"}
-# Parâmetros do próprio WFS: a chave com um destes nomes seria apagada ou
-# sobrescrita pelo owslib ao montar os pedidos (e o pedido sairia sem ela).
+# WFS's own parameters: a key with one of these names would be erased or
+# overwritten by owslib when building the requests (and the request would go out without it).
 _PARAMETROS_DO_WFS = {
     "service", "version", "request", "typename", "typenames", "count", "maxfeatures",
     "startindex", "outputformat", "srsname", "bbox", "cql_filter", "filter", "resulttype",
     "sortby", "propertyname", "featureid", "resourceid", "namespaces", "exceptions",
 }
-# Caracteres de controle (CR/LF no meio da chave): o `requests` recusa o
-# cabeçalho repetindo a chave ESCAPADA na mensagem — forma que a redação não
-# reconhece.
+# Control characters (CR/LF in the middle of the key): `requests` rejects the
+# header by repeating the ESCAPED key in the message — a form the redaction does
+# not recognize.
 _CONTROLE_RE = re.compile(r"[\x00-\x1f\x7f]")
 
-# Abaixo disto o segredo não tem como ser protegido nas mensagens: redigir
-# "geo" ou "2024" mutilaria toda mensagem de erro ("C***m***d***") e, pela
-# fábrica de LogRecord (segredos_vivos), datas e ids de todo log do processo
-# enquanto a busca roda. Uma chave authkey do GeoServer é um UUID; uma senha
-# menor que isto é fraca de qualquer jeito. É o mesmo mínimo de
+# Below this the secret cannot be protected in messages: redacting
+# "geo" or "2024" would mangle every error message ("C***m***d***") and, through
+# the LogRecord factory (segredos_vivos), dates and ids in every log of the
+# process while the fetch runs. A GeoServer authkey is a UUID; a password
+# shorter than this is weak anyway. It is the same minimum as
 # `segredos_vivos._TAMANHO_MINIMO`.
 TAMANHO_MINIMO_DO_SEGREDO = 6
 
@@ -50,7 +50,7 @@ TAMANHO_MINIMO_DO_SEGREDO = 6
 class AutenticacaoWFS:
     tipo: str                 # "authkey" | "basic"
     segredo: str              # a chave (authkey) ou a senha (basic)
-    nome: str = "authkey"     # o parâmetro (ou cabeçalho) da chave
+    nome: str = "authkey"     # the key's parameter (or header)
     no_cabecalho: bool = False
     usuario: str = ""
 
@@ -59,20 +59,20 @@ class AutenticacaoWFS:
 
     @property
     def impressao(self) -> str:
-        """Identifica a credencial num cache sem guardar o segredo em claro."""
-        # JSON, e não "|".join: com o separador, o usuário "a|b" com a senha "c"
-        # e o usuário "a" com a senha "b|c" davam a mesma impressão.
+        """Identifies the credential in a cache without storing the secret in plain text."""
+        # JSON, and not "|".join: with the separator, user "a|b" with password "c"
+        # and user "a" with password "b|c" gave the same fingerprint.
         bruto = json.dumps([self.tipo, self.nome, self.no_cabecalho, self.usuario, self.segredo])
         return hashlib.sha256(bruto.encode()).hexdigest()[:24]
 
     def parametros(self) -> dict[str, str]:
-        """Os parâmetros de URL de um pedido feito à mão: a chave, quando vai na URL."""
+        """The URL parameters of a hand-made request: the key, when it goes in the URL."""
         if self.tipo == "authkey" and not self.no_cabecalho:
             return {self.nome: self.segredo}
         return {}
 
     def cabecalhos(self) -> dict[str, str]:
-        """Os cabeçalhos de um pedido feito à mão: a chave no cabeçalho, ou o Basic."""
+        """The headers of a hand-made request: the key in the header, or Basic."""
         if self.tipo == "basic":
             return {"Authorization": f"Basic {self._par_do_basic()}"}
         if self.no_cabecalho:
@@ -80,7 +80,7 @@ class AutenticacaoWFS:
         return {}
 
     def _par_do_basic(self) -> str:
-        """`base64(usuario:senha)` — a forma em que a senha VIAJA no cabeçalho."""
+        """`base64(usuario:senha)` — the form in which the password TRAVELS in the header."""
         return base64.b64encode(f"{self.usuario}:{self.segredo}".encode()).decode()
 
 
@@ -92,11 +92,11 @@ def _segredo_curto(o_que: str) -> ValueError:
 
 
 def autenticacao_wfs(credential_id: Any, http_auth: Any) -> AutenticacaoWFS | None:
-    """A credencial resolvida, validada — ou None (serviço público)."""
-    # O servidor REMOVE `credential_id` ao injetar `http_auth` (ver o
-    # resolver). Id presente e nada injetado = a resolução não aconteceu:
-    # credencial apagada, fora do escopo de quem disparou, ou órfã. Seguir
-    # anônimo aqui devolveria só o que o servidor mostra a qualquer um.
+    """The resolved, validated credential — or None (public service)."""
+    # The server REMOVES `credential_id` when injecting `http_auth` (see the
+    # resolver). Id present and nothing injected = the resolution did not happen:
+    # credential deleted, outside the scope of whoever triggered the run, or orphaned.
+    # Proceeding anonymously here would return only what the server shows anyone.
     if credential_id and not http_auth:
         raise ValueError(
             "A credencial escolhida para este nó não pôde ser resolvida — ela pode ter sido "
@@ -115,7 +115,7 @@ def autenticacao_wfs(credential_id: Any, http_auth: Any) -> AutenticacaoWFS | No
             raise ValueError("A chave da credencial authkey tem caracteres de controle (quebra de linha?).")
         if len(chave) < TAMANHO_MINIMO_DO_SEGREDO:
             raise _segredo_curto("A chave da credencial authkey")
-        # A tela de Credenciais só EXIBE o padrão destes campos; vazio = padrão.
+        # The Credentials screen only DISPLAYS these fields' default; empty = default.
         nome = str(http_auth.get("parameter") or "").strip() or "authkey"
         if not _NOME_DA_CHAVE_RE.fullmatch(nome):
             raise ValueError(f"O nome do parâmetro da credencial authkey não é válido: {nome!r}.")
@@ -125,9 +125,9 @@ def autenticacao_wfs(credential_id: Any, http_auth: Any) -> AutenticacaoWFS | No
         if local == "header" and nome.lower() in _CABECALHOS_RESERVADOS:
             raise ValueError(f"A credencial authkey não pode mandar a chave no cabeçalho {nome!r}.")
         if local == "header" and not (chave.isascii() and chave.isprintable()):
-            # O transporte mais estrito decide: o httpx da listagem só aceita
-            # ASCII num cabeçalho, e o http.client do nó só latin-1 — e os dois
-            # falham com um erro de codec que não diz que o problema é a chave.
+            # The strictest transport decides: the listing's httpx only accepts
+            # ASCII in a header, and the node's http.client only latin-1 — and both
+            # fail with a codec error that does not say the problem is the key.
             raise ValueError(
                 "A chave da credencial authkey tem caracteres fora do ASCII; no modo cabeçalho só "
                 "letras, dígitos e pontuação simples são aceitos (confira se não há aspas curvas "
@@ -151,13 +151,13 @@ def autenticacao_wfs(credential_id: Any, http_auth: Any) -> AutenticacaoWFS | No
 
 
 def formas_do_segredo(auth: AutenticacaoWFS | None) -> tuple[str, ...]:
-    """O segredo em claro e em toda forma em que ele VIAJA — maiores primeiro.
+    """The secret in plain text and in every form in which it TRAVELS — largest first.
 
-    Na URL ele vai percent-encoded (`quote`/`quote_plus`); no Basic vai como
-    `base64(usuario:senha)`, e é essa forma que um proxy ou WAF que ecoa os
-    cabeçalhos do pedido põe na página de erro — trivialmente reversível.
-    Formas abaixo do mínimo ficam de fora: não dá para redigi-las sem mutilar
-    o texto em volta (e `autenticacao_wfs` já não aceita segredo tão curto).
+    In the URL it goes percent-encoded (`quote`/`quote_plus`); in Basic it goes as
+    `base64(usuario:senha)`, and that is the form that a proxy or WAF echoing the
+    request headers puts on its error page — trivially reversible.
+    Forms below the minimum are left out: they cannot be redacted without mangling
+    the surrounding text (and `autenticacao_wfs` already rejects such a short secret).
     """
     if auth is None or not auth.segredo:
         return ()
@@ -171,7 +171,7 @@ def formas_do_segredo(auth: AutenticacaoWFS | None) -> tuple[str, ...]:
 
 
 def sem_segredo(texto: str, auth: AutenticacaoWFS | None) -> str:
-    """O texto sem o segredo — em claro e nas formas em que ele viaja."""
+    """The text without the secret — in plain text and in the forms in which it travels."""
     for forma in formas_do_segredo(auth):
         texto = texto.replace(forma, "***")
     return texto

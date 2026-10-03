@@ -3,41 +3,41 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 export interface ResizablePanelOptions {
-  /** Chave em localStorage. Sem ela a largura não sobrevive ao fechar o painel. */
+  /** localStorage key. Without it the width does not survive closing the panel. */
   storageKey?: string
   defaultWidth?: number
   /**
-   * Fração da janela que o painel ocupa ao abrir (0–1), quando isso for mais do
-   * que `defaultWidth` — é o que faz "abrir com metade da tela" continuar
-   * valendo tanto num notebook quanto num monitor grande. Só governa a
-   * abertura: uma largura já escolhida pelo usuário vence, e arrastar para
-   * menos que a fração é permitido.
+   * Fraction of the window the panel takes when it opens (0–1), when that is more
+   * than `defaultWidth` — it is what keeps "open at half the screen" holding on
+   * both a laptop and a large monitor. It only governs the opening: a width the
+   * user has already chosen wins, and dragging to less than the fraction is
+   * allowed.
    */
   defaultRatio?: number
   minWidth?: number
   maxWidth?: number
-  /** Borda em que o painel está ancorado — define para que lado o arraste cresce. */
+  /** Edge the panel is anchored to — defines which direction dragging grows it. */
   side?: "left" | "right"
   /**
-   * Falso não desliga só o arraste: o hook para de ler o storage e de ouvir o
-   * `resize` da janela. Quem chama sempre (todo `SheetContent`, mesmo os que
-   * não redimensionam) não paga por isso.
+   * False does not only turn off dragging: the hook stops reading storage and
+   * listening to the window's `resize`. Callers that always call it (every
+   * `SheetContent`, even the ones that don't resize) pay nothing for it.
    */
   enabled?: boolean
 }
 
-/** Sobra mínima entre o painel e a borda oposta da janela. */
+/** Minimum gap between the panel and the opposite edge of the window. */
 const VIEWPORT_MARGIN = 48
 const KEY_STEP = 16
 const KEY_STEP_LARGE = 64
 
 /**
- * Largura arrastável para um painel ancorado numa borda da janela.
+ * Draggable width for a panel anchored to an edge of the window.
  *
- * O arraste usa pointer capture em vez de listeners em `window`: o ponteiro
- * continua entregando eventos ao handle mesmo depois de sair dele, e soltar
- * fora da janela ainda dispara `pointerup`/`pointercancel` — com listeners
- * globais o painel ficaria preso ao cursor.
+ * Dragging uses pointer capture instead of listeners on `window`: the pointer
+ * keeps delivering events to the handle even after leaving it, and releasing
+ * outside the window still fires `pointerup`/`pointercancel` — with global
+ * listeners the panel would get stuck to the cursor.
  */
 export function useResizablePanel({
   storageKey,
@@ -51,12 +51,12 @@ export function useResizablePanel({
   const [width, setWidth] = useState(defaultWidth)
   const [isResizing, setIsResizing] = useState(false)
 
-  // `width` em ref para que os handlers leiam o valor corrente sem entrar nas
-  // dependências (um `onPointerMove` recriado a cada pixel arrastado seria
-  // trocado no meio do gesto).
+  // `width` in a ref so the handlers read the current value without entering the
+  // dependencies (an `onPointerMove` recreated on every dragged pixel would be
+  // swapped in the middle of the gesture).
   const widthRef = useRef(defaultWidth)
-  // A largura que o usuário escolheu, antes do clamp da viewport: estreitar a
-  // janela e alargá-la de volta devolve a largura pedida em vez do resto.
+  // The width the user chose, before the viewport clamp: narrowing the window and
+  // widening it back restores the requested width instead of what was left.
   const preferredRef = useRef(defaultWidth)
   const dragRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
@@ -74,29 +74,29 @@ export function useResizablePanel({
   const persist = useCallback(() => {
     preferredRef.current = widthRef.current
     if (!storageKey) return
-    // localStorage lança em modo privado/quota cheia — a largura é preferência,
-    // não vale derrubar o painel por ela.
+    // localStorage throws in private mode/with a full quota — the width is a
+    // preference, not worth bringing the panel down over.
     try {
       window.localStorage.setItem(storageKey, String(widthRef.current))
-    } catch { /* preferência descartável */ }
+    } catch { /* disposable preference */ }
   }, [storageKey])
 
-  // Depende da viewport, então só existe no cliente.
+  // Depends on the viewport, so it only exists on the client.
   const resolveDefault = useCallback(() => {
     const porFracao = defaultRatio ? window.innerWidth * defaultRatio : 0
     return Math.max(defaultWidth, porFracao)
   }, [defaultWidth, defaultRatio])
 
-  // Largura de abertura, no mount (não no render: `window` não existe no
-  // servidor). O que o usuário arrastou antes vence a fração — ele já disse o
-  // que queria.
+  // Opening width, on mount (not on render: `window` does not exist on the
+  // server). What the user dragged before wins over the fraction — they have
+  // already said what they wanted.
   useEffect(() => {
     if (!enabled) return
     let saved = NaN
     if (storageKey) {
       try {
         saved = Number(window.localStorage.getItem(storageKey))
-      } catch { /* sem storage legível: cai no default */ }
+      } catch { /* no readable storage: falls back to the default */ }
     }
     const inicial = Number.isFinite(saved) && saved > 0 ? saved : resolveDefault()
     preferredRef.current = inicial
@@ -112,8 +112,8 @@ export function useResizablePanel({
     return () => window.removeEventListener("resize", onWindowResize)
   }, [enabled, apply])
 
-  // Durante o arraste o cursor e a supressão de seleção precisam valer para a
-  // página toda: o ponteiro passa por cima de texto e de outros elementos.
+  // While dragging, the cursor and selection suppression must apply to the whole
+  // page: the pointer passes over text and other elements.
   useEffect(() => {
     if (!isResizing) return
     const { body } = document
@@ -138,8 +138,8 @@ export function useResizablePanel({
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLElement>) => {
     const drag = dragRef.current
     if (!drag) return
-    // Delta em vez de "largura = borda até o cursor": pegar o handle pelo meio
-    // não teleporta a borda para debaixo do cursor no primeiro movimento.
+    // A delta instead of "width = edge to cursor": grabbing the handle in the middle
+    // does not teleport the edge under the cursor on the first move.
     const delta = side === "right" ? drag.startX - e.clientX : e.clientX - drag.startX
     apply(drag.startWidth + delta)
   }, [apply, side])
@@ -164,7 +164,7 @@ export function useResizablePanel({
     else if (e.key === "End") next = maxWidth
     else return
     e.preventDefault()
-    // O handle vive dentro de um Dialog do Radix, que escuta setas.
+    // The handle lives inside a Radix Dialog, which listens to arrow keys.
     e.stopPropagation()
     apply(next)
     persist()
@@ -178,7 +178,7 @@ export function useResizablePanel({
   return {
     width,
     isResizing,
-    /** Espalhe no elemento do handle. */
+    /** Spread onto the handle element. */
     resizeHandleProps: {
       role: "separator",
       "aria-orientation": "vertical",

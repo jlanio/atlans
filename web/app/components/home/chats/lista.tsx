@@ -18,18 +18,18 @@ import { useFormatos, useTextosDaCasca } from "../i18n/da-casca"
 import type { IConversaResumo } from "@/service/types"
 import { RenomearDialog } from "./renomear-dialog"
 
-// Os blocos que não são `SidebarMenuSub` (avisos, rodapé) precisam sumir à mão
-// no trilho de 3rem: só a sublista traz a classe de ocultação de fábrica.
+// The blocks that are not `SidebarMenuSub` (notices, footer) must be hidden by
+// hand in the 3rem rail: only the sublist comes with the hiding class built in.
 const SO_EXPANDIDO = "group-data-[collapsible=icon]:hidden"
 
 /**
- * "Recentes": a lista de conversas do assistente, dentro do grupo Meus → Chats.
- * Renderiza um `SidebarMenuSub` (o `<ul>` indentado). A conversa ativa fica
- * destacada; cada linha tem um menu ⋯ com Renomear e Apagar.
+ * "Recentes": the list of assistant conversations, inside the Meus → Chats group.
+ * Renders a `SidebarMenuSub` (the indented `<ul>`). The active conversation is
+ * highlighted; each row has a ⋯ menu with Renomear and Apagar.
  *
- * Clicar seleciona a conversa e abre o painel flutuante. A lista vem cortada no
- * teto do servidor — o rodapé diz o total e oferece "Ver mais", porque não há
- * outra tela de Chats onde procurar o que ficou de fora.
+ * Clicking selects the conversation and opens the floating panel. The list comes
+ * cut at the server's ceiling — the footer states the total and offers "Ver
+ * mais", because there is no other Chats screen to search for what was left out.
  */
 export function ChatsLista() {
   const {
@@ -46,13 +46,14 @@ export function ChatsLista() {
   const t = textos.listas
   const fmt = useFormatos()
 
-  // O stream do assistente (no HomeView, irmão desta lista na casca) deixa na
-  // store o anúncio "esta conversa ganhou atividade", e a lista o aplica sem
-  // GET — é assim que a conversa nova entra nos Recentes sem F5. O que já
-  // existia ao montar é passado (a carga de montagem traz a verdade; no telefone
-  // a lista remonta a cada abertura da gaveta). E espera uma carga em voo: a
-  // resposta dela SUBSTITUI a lista e apagaria o anúncio aplicado no meio;
-  // depois dela o upsert é no-op se a resposta já trouxe a conversa.
+  // The assistant stream (in HomeView, this list's sibling in the shell) leaves in
+  // the store the announcement "this conversation got activity", and the list
+  // applies it without a GET — that is how the new conversation enters Recentes
+  // without F5. Whatever already existed at mount is past (the mount load brings
+  // the truth; on the phone the list remounts on every drawer opening). And it
+  // waits for an in-flight load: its response REPLACES the list and would erase
+  // the announcement applied in the meantime; after it, the upsert is a no-op if
+  // the response already brought the conversation.
   const visto = useRef(anuncio)
   useEffect(() => {
     if (!anuncio || anuncio === visto.current || carregando || atualizando) return
@@ -63,8 +64,8 @@ export function ChatsLista() {
   const [renomeando, setRenomeando] = useState<IConversaResumo | null>(null)
   const [apagando, setApagando] = useState<IConversaResumo | null>(null)
 
-  // O painel abriria ATRÁS da gaveta no telefone: fecha junto, como o botão
-  // "Nova conversa" do HomeSidebar já faz.
+  // The panel would open BEHIND the drawer on the phone: close it too, as the
+  // HomeSidebar's "Nova conversa" button already does.
   function escolher(id: string) {
     selecionar(id)
     abrirPainel()
@@ -73,10 +74,10 @@ export function ChatsLista() {
 
   const faltam = total > conversas.length
 
-  // O corpo é escolhido numa VARIÁVEL, não por `return` antecipado: o rodapé
-  // (aviso de recarga falhada + "Ver mais") tem de viver FORA dos ramos. Com a
-  // lista vazia o `return` curto saía antes dele e uma recarga que falhava não
-  // tinha onde aparecer. Mesmo desenho de `artefatos/lista.tsx`.
+  // The body is chosen in a VARIABLE, not by an early `return`: the footer
+  // (failed-reload notice + "Ver mais") has to live OUTSIDE the branches. With
+  // the list empty the short `return` exited before it and a failing reload had
+  // nowhere to show up. Same design as `artefatos/lista.tsx`.
   let corpo: React.ReactNode
   if (carregando) {
     corpo = (
@@ -89,8 +90,8 @@ export function ChatsLista() {
       </SidebarMenuSub>
     )
   } else if (erro && !jaCarregou) {
-    // §3: o bloco de erro só toma a lista quando nunca houve carga aceita. Com
-    // conversas na tela, a falha vira o aviso âmbar do rodapé.
+    // §3: the error block only takes over the list when no load was ever accepted.
+    // With conversations on screen, the failure becomes the amber footer notice.
     corpo = (
       <div role="alert" className={`flex flex-col items-start gap-1 px-2 py-1.5 ${SO_EXPANDIDO}`}>
         <p className="text-xs text-sidebar-foreground/70">{erro}</p>
@@ -118,17 +119,18 @@ export function ChatsLista() {
           return (
             <SidebarMenuSubItem key={c.id}>
               <LinhaDoMeu ativa={ativa}>
-                {/* Um `<button>` cru, e não o `SidebarMenuSubButton` do shadcn:
-                    aquele primitivo é feito para `<a>` e não tem `w-full` — e um
-                    `<button>` flex sem largura fica do tamanho do CONTEÚDO. Com
-                    o título em `nowrap`, o botão transbordava a linha inteira
-                    até a borda da barra, sem truncar nunca (medido: 546px numa
-                    linha de 207px). `flex-1` no flex da linha o prende ao
-                    espaço que existe, e só então o `truncate` tem onde cortar.
+                {/* A raw `<button>`, not shadcn's `SidebarMenuSubButton`: that
+                    primitive is made for `<a>` and has no `w-full` — and a flex
+                    `<button>` without a width is the size of its CONTENT. With
+                    the title `nowrap`, the button overflowed the whole row up to
+                    the edge of the bar, never truncating (measured: 546px in a
+                    207px row). `flex-1` in the row's flex pins it to the space
+                    that exists, and only then does `truncate` have somewhere to cut.
 
-                    `aria-current`: o `data-active` da linha é só visual, e a
-                    diferença de fundo na paleta da Home é quase imperceptível —
-                    sem isto nada dizia qual conversa está no painel. */}
+                    `aria-current`: the row's `data-active` is only visual, and
+                    the background difference in the Home palette is almost
+                    imperceptible — without this nothing said which conversation
+                    is in the panel. */}
                 <button
                   type="button"
                   aria-current={ativa ? "true" : undefined}
@@ -143,11 +145,11 @@ export function ChatsLista() {
                   <DropdownMenuTrigger asChild>
                     <GatilhoDeAcoes rotulo={rotulo} />
                   </DropdownMenuTrigger>
-                  {/* `home-portal`: o menu é portado para o <body>, FORA da árvore
-                      que declara a paleta da Home — sem a classe ele abria claro
-                      sobre a Home quase preta quando o app está no tema claro.
-                      Os itens ganham 40px no telefone: o gatilho já era grande o
-                      bastante, o destino do toque é que não era. */}
+                  {/* `home-portal`: the menu is portaled to <body>, OUTSIDE the tree
+                      that declares the Home palette — without the class it
+                      opened light over the near-black Home when the app is in
+                      the light theme. The items get 40px on the phone: the
+                      trigger was already big enough, the tap target was not. */}
                   <DropdownMenuContent align="end" className="home-portal min-w-32">
                     <DropdownMenuItem onSelect={() => setRenomeando(c)} className="max-md:min-h-10">
                       {textos.comum.renomear}
@@ -172,12 +174,12 @@ export function ChatsLista() {
     <>
       {corpo}
 
-      {/* O rodapé vive FORA dos ramos: com a lista VAZIA e uma recarga que
-          falhou, o aviso âmbar não tinha onde aparecer. */}
+      {/* The footer lives OUTSIDE the branches: with the list EMPTY and a reload
+          that failed, the amber notice had nowhere to show up. */}
       {((erro && jaCarregou) || faltam) && (
         <div className={`flex flex-col gap-1 px-2 pb-1 ${SO_EXPANDIDO}`}>
-          {/* Refaz o que FALHOU: depois de um "Ver mais" que caiu, é a página —
-              não a lista inteira, que ainda por cima voltava ao teto de 100. */}
+          {/* Redo what FAILED: after a "Ver mais" that dropped, it is the page —
+              not the whole list, which on top of that went back to the 100 ceiling. */}
           {erro && jaCarregou && (
             <AvisoAmbar onTentar={tentarDeNovo} rotuloDoBotao={textos.comum.tentarDeNovo}>{erro}</AvisoAmbar>
           )}
@@ -217,14 +219,14 @@ export function ChatsLista() {
             cancelLabel={textos.comum.cancelar}
             closeLabel={textos.comum.fechar}
             onConfirm={async () => {
-              // O DeleteDialog não tem canal de erro e fecha de qualquer jeito:
-              // sem o toast, a conversa continuava na lista e parecia que a
-              // exclusão tinha dado certo e a tela é que não atualizara.
+              // The DeleteDialog has no error channel and closes regardless:
+              // without the toast, the conversation stayed in the list and it
+              // looked as if the deletion had worked and the screen just had not updated.
               const r = await apagar(apagando.id)
               if (!r.ok) createToast.error(t.chats.apagar.falhou, r.erro)
-              // Apagar a ATIVA deixa a Home como o botão "Nova conversa": sem
-              // isto o painel seguia na conversa morta e a mensagem seguinte
-              // batia num 404. Lido na hora (`getState`), não pelo closure.
+              // Deleting the ACTIVE one leaves the Home like the "Nova conversa" button:
+              // without this the panel stayed on the dead conversation and the
+              // next message hit a 404. Read on the spot (`getState`), not via the closure.
               else if (useHomeStore.getState().conversaId === apagando.id) novaConversa()
               setApagando(null)
             }}

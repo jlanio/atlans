@@ -1,12 +1,13 @@
 // web/app/components/workflow/utils/enquadrar.ts
 //
-// Quando o canvas deve se mexer para acompanhar o fluxo sendo montado.
+// When the canvas should move to follow the workflow being built.
 //
-// A decisão é pura de propósito. O `fitView` do React Flow é fácil de chamar e
-// difícil de calibrar: chamá-lo a cada passo reenquadra o grafo INTEIRO, e o
-// zoom muda junto — o que se vê não é a tela acompanhando o fluxo crescer, é a
-// tela saltando de escala a cada nó. A regra de quando NÃO mexer é o que evita
-// isso, e testá-la dentro de um React Flow de mentira mediria o React Flow.
+// The decision is pure on purpose. React Flow's `fitView` is easy to call and
+// hard to calibrate: calling it at every step reframes the WHOLE graph, and the
+// zoom changes with it — what you see is not the screen following the workflow
+// grow, it is the screen jumping in scale with every node. The rule of when NOT
+// to move is what avoids that, and testing it inside a fake React Flow would
+// measure React Flow.
 
 export interface Caixa {
   x: number
@@ -16,32 +17,32 @@ export interface Caixa {
 }
 
 /**
- * Folga, em unidades do grafo, antes de considerar que o desenho saiu do
- * quadro.
+ * Slack, in graph units, before considering that the drawing has left the
+ * frame.
  *
- * Existe porque o auto-layout reposiciona os nós a cada passo: sem ela, uma
- * variação de poucos pixels na caixa dispararia um reenquadramento novo a cada
- * desenho, que é o salto que se está tentando remover. Menor que um nó, para
- * que um nó de verdade entrando sempre conte.
+ * Exists because the auto-layout repositions the nodes at every step: without
+ * it, a variation of a few pixels in the box would trigger a new reframe on
+ * every draw, which is the jump we are trying to remove. Smaller than a node, so
+ * that a real node coming in always counts.
  */
 export const FOLGA_DO_ENQUADRAMENTO = 40
 
-/** Quanto dura o deslocamento da câmera, em ms. */
+/** How long the camera movement lasts, in ms. */
 export const DURACAO_DO_ENQUADRAMENTO = 700
 
-/** Teto de zoom ao enquadrar o fluxo todo. */
+/** Zoom ceiling when framing the whole workflow. */
 export const ZOOM_MAXIMO_DO_ENQUADRAMENTO = 1
 
 /**
- * O desenho novo cabe no que já estava enquadrado?
+ * Does the new drawing fit within what was already framed?
  *
- * `anterior` nulo significa que ainda não enquadramos nada — então precisa.
+ * A null `anterior` means we have not framed anything yet — so it needs to.
  *
- * A comparação é contra a ÚLTIMA caixa enquadrada, e não contra o viewport de
- * agora, e isso é decisão e não atalho: se a pessoa arrastou o canvas para
- * olhar um nó e o fluxo não cresceu, puxá-la de volta seria tirar o controle da
- * mão dela no meio da leitura. Enquanto o desenho não passar do que já foi
- * enquadrado, ninguém se mexe.
+ * The comparison is against the LAST framed box, and not against the current
+ * viewport, and that is a decision, not a shortcut: if the person dragged the
+ * canvas to look at a node and the workflow did not grow, pulling them back
+ * would take control out of their hands mid-read. As long as the drawing does
+ * not exceed what was already framed, nothing moves.
  */
 export function cabeNoEnquadrado(
   nova: Caixa,
@@ -58,11 +59,11 @@ export function cabeNoEnquadrado(
 }
 
 /**
- * A pessoa pediu menos movimento?
+ * Did the person ask for reduced motion?
  *
- * O deslocamento da câmera é animado por JS, então o `prefers-reduced-motion`
- * do CSS não o alcança — tem de ser lido aqui. Quem pediu menos movimento
- * continua sendo levado ao fluxo novo; o que some é o trajeto até lá.
+ * The camera movement is animated by JS, so CSS `prefers-reduced-motion` does
+ * not reach it — it has to be read here. Someone who asked for reduced motion is
+ * still taken to the new workflow; what goes away is the path there.
  */
 export function semMovimento(): boolean {
   if (typeof window === "undefined" || !window.matchMedia) return false

@@ -1,12 +1,12 @@
 # app/services/teto_do_assistente.py
-"""O plano e o teto de tokens do assistente de uma pessoa.
+"""A person's assistant plan and token ceiling.
 
-O núcleo não conhece plano nenhum. Sem extensão que os traga, ninguém tem
-plano, e o teto é o mesmo para todos: o da instalação
-(`ASSISTENTE_TETO_DE_TOKENS_POR_DIA`, em `app/mcp/cotas.py`). Com uma extensão
-de planos (`app/extensoes`), quem responde é ela — e a cota da conversa, os
-dois `/estado` e o donut da tela passam todos por aqui, para que o mesmo teto
-saia do mesmo lugar.
+The core knows no plan at all. Without an extension that brings them, nobody has
+a plan, and the ceiling is the same for everyone: the installation's
+(`ASSISTENTE_TETO_DE_TOKENS_POR_DIA`, in `app/mcp/cotas.py`). With a plans
+extension (`app/extensoes`), it is the extension that answers — and the conversation quota, the
+two `/estado` endpoints and the screen's donut all go through here, so that the same ceiling
+comes from the same place.
 """
 from __future__ import annotations
 
@@ -17,22 +17,22 @@ from app.mcp import cotas
 async def plano_e_teto(
     user_id: str, *, db=None, redis=None,
 ) -> tuple[str | None, int]:
-    """O plano (ou `None`, sem planos) e o teto da janela de 24 h desta pessoa."""
+    """This person's plan (or `None`, with no plans) and 24 h window ceiling."""
     resolver = registro().plano_e_teto
     if resolver is None:
-        # Lido do módulo a cada chamada, e não importado: os testes trocam o
-        # valor em `cotas`, e a extensão de planos parte do mesmo número.
+        # Read from the module on each call, not imported: the tests swap the
+        # value in `cotas`, and the plans extension starts from the same number.
         return None, cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
     return await resolver(user_id, db=db, redis=redis)
 
 
 async def teto_de(user_id: str, *, db=None, redis=None) -> int:
-    """Só o teto — o que o laço da conversa confere antes de cada turno."""
+    """Only the ceiling — what the conversation loop checks before each turn."""
     _, teto = await plano_e_teto(user_id, db=db, redis=redis)
     return teto
 
 
 def assinaturas_ativas() -> bool:
-    """Se a instalação vende planos: é o que decide se a tela os oferece
-    quando a cota estoura."""
+    """Whether the installation sells plans: that is what decides whether the screen offers them
+    when the quota runs out."""
     return registro().assinaturas_ativas()

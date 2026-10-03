@@ -1,15 +1,16 @@
 # tests/unit/test_validate_credential_idor.py
-"""A validação não pode tocar credencial alheia.
+"""Validation must not touch someone else's credential.
 
-`validar_definicao` aceita uma definition ARBITRÁRIA, sem workflow persistido
-e sem workspace. A simulação de nós com `dynamic_output` (hoje o
-DatabaseSpatialQuery) resolve o credential_id recebido e CONECTA ao banco,
-dentro do processo da API. Sem a guarda, qualquer usuário autenticado que
-conhecesse o UUID de uma credencial alheia executava SQL nela.
+`validar_definicao` accepts an ARBITRARY definition, with no persisted workflow
+and no workspace. The simulation of nodes with `dynamic_output` (today the
+DatabaseSpatialQuery) resolves the received credential_id and CONNECTS to the
+database, inside the API process. Without the guard, any authenticated user who
+knew the UUID of someone else's credential could run SQL on it.
 
-Nasceu como teste de `POST /workflows/validate`; a rota saiu (não tinha
-chamador), e a guarda continua no núcleo que a tool `validate_workflow` do MCP
-consome — por isso o teste chama o service direto.
+It started as a test of `POST /workflows/validate`; the route was removed (it
+had no caller), and the guard remains in the core that the MCP
+`validate_workflow` tool consumes — which is why the test calls the service
+directly.
 """
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
@@ -36,10 +37,11 @@ def _definition(credential_id: str) -> dict:
 
 @pytest.fixture
 def db_sem_credenciais_do_usuario():
-    """Nenhuma credencial pedida pertence ao usuário.
+    """None of the requested credentials belongs to the user.
 
-    A sessão é aberta pelo próprio service (get_session_async), só quando há
-    o que checar no banco (credencial, `workspace_id` ou nó SubWorkflow).
+    The session is opened by the service itself (get_session_async), only when
+    there is something to check in the database (credential, `workspace_id` or
+    SubWorkflow node).
     """
     from contextlib import asynccontextmanager
 
@@ -64,12 +66,12 @@ async def test_credencial_alheia_e_recusada_sem_simular(db_sem_credenciais_do_us
             await validar_definicao(_definition(alheia), user_id=USUARIO, workspace_id=None)
 
     assert exc.value.status_code == 403
-    # A recusa acontece ANTES de qualquer conexão ao banco da credencial.
+    # The refusal happens BEFORE any connection to the credential's database.
     sim.assert_not_awaited()
 
 
 async def test_definition_sem_credencial_segue_simulando():
-    """Caso comum não pode ser afetado pela guarda — nem abre sessão de banco."""
+    """The common case must not be affected by the guard — it does not even open a database session."""
     from flow.executor.core import WorkflowExecutor
 
     payload = {

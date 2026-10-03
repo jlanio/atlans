@@ -1,8 +1,8 @@
 // desktop/src/main/python/ndjson.test.ts
 //
-// Lado TypeScript do teste de contrato. O lado Python vive em
-// tests/unit/test_executor_json_ipc.py — juntos garantem que os dois falam a
-// mesma lingua, o que nenhum type checker consegue verificar sozinho.
+// TypeScript side of the contract test. The Python side lives in
+// tests/unit/test_executor_json_ipc.py — together they guarantee that both
+// speak the same language, which no type checker can verify on its own.
 import { describe, expect, it, vi } from 'vitest'
 import { LineSplitter, NdjsonParser } from './ndjson.js'
 import type { ExecutorEvent } from '../../shared/events.js'
@@ -28,8 +28,8 @@ describe('framing', () => {
   })
 
   it('trata print() de um no de workflow como texto, nao como erro', () => {
-    // O executor roda codigo de terceiros (PythonScript). Um print() cai no
-    // MESMO stdout — e nao pode derrubar o parser nem virar evento.
+    // The executor runs third-party code (PythonScript). A print() lands on the
+    // SAME stdout — and must neither bring down the parser nor become an event.
     const { p, eventos, brutas } = parser()
     p.push('processando 42 feicoes...\n' + HELLO + '\n')
     expect(brutas).toEqual(['processando 42 feicoes...'])
@@ -44,7 +44,7 @@ describe('framing', () => {
   })
 
   it('linha truncada com framing valido vira texto em vez de excecao', () => {
-    // Acontece quando o processo morre no meio de uma escrita.
+    // Happens when the process dies in the middle of a write.
     const { p, eventos, brutas } = parser()
     p.push('{"v":1,"t":"snap\n')
     expect(eventos).toHaveLength(0)
@@ -61,9 +61,9 @@ describe('framing', () => {
 
 describe('fronteira de chunk', () => {
   it('remonta uma linha partida em varios chunks', () => {
-    // O evento `data` de um stream nao respeita fronteira de linha — este e o
-    // bug classico que derruba parsers sob carga, quando as linhas ficam
-    // grandes justamente por haver mais o que reportar.
+    // A stream's `data` event does not respect line boundaries — this is the
+    // classic bug that brings parsers down under load, when lines get large
+    // precisely because there is more to report.
     const { p, eventos } = parser()
     for (const pedaco of [HELLO.slice(0, 5), HELLO.slice(5, 20), HELLO.slice(20), '\n']) {
       p.push(pedaco)
@@ -92,8 +92,8 @@ describe('fronteira de chunk', () => {
 
 describe('flush', () => {
   it('entrega a ultima linha sem \\n quando o stream fecha', () => {
-    // A ultima linha antes de um crash costuma ser a mais interessante — e ela
-    // nao tem quebra de linha no fim.
+    // The last line before a crash is usually the most interesting one — and it
+    // has no trailing newline.
     const { p, eventos } = parser()
     p.push(HELLO)
     p.flush()
@@ -124,13 +124,13 @@ describe('robustez', () => {
   })
 
   it('descarta acumulo sem quebra de linha em vez de crescer sem limite', () => {
-    // Saida binaria ou um no descontrolado nao podem consumir a memoria do app
-    // ate ele morrer.
+    // Binary output or a runaway node must not consume the app's memory until it
+    // dies.
     const { p, brutas } = parser()
     p.push('x'.repeat(2 * 1024 * 1024))
     expect(brutas).toHaveLength(1)
     expect(brutas[0]).toContain('descartada')
-    // O buffer foi mesmo esvaziado: o flush nao tem o que devolver.
+    // The buffer really was emptied: flush has nothing to return.
     p.flush()
     expect(brutas).toHaveLength(1)
   })
@@ -147,8 +147,8 @@ describe('robustez', () => {
       onEvent: () => { throw new Error('handler quebrado') },
       onRaw: vi.fn(),
     })
-    // Um handler que lanca e bug de quem o escreveu; o parser nao deve
-    // transformar isso em queda do stream inteiro.
+    // A handler that throws is a bug of whoever wrote it; the parser must not
+    // turn that into the whole stream going down.
     expect(() => p.push(HELLO + '\n')).toThrow()
   })
 })

@@ -1,20 +1,22 @@
 // desktop/src/renderer/components/Alerta.tsx
 //
-// Faixa de aviso/erro — o padrão que estava resolvido dentro do App.tsx, sem
-// `export`, e por isso remontado à mão no GeoSync e no Ajustes. As três cópias
-// já haviam divergido em três paddings, dois radius e dois tamanhos de texto: o
-// mesmo tipo de evento aparecia com peso visual diferente conforme a aba, e
-// qualquer melhoria (o ícone, o `role`) teria de ser feita três vezes.
+// Warning/error strip — the pattern that was solved inside App.tsx, without
+// `export`, and therefore rebuilt by hand in GeoSync and Ajustes. The three
+// copies had already diverged into three paddings, two radii and two text
+// sizes: the same kind of event appeared with different visual weight
+// depending on the tab, and any improvement (the icon, the `role`) would have
+// to be made three times.
 //
-// Duas coisas que só existem aqui:
+// Two things that exist only here:
 //
-//   - ÍCONE. Antes o único traço que separava erro de aviso era o matiz da
-//     borda — a 40% de alfa, sobre fundo escuro. Quem não distingue vermelho de
-//     amarelo lia os dois como "uma faixa". Forma antes de cor.
-//   - `role`. O alerta monta de forma assíncrona (o estado chega por IPC
-//     enquanto a pessoa pode estar em qualquer aba) e é a única superfície que
-//     anuncia "o executor não está rodando". Sem `role`/`aria-live`, nada é
-//     anunciado: o app só muda de cor num canto que pode não estar sob o olho.
+//   - ICON. Before, the only trait separating error from warning was the hue
+//     of the border — at 40% alpha, on a dark background. Anyone who cannot
+//     tell red from yellow read both as "a strip". Shape before color.
+//   - `role`. The alert mounts asynchronously (the state arrives over IPC
+//     while the person may be on any tab) and it is the only surface that
+//     announces "the executor is not running". Without `role`/`aria-live`,
+//     nothing is announced: the app just changes color in a corner that may
+//     not be in view.
 import type { ReactNode } from 'react'
 import { TbAlertTriangle, TbCircleX } from 'react-icons/tb'
 
@@ -39,11 +41,11 @@ export function Alerta({
 }: {
   tom: 'erro' | 'aviso'
   titulo: ReactNode
-  /** Frase acionável: o que fazer. Precede a mensagem crua. */
+  /** Actionable sentence: what to do. Precedes the raw message. */
   remedio?: ReactNode
-  /** Mensagem do sistema. Acompanha o remédio — é o que o suporte precisa ler. */
+  /** System message. Accompanies the remedy — it is what support needs to read. */
   bruto?: string | null
-  /** Variante embutida numa seção, sem o peso de um cartão inteiro. */
+  /** Variant embedded in a section, without the weight of a whole card. */
   denso?: boolean
   children?: ReactNode
 }) {
@@ -71,8 +73,8 @@ export function Alerta({
     </>
   )
 
-  // `role`/`aria-live` valem nas duas formas: um erro embutido numa seção
-  // continua sendo um erro que ninguém pediu para ver.
+  // `role`/`aria-live` apply in both forms: an error embedded in a section is
+  // still an error nobody asked to see.
   const semantica = {
     role: tom === 'erro' ? ('alert' as const) : ('status' as const),
     'aria-live': tom === 'erro' ? ('assertive' as const) : ('polite' as const),
@@ -84,9 +86,9 @@ export function Alerta({
         {...semantica}
         className={cn(
           'flex items-start gap-2 rounded-md border px-3 py-2 leading-relaxed',
-          // Entra esmaecendo: a faixa aparece por conta de um evento externo,
-          // e um bloco que materializa em corte seco empurra o conteúdo abaixo
-          // sem que nada indique de onde veio.
+          // Fades in: the strip appears because of an external event, and a block
+          // that materializes with a hard cut pushes the content below without
+          // anything indicating where it came from.
           'animate-in fade-in-0 slide-in-from-top-1 duration-200',
           caixa,
         )}

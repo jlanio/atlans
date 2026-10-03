@@ -8,9 +8,9 @@ interface AddInputHandleProps extends HTMLAttributes<HTMLDivElement> {
 }
 
 /**
- * Wrapper espelhado do AddConnectionHandle para handles de entrada.
- * Linha tracejada distingue visualmente entradas de saídas (linha sólida).
- * Quando conectado: não exibe nada (igual ao AddConnectionHandle).
+ * Mirrored wrapper of AddConnectionHandle for input handles.
+ * A dashed line visually distinguishes inputs from outputs (solid line).
+ * When connected: shows nothing (same as AddConnectionHandle).
  */
 const AddInputHandle = ({ connectionVisible: open, children, label, className, style }: AddInputHandleProps) => {
   return (
@@ -23,11 +23,11 @@ const AddInputHandle = ({ connectionVisible: open, children, label, className, s
           style={{ ...style, transform: 'translateY(-50%)' }}
         >
           <div className="absolute flex items-center w-14 -translate-x-full">
-            {/* Linha tracejada — distingue entrada de saída */}
-            {/* `text-muted-foreground` em vez de `color` inline: o fallback
-                era `#64748b`, um cinza FRIO que não existe em nenhuma das duas
-                paletas (o `--muted-foreground` real é quente). Sendo classe, o
-                token resolve nos dois temas sem fallback nenhum. */}
+            {/* Dashed line — distinguishes input from output */}
+            {/* `text-muted-foreground` instead of inline `color`: the fallback
+                was `#64748b`, a COOL gray that doesn't exist in either of the two
+                palettes (the real `--muted-foreground` is warm). Being a class, the
+                token resolves in both themes with no fallback at all. */}
             <div
               className="absolute z-0 w-14 h-0.5 text-muted-foreground"
               style={{

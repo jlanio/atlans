@@ -1,8 +1,8 @@
 /**
- * O chip em repouso diz QUANDO foi o último save, na precisão que responde a
- * pergunta do momento: minutos enquanto é recente, hora se foi hoje, dia e
- * hora antes disso. Horários locais de propósito — é o que o usuário lê no
- * relógio dele.
+ * The chip at rest says WHEN the last save was, at the precision that answers
+ * the question of the moment: minutes while it's recent, time of day if it was
+ * today, date and time before that. Local times on purpose — it's what the user
+ * reads on their own clock.
  */
 import { describe, it, expect } from "vitest"
 import { rotuloDeSalvo } from "@/app/components/workflow/utils/rotulo-de-salvo"

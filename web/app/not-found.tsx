@@ -36,7 +36,7 @@ export default function NotFound() {
           </span>
         </Link>
 
-        {/* Código de erro */}
+        {/* Error code */}
         <div
           className="text-[7rem] font-black leading-none tracking-tighter mb-2 select-none"
           style={{
@@ -57,7 +57,7 @@ export default function NotFound() {
           Verifique o link ou volte para a página inicial.
         </p>
 
-        {/* Ações */}
+        {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
             href="/"

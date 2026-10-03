@@ -1,9 +1,9 @@
 # tests/integration/test_workflow_move_contract.py
-"""Contrato HTTP de POST /workflows/{id}/move e /move/preview.
+"""HTTP contract of POST /workflows/{id}/move and /move/preview.
 
-Exercita a app real: roteamento, validacao Pydantic do corpo e da resposta, e a
-autorizacao nos dois workspaces. A logica de mutacao esta coberta em
-tests/unit/test_workflow_move.py — aqui o alvo e a borda HTTP.
+Exercises the real app: routing, Pydantic validation of the body and the
+response, and authorization in both workspaces. The mutation logic is covered
+in tests/unit/test_workflow_move.py — here the target is the HTTP edge.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock
@@ -36,13 +36,14 @@ def _resultado(**kw):
 
 @pytest.fixture
 def move_deps(client):
-    """App real com o service dublado e papel `owner` na origem.
+    """Real app with the service stubbed and the `owner` role at the source.
 
-    `get_workspace_member_role` e patcheada no modulo das guardas
-    (`workflow_access`, onde `exigir_papel_no_workspace` a procura; nao e
-    dependency injetavel) — e ela que decide o papel no DESTINO. O da origem
-    vem do override de `get_accessible_workflow_with_role`, e a comparacao
-    segue sendo a de `workflow_com_papel`.
+    `get_workspace_member_role` is patched in the guards module
+    (`workflow_access`, where `exigir_papel_no_workspace` looks it up; it is
+    not an injectable dependency) — it decides the role at the DESTINATION.
+    The source's role comes from the override of
+    `get_accessible_workflow_with_role`, and the comparison is still the one
+    in `workflow_com_papel`.
     """
     from unittest.mock import patch
 
@@ -60,8 +61,8 @@ def move_deps(client):
     async def _wf_with_role(id_hash: str):
         return _fake_workflow(id_hash=id_hash), "owner"
 
-    # A rota recebe `db` para resolver o papel no destino; sem override, o
-    # get_db real tenta abrir conexao.
+    # The route takes `db` to resolve the role at the destination; without an
+    # override, the real get_db tries to open a connection.
     async def _db():
         yield MagicMock()
 
@@ -152,7 +153,7 @@ class TestPreview:
         assert svc.move_workflow.await_args.kwargs["dry_run"] is True
 
     async def test_preview_exige_a_mesma_permissao(self, move_deps):
-        """Senao viraria um oraculo sobre o conteudo de workspaces alheios."""
+        """Otherwise it would become an oracle about the contents of other people's workspaces."""
         ac, _, papel_destino = move_deps
         papel_destino.return_value = "editor"
 
@@ -185,7 +186,7 @@ class TestAutorizacao:
         assert res.status_code == 403
 
     async def test_403_quando_e_apenas_editor_na_origem(self, move_deps):
-        """O papel na origem sozinho ja barra — nem chega a consultar o destino."""
+        """The role at the source alone already blocks it — it does not even get to check the destination."""
         ac, svc, _ = move_deps
         from app.main import app
         from app.api.dependencies import get_accessible_workflow_with_role
@@ -202,12 +203,13 @@ class TestAutorizacao:
         svc.move_workflow.assert_not_awaited()
 
 
-# ── Validacao do corpo ───────────────────────────────────────────────────────
+# ── Body validation ──────────────────────────────────────────────────────────
 
 class TestValidacao:
     async def test_400_quando_o_destino_e_o_workspace_atual(self, move_deps):
-        """A guarda mora no service (invariante da operacao, nao do payload);
-        aqui so se verifica que o erro de dominio vira 400 na borda HTTP."""
+        """The guard lives in the service (an invariant of the operation, not of the
+        payload); here we only check that the domain error becomes 400 at the
+        HTTP edge."""
         from app.core.exceptions import WorkflowMoveTargetError
 
         ac, svc, _ = move_deps
@@ -225,8 +227,8 @@ class TestValidacao:
         assert res.status_code == 422
 
     async def test_422_com_campo_desconhecido(self, move_deps):
-        """`extra="forbid"`: campo ignorado em silencio faria o cliente achar que
-        a mudanca foi aplicada."""
+        """`extra="forbid"`: a silently ignored field would make the client think
+        the change was applied."""
         ac, _, _ = move_deps
         res = await ac.post(
             "/workflows/wf-abc123/move",

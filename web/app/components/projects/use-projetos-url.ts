@@ -6,23 +6,23 @@ import { ESTADO_PADRAO, escreverEstado, lerEstado, type EstadoDeProjetos } from 
 
 export interface ProjetosUrl {
   estado: EstadoDeProjetos
-  /** Funde o que mudou com o estado atual e grava na URL. */
+  /** Merges what changed with the current state and writes it to the URL. */
   atualizar: (parcial: Partial<EstadoDeProjetos>) => void
-  /** Zera busca e chip; a ordenação fica, porque não recorta a lista. */
+  /** Resets search and chip; the sort stays, because it does not slice the list. */
   limparFiltros: () => void
 }
 
 /**
- * Estado de Projetos lido e gravado na URL (spec §3.6). A URL é a única
- * fonte: F5, o botão voltar e um link colado reabrem a mesma estante.
+ * Projects state read from and written to the URL (spec §3.6). The URL is the
+ * only source: F5, the back button and a pasted link reopen the same shelf.
  *
- * `router.replace` (não `push`: cada tecla na busca não pode virar uma
- * entrada no histórico do navegador) é assíncrono: entre a escrita e o
- * `useSearchParams` refletir a mudança há pelo menos um render. Um clique na
- * faixa de atenção seguido de uma tecla na busca partiriam ambos do estado
- * velho e o segundo apagaria o primeiro. Por isso o último estado escrito
- * fica guardado e serve de base enquanto a URL não o alcança — o mesmo
- * mecanismo de `observability/use-historico-url.ts`.
+ * `router.replace` (not `push`: each search keystroke must not become an
+ * entry in the browser history) is asynchronous: between the write and
+ * `useSearchParams` reflecting the change there is at least one render. A click
+ * on the attention strip followed by a search keystroke would both start from
+ * the old state and the second would erase the first. That is why the last
+ * written state is kept and serves as the base until the URL catches up — the
+ * same mechanism as `observability/use-historico-url.ts`.
  */
 export function useProjetosUrl(): ProjetosUrl {
   const router = useRouter()
@@ -31,11 +31,11 @@ export function useProjetosUrl(): ProjetosUrl {
   const estado = useMemo(() => lerEstado(sp), [sp])
   const pendente = useRef<EstadoDeProjetos | null>(null)
 
-  // Quando a URL alcança QUALQUER estado — o que gravamos ou uma navegação
-  // externa (voltar/avançar, link) —, `pendente` cumpriu seu papel e tem de
-  // zerar. Sem isto ele só era limpo quando `base()` era chamado de novo e batia
-  // com a URL; um `pendente` que sobra depois de um voltar/avançar vira base de
-  // uma escrita futura e ressuscita o estado antigo (perde a navegação externa).
+  // When the URL reaches ANY state — the one we wrote or an external
+  // navigation (back/forward, link) —, `pendente` has done its job and must
+  // reset. Without this it was only cleared when `base()` was called again and
+  // matched the URL; a `pendente` left over after a back/forward becomes the base
+  // of a future write and resurrects the old state (losing the external navigation).
   useEffect(() => { pendente.current = null }, [estado])
 
   const gravar = useCallback((proximo: EstadoDeProjetos) => {

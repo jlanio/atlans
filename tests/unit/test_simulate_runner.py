@@ -1,11 +1,11 @@
 # tests/unit/test_simulate_runner.py
-"""simulate_runner precisa realmente chamar o simulate() dos nos dinamicos.
+"""simulate_runner must actually call the simulate() of dynamic nodes.
 
-Regressao: a chamada era `validate_node_parameters(node_def, node_cls)`, mas a
-assinatura e (parametros, lista_de_propriedades). Passar a CLASSE fazia
-`for prop in props` levantar TypeError, que o `except Exception` do laco
-convertia em {"status": "error"} — entao `simulate()` nunca rodava e
-POST /workflows/validate devolvia erro para todo no com dynamic_output.
+Regression: the call was `validate_node_parameters(node_def, node_cls)`, but the
+signature is (parametros, lista_de_propriedades). Passing the CLASS made
+`for prop in props` raise TypeError, which the loop's `except Exception`
+turned into {"status": "error"} — so `simulate()` never ran and
+POST /workflows/validate returned an error for every node with dynamic_output.
 """
 import pytest
 
@@ -17,7 +17,7 @@ _RECEBIDO: dict = {}
 
 
 class NoDinamicoTeste(BaseNode):
-    """dynamic_output=True — o único tipo que chega a simulate()."""
+    """dynamic_output=True — the only type that reaches simulate()."""
 
     @classmethod
     def description(cls):
@@ -38,7 +38,7 @@ class NoDinamicoTeste(BaseNode):
             raise ValueError("credencial ausente")
         return [{"fields": [{"name": "col", "type": "string"}]}]
 
-    async def execute(self, inputs):  # pragma: no cover - simulação não executa
+    async def execute(self, inputs):  # pragma: no cover - simulation does not execute
         return {}
 
 
@@ -58,7 +58,7 @@ class NoEstaticoTeste(BaseNode):
 
 @pytest.fixture(autouse=True)
 def _registra_nos_de_teste():
-    """A factory resolve pelo NODE_REGISTRY global — registra e limpa depois."""
+    """The factory resolves through the global NODE_REGISTRY — registers and cleans up afterwards."""
     _RECEBIDO.clear()
     NODE_REGISTRY["NoDinamicoTeste"] = NoDinamicoTeste
     NODE_REGISTRY["NoEstaticoTeste"] = NoEstaticoTeste
@@ -72,7 +72,7 @@ def _executor(node: dict) -> WorkflowExecutor:
 
 
 async def test_simulate_e_chamado_com_os_parametros_do_no():
-    """Formato `parameters` — o que a validação (`validate_service`) envia."""
+    """`parameters` format — what the validation (`validate_service`) sends."""
     ex = _executor({
         "id": "n1", "name": "NoDinamicoTeste", "type": "datasource",
         "parameters": {"query": "SELECT 1", "limite": 5},
@@ -87,7 +87,7 @@ async def test_simulate_e_chamado_com_os_parametros_do_no():
 
 
 async def test_aceita_o_formato_properties_da_definition_salva():
-    """A definition persistida usa `properties`, não `parameters`."""
+    """The persisted definition uses `properties`, not `parameters`."""
     ex = _executor({
         "id": "n1", "name": "NoDinamicoTeste", "type": "datasource",
         "properties": {"query": "SELECT 2", "limite": 7},
@@ -110,7 +110,7 @@ async def test_defaults_das_propriedades_sao_aplicados():
 
 
 async def test_erro_no_simulate_vira_status_error():
-    """Um nó com problema não pode derrubar a validação inteira."""
+    """One node with a problem must not bring down the whole validation."""
     ex = _executor({
         "id": "n1", "name": "NoDinamicoTeste", "type": "datasource",
         "parameters": {"query": "__boom__"},
@@ -123,9 +123,9 @@ async def test_erro_no_simulate_vira_status_error():
 
 
 async def test_erro_no_simulate_e_logado_e_os_demais_nos_seguem(caplog):
-    """A exceção era engolida sem rastro: um simulate() quebrado aparecia como
-    "nó sem schema" e ninguém descobria o porquê. O warning identifica o nó e a
-    causa — e a simulação dos demais nós continua."""
+    """The exception was swallowed without a trace: a broken simulate() showed up as
+    "node without schema" and nobody found out why. The warning identifies the node
+    and the cause — and the simulation of the other nodes goes on."""
     ex = WorkflowExecutor({"nodes": [
         {"id": "n1", "name": "NoDinamicoTeste", "type": "datasource",
          "parameters": {"query": "__boom__"}},

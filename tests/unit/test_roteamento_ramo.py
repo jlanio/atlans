@@ -1,22 +1,22 @@
 # tests/unit/test_roteamento_ramo.py
 """
-Roteamento de ramo gateado por ARESTA DE RAMO, não pelo output cru "branch"
+Branch routing gated by a BRANCH EDGE, not by the raw "branch" output
 (F7 / F8).
 
-O gatilho antigo era `if "branch" in outputs and isinstance(outputs["branch"], bool)`
-— não olhava as arestas. Dois defeitos:
+The old trigger was `if "branch" in outputs and isinstance(outputs["branch"], bool)`
+— it did not look at the edges. Two defects:
 
-- F7: QUALQUER nó (não só de controle) cujo output tivesse uma chave booleana
-  'branch' sequestrava o roteamento. Como arestas normais não têm `condition`,
-  `condition == branch` dava False para TODAS → nenhuma aresta ativa → todo o
-  downstream era skipado.
-- F8: `condition != branch` capturava também as arestas de DADO (condition=None):
-  None != True e None != False. Uma aresta de dado saindo de um nó de bifurcação
-  tinha o alvo skipado — impossível rotear dado incondicional a partir dele.
+- F7: ANY node (not only control nodes) whose output had a boolean 'branch' key
+  hijacked the routing. Since normal edges have no `condition`,
+  `condition == branch` was False for ALL of them → no active edge → the whole
+  downstream was skipped.
+- F8: `condition != branch` also caught the DATA edges (condition=None):
+  None != True and None != False. A data edge leaving a fork node had its target
+  skipped — impossible to route unconditional data from it.
 
-Agora: só roteia quando há arestas de ramo (condition bool) E output.branch bool;
-arestas de dado ficam sempre ativas; só arestas de ramo com condition != branch
-são desativadas.
+Now: it only routes when there are branch edges (condition bool) AND output.branch
+bool; data edges are always active; only branch edges with condition != branch
+are deactivated.
 """
 
 import asyncio
@@ -44,8 +44,8 @@ def _gdf():
 
 
 class _NoComBranchIncidental(BaseNode):
-    """Nó comum (não-controle) cujo output CONTÉM uma chave booleana 'branch'.
-    Não é um nó de roteamento — só emite o dado e, por acaso, um 'branch'."""
+    """Ordinary (non-control) node whose output CONTAINS a boolean 'branch' key.
+    It is not a routing node — it just emits the data and, by chance, a 'branch'."""
 
     @classmethod
     def description(cls):
@@ -79,15 +79,15 @@ def _branch(nid):
 
 
 def test_f7_no_comum_com_branch_incidental_nao_sequestra_roteamento(_registra_no):
-    # N emite branch=True mas só tem aresta de DADO (sem condition). O filho D
-    # deve rodar — antes era skipado porque nenhuma aresta casava condition==True.
+    # N emits branch=True but only has a DATA edge (no condition). The child D
+    # must run — before it was skipped because no edge matched condition==True.
     definition = {
         "nodes": [_trigger("T"),
                   {"id": "N", "type": "action", "name": "TesteBranchIncidental", "properties": {}},
                   _merge("D")],
         "edges": [
             {"source": "T", "target": "N"},
-            {"source": "N", "target": "D"},   # aresta de DADO, sem condition
+            {"source": "N", "target": "D"},   # DATA edge, no condition
         ],
     }
     ex = WorkflowExecutor(definition, task_id="f7", publisher=_publisher())
@@ -97,14 +97,14 @@ def test_f7_no_comum_com_branch_incidental_nao_sequestra_roteamento(_registra_no
 
 
 def test_f8_aresta_de_dado_saindo_de_no_de_ramo_permanece_ativa():
-    # A (Conditional, branch=True) com uma aresta de RAMO (true→B) e uma aresta
-    # de DADO (→E, sem condition). E deve rodar; antes era skipado (None != True).
+    # A (Conditional, branch=True) with a BRANCH edge (true→B) and a DATA edge
+    # (→E, no condition). E must run; before it was skipped (None != True).
     definition = {
         "nodes": [_trigger("T"), _branch("A"), _merge("B"), _merge("E")],
         "edges": [
             {"source": "T", "target": "A"},
-            {"source": "A", "target": "B", "condition": True},   # aresta de ramo
-            {"source": "A", "target": "E"},                       # aresta de dado
+            {"source": "A", "target": "B", "condition": True},   # branch edge
+            {"source": "A", "target": "E"},                       # data edge
         ],
     }
     ex = WorkflowExecutor(definition, task_id="f8", publisher=_publisher())

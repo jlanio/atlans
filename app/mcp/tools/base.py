@@ -1,43 +1,46 @@
 # app/mcp/tools/base.py
 """
-A base compartilhada das tools: o decorador de tradução de erro, a guarda
-cronometrada (escopo + cota + auditoria) e as anotações derivadas da tabela.
+The tools' shared base: the error-translation decorator, the timed guard
+(scope + quota + audit) and the annotations derived from the table.
 
-O módulo mora aqui, e não em `servidor.py`, porque os TRÊS consumidores da
-guarda — `ServidorAtlans.call_tool`, os handlers de resource e as próprias
-tools — já dependem deste arquivo e nenhum deles pode importar `servidor.py`
-sem ciclo (`servidor` importa `tools` e `resources` para registrá-los).
+The module lives here, and not in `servidor.py`, because the THREE consumers of
+the guard — `ServidorAtlans.call_tool`, the resource handlers and the tools
+themselves — already depend on this file and none of them can import
+`servidor.py` without a cycle (`servidor` imports `tools` and `resources` to
+register them).
 
-── O decorador que toda tool veste ──
+── The decorator every tool wears ──
 
-Ele traduz a exceção do núcleo para o erro do MCP. Por que dentro da tool e não
-no servidor: o gerenciador de tools do SDK embrulha qualquer exceção que não
-seja `ToolError` num erro genérico ANTES de a chamada voltar para `call_tool`.
-Quem quiser transformar um `WorkflowInactiveError` num `{"code":
-"workflow_inactive"}` legível precisa fazê-lo DENTRO da tool — depois já é
-tarde, e o cliente recebe "erro inesperado".
+It translates the core's exception into the MCP error. Why inside the tool and
+not in the server: the SDK's tool manager wraps any exception that is not a
+`ToolError` into a generic error BEFORE the call returns to `call_tool`.
+Whoever wants to turn a `WorkflowInactiveError` into a readable `{"code":
+"workflow_inactive"}` has to do it INSIDE the tool — afterwards it is too late,
+and the client receives "unexpected error".
 
-O que sobe intacto, e por quê:
-- `ToolError` passa: quem o levantou (uma guarda, `resolver_workspace`, a
-  própria tool) sabia mais sobre o caso do que a tabela genérica;
-- `AtlasBaseError` e `HTTPException` viram `to_tool_error(exc)` — são as
-  exceções que os services do Atlans usam para dizer "404", "403", "422";
-- qualquer outra coisa SOBE. Um `KeyError` é defeito nosso, não recusa: o SDK
-  registra a falha e o cliente recebe uma mensagem genérica, sem `str(exc)` de
-  biblioteca — que é justamente onde uma URL com senha costuma aparecer.
+What goes up intact, and why:
+- `ToolError` passes through: whoever raised it (a guard, `resolver_workspace`,
+  the tool itself) knew more about the case than the generic table;
+- `AtlasBaseError` and `HTTPException` become `to_tool_error(exc)` — they are
+  the exceptions Atlans services use to say "404", "403", "422";
+- anything else GOES UP. A `KeyError` is a defect of ours, not a refusal: the
+  SDK records the failure and the client receives a generic message, with no
+  library `str(exc)` — which is precisely where a URL with a password tends to
+  show up.
 
-`functools.wraps` não é cosmético: o SDK monta o `inputSchema` da tool por
-introspecção da função, e sem ele toda tool chegaria ao cliente como
-`(*args, **kwargs)`. Ele também deixa `__wrapped__` no embrulho, que é o fio
-por onde `inspect.signature` e `typing.get_type_hints` chegam à função original
-— e portanto ao módulo onde `Context` e os demais nomes de fato existem (com
-`from __future__ import annotations` as anotações são STRINGS, avaliadas contra
-os globais de quem as definiu, nunca deste arquivo).
+`functools.wraps` is not cosmetic: the SDK builds the tool's `inputSchema` by
+introspecting the function, and without it every tool would reach the client as
+`(*args, **kwargs)`. It also leaves `__wrapped__` on the wrapper, which is the
+thread through which `inspect.signature` and `typing.get_type_hints` reach the
+original function — and therefore the module where `Context` and the other
+names actually exist (with `from __future__ import annotations` the annotations
+are STRINGS, evaluated against the globals of whoever defined them, never of
+this file).
 
-As anotações já resolvidas são copiadas por cima como segunda linha de defesa:
-assim o schema da tool — e o reconhecimento do parâmetro `ctx`, que o servidor
-injeta e o cliente nunca preenche — não depende desse detalhe de
-desembrulhamento continuar valendo.
+The already-resolved annotations are copied over as a second line of defense:
+that way the tool's schema — and the recognition of the `ctx` parameter, which
+the server injects and the client never fills in — does not depend on that
+unwrapping detail continuing to hold.
 """
 from __future__ import annotations
 
@@ -62,19 +65,20 @@ auditoria = get_logger("app.mcp.auditoria")
 
 
 def _anotacoes_resolvidas(fn: Callable[..., Any]) -> dict:
-    """As anotações de `fn` já avaliadas (objetos, não strings).
+    """The annotations of `fn` already evaluated (objects, not strings).
 
-    Falhar aqui não pode derrubar o registro da tool: sem as anotações
-    resolvidas o SDK ainda monta um schema a partir da assinatura original.
+    Failing here must not bring down the tool's registration: without the
+    resolved annotations the SDK still builds a schema from the original
+    signature.
     """
     try:
         return dict(typing.get_type_hints(fn, include_extras=True))
-    except Exception:  # pragma: no cover - anotação exótica ou import circular
+    except Exception:  # pragma: no cover - exotic annotation or circular import
         return dict(getattr(fn, "__annotations__", {}) or {})
 
 
 def ferramenta(fn: Callable[..., Any]) -> Callable[..., Any]:
-    """Embrulha a corrotina de uma tool traduzindo as exceções do núcleo."""
+    """Wraps a tool's coroutine, translating the core's exceptions."""
 
     @functools.wraps(fn)
     async def _embrulho(*args: Any, **kwargs: Any):
@@ -97,25 +101,27 @@ async def guarda_da_chamada(
     cobrar_cota: bool = True,
     origem: str = "tool",
 ) -> AsyncIterator[None]:
-    """Escopo → cota → corpo → linha de auditoria, com o desfecho de verdade.
+    """Scope → quota → body → audit line, with the real outcome.
 
-    A ordem importa em dois sentidos. O escopo e a cota são conferidos DENTRO do
-    bloco cronometrado para que a recusa também deixe rastro: uma chamada barrada
-    por falta de escopo ou por teto de cota é justamente a que mais interessa
-    registrar, e enquanto as guardas ficaram antes do `try` ela saía sem linha
-    nenhuma. A recusa ganha desfecho próprio (`recusa:<code>`) para não se
-    confundir com uma tool que rodou e falhou (`tool_error:<code>`).
+    The order matters in two ways. Scope and quota are checked INSIDE the timed
+    block so that the refusal also leaves a trace: a call blocked for lack of
+    scope or by a quota ceiling is precisely the one most worth recording, and
+    while the guards sat before the `try` it went out with no line at all. The
+    refusal gets its own outcome (`recusa:<code>`) so it is not confused with a
+    tool that ran and failed (`tool_error:<code>`).
 
-    `escopo` chega pronto: quem chama já o resolveu com `escopo_da_chamada`, e é
-    de propósito que essa resolução fique FORA daqui — quando ela falha não há
-    identidade para nomear na linha de auditoria.
+    `escopo` arrives ready: the caller has already resolved it with
+    `escopo_da_chamada`, and it is on purpose that this resolution stays
+    OUTSIDE of here — when it fails there is no identity to name in the audit
+    line.
 
-    `cobrar_cota=False` é o caso dos resources, que são alias de leitura de uma
-    tool e não têm balde próprio: cobrar duas vezes o mesmo trabalho não mede
-    nada, e o balde geral da tool já segura o laço. A auditoria continua valendo.
+    `cobrar_cota=False` is the case of resources, which are read aliases of a
+    tool and have no bucket of their own: charging twice for the same work
+    measures nothing, and the tool's general bucket already holds back the
+    loop. Auditing still applies.
 
-    A linha nunca carrega os argumentos da chamada — eles carregam dados do
-    usuário (nome de arquivo, id de workflow, texto de busca).
+    The line never carries the call's arguments — they carry user data (file
+    name, workflow id, search text).
     """
     guarda = GUARDAS.get(nome)
     inicio = time.perf_counter()
@@ -141,7 +147,7 @@ async def guarda_da_chamada(
             desfecho = "erro"
         raise
     finally:
-        # Prefixo do token (nunca o segredo), usuário, duração e desfecho.
+        # Token prefix (never the secret), user, duration and outcome.
         auditoria.info(
             "mcp %s=%s token=%s user=%s ms=%d desfecho=%s",
             origem,
@@ -154,15 +160,16 @@ async def guarda_da_chamada(
 
 
 def anotacoes(nome: str) -> ToolAnnotations:
-    """As `ToolAnnotations` da tool, derivadas da linha dela em `GUARDAS`.
+    """The tool's `ToolAnnotations`, derived from its row in `GUARDAS`.
 
-    Escrever os hints à mão em cada módulo de domínio é o caminho curto para o
-    doc e a tabela divergirem em silêncio — a tabela diz `idempotente=False` e a
-    anotação publicada continua dizendo `true`. Aqui há um lugar só.
+    Writing the hints by hand in each domain module is the shortcut to the doc
+    and the table silently diverging — the table says `idempotente=False` and
+    the published annotation keeps saying `true`. Here there is a single place.
 
-    `destructive_hint` é sempre False por decisão de desenho, não por omissão:
-    o MCP do Atlans não apaga nada. `open_world_hint` sai da tabela: False para
-    tudo, menos as tools que sondam um WFS (ver a nota de `app/mcp/guardas.py`).
+    `destructive_hint` is always False by design decision, not by omission: the
+    Atlans MCP deletes nothing. `open_world_hint` comes from the table: False
+    for everything except the tools that probe a WFS (see the note in
+    `app/mcp/guardas.py`).
     """
     guarda = GUARDAS[nome]
     return ToolAnnotations(

@@ -24,15 +24,15 @@ import { StorageUsageSection } from "@/app/components/admin/settings/armazenamen
 import { NodesAdminSection } from "@/app/components/admin/settings/nodes"
 import { WorkspaceTrashSection } from "@/app/components/admin/settings/lixeira-de-workspaces"
 
-// A apresentação da seção do modelo: o que vale sempre, e o que cada extensão
-// soma (a troca do modelo pode mudar uma conta dela).
+// The presentation of the model section: what always applies, and what each
+// extension adds (switching the model may change one of its accounts).
 const APOIO_DO_MODELO = [
   "Vale para o assistente da Home e o do editor.",
   ...EXTENSOES.flatMap(e => e.painelDoModelo?.apoio ?? []),
   "A troca entra na próxima conversa; as que estão em curso terminam no modelo em que começaram.",
 ].join(" ")
 
-// ── Página principal ───────────────────────────────────────────────────────────
+// ── Main page ──────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   const { data: session } = useSession()
@@ -84,8 +84,8 @@ export default function SettingsPage() {
     refetchPolicies()
   }
 
-  // Restaurar/purgar mexe no que a seção Armazenamento mostra (o workspace muda
-  // de estado, ou some), então as duas leituras têm que andar juntas.
+  // Restore/purge touches what the Storage section shows (the workspace changes
+  // state, or disappears), so the two reads have to move together.
   function refetchTrashAndStorage() {
     refetchTrash()
     refetchStorage()
@@ -97,8 +97,8 @@ export default function SettingsPage() {
     else createToast.success("Whitelist atualizada.")
   }
 
-  // Seção ativa espelhada no hash da URL: permite voltar pelo navegador,
-  // recarregar sem perder o lugar e mandar link direto para uma seção.
+  // Active section mirrored in the URL hash: allows going back through the
+  // browser, reloading without losing your place and linking directly to a section.
   const [section, setSection] = useState<SectionId>("overview")
 
   useEffect(() => {
@@ -126,8 +126,8 @@ export default function SettingsPage() {
     return acc
   }, [alerts])
 
-  // Carimbo do fim de cada ciclo de carga, para o "atualizado há N". Fica nulo
-  // até a primeira leitura completar — é o que segura o Skeleton do subtítulo.
+  // Stamp of the end of each load cycle, for the "updated N ago". It stays null
+  // until the first read completes — that is what holds the subtitle Skeleton.
   const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null)
   const carregavaAntes = useRef(anyLoading)
   useEffect(() => {
@@ -135,9 +135,9 @@ export default function SettingsPage() {
     carregavaAntes.current = anyLoading
   }, [anyLoading])
 
-  // Subtítulo que conta o estado real do sistema: quantas pendências e quantos
-  // workspaces guardam dados. Enquanto a 1ª carga não terminou, vira Skeleton —
-  // nunca escreve "0 pendências" antes de saber.
+  // Subtitle that tells the system's real state: how many pending items and how
+  // many workspaces hold data. While the 1st load has not finished, it becomes a
+  // Skeleton — it never writes "0 pendências" before knowing.
   const wsComDados = storageData?.by_workspace.length ?? 0
   const partesSubtitulo: string[] = [
     alerts.length > 0 ? plural(alerts.length, "pendência", "pendências") : "Nada requer atenção",
@@ -147,8 +147,8 @@ export default function SettingsPage() {
 
   return (
     <PageRoot>
-      {/* `flex-wrap`: sem ele o título e a fila de ações disputam a mesma linha
-          num telefone, e quem cede é sempre o título. */}
+      {/* `flex-wrap`: without it the title and the action row fight for the same line
+          on a phone, and the one that gives way is always the title. */}
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-foreground">Configurações</h1>
@@ -210,12 +210,12 @@ export default function SettingsPage() {
                 ) : healthError && !data ? (
                   <CartaoDeErro mensagem={healthError} onTentar={refetchHealth} />
                 ) : data ? (
-                  // `key` derivada do valor do servidor: quando a whitelist
-                  // buscada muda (ex.: após Atualizar), a seção remonta com o
-                  // estado fresco — o corpo deixou de trocar por Skeleton no
-                  // refetch, então essa remontagem substitui a re-sincronização
-                  // que o unmount/remount antigo garantia. Estável entre
-                  // re-renders comuns, não descarta edições em curso.
+                  // `key` derived from the server value: when the fetched
+                  // whitelist changes (e.g. after Refresh), the section remounts
+                  // with fresh state — the body stopped swapping to a Skeleton
+                  // on refetch, so this remount replaces the re-sync the old
+                  // unmount/remount guaranteed. Stable across ordinary
+                  // re-renders, it does not discard edits in progress.
                   <WhitelistSection
                     key={data.webhook_whitelist.join(" ")}
                     domains={data.webhook_whitelist}
@@ -235,9 +235,9 @@ export default function SettingsPage() {
                 ) : artifactError && !artifactSettings ? (
                   <CartaoDeErro mensagem={artifactError} onTentar={refetchArtifacts} />
                 ) : (
-                  // `key` do valor do servidor: remonta e re-sincroniza o input
-                  // quando a retenção buscada muda (ex.: após Atualizar), como o
-                  // remount do cartão antigo fazia — sem apagar edições em curso.
+                  // `key` from the server value: remounts and re-syncs the input when
+                  // the fetched retention changes (e.g. after Refresh), as the
+                  // old card's remount did — without erasing edits in progress.
                   <ArtifactRetentionSection
                     key={String(artifactSettings?.artifact_retention_days ?? "sem")}
                     initialDays={artifactSettings?.artifact_retention_days ?? null}

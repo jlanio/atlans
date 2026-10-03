@@ -1,8 +1,8 @@
-"""Regressao das 4 correcoes do motor (auditoria: fluxo/correcao).
+"""Regression for the engine's 4 fixes (audit: workflow/correctness).
 
-Cada teste falha SEM o fix; a docstring nomeia a mutacao que derruba SO ele.
-Duas correcoes sao MUDANCA DE COMPORTAMENTO (gather cancela irmaos; retry so em
-erro transitorio) e estao marcadas como tal.
+Each test fails WITHOUT the fix; the docstring names the mutation that breaks
+ONLY it. Two fixes are BEHAVIOR CHANGES (gather cancels siblings; retry only on
+transient errors) and are marked as such.
 """
 import asyncio
 
@@ -26,13 +26,13 @@ def _gdf():
     return gpd.GeoDataFrame({"n": [1]}, geometry=[Point(0, 0)], crs="EPSG:4326")
 
 
-# Estado observavel dos nos de efeito colateral e de contagem de tentativas.
+# Observable state of the side-effect nodes and of the attempt counting.
 EFEITOS: list = []
 CHAMADAS: dict = {}
 
 
 class _Ramo(BaseNode):
-    """Nó de controle que emite branch=False (o ramo True não é tomado)."""
+    """Control node that emits branch=False (the True branch is not taken)."""
     @classmethod
     def description(cls):
         return {"name": "TesteRamo", "type": "control", "properties": []}
@@ -51,7 +51,7 @@ class _Fonte(BaseNode):
 
 
 class _Coletor(BaseNode):
-    """Merge que reporta as CHAVES que recebeu — é como vemos o vazamento."""
+    """Merge that reports the KEYS it received — that is how we see the leak."""
     @classmethod
     def description(cls):
         return {"name": "TesteColetor", "type": "control", "properties": []}
@@ -70,20 +70,20 @@ class _FalhaRapida(BaseNode):
 
 
 class _EfeitoLento(BaseNode):
-    """Roda ~0,2 s e SÓ ENTÃO commita o efeito — simula computar e depois gravar."""
+    """Runs ~0.2 s and ONLY THEN commits the effect — simulates computing and then writing."""
     @classmethod
     def description(cls):
         return {"name": "TesteEfeitoLento", "type": "action", "properties": []}
 
     async def execute(self, inputs):
         await asyncio.sleep(0.2)
-        EFEITOS.append("Y")  # o "commit" que não deve acontecer se cancelado
+        EFEITOS.append("Y")  # the "commit" that must not happen if canceled
         return {"output": None}
 
 
 class _FalhaClassificada(BaseNode):
-    """Levanta ValueError (nao-retentavel) ou ConnectionError (transitorio),
-    conforme o parametro `tipo`, contando as tentativas."""
+    """Raises ValueError (non-retryable) or ConnectionError (transient),
+    depending on the `tipo` parameter, counting the attempts."""
     @classmethod
     def description(cls):
         return {"name": "TesteFalhaClassificada", "type": "action", "properties": []}
@@ -116,16 +116,17 @@ def _trigger(nid):
     return {"id": nid, "type": "trigger", "name": "Merge", "properties": {"strategy": "first"}}
 
 
-# ── F-audit: aresta de ramo NAO tomado nao injeta no merge sobrevivente ──────
+# ── F-audit: an edge from a branch NOT taken does not inject into the surviving merge ──
 
 def test_aresta_de_ramo_desativado_nao_injeta_no_merge(_registra):
-    """Mutacao: remover a checagem `id(edge) in self._deactivated_edge_ids` na
-    montagem de inputs.
+    """Mutation: remove the `id(edge) in self._deactivated_edge_ids` check when
+    assembling inputs.
 
-    Ramo emite branch=False → a aresta Ramo→C(True) é desativada; mas C tem
-    outra aresta VIVA (Fonte→C), então C RODA (has_live_input). Sem o fix, a
-    montagem itera TODAS as arestas de C e, como Ramo está 'completed' (não
-    'skipped'), injeta a saída do ramo REJEITADO — a chave 'branch' vaza para C.
+    Ramo emits branch=False → the edge Ramo→C(True) is deactivated; but C has
+    another LIVE edge (Fonte→C), so C RUNS (has_live_input). Without the fix,
+    the assembly iterates over ALL of C's edges and, since Ramo is 'completed'
+    (not 'skipped'), injects the output of the REJECTED branch — the 'branch'
+    key leaks into C.
     """
     definition = {
         "nodes": [_trigger("T"),
@@ -135,8 +136,8 @@ def test_aresta_de_ramo_desativado_nao_injeta_no_merge(_registra):
         "edges": [
             {"source": "T", "target": "Fonte"},
             {"source": "T", "target": "Ramo"},
-            {"source": "Fonte", "target": "C"},               # aresta de dado
-            {"source": "Ramo", "target": "C", "condition": True},  # ramo NÃO tomado
+            {"source": "Fonte", "target": "C"},               # data edge
+            {"source": "Ramo", "target": "C", "condition": True},  # branch NOT taken
         ],
     }
     ex = WorkflowExecutor(definition, task_id="fa", publisher=_publisher())
@@ -146,14 +147,14 @@ def test_aresta_de_ramo_desativado_nao_injeta_no_merge(_registra):
     assert "output" in final["C"]["chaves"], "o dado de Fonte deve chegar"
 
 
-# ── F-audit: gather cancela os irmaos na 1a falha (MUDANCA DE COMPORTAMENTO) ──
+# ── F-audit: gather cancels the siblings on the 1st failure (BEHAVIOR CHANGE) ──
 
 async def test_gather_cancela_irmaos_na_primeira_falha(_registra):
-    """Mutacao: voltar a `results = await asyncio.gather(*tasks)` sem cancelar.
+    """Mutation: go back to `results = await asyncio.gather(*tasks)` without canceling.
 
-    X falha rápido; Y computa ~0,2 s e SÓ ENTÃO commita o efeito. Com o fix, a
-    falha de X cancela Y antes do commit. Sem o fix, Y segue vivo (gather não
-    cancela) e commita durante a espera abaixo.
+    X fails fast; Y computes ~0.2 s and ONLY THEN commits the effect. With the
+    fix, X's failure cancels Y before the commit. Without the fix, Y stays alive
+    (gather does not cancel) and commits during the wait below.
     """
     definition = {
         "nodes": [_trigger("T"),
@@ -164,16 +165,16 @@ async def test_gather_cancela_irmaos_na_primeira_falha(_registra):
     ex = WorkflowExecutor(definition, task_id="ga", publisher=_publisher())
     with pytest.raises(Exception):
         await ex.run(initial_inputs={"T": {"output": _gdf()}})
-    await asyncio.sleep(0.5)  # dá tempo de Y commitar SE não tiver sido cancelado
+    await asyncio.sleep(0.5)  # gives Y time to commit IF it was not canceled
     assert EFEITOS == [], "o irmão não pode commitar efeito após a falha do batch"
 
 
 # ── F-audit: retry so em erro transitorio (MUDANCA DE COMPORTAMENTO) ─────────
 
 def test_retry_nao_retenta_erro_deterministico(_registra):
-    """Mutacao: remover o gate `is_retryable(classify_error(...))`.
+    """Mutation: remove the `is_retryable(classify_error(...))` gate.
 
-    ValueError é 'user' (não-retentável): execute deve rodar UMA vez, não 3.
+    ValueError is 'user' (non-retryable): execute must run ONCE, not 3 times.
     """
     definition = {
         "nodes": [_trigger("T"),
@@ -188,7 +189,7 @@ def test_retry_nao_retenta_erro_deterministico(_registra):
 
 
 def test_retry_retenta_erro_transitorio(_registra):
-    """ConnectionError é 'transient': execute roda 1 + 2 retries = 3 vezes."""
+    """ConnectionError is 'transient': execute runs 1 + 2 retries = 3 times."""
     definition = {
         "nodes": [_trigger("T"),
                   {"id": "R", "type": "action", "name": "TesteFalhaClassificada",
@@ -201,13 +202,13 @@ def test_retry_retenta_erro_transitorio(_registra):
     assert CHAMADAS.get("R") == 3, "erro transitório deve ser retentado até esgotar"
 
 
-# ── F-audit: spill que nao restaura falha alto, nao entrega a sentinela ──────
+# ── F-audit: a spill that does not restore fails loudly, does not deliver the sentinel ──
 
 def test_spill_nao_restaurado_levanta(tmp_path):
-    """Mutacao: voltar a só logar o warning e deixar a referência sentinela.
+    """Mutation: go back to just logging the warning and leaving the sentinel reference.
 
-    Sem o fix, o nó consumidor receberia {'__spilled__': True, ...} como se fosse
-    dado. Agora falha alto com a causa real.
+    Without the fix, the consuming node would receive {'__spilled__': True, ...}
+    as if it were data. Now it fails loudly with the real cause.
     """
     outputs = {"gdf": {"__spilled__": True, "__spill_path__": str(tmp_path / "nao_existe.parquet")}}
     with pytest.raises(RuntimeError):

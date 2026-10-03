@@ -7,22 +7,22 @@ from flow.nodes.base import BaseNode
 from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 
-# SandboxedEnvironment, nao Environment: a expressao vem do usuario que edita o
-# workflow, e num Environment comum os globais default (`cycler`, `joiner`,
-# `namespace`, `lipsum`) abrem a cadeia `__init__.__globals__` ate o modulo `os`
-# — execucao de comandos no processo do executor, onde ficam o cert mTLS da
-# maquina e as connection strings ja descriptografadas.
+# SandboxedEnvironment, not Environment: the expression comes from the user who
+# edits the workflow, and in a plain Environment the default globals (`cycler`,
+# `joiner`, `namespace`, `lipsum`) open the `__init__.__globals__` chain up to the
+# `os` module — command execution in the executor's process, where the machine's
+# mTLS cert and the already-decrypted connection strings live.
 #
-# Mesmo ambiente usado por flow/utils/expression_service.py e
-# flow/nodes/action/field_transformer.py para exatamente esta classe de entrada;
-# este no era o unico desvio.
+# Same environment used by flow/utils/expression_service.py and
+# flow/nodes/action/field_transformer.py for exactly this class of input;
+# this node was the only deviation.
 #
-# Instanciado uma vez no modulo: o env e stateless entre renders (o contexto so
-# entra no .render()) e recria-lo por execucao so custava CPU.
+# Instantiated once at module level: the env is stateless between renders (the
+# context only enters in .render()) and recreating it per run only cost CPU.
 _JINJA_ENV = criar_ambiente_sandbox(undefined=StrictUndefined)
 
-# Conjuntos de valores reconhecidos como truthy/falsy para o resultado da expressão Jinja2.
-# Evita falsos negativos com variações de casing ("TRUE", "Yes", "False", etc.).
+# Sets of values recognized as truthy/falsy for the result of the Jinja2 expression.
+# Avoids false negatives with casing variations ("TRUE", "Yes", "False", etc.).
 _TRUTHY = frozenset({'true', '1', 'yes', 'on'})
 _FALSY  = frozenset({'false', '0', 'no', 'off', 'none', '', 'null'})
 
@@ -30,12 +30,12 @@ _FALSY  = frozenset({'false', '0', 'no', 'off', 'none', '', 'null'})
 @register_node
 class JinjaBranchNode(BaseNode):
     """
-    Nó de controle que avalia uma expressão Jinja2 e roteia o fluxo de acordo com
-    o resultado booleano. Mais flexível que o Conditional pois permite expressões
-    arbitrárias com acesso completo ao contexto de inputs.
+    Control node that evaluates a Jinja2 expression and routes the workflow according
+    to the boolean result. More flexible than Conditional, since it allows arbitrary
+    expressions with full access to the inputs context.
 
-    Propriedades:
-      - expression: expressão Jinja2 a avaliar, ex: '{{ inputs.count > 10 }}'
+    Properties:
+      - expression: Jinja2 expression to evaluate, e.g.: '{{ inputs.count > 10 }}'
     """
 
     @classmethod
@@ -65,14 +65,14 @@ class JinjaBranchNode(BaseNode):
                 {'name': 'branch', 'type': 'boolean', 'description': 'Resultado booleano da expressão Jinja2'},
             ],
             'branches': True,
-            # `result` primeiro: aresta de bifurcação nasce sem `from_key`, e a
-            # simulação tipa a entrada do nó seguinte pelo primeiro campo daqui
-            # (core.py:805). Ver o comentário em conditional.py.
+            # `result` first: a fork edge is created without `from_key`, and the
+            # simulation types the next node's input by the first field here
+            # (core.py:805). See the comment in conditional.py.
         }
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         # -------------------------------------------------------
-        # 1) Validação e extração de parâmetros
+        # 1) Parameter validation and extraction
         # -------------------------------------------------------
         self.validate()
 
@@ -82,9 +82,9 @@ class JinjaBranchNode(BaseNode):
             raise ValueError("Parâmetro 'expression' é obrigatório e não pode ser vazio.")
 
         # -------------------------------------------------------
-        # 2) Monta o contexto para a expressão Jinja2
+        # 2) Builds the context for the Jinja2 expression
         # -------------------------------------------------------
-        # Expõe o primeiro valor dos inputs como 'value' para conveniência
+        # Exposes the first value of the inputs as 'value' for convenience
         value = next(iter(inputs.values()), None) if inputs else None
 
         context: Dict[str, Any] = {
@@ -93,14 +93,14 @@ class JinjaBranchNode(BaseNode):
         }
 
         # -------------------------------------------------------
-        # 3) Avalia a expressão Jinja2
+        # 3) Evaluates the Jinja2 expression
         # -------------------------------------------------------
         try:
             rendered = _JINJA_ENV.from_string(expression).render(context)
         except SecurityError as e:
-            # A sandbox barrou acesso a atributo/operação insegura. Erro próprio
-            # (e não o RuntimeError genérico abaixo) para que o autor do workflow
-            # entenda que foi bloqueio de segurança, não falha de sintaxe.
+            # The sandbox blocked access to an unsafe attribute/operation. A dedicated error
+            # (and not the generic RuntimeError below) so the workflow author
+            # understands it was a security block, not a syntax failure.
             raise ValueError(
                 f"Operação não permitida por segurança na expressão Jinja2 '{expression}': {e}"
             ) from e
@@ -118,21 +118,21 @@ class JinjaBranchNode(BaseNode):
             ) from e
 
         # -------------------------------------------------------
-        # 4) Converte o resultado renderizado para booleano
+        # 4) Converts the rendered result to a boolean
         # -------------------------------------------------------
-        # Conversão robusta: reconhece variações de casing e valores numéricos.
-        # Antes: só checava ('True', 'true', '1', 'yes') — ignorava 'TRUE', 'Yes', etc.
+        # Robust conversion: recognizes casing variations and numeric values.
+        # Before: only checked ('True', 'true', '1', 'yes') — ignored 'TRUE', 'Yes', etc.
         raw = rendered.strip().lower()
         if raw in _TRUTHY:
             result_bool = True
         elif raw in _FALSY:
             result_bool = False
         else:
-            # Tenta interpretar como número (0 = falsy, qualquer outro = truthy)
+            # Tries to interpret it as a number (0 = falsy, anything else = truthy)
             try:
                 result_bool = bool(float(raw))
             except ValueError:
-                # String não reconhecida e não-vazia → truthy (consistente com Python)
+                # Unrecognized non-empty string → truthy (consistent with Python)
                 result_bool = bool(raw)
 
         logger.info(
@@ -141,17 +141,17 @@ class JinjaBranchNode(BaseNode):
         )
 
         # -------------------------------------------------------
-        # 5) Retorna resultado com o branch sinalizado
+        # 5) Returns the result with the signaled branch
         # -------------------------------------------------------
-        # Mesma ordem do Conditional, e pelo mesmo motivo: `**inputs` por
-        # último sobrescrevia o `branch` recém-calculado (duas bifurcações em
-        # sequência faziam a segunda repetir a decisão da primeira), e `branch`
-        # como primeira chave fazia todo nó que lê `next(iter(inputs.values()))`
-        # receber o booleano no lugar do dado. Ver o comentário em
-        # conditional.py para o caminho completo.
-        # Mesma reconstrução do Conditional: reatribuir chave existente mantém
-        # a posição dela no dict, e o `result` precisa terminar no fim para o
-        # Merge "último" achar o dado. Ver o comentário em conditional.py.
+        # Same order as Conditional, and for the same reason: `**inputs`
+        # last overwrote the freshly computed `branch` (two forks in
+        # sequence made the second repeat the first's decision), and `branch`
+        # as the first key made every node that reads `next(iter(inputs.values()))`
+        # receive the boolean in place of the data. See the comment in
+        # conditional.py for the full path.
+        # Same rebuild as Conditional: reassigning an existing key keeps
+        # its position in the dict, and `result` needs to end up at the end for
+        # the "último" Merge to find the data. See the comment in conditional.py.
         saida = {k: v for k, v in inputs.items()
                  if k not in ('branch', 'result')}
         saida['branch'] = result_bool

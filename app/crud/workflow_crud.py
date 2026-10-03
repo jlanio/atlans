@@ -7,55 +7,57 @@ from app.models.models import Workflow, WorkflowVersion
 from app.core.exceptions import WorkflowVersionConflictError
 from app.core.utils.logger import get_logger
 
-# O nome da UNIQUE (workflow_hash, version_number). Estável nos três lugares que
-# a definem: `app/models/workflow_version.py`, a migração inicial e
-# `scripts/init_schema.sql`.
+# The name of the UNIQUE (workflow_hash, version_number). Stable in the three
+# places that define it: `app/models/workflow_version.py`, the initial migration
+# and `scripts/init_schema.sql`.
 _NOME_DA_UNIQUE_DE_VERSAO = "uq_workflow_version"
 
 
 def _e_colisao_de_versao(exc: IntegrityError) -> bool:
-    """A violação é a da UNIQUE (workflow_hash, version_number)?
+    """Is the violation the one from the UNIQUE (workflow_hash, version_number)?
 
-    Duas formas de reconhecer, porque as duas bases dizem coisas diferentes:
+    Two ways to recognize it, because the two databases say different things:
 
         PostgreSQL  duplicate key value violates unique constraint "uq_workflow_version"
         SQLite      UNIQUE constraint failed: workflow_versions.workflow_hash, ...
 
-    O SQLite **não** cita o nome da constraint — cita as colunas. Casar só pelo
-    nome faria o retry funcionar em produção e nunca nos testes, que é a pior
-    combinação possível: o conserto pareceria não testado quando está certo, ou
-    passaria a suíte por um caminho que produção não percorre.
+    SQLite does **not** cite the constraint name — it cites the columns.
+    Matching only by name would make the retry work in production and never in
+    the tests, which is the worst possible combination: the fix would look
+    untested when it is right, or the suite would pass through a path that
+    production does not take.
 
-    Medido, não suposto — as duas mensagens acima saíram de uma violação real de
-    cada base.
+    Measured, not assumed — the two messages above came from a real violation
+    in each database.
     """
     texto = str(getattr(exc, "orig", exc)).lower()
     if _NOME_DA_UNIQUE_DE_VERSAO in texto:
         return True
     return "unique" in texto and "version_number" in texto
 
-# Três tentativas cobrem contenção real (saves simultâneos do mesmo fluxo).
-# Esgotar as três não é "mais azar": é sinal de outra coisa, e vira 409.
+# Three attempts cover real contention (simultaneous saves of the same workflow).
+# Exhausting all three is not "more bad luck": it signals something else, and becomes a 409.
 _TENTATIVAS_DE_VERSAO = 3
 
 def _tem_node(nome: str, rotulo: str):
-    """Marca de listagem: a definition menciona um node com este nome.
+    """Listing flag: the definition mentions a node with this name.
 
-    Procura no texto de `definition['nodes']` — não traz o JSON para o Python,
-    que é o ponto de existir na consulta e não em código.
+    Searches the text of `definition['nodes']` — does not bring the JSON into
+    Python, which is the point of doing it in the query and not in code.
 
-    Limitação conhecida: é busca por substring no JSON serializado, então um nó
-    cujo APELIDO seja o nome procurado, ou um script que mencione o nome num
-    comentário, marcam o workflow. Verificado: os dois casos dão positivo. O
-    desfecho é um selo a mais numa lista, e a alternativa exata (`cast(... AS
-    jsonb) @> '[{"name": "..."}]'`) prende a consulta ao PostgreSQL e tira estes
-    testes do SQLite. Se a precisão passar a importar, é essa a troca.
+    Known limitation: it is a substring search on the serialized JSON, so a
+    node whose NICKNAME is the name searched for, or a script that mentions the
+    name in a comment, flags the workflow. Verified: both cases come out
+    positive. The outcome is one extra badge in a list, and the exact
+    alternative (`cast(... AS
+    jsonb) @> '[{"name": "..."}]'`) ties the query to PostgreSQL and takes
+    these tests off SQLite. If precision ever matters, that is the trade-off.
 
-    O `coalesce` não é zelo: `definition` sem a chave `nodes` faz o `->>`
-    devolver NULL, o `LIKE` propaga NULL, e o Pydantic recusa None num campo
-    `bool` — a resposta inteira de GET /workflows/ virava 500, e não só a linha
-    daquele workflow. A coluna é `nullable=False`, mas nada garante o formato
-    de dentro do JSON.
+    The `coalesce` is not overcaution: a `definition` without the `nodes` key
+    makes `->>` return NULL, `LIKE` propagates NULL, and Pydantic refuses None
+    in a `bool` field — the whole GET /workflows/ response became a 500, not
+    just that workflow's row. The column is `nullable=False`, but nothing
+    guarantees the shape inside the JSON.
     """
     return cast(
         func.coalesce(Workflow.definition["nodes"].as_string().contains(nome), False),
@@ -65,32 +67,32 @@ def _tem_node(nome: str, rotulo: str):
 
 _has_publish_map_expr = _tem_node("PublishMap", "has_publish_map")
 
-# Workflow que existe para ser CHAMADO por outro: declara a saida publica de
-# sub-fluxo. `SubWorkflowOutput` e o unico node obrigatorio do contrato (ver
-# validate_subworkflow_references_against_db) — a entrada e opcional, porque um
-# sub-fluxo pode nao receber nada.
+# A workflow that exists to be CALLED by another: it declares the public
+# sub-workflow output. `SubWorkflowOutput` is the only mandatory node of the
+# contract (see validate_subworkflow_references_against_db) — the input is
+# optional, because a sub-workflow may receive nothing.
 #
-# Vale a pena marcar na listagem porque um sub-fluxo costuma NAO ter gatilho:
-# executa-lo sozinho pelo botao da lista nao faz o que se espera.
+# Worth flagging in the listing because a sub-workflow usually has NO trigger:
+# running it alone from the list's button does not do what one expects.
 _e_subfluxo_expr = _tem_node("SubWorkflowOutput", "is_subworkflow")
 
-# Gatilhos, pelo mesmo mecanismo. Sao a natureza do workflow ("como ele
-# dispara"), nao execucao — por isso saem na listagem e nao nas metricas.
-# Os nomes sao os registrados em `flow/nodes/trigger/*` (`get_definition()['name']`).
+# Triggers, by the same mechanism. They are the workflow's nature ("how it
+# fires"), not execution — that is why they go in the listing and not in metrics.
+# The names are the ones registered in `flow/nodes/trigger/*` (`get_definition()['name']`).
 #
-# Colisoes de substring aceitas, alem das gerais de `_tem_node`: um node cujo
-# nome CONTENHA o procurado tambem marca — "GeofenceTrigger" casa com a classe
-# `GeofenceTriggerNode` se algum dia o nome registrado mudar para ela, o que e
-# o resultado desejado; nao ha hoje node registrado que contenha "FileTrigger",
-# "WebhookTrigger" ou "ScheduleTrigger" sem ser o proprio gatilho.
+# Accepted substring collisions, besides the general ones of `_tem_node`: a node
+# whose name CONTAINS the one searched for also flags — "GeofenceTrigger" matches
+# the `GeofenceTriggerNode` class if the registered name ever changes to it, which
+# is the desired result; today there is no registered node that contains
+# "FileTrigger", "WebhookTrigger" or "ScheduleTrigger" without being the trigger itself.
 _has_webhook_trigger_expr = _tem_node("WebhookTrigger", "has_webhook_trigger")
 _has_schedule_trigger_expr = _tem_node("ScheduleTrigger", "has_schedule_trigger")
 _has_file_trigger_expr = _tem_node("FileTrigger", "has_file_trigger")
 _has_geofence_trigger_expr = _tem_node("GeofenceTrigger", "has_geofence_trigger")
 
-# Colunas leves para listagem — exclui definition, pinned_outputs, pin_metadata,
-# params_schema. `deleted_at` tambem fica de fora: as duas consultas que usam
-# esta lista filtram `deleted_at IS NULL`, entao a coluna era sempre nula.
+# Light columns for listing — excludes definition, pinned_outputs, pin_metadata,
+# params_schema. `deleted_at` is also left out: both queries that use this
+# list filter `deleted_at IS NULL`, so the column was always null.
 _METADATA_COLUMNS = [
     Workflow.id,
     Workflow.id_hash,
@@ -132,29 +134,30 @@ class WorkflowCRUD:
         workflow = result.scalar_one_or_none()
         return workflow
     
-    # Os dois metodos abaixo carregavam `OR workspace_id IS NULL` para nao
-    # esconder workflows legados. O efeito colateral era entrega-los na listagem
-    # de TODO usuario autenticado, de qualquer tenant. A coluna e NOT NULL desde
-    # a migration 20260828_0001, que atribuiu esses legados ao workspace certo —
-    # nao ha mais legado a acomodar, e o filtro passa a ser so o do tenant.
+    # The two methods below carried `OR workspace_id IS NULL` so as not to
+    # hide legacy workflows. The side effect was delivering them in the listing
+    # of EVERY authenticated user, of any tenant. The column is NOT NULL since
+    # migration 20260828_0001, which assigned those legacy ones to the right
+    # workspace — there is no more legacy to accommodate, and the filter is now
+    # just the tenant's.
 
     async def get_all_metadata(
         self, workspace_id: str | None = None, *, incluir_do_assistente: bool = False,
     ):
-        """Retorna workflows SEM os campos JSON pesados (definition, pinned_outputs, etc.).
-        Ideal para listagem — economiza ~10KB por workflow.
+        """Returns workflows WITHOUT the heavy JSON fields (definition, pinned_outputs, etc.).
+        Ideal for listing — saves ~10KB per workflow.
 
-        Por padrao esconde os fluxos do assistente (`origem = "assistente"`): eles
-        sao meio de entrega da Home, nao itens que o dono gerencia. Quem passa
-        `incluir_do_assistente=True` hoje: o `ActiveRunsContext` (precisa dos
-        nomes para o badge do run), a tool `list_workflows` quando quem chama e o
-        proprio assistente, e a rota `GET /workflows?assistente=1`.
+        By default hides the assistant's workflows (`origem = "assistente"`):
+        they are a delivery vehicle for Home, not items the owner manages. Who
+        passes `incluir_do_assistente=True` today: `ActiveRunsContext` (needs
+        the names for the run badge), the `list_workflows` tool when the caller
+        is the assistant itself, and the `GET /workflows?assistente=1` route.
 
-        ATENCAO — a tela de Projetos AINDA NAO tem o interruptor que usaria essa
-        rota, e a observabilidade (inventario do Dashboard, contagens de grupo)
-        nao filtra `origem`. Enquanto os dois lados nao concordarem, um fluxo do
-        assistente aparece no Historico e nas metricas sem existir em Projetos.
-        Os agendamentos dele aparecem de proposito, com selo — ver
+        WARNING — the Projects screen does NOT YET have the toggle that would
+        use that route, and observability (Dashboard inventory, group counts)
+        does not filter by `origem`. Until both sides agree, an assistant
+        workflow shows up in History and in metrics without existing in
+        Projects. Its schedules show up on purpose, with a badge — see
         `schedule_service.listar_agendamentos_de`."""
         stmt = select(*_METADATA_COLUMNS).where(Workflow.deleted_at.is_(None))
         if not incluir_do_assistente:
@@ -167,9 +170,9 @@ class WorkflowCRUD:
     async def get_all_metadata_by_workspace_ids(
         self, workspace_ids: list[str], *, incluir_do_assistente: bool = False,
     ):
-        """Retorna workflows (somente metadados) dos workspaces fornecidos.
+        """Returns workflows (metadata only) from the given workspaces.
 
-        Esconde os fluxos do assistente por padrao — ver `get_all_metadata`."""
+        Hides the assistant's workflows by default — see `get_all_metadata`."""
         stmt = select(*_METADATA_COLUMNS).where(
             Workflow.deleted_at.is_(None),
             Workflow.workspace_id.in_(workspace_ids),
@@ -194,7 +197,7 @@ class WorkflowCRUD:
         return wf
 
     async def soft_delete_by_hash(self, id_hash: str) -> Workflow | None:
-        """Soft delete: marca deleted_at e desativa o workflow sem removê-lo do banco."""
+        """Soft delete: sets deleted_at and deactivates the workflow without removing it from the database."""
         from app.core.utils.datetime_utils import utc_now_naive
         stmt = select(Workflow).where(Workflow.id_hash == id_hash)
         result = await self.db.execute(stmt)
@@ -221,35 +224,38 @@ class WorkflowCRUD:
         *,
         tentativas: int = _TENTATIVAS_DE_VERSAO,
     ) -> WorkflowVersion:
-        """Snapshot automático: salva a versão ATUAL antes de uma atualização.
+        """Automatic snapshot: saves the CURRENT version before an update.
 
-        O número da versão é read-modify-write — lê o máximo atual e soma 1 —, e
-        a UNIQUE `uq_workflow_version` é a única árbitra do empate. Dois saves
-        simultâneos do mesmo workflow leem o mesmo máximo, e o segundo INSERT
-        viola.
+        The version number is read-modify-write — it reads the current maximum
+        and adds 1 —, and the UNIQUE `uq_workflow_version` is the only arbiter
+        of a tie. Two simultaneous saves of the same workflow read the same
+        maximum, and the second INSERT violates it.
 
-        **A janela não é a de um INSERT.** Como esta função só faz `flush()` (o
-        commit é do chamador, de propósito — ver `workflow_move_service._aplicar`,
-        que depende disso para desfazer tudo junto), ela vai do `SELECT max()`
-        até o commit lá adiante, cobrindo tudo o que o chamador fizer no meio.
+        **The window is not that of one INSERT.** Since this function only does
+        `flush()` (the commit belongs to the caller, on purpose — see
+        `workflow_move_service._aplicar`, which depends on it to undo everything
+        together), it runs from the `SELECT max()` to the commit further on,
+        covering everything the caller does in between.
 
-        Por que SAVEPOINT e não `try` solto: no PostgreSQL uma violação de
-        constraint envenena a transação INTEIRA, e esta roda dentro da transação
-        de outra pessoa, que ainda vai commitar trabalho não relacionado. Sem o
-        `begin_nested`, capturar o erro não conserta — só troca o 500 por um
-        `PendingRollbackError` no commit seguinte. Mesmo motivo, e mesmo molde,
-        de `_upsert_pin_artifact` (`app/core/run_result_consumer.py`),
-        `api_token_service.marcar_uso` e `credential_loader`.
+        Why a SAVEPOINT and not a bare `try`: in PostgreSQL a constraint
+        violation poisons the WHOLE transaction, and this one runs inside
+        someone else's transaction, which will still commit unrelated work.
+        Without `begin_nested`, catching the error does not fix it — it only
+        swaps the 500 for a `PendingRollbackError` on the next commit. Same
+        reason, and same mold, as `_upsert_pin_artifact`
+        (`app/core/run_result_consumer.py`), `api_token_service.marcar_uso` and
+        `credential_loader`.
 
-        Por que NÃO `SELECT ... FOR UPDATE` na linha do workflow: `FOR UPDATE`
-        conflita com o `FOR KEY SHARE` que todo INSERT com FK pede na linha
-        referenciada, e `WorkflowVersion.workflow_hash` é FK para
-        `workflows.id_hash`. O comentário de `app/core/async_scheduler.py` (no
-        `with_for_update`) registra o auto-deadlock que isso já custou aqui, e
-        `api_token_service` registra o descarte do mesmo recurso por custo.
+        Why NOT `SELECT ... FOR UPDATE` on the workflow row: `FOR UPDATE`
+        conflicts with the `FOR KEY SHARE` that every INSERT with an FK requests
+        on the referenced row, and `WorkflowVersion.workflow_hash` is an FK to
+        `workflows.id_hash`. The comment in `app/core/async_scheduler.py` (at
+        `with_for_update`) records the self-deadlock this has already cost here,
+        and `api_token_service` records discarding the same feature for cost.
 
-        O retry **relê** o máximo em vez de incrementar o número que falhou: dois
-        perdedores simultâneos que incrementassem colidiriam de novo entre si.
+        The retry **re-reads** the maximum instead of incrementing the number
+        that failed: two simultaneous losers that incremented would collide
+        with each other again.
         """
         for _ in range(max(1, tentativas)):
             max_ver_result = await self.db.execute(
@@ -267,17 +273,17 @@ class WorkflowCRUD:
             try:
                 async with self.db.begin_nested():
                     self.db.add(version)
-                    await self.db.flush()   # obtém ID sem commit separado
+                    await self.db.flush()   # gets the ID without a separate commit
                 return version
             except IntegrityError as exc:
                 if not _e_colisao_de_versao(exc):
                     raise
-                # Não há `expunge(version)` aqui, e a ausência é medida: o
-                # rollback do SAVEPOINT já retira da sessão o objeto adicionado
-                # dentro dele, e chamar `expunge` depois levanta
+                # There is no `expunge(version)` here, and its absence is measured: the
+                # SAVEPOINT rollback already removes from the session the object
+                # added inside it, and calling `expunge` afterwards raises
                 # `InvalidRequestError: Instance is not present in this Session`.
-                # Cada volta do laço cria um `WorkflowVersion` novo, então nada
-                # do INSERT que falhou sobrevive para ser reemitido.
+                # Each turn of the loop creates a new `WorkflowVersion`, so nothing
+                # from the failed INSERT survives to be re-emitted.
                 logger.info(
                     "Colisão de version_number no workflow %s; relendo o máximo.",
                     workflow_hash,

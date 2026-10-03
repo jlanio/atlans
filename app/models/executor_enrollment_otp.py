@@ -1,15 +1,15 @@
 # app/models/executor_enrollment_otp.py
 """
-OTP de uso unico para enrollment de executores via mTLS.
+Single-use OTP for enrolling executors via mTLS.
 
-Fluxo:
-  1. Admin cria executor (status=pending) e gera OTP via POST /executores/{id}/enroll-otp.
-  2. Operador rece o OTP por canal seguro e roda `atlans-executor enroll --otp=...`.
-  3. Executor troca OTP por cert mTLS via POST /executores/enroll.
-  4. consumed_at marcado atomicamente — OTP nao pode ser reutilizado.
+Flow:
+  1. Admin creates the executor (status=pending) and generates an OTP via POST /executores/{id}/enroll-otp.
+  2. The operator receives the OTP over a secure channel and runs `atlans-executor enroll --otp=...`.
+  3. The executor exchanges the OTP for an mTLS cert via POST /executores/enroll.
+  4. consumed_at is set atomically — the OTP cannot be reused.
 
-Persistimos apenas HMAC do OTP (otp_hash); a string plaintext aparece uma
-unica vez na resposta ao admin e nunca e armazenada.
+We persist only the OTP's HMAC (otp_hash); the plaintext string appears only
+once, in the response to the admin, and is never stored.
 """
 from uuid import uuid4
 

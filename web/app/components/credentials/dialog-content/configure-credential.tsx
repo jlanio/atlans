@@ -35,9 +35,9 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
   const [typesError, setTypesError] = useState(false)
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<TestResult | null>(null)
-  // Estado do carregamento dos segredos. Enquanto não terminar, o formulário
-  // fica bloqueado — ver o comentário do efeito abaixo, é o ponto mais delicado
-  // deste modal.
+  // Loading state of the secrets. Until it finishes, the form stays locked —
+  // see the comment on the effect below, it is the most delicate point of
+  // this modal.
   const [secretsState, setSecretsState] = useState<"loading" | "ready" | "error">("loading")
 
   const form = useForm<z.infer<typeof formCredentialSchema>>({
@@ -57,28 +57,28 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
       if (res?.data) {
         setCredentialTypes(res.data)
       } else {
-        // Sem o catálogo não há schema, então o formulário cai no editor livre —
-        // com os valores mascarados, sem rótulos de campo e sem explicação. Avisar
-        // é o mínimo; o create-credential já fazia isso e este ficou sem.
+        // Without the catalog there is no schema, so the form falls back to the free
+        // editor — with masked values, no field labels and no explanation. Warning
+        // is the minimum; create-credential already did it and this one did not.
         setTypesError(true)
       }
       setTypesLoaded(true)
     })
   }, [])
 
-  // Busca os dados descriptografados para pré-popular o formulário de edição.
+  // Fetches the decrypted data to pre-populate the edit form.
   //
-  // PERIGO que este bloqueio evita: o backend faz `self.data = {...}` no
-  // encrypt_and_store — SUBSTITUI o blob inteiro, sem merge. E só pula a
-  // re-encriptação quando `data` é vazio (`if update_data.data:`). Então um
-  // `data` PARCIAL é o caso destrutivo: se esta busca falhasse (ou o usuário
-  // digitasse antes de ela voltar) e ele salvasse, todos os outros segredos
-  // seriam apagados — e `_build_postgres_dsn` preenche o que falta com defaults,
-  // produzindo `postgresql://:@localhost:5432/`. Uma credencial plausível e
-  // quebrada, que só falha na execução do workflow.
+  // DANGER this lock prevents: the backend does `self.data = {...}` in
+  // encrypt_and_store — it REPLACES the whole blob, without merging. And it only
+  // skips re-encryption when `data` is empty (`if update_data.data:`). So a
+  // PARTIAL `data` is the destructive case: if this fetch failed (or the user
+  // typed before it came back) and they saved, all the other secrets would be
+  // erased — and `_build_postgres_dsn` fills in what is missing with defaults,
+  // producing `postgresql://:@localhost:5432/`. A plausible, broken credential
+  // that only fails when the workflow runs.
   //
-  // Por isso: campos desabilitados até `ready`, e em `error` o Salvar fica
-  // bloqueado em vez de gravar por cima.
+  // Hence: fields disabled until `ready`, and on `error` Save stays locked
+  // instead of writing over it.
   useEffect(() => {
     if (!configureCredentialId) return
     let ativo = true
@@ -105,11 +105,11 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
   const selectedType = form.watch("type")
   const activeSchema = credentialTypes.find(t => t.type === selectedType)
 
-  // Resultado do teste envelhece a cada mudança de campo — neste modal não havia
-  // reset nenhum, então testar e depois trocar a senha deixava o verde na tela.
-  // A dependência é o valor serializado, não o objeto: `form.watch` pode devolver
-  // referência nova por render, e aí o resultado seria limpo no render seguinte
-  // ao próprio teste.
+  // The test result goes stale on every field change — this modal had no reset
+  // at all, so testing and then changing the password left the green on screen.
+  // The dependency is the serialized value, not the object: `form.watch` may
+  // return a new reference per render, and then the result would be cleared on
+  // the render right after the test itself.
   const dataFields = form.watch("data")
   const dataSignature = JSON.stringify(dataFields ?? {})
   useEffect(() => {
@@ -130,8 +130,8 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
   }
 
   async function onSubmit(data: z.infer<typeof formCredentialSchema>) {
-    // O guard antigo (`!credentialFound`) falhava em silêncio: clicar em Salvar
-    // simplesmente não fazia nada se a credencial não estivesse no contexto.
+    // The old guard (`!credentialFound`) failed silently: clicking Save
+    // simply did nothing if the credential was not in the context.
     if (!configureCredentialId) return
     if (secretsState !== "ready") {
       return createToast.error(
@@ -140,17 +140,18 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
       )
     }
 
-    // Envia só o que o backend aceita (name/type/data). O `{...credentialFound}`
-    // anterior arrastava id/expires_at no PUT e, pior, injetava `data` — segredos
-    // em claro — nos objetos da listagem, que é tipada sem esse campo.
+    // Sends only what the backend accepts (name/type/data). The previous
+    // `{...credentialFound}` dragged id/expires_at into the PUT and, worse,
+    // injected `data` — plaintext secrets — into the listing objects, which are
+    // typed without that field.
     const respCred = await GisFlowService.updateCredential(configureCredentialId, data)
 
     if (respCred?.error)
       return createToast.error("Erro ao atualizar credencial!", respCred?.error.message)
 
-    // Atualiza a lista DEPOIS da resposta. Antes era otimista e sem rollback:
-    // em erro saía o toast e a listagem seguia exibindo o valor que o backend
-    // recusou.
+    // Updates the list AFTER the response. Before it was optimistic with no
+    // rollback: on error the toast came out and the listing kept showing the
+    // value the backend refused.
     setCredentialsContext(prev => ({
       ...prev,
       credentials: prev.credentials.map(credential =>
@@ -160,8 +161,9 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
       )
     }))
 
-    // O canvas guarda a lista de credenciais em memória por 5 min; sem invalidar,
-    // o nó continuaria mostrando o nome antigo da credencial até o TTL vencer.
+    // The canvas keeps the credential list in memory for 5 min; without
+    // invalidating, the node would keep showing the credential's old name until
+    // the TTL expired.
     useWorkflowCatalogStore.getState().invalidarCredenciais()
 
     createToast.success("Credencial atualizada", data.name)
@@ -177,9 +179,9 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
       bloqueado={isSubmitting}
     >
       <DialogHeader>
-        {/* `pr-8` e `break-words`: o nome vem do usuário, e um nome longo
-            passava por baixo do X de fechar — ou vazava a lateral no telefone,
-            onde o diálogo tem 328px. */}
+        {/* `pr-8` and `break-words`: the name comes from the user, and a long name
+            ran under the close X — or overflowed the side on the phone,
+            where the dialog is 328px wide. */}
         <DialogTitle className="pr-8 break-words">Configurar credencial «{credentialFound?.name}»</DialogTitle>
         <DialogDescription>
           Altere as configurações da sua credencial.
@@ -210,11 +212,12 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
 
           <TypeInput form={form} credentialTypes={credentialTypes} disabled />
 
-          {/* Campos guiados pelo schema ou editor livre como fallback.
-              `typesLoaded` no gate evita o piscar: o tipo já vem preenchido nos
-              defaults, então antes do catálogo chegar `activeSchema` era undefined
-              e caía no PropsInput — que renderiza os valores SEM type="password",
-              expondo os segredos em texto claro por um instante. */}
+          {/* Schema-driven fields or the free editor as a fallback.
+              `typesLoaded` in the gate avoids the flash: the type already comes
+              filled in the defaults, so before the catalog arrived `activeSchema`
+              was undefined and fell into PropsInput — which renders the values
+              WITHOUT type="password", exposing the secrets in plain text for an
+              instant. */}
           {secretsState === "loading" || !typesLoaded ? (
             <div className="flex flex-col gap-2" aria-busy="true">
               <Skeleton className="h-9 w-full rounded-md" />
@@ -228,8 +231,8 @@ const ConfigureCredential = ({ configureCredentialId, setConfigureCredentialId }
             <PropsInput form={form} />
           ) : null}
 
-          {/* Metadados opcionais — só depois que os segredos carregam, e
-              bloqueados junto com o resto enquanto isso. */}
+          {/* Optional metadata — only after the secrets load, and locked along
+              with the rest in the meantime. */}
           {secretsState === "ready" && <MetaInputs form={form} disabled={camposBloqueados} />}
 
           <TestResultBanner result={testResult} />

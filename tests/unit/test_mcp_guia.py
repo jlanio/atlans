@@ -1,16 +1,16 @@
 # tests/unit/test_mcp_guia.py
 """
-O guia de autoria — o conteúdo, não o transporte.
+The authoring guide — the content, not the transport.
 
-Este arquivo existe por uma razão só: o guia ENSINA a montar fluxo, e um guia
-errado custa mais caro que código errado — quem o lê confia e reproduz. Então
-o que é verificável fica verificado aqui: os oito tópicos existem e têm texto,
-nenhum deles repete afirmação que já foi desmentida pelo servidor de hoje, e
-cada receita é um fluxo que de fato passa no lint.
+This file exists for a single reason: the guide TEACHES how to build workflows,
+and a wrong guide costs more than wrong code — whoever reads it trusts it and
+reproduces it. So what is verifiable is verified here: the eight topics exist
+and have text, none of them repeats a claim already disproven by today's
+server, and every recipe is a workflow that actually passes the lint.
 
-O lint (`flow/utils/definition_lint.py`) é o mesmo que o `/validate` roda antes
-de simular. Uma receita com nome de nó errado, id duplicado ou ciclo seria
-recusada pela plataforma — e estaria no guia, ensinando o erro.
+The lint (`flow/utils/definition_lint.py`) is the same one `/validate` runs
+before simulating. A recipe with a wrong node name, a duplicate id or a cycle
+would be refused by the platform — and would be in the guide, teaching the error.
 """
 from __future__ import annotations
 
@@ -24,16 +24,16 @@ from app.mcp import guia
 from flow.registry import NODE_REGISTRY
 from flow.utils.definition_lint import CHAVES_SECRETAS, lint_definition
 
-# Blocos ```json ... ``` de um markdown.
+# ```json ... ``` blocks of a markdown document.
 _BLOCO_JSON = re.compile(r"```json\n(.*?)\n```", re.S)
 
-# Frases que o servidor desmentiu e que não podem sobreviver num tópico:
-# o nome de nó inexistente virou 422 estruturado (com `unknown_node` no
-# relatório), e os scripts da skill foram substituídos pelas tools.
+# Sentences the server has disproven and that must not survive in a topic:
+# a nonexistent node name became a structured 422 (with `unknown_node` in the
+# report), and the skill's scripts were replaced by the tools.
 PROIBIDOS = ("HTTP 500", "validar.py", "catalogo.py")
 
-# Teto por tópico. Não é estética: o guia é lido por chamada, e um tópico que
-# não cabe numa leitura deixa de ser consultado.
+# Ceiling per topic. It is not aesthetics: the guide is read per call, and a
+# topic that doesn't fit in one read stops being consulted.
 LIMITE_BYTES = 8 * 1024
 
 
@@ -46,7 +46,7 @@ def _blocos_json(texto: str) -> list[dict]:
 
 
 def _valores_de_chave(valor, chave_alvo: str) -> list:
-    """Todos os valores gravados sob `chave_alvo`, em qualquer profundidade."""
+    """All values stored under `chave_alvo`, at any depth."""
     achados: list = []
     if isinstance(valor, dict):
         for chave, sub in valor.items():
@@ -59,7 +59,7 @@ def _valores_de_chave(valor, chave_alvo: str) -> list:
     return achados
 
 
-# ── Os nove tópicos ───────────────────────────────────────────────────────────
+# ── The nine topics ───────────────────────────────────────────────────────────
 
 
 def test_sao_nove_topicos_na_ordem_de_leitura():
@@ -80,14 +80,14 @@ def test_sao_nove_topicos_na_ordem_de_leitura():
 def test_topico_tem_texto_e_cabe_numa_leitura(topico):
     texto = guia.ler_topico(topico)
     assert texto.strip(), f"{topico} está vazio"
-    # Um tópico precisa valer sozinho: título e mais de um parágrafo.
+    # A topic must stand on its own: a title and more than one paragraph.
     assert texto.lstrip().startswith("#"), f"{topico} não começa por um título"
     assert len(texto) > 400, f"{topico} é curto demais para valer sozinho"
     assert len(texto.encode("utf-8")) <= LIMITE_BYTES, f"{topico} passou de {LIMITE_BYTES} bytes"
 
 
 def test_topico_desconhecido_e_recusado_sem_tocar_no_disco():
-    # O nome vem do cliente: montar `Path` com ele seria travessia de diretório.
+    # The name comes from the client: building a `Path` with it would be directory traversal.
     for entrada in ("inexistente", "../__init__", "/etc/passwd", ""):
         with pytest.raises(ValueError) as exc:
             guia.ler_topico(entrada)
@@ -104,9 +104,9 @@ def test_topico_nao_repete_afirmacao_desmentida(topico):
 @pytest.mark.parametrize("topico", guia.TOPICOS)
 def test_topico_nao_carrega_segredo(topico):
     texto = guia.ler_topico(topico)
-    # Segredo de token pessoal: nem como exemplo.
+    # A personal token's secret: not even as an example.
     assert "atl_pat_" not in texto, f"{topico} carrega o prefixo de um token pessoal"
-    # E nenhuma propriedade secreta preenchida dentro dos exemplos em JSON.
+    # And no secret property filled in inside the JSON examples.
     for definicao in _blocos_json(texto):
         for chave in CHAVES_SECRETAS:
             preenchidos = [v for v in _valores_de_chave(definicao, chave) if v not in (None, "", {}, [])]
@@ -114,12 +114,12 @@ def test_topico_nao_carrega_segredo(topico):
 
 
 def test_overview_ensina_o_relatorio_estruturado():
-    """O que substituiu a afirmação antiga sobre nome de nó inexistente."""
+    """What replaced the old claim about a nonexistent node name."""
     texto = guia.ler_topico("overview")
     for codigo in ("unknown_node", "duplicate_node_id", "cycle", "invalid_credential_id"):
         assert codigo in texto
     assert "report.errors" in texto
-    # E a regra de hoje sobre o formato de entrada.
+    # And today's rule about the input format.
     assert "`parameters`" in texto and "`properties`" in texto
 
 
@@ -132,7 +132,7 @@ def test_inputs_cobre_os_tres_caminhos_de_entrada():
     assert "suggested_params_schema" in texto
 
 
-# ── As receitas ───────────────────────────────────────────────────────────────
+# ── The recipes ───────────────────────────────────────────────────────────────
 
 
 def test_sao_cinco_receitas():
@@ -142,15 +142,15 @@ def test_sao_cinco_receitas():
 
 
 def test_receitas_sao_json_valido_e_passam_no_lint():
-    """A trava que impede o guia de ensinar fluxo quebrado.
+    """The lock that keeps the guide from teaching a broken workflow.
 
-    `lint_definition` é o mesmo lint do `/validate`. Um erro FATAL aqui é uma
-    definição que a plataforma recusaria — exatamente o que não pode estar
-    escrito no guia como exemplo a copiar.
+    `lint_definition` is the same lint as `/validate`. A FATAL error here is a
+    definition the platform would refuse — exactly what must not be written in
+    the guide as an example to copy.
     """
     texto = guia.ler_topico("recipes")
     definicoes = _blocos_json(texto)
-    # Quatro receitas, e a do sub-fluxo traz as duas pontas (filho e pai).
+    # Four recipes, and the sub-workflow one carries both ends (child and parent).
     assert len(definicoes) >= 4
 
     nomes = set(NODE_REGISTRY)
@@ -165,7 +165,7 @@ def test_receitas_sao_json_valido_e_passam_no_lint():
         )
         fatais = [d.code for d in relatorio.errors if d.fatal]
         assert not fatais, f"receita {indice} tem erro fatal: {fatais}"
-        # Nem fatal nem não-fatal: uma receita é exemplo, sai limpa.
+        # Neither fatal nor non-fatal: a recipe is an example, it comes out clean.
         assert not relatorio.errors, (
             f"receita {indice}: {[(d.code, d.message) for d in relatorio.errors]}"
         )
@@ -180,7 +180,7 @@ def test_receitas_so_referenciam_nos_do_catalogo():
 
 
 def test_receitas_usam_credential_id_como_uuid():
-    """Credencial entra por id; um id que não é UUID é fatal no lint."""
+    """A credential goes in by id; an id that is not a UUID is fatal in the lint."""
     import uuid
 
     texto = guia.ler_topico("recipes")
@@ -189,6 +189,6 @@ def test_receitas_usam_credential_id_como_uuid():
         for valor in _valores_de_chave(definicao, "credential_id"):
             if valor in (None, ""):
                 continue
-            uuid.UUID(str(valor))  # levanta se não for UUID
+            uuid.UUID(str(valor))  # raises if it is not a UUID
             encontrados += 1
     assert encontrados >= 1, "nenhuma receita mostra o uso de credential_id"

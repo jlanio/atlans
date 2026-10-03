@@ -5,14 +5,15 @@ interface Props {
   label?: string
 }
 
-// A aba mostrava também o endpoint e um snippet (cURL/Python/JS) para baixar o
-// artefato por `GET /artifacts/runs/<task_id>/<arquivo>`. A rota não era
-// publicada em produção e devolvia um JSON com a URL, não o arquivo — o
-// snippet não funcionava. Saiu junto com a rota; fica o que continua valendo.
+// The tab also used to show the endpoint and a snippet (cURL/Python/JS) to
+// download the artifact via `GET /artifacts/runs/<task_id>/<arquivo>`. The route
+// wasn't published in production and returned a JSON with the URL, not the
+// file — the snippet didn't work. It went away along with the route; what still
+// holds stays.
 export default function DataOutputHelper({ label }: Props) {
   return (
     <div className="flex flex-col gap-3 px-3 mt-3 pb-4">
-        {/* Título */}
+        {/* Title */}
         <div className="flex items-center gap-1.5">
           <LuFileOutput className="h-3.5 w-3.5 text-muted-foreground" />
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
@@ -20,7 +21,7 @@ export default function DataOutputHelper({ label }: Props) {
           </p>
         </div>
 
-        {/* Aviso sobre label */}
+        {/* Note about the label */}
         {!label?.trim() && (
           <div className="flex items-start gap-2 bg-amber-500/8 border border-amber-500/20 rounded-md px-2.5 py-2">
             <span className="text-amber-500 text-[10px] font-bold mt-0.5 shrink-0">⚠</span>
@@ -31,7 +32,7 @@ export default function DataOutputHelper({ label }: Props) {
           </div>
         )}
 
-        {/* Info sobre formato */}
+        {/* Info about the format */}
         <div className="flex items-start gap-2 bg-muted/60 border border-border rounded-md px-2.5 py-2">
           <p className="text-[11px] text-foreground/70 leading-relaxed">
             O formato é determinado automaticamente:{" "}

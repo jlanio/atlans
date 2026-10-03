@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import type { IWorkflow, IWorkflowGroup } from "@/service/types"
 import type { IWorkflowMetricsRow } from "@/service/types"
 
-// ── Dublês ───────────────────────────────────────────────────────────────────
+// ── Doubles ──────────────────────────────────────────────────────────────────
 const url = vi.hoisted(() => ({ sp: new URLSearchParams(""), pathname: "/projects" }))
 const roteador = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn(), prefetch: vi.fn() }))
 vi.mock("next/navigation", () => ({
@@ -125,7 +125,7 @@ afterEach(cleanup)
 
 const ultimaUrl = () => roteador.replace.mock.calls.at(-1)![0] as string
 
-/** A linha de um workflow, pelo botão do nome. */
+/** A workflow's row, by the name button. */
 async function linha(nome: string, opcoes: { hidden?: boolean } = {}) {
   const botao = await screen.findByRole("button", { name: `Abrir ${nome} no editor`, ...opcoes })
   return botao.closest("[data-workflow]") as HTMLElement
@@ -156,15 +156,15 @@ describe("Projetos — página", () => {
     expect(within(semGrupo).getByRole("button", { name: "Abrir Recorte por município no editor" })).toBeInTheDocument()
     expect(within(semGrupo).getByRole("button", { name: "Abrir Mapa de risco no editor" })).toBeInTheDocument()
 
-    // "Sem grupo" vem ANTES dos grupos.
+    // "Sem grupo" (no group) comes BEFORE the groups.
     expect(semGrupo.compareDocumentPosition(hidrologia) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 
-    // Subtítulo sobre a lista inteira; "como anda" veio das métricas.
+    // Subtitle about the whole list; "como anda" (how it is going) came from the metrics.
     expect(screen.getByText("4 workflows em 2 grupos · 3 ativos · 1 agendado")).toBeInTheDocument()
     expect(await linha("Consolidação de outorgas")).toHaveTextContent("Concluída há 30 min")
     expect(await linha("Mapa de risco")).toHaveTextContent("Timeout ao consultar o WFS")
 
-    // As três chamadas, por workspace, com a janela de 30 dias.
+    // The three calls, per workspace, with the 30-day window.
     expect(svc.getWorkflows).toHaveBeenCalledWith("ws-1", { incluirDoAssistente: true })
     expect(svc.getWorkflowGroups).toHaveBeenCalledWith("ws-1")
     expect(svc.getWorkflowMetricsList).toHaveBeenCalledWith(30, false, { workspace_id: "ws-1" })
@@ -221,14 +221,14 @@ describe("Projetos — página", () => {
 
     abrirMenu("Consolidação de outorgas")
     fireEvent.click(screen.getByRole("menuitem", { name: "Desativar…" }))
-    // Nada muda antes da confirmação.
+    // Nothing changes before the confirmation.
     expect(svc.updateStatusWorkflow).not.toHaveBeenCalled()
     const dialogo = screen.getByRole("dialog", { name: "Desativar «Consolidação de outorgas»?" })
     expect(dialogo).toHaveTextContent("Ele some dos gatilhos e não pode ser executado até você ativar de novo.")
     fireEvent.click(within(dialogo).getByRole("button", { name: "Desativar" }))
 
     expect(svc.updateStatusWorkflow).toHaveBeenCalledWith("a", { flag_ative: false })
-    // Otimista: a linha já aparece inativa enquanto o servidor responde.
+    // Optimistic: the row already shows as inactive while the server responds.
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
     expect(await linha("Consolidação de outorgas")).toHaveTextContent("Inativo")
 
@@ -246,7 +246,7 @@ describe("Projetos — página", () => {
     expect(svc.updateStatusWorkflow).toHaveBeenCalledWith("b", { flag_ative: true })
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith("«Cheias» ativado"))
     expect(await linha("Cheias")).not.toHaveTextContent("Inativo")
-    // Agora que está ativa, o lugar do Ativar é o Executar.
+    // Now that it is active, Ativar's place is taken by Executar.
     expect(screen.getByRole("button", { name: "Executar Cheias agora" })).toBeInTheDocument()
   })
 
@@ -265,8 +265,8 @@ describe("Projetos — página", () => {
   it("métricas indisponíveis: aviso discreto e a lista completa, sem dados de execução", async () => {
     svc.getWorkflowMetricsList.mockResolvedValue(falha())
     render(<ProjectActions />)
-    // Por texto, não por role="status": o skeleton de carregamento também é
-    // uma live region e apareceria primeiro numa busca genérica por role.
+    // By text, not by role="status": the loading skeleton is also
+    // a live region and would show up first in a generic search by role.
     const aviso = (await screen.findByText("Sem dados de execução agora — a lista continua completa.")).closest<HTMLElement>('[role="status"]')!
     expect(aviso).not.toBeNull()
     expect(await linha("Consolidação de outorgas")).toHaveTextContent("Sem dados de execução")
@@ -291,7 +291,7 @@ describe("Projetos — página", () => {
     render(<ProjectActions />)
     expect(await screen.findByText("Não foi possível carregar os projetos")).toBeInTheDocument()
     expect(screen.getByText("API fora do ar")).toBeInTheDocument()
-    // O cartão é o anúncio (role="alert"); o toast leria a mesma falha de novo.
+    // The card is the announcement (role="alert"); the toast would read the same failure again.
     expect(screen.getByRole("alert")).toHaveTextContent("Não foi possível carregar os projetos")
     expect(toast.error).not.toHaveBeenCalled()
     svc.getWorkflows.mockResolvedValue(ok(workflows()))

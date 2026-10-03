@@ -1,16 +1,16 @@
 /**
- * Como as colunas conhecidas ENTRAM na store — os dois caminhos reais:
+ * How the known columns ENTER the store — the two real paths:
  *
- *   1. Re-hidratação: abrir um workflow cujo último run já concluiu busca o
- *      `node_stats` persistido e semeia as sugestões SEM executar nada. É o
- *      que mata o "F5 apaga tudo" — antes, as colunas só existiam enquanto a
- *      sessão do run vivia.
- *   2. Ao vivo: o evento `completed` de cada nó escreve as colunas com
- *      `fresh: true`; e `completed` SEM a chave REMOVE a entrada — manter o
- *      valor antigo afirmaria colunas que a última execução não produziu.
+ *   1. Re-hydration: opening a workflow whose last run has already finished
+ *      fetches the persisted `node_stats` and seeds the suggestions WITHOUT
+ *      executing anything. It's what kills "F5 wipes everything" — before,
+ *      the columns only existed while the run's session was alive.
+ *   2. Live: each node's `completed` event writes the columns with
+ *      `fresh: true`; and `completed` WITHOUT the key REMOVES the entry —
+ *      keeping the old value would assert columns the last run didn't produce.
  *
- * Usa o mesmo harness de socket/quadro da recuperação de stream: o caminho ao
- * vivo passa pelo lote por quadro (`drenarLote`), não por chamada direta.
+ * Uses the same socket/frame harness as the stream recovery: the live path
+ * goes through the per-frame batch (`drenarLote`), not through a direct call.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
@@ -21,7 +21,7 @@ const RUN = "run-x"
 
 let workflowAtual = "wf-a"
 const runsPorWorkflow: Record<string, { run_id: string; status: string }[]> = {}
-/** O que `getRunDetail` devolve — o detalhe com `node_stats` da hidratação. */
+/** What `getRunDetail` returns — the detail with `node_stats` for hydration. */
 let detalheNaApi: Record<string, unknown> = {}
 
 const nosDoCanvas = [
@@ -76,7 +76,7 @@ class SocketFalso {
 const quadros = new Map<number, FrameRequestCallback>()
 let proximoQuadro = 1
 
-/** Roda os quadros pendentes — é o que aplica o lote na store. */
+/** Runs the pending frames — it's what applies the batch to the store. */
 function rodarQuadros() {
   const cbs = [...quadros.values()]
   quadros.clear()
@@ -113,7 +113,7 @@ describe("colunas do run → knownColumnsStore", () => {
     vi.restoreAllMocks()
   })
 
-  // ── 1. Re-hidratação do último run persistido ───────────────────────────
+  // ── 1. Re-hydration of the last persisted run ───────────────────────────
 
   it("último run concluído semeia as colunas do node_stats, sem abrir socket", async () => {
     runsPorWorkflow["wf-a"] = [{ run_id: RUN, status: "success" }]
@@ -121,7 +121,7 @@ describe("colunas do run → knownColumnsStore", () => {
       status: "success",
       node_stats: {
         n1: { node_name: "Ler camada", output_columns: { output: ["cod", "nome"] } },
-        // Sem a chave (executor antigo, corte de 8KB): simplesmente não semeia.
+        // Without the key (old executor, 8KB cut): it simply doesn't seed.
         n2: { node_name: "Filtro" },
       },
     }
@@ -134,9 +134,9 @@ describe("colunas do run → knownColumnsStore", () => {
     })
     expect(useKnownColumnsStore.getState().workflowId).toBe("wf-a")
     expect(useKnownColumnsStore.getState().porNo.has("n2")).toBe(false)
-    // Run morto não tem o que re-anexar.
+    // A dead run has nothing to re-attach.
     expect(SocketFalso.abertos).toHaveLength(0)
-    // E a hidratação não mexe no estado de execução (canvas limpo).
+    // And hydration doesn't touch the execution state (clean canvas).
     expect(useWorkflowExecutionStore.getState().statusWorkflow).toBeNull()
 
     view.unmount()
@@ -153,7 +153,7 @@ describe("colunas do run → knownColumnsStore", () => {
     view.unmount()
   })
 
-  // ── 2. Escrita ao vivo, pelo lote por quadro ────────────────────────────
+  // ── 2. Live write, through the per-frame batch ──────────────────────────
 
   it("completed com colunas grava fresh=true; sem colunas, remove a entrada", async () => {
     runsPorWorkflow["wf-a"] = [{ run_id: RUN, status: "running" }]
@@ -178,9 +178,9 @@ describe("colunas do run → knownColumnsStore", () => {
       porPorta: { output: ["x", "y"] }, runId: RUN, fresh: true,
     })
 
-    // O mesmo nó completa de novo, agora sem publicar colunas (saída
-    // não-tabular): vira lápide — nada a sugerir, e a semeadura atrasada do
-    // run anterior não ressuscita o dado negado.
+    // The same node completes again, now without publishing columns
+    // (non-tabular output): it becomes a tombstone — nothing to suggest, and
+    // the previous run's late seeding doesn't resurrect the denied data.
     await act(async () => {
       ws.onmessage?.({
         data: frame([{ node: "n1", status: "completed", kind: "lifecycle", timestamp: 2, extra: {} }]),
@@ -213,7 +213,7 @@ describe("colunas do run → knownColumnsStore", () => {
       })
       rodarQuadros()
     })
-    // `started` (e stdout, debug…) não afirmam nada sobre colunas.
+    // `started` (and stdout, debug…) assert nothing about columns.
     expect(useKnownColumnsStore.getState().porNo.get("n1")).toMatchObject({
       porPorta: { output: ["antiga"] }, fresh: false,
     })

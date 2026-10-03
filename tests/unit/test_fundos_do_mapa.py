@@ -1,15 +1,15 @@
 # tests/unit/test_fundos_do_mapa.py
 """
-Os fundos de mapa são da instalação, e o código só traz as ruas.
+Basemaps belong to the installation, and the code only ships the streets.
 
-Antes, o satélite e o híbrido da Carta eram a imagem do Google, fixa no código,
-para toda instalação. Agora a URL de cada fundo com nome vem de MAPA_*_URL: o
-servidor a injeta no nó Carta ao despachar (o executor não tem a
-configuração), e sem ela só as ruas (OpenStreetMap) funcionam.
+Before, the satellite and hybrid of the image map (Carta) were Google imagery, hard-coded,
+for every installation. Now the URL of each named basemap comes from MAPA_*_URL: the
+server injects it into the Carta (image map) node on dispatch (the executor does not have the
+configuration), and without it only the streets (OpenStreetMap) work.
 
-  CONFIG     MAPA_* no servidor, com validação do template; sem híbrido, o satélite
-  INJEÇÃO    o despacho põe o fundo da instalação em cada nó Carta
-  CARTA      o nó usa o injetado, o ambiente do executor ou o OSM — ou explica
+  CONFIG     MAPA_* on the server, with template validation; without hybrid, the satellite
+  INJECTION  the dispatch puts the installation's basemap into each Carta node
+  CARTA      the node uses the injected one, the executor's environment or OSM — or explains
 """
 from __future__ import annotations
 
@@ -47,10 +47,10 @@ def test_sem_configuracao_o_servidor_nao_tem_fundo_nenhum():
 def test_o_servidor_le_os_fundos_e_ignora_o_que_nao_e_template():
     saida = _mapa_fundos({
         "MAPA_SATELITE_URL": " https://sat.example.org/{z}/{x}/{y}.jpg ", "MAPA_SATELITE_CREDITO": "© Sat",
-        "MAPA_HIBRIDO_URL": "https://hib.example.org/tiles",  # sem {z}/{x}/{y}
+        "MAPA_HIBRIDO_URL": "https://hib.example.org/tiles",  # without {z}/{x}/{y}
         "MAPA_RUAS_URL": "file:///etc/{z}/{x}/{y}",
     })
-    # O híbrido inválido é ignorado, e o híbrido cai no satélite, como no web.
+    # The invalid hybrid is ignored, and hybrid falls back to satellite, as on the web.
     sat = "{'url': 'https://sat.example.org/{z}/{x}/{y}.jpg', 'credito': '© Sat'}"
     assert saida == f"[('hibrido', {sat}), ('satelite', {sat})]"
 
@@ -63,7 +63,7 @@ def test_o_hibrido_proprio_vence_o_satelite():
     assert "('hibrido', {'url': 'https://hib.example.org/{z}/{x}/{y}.jpg'" in saida
 
 
-# ── INJEÇÃO ──────────────────────────────────────────────────────────────────
+# ── INJECTION ────────────────────────────────────────────────────────────────
 
 def _definicao(*nos):
     return {"nodes": list(nos), "edges": []}
@@ -79,10 +79,10 @@ def test_o_despacho_poe_o_fundo_da_instalacao_no_no_carta():
     enriquecida = injetar_fundos_de_mapa(original, {"satelite": SAT})
 
     assert enriquecida["nodes"][0]["properties"]["fundo_da_instalacao"] == SAT
-    # Fundo sem configuração: a URL vai vazia — o executor sabe que o servidor
-    # respondeu, e decide.
+    # Basemap without configuration: the URL goes empty — the executor knows the server
+    # answered, and decides.
     assert enriquecida["nodes"][1]["data"]["properties"]["fundo_da_instalacao"] == SEM_FUNDO
-    # Só o nó Carta; e a definição original fica intacta (é a gravada no banco).
+    # Only the Carta node; and the original definition stays intact (it is the one stored in the database).
     assert "fundo_da_instalacao" not in enriquecida["nodes"][2]["properties"]
     assert "fundo_da_instalacao" not in original["nodes"][0]["properties"]
 
@@ -98,8 +98,8 @@ def test_um_fundo_escrito_a_mao_no_workflow_nao_passa_por_fundo_da_instalacao():
 
 
 def test_o_forjado_some_das_duas_formas_de_propriedades():
-    """Achado da revisão: com `properties` E `data.properties` no mesmo nó, a
-    injeção escrevia só no segundo — e o executor lê o primeiro."""
+    """Review finding: with `properties` AND `data.properties` on the same node, the
+    injection wrote only to the second — and the executor reads the first."""
     original = _definicao({
         "id": "c1", "name": "CartaImagem",
         "properties": {"fundo": "satelite", "fundo_da_instalacao": FORJADO},
@@ -111,8 +111,8 @@ def test_o_forjado_some_das_duas_formas_de_propriedades():
 
 
 async def test_o_despacho_injeta_na_raiz_e_nos_sub_fluxos(monkeypatch):
-    """O envelope que sai para o executor, e não só a função: tirar a injeção
-    de `_serializar_payload` tem de quebrar este teste."""
+    """The envelope that goes out to the executor, not just the function: removing the injection
+    from `_serializar_payload` must break this test."""
     import json
     from types import SimpleNamespace
 
@@ -165,7 +165,7 @@ def test_no_executor_o_hibrido_tambem_cai_no_satelite():
 def test_o_executor_sabe_se_o_servidor_mandou_o_fundo():
     assert servidor_injetou(SEM_FUNDO)
     assert servidor_injetou(SAT)
-    # O padrão do campo: o servidor anterior a esta versão não manda nada.
+    # The field's default: a server older than this version sends nothing.
     assert not servidor_injetou({})
     assert not servidor_injetou(None)
 
@@ -185,9 +185,9 @@ async def test_a_carta_sem_satelite_configurado_explica_o_que_fazer(monkeypatch)
 
 
 async def test_executor_novo_com_servidor_antigo_diz_o_que_houve(monkeypatch):
-    """Achado da revisão: os executores pegam a `main` antes do deploy do
-    servidor. Sem a injeção (servidor antigo) e sem MAPA_* no executor, a
-    mensagem diz isso, e não que a instalação não tem o fundo."""
+    """Review finding: the executors pick up `main` before the server
+    deploy. Without the injection (old server) and without MAPA_* on the executor, the
+    message says so, and not that the installation does not have the basemap."""
     from flow.nodes.outputs.carta_imagem import CartaImagem
 
     monkeypatch.delenv("MAPA_HIBRIDO_URL", raising=False)

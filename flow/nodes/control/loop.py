@@ -10,12 +10,12 @@ logger = get_logger(__name__)
 @register_node
 class LoopNode(BaseNode):
     """
-    Nó de controle que age como um processador em lote (batch processor):
-    divide um GeoDataFrame em chunks de tamanho fixo e os retorna como lista.
-    Útil para processar grandes datasets em partições sequenciais.
+    Control node that acts as a batch processor:
+    splits a GeoDataFrame into fixed-size chunks and returns them as a list.
+    Useful for processing large datasets in sequential partitions.
 
-    Propriedades:
-      - chunkSize: número de linhas por chunk (default 100)
+    Properties:
+      - chunkSize: number of rows per chunk (default 100)
     """
 
     @classmethod
@@ -44,7 +44,7 @@ class LoopNode(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         # -------------------------------------------------------
-        # 1) Validação e extração de parâmetros
+        # 1) Parameter validation and extraction
         # -------------------------------------------------------
         self.validate()
 
@@ -53,7 +53,7 @@ class LoopNode(BaseNode):
             raise ValueError("chunkSize deve ser maior que zero.")
 
         # -------------------------------------------------------
-        # 2) Obtém o GeoDataFrame de entrada via helper da classe base
+        # 2) Gets the input GeoDataFrame via the base class helper
         # -------------------------------------------------------
         gdf = self.get_first_gdf(inputs)
 
@@ -62,9 +62,9 @@ class LoopNode(BaseNode):
         )
 
         # -------------------------------------------------------
-        # 3) Divide o GeoDataFrame em chunks (em thread separada)
+        # 3) Splits the GeoDataFrame into chunks (in a separate thread)
         # -------------------------------------------------------
-        # Limite de seguranca para evitar exaustao de memoria
+        # Safety limit to avoid memory exhaustion
         MAX_CHUNKS = 1000
         expected_chunks = (len(gdf) + chunk_size - 1) // chunk_size
         if expected_chunks > MAX_CHUNKS:

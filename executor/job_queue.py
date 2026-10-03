@@ -1,12 +1,12 @@
 # executor/job_queue.py
 """
-Fila local de jobs com controle de concorrência e back-pressure.
+Local job queue with concurrency control and back-pressure.
 
-Arquitetura:
-  - asyncio.PriorityQueue: buffer de jobs aguardando execução
-  - asyncio.Semaphore: limita execuções paralelas do flow/
-  - N worker coroutines: consumem a fila e executam jobs
-  - Capacity reporting: informa o servidor do estado atual da fila
+Architecture:
+  - asyncio.PriorityQueue: buffer of jobs awaiting execution
+  - asyncio.Semaphore: limits parallel flow/ executions
+  - N worker coroutines: consume the queue and run jobs
+  - Capacity reporting: informs the server of the queue's current state
 """
 import asyncio
 import itertools
@@ -20,23 +20,24 @@ from executor import config
 logger = logging.getLogger(__name__)
 
 
-# Lápide de um job cancelado ANTES de chegar a este executor (ver `lapidar`).
-# O job pode estar em trânsito — despachado por um worker da API cujo envio
-# ainda não saiu — e, se chegar depois do cancelamento, é descartado em vez de
-# rodar um run que o servidor já fechou. Dez minutos cobrem com folga o prazo de
-# envio do servidor; o teto impede que um servidor com bug encha a memória.
+# Tombstone of a job canceled BEFORE it reached this executor (see `lapidar`).
+# The job may be in transit — dispatched by an API worker whose send has not
+# gone out yet — and, if it arrives after the cancellation, it is discarded
+# instead of running a run the server has already closed. Ten minutes comfortably
+# cover the server's send deadline; the ceiling keeps a buggy server from filling
+# memory.
 _LAPIDE_TTL_S = 600.0
 _LAPIDE_MAX = 1000
 
 
 @dataclass(order=True)
 class _QueueItem:
-    """Item da fila de prioridade. Menor valor = maior prioridade; entre
-    prioridades iguais, quem chegou antes (`seq`).
+    """Priority queue item. Lower value = higher priority; among equal
+    priorities, whoever arrived first (`seq`).
 
-    Sem o `seq` o empate não tinha ordem: o heap da PriorityQueue não é estável,
-    e como o servidor não manda prioridade, TODO job empata no 5. Com dez jobs
-    na fila, o segundo a chegar era o nono a rodar.
+    Without `seq` ties had no order: the PriorityQueue heap is not stable,
+    and since the server sends no priority, EVERY job ties at 5. With ten jobs
+    in the queue, the second to arrive was the ninth to run.
     """
     priority:  int
     seq:       int
@@ -45,14 +46,14 @@ class _QueueItem:
 
 class ExecutorJobQueue:
     """
-    Fila de jobs com controle de concorrência para o executor.
+    Job queue with concurrency control for the executor.
 
-    Uso:
+    Usage:
         queue = ExecutorJobQueue(on_execute=executor_coroutine)
-        await queue.start()          # inicia workers em background
+        await queue.start()          # starts workers in the background
         accepted = await queue.enqueue(job_message)
         capacity = queue.get_capacity()
-        await queue.shutdown()       # para de aceitar, aguarda jobs em execução
+        await queue.shutdown()       # stops accepting, waits for running jobs
     """
 
     def __init__(
@@ -63,47 +64,47 @@ class ExecutorJobQueue:
         on_cancelled: Callable[[dict], Coroutine[Any, Any, None]] | None = None,
     ):
         self._on_execute   = on_execute
-        # Chamado quando um job é cancelado — quem cancela é o servidor, e sem
-        # este aviso a execução simplesmente sumiria: o `on_execute` interrompido
-        # nunca chega a produzir resultado, e o run ficaria "running" para sempre.
+        # Called when a job is canceled — the one canceling is the server, and without
+        # this notice the execution would simply vanish: the interrupted `on_execute`
+        # never gets to produce a result, and the run would stay "running" forever.
         self._on_cancelled = on_cancelled
-        # Chamado na PRIMEIRA linha do shutdown, para o servidor saber da
-        # drenagem sem esperar o tick de 10s do capacity_loop. Injetado depois da
-        # construção (`set_on_draining`) porque a conexão só existe depois desta
-        # fila — ela recebe a fila no próprio construtor.
+        # Called on the FIRST line of shutdown, so the server learns about the
+        # draining without waiting for the capacity_loop's 10s tick. Injected after
+        # construction (`set_on_draining`) because the connection only exists after
+        # this queue — it receives the queue in its own constructor.
         self._on_draining: Callable[[], Coroutine[Any, Any, None]] | None = None
         self._max_concurrent = max_concurrent
         self._max_queue    = max_queue_size
 
         self._queue        = asyncio.PriorityQueue(maxsize=max_queue_size)
-        # Ordem de chegada, desempate da prioridade — ver `_QueueItem`.
+        # Arrival order, the priority tiebreaker — see `_QueueItem`.
         self._seq          = itertools.count()
         self._semaphore    = asyncio.Semaphore(max_concurrent)
         self._running      = 0
         self._shutting_down = False
         self._workers: list[asyncio.Task] = []
         self._active_jobs: dict[str, dict] = {}  # job_id → message
-        self._active_tasks: dict[str, asyncio.Task] = {}  # job_id → task em execução
-        # Jobs cancelados enquanto ainda esperavam na fila. Não dá para remover
-        # um item do meio de uma PriorityQueue, então o worker descarta ao pegar.
+        self._active_tasks: dict[str, asyncio.Task] = {}  # job_id → running task
+        # Jobs canceled while still waiting in the queue. An item cannot be removed
+        # from the middle of a PriorityQueue, so the worker discards it on pickup.
         self._cancelled: set[str] = set()
-        # Jobs aceitos e ainda não finalizados (na fila, presos no semáforo ou em
-        # execução). É o que permite ao `cancel()` responder "unknown" honestamente
-        # em vez de marcar qualquer id desconhecido em `_cancelled` para sempre —
-        # o set crescia sem limite e a UI dizia "cancelamento solicitado" para um
-        # job que nem existia nesta instância.
+        # Jobs accepted and not yet finished (in the queue, stuck on the semaphore or
+        # running). This is what lets `cancel()` answer "unknown" honestly
+        # instead of marking any unknown id in `_cancelled` forever —
+        # the set grew without bound and the UI said "cancelamento solicitado"
+        # (cancellation requested) for a job that did not even exist on this instance.
         self._known: set[str] = set()
-        # job_id → instante (monotonic) em que a lápide vence. Ver `lapidar`.
+        # job_id → (monotonic) instant at which the tombstone expires. See `lapidar`.
         self._lapides: dict[str, float] = {}
-        # Sinaliza "nenhum job em execução". Substitui o polling de 0.5s do
-        # shutdown — o `await` acorda no instante em que o último job termina.
+        # Signals "no job running". Replaces shutdown's 0.5s polling — the
+        # `await` wakes up the instant the last job finishes.
         self._idle = asyncio.Event()
         self._idle.set()
 
-    # ── Ciclo de vida ─────────────────────────────────────────────────────────
+    # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def start(self, n_workers: int | None = None):
-        """Inicia N workers assíncronos consumindo a fila."""
+        """Starts N async workers consuming the queue."""
         n = n_workers or self._max_concurrent
         self._workers = [
             asyncio.create_task(self._worker(i), name=f"executor-worker-{i}")
@@ -111,34 +112,35 @@ class ExecutorJobQueue:
         ]
         logger.info("ExecutorJobQueue iniciada com %d workers.", n)
 
-    # Motivo enviado ao servidor para jobs que estavam na fila e nunca chegaram a
-    # rodar. Distinto do cancelamento pedido pelo usuário — é o que impede a UI de
-    # dizer "cancelada pelo usuário" para algo que ninguém cancelou.
-    # ATENÇÃO: isto afirma um invariante LOCAL (nada foi executado, nenhum efeito
-    # colateral aconteceu neste executor, logo redespachar é seguro). NÃO existe
-    # redespacho automático: o servidor grava o run como 'cancelled' terminal e
-    # ninguém o reenvia. Implementar re-dispatch exige mudança no servidor
-    # (executor_ws_router._handle_job_result) — não presuma que já existe.
+    # Reason sent to the server for jobs that were in the queue and never got to
+    # run. Distinct from a user-requested cancellation — it is what keeps the UI
+    # from saying "cancelada pelo usuário" (canceled by the user) for something
+    # nobody canceled.
+    # WARNING: this asserts a LOCAL invariant (nothing was executed, no side
+    # effect happened on this executor, so redispatching is safe). There is NO
+    # automatic redispatch: the server records the run as terminal 'cancelled'
+    # and nobody resends it. Implementing re-dispatch requires a server change
+    # (executor_ws_router._handle_job_result) — do not assume it already exists.
     NAO_INICIADO = "Job não iniciado — executor encerrando."
 
     async def shutdown(self, timeout: int = 120):
         """
         Graceful shutdown:
-          1. Para de aceitar novos jobs
-          2. Avisa o servidor NA HORA que entramos em drenagem
-          3. Devolve (como cancelados) os jobs que ainda esperavam na fila
-          4. Aguarda jobs em execução terminarem (máx timeout segundos)
-          5. Cancela workers
+          1. Stops accepting new jobs
+          2. Tells the server RIGHT AWAY that we are draining
+          3. Returns (as canceled) the jobs that were still waiting in the queue
+          4. Waits for running jobs to finish (max timeout seconds)
+          5. Cancels workers
         """
         self._shutting_down = True
 
-        # Passo 2 ANTES de drenar a fila, e antes de qualquer espera: a partir da
-        # linha acima `get_capacity()` anuncia saturação, mas quem envia é o
-        # `_capacity_loop`, que dorme 10s ANTES de cada envio. Nessa janela o
-        # `_resolve_candidates` do servidor ainda podia eleger este executor pelo
-        # least-loaded, e o job voltava como "Executor em shutdown." — run FAILED
-        # sem failover, que é exatamente o problema que o anúncio de saturação
-        # existe para evitar. O empurrão imediato fecha a janela.
+        # Step 2 BEFORE draining the queue, and before any wait: from the line
+        # above on `get_capacity()` announces saturation, but the sender is
+        # `_capacity_loop`, which sleeps 10s BEFORE each send. In that window the
+        # server's `_resolve_candidates` could still pick this executor as
+        # least-loaded, and the job came back as "Executor em shutdown." — run
+        # FAILED with no failover, which is exactly the problem the saturation
+        # announcement exists to avoid. The immediate push closes the window.
         await self._notify_draining()
 
         await self._drain_queued()
@@ -158,7 +160,7 @@ class ExecutorJobQueue:
             w.cancel()
         await asyncio.gather(*self._workers, return_exceptions=True)
 
-        # Jobs que ainda restaram ativos após o cancelamento dos workers
+        # Jobs still active after the workers were canceled
         if self._active_jobs:
             logger.warning(
                 "Executor encerrado com %d job(s) ainda em execução (serão marcados como falha pelo servidor): %s",
@@ -172,12 +174,13 @@ class ExecutorJobQueue:
         await self._idle.wait()
 
     async def _drain_queued(self) -> None:
-        """Esvazia a PriorityQueue avisando cada job que não vai rodar.
+        """Empties the PriorityQueue, notifying each job that it will not run.
 
-        `_wait_for_running` só enxerga `self._running`: os itens ainda na fila
-        eram invisíveis e ninguém chamava `_notify_cancelled`. O servidor, que já
-        marcou o run como 'running' ao despachar, acabava fechando tudo como
-        "Executor desconectou durante a execucao" para jobs que nunca começaram.
+        `_wait_for_running` only sees `self._running`: the items still in the
+        queue were invisible and nobody called `_notify_cancelled`. The server,
+        which already marked the run as 'running' on dispatch, ended up closing
+        everything as "Executor desconectou durante a execucao" (executor
+        disconnected during execution) for jobs that never started.
         """
         pendentes: list[dict] = []
         while True:
@@ -185,8 +188,8 @@ class ExecutorJobQueue:
                 item: _QueueItem = self._queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
-            # Balanceia o contador interno da fila — sem isto um `join()` futuro
-            # nunca completaria.
+            # Balances the queue's internal counter — without this a future `join()`
+            # would never complete.
             self._queue.task_done()
             pendentes.append(item.message)
 
@@ -207,11 +210,11 @@ class ExecutorJobQueue:
 
     async def enqueue(self, message: dict) -> bool:
         """
-        Coloca um job na fila.
+        Puts a job in the queue.
 
-        Retorna False (back-pressure) se:
-          - Shutdown em andamento
-          - Fila cheia (max_queue_size atingido)
+        Returns False (back-pressure) if:
+          - Shutdown in progress
+          - Queue full (max_queue_size reached)
         """
         if self._shutting_down:
             return False
@@ -247,25 +250,25 @@ class ExecutorJobQueue:
 
             job_id = item.message.get("envelope", {}).get("job_id", "?")
 
-            # Shutdown começou entre o `get()` e agora: o `_drain_queued()` já
-            # passou e este item escapou da drenagem. Avisa em vez de executar —
-            # senão o job rodaria com o executor encerrando e morreria no meio.
+            # Shutdown started between the `get()` and now: `_drain_queued()` has already
+            # run and this item escaped the draining. Notify instead of running —
+            # otherwise the job would run with the executor shutting down and die midway.
             if self._shutting_down:
                 await self._discard_cancelled(item.message, job_id, reason=self.NAO_INICIADO)
                 break
 
-            # Cancelado enquanto esperava na fila — nem chega a executar.
+            # Canceled while waiting in the queue — it never even runs.
             if self._take_cancelled(job_id):
                 await self._discard_cancelled(item.message, job_id)
                 continue
 
             async with self._semaphore:
-                # Re-checa APÓS o semáforo: com o executor saturado um job fica
-                # parado aqui por bastante tempo, e um cancelamento que chegasse
-                # nessa janela se perdia — `cancel()` não encontrava task ativa,
-                # marcava para descarte, e o worker já tinha passado da primeira
-                # checagem. O job rodava até o fim enquanto a UI dizia
-                # "cancelamento solicitado".
+                # Re-check AFTER the semaphore: with the executor saturated a job sits
+                # here for quite a while, and a cancellation arriving in that
+                # window was lost — `cancel()` found no active task, marked it
+                # for discard, and the worker was already past the first
+                # check. The job ran to the end while the UI said
+                # "cancelamento solicitado" (cancellation requested).
                 if self._take_cancelled(job_id):
                     await self._discard_cancelled(item.message, job_id)
                     continue
@@ -273,25 +276,25 @@ class ExecutorJobQueue:
                 self._running += 1
                 self._idle.clear()
                 self._active_jobs[job_id] = item.message
-                # Executa numa task própria para que `cancel()` tenha o que
-                # cancelar — com `await self._on_execute(...)` direto não havia
-                # handle e não existia forma de interromper um job em andamento.
+                # Runs in its own task so that `cancel()` has something to
+                # cancel — with a direct `await self._on_execute(...)` there was no
+                # handle and no way to interrupt a job in progress.
                 task = asyncio.create_task(self._on_execute(item.message), name=f"job-{job_id}")
                 self._active_tasks[job_id] = task
                 try:
                     await task
                 except asyncio.CancelledError:
                     if task.cancelled():
-                        # Cancelamento DESTE job (via cancel()). Não propaga:
-                        # o worker segue vivo para o próximo item da fila.
+                        # Cancellation of THIS job (via cancel()). Does not propagate:
+                        # the worker stays alive for the next queue item.
                         logger.info("Job '%s' cancelado durante a execução.", job_id)
                         await self._notify_cancelled(item.message)
                     else:
-                        # Quem está sendo cancelado é o WORKER (shutdown com
-                        # timeout). Cancelar um `await task` NÃO cancela a task:
-                        # sem este cancel explícito o job continuaria rodando
-                        # órfão depois do encerramento — regressão em relação ao
-                        # `await self._on_execute(...)` direto, que morria junto.
+                        # What is being canceled is the WORKER (shutdown with
+                        # timeout). Canceling an `await task` does NOT cancel the task:
+                        # without this explicit cancel the job would keep running
+                        # orphaned after shutdown — a regression compared to the
+                        # direct `await self._on_execute(...)`, which died along with it.
                         task.cancel()
                         raise
                 except Exception as exc:
@@ -309,30 +312,30 @@ class ExecutorJobQueue:
         logger.debug("Worker %d encerrado.", worker_id)
 
     def _take_cancelled(self, job_id: str) -> bool:
-        """Consome a marca de cancelamento do job, se existir."""
+        """Consumes the job's cancellation mark, if there is one."""
         if job_id in self._cancelled:
             self._cancelled.discard(job_id)
             return True
         return False
 
     async def _discard_cancelled(self, message: dict, job_id: str, reason: str | None = None) -> None:
-        """Descarta um job cancelado antes de começar e fecha o item da fila."""
+        """Discards a job canceled before starting and closes the queue item."""
         logger.info("Job '%s' descartado (%s).", job_id, reason or "cancelado antes de iniciar")
         self._known.discard(job_id)
         await self._notify_cancelled(message, reason=reason)
         self._queue.task_done()
 
     def set_on_draining(self, callback: Callable[[], Coroutine[Any, Any, None]] | None) -> None:
-        """Registra quem avisar quando a drenagem começar (ver `shutdown`)."""
+        """Registers whom to notify when draining starts (see `shutdown`)."""
         self._on_draining = callback
 
     async def _notify_draining(self) -> None:
-        """Avisa o mundo externo que entramos em drenagem. Nunca levanta.
+        """Tells the outside world that we are draining. Never raises.
 
-        Best-effort de propósito: se o WS já caiu, o servidor descobre pela
-        ausência de heartbeat de qualquer jeito. Falhar aqui não pode impedir o
-        shutdown de prosseguir — o aviso serve para economizar um job mal
-        roteado, não é pré-requisito do encerramento.
+        Best-effort on purpose: if the WS is already down, the server finds out
+        from the missing heartbeat anyway. Failing here cannot keep the shutdown
+        from proceeding — the notice serves to save a misrouted job, it is not a
+        prerequisite for shutting down.
         """
         if self._on_draining is None:
             return
@@ -345,9 +348,9 @@ class ExecutorJobQueue:
         if self._on_cancelled is None:
             return
         if reason:
-            # O motivo viaja dentro do próprio message porque a assinatura do
-            # callback é pública (`on_cancelled(message)`) — mudá-la quebraria
-            # todos os call sites. Cópia rasa: não mexemos no dict do caller.
+            # The reason travels inside the message itself because the callback's
+            # signature is public (`on_cancelled(message)`) — changing it would break
+            # every call site. Shallow copy: we do not touch the caller's dict.
             message = {**message, "cancel_reason": reason}
         try:
             await self._on_cancelled(message)
@@ -357,11 +360,11 @@ class ExecutorJobQueue:
     # ── Cancelamento ──────────────────────────────────────────────────────────
 
     def cancel(self, job_id: str) -> str:
-        """Cancela um job em execução ou ainda enfileirado.
+        """Cancels a job that is running or still queued.
 
-        Retorna "running" (task interrompida), "queued" (job conhecido, marcado
-        para descarte quando um worker o pegar) ou "unknown" (não está nesta
-        instância — nada foi marcado).
+        Returns "running" (task interrupted), "queued" (known job, marked
+        for discard when a worker picks it up) or "unknown" (not on this
+        instance — nothing was marked).
         """
         task = self._active_tasks.get(job_id)
         if task is not None and not task.done():
@@ -369,10 +372,10 @@ class ExecutorJobQueue:
             logger.info("Cancelamento solicitado para job '%s' em execução.", job_id)
             return "running"
 
-        # Não está executando. Só marca para descarte se o job for realmente
-        # desta instância: pode estar na fila ou preso no semáforo (já saiu da
-        # fila, ainda não virou task). Marcar ids desconhecidos fazia `_cancelled`
-        # crescer para sempre e prometia um cancelamento que nunca aconteceria.
+        # Not running. Only marks for discard if the job really belongs to
+        # this instance: it may be in the queue or stuck on the semaphore (already
+        # out of the queue, not yet a task). Marking unknown ids made `_cancelled`
+        # grow forever and promised a cancellation that would never happen.
         if job_id in self._known:
             self._cancelled.add(job_id)
             logger.info("Job '%s' marcado para descarte na fila.", job_id)
@@ -382,33 +385,33 @@ class ExecutorJobQueue:
         return "unknown"
 
     def job_ids_ativos(self) -> list[str]:
-        """Jobs aceitos e ainda não finalizados: na fila, presos no semáforo ou
-        em execução. É o inventário que o servidor confere — um run que ele acha
-        que está aqui e não está nesta lista (nem com resultado pendente) se
-        perdeu."""
+        """Jobs accepted and not yet finished: in the queue, stuck on the semaphore
+        or running. It is the inventory the server checks — a run it thinks is
+        here and is not in this list (nor has a pending result) has been
+        lost."""
         return sorted(self._known)
 
     async def encerrar_desconhecido(self, job_id: str, motivo: str) -> None:
-        """Fecha um job que não está aqui: lápide + resultado 'cancelled' pelo
-        mesmo caminho dos cancelamentos normais (`on_cancelled`)."""
+        """Closes a job that is not here: tombstone + 'cancelled' result through
+        the same path as normal cancellations (`on_cancelled`)."""
         self.lapidar(job_id)
         await self._notify_cancelled({"envelope": {"job_id": job_id}}, reason=motivo)
 
     def lapidar(self, job_id: str) -> None:
-        """Marca um job que foi cancelado sem estar aqui. Se ele chegar depois,
-        `cancelado_antes_de_chegar` o descarta."""
+        """Marks a job that was canceled without being here. If it arrives later,
+        `cancelado_antes_de_chegar` discards it."""
         agora = time.monotonic()
         if len(self._lapides) >= _LAPIDE_MAX:
             for jid in [j for j, vence in self._lapides.items() if vence <= agora]:
                 del self._lapides[jid]
             while len(self._lapides) >= _LAPIDE_MAX:
-                # Dicionário mantém ordem de inserção: sai a lápide mais antiga.
+                # The dict keeps insertion order: the oldest tombstone goes first.
                 del self._lapides[next(iter(self._lapides))]
         self._lapides[job_id] = agora + _LAPIDE_TTL_S
 
     def cancelado_antes_de_chegar(self, job_id: str) -> bool:
-        """True se o job foi cancelado (e fechado no servidor) antes de chegar.
-        Consome a lápide."""
+        """True if the job was canceled (and closed on the server) before arriving.
+        Consumes the tombstone."""
         vence = self._lapides.pop(job_id, None)
         return vence is not None and vence > time.monotonic()
 
@@ -416,25 +419,25 @@ class ExecutorJobQueue:
 
     def get_capacity(self) -> dict:
         if self._shutting_down:
-            # Drenando: o WS continua vivo por ate ~150s (jobs terminando +
-            # resultados subindo) e o executor SEGUE no registry do servidor.
-            # Reportar a carga real aqui era uma armadilha: `_drain_queued()`
-            # esvazia a fila na hora e os jobs vao terminando, entao queued/running
-            # DESPENCAM ate zero — e o `_resolve_candidates` de antes
-            # (workflow_execution_service) ordenava o pool por running+queued.
-            # O executor que esta morrendo virava o preferido do least-loaded e
-            # todo job roteado para ele voltava como "Executor em shutdown."
-            # (connection._handle_job), fechando o run como FAILED sem failover.
+            # Draining: the WS stays alive for up to ~150s (jobs finishing +
+            # results going up) and the executor REMAINS in the server's registry.
+            # Reporting the real load here was a trap: `_drain_queued()`
+            # empties the queue right away and the jobs keep finishing, so
+            # queued/running PLUMMET to zero — and the old `_resolve_candidates`
+            # (workflow_execution_service) sorted the pool by running+queued.
+            # The dying executor became the least-loaded favorite and
+            # every job routed to it came back as "Executor em shutdown."
+            # (connection._handle_job), closing the run as FAILED with no failover.
             #
-            # Anunciamos saturacao: queued = teto da fila + teto de concorrencia.
-            #   - cheio pela carga declarada -> o dispatch nos poe por ULTIMO
-            #     (`_chave_de_ordem`, grupo dos cheios);
-            #   - queued+running >= max_concurrent+max_queue -> `is_full()` do
-            #     servidor (ExecutorConnection.is_full) da True e `send_job`
-            #     recusa, fazendo o dispatch cair no proximo candidato.
-            # Funciona mesmo com o clamp do servidor (`_sanitize_capacity` reduz
-            # max_* para os limites do banco, nunca aumenta) — a soma clampada e
-            # sempre <= o `queued` que declaramos.
+            # We announce saturation: queued = queue ceiling + concurrency ceiling.
+            #   - full by declared load -> dispatch puts us LAST
+            #     (`_chave_de_ordem`, the group of full ones);
+            #   - queued+running >= max_concurrent+max_queue -> the server's
+            #     `is_full()` (ExecutorConnection.is_full) returns True and `send_job`
+            #     refuses, making dispatch fall through to the next candidate.
+            # Works even with the server's clamp (`_sanitize_capacity` reduces
+            # max_* to the database limits, never increases) — the clamped sum is
+            # always <= the `queued` we declare.
             return {
                 "queued":         self._max_queue + self._max_concurrent,
                 "running":        self._running,

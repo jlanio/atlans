@@ -8,13 +8,13 @@ interface CardIconDrawerProps extends IconBaseProps {
 }
 
 /**
- * Ícone da CATEGORIA de nó.
+ * Icon for the node CATEGORY.
  *
- * `fontSize` e `className` vinham DEPOIS do spread e sobrescreviam em silêncio o
- * que o chamador passava: a lista de nós pedia a cor do tipo no cabeçalho de
- * cada grupo e recebia `text-foreground`, e os cartões de categoria precisaram
- * de um `!text-inherit` só para furar isso. Com `cn()` e o padrão ANTES do
- * spread, o chamador volta a mandar.
+ * `fontSize` and `className` came AFTER the spread and silently overrode what
+ * the caller passed: the node list asked for the type color in each group's
+ * header and got `text-foreground`, and the category cards needed a
+ * `!text-inherit` just to punch through it. With `cn()` and the default BEFORE
+ * the spread, the caller is in charge again.
  */
 const IconDrawer = ({ type, className, ...props }: CardIconDrawerProps) => {
 

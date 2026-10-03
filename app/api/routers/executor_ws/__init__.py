@@ -1,2 +1,2 @@
 # app/api/routers/executor_ws/__init__.py
-"""Pacote do WebSocket de executores — ver executor_ws_router.py (fachada)."""
+"""Executor WebSocket package — see executor_ws_router.py (facade)."""

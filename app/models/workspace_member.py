@@ -26,5 +26,5 @@ class WorkspaceMember(Base):
     )
     # owner | admin | editor | viewer
     role        = Column(String(20), nullable=False, default="editor")
-    invited_by  = Column(String(36), nullable=True)   # id_hash de quem convidou
+    invited_by  = Column(String(36), nullable=True)   # id_hash of whoever sent the invitation
     joined_at   = Column(DateTime, server_default=func.now(), nullable=False)

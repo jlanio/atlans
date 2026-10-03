@@ -1,52 +1,53 @@
 // desktop/src/preload/web.ts
 //
-// Preload da janela que exibe a UI web.
+// Preload of the window that displays the web UI.
 //
-// Ao contrário do preload do painel (preload/index.ts), este expõe uma ponte
-// MÍNIMA e SÓ LEITURA. A UI web é conteúdo REMOTO: dar a ela o IPC do main
-// — iniciar/parar executor, diálogos de arquivo, abrir caminhos no disco —
-// significaria que qualquer XSS na UI dirigiria o executor local com as
-// permissões do usuário. Por isso `atlansDesktop` não tem NENHUM comando: só
-// `obterStatus`/`aoMudarStatus`, que leem o status redigido de
-// shared/executor-status.ts (main → web). Nenhum método aceita nome de canal,
-// e o `window.atlas` do painel jamais é exposto aqui.
+// Unlike the panel's preload (preload/index.ts), this one exposes a MINIMAL,
+// READ-ONLY bridge. The web UI is REMOTE content: giving it main's IPC —
+// starting/stopping the executor, file dialogs, opening paths on disk — would
+// mean any XSS in the UI could drive the local executor with the user's
+// permissions. That is why `atlansDesktop` has NO commands: only
+// `obterStatus`/`aoMudarStatus`, which read the redacted status from
+// shared/executor-status.ts (main → web). No method accepts a channel name,
+// and the panel's `window.atlas` is never exposed here.
 //
-// ## Arrasto da janela
+// ## Window dragging
 //
-// A janela é `titleBarStyle: 'hidden'`: o Windows pinta os botões (min/max/
-// fechar) à direita, mas o resto do topo não move a janela sozinho. Em vez de
-// injetar uma faixa de arrasto aqui — fina demais para agarrar, e sob a borda
-// de resize —, o preload apenas MARCA o documento com `data-atlans-desktop`. A
-// própria UI web transforma os seus headers (o da sidebar e o AppHeader) em
-// região de arrasto SÓ quando vê esse atributo, marcando os próprios controles
-// como `no-drag` — ela sabe onde eles ficam, então nada de clique engolido. Ver
-// as regras `[data-atlans-desktop] .app-region-*` em web/app/globals.css.
+// The window is `titleBarStyle: 'hidden'`: Windows paints the buttons
+// (min/max/close) on the right, but the rest of the top does not move the
+// window by itself. Instead of injecting a drag strip here — too thin to grab,
+// and under the resize edge —, the preload only MARKS the document with
+// `data-atlans-desktop`. The web UI itself turns its headers (the sidebar's
+// and the AppHeader) into a drag region ONLY when it sees that attribute,
+// marking its own controls as `no-drag` — it knows where they are, so no
+// swallowed clicks. See the `[data-atlans-desktop] .app-region-*` rules in
+// web/app/globals.css.
 
 import { contextBridge, ipcRenderer } from 'electron'
 import { CANAIS_WEB, type StatusExecutorLocal } from '../shared/executor-status.js'
 
-/** Marca o <html> para o CSS ligar o arrasto dos headers só dentro do desktop. */
+/** Marks the <html> so CSS turns on header dragging only inside the desktop app. */
 function marcarDesktop(): void {
   document.documentElement?.setAttribute('data-atlans-desktop', '1')
 }
-// `documentElement` já existe quando o preload roda; o listener cobre o caso
-// raro de ainda não existir. `setAttribute` é idempotente, então repetir custa
-// nada.
+// `documentElement` already exists when the preload runs; the listener covers
+// the rare case where it does not exist yet. `setAttribute` is idempotent, so
+// repeating it costs nothing.
 marcarDesktop()
 document.addEventListener('DOMContentLoaded', marcarDesktop, { once: true })
 
-// ── Ponte read-only ────────────────────────────────────────────────────────
+// ── Read-only bridge ───────────────────────────────────────────────────────
 //
-// `window.atlansDesktop` — só leitura, sem nome de canal como parâmetro. A UI
-// faz feature-detect: no navegador comum este objeto não existe.
+// `window.atlansDesktop` — read-only, no channel name as a parameter. The UI
+// feature-detects: in a regular browser this object does not exist.
 contextBridge.exposeInMainWorld('atlansDesktop', {
   versao: 1,
   obterStatus: (): Promise<StatusExecutorLocal> => ipcRenderer.invoke(CANAIS_WEB.status),
   aoMudarStatus: (fn: (s: StatusExecutorLocal) => void): (() => void) => {
     const ouvinte = (_e: unknown, s: StatusExecutorLocal): void => fn(s)
     ipcRenderer.on(CANAIS_WEB.statusMudou, ouvinte)
-    // Devolve o cancelamento: sem ele, cada remontagem no React acumularia um
-    // ouvinte (o mesmo motivo do `assinar` em preload/index.ts).
+    // Returns the unsubscribe: without it, each React remount would accumulate a
+    // listener (the same reason as `assinar` in preload/index.ts).
     return () => ipcRenderer.removeListener(CANAIS_WEB.statusMudou, ouvinte)
   },
 })

@@ -15,7 +15,7 @@ beforeEach(() => {
 
 const fc = (features: unknown[] = []) => ({ type: "FeatureCollection", features })
 
-/** Uma resposta com corpo em pedaços, como a do navegador de verdade. */
+/** A response with a chunked body, like the real browser's. */
 function respostaEmPedacos(texto: string, pedaco = 64) {
   const bytes = new TextEncoder().encode(texto)
   let i = 0
@@ -122,7 +122,7 @@ describe("useCamadas.adicionar", () => {
     await act(async () => { await result.current.adicionar("a5") })
 
     expect(result.current.camadas[0]).toMatchObject({ id: "art:a5", mvt: { workflowHash: "w1", layerKey: "lk" } })
-    expect(fetch).not.toHaveBeenCalled() // MVT não faz fetch de GeoJSON
+    expect(fetch).not.toHaveBeenCalled() // MVT does not fetch GeoJSON
   })
 
   it("size_bytes nulo NÃO é 'pequeno': o corte vale pelo que chega no fio", async () => {
@@ -130,7 +130,7 @@ describe("useCamadas.adicionar", () => {
       success: true,
       data: { artifact_id: "b1", nome: "Sem tamanho", tipo: "geojson", available: true, download_url: "u", size_bytes: null },
     })
-    // 26 MB de corpo, acima do teto por camada.
+    // 26 MB body, above the per-layer ceiling.
     const gigante = JSON.stringify({ type: "FeatureCollection", features: [], lixo: "x".repeat(26 * 1024 * 1024) })
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue(respostaEmPedacos(gigante, 1024 * 1024))
 
@@ -211,16 +211,16 @@ describe("useCamadas.adicionar", () => {
     rerender({ conversa: "B" })
     expect(result.current.camadas).toHaveLength(0)
 
-    // De volta em A: o mesmo artefato pode entrar de novo (o "já busquei" zerou).
+    // Back on A: the same artifact can come in again (the "already fetched" was reset).
     rerender({ conversa: "A" })
     await act(async () => { await result.current.adicionar("x1") })
     expect(result.current.camadas).toHaveLength(1)
   })
 
   it("o teto AGREGADO conta o que está em voo: adições simultâneas não estouram juntas", async () => {
-    // 3 × 24 MB = 72 MB, acima dos 60 MB do teto agregado. O mapa de bytes só é
-    // escrito DEPOIS do download: sem reserva, as três liam o orçamento inteiro
-    // e passavam todas — o globo ficava com 72 MB de GeoJSON em memória.
+    // 3 × 24 MB = 72 MB, above the 60 MB aggregate ceiling. The bytes map is only
+    // written AFTER the download: without a reservation, all three read the whole budget
+    // and all passed — the globe ended up with 72 MB of GeoJSON in memory.
     camadaDoGlobo.mockImplementation(async (id: string) => ({
       success: true,
       data: {
@@ -228,8 +228,8 @@ describe("useCamadas.adicionar", () => {
         download_url: "u", size_bytes: 24 * 1024 * 1024,
       },
     }))
-    // Os downloads só terminam quando o segundo começa: assim as três adições
-    // se atropelam de verdade, que é a situação em que o teto era furado.
+    // The downloads only finish when the second one starts: that way the three additions
+    // really trample each other, which is the situation in which the ceiling was breached.
     let liberar!: () => void
     const espera = new Promise<void>((r) => { liberar = r })
     let chamadas = 0
@@ -279,8 +279,8 @@ describe("useCamadas.adicionar", () => {
     await act(async () => { nova = result.current.adicionar("x1"); await respirar() })
     expect(fetch).toHaveBeenCalledTimes(2)
 
-    // A antiga só termina agora, já fora do escopo dela: se ela apagar a marca
-    // da nova, o mesmo artefato é baixado uma terceira vez.
+    // The old one only finishes now, already outside its scope: if it erases the new one's
+    // mark, the same artifact is downloaded a third time.
     await act(async () => { portas[0](); await antiga; await respirar() })
     await act(async () => { await result.current.adicionar("x1") })
     expect(fetch).toHaveBeenCalledTimes(2)
@@ -307,16 +307,16 @@ describe("useCamadas.adicionar", () => {
   })
 
   it("teto AGREGADO com tamanho DESCONHECIDO: reservar o teto barra a 3a; reservar 0 (o bug) deixava passar", async () => {
-    // 3 buscas de tamanho nulo, simultâneas. A reserva `?? teto` faz cada uma
-    // guardar o máximo que pode chegar, então a 3a só herda ~10 MB de orçamento
-    // e é cortada no fio; com `?? 0` as três reservavam nada, liam 25 MB cada e
-    // entravam — o globo ficava com o triplo do teto agregado em memória.
+    // 3 fetches of null size, simultaneous. The `?? teto` reservation makes each one
+    // reserve the maximum that can arrive, so the 3rd only inherits ~10 MB of budget
+    // and is cut off mid-stream; with `?? 0` all three reserved nothing, read 25 MB each and
+    // got in — the globe ended up with triple the aggregate ceiling in memory.
     camadaDoGlobo.mockImplementation(async (id: string) => ({
       success: true,
       data: { artifact_id: id, nome: id, tipo: "geojson", available: true, download_url: "u", size_bytes: null },
     }))
-    // ~12 MB por corpo: cabe no teto por camada (25 MB) das duas primeiras, mas
-    // não nos ~10 MB que sobram para a 3a depois das duas reservas.
+    // ~12 MB per body: fits within the per-layer ceiling (25 MB) for the first two, but
+    // not within the ~10 MB left for the 3rd after the two reservations.
     const corpo = JSON.stringify({ type: "FeatureCollection", features: [], lixo: "x".repeat(12 * 1024 * 1024) })
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(async () => respostaEmPedacos(corpo, 1024 * 1024))
 
@@ -343,7 +343,7 @@ describe("useCamadas.adicionar", () => {
     let sinal: AbortSignal | undefined
     ;(fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (_url: string, init?: RequestInit) => {
       sinal = init?.signal ?? undefined
-      // Um corpo que nunca termina de ler — é o abort que o encerra.
+      // A body that never finishes reading — it is the abort that ends it.
       return { ok: true, headers: { get: () => null }, body: { getReader: () => ({ read: () => new Promise(() => {}), cancel: async () => {} }) } }
     })
 

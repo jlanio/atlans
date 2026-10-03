@@ -1,10 +1,10 @@
 /**
- * Os fundos do mapa vêm da instalação (MAPA_*), e o código só traz as ruas.
+ * The map backgrounds come from the install (MAPA_*), and the code only ships the streets.
  *
- * Antes, o satélite e o híbrido eram a imagem do Google, fixa no código: toda
- * instalação a usava, sem chave e sob os termos do Google, sem escolher. Agora o
- * layout raiz lê MAPA_{RUAS,SATELITE,HIBRIDO}_{URL,CREDITO} do ambiente do
- * servidor web, e sem satélite o portal não oferece o alternador.
+ * Before, satellite and hybrid were Google's imagery, hard-coded: every
+ * install used it, with no key and under Google's terms, without choosing. Now the
+ * root layout reads MAPA_{RUAS,SATELITE,HIBRIDO}_{URL,CREDITO} from the web
+ * server's environment, and without satellite the portal does not offer the switcher.
  */
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"

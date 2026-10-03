@@ -1,44 +1,45 @@
 // desktop/src/main/ui/notificacoes.ts
 //
-// Notificações do Windows.
+// Windows notifications.
 //
-// Um agente de background que falha em silêncio é o modo de falha clássico: o
-// app vive na bandeja, a janela costuma estar fechada, e a pessoa só descobre
-// que o executor parou pelo trabalho que não rodou.
+// A background agent that fails silently is the classic failure mode: the app
+// lives in the tray, the window is usually closed, and the person only finds
+// out the executor stopped through the work that did not run.
 //
-// ## O que NÃO notifica
+// ## What does NOT notify
 //
-// Nada de "workflow concluído". Numa máquina que roda dezenas por dia, isso
-// vira ruído, e a pessoa desliga as notificações do app inteiro — inclusive as
-// três que importam. A régua aqui é: **notifica só o que exige uma ação humana
-// e não se resolve sozinho.**
+// No "workflow completed". On a machine that runs dozens a day, that becomes
+// noise, and the person turns off notifications for the whole app — including
+// the three that matter. The yardstick here is: **notify only what requires
+// human action and will not resolve itself.**
 //
-// Falha de conexão também fica de fora: o executor reconecta com backoff, e uma
-// oscilação de rede de trinta segundos não é assunto de ninguém.
+// Connection failures are also left out: the executor reconnects with backoff,
+// and a thirty-second network blip is nobody's business.
 //
-// ## Por que uma função pura
+// ## Why a pure function
 //
-// `avaliarNotificacao` decide sem tocar no Electron. O que faz um sistema de
-// notificação virar spam é a duplicação — notificar a cada tick do snapshot, ou
-// re-notificar a mesma condição — e isso é exatamente o que dá para travar com
-// teste quando a decisão está separada do efeito.
+// `avaliarNotificacao` decides without touching Electron. What turns a
+// notification system into spam is duplication — notifying on every snapshot
+// tick, or re-notifying the same condition — and that is exactly what can be
+// locked down with tests when the decision is separate from the effect.
 import { Notification } from 'electron'
 import { ICONE_APP } from '../paths.js'
 import type { EstadoApp } from '../state/store.js'
-// Os limiares moram em `shared/` porque a TELA também precisa deles e não pode
-// importar valor daqui (este módulo puxa `electron`). Uma barra verde enquanto
-// a notificação já avisou seria pior que compartilhar dois números.
+// The thresholds live in `shared/` because the SCREEN needs them too and
+// cannot import values from here (this module pulls in `electron`). A green
+// bar while the notification has already warned would be worse than sharing
+// two numbers.
 import { DISCO_BAIXO_GB, DISCO_CRITICO_GB } from '../../shared/disco.js'
 
 export { DISCO_BAIXO_GB, DISCO_CRITICO_GB }
 
 export interface Aviso {
   /**
-   * Identidade da condição, não da mensagem.
+   * Identity of the condition, not of the message.
    *
-   * Duas leituras seguidas com a mesma chave são a MESMA situação, e a segunda
-   * não vira notificação. É o que separa "avisar" de "martelar": o snapshot
-   * chega a cada segundo.
+   * Two consecutive reads with the same key are the SAME situation, and the
+   * second does not become a notification. That is what separates "warning"
+   * from "hammering": the snapshot arrives every second.
    */
   chave: string
   titulo: string
@@ -47,15 +48,17 @@ export interface Aviso {
 }
 
 /**
- * Decide o que merece notificação no estado atual. `null` = nada a dizer.
+ * Decides what deserves a notification in the current state. `null` = nothing
+ * to say.
  *
- * Uma condição por vez, por prioridade: o executor parado por erro torna o
- * espaço em disco irrelevante, e duas toasts empilhadas competem entre si.
+ * One condition at a time, by priority: an executor stopped by an error makes
+ * disk space irrelevant, and two stacked toasts compete with each other.
  */
 export function avaliarNotificacao(estado: EstadoApp): Aviso | null {
-  // ── 1. Revogado ────────────────────────────────────────────────────────────
-  // O caso mais grave: não é uma falha que passa. O executor está fora do ar
-  // até alguém refazer o vínculo, e nada no sistema vai consertar isso sozinho.
+  // ── 1. Revoked ─────────────────────────────────────────────────────────────
+  // The most serious case: it is not a failure that passes. The executor is
+  // down until someone redoes the link, and nothing in the system will fix
+  // that on its own.
   if (estado.supervisor === 'failed' && estado.passoFase === 'revoked') {
     return {
       chave: 'revoked',
@@ -66,11 +69,11 @@ export function avaliarNotificacao(estado: EstadoApp): Aviso | null {
     }
   }
 
-  // ── 2. Parado por erro ─────────────────────────────────────────────────────
+  // ── 2. Stopped by an error ─────────────────────────────────────────────────
   if (estado.supervisor === 'failed') {
     return {
-      // O passo entra na chave: um erro de certificado depois de um erro de
-      // configuração são problemas diferentes, e o segundo merece ser dito.
+      // The step goes into the key: a certificate error after a configuration
+      // error are different problems, and the second deserves to be reported.
       chave: `failed:${estado.passoFase ?? '?'}`,
       titulo: 'O executor parou',
       corpo: estado.detalheFase ?? estado.detalheSupervisor
@@ -79,9 +82,9 @@ export function avaliarNotificacao(estado: EstadoApp): Aviso | null {
     }
   }
 
-  // ── 3. Disco ───────────────────────────────────────────────────────────────
-  // Só com o executor rodando: avisar sobre disco de um executor parado é
-  // ruído sobre um problema que ainda não existe.
+  // ── 3. Disk ────────────────────────────────────────────────────────────────
+  // Only with the executor running: warning about disk for a stopped
+  // executor is noise about a problem that does not exist yet.
   const livre = estado.snapshot?.artifacts_disk_free_gb
   if (estado.supervisor === 'running' && typeof livre === 'number') {
     if (livre < DISCO_CRITICO_GB) {
@@ -112,22 +115,22 @@ export function avaliarNotificacao(estado: EstadoApp): Aviso | null {
 let ultimaChave: string | null = null
 
 /**
- * Notifica quando a condição MUDA.
+ * Notifies when the condition CHANGES.
  *
- * Chamada a cada atualização do store — uma vez por segundo com o executor
- * rodando. Sem a comparação com a chave anterior, um executor parado por erro
- * geraria uma toast por segundo até alguém intervir.
+ * Called on every store update — once per second with the executor running.
+ * Without the comparison with the previous key, an executor stopped by an
+ * error would generate one toast per second until someone intervened.
  *
- * `aoClicar` leva ao painel: uma notificação que diz "abra o painel" e não abre
- * nada ao ser clicada é pior que não existir.
+ * `aoClicar` leads to the panel: a notification that says "open the panel"
+ * and opens nothing when clicked is worse than none at all.
  */
 export function notificarSeMudou(estado: EstadoApp, aoClicar: () => void): void {
   const aviso = avaliarNotificacao(estado)
   const chave = aviso?.chave ?? null
 
-  // Voltar ao normal REARMA: se o problema retornar depois de resolvido, ele é
-  // dito de novo. Sem isto, um executor que falha, é reiniciado e falha outra
-  // vez ficaria mudo na segunda.
+  // Going back to normal RE-ARMS: if the problem returns after being resolved,
+  // it is reported again. Without this, an executor that fails, is restarted
+  // and fails again would stay silent the second time.
   if (chave === ultimaChave) return
   ultimaChave = chave
   if (!aviso) return
@@ -138,19 +141,19 @@ export function notificarSeMudou(estado: EstadoApp, aoClicar: () => void): void 
       title: aviso.titulo,
       body: aviso.corpo,
       icon: ICONE_APP,
-      // `urgency` só tem efeito no Linux; no Windows o Electron o ignora.
-      // Fica pela portabilidade, não porque muda algo aqui.
+      // `urgency` only has an effect on Linux; on Windows Electron ignores it.
+      // It stays for portability, not because it changes anything here.
       urgency: aviso.urgente ? 'critical' : 'normal',
     })
     n.on('click', aoClicar)
     n.show()
   } catch {
-    // Notificação é conveniência. Um Windows com toasts desativadas por
-    // política não pode derrubar o loop de estado do app.
+    // Notifications are a convenience. A Windows with toasts disabled by
+    // policy must not take down the app's state loop.
   }
 }
 
-/** Para os testes: descarta a memória da última condição. */
+/** For the tests: discards the memory of the last condition. */
 export function _resetarMemoria(): void {
   ultimaChave = null
 }

@@ -1,37 +1,38 @@
 # app/mcp/tools/construcao.py
 """
-Tools de construção: validar, criar, atualizar, (des)ativar e publicar.
+Building tools: validate, create, update, (de)activate and publish.
 
-São as cinco ferramentas que ESCREVEM no acervo — e, por isso, as que carregam
-três cuidados que as de leitura não precisam ter:
+These are the five tools that WRITE to the collection — and, for that reason,
+the ones that carry three precautions the read tools do not need:
 
-1. **Segredo não entra.** Toda definition recebida passa por
-   `definition_contem_segredo` ANTES de qualquer outra coisa. Uma senha em
-   `connectionString` ou um `Authorization` em `headers` gravados na definition
-   ficariam cifrados no banco, mas continuariam sendo um segredo que viajou por
-   um transporte, um histórico de cliente e um log — e que a redação da saída
-   depois apagaria, dando a falsa impressão de que ele não está lá. A recusa
-   cita o CAMINHO do campo e nunca o valor (`erros.erro_de_segredo`).
-2. **Validar antes de gravar é o default.** `validate_first=True` roda o
-   núcleo de validação (`validate_service.validar_definicao`) e recusa a
-   gravação quando o relatório traz erros. `force=True` passa por cima dos
-   erros comuns — mas nunca dos FATAIS (nó inexistente, id duplicado, ciclo,
-   `credential_id` que não é UUID): esses `validar_definicao` levanta como
-   `DefinicaoInvalidaError` antes de montar relatório nenhum, e gravar uma
-   definição que o executor nem constrói seria criar um workflow que só pode
-   falhar.
-3. **A autoria vem da identidade, nunca do corpo.** `created_by_id` e
-   `updated_by_id` são carimbados com o dono do token. `WorkflowCreate` não é
-   `extra="forbid"` e tem `id_hash` com default, então jogar um dicionário do
-   cliente lá dentro deixaria o chamador escolher o id do workflow e o nome de
-   quem o criou; aqui o que chega do cliente são parâmetros nomeados e o que
-   vai ao service é uma lista branca.
+1. **Secrets do not get in.** Every definition received goes through
+   `definition_contem_segredo` BEFORE anything else. A password in
+   `connectionString` or an `Authorization` in `headers` saved in the definition
+   would be encrypted in the database, but would still be a secret that
+   traveled through a transport, a client history and a log — and that the
+   output redaction would later erase, giving the false impression that it is
+   not there. The refusal cites the field's PATH and never the value
+   (`erros.erro_de_segredo`).
+2. **Validating before saving is the default.** `validate_first=True` runs the
+   validation core (`validate_service.validar_definicao`) and refuses the save
+   when the report contains errors. `force=True` overrides ordinary errors —
+   but never the FATAL ones (nonexistent node, duplicate id, cycle,
+   `credential_id` that is not a UUID): `validar_definicao` raises those as
+   `DefinicaoInvalidaError` before building any report, and saving a
+   definition that the executor cannot even build would be creating a workflow
+   that can only fail.
+3. **Authorship comes from the identity, never from the body.** `created_by_id`
+   and `updated_by_id` are stamped with the token's owner. `WorkflowCreate` is
+   not `extra="forbid"` and has `id_hash` with a default, so throwing a client
+   dictionary into it would let the caller choose the workflow's id and the
+   name of whoever created it; here what comes from the client are named
+   parameters and what goes to the service is an allowlist.
 
-A ordem "sessão → resolve → papel → fecha → valida → sessão → grava" é
-deliberada: `validar_definicao` abre a PRÓPRIA sessão, e mantê-la aninhada
-dentro da nossa empilharia duas sessões sobre a mesma conexão. O custo é uma
-janela mínima entre a checagem de papel e a escrita, que o banco fecha de todo
-jeito (as chaves e o índice único valem no INSERT).
+The order "session → resolve → role → close → validate → session → save" is
+deliberate: `validar_definicao` opens its OWN session, and keeping it nested
+inside ours would stack two sessions on the same connection. The cost is a
+minimal window between the role check and the write, which the database closes
+anyway (the keys and the unique index apply on INSERT).
 """
 from __future__ import annotations
 
@@ -50,9 +51,10 @@ from app.mcp.escopo import escopo_da_chamada, exigir_escopo
 from app.mcp.resolucao import carregar_workflow, resolver_workspace
 from app.mcp.saida import envelope, higienizar
 from app.mcp.tools.base import anotacoes, ferramenta
-# `_share_url` é da mesma família de tools e é a ÚNICA definição da URL absoluta
-# do portal. Copiá-la para cá por causa do underscore criaria duas verdades sobre
-# o mesmo endereço — e a que envelhecesse seria descoberta por quem clicasse.
+# `_share_url` belongs to the same family of tools and is the ONLY definition of
+# the portal's absolute URL. Copying it here because of the underscore would
+# create two truths about the same address — and the one that went stale would
+# be discovered by whoever clicked it.
 from app.mcp.tools.workflows import _share_url
 from app.models.workflow_version import WorkflowVersion
 from app.schemas.workflow import WorkflowUpdate
@@ -61,23 +63,23 @@ from app.services.workflow_service import WorkflowService
 
 _MENSAGEM_PAPEL = "Requer papel 'editor' ou superior neste workspace."
 
-# Os três estados do portal, na mesma ordem em que a tela os oferece. É a mesma
-# lista do `pattern` de `PortalSettingsSchema` na REST.
+# The three portal states, in the same order the screen offers them. It is the
+# same list as the `pattern` of `PortalSettingsSchema` in REST.
 ACESSOS_DO_PORTAL = ("disabled", "public", "private")
 
-# Teto de itens de erro de forma repassados ao cliente: um corpo muito errado
-# rende dezenas de itens, e a lista inteira só afoga a primeira linha, que é a
-# que interessa.
+# Ceiling of shape-error items passed on to the client: a very wrong body
+# yields dozens of items, and the whole list only drowns the first line, which
+# is the one that matters.
 _MAX_ERROS_DE_FORMA = 20
 
 
 def _erros_de_forma(exc: ValidationError) -> list:
-    """`[{path, message}]` a partir de um erro do Pydantic — sem o valor recebido.
+    """`[{path, message}]` from a Pydantic error — without the value received.
 
-    O `str(exc)` do Pydantic ecoa o INPUT de cada campo reprovado, e o input
-    aqui é a definition que o cliente mandou: devolvê-lo inteiro faria uma
-    senha gravada no lugar errado dar mais uma volta pelo transporte e pelo log
-    do SDK. Caminho e motivo bastam para corrigir.
+    Pydantic's `str(exc)` echoes the INPUT of each failed field, and the input
+    here is the definition the client sent: returning it whole would make a
+    password saved in the wrong place take one more trip through the transport
+    and the SDK log. Path and reason are enough to fix it.
     """
     itens = []
     for detalhe in exc.errors()[:_MAX_ERROS_DE_FORMA]:
@@ -87,11 +89,12 @@ def _erros_de_forma(exc: ValidationError) -> list:
 
 
 def _recusar_segredo(definition: Any) -> None:
-    """Recusa a definition que traz segredo em texto claro.
+    """Refuses a definition that carries a secret in plaintext.
 
-    Só um dict é inspecionado: um corpo de outro tipo (um `params_schema` que é
-    string) é erro de FORMA, e a validação do Pydantic adiante o responde com o
-    caminho do campo — aqui ele derrubava a ferramenta com erro interno.
+    Only a dict is inspected: a body of another type (a `params_schema` that is
+    a string) is a SHAPE error, and the Pydantic validation further on answers
+    it with the field's path — here it used to bring down the tool with an
+    internal error.
     """
     if not isinstance(definition, dict):
         return
@@ -101,26 +104,26 @@ def _recusar_segredo(definition: Any) -> None:
 
 
 def _recusar_segredo_no_schema(params_schema: Any) -> None:
-    """Recusa o `params_schema` que grava segredo como VALOR de um parâmetro
-    (`params_schema.token.default`). Declarar um parâmetro `token` sem valor,
-    como o próprio lint sugere, passa."""
+    """Refuses a `params_schema` that stores a secret as the VALUE of a parameter
+    (`params_schema.token.default`). Declaring a `token` parameter with no
+    value, as the lint itself suggests, passes."""
     caminhos = params_schema_contem_segredo(params_schema)
     if caminhos:
         raise erro_de_segredo(caminhos)
 
 
 def _relatorio(saida: Any) -> dict:
-    """O `__report__` da validação — dict vazio quando a saída não o traz."""
+    """The validation's `__report__` — an empty dict when the output lacks it."""
     relatorio = saida.get("__report__") if isinstance(saida, dict) else None
     return relatorio if isinstance(relatorio, dict) else {}
 
 
 def _resumo_da_validacao(relatorio: dict) -> dict:
-    """O que cabe no topo da resposta: o veredito e as contagens.
+    """What fits at the top level of the response: the verdict and the counts.
 
-    As MENSAGENS do relatório ficam de fora de propósito — elas citam nome de
-    nó e texto escrito por quem monta o fluxo, e é no bloco `untrusted_data`
-    que esse tipo de texto pode aparecer.
+    The report's MESSAGES are left out on purpose — they cite node names and
+    text written by whoever builds the workflow, and the `untrusted_data` block
+    is where that kind of text may appear.
     """
     return {
         "ok": bool(relatorio.get("ok")),
@@ -130,10 +133,11 @@ def _resumo_da_validacao(relatorio: dict) -> dict:
 
 
 def _avisos_de_agendamento(wf) -> list:
-    """`schedule_notices` (atributo transiente do service) como dicts.
+    """`schedule_notices` (a transient attribute of the service) as dicts.
 
-    São objetos Pydantic: sem isto, a resposta não serializa e a falha só
-    apareceria quando o workflow tivesse um `ScheduleTrigger`.
+    They are Pydantic objects: without this, the response does not serialize
+    and the failure would only show up when the workflow had a
+    `ScheduleTrigger`.
     """
     brutos = getattr(wf, "schedule_notices", None) or []
     avisos = []
@@ -146,8 +150,9 @@ def _avisos_de_agendamento(wf) -> list:
 
 
 async def _contar_versoes(db, workflow_hash: str) -> int:
-    """Quantos snapshots o workflow tem. Contagem, e não `list_versions`: a
-    listagem traz a definition de cada versão, e aqui só se quer o número."""
+    """How many snapshots the workflow has. A count, and not `list_versions`: the
+    listing brings each version's definition, and here only the number is
+    wanted."""
     resultado = await db.execute(
         select(func.count())
         .select_from(WorkflowVersion)
@@ -157,12 +162,12 @@ async def _contar_versoes(db, workflow_hash: str) -> int:
 
 
 async def _validar(definition: Any, *, user_id: str, workspace_id: str) -> dict:
-    """`validar_definicao` com o corpo mal formado traduzido.
+    """`validar_definicao` with a malformed body translated.
 
-    Um `pydantic.ValidationError` — nó sem `id`, aresta sem `target`, `nodes`
-    que não é lista — subiria como erro inesperado ("erro interno"), que é a
-    pior resposta possível para um corpo que o cliente consegue corrigir
-    sozinho.
+    A `pydantic.ValidationError` — a node without `id`, an edge without
+    `target`, `nodes` that is not a list — would go up as an unexpected error
+    ("internal error"), which is the worst possible answer for a body the
+    client can fix on its own.
     """
     try:
         return await validate_service.validar_definicao(
@@ -180,14 +185,14 @@ async def _validar(definition: Any, *, user_id: str, workspace_id: str) -> dict:
 async def _validar_antes_de_gravar(
     definition: Any, *, user_id: str, workspace_id: str, force: bool
 ) -> dict:
-    """Valida e recusa a gravação quando há erros — salvo `force`.
+    """Validates and refuses the save when there are errors — unless `force`.
 
-    O caso FATAL não chega aqui nem com `force=True`: `validar_definicao` o
-    levanta como `DefinicaoInvalidaError`, que o decorador traduz em
-    `validation` com o mesmo relatório. É a assimetria que se quer — `force`
-    existe para o erro de julgamento (um nó que a simulação não consegue
-    exercitar sem dados reais), não para gravar um grafo que o executor nem
-    monta.
+    The FATAL case does not get here even with `force=True`:
+    `validar_definicao` raises it as `DefinicaoInvalidaError`, which the
+    decorator translates into `validation` with the same report. That is the
+    asymmetry we want — `force` exists for judgment errors (a node the
+    simulation cannot exercise without real data), not for saving a graph the
+    executor cannot even build.
     """
     relatorio = _relatorio(await _validar(definition, user_id=user_id, workspace_id=workspace_id))
     erros = relatorio.get("errors") or []
@@ -196,17 +201,17 @@ async def _validar_antes_de_gravar(
             "validation",
             f"A definição tem {len(erros)} erro(s) de validação e não foi gravada.",
             "corrija os itens de report.errors ou repita com force=true",
-            # O relatório vai higienizado: `erro()` redige as strings que recebe
-            # no topo, mas não desce por uma estrutura aninhada, e a mensagem de
-            # um `simulate_error` repete o que o nó tentou fazer — inclusive uma
-            # URL que a simulação montou.
+            # The report goes out sanitized: `erro()` redacts the strings it
+            # receives at the top level, but does not descend into a nested
+            # structure, and a `simulate_error` message repeats what the node
+            # tried to do — including a URL the simulation built.
             report=higienizar(relatorio),
         )
     return relatorio
 
 
 async def _workspace_editavel(db, escopo, workspace_id: str | None) -> str:
-    """O workspace da chamada, já conferido o papel mínimo de editor."""
+    """The call's workspace, with the minimum editor role already checked."""
     alvo = await resolver_workspace(db, escopo, workspace_id)
     papel = await get_workspace_member_role(db, alvo, escopo.user_id)
     exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL)
@@ -220,26 +225,27 @@ async def _workspace_editavel(db, escopo, workspace_id: str | None) -> str:
 async def validate_workflow(
     ctx: Context, definition: dict, workspace_id: str | None = None
 ) -> dict:
-    """Valida uma definição sem gravar nada.
+    """Validates a definition without saving anything.
 
-    `workspace_id` é obrigatório aqui, ao contrário do núcleo, onde é opcional:
-    é o workspace que decide quais credenciais entram no escopo da simulação,
-    quais nós estão desabilitados e quais sub-fluxos existem. Sem ele a
-    validação passaria a mentir por omissão — aprovaria uma definição que o
-    run depois recusa. Quando o token alcança um workspace só, omitir continua
-    valendo (o parâmetro é resolvido para esse único).
+    `workspace_id` is required here, unlike in the core, where it is optional:
+    the workspace decides which credentials enter the simulation's scope, which
+    nodes are disabled and which sub-workflows exist. Without it validation
+    would start lying by omission — it would approve a definition that the run
+    later refuses. When the token reaches a single workspace, omitting it still
+    works (the parameter resolves to that one).
 
-    A recusa por segredo acontece aqui no MESMO lugar das tools irmãs — logo
-    depois do escopo e antes de tudo o que toca o banco —, ainda que esta não
-    grave nada. O lint do núcleo também acusa `secret_in_definition`, mas só
-    como item de `report.errors`, e deixá-lo dar a resposta custaria três
-    coisas: (a) a recusa é a única verificação que fala só sobre o corpo que o
-    próprio chamador mandou, e fazê-la primeiro impede que a senha chegue ao
-    caminho de validação, que abre sessão própria e simula os nós; (b) um erro
-    `secret_in_definition` com os CAMINHOS dos campos é diagnóstico melhor do
-    que um item enterrado num relatório de dezenas de linhas; (c) a promessa de
-    `docs/mcp.md` — recusa na entrada, antes de qualquer validação — passa a
-    valer para as três tools que recebem definition, e não para duas delas.
+    The secret refusal happens here in the SAME place as in the sibling tools —
+    right after the scope and before everything that touches the database —,
+    even though this one saves nothing. The core's lint also flags
+    `secret_in_definition`, but only as an item of `report.errors`, and letting
+    it give the answer would cost three things: (a) the refusal is the only
+    check that speaks solely about the body the caller themselves sent, and
+    doing it first prevents the password from reaching the validation path,
+    which opens its own session and simulates the nodes; (b) a
+    `secret_in_definition` error with the fields' PATHS is a better diagnosis
+    than an item buried in a report dozens of lines long; (c) the promise in
+    `docs/mcp.md` — refusal at the entrance, before any validation — comes to
+    hold for all three tools that receive a definition, not for two of them.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -250,10 +256,10 @@ async def validate_workflow(
 
     saida = await _validar(definition, user_id=escopo.user_id, workspace_id=alvo)
     relatorio = _relatorio(saida)
-    # O corpo do validate é `{node_id: {...}}` mais as chaves reservadas `__*`.
-    # Aqui ele sai separado em duas partes, e as duas são texto de quem escreve
-    # a definition: o id e o apelido dos nós, as mensagens do lint, o
-    # `suggested_params_schema`.
+    # The validate body is `{node_id: {...}}` plus the reserved `__*` keys.
+    # Here it comes out separated into two parts, and both are text from
+    # whoever writes the definition: the nodes' id and label, the lint
+    # messages, the `suggested_params_schema`.
     por_no = {
         chave: valor for chave, valor in saida.items() if not str(chave).startswith("__")
     }
@@ -278,19 +284,20 @@ async def create_workflow(
     validate_first: bool = True,
     force: bool = False,
 ) -> dict:
-    """Cria um workflow no workspace indicado.
+    """Creates a workflow in the given workspace.
 
-    A recusa por segredo vem ANTES de tudo o que toca o banco: é a única
-    verificação que fala só sobre o corpo que o próprio chamador mandou, e
-    fazê-la primeiro garante que uma senha em texto claro não chegue sequer ao
-    caminho de validação.
+    The secret refusal comes BEFORE everything that touches the database: it is
+    the only check that speaks solely about the body the caller themselves
+    sent, and doing it first guarantees that a plaintext password does not even
+    reach the validation path.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
     _recusar_segredo(definition)
-    # `params_schema` é coluna irmã e vai crua para o banco (não passa por
-    # `encrypt_workflow_connections`): a mesma recusa da REST — só sobre o que
-    # o schema grava como valor, e não sobre `required: true` de um `token`.
+    # `params_schema` is a sibling column and goes raw to the database (it
+    # does not go through `encrypt_workflow_connections`): the same refusal as
+    # REST — only on what the schema stores as a value, and not on
+    # `required: true` of a `token`.
     _recusar_segredo_no_schema(params_schema)
 
     async with infra.sessao() as db:
@@ -302,15 +309,15 @@ async def create_workflow(
             definition, user_id=escopo.user_id, workspace_id=alvo, force=force
         )
 
-    # Lista branca: só estas colunas chegam ao service, e a autoria é sempre a
-    # do dono do token. `WorkflowCreate` aceita campo extra e tem `id_hash` com
-    # default — repassar o que o cliente mandou deixaria escolher o id do
-    # workflow e forjar quem o criou.
+    # Allowlist: only these columns reach the service, and authorship is always
+    # the token owner's. `WorkflowCreate` accepts extra fields and has `id_hash`
+    # with a default — passing on what the client sent would let it choose the
+    # workflow's id and forge who created it.
     extras: dict = {
         "created_by_id": escopo.user_id,
         "updated_by_id": escopo.user_id,
-        # Proveniencia carimbada pela IDENTIDADE, nunca por argumento do corpo:
-        # "usuario" para PAT e assistente, "assistente" para o assistente da Home.
+        # Provenance stamped by the IDENTITY, never by a body argument:
+        # "usuario" for PAT and assistant, "assistente" for the Home assistant.
         "origem": escopo.origem_dos_fluxos,
     }
     if description is not None:
@@ -322,9 +329,9 @@ async def create_workflow(
         wf = await WorkflowService(db).create_workflow(
             name=name, definition=definition or {}, workspace_id=alvo, **extras
         )
-        # O CRUD já commitou o workflow; este commit fecha o que o agendamento
-        # tenha acrescentado. `infra.sessao` faz rollback no finally — o que
-        # não for commitado aqui não existe.
+        # The CRUD has already committed the workflow; this commit closes
+        # whatever the scheduling may have added. `infra.sessao` rolls back in
+        # the finally — what is not committed here does not exist.
         await db.commit()
         dados = {
             "id": wf.id_hash,
@@ -352,15 +359,16 @@ async def update_workflow(
     validate_first: bool = True,
     force: bool = False,
 ) -> dict:
-    """Atualiza um workflow existente. Só os campos enviados mudam.
+    """Updates an existing workflow. Only the fields sent change.
 
-    Ativar e desativar NÃO passa por aqui: `flag_ative` tem ferramenta própria
-    (`set_workflow_active`), porque ligar um fluxo é uma decisão de operação,
-    não de edição, e misturá-la a um `update` faria uma chamada que só queria
-    renomear ligar o agendamento junto.
+    Activating and deactivating does NOT go through here: `flag_ative` has its
+    own tool (`set_workflow_active`), because turning a workflow on is an
+    operations decision, not an editing one, and mixing it into an `update`
+    would make a call that only wanted to rename turn on the schedule as well.
 
-    Trocar a definition pode gerar um snapshot em `workflow_versions` (a regra
-    é do núcleo: só mudança substancial versiona) — a resposta diz se gerou.
+    Changing the definition may generate a snapshot in `workflow_versions` (the
+    rule belongs to the core: only a substantial change creates a version) —
+    the response says whether it did.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -399,8 +407,9 @@ async def update_workflow(
         )
 
     try:
-        # `WorkflowUpdate` é `extra="forbid"` e não expõe `workspace_id` nem
-        # `updated_by_id`: mudar de tenant ou forjar autoria não passa por aqui.
+        # `WorkflowUpdate` is `extra="forbid"` and exposes neither
+        # `workspace_id` nor `updated_by_id`: changing tenant or forging
+        # authorship does not go through here.
         workflow_in = WorkflowUpdate(**campos)
     except ValidationError as exc:
         raise erro(
@@ -424,9 +433,9 @@ async def update_workflow(
             "updated_fields": sorted(campos),
             "version_snapshot": versoes_depois > versoes_antes,
             "versions_count": versoes_depois,
-            # O código do aviso é fechado e gerado pela plataforma; a mensagem,
-            # que cita a expressão de agendamento escrita por gente, vai no
-            # bloco não confiável.
+            # The notice code is closed and generated by the platform; the
+            # message, which cites the schedule expression written by people,
+            # goes in the untrusted block.
             "schedule_notice_codes": [str(a.get("code")) for a in avisos],
         }
         nome = atualizado.name
@@ -443,11 +452,11 @@ async def update_workflow(
 
 @ferramenta
 async def set_workflow_active(ctx: Context, workflow_id: str, active: bool) -> dict:
-    """Liga ou desliga o workflow — o único caminho para `flag_ative`.
+    """Turns the workflow on or off — the only path to `flag_ative`.
 
-    Desligar não é só um campo: o núcleo sincroniza os agendamentos com o novo
-    estado, para que um fluxo desativado não continue sendo disparado pelo
-    agendador. Os avisos dessa sincronização voltam na resposta.
+    Turning it off is not just a field: the core syncs the schedules with the
+    new state, so that a deactivated workflow does not keep being fired by the
+    scheduler. The notices from that sync come back in the response.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -474,12 +483,12 @@ async def set_workflow_active(ctx: Context, workflow_id: str, active: bool) -> d
 
 
 def _lista_de_compartilhamento(shared_with: Any) -> list | None:
-    """A lista de quem enxerga o portal privado, higienizada.
+    """The list of who sees the private portal, sanitized.
 
-    `None` continua `None` ("com ninguém ainda"), que é o que a REST grava
-    quando o corpo não traz a lista. Qualquer outra coisa que não seja lista é
-    recusada em vez de coagida: gravar `"ana"` como `["a","n","a"]` é o tipo de
-    conserto silencioso que só aparece quando alguém abre o portal.
+    `None` stays `None` ("with nobody yet"), which is what REST saves when the
+    body does not bring the list. Anything else that is not a list is refused
+    instead of coerced: saving `"ana"` as `["a","n","a"]` is the kind of silent
+    fix that only shows up when someone opens the portal.
     """
     if shared_with is None:
         return None
@@ -496,15 +505,16 @@ def _lista_de_compartilhamento(shared_with: Any) -> list | None:
 async def set_portal_access(
     ctx: Context, workflow_id: str, access: str, shared_with: list[str] | None = None
 ) -> dict:
-    """Publica (ou despublica) o workflow no portal.
+    """Publishes (or unpublishes) the workflow on the portal.
 
-    `private` é o único estado em que a lista de compartilhamento significa
-    alguma coisa: em `public` e `disabled` ela é ZERADA, e não apenas ignorada.
-    Guardá-la "para quando voltar a ser privado" deixaria no banco uma lista de
-    pessoas que ninguém vê na tela e que voltaria a valer sem novo aval.
+    `private` is the only state in which the sharing list means anything: in
+    `public` and `disabled` it is CLEARED, and not merely ignored. Keeping it
+    "for when it becomes private again" would leave in the database a list of
+    people nobody sees on screen and that would become valid again without new
+    approval.
 
-    A URL devolvida é absoluta — um cliente MCP não tem base para completar um
-    caminho relativo.
+    The URL returned is absolute — an MCP client has no base to complete a
+    relative path.
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:write")
@@ -522,10 +532,10 @@ async def set_portal_access(
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
         exigir_papel(papel, ROLE_EDITOR, _MENSAGEM_PAPEL)
-        # Gravação direta no ORM, como o `PATCH /workflows/{id}/portal`:
-        # `WorkflowUpdate` não tem `portal_access` (e não deve ter — trocar o
-        # estado de publicação pelo PUT genérico esconderia a decisão dentro
-        # de um "salvar").
+        # Direct write in the ORM, like `PATCH /workflows/{id}/portal`:
+        # `WorkflowUpdate` has no `portal_access` (and must not have it —
+        # changing the publication state through the generic PUT would hide
+        # the decision inside a "save").
         wf.portal_access = alvo
         wf.portal_shared_with = lista
         dados = {
@@ -538,12 +548,12 @@ async def set_portal_access(
         nome = wf.name
         await db.commit()
 
-    # Lista vazia continua aparecendo: "compartilhado com ninguém" é resposta.
+    # An empty list still shows up: "shared with nobody" is an answer.
     return envelope(dados, name=nome, shared_with=com_quem)
 
 
 def registrar(server) -> None:
-    """Registra as tools deste domínio."""
+    """Registers this domain's tools."""
     server.tool(
         name="validate_workflow",
         title="Validar definição",

@@ -1,9 +1,9 @@
 /**
- * Rótulo em português de um status de execução.
+ * Portuguese label for a run status.
  *
- * O backend usa `success/failed/running/pending/cancelled` (e, por nó,
- * `error`/`cached`). O `StatusBadge` mostrava o texto cru numa interface toda
- * em português; este é o único lugar que traduz, para todas as telas.
+ * The backend uses `success/failed/running/pending/cancelled` (and, per node,
+ * `error`/`cached`). The `StatusBadge` showed the raw text in an interface
+ * entirely in Portuguese; this is the only place that translates, for every screen.
  */
 const ROTULOS: Record<string, string> = {
   success: "Concluída",

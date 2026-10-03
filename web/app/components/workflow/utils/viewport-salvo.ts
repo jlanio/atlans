@@ -1,12 +1,12 @@
 import type { Viewport } from "@xyflow/react"
 
-/** Tolerâncias abaixo das quais dois viewports são "o mesmo": ruído de ponto
- *  flutuante do d3-zoom não vira PUT. Meio pixel e um milésimo de zoom não
- *  são distinguíveis na tela. */
+/** Tolerances below which two viewports are "the same": d3-zoom floating-point
+ *  noise does not turn into a PUT. Half a pixel and a thousandth of zoom are
+ *  not distinguishable on screen. */
 const TOLERANCIA_PX = 0.5
 const TOLERANCIA_ZOOM = 0.001
 
-/** Viewport que veio da `definition` salva e que dá para restaurar. */
+/** Viewport that came from the saved `definition` and can be restored. */
 export function viewportSalvoValido(v: Partial<Viewport> | null | undefined): v is Viewport {
   if (!v) return false
   return [v.x, v.y, v.zoom].every(n => typeof n === "number" && Number.isFinite(n))

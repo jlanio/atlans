@@ -4,19 +4,19 @@ import { serializeEdge, resolveSourceHandle } from "@/app/components/workflow/ut
 import { INodePortAPI } from "@/service/types"
 
 /**
- * Regressão: ligar "Entrada de Dados" (2 portas) a "Salvar em PostGIS" funcionava
- * na sessão e sumia do canvas ao reabrir. `condition` era gravado para QUALQUER
- * handle nomeado, apagando o id da porta; no load virava sourceHandle="false",
- * handle inexistente, e o React Flow não conseguia ancorar a aresta.
+ * Regression: connecting "Entrada de Dados" (2 ports) to "Salvar em PostGIS"
+ * worked in the session and disappeared from the canvas on reopening. `condition`
+ * was written for ANY named handle, erasing the port id; on load it became
+ * sourceHandle="false", a nonexistent handle, and React Flow couldn't anchor the edge.
  */
 
 const port = (name: string): INodePortAPI => ({ name } as INodePortAPI)
 
 // DataInput declara duas portas — o caso que quebrava.
 const DATA_INPUT = [port("output"), port("metadata")]
-// Conditional roteia por true/false.
+// Conditional routes by true/false.
 const CONDITIONAL = [port("true"), port("false")]
-// ReadGeoJSON tem porta única → handle anônimo.
+// ReadGeoJSON has a single port → anonymous handle.
 const SINGLE = [port("output")]
 
 function edge(partial: Partial<Edge>): Edge {
@@ -34,7 +34,7 @@ describe("serializeEdge", () => {
     const saved = serializeEdge(edge({ sourceHandle: "output", data: { from_key: "output" } }))
 
     expect(saved.source_handle).toBe("output")
-    // O bug: "output" virava condition:false e o nome da porta se perdia.
+    // The bug: "output" became condition:false and the port name was lost.
     expect(saved.condition).toBeUndefined()
     expect(saved.from_key).toBe("output")
   })
@@ -50,23 +50,23 @@ describe("serializeEdge", () => {
 
     expect(saved.source_handle).toBeUndefined()
     expect(saved.condition).toBeUndefined()
-    // from_key sobrevive: é o picker de chave, independente do handle.
+    // from_key survives: it's the key picker, independent of the handle.
     expect(saved.from_key).toBe("crs")
   })
 })
 
 /**
- * O par do conserto da porta ÚNICA (`handleDeEntrada`): com UMA porta o nó
- * renderiza um handle de entrada ANÔNIMO, então `buildEdges` resolve
- * `targetHandle` indefinido — mas o executor roteia pelo `to_key`. `serializeEdge`
- * TEM de gravar o `to_key` mesmo sem `targetHandle` (cai para `data.to_key`),
- * senão o conserto visual perderia o roteamento no banco. Esta é a garantia que
- * torna seguro NÃO ancorar a aresta pelo nome da porta única.
+ * The counterpart of the SINGLE-port fix (`handleDeEntrada`): with ONE port the
+ * node renders an ANONYMOUS input handle, so `buildEdges` resolves `targetHandle`
+ * as undefined — but the executor routes by `to_key`. `serializeEdge` MUST write
+ * `to_key` even without `targetHandle` (it falls back to `data.to_key`),
+ * otherwise the visual fix would lose the routing in the database. This is the
+ * guarantee that makes it safe NOT to anchor the edge by the single port's name.
  *
- * Fecha o ciclo com `build-canvas.test.ts`: lá, uma porta + `to_key` →
- * `targetHandle` indefinido + `data.to_key` preservado; aqui, esse mesmo estado
- * volta ao banco como `to_key` intacto. A próxima abertura repete o passo e
- * desenha de novo — idempotente, sem a aresta sumir.
+ * It closes the loop with `build-canvas.test.ts`: there, one port + `to_key` →
+ * undefined `targetHandle` + preserved `data.to_key`; here, that same state
+ * goes back to the database as an intact `to_key`. The next opening repeats the
+ * step and draws again — idempotent, without the edge disappearing.
  */
 describe("serializeEdge — `to_key` sobrevive sem targetHandle (porta única)", () => {
   it("targetHandle indefinido + data.to_key: grava o to_key do data", () => {
@@ -97,12 +97,12 @@ describe("round-trip canvas → banco → canvas", () => {
   })
 
   it("F9: trocar from_key sem sincronizar sourceHandle reancora na porta ERRADA", () => {
-    // O bug do picker: só data.from_key mudava (para "metadata"), sourceHandle
-    // ficava "output". No load, resolveSourceHandle segue o sourceHandle antigo.
+    // The picker bug: only data.from_key changed (to "metadata"), sourceHandle
+    // stayed "output". On load, resolveSourceHandle follows the old sourceHandle.
     expect(roundTrip(edge({ sourceHandle: "output", data: { from_key: "metadata" } }), DATA_INPUT))
       .toBe("output")
-    // escolherChave agora grava sourceHandle=from_key quando a chave é uma porta
-    // declarada — a invariante sourceHandle==from_key que este round-trip exige.
+    // escolherChave now writes sourceHandle=from_key when the key is a declared
+    // port — the sourceHandle==from_key invariant that this round-trip requires.
     expect(roundTrip(edge({ sourceHandle: "metadata", data: { from_key: "metadata" } }), DATA_INPUT))
       .toBe("metadata")
   })
@@ -115,7 +115,7 @@ describe("round-trip canvas → banco → canvas", () => {
   })
 
   it("saída única: segue anônima, sem inventar handle a partir do from_key", () => {
-    // WFS declara 1 porta mas 4 chaves de dado — from_key="crs" não é handle.
+    // WFS declares 1 port but 4 data keys — from_key="crs" is not a handle.
     expect(roundTrip(edge({ sourceHandle: null, data: { from_key: "crs" } }), SINGLE))
       .toBeUndefined()
   })
@@ -123,7 +123,7 @@ describe("round-trip canvas → banco → canvas", () => {
 
 describe("resolveSourceHandle — arestas salvas antes da correção", () => {
   it("recupera a porta a partir do from_key quando o nó tem várias saídas", () => {
-    // Formato corrompido gravado pela versão antiga.
+    // Corrupted format written by the old version.
     const legado = { source: "a", target: "b", condition: false, from_key: "output" }
 
     expect(resolveSourceHandle(legado, new Map([["a", DATA_INPUT]]))).toBe("output")
@@ -132,7 +132,7 @@ describe("resolveSourceHandle — arestas salvas antes da correção", () => {
   it("não confunde condition legítimo de um nó condicional", () => {
     const ramo = { source: "a", target: "b", condition: false, from_key: "output" }
 
-    // Mesmo payload, nó diferente: aqui `false` é ramo de verdade.
+    // Same payload, different node: here `false` is a real branch.
     expect(resolveSourceHandle(ramo, new Map([["a", CONDITIONAL]]))).toBe("false")
   })
 
@@ -156,15 +156,15 @@ describe("resolveSourceHandle — arestas salvas antes da correção", () => {
 })
 
 /**
- * Regressão: o picker do badge sincronizava o sourceHandle com QUALQUER
- * candidato (getCandidateKeys oferece todos os campos), gravando um source_handle
- * que não é handle nenhum. resolveSourceHandle o devolvia intacto e a aresta
- * ficava sem âncora — sumia do canvas e nem reabrindo voltava. Agora um handle
- * persistido que não corresponde a uma porta real é ignorado e a aresta se
- * recupera pelo from_key / handle anônimo.
+ * Regression: the badge picker synced the sourceHandle with ANY candidate
+ * (getCandidateKeys offers every field), writing a source_handle that isn't a
+ * handle at all. resolveSourceHandle returned it intact and the edge was left
+ * without an anchor — it disappeared from the canvas and didn't come back even
+ * on reopening. Now a persisted handle that doesn't match a real port is ignored
+ * and the edge recovers through from_key / the anonymous handle.
  */
 describe("resolveSourceHandle — handle fantasma (campo sem porta gravado)", () => {
-  // ChangeDetector roteia por branches → nenhuma porta de dado nomeada.
+  // ChangeDetector routes by branches → no named data port.
   const STATIC_ONLY: INodePortAPI[] = []
 
   it("saída anônima: campo sem porta gravado como handle volta a anônimo", () => {
@@ -174,7 +174,7 @@ describe("resolveSourceHandle — handle fantasma (campo sem porta gravado)", ()
   })
 
   it("nó multi-saída: handle fantasma cai na recuperação por from_key", () => {
-    // source_handle inválido, mas from_key aponta uma porta real → reancora nela.
+    // Invalid source_handle, but from_key points to a real port → re-anchors on it.
     const corrompida = { source: "a", target: "b", source_handle: "inexistente", from_key: "metadata" }
 
     expect(resolveSourceHandle(corrompida, new Map([["a", DATA_INPUT]]))).toBe("metadata")

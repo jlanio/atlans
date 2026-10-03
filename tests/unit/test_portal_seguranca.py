@@ -1,13 +1,13 @@
-"""Regressao dos consertos de exposicao do portal (auditoria: altas/medias).
+"""Regression for the portal exposure fixes (audit: high/medium).
 
-- Tiles de portal PRIVADO nao podem sair com `Cache-Control: public` nem
-  `Access-Control-Allow-Origin: *`: o cache do browser/CDN serviria a geometria
-  apos a revogacao, ou a uma requisicao sem Bearer.
-- O publish do portal descomprimia o gzip INTEIRO antes de checar o teto: uma
-  bomba (poucos KB -> GBs) derrubaria a API por memoria. Agora le e descomprime
-  com corte incremental no teto, fora do event loop.
+- Tiles of a PRIVATE portal must not go out with `Cache-Control: public` nor
+  `Access-Control-Allow-Origin: *`: the browser/CDN cache would serve the
+  geometry after revocation, or to a request without a Bearer.
+- The portal publish decompressed the WHOLE gzip before checking the ceiling: a
+  bomb (a few KB -> GBs) would bring down the API through memory. Now it reads and
+  decompresses with an incremental cutoff at the ceiling, off the event loop.
 
-Cada teste falha SEM o fix; a docstring nomeia a mutacao que derruba SO ele.
+Each test fails WITHOUT the fix; the docstring names the mutation that breaks ONLY it.
 """
 import gzip
 import json
@@ -22,12 +22,12 @@ from app.api.routers.portal_router import (
 )
 
 
-# ── Cache/CORS do tile por visibilidade ─────────────────────────────────────
+# ── Tile cache/CORS by visibility ───────────────────────────────────────────
 
 def test_tile_privado_nao_cacheia_nem_abre_cors():
-    """Mutacao: emitir sempre `public, max-age` (o header antigo).
+    """Mutation: always emit `public, max-age` (the old header).
 
-    Privado -> `private, no-store` e SEM Access-Control-Allow-Origin.
+    Private -> `private, no-store` and NO Access-Control-Allow-Origin.
     """
     h = _headers_do_tile("private")
     assert h["Cache-Control"] == "private, no-store"
@@ -43,12 +43,12 @@ def test_tile_publico_continua_cacheavel():
 # ── Bomba gzip: corte incremental no teto ───────────────────────────────────
 
 def test_bomba_gzip_barrada_sem_materializar():
-    """Mutacao: voltar a gzip.decompress() inteiro antes do check de tamanho.
+    """Mutation: go back to a whole gzip.decompress() before the size check.
 
-    100 MB de zeros comprimem para ~100 KB; o teto de 1 MB corta antes de
-    materializar os 100 MB. tracemalloc prova que a saida NAO foi alocada
-    inteira — um decompress-inteiro-depois-checa alocaria os 100 MB e falharia
-    este teto de memoria.
+    100 MB of zeros compress to ~100 KB; the 1 MB ceiling cuts off before
+    materializing the 100 MB. tracemalloc proves the output was NOT allocated
+    whole — a decompress-everything-then-check would allocate the 100 MB and fail
+    this memory ceiling.
     """
     import tracemalloc
 
@@ -78,14 +78,14 @@ def test_gzip_no_limite_exato_passa_e_uma_acima_barra():
 
 
 def test_gzip_invalido_nao_vira_corpo_grande():
-    """gzip corrompido deve levantar erro de zlib (vira 400 no handler), nunca
-    _CorpoGrandeDemais (que vira 413)."""
+    """Corrupted gzip must raise a zlib error (becomes 400 in the handler), never
+    _CorpoGrandeDemais (which becomes 413)."""
     with pytest.raises(Exception) as exc:
         _descomprimir_gzip_com_teto(b"isto nao e gzip", 50 * 1024 * 1024)
     assert not isinstance(exc.value, _CorpoGrandeDemais)
 
 
-# ── Leitura do corpo com teto ────────────────────────────────────────────────
+# ── Reading the body with a ceiling ──────────────────────────────────────────
 
 class _ReqFalso:
     def __init__(self, pedacos):
@@ -102,9 +102,9 @@ async def test_ler_corpo_abaixo_do_teto_junta_os_pedacos():
 
 
 async def test_ler_corpo_acima_do_teto_barra_sem_juntar_tudo():
-    """Mutacao: usar `await request.body()` (bufferiza tudo) no lugar do corte.
+    """Mutation: use `await request.body()` (buffers everything) instead of the cutoff.
 
-    Um corpo acima do teto e recusado assim que passa, sem ler o resto.
+    A body above the ceiling is rejected as soon as it crosses it, without reading the rest.
     """
     req = _ReqFalso([b"x" * 50, b"y" * 60])  # 110 bytes, teto 100
     with pytest.raises(_CorpoGrandeDemais):

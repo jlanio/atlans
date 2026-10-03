@@ -1,13 +1,13 @@
 """
-Regressoes das otimizacoes de performance.
+Regressions for the performance optimizations.
 
-Garantem que as mudancas preservam COMPORTAMENTO — o ganho e de custo, o
-resultado tem de ser identico ao caminho anterior.
+They ensure the changes preserve BEHAVIOR — the gain is in cost, the
+result must be identical to the previous path.
 """
 import numpy as np
 
 
-# ── P1: cache de compilacao de template Jinja ────────────────────────────────
+# ── P1: Jinja template compilation cache ─────────────────────────────────────
 
 def test_template_cache_compila_uma_vez_e_preserva_render():
     from flow.utils.expression_service import ExpressionService
@@ -38,7 +38,7 @@ def test_template_cache_respeita_o_teto():
 
 
 def test_alias_ainda_funciona_com_cache():
-    """O caminho de alias ($X -> X) tem de renderizar via cache tambem."""
+    """The alias path ($X -> X) must render via the cache too."""
     from flow.utils.expression_service import ExpressionService
 
     svc = ExpressionService()
@@ -86,7 +86,7 @@ def test_heatmap_grid_vetorizado_bate_com_scalar():
 # ── P3: gpd.concat nao existe (o bug corrigido) ──────────────────────────────
 
 def test_geopandas_nao_tem_concat_e_pd_concat_preserva_tipo():
-    """Prova o bug do WFS: gpd.concat nao existe; pd.concat preserva GeoDataFrame."""
+    """Proves the WFS bug: gpd.concat does not exist; pd.concat preserves GeoDataFrame."""
     import geopandas as gpd
     import pandas as pd
     from shapely.geometry import Point

@@ -1,11 +1,11 @@
 # flow/utils/logger.py
 """
-Logger do modulo flow — independente de app/.
-Usa logging padrao do Python; handlers configurados pelo executor/main.
+Logger for the flow module — independent of app/.
+Uses standard Python logging; handlers configured by executor/main.
 
-Todo logger daqui leva o filtro de redação de segredos (`redacao_log`): o flow
-também roda dentro da API (validação, simulação de nó), e lá não há a fábrica
-de LogRecord que o executor instala.
+Every logger here carries the secret redaction filter (`redacao_log`): flow
+also runs inside the API (validation, node simulation), and there is no
+LogRecord factory there like the one the executor installs.
 """
 import logging
 

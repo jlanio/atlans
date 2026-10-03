@@ -4,15 +4,15 @@ import AppSidebar from "./app-sidebar"
 import HomeSidebar from "./home-sidebar"
 
 /**
- * Escolhe a casca lateral pela rota, no cliente. O layout (dashboard) é
- * COMPARTILHADO entre a Home (`/`) e o resto do app; em vez de dois layouts —
- * que dariam dois SidebarProvider e perderiam o estado recolhido ao navegar
- * entre a Home e uma página do app — um seam só troca a barra: a Home ganha o
- * HomeSidebar (Meus → Agendamentos, Artefatos, Chats); toda outra rota mantém o
- * AppSidebar de sempre.
+ * Picks the side shell by route, on the client. The (dashboard) layout is
+ * SHARED between the Home (`/`) and the rest of the app; instead of two layouts —
+ * which would give two SidebarProviders and lose the collapsed state when
+ * navigating between the Home and an app page — a single seam swaps the bar: the
+ * Home gets HomeSidebar (Meus → Agendamentos, Artefatos, Chats); every other
+ * route keeps the usual AppSidebar.
  *
- * `usePathname() === "/"` é casamento EXATO — um `startsWith("/")` casaria todas
- * as rotas do app.
+ * `usePathname() === "/"` is an EXACT match — a `startsWith("/")` would match
+ * every app route.
  */
 export default function ShellSidebar() {
   const pathname = usePathname()

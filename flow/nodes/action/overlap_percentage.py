@@ -10,12 +10,12 @@ logger = get_logger(__name__)
 @register_node
 class OverlapPercentage(BaseNode):
     """
-    Nó que calcula a porcentagem de sobreposição entre duas camadas poligonais (layerA e layerB).
-    Retorna um GeoDataFrame contendo apenas as geometrias de interseção, com campos de percentual.
+    Node that computes the overlap percentage between two polygon layers (layerA and layerB).
+    Returns a GeoDataFrame containing only the intersection geometries, with percentage fields.
 
-    Exemplo de saída:
-    - percentA: % da interseção em relação à área total de A
-    - percentB: % da interseção em relação à área total de B
+    Example output:
+    - percentA: % of the intersection relative to the total area of A
+    - percentB: % of the intersection relative to the total area of B
     """
 
     @classmethod
@@ -44,36 +44,36 @@ class OverlapPercentage(BaseNode):
         }
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
-        # Valida parâmetros
+        # Validates parameters
         self.validate()
 
         ref = self.parameters.get("reference", "A").upper()
 
-        # Obtém as camadas via helper da classe base (o CRS é tratado abaixo)
+        # Gets the layers via the base class helper (CRS is handled below)
         gdfA, gdfB = self.get_pair(inputs, crs=None)
 
-        # Reprojeção para UM CRS métrico comum às duas camadas. Estimar a UTM de
-        # cada uma em separado as punha em zonas diferentes quando os centros
-        # caíam em lados opostos de um meridiano de zona, e o overlay entre CRSs
-        # diferentes só avisa — o percentual saía errado, sem erro.
+        # Reprojection to ONE metric CRS shared by both layers. Estimating the UTM of
+        # each one separately put them in different zones when the centers
+        # fell on opposite sides of a zone meridian, and the overlay between different
+        # CRSs only warns — the percentage came out wrong, with no error.
         try:
             gdfA, gdfB = await asyncio.to_thread(para_crs_metrico, gdfA, gdfB)
         except Exception as e:
             logger.warning(f"Falha ao reprojetar as camadas para um CRS métrico comum: {e}")
 
-        # Calcula interseção
+        # Computes intersection
         try:
             intersection = await asyncio.to_thread(gpd.overlay, gdfA, gdfB, how="intersection")
         except Exception as e:
             logger.error(f"Erro ao calcular interseção: {e}")
             raise RuntimeError(f"Erro no overlay: {e}")
 
-        # Calcula áreas
+        # Computes areas
         areaA = await asyncio.to_thread(lambda df: df.geometry.area.sum(), gdfA)
         areaB = await asyncio.to_thread(lambda df: df.geometry.area.sum(), gdfB)
         areaI = await asyncio.to_thread(lambda df: df.geometry.area.sum(), intersection)
 
-        # Calcula percentual e adiciona como coluna no GeoDataFrame
+        # Computes percentage and adds it as a column in the GeoDataFrame
         if ref == "A":
             pctA = 0.0 if areaA == 0 else float(areaI / areaA) * 100
             intersection["percentA"] = pctA

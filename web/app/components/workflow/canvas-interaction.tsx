@@ -4,34 +4,34 @@ import { createContext, PropsWithChildren, useContext } from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 
 /**
- * "Este canvas está sendo operado por toque, numa tela de telefone."
+ * "This canvas is being operated by touch, on a phone screen."
  *
- * Não é o mesmo que `useSubflowReadOnly`, apesar de as duas coisas resultarem
- * em menos edição na tela. Aquele é uma propriedade do CONTEXTO (o nó está
- * sendo desenhado dentro do visualizador de um sub-fluxo, onde ele nem é
- * editável); este é uma propriedade do DISPOSITIVO. Um nó pode estar nos dois
- * estados, em nenhum, ou só num deles, e o que cada um esconde é diferente —
- * misturá-los faria uma regra de layout apagar uma regra de domínio.
+ * It isn't the same as `useSubflowReadOnly`, even though both result in less
+ * editing on screen. That one is a property of the CONTEXT (the node is being
+ * drawn inside a sub-workflow viewer, where it isn't even editable); this one is
+ * a property of the DEVICE. A node can be in both states, in neither, or in just
+ * one, and what each one hides is different — mixing them would let a layout
+ * rule erase a domain rule.
  *
- * Por que um contexto e não `useIsMobile()` em cada componente: o hook monta um
- * `matchMedia` com listener por instância. Com 50 nós no canvas, cada um com
- * card, ferramentas e pontos de conexão, isso são centenas de listeners
- * observando a MESMA media query e re-renderizando juntos a cada rotação de
- * tela. Aqui a query é observada uma vez e o valor desce por contexto.
+ * Why a context and not `useIsMobile()` in each component: the hook sets up a
+ * `matchMedia` with a listener per instance. With 50 nodes on the canvas, each
+ * with a card, tools and connection points, that's hundreds of listeners
+ * watching the SAME media query and re-rendering together on every screen
+ * rotation. Here the query is watched once and the value flows down via context.
  *
- * O gate é a largura, não o tipo de ponteiro: um tablet em paisagem tem toque
- * grosso mas espaço de sobra para o editor, e degradá-lo tiraria capacidade sem
- * ganho nenhum. Quem é estreito é que não comporta arrastar nó, puxar conexão e
- * ainda acertar um handle de 8px.
+ * The gate is the width, not the pointer type: a tablet in landscape has coarse
+ * touch but plenty of room for the editor, and degrading it would take away
+ * capability for no gain at all. It's the narrow screen that can't accommodate
+ * dragging a node, pulling a connection and still hitting an 8px handle.
  */
 const CanvasReadOnlyContext = createContext(false)
 
-/** true quando o canvas deve se comportar como visualizador (telefone). */
+/** true when the canvas should behave as a viewer (phone). */
 export function useCanvasReadOnly(): boolean {
   return useContext(CanvasReadOnlyContext)
 }
 
-/** Observa a media query UMA vez e distribui o resultado. */
+/** Watches the media query ONCE and distributes the result. */
 export function CanvasInteractionProvider({ children }: PropsWithChildren) {
   const somenteLeitura = useIsMobile()
   return (
@@ -42,8 +42,8 @@ export function CanvasInteractionProvider({ children }: PropsWithChildren) {
 }
 
 /**
- * Mesma resposta do contexto, para quem está ACIMA do provider e não pode
- * consumi-lo — hoje só o próprio canvas, que precisa do valor para montar as
- * props do `<ReactFlow>`. Uma segunda observação da media query, não uma por nó.
+ * Same answer as the context, for whoever is ABOVE the provider and can't
+ * consume it — today only the canvas itself, which needs the value to build the
+ * `<ReactFlow>` props. A second watch of the media query, not one per node.
  */
 export const useCanvasReadOnlyRoot = useIsMobile

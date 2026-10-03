@@ -6,8 +6,8 @@ from app.models.base import Base
 
 class PortalFeature(Base):
     """
-    Feature individual de uma camada do portal.
-    Armazena geometria PostGIS para geração de MVT (Mapbox Vector Tiles) via ST_AsMVT.
+    Individual feature of a portal layer.
+    Stores PostGIS geometry for MVT (Mapbox Vector Tiles) generation via ST_AsMVT.
     """
     __tablename__ = "portal_features"
     __table_args__ = (

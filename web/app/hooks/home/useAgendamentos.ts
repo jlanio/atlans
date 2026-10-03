@@ -7,54 +7,54 @@ import type { IAgendamentoMeu } from "@/service/types"
 
 export interface UseAgendamentos {
   agendamentos: IAgendamentoMeu[]
-  /** Só a PRIMEIRA carga (o esqueleto). */
+  /** Only the FIRST load (the skeleton). */
   carregando: boolean
-  /** Recarga em voo sobre a lista já na tela — `aria-busy`, não esqueleto. */
+  /** Reload in flight over the list already on screen — `aria-busy`, not a skeleton. */
   atualizando: boolean
-  /** Já houve uma carga aceita: o bloco de erro só toma a lista antes disso. */
+  /** An accepted load has already happened: the error block only takes over the list before that. */
   jaCarregou: boolean
   erro: string | null
   /** Quantos agendamentos o servidor tem — a lista vem cortada em `LIMITE`. */
   total: number
-  /** Uma página a mais em voo (o "Ver mais"). */
+  /** One more page in flight (the "Ver mais" (see more)). */
   carregandoMais: boolean
-  /** O agendamento cujo PUT está em voo — a linha não aceita um segundo clique. */
+  /** The schedule whose PUT is in flight — the row does not accept a second click. */
   alternandoId: string | null
   recarregar: () => void
-  /** Anexa a próxima página. Sem isto o corte em 200 era invisível. */
+  /** Appends the next page. Without this the cutoff at 200 was invisible. */
   carregarMais: () => void
-  /** Pausa/ativa (otimista). Ao religar, o servidor zera `next_run_at` e recalcula
-   *  (o fix de "religar não dispara" mora no schedule_service). */
+  /** Pause/activate (optimistic). On re-enabling, the server clears `next_run_at`
+   *  and recalculates it (the "re-enabling does not fire" fix lives in schedule_service). */
   alternarAtivo: (item: IAgendamentoMeu) => Promise<void>
 }
 
-/** O tamanho de página que pedimos (o padrão da rota). */
+/** The page size we request (the route's default). */
 const LIMITE = 200
-/** O teto que o servidor apara (`LIMITE_MAXIMO` do `me_router`): pedir mais que
- *  isto numa recarga devolveria MENOS linhas do que já estão na tela. */
+/** The ceiling the server trims to (`LIMITE_MAXIMO` in `me_router`): asking for
+ *  more than this on a reload would return FEWER rows than are already on screen. */
 const TETO_DO_SERVIDOR = 500
 
 /**
- * A falha guardada: a microcopy da casa como CHAVE, para a frase sair no idioma
- * em uso quando é mostrada (trocar de idioma nas Preferências não recarrega a
- * lista), ou o `detail` do servidor, que não se traduz.
+ * The stored failure: our own microcopy as a KEY, so the sentence comes out in
+ * the language in use when it is shown (switching language in Preferences does
+ * not reload the list), or the server's `detail`, which is not translated.
  */
 type Falha = "carregar" | "carregarMais" | { detalhe: string }
 
 /**
- * Os agendamentos da pessoa, entre todos os workspaces (`GET /me/schedules`).
- * JSON puro, no molde do `useConversas`: `geracao` descarta respostas velhas numa
- * troca rápida. Pausar/ativar é otimista — a linha muda na hora, e recarregamos
- * para trazer o `next_run_at` recalculado pelo agendador (o `put` do
- * `updateSchedule` já invalida a leitura por época).
+ * The person's schedules, across all workspaces (`GET /me/schedules`).
+ * Plain JSON, on the `useConversas` model: `geracao` discards stale responses on
+ * a quick switch. Pause/activate is optimistic — the row changes right away, and
+ * we reload to bring the `next_run_at` recalculated by the scheduler (the `put`
+ * in `updateSchedule` already invalidates the read by epoch).
  *
- * Duas regras do §3 do padrão de telas moram aqui: o esqueleto é só da PRIMEIRA
- * carga (antes, pausar um agendamento piscava a lista inteira) e uma recarga que
- * falha NÃO apaga os agendamentos já na tela.
+ * Two rules from §3 of the screen patterns live here: the skeleton is only for
+ * the FIRST load (before, pausing a schedule blinked the whole list) and a
+ * reload that fails does NOT erase the schedules already on screen.
  *
- * A rota é paginada e devolve o TOTAL junto da página (o envelope de Chats e do
- * Acervo): sem ele, o teto do servidor truncava em silêncio — quem via 200
- * linhas concluía que eram todas.
+ * The route is paginated and returns the TOTAL along with the page (the Chats
+ * and Collection envelope): without it, the server ceiling truncated silently —
+ * whoever saw 200 rows concluded those were all of them.
  */
 export function useAgendamentos(): UseAgendamentos {
   const t = useTextosDaCasca().listas
@@ -68,11 +68,11 @@ export function useAgendamentos(): UseAgendamentos {
   const [alternandoId, setAlternandoId] = useState<string | null>(null)
   const geracao = useRef(0)
   const jaCarregouRef = useRef(false)
-  // O guarda de "em voo" precisa valer no MESMO tick do clique: o estado só
-  // chega no render seguinte, e dois cliques rápidos passavam pelos dois.
+  // The "in flight" guard must apply on the SAME tick as the click: the state
+  // only arrives on the next render, and two quick clicks got past both.
   const emVoo = useRef<string | null>(null)
-  // Quantas linhas estão na tela, sem entrar nas dependências (o `recarregar`
-  // precisa ser estável para o efeito de montagem não relançar a cada carga).
+  // How many rows are on screen, without entering the dependencies (`recarregar`
+  // must be stable so the mount effect does not re-fire on every load).
   const quantidade = useRef(0)
   quantidade.current = agendamentos.length
 
@@ -80,8 +80,8 @@ export function useAgendamentos(): UseAgendamentos {
     const minha = ++geracao.current
     if (jaCarregouRef.current) setAtualizando(true)
     else setCarregando(true)
-    // Pausar/ativar recarrega: pedir só uma página encolheria a lista de quem já
-    // clicou "Ver mais". Por isso a recarga pede o que está na tela.
+    // Pause/activate reloads: requesting just one page would shrink the list of
+    // someone who already clicked "Ver mais". So the reload requests what is on screen.
     const quantas = Math.min(TETO_DO_SERVIDOR, Math.max(LIMITE, quantidade.current))
     GisFlowService.getMySchedules(quantas).then((res) => {
       if (minha !== geracao.current) return
@@ -92,8 +92,8 @@ export function useAgendamentos(): UseAgendamentos {
         jaCarregouRef.current = true
         setJaCarregou(true)
       } else {
-        // A microcopy da casa antes do `detail` cru do backend (um 500 devolvia
-        // "Erro inesperado." como se fosse texto escrito para a pessoa).
+        // Our own microcopy before the backend's raw `detail` (a 500 returned
+        // "Erro inesperado." (unexpected error) as if it were text written for the person).
         const detalhe = res.error?.message
         setFalha(res.status >= 500 || !detalhe ? "carregar" : { detalhe })
       }
@@ -105,9 +105,9 @@ export function useAgendamentos(): UseAgendamentos {
   useEffect(() => { recarregar() }, [recarregar])
 
   const carregarMais = useCallback(() => {
-    // A geração NÃO avança: esta é outra página da MESMA carga, e uma recarga em
-    // paralelo (o "Tentar de novo", ou a que pausar/ativar dispara) precisa
-    // poder invalidá-la.
+    // The generation does NOT advance: this is another page of the SAME load, and
+    // a parallel reload (the "Tentar de novo", or the one pause/activate
+    // triggers) must be able to invalidate it.
     const minha = geracao.current
     setCarregandoMais(true)
     GisFlowService.getMySchedules(LIMITE, quantidade.current).then((res) => {
@@ -115,9 +115,9 @@ export function useAgendamentos(): UseAgendamentos {
       if (res.success && res.data) {
         const pagina = res.data.itens
         setAgendamentos((atual) => {
-          // A ordem é por próxima execução e o agendador a recalcula a cada
-          // ~30 s: entre duas páginas uma linha pode escorregar e repetir. A
-          // chave é o `job_id`, não a posição.
+          // The order is by next run and the scheduler recalculates it every
+          // ~30 s: between two pages a row can slip and repeat. The
+          // key is the `job_id`, not the position.
           const vistos = new Set(atual.map((a) => a.job_id))
           return [...atual, ...pagina.filter((a) => !vistos.has(a.job_id))]
         })
@@ -131,14 +131,14 @@ export function useAgendamentos(): UseAgendamentos {
   }, [])
 
   const alternarAtivo = useCallback(async (item: IAgendamentoMeu) => {
-    // Sem este guarda, dois cliques na rede lenta soltavam dois PUT e o erro do
-    // primeiro revertia a linha para um estado que o segundo já tinha superado.
+    // Without this guard, two clicks on a slow network fired two PUTs and the
+    // first one's error reverted the row to a state the second had already superseded.
     if (emVoo.current === item.job_id) return
     emVoo.current = item.job_id
     setAlternandoId(item.job_id)
     const alvo = !item.active
-    // Otimista: a linha muda já. Ao ativar, some a "próxima" até o agendador
-    // recalcular (até ~30 s) — o resumo mostra "calculando" nesse meio-tempo.
+    // Optimistic: the row changes now. On activating, the "next" disappears until
+    // the scheduler recalculates (up to ~30 s) — the summary shows "calculando" (calculating) meanwhile.
     setAgendamentos((atual) =>
       atual.map((a) =>
         a.job_id === item.job_id
@@ -153,7 +153,7 @@ export function useAgendamentos(): UseAgendamentos {
       createToast.success(alvo ? t.agendamentos.ativou : t.agendamentos.pausou)
       recarregar()
     } else {
-      // Reverte ao estado anterior.
+      // Revert to the previous state.
       setAgendamentos((atual) =>
         atual.map((a) =>
           a.job_id === item.job_id

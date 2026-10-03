@@ -60,11 +60,11 @@ export default async function SharePage({
 }
 
 /**
- * Página de erro do portal (contrato §3.2): fundo `bg-background`, cartão
- * centralizado `rounded-lg border bg-card shadow-xs` com o círculo de alerta
- * destrutivo. A marca fica no topo como identidade; ações em `Button` outline.
- * O `redirect` do 401 não passa por aqui — só as espinhas que derrubam a 1ª
- * (e única) carga do portal.
+ * The portal's error page (contract §3.2): `bg-background` background, a
+ * centered `rounded-lg border bg-card shadow-xs` card with the destructive alert
+ * circle. The brand stays at the top as identity; actions in an outline `Button`.
+ * The 401 `redirect` does not go through here — only the snags that bring down
+ * the portal's 1st (and only) load.
  */
 function ErrorPage({ title, message, children }: { title: string; message: string; children?: React.ReactNode }) {
   return (

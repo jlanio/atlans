@@ -1,28 +1,28 @@
 # app/mcp/erros.py
 """
-Erros do MCP: um formato só, legível por quem lê e parseável por quem integra.
+MCP errors: a single format, readable by people and parseable by integrators.
 
-O protocolo MCP não tem código de status — o que chega ao cliente é o texto do
-`ToolError`. Se cada tool escrevesse a sua frase, quem integra não teria como
-distinguir "falta escopo" de "workflow não existe" sem ler português. Por isso
-a mensagem é sempre um JSON compacto `{code, message, hint?, ...extras}`:
-`code` é o contrato estável, `message` é para o humano, `hint` diz o próximo
-passo e os extras carregam o que a tool sabe (o relatório do lint, o escopo
-que falta, os segundos até liberar).
+The MCP protocol has no status code — what reaches the client is the text of the
+`ToolError`. If each tool wrote its own sentence, an integrator would have no way
+to tell "missing scope" from "workflow does not exist" without reading
+Portuguese. That is why the message is always a compact JSON
+`{code, message, hint?, ...extras}`: `code` is the stable contract, `message`
+is for the human, `hint` says the next step and the extras carry what the tool
+knows (the lint report, the missing scope, the seconds until it frees up).
 
-`to_tool_error` é a tradução única das exceções do núcleo para esse formato.
-Ela existe porque o `ToolManager` do SDK embrulha qualquer exceção que não
-seja `ToolError` num `UnexpectedToolError` genérico — o mapeamento precisa
-acontecer DENTRO da tool, antes de o SDK ver a exceção.
+`to_tool_error` is the single translation of the core's exceptions into this
+format. It exists because the SDK's `ToolManager` wraps any exception that is
+not a `ToolError` in a generic `UnexpectedToolError` — the mapping has to
+happen INSIDE the tool, before the SDK sees the exception.
 
-Regra de segurança: nada de segredo na mensagem. Só entram `str(exc)` de
-exceções de domínio (escritas por nós) e `exc.detail` de `HTTPException` — e
-tudo passa por `scrub_text` dentro de `erro()`, que é o funil único por onde
-todo erro do MCP sai. A redação no funil cobre de uma vez os dois destinos: o
-cliente e o log do SDK, que imprime o texto do `ToolError` por um logger que
-não tem o filtro de segredos da casa. Vale também porque a mensagem ecoa
-argumento escrito por gente (nome de nó, tópico, nome de workflow) — o mesmo
-caminho por onde uma string de conexão entraria sem querer.
+Security rule: no secrets in the message. Only `str(exc)` of domain exceptions
+(written by us) and `exc.detail` of `HTTPException` go in — and everything goes
+through `scrub_text` inside `erro()`, which is the single funnel through which
+every MCP error leaves. Redaction at the funnel covers both destinations at
+once: the client and the SDK log, which prints the `ToolError` text through a
+logger that does not have the house secret filter. It also matters because the
+message echoes arguments written by people (node name, topic, workflow name) —
+the same path through which a connection string would get in by accident.
 """
 from __future__ import annotations
 
@@ -51,8 +51,8 @@ from app.core.exceptions import (
 from app.core.utils.logger import scrub_text
 from app.mcp.saida import higienizar
 
-# Status HTTP → `code` do MCP. É a tabela que traduz qualquer `AtlasBaseError`
-# e qualquer `HTTPException` sem precisar de um ramo por exceção.
+# HTTP status → MCP `code`. It is the table that translates any `AtlasBaseError`
+# and any `HTTPException` without needing a branch per exception.
 CODIGO_POR_STATUS: dict[int, str] = {
     401: "unauthorized",
     403: "forbidden",
@@ -63,29 +63,31 @@ CODIGO_POR_STATUS: dict[int, str] = {
     503: "unavailable",
 }
 
-# O nome do workflow aparece entre aspas simples na mensagem do conflito
-# ("Já existe um workflow chamado 'X' neste workspace.") — é de onde sai a
-# sugestão. Sem casamento, o erro vai sem `suggestion`, nunca com uma inventada.
+# The workflow name appears in single quotes in the conflict message
+# ("Já existe um workflow chamado 'X' neste workspace.") — that is where the
+# suggestion comes from. With no match, the error goes without `suggestion`,
+# never with an invented one.
 _NOME_ENTRE_ASPAS = re.compile(r"'([^']{1,120})'")
 
 
 def erro(code: str, message: str, hint: str | None = None, **extras: Any) -> ToolError:
-    """Monta o `ToolError` no formato padrão. Chaves nulas não entram no JSON.
+    """Builds the `ToolError` in the standard format. Null keys are left out of the JSON.
 
-    `message`, `hint` e todo extra que seja texto passam por `scrub_text`. É o
-    único ponto por onde um erro do MCP sai, e redigir aqui vale para o cliente
-    e para o log — o SDK registra o texto do `ToolError` por um logger que não
-    carrega o filtro de segredos da casa.
+    `message`, `hint` and every extra that is text go through `scrub_text`. It
+    is the only point through which an MCP error leaves, and redacting here
+    covers the client and the log — the SDK records the `ToolError` text
+    through a logger that does not carry the house secret filter.
 
-    O que NÃO é string (o relatório do lint, a lista de candidatos, o número de
-    segundos) segue intacto, porque descer nessas estruturas aqui destruiria o
-    formato que o cliente lê. Em troca, a redação delas é responsabilidade de
-    QUEM CHAMA, com o `higienizar` do `app.mcp.saida`: a premissa de que
-    toda estrutura já vinha limpa da origem falhou — o relatório do lint
-    montado por `validate_service` sai cru, e a mensagem fatal de
-    `invalid_credential_id` ecoa o valor recebido, que nesse erro é justamente
-    uma credencial colada no campo errado. `to_tool_error` higieniza antes de
-    embarcar; toda tool que passar um extra estruturado precisa fazer o mesmo.
+    What is NOT a string (the lint report, the candidate list, the number of
+    seconds) goes through intact, because descending into those structures here
+    would destroy the format the client reads. In exchange, redacting them is
+    the CALLER's responsibility, with `higienizar` from `app.mcp.saida`: the
+    premise that every structure already came clean from its origin failed —
+    the lint report built by `validate_service` comes out raw, and the fatal
+    message of `invalid_credential_id` echoes the received value, which in this
+    error is precisely a credential pasted into the wrong field. `to_tool_error`
+    sanitizes before embedding; every tool that passes a structured extra must
+    do the same.
     """
     corpo: dict[str, Any] = {"code": code, "message": scrub_text(message)}
     if hint:
@@ -97,12 +99,12 @@ def erro(code: str, message: str, hint: str | None = None, **extras: Any) -> Too
     return ToolError(json.dumps(corpo, ensure_ascii=False))
 
 
-# O gerenciador de tools do SDK re-levanta qualquer `ToolError` de dentro de uma
-# tool prefixado com "Error executing tool <nome>: ". O prefixo é ruído para
-# quem lê o erro: o contrato publicado em docs/mcp.md diz que a mensagem É o
-# JSON `{code, message, hint}`, e os erros levantados nas guardas (escopo, cota)
-# chegam sem prefixo nenhum. `sem_prefixo_do_sdk` devolve as duas formas ao
-# mesmo formato.
+# The SDK's tool manager re-raises any `ToolError` from inside a tool prefixed
+# with "Error executing tool <nome>: ". The prefix is noise for whoever reads
+# the error: the contract published in docs/mcp.md says the message IS the
+# JSON `{code, message, hint}`, and errors raised in the guards (scope, quota)
+# arrive with no prefix at all. `sem_prefixo_do_sdk` brings both forms to the
+# same format.
 _PREFIXO_DO_SDK = re.compile(r"^Error executing tool [^:]+: ")
 
 
@@ -111,9 +113,9 @@ def sem_prefixo_do_sdk(mensagem: str) -> str:
 
 
 def codigo_do_erro(exc: BaseException) -> str:
-    """O `code` de um `ToolError` nosso — "erro" quando a mensagem não é JSON.
+    """The `code` of one of our `ToolError`s — "erro" when the message is not JSON.
 
-    Serve à auditoria e aos testes; nunca muda o erro que chega ao cliente.
+    Serves auditing and tests; never changes the error that reaches the client.
     """
     try:
         corpo = json.loads(sem_prefixo_do_sdk(str(exc)))
@@ -124,10 +126,10 @@ def codigo_do_erro(exc: BaseException) -> str:
 
 
 def to_tool_error(exc: BaseException) -> ToolError:
-    """Traduz uma exceção do núcleo para o erro do MCP.
+    """Translates a core exception into the MCP error.
 
-    Um `ToolError` já formatado passa intacto: quem o levantou sabia mais sobre
-    o caso do que esta tabela genérica.
+    An already formatted `ToolError` passes through intact: whoever raised it
+    knew more about the case than this generic table.
     """
     if isinstance(exc, ToolError):
         return exc
@@ -140,8 +142,8 @@ def to_tool_error(exc: BaseException) -> ToolError:
         )
 
     if isinstance(exc, NoExecutorAvailableError):
-        # O `error_code` desta exceção é "no_agent_available" (nome antigo do
-        # executor). O MCP expõe o vocabulário atual, não o histórico do banco.
+        # This exception's `error_code` is "no_agent_available" (the executor's old
+        # name). MCP exposes the current vocabulary, not the database's history.
         return erro(
             "no_executor",
             str(exc) or "Nenhum executor disponível.",
@@ -149,13 +151,14 @@ def to_tool_error(exc: BaseException) -> ToolError:
         )
 
     if isinstance(exc, DefinicaoInvalidaError):
-        # O relatório vai higienizado porque ele NÃO nasce limpo: os itens do
-        # lint ecoam o valor recebido para que quem lê ache o campo errado — e
-        # `invalid_credential_id` cita o próprio `credential_id`, que só chega
-        # nesse erro quando alguém colou ali uma string de conexão em vez do id
-        # da credencial. Sem esta passada, o mesmo segredo saía `<REDACTED>` na
-        # `message` (que passa por `scrub_text` no funil) e em claro dentro de
-        # `report.errors[].message` — para o cliente e para o log do SDK.
+        # The report goes sanitized because it is NOT born clean: the lint items
+        # echo the received value so whoever reads finds the wrong field — and
+        # `invalid_credential_id` quotes the `credential_id` itself, which only
+        # reaches this error when someone pasted a connection string there instead
+        # of the credential id. Without this pass, the same secret went out as
+        # `<REDACTED>` in `message` (which goes through `scrub_text` at the funnel)
+        # and in the clear inside `report.errors[].message` — to the client and
+        # to the SDK log.
         return erro(
             "validation",
             str(exc) or "Definição inválida.",
@@ -201,36 +204,36 @@ def to_tool_error(exc: BaseException) -> ToolError:
         return erro(CODIGO_POR_STATUS.get(exc.status_code, "erro"), detalhe)
 
     if isinstance(exc, AtlasBaseError):
-        # `atlas_code` preserva o código do domínio para quem integra e quiser
-        # distinguir dois casos que caem no mesmo status.
+        # `atlas_code` preserves the domain code for integrators who want to
+        # distinguish two cases that fall under the same status.
         return erro(
             CODIGO_POR_STATUS.get(exc.status_code, "erro"),
             str(exc) or "Operação recusada.",
             atlas_code=exc.error_code,
         )
 
-    # Nada conhecido: o chamador decide se embrulha ou deixa estourar. Mensagem
-    # genérica de propósito — `str(exc)` de uma exceção de biblioteca pode
-    # carregar uma URL com credencial.
+    # Nothing known: the caller decides whether to wrap it or let it blow up. A
+    # generic message on purpose — `str(exc)` of a library exception may
+    # carry a URL with a credential.
     if isinstance(exc, FileNotFoundError):
-        # `drive_service` levanta o FileNotFoundError embutido para arquivo que
-        # não existe (ou saiu do alcance); é 404, não falha interna.
+        # `drive_service` raises the built-in FileNotFoundError for a file that
+        # does not exist (or went out of reach); it is a 404, not an internal failure.
         return erro("not_found", "Recurso não encontrado.")
     return erro("internal_error", "Erro interno ao atender a chamada.")
 
 
 def erro_de_segredo(caminhos: list[str]) -> ToolError:
-    """A recusa de uma definition que traz segredo em texto claro.
+    """The refusal of a definition that carries a secret in clear text.
 
-    Existe como helper (e não como uma chamada a `erro` espalhada por cada
-    tool de escrita) por causa da mensagem: ela cita o CAMINHO do campo e
-    nunca o valor. Quem lê o erro vai justamente ao lugar onde a senha está
-    para corrigi-la, e devolver o valor "para ajudar" faria o segredo dar mais
-    uma volta — pelo transporte, pelo histórico do cliente e pelo log do SDK.
+    It exists as a helper (and not as a call to `erro` scattered across each
+    write tool) because of the message: it cites the field's PATH and never
+    the value. Whoever reads the error goes precisely to where the password is
+    to fix it, and returning the value "to help" would make the secret take
+    one more trip — through the transport, the client's history and the SDK log.
 
-    `caminhos` é o que `definition_contem_segredo` devolve
-    (`nodes[2].properties.connectionString`); ainda assim cada um passa por
-    `scrub_text`, porque o nome de uma propriedade é texto escrito por gente.
+    `caminhos` is what `definition_contem_segredo` returns
+    (`nodes[2].properties.connectionString`); even so each one goes through
+    `scrub_text`, because a property name is text written by people.
     """
     return erro(
         "secret_in_definition",

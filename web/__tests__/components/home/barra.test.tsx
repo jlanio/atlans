@@ -6,14 +6,14 @@ import { pt } from "@/app/components/home/i18n/secoes/assistente"
 import { useHomeStore } from "@/app/stores/homeStore"
 import type { IAssistenteEstado } from "@/service/types"
 
-// As frases digitadas no campo vazio e os chips do hero, em português — o
-// dicionário que a barra lê sem provider de idioma.
+// The sentences typed into the empty field and the hero chips, in Portuguese — the
+// dictionary the bar reads with no language provider.
 const { sugestoes: SUGESTOES, chips: CHIPS } = pt.barra
 
 const ATIVO: IAssistenteEstado = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
 
-// O rascunho mora na store (ele atravessa a troca painel↔barra): cada teste
-// recomeça com a caixa vazia, senão o texto de um vaza para o seguinte.
+// The draft lives in the store (it survives the panel↔bar switch): each test
+// starts over with an empty box, otherwise the text of one leaks into the next.
 beforeEach(() => { cleanup(); useHomeStore.setState({ painel: "barra", rascunho: "" }) })
 afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks() })
 
@@ -24,9 +24,9 @@ function digitar(texto: string) {
 }
 
 /**
- * Avança os timers da digitação UM passo por vez. Dentro de um único `act` o
- * React só aplica os `setState` no fim, então um `advanceTimersByTime(1600)`
- * disparava um timer só (o efeito que agenda o próximo nunca reexecutava).
+ * Advances the typing timers ONE step at a time. Inside a single `act`
+ * React only applies the `setState`s at the end, so one `advanceTimersByTime(1600)`
+ * fired a single timer (the effect that schedules the next one never re-ran).
  */
 function avancar(ms: number, passo = 26) {
   for (let t = 0; t < ms; t += passo) act(() => { vi.advanceTimersByTime(passo) })
@@ -64,7 +64,7 @@ describe("Barra de comando — rodapé", () => {
     expect((campo as HTMLInputElement).disabled).toBe(true)
     fireEvent.keyDown(campo, { key: "Enter" })
     expect(enviar).not.toHaveBeenCalled()
-    // E o donut fecha: vira a contagem de reabertura, não um "100%" mudo.
+    // And the donut closes: it becomes the reopening countdown, not a mute "100%".
     expect(screen.getByTestId("uso-da-cota").textContent).toBe("reabre em 1 h")
   })
 
@@ -112,7 +112,7 @@ describe("Barra de comando — rodapé", () => {
 describe("Barra de comando — hero", () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    // Digitação em ritmo fixo (26 ms por letra): o teste mede a sequência, não o acaso.
+    // Typing at a fixed pace (26 ms per letter): the test measures the sequence, not chance.
     vi.spyOn(Math, "random").mockReturnValue(0)
   })
 
@@ -132,7 +132,7 @@ describe("Barra de comando — hero", () => {
     avancar(26 * primeira.length)
     expect(sugestao.textContent).toBe(primeira)
 
-    // Lida por 2,3 s, apagada (14 ms por letra) e trocada pela seguinte.
+    // Read for 2.3 s, erased (14 ms per letter) and replaced by the next one.
     avancar(2300 + 14 * primeira.length + 420 + 26 * 4, 14)
     const agora = sugestao.textContent ?? ""
     expect(agora.length).toBeGreaterThan(0)
@@ -146,7 +146,7 @@ describe("Barra de comando — hero", () => {
     fireEvent.keyDown(campo, { key: "Tab" })
 
     expect(useHomeStore.getState().rascunho).toBe(SUGESTOES[0])
-    // Com texto na caixa a sugestão some.
+    // With text in the box the suggestion goes away.
     expect(screen.queryByTestId("sugestao")).toBeNull()
   })
 
@@ -178,8 +178,8 @@ describe("Barra de comando — hero", () => {
     expect(screen.queryByRole("group", { name: /sugestões/i })).toBeNull()
     expect(screen.queryByTestId("sugestao")).toBeNull()
     const pensando = screen.getByText(/Trabalhando…/)
-    // O texto tem o brilho que varre e, ao lado, a marca do site animada —
-    // era o ExecActivity parado, e o dono pediu vida (2026-09-19).
+    // The text has the sweeping shimmer and, next to it, the animated site mark —
+    // it used to be the static ExecActivity, and the owner asked for life (2026-09-19).
     expect(pensando.classList.contains("texto-pensando")).toBe(true)
     expect(document.querySelector(".home-marca-anim")).toBeTruthy()
 
@@ -189,9 +189,9 @@ describe("Barra de comando — hero", () => {
 })
 
 /**
- * O `animationend` como o React o escuta: no jsdom não existe `AnimationEvent`,
- * e o React cai no nome com prefixo (`webkitAnimationEnd`). Disparar os dois
- * cobre os dois ambientes; quem não for escutado é ignorado.
+ * `animationend` as React listens to it: in jsdom there is no `AnimationEvent`,
+ * and React falls back to the prefixed name (`webkitAnimationEnd`). Firing both
+ * covers both environments; whichever is not listened to is ignored.
  */
 function fimDaAnimacao(el: Element) {
   fireEvent.animationEnd(el)
@@ -208,7 +208,7 @@ describe("Barra — o envio tem sinal, e a saída apaga", () => {
     fireEvent.keyDown(campo, { key: "Enter" })
     expect(caixa.getAttribute("data-flash")).toBe("true")
 
-    // Um filho animado (o chevron, o cursor) que termine não conta.
+    // An animated child (the chevron, the cursor) finishing does not count.
     fimDaAnimacao(screen.getByRole("button", { name: /abrir o assistente/i }))
     expect(caixa.getAttribute("data-flash")).toBe("true")
     fimDaAnimacao(caixa)
@@ -236,8 +236,8 @@ describe("Barra — o envio tem sinal, e a saída apaga", () => {
 })
 
 describe("Barra — os anexos soltos sobre a Home", () => {
-  // Estes casos mexem no estado dos anexos; cada um recomeça limpo, senão os
-  // chips de um vazam para o seguinte.
+  // These cases touch the attachments state; each one starts clean, otherwise the
+  // chips of one leak into the next.
   beforeEach(() => useHomeStore.setState({ painel: "barra", rascunho: "", anexos: [], arrastandoArquivo: false }))
 
   const pronto = (nome: string, id = nome) =>
@@ -249,7 +249,7 @@ describe("Barra — os anexos soltos sobre a Home", () => {
     render(<Barra enviar={enviar} estado={ATIVO} />)
 
     expect(screen.getByText("municipios.geojson")).toBeTruthy()
-    // Campo vazio + anexo pronto: o botão de enviar está habilitado.
+    // Empty field + ready attachment: the send button is enabled.
     const botao = screen.getByRole("button", { name: /^enviar$/i }) as HTMLButtonElement
     expect(botao.disabled).toBe(false)
 
@@ -294,7 +294,7 @@ describe("Barra — os anexos soltos sobre a Home", () => {
     })
     const enviar = vi.fn()
     render(<Barra enviar={enviar} estado={ATIVO} />)
-    // Sem chip; com aviso.
+    // No chip; with a warning.
     expect(screen.queryByTestId("chips-de-anexo")).toBeNull()
     expect(screen.getByTestId("anexos-recusados")).toBeTruthy()
     expect(screen.getByText("«x.pdf»")).toBeTruthy()
@@ -304,8 +304,8 @@ describe("Barra — os anexos soltos sobre a Home", () => {
     const aoMedirExtras = vi.fn()
     useHomeStore.setState({ anexos: [pronto("a.csv")] })
     render(<Barra enviar={vi.fn()} estado={ATIVO} aoMedirExtras={aoMedirExtras} />)
-    // jsdom não faz layout (offsetHeight = 0), então o número é 0; o que importa
-    // é que a barra MEDE e reporta — a régua existe e o canal está ligado.
+    // jsdom does no layout (offsetHeight = 0), so the number is 0; what matters
+    // is that the bar MEASURES and reports — the ruler exists and the channel is wired.
     expect(aoMedirExtras).toHaveBeenCalled()
     expect(typeof aoMedirExtras.mock.calls[0][0]).toBe("number")
   })

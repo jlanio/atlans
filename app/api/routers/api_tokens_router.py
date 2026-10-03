@@ -1,17 +1,17 @@
 # app/api/routers/api_tokens_router.py
 """
-Tokens pessoais de acesso do usuário autenticado — /auth/tokens.
+Personal access tokens of the authenticated user — /auth/tokens.
 
-Só a sessão JWT cria, lista e revoga tokens (um PAT nunca gerencia PATs). O
-segredo aparece uma vez, na resposta do POST. Revogar é marcar, não apagar:
-o token continua na lista como "revogado" para o usuário saber o que existiu.
+Only the JWT session creates, lists and revokes tokens (a PAT never manages PATs). The
+secret appears once, in the POST response. Revoking is marking, not deleting:
+the token stays in the list as "revogado" (revoked) so the user knows what existed.
 
-Os 422 do POST chegam em dois formatos, de propósito: nome, escopos, validade
-e lista vazia caem no schema (`validation_error`, com `details`, como toda
-rota do repo); o service revalida com as mesmas frases (defesa em
-profundidade), mas o único 422 de domínio que de fato sai daqui é
-`api_token_invalid` para "workspace de que o usuário não participa" — esse
-precisa do banco.
+The POST's 422s come in two formats, on purpose: name, scopes, validity
+and empty list fall to the schema (`validation_error`, with `details`, like every
+route in the repo); the service revalidates with the same sentences (defense in
+depth), but the only domain 422 that actually comes out of here is
+`api_token_invalid` for "a workspace the user does not belong to" — that one
+needs the database.
 """
 from typing import List
 
@@ -39,7 +39,7 @@ async def criar_token(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Cria um token pessoal. O segredo (`token`) aparece UMA única vez nesta resposta."""
+    """Creates a personal token. The secret (`token`) appears only ONCE, in this response."""
     token, segredo = await svc.criar(
         db,
         current_user,
@@ -66,6 +66,6 @@ async def revogar_token(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Revoga (não apaga) um token do próprio usuário. Idempotente."""
+    """Revokes (does not delete) one of the user's own tokens. Idempotent."""
     token = await svc.revogar(db, current_user.id_hash, id_hash)
     return ApiTokenOut.de_modelo(token, utc_now_naive())

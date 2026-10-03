@@ -1,10 +1,10 @@
 # tests/unit/test_sync_paths.py
-"""Contencao de caminho no GeoSync.
+"""Path containment in GeoSync.
 
-Regressao: `original_name` vem do servidor (digitado por um usuario no upload do
-Drive) e era usado direto como `sync_dir / original_name` no download. Um nome
-com `../` ou absoluto escapava do diretorio de sync = escrita arbitraria de
-arquivo no host do executor.
+Regression: `original_name` comes from the server (typed by a user in the Drive
+upload) and was used directly as `sync_dir / original_name` in the download. A
+name with `../` or an absolute one escaped the sync directory = arbitrary file
+write on the executor's host.
 """
 import pytest
 
@@ -70,7 +70,7 @@ def test_symlink_apontando_para_fora_e_rejeitado(sync_dir, tmp_path):
         safe_join(sync_dir, "atalho.geojson")
 
 
-# ── Variante nao-levantavel usada nos loops de sync ───────────────────────────
+# ── Non-raising variant used in the sync loops ────────────────────────────────
 
 def test_safe_join_or_none_devolve_none_em_vez_de_levantar(sync_dir):
     assert safe_join_or_none(sync_dir, "../fora.geojson") is None

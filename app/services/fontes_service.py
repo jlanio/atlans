@@ -1,34 +1,34 @@
 # app/services/fontes_service.py
 """
-O catálogo de fontes pré-mapeadas — o único módulo que sabe sondar um WFS,
-gravar uma fonte e procurá-la.
+The catalog of pre-mapped sources — the only module that knows how to probe a WFS,
+store a source and search for it.
 
-Quatro clientes leem daqui, e nenhum deles fala com a rede ou com a tabela por
-conta própria: as tools MCP (`app/mcp/tools/fontes.py`), a validação
-(`conferir_fontes_da_definicao`, sem rede), o consumidor de resultados
-(`aprender_de_execucao`) e o laço de arranque/verificação
+Four clients read from here, and none of them talks to the network or the table on
+its own: the MCP tools (`app/mcp/tools/fontes.py`), validation
+(`conferir_fontes_da_definicao`, no network), the results consumer
+(`aprender_de_execucao`) and the startup/verification loop
 (`importar_pasta`, `verificar_endpoint`).
 
-Decisões que valem para tudo aqui:
+Decisions that apply to everything here:
 
-- **Toda sondagem passa por `safe_httpx_request`** (pin de IP, sem redirect,
-  teto de bytes, timeout). O `get_schema` do owslib faz `openURL` sem nada
-  disso e por isso NÃO é usado no servidor — o XSD do DescribeFeatureType é
-  lido por um parser próprio, com a mesma tabela de geometrias.
-- **A identidade da linha é `chave`** = sha256(workspace | tipo | url
-  normalizada | type_name). A URL é normalizada pela MESMA função que o
-  `WFSNode` aplica em `execute()` (`normalize_ows_endpoint_url`), então o que
-  o catálogo guarda é o que o nó de fato usa, e a validação confere um nó em
-  uma consulta.
-- **A busca é por texto normalizado** (`busca`, sem acento, minúsculas), com
-  `LIKE` por termo e expansão por sinônimos; 25 k linhas × ~300 B é uma
-  varredura de milissegundos. Um índice trigram fica para quando crescer.
-- **Verificar é por ENDPOINT, não por camada**: um GetCapabilities marca todas
-  as linhas daquela URL de uma vez (77 pedidos para a semente inteira). O
-  DescribeFeatureType, por camada, só acontece sob demanda (sondar/registrar).
-- **Escrita não faz commit**, salvo os dois lotes que gerenciam a própria
-  transação (`importar_pasta`, `verificar_endpoint`). Quem chama uma tool
-  commita no fim, como nas demais tools do MCP.
+- **Every probe goes through `safe_httpx_request`** (IP pinning, no redirect,
+  byte ceiling, timeout). owslib's `get_schema` does `openURL` with none of
+  that and so is NOT used on the server — the DescribeFeatureType XSD is
+  read by our own parser, with the same geometry table.
+- **The row's identity is `chave`** = sha256(workspace | type | normalized
+  url | type_name). The URL is normalized by the SAME function that
+  `WFSNode` applies in `execute()` (`normalize_ows_endpoint_url`), so what
+  the catalog stores is what the node actually uses, and validation checks a node in
+  one query.
+- **Search is by normalized text** (`busca`, no accents, lowercase), with
+  `LIKE` per term and synonym expansion; 25 k rows × ~300 B is a
+  millisecond scan. A trigram index is left for when it grows.
+- **Verification is per ENDPOINT, not per layer**: one GetCapabilities marks every
+  row for that URL at once (77 requests for the whole seed). The
+  per-layer DescribeFeatureType only happens on demand (probe/register).
+- **Writes do not commit**, except the two batches that manage their own
+  transaction (`importar_pasta`, `verificar_endpoint`). Whoever calls a tool
+  commits at the end, as with the other MCP tools.
 """
 from __future__ import annotations
 
@@ -64,16 +64,16 @@ NO_WFS = "WFS"
 VERSOES_WFS = ("1.0.0", "1.1.0", "2.0.0")
 VERSAO_PADRAO = "2.0.0"
 ORIGENS = ("vault", "aprendida", "manual")
-# `origem` nunca é rebaixada: uma fonte do Vault que uma execução usa continua
-# sendo do Vault. A ordem é a força de cada origem.
+# `origem` is never downgraded: a Vault source that an execution uses remains
+# a Vault source. The order is the strength of each origin.
 _FORCA_DA_ORIGEM = {"aprendida": 0, "manual": 1, "vault": 2}
-# O mesmo para o esquema: o DescribeFeatureType ao vivo vence a tabela do Vault,
-# que vence o que uma execução viu (só nomes de coluna), que vence o vazio.
+# The same for the schema: the live DescribeFeatureType beats the Vault table,
+# which beats what an execution saw (column names only), which beats nothing.
 _FORCA_DO_ESQUEMA = {None: 0, "run": 1, "vault": 2, "describe_feature_type": 3}
 
 URL_MAX = 2048
-# O GetCapabilities do IBGE tem 9.759 FeatureTypes — bem acima dos 10 MB da rota
-# interativa. Aqui o teto é do servidor para o servidor.
+# IBGE's GetCapabilities has 9,759 FeatureTypes — well above the interactive
+# route's 10 MB. Here the ceiling is server-to-server.
 TIMEOUT_CAPABILITIES_S = 30.0
 MAX_CAPABILITIES_BYTES = 32 * 1024 * 1024
 TIMEOUT_DESCRIBE_S = 15.0
@@ -81,15 +81,15 @@ MAX_DESCRIBE_BYTES = 2 * 1024 * 1024
 LIMITE_DE_BUSCA = 20
 LOTE_DE_IMPORTACAO = 500
 
-# As propriedades que o nó WFS declara HOJE. `version` fica no catálogo mas não
-# entra no trecho que o modelo cola enquanto o nó não a declarar — colá-la
-# renderia `undeclared_property` na validação. `cqlFilter` fica de fora de
-# propósito: é da PERGUNTA, não da fonte — aprendido de uma execução, o
-# `uf = 'MT'` dela grudaria no trecho de todas as próximas.
+# The properties the WFS node declares TODAY. `version` stays in the catalog but
+# does not go into the snippet the model pastes while the node does not declare it —
+# pasting it would yield `undeclared_property` in validation. `cqlFilter` is left out
+# on purpose: it belongs to the QUESTION, not the source — learned from an execution,
+# its `uf = 'MT'` would stick to the snippet of every later one.
 PROPRIEDADES_DO_NO_WFS = ("url", "typeName", "maxFeatures", "bbox", "crs", "sortBy", "timeout", "retries")
 
-# Sinônimos que valem mesmo sem `_sinonimos.md` no Vault: os temas que as
-# frases do produto usam. Chaves e valores são normalizados no uso.
+# Synonyms that apply even without `_sinonimos.md` in the Vault: the themes the
+# product's phrases use. Keys and values are normalized on use.
 SINONIMOS_PADRAO: dict[str, set[str]] = {
     "focos de calor": {"queimadas", "incendio", "fogo", "hotspot", "focos"},
     "queimadas": {"focos de calor", "incendio", "fogo"},
@@ -112,11 +112,11 @@ _SEPARADORES = re.compile(r"[\s,;/|]+")
 
 
 class SondagemError(Exception):
-    """Uma sondagem (GetCapabilities/DescribeFeatureType) que não deu certo.
+    """A probe (GetCapabilities/DescribeFeatureType) that did not succeed.
 
-    `codigo` é fechado — `timeout | http_status | ssrf | tamanho | tls |
-    sem_camadas | camada_inexistente | xml | rede` — para a rota traduzir em
-    status HTTP e a tool em `reason`, sem ninguém ler a mensagem.
+    `codigo` is closed — `timeout | http_status | ssrf | tamanho | tls |
+    sem_camadas | camada_inexistente | xml | rede` — so the route can map it to an
+    HTTP status and the tool to a `reason`, without anyone reading the message.
     """
 
     def __init__(self, codigo: str, mensagem: str, *, status: int | None = None, candidatas: list[str] | None = None):
@@ -127,7 +127,7 @@ class SondagemError(Exception):
         self.candidatas = candidatas or []
 
     def como_http(self) -> tuple[int, str]:
-        """(status, detail) na forma que `GET /nodes/wfs/layers` sempre respondeu."""
+        """(status, detail) in the shape `GET /nodes/wfs/layers` has always returned."""
         if self.codigo == "timeout":
             return 504, "Timeout ao conectar ao servidor WFS."
         if self.codigo == "http_status":
@@ -138,7 +138,7 @@ class SondagemError(Exception):
             return 502, self.mensagem
         if self.codigo in ("sem_camadas", "camada_inexistente"):
             return 404, self.mensagem
-        # Genérico para não vazar internals (ver V36 em nodes_router).
+        # Generic so as not to leak internals (see V36 in nodes_router).
         return 502, "Erro ao conectar ao servidor WFS."
 
 
@@ -146,7 +146,7 @@ class SondagemError(Exception):
 
 
 def normalizar_texto(texto: Any) -> str:
-    """Minúsculas, sem acento, espaços colapsados — a forma de `busca` e da consulta."""
+    """Lowercase, no accents, collapsed spaces — the form of `busca` and of the query."""
     if texto is None:
         return ""
     sem_acento = unicodedata.normalize("NFKD", str(texto))
@@ -155,12 +155,12 @@ def normalizar_texto(texto: Any) -> str:
 
 
 def normalizar_url(url: Any) -> str:
-    """A URL como o nó WFS a usa — ou `FonteInvalidaError`.
+    """The URL as the WFS node uses it — or `FonteInvalidaError`.
 
-    Pura de propósito (sem DNS): a checagem de SSRF acontece na hora de buscar,
-    em `safe_httpx_request`. Aqui se recusa o que nunca poderia ser fonte:
-    scheme fora de http(s), tamanho e credencial embutida (que iria para o
-    banco e para o trecho que o modelo cola).
+    Pure on purpose (no DNS): the SSRF check happens at fetch time,
+    in `safe_httpx_request`. Here we refuse what could never be a source:
+    a scheme other than http(s), size, and embedded credentials (which would go to the
+    database and to the snippet the model pastes).
     """
     texto = str(url or "").strip()
     if texto.startswith("<") and texto.endswith(">"):
@@ -198,10 +198,10 @@ def texto_de_busca(
     temas: Iterable[str] | None,
     esquema: Mapping[str, Any] | None,
 ) -> str:
-    """O texto que `LIKE` varre: tudo o que descreve a fonte, normalizado."""
+    """The text that `LIKE` scans: everything that describes the source, normalized."""
     partes: list[str] = [instituicao or "", grupo or "", titulo or "", type_name or ""]
     if type_name:
-        # `Funai:tis_poligonais` também responde por "tis poligonais".
+        # `Funai:tis_poligonais` also answers to "tis poligonais".
         partes.append(re.sub(r"[:_]+", " ", type_name))
     if url:
         partes.append(urlparse(url).hostname or "")
@@ -216,7 +216,7 @@ def texto_de_busca(
 
 
 def definir_sinonimos(mapa: Mapping[str, Iterable[str]] | None) -> None:
-    """Troca os sinônimos vindos do Vault (`_sinonimos.md`); os padrão continuam."""
+    """Replaces the synonyms coming from the Vault (`_sinonimos.md`); the defaults remain."""
     global _sinonimos_extra
     _sinonimos_extra = {
         normalizar_texto(k): {normalizar_texto(v) for v in vs if normalizar_texto(v)}
@@ -240,12 +240,12 @@ def sinonimos_de(termo: str) -> set[str]:
 
 
 def termos_da_consulta(query: str | None) -> list[set[str]]:
-    """Cada termo da consulta com as suas variantes (o próprio + sinônimos).
+    """Each query term with its variants (itself + synonyms).
 
-    A consulta inteira também conta como um termo quando tem mais de uma
-    palavra: "focos de calor" precisa casar com a expressão, não só com
-    "focos", "de" e "calor" separados. Palavras de uma letra e conectivos
-    ficam de fora.
+    The whole query also counts as a term when it has more than one
+    word: "focos de calor" (hotspots) must match the expression, not just
+    "focos", "de" and "calor" separately. One-letter words and connectives
+    are left out.
     """
     texto = normalizar_texto(query)
     if not texto:
@@ -254,8 +254,8 @@ def termos_da_consulta(query: str | None) -> list[set[str]]:
     palavras = [p for p in _SEPARADORES.split(texto) if len(p) > 1 and p not in _CONECTIVOS]
     if len(palavras) <= 1:
         return [frase | (sinonimos_de(palavras[0]) if palavras else set())]
-    # Frase OU (cada palavra com os sinônimos dela): quem tem a frase inteira
-    # casa de primeira; quem só tem as palavras casa pelo AND abaixo.
+    # Phrase OR (each word with its synonyms): rows with the whole phrase
+    # match right away; rows with only the words match via the AND below.
     return [frase | {p} | sinonimos_de(p) for p in palavras]
 
 
@@ -303,11 +303,11 @@ def _filho(no: ET.Element, *nomes: str) -> ET.Element | None:
 
 
 def _parse_xml(texto: str | bytes) -> ET.Element:
-    """`fromstring` com a proteção que o servidor precisa: sem DTD/entidades.
+    """`fromstring` with the protection the server needs: no DTD/entities.
 
-    `defusedxml` não é dependência; o que um DTD externo ou uma entidade
-    recursiva faria aqui é estourar memória, e nenhum GetCapabilities legítimo
-    traz um. Rejeitar o prefixo é mais barato e mais seguro que parsear.
+    `defusedxml` is not a dependency; what an external DTD or a recursive
+    entity would do here is blow up memory, and no legitimate GetCapabilities
+    carries one. Rejecting the prefix is cheaper and safer than parsing.
     """
     cabeca = texto[:4096] if isinstance(texto, str) else texto[:4096].decode("utf-8", errors="replace")
     if "<!DOCTYPE" in cabeca or "<!ENTITY" in cabeca:
@@ -328,7 +328,7 @@ def _crs_normalizado(valor: str | None) -> str | None:
 
 
 def _bbox(no: ET.Element) -> tuple[float, float, float, float] | None:
-    """`WGS84BoundingBox` (2.0/1.1) ou `LatLongBoundingBox` (1.0)."""
+    """`WGS84BoundingBox` (2.0/1.1) or `LatLongBoundingBox` (1.0)."""
     try:
         if _local(no.tag) == "LatLongBoundingBox":
             return tuple(float(no.attrib[k]) for k in ("minx", "miny", "maxx", "maxy"))  # type: ignore[return-value]
@@ -343,7 +343,7 @@ def _bbox(no: ET.Element) -> tuple[float, float, float, float] | None:
 
 
 def parsear_capabilities(xml: str | bytes) -> Capabilities:
-    """As camadas de um GetCapabilities, em qualquer versão (1.0.0, 1.1.0, 2.0.0)."""
+    """The layers of a GetCapabilities, in any version (1.0.0, 1.1.0, 2.0.0)."""
     raiz = _parse_xml(xml)
     if _local(raiz.tag) in ("ExceptionReport", "ServiceExceptionReport"):
         texto = " ".join(t.strip() for t in raiz.itertext() if t.strip())[:300]
@@ -375,11 +375,11 @@ def parsear_capabilities(xml: str | bytes) -> Capabilities:
 
 
 def parsear_describe_feature_type(xml: str | bytes) -> dict:
-    """`{columns, geometry_column, geometry_type, columns_source}` de um XSD.
+    """`{columns, geometry_column, geometry_type, columns_source}` from an XSD.
 
-    Lê os `element` dentro de `sequence`: é onde o GeoServer (e o MapServer)
-    listam os atributos de um FeatureType; o `element` de topo, que declara o
-    próprio tipo, fica de fora porque nunca está numa sequence.
+    Reads the `element`s inside `sequence`: that is where GeoServer (and MapServer)
+    list a FeatureType's attributes; the top-level `element`, which declares the
+    type itself, is left out because it is never inside a sequence.
     """
     raiz = _parse_xml(xml)
     colunas: list[dict] = []
@@ -416,11 +416,11 @@ def parsear_describe_feature_type(xml: str | bytes) -> dict:
 
 
 async def _buscar(url: str, *, timeout: float, max_bytes: int, auth: AutenticacaoWFS | None = None) -> str:
-    """GET seguro; toda falha vira `SondagemError` com um código fechado.
+    """Safe GET; every failure becomes a `SondagemError` with a closed code.
 
-    Com `auth`, o pedido sai assinado: a chave do authkey na URL ou num
-    cabeçalho, ou o Basic. Nenhuma mensagem daqui repete a URL — só o host, o
-    status ou o nome da exceção —, então a chave não volta a quem pediu.
+    With `auth`, the request goes out signed: the authkey key in the URL or in a
+    header, or Basic. No message from here repeats the URL — only the host, the
+    status or the exception name —, so the key does not go back to the requester.
     """
     try:
         await asyncio.to_thread(validate_url_ssrf, url)
@@ -428,13 +428,13 @@ async def _buscar(url: str, *, timeout: float, max_bytes: int, auth: Autenticaca
         raise SondagemError("ssrf", str(exc)) from exc
     endereco, cabecalhos = url, None
     if auth is not None:
-        # Concatenada, e não pelo `params` do httpx: ele TROCA a query da URL
-        # pela que recebe — o GetCapabilities sairia sem `service` e `request`.
+        # Concatenated, and not via httpx's `params`: it REPLACES the URL's query
+        # with the one it receives — the GetCapabilities would go out without `service` and `request`.
         if auth.parametros():
             endereco = f"{url}{'&' if '?' in url else '?'}{urlencode(auth.parametros(), quote_via=quote)}"
         cabecalhos = auth.cabecalhos() or None
     try:
-        # O httpx loga a URL de cada pedido (INFO): com a chave nela, só `***`.
+        # httpx logs the URL of every request (INFO): with the key in it, only `***`.
         with segredos_vivos.em_uso(*formas_do_segredo(auth)):
             resposta = await safe_httpx_request(
                 "GET", endereco, timeout=timeout, max_response_bytes=max_bytes, headers=cabecalhos,
@@ -448,17 +448,17 @@ async def _buscar(url: str, *, timeout: float, max_bytes: int, auth: Autenticaca
             status=exc.response.status_code,
         ) from exc
     except ValueError as exc:
-        # `safe_httpx_request` levanta ValueError para SSRF (já coberto acima,
-        # mas o rebinding entre as duas resoluções cai aqui) e para resposta
-        # acima do teto.
+        # `safe_httpx_request` raises ValueError for SSRF (already covered above,
+        # but rebinding between the two resolutions lands here) and for a response
+        # above the ceiling.
         codigo = "tamanho" if "excedeu" in str(exc).lower() else "ssrf"
         raise SondagemError(codigo, str(exc)) from exc
     except RuntimeError as exc:
-        # Cadeia TLS inválida, já traduzida em mensagem acionável pelo helper.
+        # Invalid TLS chain, already turned into an actionable message by the helper.
         raise SondagemError("tls", str(exc)) from exc
     except SondagemError:
         raise
-    except Exception as exc:  # rede, DNS, conexão recusada
+    except Exception as exc:  # network, DNS, connection refused
         raise SondagemError("rede", f"Erro ao conectar ao servidor WFS: {exc.__class__.__name__}") from exc
     return resposta.text
 
@@ -477,10 +477,10 @@ async def obter_capabilities(
 async def listar_camadas_wfs(
     url: str, version: str = VERSAO_PADRAO, *, auth: AutenticacaoWFS | None = None,
 ) -> list[dict]:
-    """`[{name, title}]` ordenado por título — o corpo de `GET /nodes/wfs/layers`.
+    """`[{name, title}]` sorted by title — the body of `GET /nodes/wfs/layers`.
 
-    `auth` é a credencial do nó: um GeoServer esconde do anônimo as camadas
-    protegidas, e sem ela o editor só ofereceria as públicas.
+    `auth` is the node's credential: a GeoServer hides protected layers from
+    anonymous users, and without it the editor would only offer the public ones.
     """
     caps = await obter_capabilities(url, version, auth=auth)
     if not caps.layers:
@@ -512,14 +512,14 @@ def _achar_camada(caps: Capabilities, type_name: str) -> CamadaDoServico | None:
     por_nome = caps.por_nome()
     if type_name in por_nome:
         return por_nome[type_name]
-    # Sem o prefixo do namespace, quando for único.
+    # Without the namespace prefix, when it is unique.
     local = type_name.split(":", 1)[-1]
     candidatas = [c for c in caps.layers if c.name.split(":", 1)[-1] == local]
     return candidatas[0] if len(candidatas) == 1 else None
 
 
 async def sondar_wfs(url: str, type_name: str | None = None, version: str = VERSAO_PADRAO) -> Sondagem:
-    """GetCapabilities e, com `type_name`, a camada e o seu DescribeFeatureType."""
+    """GetCapabilities and, with `type_name`, the layer and its DescribeFeatureType."""
     caps = await obter_capabilities(url, version)
     if not caps.layers:
         raise SondagemError("sem_camadas", "Nenhuma camada encontrada no servidor WFS.")
@@ -547,11 +547,11 @@ async def sondar_wfs(url: str, type_name: str | None = None, version: str = VERS
 
 
 def fundir_esquema(atual: Mapping[str, Any] | None, novo: Mapping[str, Any] | None) -> dict | None:
-    """O esquema mais completo, sem perder o que só o outro tinha.
+    """The most complete schema, without losing what only the other one had.
 
-    As COLUNAS vêm da fonte mais forte (`describe_feature_type` > `vault` >
-    `run`); `crs`, `bbox` e `feature_count` vêm do mais recente que os tiver,
-    porque só uma execução ou um GetCapabilities os conhece.
+    The COLUMNS come from the strongest source (`describe_feature_type` > `vault` >
+    `run`); `crs`, `bbox` and `feature_count` come from the most recent one that has
+    them, because only an execution or a GetCapabilities knows them.
     """
     if not atual and not novo:
         return None
@@ -583,7 +583,7 @@ def _no_escopo(workspace_ids: Iterable[str] | None):
 
 
 def _like(termo: str):
-    # `busca` já é gravada normalizada (sem acento, minúsculas): LIKE simples.
+    # `busca` is already stored normalized (no accents, lowercase): plain LIKE.
     return contem(FonteDeDados.busca, termo, ignorar_caixa=False)
 
 
@@ -598,13 +598,13 @@ async def buscar(
     limit: int = LIMITE_DE_BUSCA,
     offset: int = 0,
 ) -> tuple[list[FonteDeDados], int]:
-    """As fontes ao alcance (plataforma + workspaces do escopo) que casam com a consulta."""
+    """The sources within reach (platform + workspaces in scope) that match the query."""
     filtros = [FonteDeDados.deleted_at.is_(None), _no_escopo(workspace_ids)]
     if kind:
         filtros.append(FonteDeDados.tipo == str(kind).strip().lower())
     if institution:
-        # Exata (como está no catálogo) OU normalizada no texto de busca — quem
-        # escreve "ministerio da saude" encontra "Ministério da Saúde".
+        # Exact (as in the catalog) OR normalized in the search text — whoever
+        # types "ministerio da saude" finds "Ministério da Saúde".
         filtros.append(or_(FonteDeDados.instituicao == str(institution).strip(), _like(normalizar_texto(institution))))
     if state:
         filtros.append(FonteDeDados.estado == str(state).strip().lower())
@@ -644,7 +644,7 @@ async def obter_por_chave(db: AsyncSession, chave: str) -> FonteDeDados | None:
 
 
 def trecho_do_no(fonte: FonteDeDados) -> dict:
-    """O nó pronto para colar numa definition — só as propriedades que o nó declara."""
+    """The node ready to paste into a definition — only the properties the node declares."""
     propriedades = {
         chave: valor
         for chave, valor in (fonte.propriedades or {}).items()
@@ -701,14 +701,14 @@ async def upsert_fonte(
     contar_uso: bool = False,
     no: str = NO_WFS,
 ) -> tuple[FonteDeDados, str]:
-    """Cria ou atualiza a fonte de `chave`; devolve `(fonte, "created" | "updated")`.
+    """Creates or updates the source for `chave`; returns `(fonte, "created" | "updated")`.
 
-    Regras de fusão — o que uma origem mais fraca NÃO faz:
-    - não ressuscita uma linha apagada (`deleted_at`) quando é `aprendida`;
-    - não rebaixa `origem` (vault > manual > aprendida);
-    - não apaga `titulo`/`descricao`/`dicas` que alguém escreveu: só preenche o vazio;
-    - não troca o esquema por um mais fraco (`fundir_esquema`).
-    Sem commit: quem chama decide a transação.
+    Merge rules — what a weaker origin does NOT do:
+    - does not resurrect a deleted row (`deleted_at`) when it is `aprendida`;
+    - does not downgrade `origem` (vault > manual > aprendida);
+    - does not erase a `titulo`/`descricao`/`dicas` someone wrote: it only fills blanks;
+    - does not replace the schema with a weaker one (`fundir_esquema`).
+    No commit: the caller decides the transaction.
     """
     assert origem in ORIGENS, origem
     url = normalizar_url(url)
@@ -736,14 +736,14 @@ async def upsert_fonte(
 
     if fonte.deleted_at is not None:
         if origem == "aprendida":
-            # A pessoa apagou; uma execução não desfaz isso.
+            # The person deleted it; an execution does not undo that.
             return fonte, "deleted"
         fonte.deleted_at = None
 
     if _FORCA_DA_ORIGEM[origem] >= _FORCA_DA_ORIGEM.get(fonte.origem, 0):
         fonte.origem = origem
-    # Propriedades: as novas por cima, sem apagar o que só o catálogo sabia
-    # (uma execução não traz `sortBy`; o Vault trouxe).
+    # Properties: the new ones on top, without erasing what only the catalog knew
+    # (an execution does not bring `sortBy`; the Vault did).
     fonte.propriedades = {**(fonte.propriedades or {}), **props}
     fonte.no = no or fonte.no
     if titulo and not fonte.titulo:
@@ -776,7 +776,7 @@ async def upsert_fonte(
     return fonte, "updated"
 
 
-# ── Validação (sem rede) ──────────────────────────────────────────────────────
+# ── Validation (no network) ───────────────────────────────────────────────────
 
 
 def _propriedades_do_no(no: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -791,11 +791,11 @@ def _propriedades_do_no(no: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def _alguma_credencial(no: Mapping[str, Any]) -> bool:
-    """`credential_id` em QUALQUER dos lugares onde um nó guarda propriedades.
+    """`credential_id` in ANY of the places where a node stores properties.
 
-    `_propriedades_do_no` lê `parameters`/`properties` primeiro; o resolver e o
-    executor, `data.properties` primeiro (`node_props`). Com a credencial num e
-    não no outro, a execução saía autenticada e a camada entrava no catálogo.
+    `_propriedades_do_no` reads `parameters`/`properties` first; the resolver and the
+    executor read `data.properties` first (`node_props`). With the credential in one and
+    not the other, the execution went out authenticated and the layer went into the catalog.
     """
     dados = no.get("data")
     candidatos = (no.get("parameters"), no.get("properties"), dados.get("properties") if isinstance(dados, Mapping) else None)
@@ -803,7 +803,7 @@ def _alguma_credencial(no: Mapping[str, Any]) -> bool:
 
 
 def nos_de_fonte(nodes: Iterable[Mapping[str, Any]], descriptors: Mapping[str, Mapping[str, Any]] | None = None):
-    """Os nós que leem uma fonte externa e o (url, typeName) de cada um."""
+    """The nodes that read an external source and the (url, typeName) of each."""
     for no in nodes:
         if not isinstance(no, Mapping):
             continue
@@ -829,10 +829,10 @@ async def conferir_fontes_da_definicao(
     descriptors: Mapping[str, Mapping[str, Any]],
     workspace_id: str,
 ) -> list[dict]:
-    """Avisos `unknown_source`/`failing_source` para os nós WFS da definição.
+    """`unknown_source`/`failing_source` warnings for the definition's WFS nodes.
 
-    Falha ABERTA: qualquer erro aqui vira log e lista vazia — a validação não
-    pode depender do catálogo para responder.
+    Fails OPEN: any error here becomes a log line and an empty list — validation
+    cannot depend on the catalog to respond.
     """
     try:
         alvos = list(nos_de_fonte(nodes, descriptors))
@@ -872,7 +872,7 @@ async def conferir_fontes_da_definicao(
                     ),
                 })
         return avisos
-    except Exception as exc:  # o catálogo nunca derruba a validação
+    except Exception as exc:  # the catalog never brings down validation
         logger.warning("Catálogo de fontes indisponível na validação: %s", exc)
         return []
 
@@ -881,11 +881,11 @@ async def conferir_fontes_da_definicao(
 
 
 def _esquema_da_execucao(nid: str, stats: Mapping[str, Any], *, recortada: bool = False) -> dict | None:
-    """O que a execução viu da camada.
+    """What the execution saw of the layer.
 
-    `recortada` (o nó tinha filtro CQL ou bbox): a extensão e a contagem são
-    as do RECORTE, não as da camada — não são aprendidas. As colunas e o CRS
-    continuam valendo.
+    `recortada` (the node had a CQL or bbox filter): the extent and the count are
+    those of the SLICE, not of the layer — they are not learned. The columns and the CRS
+    still apply.
     """
     no_stats = stats.get(nid) if isinstance(stats.get(nid), Mapping) else {}
     metricas = ((stats.get("__metrics__") or {}).get("nodes") or {}).get(nid) or {}
@@ -906,26 +906,26 @@ def _esquema_da_execucao(nid: str, stats: Mapping[str, Any], *, recortada: bool 
 
 
 def _produz_bbox_string(nome_do_no: str) -> bool:
-    """O nó declara `bbox_string` entre as saídas (ComputeBoundingBox, outro
-    WFS)? Numa aresta sem chaves tudo o que ele produz entra no nó seguinte."""
+    """Does the node declare `bbox_string` among its outputs (ComputeBoundingBox, another
+    WFS)? On an edge without keys everything it produces goes into the next node."""
     try:
         from flow.registry import NODE_REGISTRY
 
         cls = NODE_REGISTRY.get(nome_do_no)
         saidas = cls.description().get("outputs") or [] if cls is not None else []
-    except Exception:  # registro indisponível ou descriptor quebrado
+    except Exception:  # registry unavailable or broken descriptor
         saidas = []
     return any(isinstance(s, Mapping) and s.get("name") == "bbox_string" for s in saidas)
 
 
 def _bbox_por_aresta(nid: str, definition: Mapping[str, Any]) -> bool:
-    """O nó recebe o bbox de OUTRO nó? O nó WFS lê `inputs["bbox_string"]`
-    quando o campo `bbox` está vazio (o caso ComputeBoundingBox → WFS), e aí a
-    execução também é um recorte: a extensão e a contagem não são as da camada.
+    """Does the node receive the bbox from ANOTHER node? The WFS node reads
+    `inputs["bbox_string"]` when the `bbox` field is empty (the ComputeBoundingBox → WFS
+    case), and then the execution is also a slice: the extent and the count are not the layer's.
 
-    A semântica da aresta é a do executor (flow/executor/edge_resolver.py): com
-    `from_key`/`to_key`, a porta de entrada é `to_key or from_key`; sem os
-    dois, entra tudo o que a origem produz."""
+    The edge semantics are the executor's (flow/executor/edge_resolver.py): with
+    `from_key`/`to_key`, the input port is `to_key or from_key`; without
+    both, everything the origin produces goes in."""
     nomes = {
         str(n.get("id")): str(n.get("name") or "")
         for n in definition.get("nodes") or [] if isinstance(n, Mapping)
@@ -944,7 +944,7 @@ def _bbox_por_aresta(nid: str, definition: Mapping[str, Any]) -> bool:
 async def aprender_de_execucao(
     db: AsyncSession, run: Any, stats: Mapping[str, Any], definition: Mapping[str, Any], *, first_close: bool
 ) -> int:
-    """Registra (ou atualiza) as fontes que os nós WFS desta execução leram com sucesso."""
+    """Registers (or updates) the sources that this execution's WFS nodes read successfully."""
     if not isinstance(definition, Mapping) or not isinstance(stats, Mapping):
         return 0
     quando = getattr(run, "end_time", None) or utc_now_naive()
@@ -957,9 +957,9 @@ async def aprender_de_execucao(
         if not isinstance(no_stats, Mapping) or no_stats.get("status") != "completed":
             continue
         props = _propriedades_do_no(no)
-        # Camada lida COM credencial é protegida: não entra no catálogo — a
-        # verificação diária a sondaria sem a chave e a marcaria como falhando,
-        # e o trecho pronto a ofereceria a quem não tem acesso.
+        # A layer read WITH a credential is protected: it does not go into the catalog — the
+        # daily verification would probe it without the key and mark it as failing,
+        # and the ready snippet would offer it to people without access.
         if _alguma_credencial(no):
             continue
         recortada = (
@@ -979,7 +979,7 @@ async def aprender_de_execucao(
     return aprendidas
 
 
-# ── Verificação ───────────────────────────────────────────────────────────────
+# ── Verification ──────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -993,11 +993,11 @@ class ResumoDaVerificacao:
 async def endpoints_para_verificar(
     db: AsyncSession, *, desatualizados_ha: int | None = None
 ) -> list[tuple[str, str]]:
-    """As URLs distintas do catálogo (com a versão do WFS de cada uma).
+    """The catalog's distinct URLs (with each one's WFS version).
 
-    `desatualizados_ha` (segundos): só as URLs com alguma camada nunca
-    verificada ou verificada há mais tempo que isso — o modo da verificação
-    inicial da subida, que não refaz o que a rodada anterior já fez.
+    `desatualizados_ha` (seconds): only URLs with some layer never
+    verified or verified longer ago than that — the mode of the initial
+    verification at startup, which does not redo what the previous round already did.
     """
     consulta = select(FonteDeDados.url, FonteDeDados.propriedades).where(
         FonteDeDados.deleted_at.is_(None), FonteDeDados.tipo == TIPO_WFS
@@ -1016,9 +1016,9 @@ async def endpoints_para_verificar(
 
 
 async def verificar_endpoint(db: AsyncSession, url: str, version: str = VERSAO_PADRAO) -> ResumoDaVerificacao:
-    """UM GetCapabilities marca todas as linhas daquela URL: `ok` (com crs/bbox
-    do capabilities) ou `falhando`. Endpoint fora do ar: todas `falhando`.
-    Commita no fim — é um lote."""
+    """ONE GetCapabilities marks every row for that URL: `ok` (with crs/bbox
+    from the capabilities) or `falhando`. Endpoint down: all `falhando`.
+    Commits at the end — it is a batch."""
     resumo = ResumoDaVerificacao(url=url)
     linhas = await db.execute(
         select(FonteDeDados).where(
@@ -1064,7 +1064,7 @@ async def verificar_endpoint(db: AsyncSession, url: str, version: str = VERSAO_P
     return resumo
 
 
-# ── Importação do Vault ───────────────────────────────────────────────────────
+# ── Vault import ──────────────────────────────────────────────────────────────
 
 
 @dataclass
@@ -1085,27 +1085,27 @@ class ResumoDaImportacao:
         )
 
 
-# Os campos de texto que o banco limita, e o que fazer quando o Vault traz algo
-# maior. A distinção não é de gosto:
+# The text fields the database limits, and what to do when the Vault brings something
+# larger. The distinction is not a matter of taste:
 #
-# - **exibição** (`instituicao`, `grupo`): cortar perde a cauda de um rótulo. A
-#   fonte continua funcionando e continua sendo achada pela busca.
-# - **funcional** (`type_name`, `url`): cortar cria uma fonte que aponta para
-#   uma camada que não existe — o `type_name` vai literalmente na consulta WFS,
-#   e a `chave` deriva dele. Um registro assim é PULADO, com erro no resumo.
+# - **display** (`instituicao`, `grupo`): cutting loses the tail of a label. The
+#   source keeps working and keeps being found by search.
+# - **functional** (`type_name`, `url`): cutting creates a source that points to
+#   a layer that does not exist — the `type_name` goes literally into the WFS query,
+#   and the `chave` derives from it. Such a record is SKIPPED, with an error in the summary.
 #
-# `titulo` não está aqui porque virou TEXT (scripts/init_schema.sql; a
-# migração histórica a3c81d7e2f46 fez a troca): ele é
-# escrito por gente e qualquer limite fixo volta a estourar no próximo catálogo.
+# `titulo` is not here because it became TEXT (scripts/init_schema.sql; the
+# historical migration a3c81d7e2f46 made the change): it is
+# written by people and any fixed limit would overflow again in the next catalog.
 _FUNCIONAIS = ("type_name", "url")
 
 
 def _limite(coluna: str) -> int | None:
-    """O limite da COLUNA, lido do modelo.
+    """The COLUMN's limit, read from the model.
 
-    Lido, e não copiado: uma constante repetida aqui divergiria no dia em que a
-    coluna mudasse, e a divergência apareceria como o mesmo estouro que esta
-    guarda existe para impedir.
+    Read, not copied: a constant repeated here would diverge the day the
+    column changed, and the divergence would show up as the same overflow this
+    guard exists to prevent.
     """
     return getattr(FonteDeDados.__table__.c[coluna].type, "length", None)
 
@@ -1117,7 +1117,7 @@ def _cortar(valor: str | None, limite: int | None) -> str | None:
 
 
 def _campo_funcional_longo(registro: fontes_vault.RegistroDoVault) -> str | None:
-    """A mensagem de erro quando um campo que NÃO pode ser cortado não cabe."""
+    """The error message when a field that can NOT be cut does not fit."""
     for coluna in _FUNCIONAIS:
         limite = _limite(coluna)
         valor = getattr(registro, coluna, None)
@@ -1131,13 +1131,13 @@ def _campo_funcional_longo(registro: fontes_vault.RegistroDoVault) -> str | None
 
 
 def _aplicar_registro(fonte: FonteDeDados, registro: fontes_vault.RegistroDoVault, agora: datetime) -> None:
-    """Os campos que o Vault dita numa linha `vault`. Preserva o que o catálogo
-    aprendeu por conta (estado, verificação, usos) e o que a UI de um dia editar
-    por cima do vazio."""
+    """The fields the Vault dictates on a `vault` row. Preserves what the catalog
+    learned on its own (state, verification, uses) and what a future UI edits
+    on top of blanks."""
     fonte.propriedades = {**(fonte.propriedades or {}), **registro.propriedades}
-    # Cortados no limite da COLUNA: são rótulos, e um rótulo sem a cauda ainda
-    # serve. Sem isto, um deles fora do limite derrubava o lote inteiro — e com
-    # ele todo o resto do catálogo.
+    # Cut at the COLUMN's limit: they are labels, and a label without its tail still
+    # works. Without this, one of them over the limit brought down the whole batch — and
+    # with it all the rest of the catalog.
     fonte.instituicao = _cortar(registro.instituicao, _limite("instituicao"))
     fonte.grupo = _cortar(registro.grupo, _limite("grupo"))
     fonte.titulo = registro.titulo
@@ -1152,9 +1152,9 @@ def _aplicar_registro(fonte: FonteDeDados, registro: fontes_vault.RegistroDoVaul
 
 
 async def importar_pasta(db: AsyncSession, caminho: str | Path, *, workspace_id: str | None = None) -> ResumoDaImportacao:
-    """Importa `<caminho>/<INSTITUIÇÃO>/` como fontes `vault` (da plataforma por
-    padrão). Idempotente por `chave` + `vault_hash`: reimportar a mesma pasta é
-    uma consulta e zero escritas. Commita por lote."""
+    """Imports `<caminho>/<INSTITUIÇÃO>/` as `vault` sources (platform-wide by
+    default). Idempotent by `chave` + `vault_hash`: reimporting the same folder is
+    one query and zero writes. Commits per batch."""
     resumo = ResumoDaImportacao()
     raiz = Path(caminho)
     if not raiz.is_dir():
@@ -1183,11 +1183,11 @@ async def importar_pasta(db: AsyncSession, caminho: str | Path, *, workspace_id:
         except FonteInvalidaError as exc:
             resumo.erros.append(f"{item.instituicao}/{item.type_name}: {exc.detail}")
             continue
-        # ANTES de qualquer conta com o registro: a `chave` deriva do
-        # `type_name`, e um valor que o banco vai recusar não pode chegar ao
-        # `db.add`. O commit é por LOTE, então uma linha que estoura leva junto
-        # as 499 vizinhas e aborta o resto da importação — foi assim que 75 % do
-        # catálogo sumiu em produção sem nada além de um ERROR no log.
+        # BEFORE any computation with the record: the `chave` derives from the
+        # `type_name`, and a value the database will refuse must not reach
+        # `db.add`. The commit is per BATCH, so a row that overflows takes along
+        # its 499 neighbors and aborts the rest of the import — that is how 75% of the
+        # catalog vanished in production with nothing but an ERROR in the log.
         longo = _campo_funcional_longo(item)
         if longo:
             resumo.erros.append(f"{item.instituicao}/{item.type_name}: {longo}")
@@ -1221,8 +1221,8 @@ async def importar_pasta(db: AsyncSession, caminho: str | Path, *, workspace_id:
             await db.commit()
             pendentes = 0
 
-    # O Vault é a fonte da verdade da origem `vault`: o que sumiu da pasta sai
-    # do catálogo (soft delete — a linha e o histórico ficam).
+    # The Vault is the source of truth for the `vault` origin: what vanished from the folder
+    # leaves the catalog (soft delete — the row and the history stay).
     sumidas = [id_ for chave, (id_, _) in existentes.items() if chave not in vistas]
     for id_ in sumidas:
         fonte = await db.get(FonteDeDados, id_)

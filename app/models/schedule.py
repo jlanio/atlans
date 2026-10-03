@@ -26,10 +26,10 @@ class Schedule(Base):
     job_id = Column(String, unique=True, nullable=False)
     active = Column(Boolean, default=True, nullable=False)
 
-    # PERF: lazy='raise' evita N+1 acidental — mesmo tratamento já aplicado em
-    # WorkflowRun.workflow. Com 'selectin', TODO `select(Schedule)` disparava um
-    # segundo SELECT sobre workflows trazendo a coluna `definition` (JSON
-    # completo) de cada workflow referenciado. O scheduler roda a cada 30s em 4
-    # workers e nunca lê este relacionamento — era tráfego puro.
-    # Endpoints que precisarem devem usar selectinload() explícito na query.
+    # PERF: lazy='raise' prevents accidental N+1 — the same treatment already
+    # applied to WorkflowRun.workflow. With 'selectin', EVERY `select(Schedule)`
+    # fired a second SELECT on workflows bringing the `definition` column
+    # (full JSON) of every referenced workflow. The scheduler runs every 30s
+    # on 4 workers and never reads this relationship — it was pure traffic.
+    # Endpoints that need it must use an explicit selectinload() in the query.
     workflow = relationship('Workflow', back_populates='schedules', lazy='raise')

@@ -1,7 +1,7 @@
 """
-Padronização de usabilidade + funcionalidade de SpatialJoin e SpatialFilter:
-- SpatialJoin ganha a relação 'dwithin' com campo 'distance' (gated por visibleWhen).
-- SpatialFilter usa entradas nomeadas layer/mask e ganha 'invert' (complemento).
+Usability + functionality standardization of SpatialJoin and SpatialFilter:
+- SpatialJoin gains the 'dwithin' relation with a 'distance' field (gated by visibleWhen).
+- SpatialFilter uses named inputs layer/mask and gains 'invert' (complement).
 """
 import pytest
 
@@ -24,13 +24,13 @@ def _pts(coords, crs="EPSG:3857"):
 
 @pytest.mark.asyncio
 async def test_sjoin_dwithin_marca_matches_e_mantem_todos_a():
-    # p0 a 5m de um ponto de B; p1 longe (100m).
+    # p0 5m from a point of B; p1 far away (100m).
     A = _pts([(0, 0), (100, 100)])
     B = _pts([(5, 0)])
     node = SpatialJoinNode("n", {"how": "left", "predicate": "dwithin", "distance": 10})
     out = (await node.execute({"layerA": A, "layerB": B}))["output"]
-    assert len(out) == 2                          # how=left mantém todos de A
-    assert out["index_right"].notna().sum() == 1  # só p0 casa a ≤10m
+    assert len(out) == 2                          # how=left keeps all of A
+    assert out["index_right"].notna().sum() == 1  # only p0 matches at ≤10m
 
 
 @pytest.mark.asyncio
@@ -51,11 +51,11 @@ async def test_sjoin_intersects_regressao():
     assert len(out) == 1
 
 
-# ── SpatialFilter: máscara + invert ───────────────────────────────────────────
+# ── SpatialFilter: mask + invert ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_filter_mask_mantem_intersectantes():
-    pts = _pts([(1, 1), (50, 50)])           # p0 dentro do polígono, p1 fora
+    pts = _pts([(1, 1), (50, 50)])           # p0 inside the polygon, p1 outside
     mask = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:3857")
     node = SpatialFilterNode("n", {"filter_mode": "mask", "predicate": "intersects", "invert": False})
     out = (await node.execute({"layer": pts, "mask": mask}))["output"]
@@ -84,4 +84,4 @@ async def test_filter_bbox_invert():
     pts = _pts([(1, 1), (50, 50)])
     node = SpatialFilterNode("n", {"filter_mode": "bbox", "bbox": "0,0,10,10", "invert": True})
     out = (await node.execute({"layer": pts}))["output"]
-    assert set(out["id"]) == {1}  # inverte: mantém quem está FORA da bbox
+    assert set(out["id"]) == {1}  # inverts: keeps what is OUTSIDE the bbox

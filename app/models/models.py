@@ -1,7 +1,7 @@
 # app/models/models.py
 """
-Re-exporta modelos para retrocompatibilidade.
-Novos imports devem usar os modulos individuais:
+Re-exports models for backward compatibility.
+New imports should use the individual modules:
   from app.models.workflow import Workflow
   from app.models.workflow_run import WorkflowRun
   from app.models.schedule import Schedule

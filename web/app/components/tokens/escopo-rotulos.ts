@@ -1,12 +1,12 @@
 import type { ApiTokenScope, ApiTokenStatus } from "@/service/types"
 
 /**
- * Rótulos dos escopos e dos status de um token de acesso.
+ * Labels for the scopes and statuses of an access token.
  *
- * `ESCOPOS` é a ordem canônica — a grade do diálogo e os chips da lista a
- * seguem, para o mesmo conjunto de escopos ler igual em qualquer token. O
- * rótulo curto vai no chip e no cartão; a descrição, só na grade de escolha.
- * O valor cru nunca aparece na tela (contrato §7).
+ * `ESCOPOS` is the canonical order — the dialog grid and the list chips follow
+ * it, so the same set of scopes reads the same on any token. The short label
+ * goes on the chip and the card; the description, only in the selection grid.
+ * The raw value never appears on screen (contract §7).
  */
 
 export const ESCOPOS = [
@@ -36,14 +36,14 @@ export const ESCOPO_DESCRICOES: Record<ApiTokenScope, string> = {
   "drive:write":     "Enviar e substituir arquivos no Drive.",
 }
 
-/** Atalho «Somente leitura» do diálogo: o menor conjunto útil para um agente. */
+/** The dialog's "Somente leitura" (read-only) shortcut: the smallest useful set for an agent. */
 export const ESCOPOS_SOMENTE_LEITURA: readonly ApiTokenScope[] = ["workflows:read", "drive:read"]
 
 export function rotuloDeEscopo(escopo: ApiTokenScope | string): string {
   return ESCOPO_ROTULOS[escopo as ApiTokenScope] ?? escopo
 }
 
-/** Devolve os escopos na ordem canônica, ignorando o que não se conhece. */
+/** Returns the scopes in canonical order, ignoring what isn't known. */
 export function ordenarEscopos(escopos: readonly string[]): ApiTokenScope[] {
   return ESCOPOS.filter(e => escopos.includes(e))
 }

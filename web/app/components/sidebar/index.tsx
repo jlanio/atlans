@@ -6,16 +6,16 @@ import { CamadasDasExtensoes } from "./camadas-das-extensoes"
 
 interface SidebarRootProps {
   children: ReactNode
-  // Casca lateral. Por padrão o ShellSidebar escolhe pela rota (Home × app);
-  // o layout pode injetar uma explícita. Seam explícito — em vez de tornar o
-  // AppSidebar polimórfico, a Home tem um HomeSidebar irmão.
+  // Side shell. By default ShellSidebar picks by route (Home × app); the
+  // layout can inject an explicit one. Explicit seam — instead of making
+  // AppSidebar polymorphic, the Home has a sibling HomeSidebar.
   sidebar?: ReactNode
-  // Estado inicial recolhido/expandido, lido do cookie `sidebar_state` pelo
-  // layout no servidor. O cookie era GRAVADO (ui/sidebar.tsx) mas nunca lido —
-  // recolher a barra não sobrevivia ao F5. Passar `defaultOpen` conserta isso.
+  // Initial collapsed/expanded state, read from the `sidebar_state` cookie by
+  // the layout on the server. The cookie was WRITTEN (ui/sidebar.tsx) but never
+  // read — collapsing the bar didn't survive F5. Passing `defaultOpen` fixes that.
   defaultOpen?: boolean
-  // Largura escolhida no separador da borda, em px, lida do cookie
-  // `sidebar_width` pelo layout — mesmo molde do `defaultOpen`.
+  // Width chosen on the edge separator, in px, read from the `sidebar_width`
+  // cookie by the layout — same template as `defaultOpen`.
   defaultWidth?: number
 }
 
@@ -25,18 +25,18 @@ const SidebarRoot = ({ children, sidebar, defaultOpen = true, defaultWidth }: Si
     <SidebarProvider defaultOpen={defaultOpen} defaultWidth={defaultWidth}>
       {sidebar ?? <ShellSidebar />}
       <main className="flex-1 overflow-auto bg-card flex flex-col">
-        {/* AppHeader devolve null na Home e no canvas (full-bleed). */}
+        {/* AppHeader returns null on the Home and on the canvas (full-bleed). */}
         <AppHeader />
         <div className="flex-1">
           {children}
         </div>
       </main>
-      {/* Fora do `Sidebar`, e é o ponto todo: no telefone ele vive num `Sheet`
-          do Radix, DESMONTADO enquanto fechado. Um modal de extensão lá dentro,
-          aberto de fora do sidebar (do aviso de cota, por exemplo), mexeria
-          numa store sem ninguém inscrito — e não aconteceria nada. Aqui as
-          camadas são montadas uma vez, nas duas cascas, e a paleta do portal
-          vem de quem abriu. */}
+      {/* Outside the `Sidebar`, and that's the whole point: on the phone it lives
+          in a Radix `Sheet`, UNMOUNTED while closed. An extension modal in there,
+          opened from outside the sidebar (from the quota warning, for example),
+          would touch a store with nobody subscribed — and nothing would happen.
+          Here the layers are mounted once, in both shells, and the portal
+          palette comes from whoever opened it. */}
       <CamadasDasExtensoes />
     </SidebarProvider>
   )

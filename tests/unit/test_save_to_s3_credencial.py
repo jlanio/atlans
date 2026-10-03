@@ -1,10 +1,10 @@
 # tests/unit/test_save_to_s3_credencial.py
-"""SaveToS3 usa a credencial `s3` do cofre; o segredo não fica mais na definition.
+"""SaveToS3 uses the vault's `s3` credential; the secret no longer lives in the definition.
 
-Antes o tipo `s3` existia no cofre (com teste de conexão) e nenhum nó o usava:
-o SaveToS3 pedia `awsSecretAccessKey` digitada no nó, gravada em texto puro. E
-como as listas de segredo comparam o NOME exato, o campo escapava do lint, da
-redação da leitura e da máscara do log.
+Before, the `s3` type existed in the vault (with a connection test) and no node
+used it: SaveToS3 asked for an `awsSecretAccessKey` typed into the node, stored in
+plain text. And since the secret lists compare the exact NAME, the field escaped
+the lint, the read redaction and the log mask.
 """
 from unittest.mock import MagicMock, patch
 
@@ -12,7 +12,7 @@ import geopandas as gpd
 import pytest
 from shapely.geometry import Point
 
-import flow.nodes.outputs.save_to_s3  # noqa: F401 — registra o nó
+import flow.nodes.outputs.save_to_s3  # noqa: F401 — registers the node
 from app.core.utils.redacao import definition_contem_segredo, redigir_definition
 from app.services.credential_resolver import (
     inject_credentials,
@@ -38,7 +38,7 @@ def _definicao(**props):
                        "properties": {"key": "saida/a.geojson", "credential_id": CID, **props}}]}
 
 
-# ── Resolução ────────────────────────────────────────────────────────────────
+# ── Resolution ───────────────────────────────────────────────────────────────
 
 
 @pytest.mark.asyncio
@@ -66,7 +66,7 @@ def test_propriedade_e_forma_da_credencial_s3():
     assert s3_auth_da_credencial({"type": "postgresql", "connectionString": "x"}) is None
 
 
-# ── Execução ─────────────────────────────────────────────────────────────────
+# ── Execution ────────────────────────────────────────────────────────────────
 
 
 def _gdf():
@@ -74,7 +74,7 @@ def _gdf():
 
 
 def _boto3():
-    """`boto3.session.Session` dublado; devolve (patch, `client` da sessão)."""
+    """`boto3.session.Session` doubled; returns (patch, the session's `client`)."""
     sessao = MagicMock()
     return patch("boto3.session.Session", sessao), sessao.return_value.client
 
@@ -128,8 +128,8 @@ async def test_endpoint_interno_e_recusado_como_no_teste_da_credencial():
 
 @pytest.mark.asyncio
 async def test_fluxo_antigo_com_as_chaves_no_no_segue_com_a_mesma_identidade():
-    """Sem credencial S3, os campos antigos continuam lidos: trocar em silêncio
-    para a cadeia padrão do executor mudaria QUEM escreve no bucket."""
+    """Without an S3 credential, the old fields are still read: silently switching
+    to the executor's default chain would change WHO writes to the bucket."""
     fabrica, _, _ = await _executar(
         bucketName="b", awsAccessKeyId="AKIAANTIGA", awsSecretAccessKey="segredo-antigo",  # pragma: allowlist secret
     )
@@ -153,7 +153,7 @@ async def test_sem_bucket_no_no_nem_na_credencial_recusa():
             await no.execute({"in": _gdf()})
 
 
-# ── O campo antigo é segredo em todas as listas ─────────────────────────────
+# ── The old field is a secret in every list ─────────────────────────────────
 
 
 def test_chave_secreta_digitada_no_no_e_recusada_ao_gravar():
@@ -180,7 +180,7 @@ def test_log_da_fabrica_mascara_a_chave_secreta_e_o_s3_auth():
     assert mascarado == {"awsSecretAccessKey": "***", "s3_auth": "***", "key": "k"}
 
 
-# ── Validação: severidade conforme o uso da credencial ──────────────────────
+# ── Validation: severity according to the credential's use ─────────────────
 
 
 def _conferir(tipo: str):
@@ -218,7 +218,7 @@ def _conferir_com(tipo: str, register_artifact):
 
 @pytest.mark.parametrize("ligado", [True, "true"])
 def test_credencial_s3_com_copia_registrada_avisa_que_a_copia_fica_sem_protecao(ligado):
-    """O mesmo campo serve às duas coisas: escolher a S3 tira o Webhook Token da cópia."""
+    """The same field serves both things: choosing the S3 one removes the Webhook Token from the copy."""
     rel = _conferir_com("s3", ligado)
     assert [d.code for d in rel.warnings] == ["artifact_copy_unprotected"]
     assert not rel.errors
@@ -229,13 +229,13 @@ def test_sem_copia_registrada_ou_com_token_nao_ha_aviso():
     assert not _conferir_com("webhook_token", True).warnings
 
 
-# ── Credencial que não resolveu ──────────────────────────────────────────────
+# ── Credential that did not resolve ──────────────────────────────────────────
 
 
 @pytest.mark.asyncio
 async def test_credencial_s3_nao_resolvida_sem_copia_recusa_em_vez_de_trocar_de_identidade():
-    """Sem `s3_auth` e com o id no lugar, o upload saía com a cadeia padrão do
-    executor — outra identidade, em silêncio. Agora recusa, como o HttpRequest."""
+    """Without `s3_auth` and with the id in place, the upload went out with the
+    executor's default chain — another identity, silently. Now it refuses, like HttpRequest."""
     dublê, fabrica = _boto3()
     with dublê:
         no = SaveToS3Node(node_id="n1", parameters={"key": "a.geojson", "bucketName": "b", "credential_id": CID})
@@ -246,8 +246,8 @@ async def test_credencial_s3_nao_resolvida_sem_copia_recusa_em_vez_de_trocar_de_
 
 @pytest.mark.asyncio
 async def test_token_antigo_sem_copia_registrada_sai_na_resolucao_e_o_fluxo_segue():
-    """Um Webhook Token que sobrou no nó com a cópia desligada não protege nada:
-    o servidor o tira, e o nó não confunde isso com credencial S3 não resolvida."""
+    """A Webhook Token left over in the node with the copy turned off protects nothing:
+    the server removes it, and the node does not confuse that with an unresolved S3 credential."""
     saida = await inject_credentials(
         _definicao(registerArtifact=False), pre_resolved={CID: {"type": "webhook_token", "token": "T"}},
     )

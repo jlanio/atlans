@@ -1,33 +1,33 @@
 # app/core/utils/allowlist.py
-"""Casamento de hostname contra allowlist de workspace.
+"""Matching a hostname against a workspace allowlist.
 
-Extraído de `run_result_consumer` para poder ser usado também pelo relatório de
-impacto do move de workflow, que precisa avisar quando a `notification_url` do
-workflow deixará de ser aceita no workspace de destino. Importar o consumer só
-para esta função puxaria Redis, storage e o registro de artefatos junto.
+Extracted from `run_result_consumer` so it can also be used by the workflow
+move impact report, which needs to warn when the workflow's `notification_url`
+will no longer be accepted in the destination workspace. Importing the consumer
+just for this function would pull in Redis, storage and artifact registration too.
 """
 import re
 
-# Um rótulo de hostname: letras ou dígitos (de qualquer alfabeto), com hífen só
-# no meio. Um domínio tem ao menos dois rótulos. O que não casa com isto
-# (vírgula, espaço, ponto-e-vírgula, ponto no começo, dois pontos seguidos)
-# nunca casaria com hostname nenhum no disparo — e, numa lista aplicada,
-# bloquearia todo webhook sem explicar.
+# A hostname label: letters or digits (of any alphabet), with a hyphen only
+# in the middle. A domain has at least two labels. Whatever does not match this
+# (comma, space, semicolon, leading dot, two dots in a row) would never match
+# any hostname at firing time — and, in an applied list, would block every
+# webhook without explanation.
 _ROTULO = r"(?:[^\W_](?:[^\W_]|-){0,61}[^\W_]|[^\W_])"
 _HOSTNAME = re.compile(rf"(?:\*\.)?{_ROTULO}(?:\.{_ROTULO})+")
-# Uma linha colada com vários domínios: "a.com, b.com" são dois.
+# A pasted line with several domains: "a.com, b.com" is two.
 _SEPARADORES = re.compile(r"[,;\s]+")
 
 
 def hostname_matches_allowlist(hostname: str, allowlist: list[str]) -> bool:
-    """Verifica se hostname casa com algum padrao na allowlist.
+    """Check whether the hostname matches some pattern in the allowlist.
 
-    Padroes aceitos:
-      - "exemplo.com"   -> match exato
-      - "*.exemplo.com" -> qualquer subdominio (a.exemplo.com, foo.bar.exemplo.com)
-                            mas NAO o dominio nu (exemplo.com).
+    Accepted patterns:
+      - "example.com"   -> exact match
+      - "*.example.com" -> any subdomain (a.example.com, foo.bar.example.com)
+                            but NOT the bare domain (example.com).
 
-    Comparacao case-insensitive.
+    Case-insensitive comparison.
     """
     hostname = (hostname or "").lower().strip()
     if not hostname:
@@ -37,7 +37,7 @@ def hostname_matches_allowlist(hostname: str, allowlist: list[str]) -> bool:
         if not pattern:
             continue
         if pattern.startswith("*."):
-            suffix = pattern[1:]  # ".exemplo.com"
+            suffix = pattern[1:]  # ".example.com"
             if hostname.endswith(suffix) and hostname != suffix[1:]:
                 return True
         elif hostname == pattern:
@@ -46,12 +46,12 @@ def hostname_matches_allowlist(hostname: str, allowlist: list[str]) -> bool:
 
 
 def normalizar_dominio(entrada: str) -> str:
-    """O HOST de uma entrada de allowlist, como `hostname_matches_allowlist` o
-    compara: `https://Hooks.Slack.com/services/x` → `hooks.slack.com`.
+    """The HOST of an allowlist entry, as `hostname_matches_allowlist` compares
+    it: `https://Hooks.Slack.com/services/x` → `hooks.slack.com`.
 
-    A whitelist global de webhooks aceitava o texto com caminho e porta — que
-    nunca casaria com um hostname. Serve à gravação e à leitura (o que já está
-    gravado passa pela mesma regra).
+    The global webhook whitelist accepted text with a path and port — which
+    would never match a hostname. Serves both writing and reading (what is
+    already stored goes through the same rule).
     """
     d = (entrada or "").strip().lower()
     for prefixo in ("https://", "http://"):
@@ -65,13 +65,14 @@ def normalizar_dominio(entrada: str) -> str:
 
 
 def validar_allowlist(raw: list[str]) -> list[str]:
-    """Normaliza e valida padrões de hostname; `ValueError` no que o matcher
-    ignoraria.
+    """Normalize and validate hostname patterns; `ValueError` for what the matcher
+    would ignore.
 
-    Sem validação, `https://exemplo.com/hook` entraria na lista, nunca casaria
-    com hostname nenhum (o matcher compara só o host) e o usuário ficaria com
-    todos os webhooks bloqueados sem entender por quê. `*` sozinho, idem: não é
-    curinga para o matcher, e uma lista só com ele bloquearia tudo.
+    Without validation, `https://example.com/hook` would go into the list, would
+    never match any hostname (the matcher compares only the host) and the user
+    would have every webhook blocked without understanding why. A lone `*`,
+    likewise: it is not a wildcard for the matcher, and a list with only it
+    would block everything.
     """
     normalized: list[str] = []
     for entry in raw or []:
@@ -84,8 +85,8 @@ def validar_allowlist(raw: list[str]) -> list[str]:
                 f"'{entry}' não é um hostname. Informe apenas o host, sem "
                 "protocolo, porta ou caminho (ex.: exemplo.com)."
             )
-        # `*` sozinho e `*exemplo.com` sem o ponto nao sao curinga para o matcher:
-        # ele so trata prefixo "*.". Aceitos em silencio, nunca casariam com nada.
+        # A lone `*` and `*example.com` without the dot are not wildcards for the matcher:
+        # it only handles the "*." prefix. Accepted silently, they would never match anything.
         if "*" in pattern and not pattern.startswith("*."):
             raise ValueError(
                 f"'{entry}' é inválido. O curinga só vale no formato "
@@ -111,13 +112,13 @@ def validar_allowlist(raw: list[str]) -> list[str]:
 
 
 def padroes_validos(raw: list[str]) -> list[str]:
-    """Os padrões de `raw` que o matcher consegue casar, cada um normalizado
-    para o host — os demais descartados em silêncio.
+    """The patterns in `raw` that the matcher can match, each one normalized
+    to the host — the others silently dropped.
 
-    Para ler o que JÁ está gravado: a whitelist global aceitava `*`, URL com
-    caminho e `localhost` antes de ser aplicada. Nenhum deles casava com host
-    nenhum; aplicados como vieram, um `*` gravado para "liberar tudo"
-    bloquearia todos os webhooks.
+    For reading what is ALREADY stored: the global whitelist accepted `*`, URLs
+    with a path and `localhost` before it was enforced. None of them matched
+    any host; applied as they came, a `*` saved to "allow everything" would
+    block every webhook.
     """
     validos: list[str] = []
     for entrada in separar_dominios(raw):
@@ -129,7 +130,7 @@ def padroes_validos(raw: list[str]) -> list[str]:
 
 
 def separar_dominios(entradas) -> list[str]:
-    """Cada item, dividido onde uma linha colada junta vários domínios:
+    """Each item, split where a pasted line joins several domains:
     `["a.com, b.com"]` → `["a.com", "b.com"]`."""
     partes: list[str] = []
     for entrada in entradas or []:

@@ -1,38 +1,38 @@
 # app/mcp/guardas.py
 """
-A tabela tool → guarda: fonte única de quem pode chamar o quê.
+The tool → guard table: the single source of who may call what.
 
-Cada tool tem exatamente uma linha aqui, e essa linha é lida por três
-consumidores: `list_tools` (esconde do catálogo o que o token não alcança),
-`call_tool` (recusa a chamada com `forbidden_scope` e aplica a cota) e a
-documentação. Mantê-los lendo a MESMA estrutura é o que impede o caso clássico
-— a tool some da lista mas continua chamável, ou o doc promete um escopo e o
-código exige outro.
+Each tool has exactly one row here, and that row is read by three consumers:
+`list_tools` (hides from the catalog what the token does not reach),
+`call_tool` (refuses the call with `forbidden_scope` and applies the quota) and
+the documentation. Keeping them reading the SAME structure is what prevents the
+classic case — the tool disappears from the list but remains callable, or the
+doc promises one scope and the code requires another.
 
-Campos:
-- `escopo`: o escopo do PAT exigido (None = nenhum; não existe tool sem escopo
-  hoje, mas o campo é opcional para o caso de uma tool puramente informativa);
-- `papel`: papel MÍNIMO no workspace. A guarda não o aplica — quem conhece o
-  workspace da chamada é a tool, que chama `exigir_papel`. O campo fica aqui
-  para a documentação e para os testes de paridade.
-  Uma exceção, e ela é deliberada: `cancel_run` não chama `exigir_papel`,
-  porque a conferência mora dentro de `workflow_execution_service.cancel_run`,
-  junto do SELECT que carrega a execução. Foi para lá que ela foi movida de
-  propósito — antes vivia só na rota REST, e qualquer outro chamador (uma tool
-  daqui, um script, um job) cancelava execução de qualquer conta. Repetí-la na
-  tool custaria uma consulta a mais e reabriria a chance de as duas cópias
-  divergirem. Quem garante que ela continua lá é
-  `test_cancelar_com_papel_de_viewer_e_recusado_pelo_servico_de_verdade`, o
-  único teste de cancelamento que não dubla o serviço;
-- `cota`: balde extra de rate limit ("validate", "run"); None = só o geral;
-- `read_only` / `idempotente`: viram `readOnlyHint`/`idempotentHint` nas
-  anotações da tool. `destructive_hint` é sempre False: o MCP do Atlans não
-  apaga nada;
-- `open_world`: vira `openWorldHint`. False para tudo, menos as duas tools do
-  catálogo de fontes que SONDAM um WFS (`probe_source`, `register_source`) —
-  elas falam com a internet aberta, pelo servidor, com guarda de SSRF, teto de
-  bytes e o balde `probe`. Mentir `False` ali desinformaria o cliente que
-  decide pelo hint.
+Fields:
+- `escopo`: the required PAT scope (None = none; no tool without a scope exists
+  today, but the field is optional for the case of a purely informational tool);
+- `papel`: MINIMUM role in the workspace. The guard does not enforce it — what
+  knows the call's workspace is the tool, which calls `exigir_papel`. The field
+  stays here for the documentation and for the parity tests.
+  One exception, and it is deliberate: `cancel_run` does not call
+  `exigir_papel`, because the check lives inside
+  `workflow_execution_service.cancel_run`, next to the SELECT that loads the
+  run. It was moved there on purpose — before, it lived only in the REST route,
+  and any other caller (a tool here, a script, a job) could cancel any
+  account's run. Repeating it in the tool would cost one more query and reopen
+  the chance of the two copies diverging. What guarantees it stays there is
+  `test_cancelar_com_papel_de_viewer_e_recusado_pelo_servico_de_verdade`, the
+  only cancellation test that does not stub the service;
+- `cota`: extra rate limit bucket ("validate", "run"); None = only the general one;
+- `read_only` / `idempotente`: become `readOnlyHint`/`idempotentHint` in the
+  tool's annotations. `destructive_hint` is always False: the Atlans MCP
+  deletes nothing;
+- `open_world`: becomes `openWorldHint`. False for everything except the two
+  source catalog tools that PROBE a WFS (`probe_source`, `register_source`) —
+  they talk to the open internet, through the server, with an SSRF guard, a
+  byte ceiling and the `probe` bucket. Lying `False` there would misinform a
+  client that decides by the hint.
 """
 from __future__ import annotations
 
@@ -46,25 +46,25 @@ class Guarda:
     cota: str | None
     read_only: bool
     idempotente: bool
-    # Default no fim: as linhas existentes seguem intactas.
+    # Default at the end: the existing rows remain intact.
     open_world: bool = False
 
 
-# As 42 tools, em oito blocos: leitura do catálogo (11), construção (5),
-# execução (7, das quais três escrevem — `run_workflow`, `cancel_run` e
-# `retry_run`), acervo (5, das quais duas escrevem — `restore_workflow_version`
-# e `duplicate_workflow`), pins (3, das quais duas escrevem), gatilhos (4, das
-# quais três escrevem), escrita no Drive (3, todas de escrita) e fontes (4, das
-# quais uma escreve — `register_source`). Acrescentar
-# aqui sem registrar a tool (ou o contrário) quebra o teste de paridade, que é
-# justamente o ponto.
+# The 42 tools, in eight blocks: catalog reading (11), building (5),
+# execution (7, of which three write — `run_workflow`, `cancel_run` and
+# `retry_run`), collection (5, of which two write — `restore_workflow_version`
+# and `duplicate_workflow`), pins (3, of which two write), triggers (4, of
+# which three write), Drive writing (3, all writes) and sources (4, of
+# which one writes — `register_source`). Adding
+# here without registering the tool (or the other way around) breaks the parity
+# test, which is exactly the point.
 #
-# A leitura de execuções (`get_run`, `list_runs`, `get_run_artifacts`) pede
-# `workflows:read` + membro, e não `runs:execute`: é a mesma exigência da REST,
-# onde `/observability` só pede ser membro do workspace do run.
-# Cobrar `runs:execute` para LER obrigaria a dar permissão de disparar a quem só
-# acompanha — e um escopo mais largo do que o necessário é o oposto do que a
-# tabela existe para garantir.
+# Reading runs (`get_run`, `list_runs`, `get_run_artifacts`) requires
+# `workflows:read` + member, and not `runs:execute`: it is the same requirement
+# as REST, where `/observability` only requires being a member of the run's workspace.
+# Requiring `runs:execute` to READ would force granting permission to fire to
+# those who only follow along — and a scope wider than necessary is the opposite
+# of what the table exists to guarantee.
 GUARDAS: dict[str, Guarda] = {
     "list_workspaces":        Guarda("workflows:read",  None,       None,       True,  True),
     "list_workflows":         Guarda("workflows:read",  "viewer",   None,       True,  True),
@@ -74,109 +74,111 @@ GUARDAS: dict[str, Guarda] = {
     "describe_node":          Guarda("workflows:read",  None,       None,       True,  True),
     "list_credentials":       Guarda("workflows:read",  "viewer",   None,       True,  True),
     "list_drive_files":       Guarda("drive:read",      "viewer",   None,       True,  True),
-    # Não idempotente: cada chamada assina uma URL nova, com validade própria.
+    # Not idempotent: each call signs a new URL, with its own validity.
     "get_drive_download_url": Guarda("drive:read",      "viewer",   None,       True,  False),
     "get_portal_info":        Guarda("workflows:read",  "viewer",   None,       True,  True),
     "get_authoring_guide":    Guarda("workflows:read",  None,       None,       True,  True),
-    # Construção. `validate_workflow` não grava nada, mas simula o fluxo (lê
-    # credenciais, monta o payload do executor) — por isso não é read_only e
-    # paga o balde `validate`, que é o que impede varrer a plataforma a golpe
-    # de validação. Criar e atualizar não são idempotentes: repetir a chamada
-    # cria outro workflow ou outra versão.
+    # Building. `validate_workflow` stores nothing, but it simulates the workflow
+    # (reads credentials, builds the executor payload) — that is why it is not
+    # read_only and pays the `validate` bucket, which is what prevents sweeping
+    # the platform by brute-force validation. Create and update are not
+    # idempotent: repeating the call creates another workflow or another version.
     "validate_workflow":      Guarda("workflows:write", "editor",   "validate", False, True),
     "create_workflow":        Guarda("workflows:write", "editor",   "validate", False, False),
     "update_workflow":        Guarda("workflows:write", "editor",   "validate", False, False),
     "set_workflow_active":    Guarda("workflows:write", "editor",   None,       False, True),
     "set_portal_access":      Guarda("workflows:write", "editor",   None,       False, True),
-    # Execução. O balde `run` soma-se ao geral, e a espera (`wait`) ainda passa
-    # pelo teto de esperas simultâneas — despachar é a chamada mais cara que o
-    # servidor oferece.
+    # Execution. The `run` bucket adds to the general one, and the wait (`wait`)
+    # also goes through the simultaneous wait ceiling — dispatching is the most
+    # expensive call the server offers.
     "run_workflow":           Guarda("runs:execute",    "operator", "run",      False, False),
     "get_run":                Guarda("workflows:read",  "viewer",   None,       True,  True),
     "list_runs":              Guarda("workflows:read",  "viewer",   None,       True,  True),
-    # Não idempotente: as URLs dos artefatos são assinadas na hora, com prazo.
+    # Not idempotent: the artifact URLs are signed on the spot, with an expiry.
     "get_run_artifacts":      Guarda("workflows:read",  "viewer",   None,       True,  False),
-    # Fase 2 — execuções. Ler o log é leitura, como o resto da observabilidade.
-    # Cancelar e reexecutar mexem no que está rodando: pedem `runs:execute` e
-    # `operator`, o mesmo par que disparar.
+    # Phase 2 — runs. Reading the log is a read, like the rest of observability.
+    # Canceling and re-running touch what is running: they require `runs:execute`
+    # and `operator`, the same pair as firing.
     "get_run_events":         Guarda("workflows:read",  "viewer",   None,       True,  True),
-    # Idempotente pelo EFEITO, não pela resposta: pedir a interrupção duas vezes
-    # ao mesmo executor não interrompe duas vezes. A resposta pode variar — uma
-    # execução já entregue é fechada pelo executor de volta, então as duas
-    # chamadas costumam responder `requested`, e nenhuma delas é o fim. read_only
-    # é False porque a chamada interrompe trabalho real.
+    # Idempotent by EFFECT, not by response: asking the same executor for the
+    # interruption twice does not interrupt twice. The response may vary — a run
+    # already delivered is closed back by the executor, so both calls usually
+    # answer `requested`, and neither of them is the end. read_only is False
+    # because the call interrupts real work.
     "cancel_run":             Guarda("runs:execute",    "operator", None,       False, True),
-    # Não idempotente, e é o ponto: cada chamada DISPARA outra execução. Paga o
-    # balde `run` pelo mesmo motivo que `run_workflow` — é despacho.
+    # Not idempotent, and that is the point: each call FIRES another run. Pays the
+    # `run` bucket for the same reason as `run_workflow` — it is a dispatch.
     "retry_run":              Guarda("runs:execute",    "operator", "run",      False, False),
-    # Fase 2 — acervo. Ler o histórico e o que as execuções produziram é leitura,
-    # como o resto; restaurar e duplicar escrevem, e pedem `editor`.
+    # Phase 2 — collection. Reading the history and what the runs produced is a
+    # read, like the rest; restoring and duplicating write, and require `editor`.
     "list_workflow_versions": Guarda("workflows:read",  "viewer",   None,       True,  True),
     "get_workflow_version":   Guarda("workflows:read",  "viewer",   None,       True,  True),
-    # Não idempotente, e o motivo é o auto-snapshot: cada chamada grava uma
-    # versão nova antes de trocar. Restaurar duas vezes seguidas leva ao mesmo
-    # estado, mas deixa dois snapshots no histórico — o efeito no banco difere.
+    # Not idempotent, and the reason is the auto-snapshot: each call stores a new
+    # version before swapping. Restoring twice in a row leads to the same state,
+    # but leaves two snapshots in the history — the effect on the database differs.
     "restore_workflow_version": Guarda("workflows:write", "editor", None,       False, False),
-    # Não idempotente pelo mesmo motivo que `create_workflow`: cada chamada
-    # produz um fluxo novo, com id novo.
+    # Not idempotent for the same reason as `create_workflow`: each call
+    # produces a new workflow, with a new id.
     "duplicate_workflow":     Guarda("workflows:write", "editor",   None,       False, False),
-    # Não idempotente: as URLs de download são assinadas na hora, com prazo —
-    # mesma razão de `get_run_artifacts`.
+    # Not idempotent: the download URLs are signed on the spot, with an expiry —
+    # same reason as `get_run_artifacts`.
     "list_artifacts":         Guarda("workflows:read",  "viewer",   None,       True,  False),
 
     # ── Pins ────────────────────────────────────────────────────────────────
-    # As duas de escrita SÃO idempotentes, ao contrário das outras escritas do
-    # servidor: fixar um nó já fixado reescreve a mesma entrada, e desfixar um
-    # nó já desfixado não faz nada. Nenhuma das duas acumula estado a cada
-    # chamada — é o que separa estas de `restore_workflow_version`, que deixa
-    # um snapshot novo no histórico toda vez.
+    # The two write tools ARE idempotent, unlike the server's other writes:
+    # pinning an already pinned node rewrites the same entry, and unpinning an
+    # already unpinned node does nothing. Neither accumulates state on each
+    # call — that is what sets these apart from `restore_workflow_version`,
+    # which leaves a new snapshot in the history every time.
     #
-    # `pin_node_output` reescreve `pinned_at`/`expires_at` a cada chamada, mas
-    # isso é o VALOR do mesmo campo e não uma linha nova: repetir a chamada
-    # continua levando ao mesmo estado, que é o que a dica promete a quem
-    # decide se pode repetir com segurança.
+    # `pin_node_output` rewrites `pinned_at`/`expires_at` on each call, but
+    # that is the VALUE of the same field and not a new row: repeating the call
+    # still leads to the same state, which is what the hint promises to whoever
+    # decides whether it is safe to repeat.
     "list_pins":              Guarda("workflows:read",  "viewer",   None,       True,  True),
     "pin_node_output":        Guarda("workflows:write", "editor",   None,       False, True),
     "unpin_node_output":      Guarda("workflows:write", "editor",   None,       False, True),
 
-    # ── Gatilhos ────────────────────────────────────────────────────────────
-    # As três de escrita pedem `operator`, e não `editor`: AGENDAR É EXECUTAR.
-    # Um schedule de um minuto dispara o fluxo com as credenciais do dono,
-    # indefinidamente — é a mesma régua de `run_workflow`, e a mesma que a rota
-    # REST aplica (`workflow_com_papel(ROLE_OPERATOR)` no `schedules_router`).
+    # ── Triggers ────────────────────────────────────────────────────────────
+    # The three write tools require `operator`, not `editor`: SCHEDULING IS
+    # EXECUTING. A one-minute schedule fires the workflow with the owner's
+    # credentials, indefinitely — it is the same yardstick as `run_workflow`, and
+    # the same one the REST route applies (`workflow_com_papel(ROLE_OPERATOR)` in
+    # `schedules_router`).
     #
-    # `create_schedule` não é idempotente: cada chamada cria um `job_id` novo, e
-    # repetir depois de um erro de rede deixaria DOIS agendamentos disparando o
-    # mesmo fluxo. As outras duas endereçam um `job_id` que já existe, então
-    # repetir leva ao mesmo estado.
+    # `create_schedule` is not idempotent: each call creates a new `job_id`, and
+    # repeating after a network error would leave TWO schedules firing the
+    # same workflow. The other two address a `job_id` that already exists, so
+    # repeating leads to the same state.
     "list_schedules":         Guarda("workflows:read",  "viewer",   None,       True,  True),
     "create_schedule":        Guarda("triggers:manage", "operator", None,       False, False),
     "update_schedule":        Guarda("triggers:manage", "operator", None,       False, True),
     "delete_schedule":        Guarda("triggers:manage", "operator", None,       False, True),
 
-    # ── Escrita no Drive ────────────────────────────────────────────────────
-    # `editor`, e não `operator`: pôr e tirar arquivo é mexer no acervo do
-    # workspace, não disparar execução. Mesma régua que a rota REST aplica
-    # (`exigir_papel_no_workspace(..., ROLE_EDITOR)` no `drive_router`).
+    # ── Drive writing ───────────────────────────────────────────────────────
+    # `editor`, not `operator`: adding and removing files is changing the
+    # workspace's collection, not firing a run. Same yardstick the REST route
+    # applies (`exigir_papel_no_workspace(..., ROLE_EDITOR)` in `drive_router`).
     #
-    # `create_drive_upload_url` não é idempotente porque cada chamada cria uma
-    # LINHA pendente nova e assina uma URL nova — repetir depois de um erro de
-    # rede deixaria registros pendentes órfãos até a faxina passar. As outras
-    # duas endereçam um `file_id` que já existe.
+    # `create_drive_upload_url` is not idempotent because each call creates a new
+    # pending ROW and signs a new URL — repeating after a network error would
+    # leave orphan pending records until the cleanup runs. The other two
+    # address a `file_id` that already exists.
     "create_drive_upload_url": Guarda("drive:write",     "editor",   None,       False, False),
     "confirm_drive_upload":    Guarda("drive:write",     "editor",   None,       False, True),
     "delete_drive_file":       Guarda("drive:write",     "editor",   None,       False, True),
 
-    # ── Fontes ──────────────────────────────────────────────────────────────
-    # O catálogo de fontes pré-mapeadas: o que o assistente consulta ANTES de
-    # prospectar. Buscar e descrever são leitura pura, sem rede. `probe_source`
-    # não cria fonte, mas ATUALIZA o estado/esquema de uma já catalogada e fala
-    # com a internet (uma das duas únicas open-world do servidor): por isso não
-    # é read-only, pede `workflows:write` e paga o balde `probe` — a mesma
-    # lógica de `validate_workflow`, que também não grava e também não é
-    # read-only. `register_source` sonda E grava no acervo do workspace:
-    # `editor`, a régua da escrita no Drive. As quatro são idempotentes — a
-    # mesma URL+camada cai na mesma linha, e sondar duas vezes lê o mesmo.
+    # ── Sources ─────────────────────────────────────────────────────────────
+    # The catalog of pre-mapped sources: what the assistant consults BEFORE
+    # prospecting. Searching and describing are pure reads, no network.
+    # `probe_source` does not create a source, but it UPDATES the state/schema of
+    # an already cataloged one and talks to the internet (one of the server's only
+    # two open-world tools): that is why it is not read-only, requires
+    # `workflows:write` and pays the `probe` bucket — the same logic as
+    # `validate_workflow`, which also stores nothing and is also not read-only.
+    # `register_source` probes AND stores in the workspace's collection:
+    # `editor`, the Drive writing yardstick. All four are idempotent — the
+    # same URL+layer lands on the same row, and probing twice reads the same.
     "search_sources":         Guarda("workflows:read",  "viewer",   None,       True,  True),
     "describe_source":        Guarda("workflows:read",  "viewer",   None,       True,  True),
     "probe_source":           Guarda("workflows:write", "editor",   "probe",    False, True, open_world=True),

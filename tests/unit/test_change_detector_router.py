@@ -1,6 +1,6 @@
 # tests/unit/test_change_detector_router.py
-"""Testes do router /internal/change-detector — bridge HTTP do executor para
-o Redis do servidor onde o ChangeDetector armazena hashes."""
+"""Tests for the /internal/change-detector router — the executor's HTTP bridge to
+the server's Redis, where ChangeDetector stores hashes."""
 import pytest
 from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,15 +10,15 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 @contextmanager
 def _bypass_auth_and_db(*, workflow_workspace_id: str | None = "ws-test-001"):
-    """Substitui _auth_agent e get_db (não há DB real nos testes unitários).
+    """Replaces _auth_agent and get_db (there is no real DB in unit tests).
 
-    O router real chama `_auth_agent` do drive_router, que autentica o executor
-    pelo cert mTLS. Para testes unitários do router em si, basta simular sucesso
-    de auth e usar uma session mock.
+    The real router calls drive_router's `_auth_agent`, which authenticates the
+    executor by its mTLS cert. For unit tests of the router itself, it is enough
+    to simulate auth success and use a mock session.
 
-    `_authorize_key` consulta o banco para descobrir a que workspace pertence o
-    workflow de uma chave `wf:*`. O DB mock devolve `workflow_workspace_id` —
-    passe um valor fora de `_resolved_ws_ids` (ou None) para exercitar o 403.
+    `_authorize_key` queries the database to find out which workspace the
+    workflow of a `wf:*` key belongs to. The mock DB returns `workflow_workspace_id` —
+    pass a value outside `_resolved_ws_ids` (or None) to exercise the 403.
     """
     from app.main import app
     from app.api.dependencies import get_db
@@ -131,9 +131,9 @@ async def test_swap_primeira_vez_devolve_previous_none_e_grava(client, fake_redi
 
 @pytest.mark.asyncio
 async def test_swap_devolve_o_anterior_e_grava_o_novo(client, fake_redis):
-    """A operação única: decisão (previous) e gravação (novo) na mesma ida —
-    sem a janela ler→decidir→gravar em que duas runs simultâneas liam o mesmo
-    hash antigo e ambas decidiam 'Mudou'."""
+    """The single operation: decision (previous) and write (new) in the same round
+    trip — without the read→decide→write window in which two simultaneous runs
+    read the same old hash and both decided 'Mudou' (changed)."""
     fake_redis._store["change_detector:wf:wfh-abc:n-xyz"] = "a" * 64
     payload = {"hash": "b" * 64, "ttl_seconds": 3600}
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
@@ -155,7 +155,7 @@ async def test_swap_sem_ttl_grava_sem_expiracao(client, fake_redis):
 
 @pytest.mark.asyncio
 async def test_swap_hash_invalido_retorna_422(client, fake_redis):
-    """Hash que não é SHA-256 hex (64 chars lowercase) é rejeitado."""
+    """A hash that isn't SHA-256 hex (64 lowercase chars) is rejected."""
     payload = {"hash": "nao-eh-sha256", "ttl_seconds": 3600}
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
         resp = await client.post(SWAP_URL, json=payload)
@@ -180,7 +180,7 @@ async def test_swap_ttl_excessivo_retorna_422(client, fake_redis):
 
 @pytest.mark.asyncio
 async def test_swap_formato_chave_invalido_retorna_400(client, fake_redis):
-    """Chaves fora do prefixo permitido (wf:/ws:) são rejeitadas."""
+    """Keys outside the allowed prefix (wf:/ws:) are rejected."""
     payload = {"hash": "a" * 64, "ttl_seconds": 0}
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
         resp = await client.post("/internal/change-detector/idempotency:abc", json=payload)
@@ -189,8 +189,8 @@ async def test_swap_formato_chave_invalido_retorna_400(client, fake_redis):
 
 @pytest.mark.asyncio
 async def test_swap_redis_indisponivel_retorna_503(client):
-    """Falha ao conectar com Redis → 503; o executor decide o branch pela
-    política on_backend_error do nó."""
+    """Failure to connect to Redis → 503; the executor decides the branch by the
+    node's on_backend_error policy."""
     redis_falho = AsyncMock()
     redis_falho.set = AsyncMock(side_effect=ConnectionError("redis down"))
     payload = {"hash": "a" * 64, "ttl_seconds": 0}
@@ -203,8 +203,8 @@ async def test_swap_redis_indisponivel_retorna_503(client):
 
 @pytest.mark.asyncio
 async def test_workflow_de_outro_workspace_retorna_403(client, fake_redis):
-    """Executor não pode tocar o estado de um workflow fora dos seus workspaces:
-    a troca fora de escopo é barrada ANTES de tocar o Redis."""
+    """An executor must not touch the state of a workflow outside its workspaces:
+    the out-of-scope swap is blocked BEFORE touching Redis."""
     fake_redis._store["change_detector:wf:wfh-alheio:n-xyz"] = "h" * 64
     with _bypass_auth_and_db(workflow_workspace_id="ws-de-outro-tenant"), \
             patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
@@ -216,7 +216,7 @@ async def test_workflow_de_outro_workspace_retorna_403(client, fake_redis):
 
 @pytest.mark.asyncio
 async def test_workflow_inexistente_retorna_403(client, fake_redis):
-    """Não distingue 'não existe' de 'não é seu' — evita enumeração."""
+    """Doesn't distinguish 'doesn't exist' from 'isn't yours' — prevents enumeration."""
     with _bypass_auth_and_db(workflow_workspace_id=None), \
             patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
         resp = await client.post("/internal/change-detector/wf:nao-existe:n-xyz",
@@ -226,7 +226,7 @@ async def test_workflow_inexistente_retorna_403(client, fake_redis):
 
 @pytest.mark.asyncio
 async def test_escopo_ws_alheio_retorna_403(client, fake_redis):
-    """Chave 'ws:' de workspace fora da lista do executor é negada."""
+    """A 'ws:' key for a workspace outside the executor's list is denied."""
     with _bypass_auth_and_db(), \
             patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
         resp = await client.post("/internal/change-detector/ws:ws-alheio:shared-key",
@@ -247,10 +247,10 @@ async def test_escopo_ws_proprio_permitido(client, fake_redis):
 
 @pytest.mark.asyncio
 async def test_swap_e_uma_unica_operacao_atomica(client):
-    """A atomicidade não é observável num fake serializado, então este teste
-    trava o PADRÃO: a troca inteira deve ser um único SET ... GET. Um GET
-    separado seguido de SET reabriria exatamente a janela de corrida (duas runs
-    simultâneas lendo o mesmo hash antigo) que o endpoint existe para fechar."""
+    """Atomicity is not observable in a serialized fake, so this test locks down
+    the PATTERN: the whole swap must be a single SET ... GET. A separate GET
+    followed by a SET would reopen exactly the race window (two simultaneous runs
+    reading the same old hash) that the endpoint exists to close."""
     chamadas: list = []
     rc = AsyncMock()
 

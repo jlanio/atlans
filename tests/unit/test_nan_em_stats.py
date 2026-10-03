@@ -1,16 +1,16 @@
 # tests/unit/test_nan_em_stats.py
-"""NaN nos stats prendia o run em 'running' para sempre.
+"""NaN in the stats kept the run stuck in 'running' forever.
 
-Cadeia real, observada em producao: um filtro espacial retorna ZERO feicoes ->
-`GeoDataFrame.total_bounds` e [nan, nan, nan, nan] -> `round(float('nan'), 6)`
-devolve nan sem levantar, entao o try/except do collector nao pegava -> o nan
-viaja nos stats (json.dumps do Python emite NaN, extensao fora da spec, e
-json.loads o aceita de volta) -> chega em WorkflowRun.node_stats, que e JSONB ->
-Postgres recusa o INSERT -> a excecao sobe ANTES do commit do status -> o run
-fica 'running' e o resultado vai para run_dead_letter.
+Real chain, observed in production: a spatial filter returns ZERO features ->
+`GeoDataFrame.total_bounds` is [nan, nan, nan, nan] -> `round(float('nan'), 6)`
+returns nan without raising, so the collector's try/except didn't catch it -> the
+nan travels in the stats (Python's json.dumps emits NaN, an off-spec extension,
+and json.loads accepts it back) -> it reaches WorkflowRun.node_stats, which is
+JSONB -> Postgres refuses the INSERT -> the exception propagates BEFORE the status
+commit -> the run stays 'running' and the result goes to run_dead_letter.
 
-O workflow tinha concluido: 46 resultados estavam na fila morta quando isto foi
-diagnosticado.
+The workflow had completed: 46 results were in the dead-letter queue when this
+was diagnosed.
 """
 import json
 import math
@@ -21,7 +21,7 @@ import pytest
 from app.core.run_result_consumer import _json_seguro, _update_run_status
 
 
-# ── Origem: bbox de GeoDataFrame vazio ───────────────────────────────────────
+# ── Origin: bbox of an empty GeoDataFrame ────────────────────────────────────
 
 def test_bbox_de_geodataframe_vazio_vira_none():
     import geopandas as gpd
@@ -56,7 +56,7 @@ def test_metricas_leves_omitem_bbox_quando_vazio():
     assert "bbox" not in out
 
 
-# ── Defesa: saneamento antes do JSONB ────────────────────────────────────────
+# ── Defense: sanitizing before JSONB ─────────────────────────────────────────
 
 def test_json_seguro_troca_nan_e_infinito_por_none():
     sujo = {
@@ -69,20 +69,20 @@ def test_json_seguro_troca_nan_e_infinito_por_none():
 
     assert limpo["spatial"]["bbox"] == [None, None, None, None]
     assert limpo["lista"] == [1.5, None, None]
-    # Valores válidos passam intactos.
+    # Valid values pass through intact.
     assert limpo["ok"] == {"duration_ms": 12.5, "nome": "WFS", "flag": True, "nada": None}
 
 
 def test_json_seguro_produz_json_valido():
-    """O critério real: `allow_nan=False` é o que o Postgres exige."""
+    """The real criterion: `allow_nan=False` is what Postgres requires."""
     limpo = _json_seguro({"bbox": [float("nan"), float("inf")]})
 
-    json.dumps(limpo, allow_nan=False)   # não pode levantar
+    json.dumps(limpo, allow_nan=False)   # must not raise
 
 
 @pytest.mark.asyncio
 async def test_update_run_status_grava_com_stats_saneados():
-    """Regressão: era aqui que o commit estourava e o run ficava 'running'."""
+    """Regression: this is where the commit blew up and the run stayed 'running'."""
     run, db = MagicMock(), MagicMock(commit=AsyncMock())
     payload = {
         "task_id": "run-1",
@@ -97,7 +97,7 @@ async def test_update_run_status_grava_com_stats_saneados():
 
     assert run.status == "success"
     assert run.node_stats["no-1"]["spatial"]["bbox"] == [None, None, None, None]
-    # O que o Postgres teria recusado agora serializa.
+    # What Postgres would have refused now serializes.
     json.dumps(run.node_stats, allow_nan=False)
     db.commit.assert_awaited_once()
 
@@ -118,15 +118,15 @@ async def test_stats_validos_chegam_intactos():
     assert math.isclose(run.node_stats["no-1"]["duration_ms"], 2887.09)
 
 
-# ── As métricas: bbox, spatial_summary e operation_types ─────────────────────
+# ── The metrics: bbox, spatial_summary and operation_types ───────────────────
 
 @pytest.mark.asyncio
 async def test_persist_metrics_saneia_nan_antes_das_colunas_json():
-    """Regressão: 37 resultados na fila morta com `Token "NaN" is invalid`.
+    """Regression: 37 results in the dead-letter queue with `Token "NaN" is invalid`.
 
-    O saneamento cobria só o node_stats; o bbox de node_run_metrics e o
-    spatial_summary de workflow_run_metrics são colunas JSON também, e o
-    INSERT delas morria no Postgres com um executor antigo (anterior ao
+    The sanitizing only covered node_stats; node_run_metrics' bbox and
+    workflow_run_metrics' spatial_summary are JSON columns too, and their
+    INSERT died in Postgres with an old executor (predating
     `_bbox_finito`).
     """
     from datetime import datetime, timezone
@@ -162,6 +162,6 @@ async def test_persist_metrics_saneia_nan_antes_das_colunas_json():
     assert wrm.spatial_summary == {"bbox": [None, None, None, None]}
     assert wrm.operation_types == {"clip": None}
     assert wrm.cpu_avg_pct is None
-    # O que o Postgres teria recusado agora serializa.
+    # What Postgres would have refused now serializes.
     json.dumps([nrm.bbox, wrm.spatial_summary, wrm.operation_types], allow_nan=False)
     db.commit.assert_awaited_once()

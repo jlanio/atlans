@@ -15,7 +15,7 @@ _IGNORE_FILENAME = ".atlans-ignore"
 
 
 class IgnoreFilter:
-    """Carrega e aplica padroes de exclusao do .atlans-ignore."""
+    """Loads and applies the exclusion patterns from .atlans-ignore."""
 
     def __init__(self, sync_dir: str | Path):
         self.sync_dir = Path(sync_dir)
@@ -30,9 +30,9 @@ class IgnoreFilter:
             self._mtime = 0
             return
 
-        # Dotfile de config na pasta do usuario: no Windows o ponto nao esconde,
-        # entao garantimos o atributo oculto sempre que o encontramos — mesmo
-        # tratamento do .atlans-sync-config.json (ver sync_config._load_local).
+        # Config dotfile in the user's folder: on Windows the dot doesn't hide it,
+        # so we ensure the hidden attribute whenever we find it — same
+        # treatment as .atlans-sync-config.json (see sync_config._load_local).
         ocultar_no_windows(ignore_path)
 
         try:
@@ -47,7 +47,7 @@ class IgnoreFilter:
             self._spec = None
 
     def reload(self):
-        """Recarrega o arquivo se foi modificado."""
+        """Reloads the file if it was modified."""
         ignore_path = self.sync_dir / _IGNORE_FILENAME
         if not ignore_path.exists():
             if self._spec is not None:
@@ -65,7 +65,7 @@ class IgnoreFilter:
             self._load()
 
     def should_ignore(self, path: str | Path) -> bool:
-        """Retorna True se o path deve ser ignorado pelo sync."""
+        """Returns True if the path should be ignored by the sync."""
         if self._spec is None:
             return False
         try:

@@ -7,22 +7,22 @@ import { criarClienteDeConsultas } from "@/lib/consultas"
 let doNavegador: QueryClient | undefined
 
 /**
- * No servidor, um cliente por requisição: o processo do Node atende usuários
- * diferentes ao mesmo tempo, e um cache de módulo passaria o dado de um para o
- * outro — o mesmo cuidado do `setAuthToken` no SessionSync. No navegador, um só
- * para a aba. Num `useState` ele se perderia se o primeiro render suspendesse
- * sem um Suspense entre este provedor e quem suspende (a recomendação da
- * biblioteca para o App Router).
+ * On the server, one client per request: the Node process serves different
+ * users at the same time, and a module cache would pass one user's data to
+ * another — the same care as `setAuthToken` in SessionSync. In the browser, a
+ * single one for the tab. In a `useState` it would be lost if the first render
+ * suspended without a Suspense between this provider and whoever suspends (the
+ * library's recommendation for the App Router).
  *
- * O cache não passa de uma sessão para outra: o logout (`signOut` com
- * redirecionamento) recarrega a página, e com ela este módulo.
+ * The cache does not carry over from one session to another: logout (`signOut`
+ * with redirect) reloads the page, and this module with it.
  */
 function clienteDeConsultas(): QueryClient {
   if (environmentManager.isServer()) return criarClienteDeConsultas()
   return (doNavegador ??= criarClienteDeConsultas())
 }
 
-/** O `QueryClientProvider` das telas do grupo (dashboard) — ver lib/consultas.ts. */
+/** The `QueryClientProvider` for the (dashboard) group's screens — see lib/consultas.ts. */
 export function ProvedorDeConsultas({ children }: { children: ReactNode }) {
   return <QueryClientProvider client={clienteDeConsultas()}>{children}</QueryClientProvider>
 }

@@ -1,52 +1,54 @@
 // desktop/build/sign.cjs
 //
-// Hook de assinatura de código do electron-builder.
+// electron-builder code-signing hook.
 //
-// Sem `ATLANS_SIGN_PROVIDER` no ambiente ele é um no-op e o build sai NÃO
-// assinado — funcional, mas com o SmartScreen exibindo "O Windows protegeu o
-// computador" e o botão "Executar assim mesmo" escondido atrás de "Mais
-// informações". Para um app que dá spawn em `python.exe` e abre WebSocket de
-// saída, heurística de antivírus corporativo também é provável.
+// Without `ATLANS_SIGN_PROVIDER` in the environment it is a no-op and the build
+// comes out UNSIGNED — functional, but with SmartScreen showing "Windows
+// protected your PC" and the "Run anyway" button hidden behind "More info".
+// For an app that spawns `python.exe` and opens an outbound WebSocket,
+// corporate antivirus heuristics are also likely.
 //
-// ── O que escolher ───────────────────────────────────────────────────────────
+// ── What to choose ───────────────────────────────────────────────────────────
 //
-// Token físico USB (o padrão de OV/EV desde jun/2023) é INCOMPATÍVEL com runner
-// do GitHub — ninguém pluga um token num runner efêmero. As opções viáveis:
+// A physical USB token (the OV/EV standard since Jun/2023) is INCOMPATIBLE with
+// GitHub runners — nobody plugs a token into an ephemeral runner. The viable
+// options:
 //
-//   Azure Trusted Signing   o mais barato de longe (~US$ 10/mês), mas exige
-//                           pessoa jurídica com 3+ anos de histórico
-//                           verificável. Confirmar elegibilidade de CNPJ
-//                           brasileiro ANTES de contar com ele.
-//   DigiCert KeyLocker      variante HSM-em-nuvem do OV/EV tradicional.
-//   SSL.com eSigner         idem, costuma ser o mais acessível dos dois.
+//   Azure Trusted Signing   by far the cheapest (~US$ 10/month), but requires
+//                           a legal entity with 3+ years of verifiable
+//                           history. Confirm eligibility of a Brazilian
+//                           CNPJ BEFORE counting on it.
+//   DigiCert KeyLocker      cloud-HSM variant of traditional OV/EV.
+//   SSL.com eSigner         same, usually the more affordable of the two.
 //
-// Os três assinam via `signtool` — os dois primeiros com uma DLL de
-// interoperabilidade (`/dlib`), o `.pfx` direto só existe para certificados
-// antigos e para o autoteste local.
+// All three sign via `signtool` — the first two with an interop DLL
+// (`/dlib`); a direct `.pfx` only exists for legacy certificates and for the
+// local self-test.
 //
-// **EV não é obrigatório para funcionar, mas muda muito na prática:** um
-// certificado OV começa com reputação zero no SmartScreen e leva instalações
-// até deixar de alertar; um EV alerta desde o primeiro dia zero vezes.
+// **EV is not required for it to work, but it makes a big difference in
+// practice:** an OV certificate starts with zero reputation in SmartScreen and
+// takes a number of installs before it stops warning; an EV warns zero times
+// from day one.
 //
-// ── Como ativar ──────────────────────────────────────────────────────────────
+// ── How to enable ────────────────────────────────────────────────────────────
 //
 //   Azure Trusted Signing / DigiCert KeyLocker
 //     ATLANS_SIGN_PROVIDER=dlib
 //     ATLANS_SIGN_DLIB=C:\ts\bin\x64\Azure.CodeSigning.Dlib.dll
 //     ATLANS_SIGN_DLIB_METADATA=C:\ts\metadata.json
 //
-//   Arquivo .pfx (certificado antigo, ou o autoteste — ver npm run sign:selftest)
+//   .pfx file (legacy certificate, or the self-test — see npm run sign:selftest)
 //     ATLANS_SIGN_PROVIDER=pfx
-//     ATLANS_SIGN_PFX=C:\caminho\cert.pfx     (ou o conteúdo em base64)
+//     ATLANS_SIGN_PFX=C:\caminho\cert.pfx     (or the content in base64)
 //     ATLANS_SIGN_PFX_PASSWORD=…
 //
-// No CI, os valores vêm de secrets; o job só os injeta quando existem, então um
-// fork sem segredos continua conseguindo buildar.
+// In CI, the values come from secrets; the job only injects them when they
+// exist, so a fork without secrets can still build.
 //
-// A extensão é `.cjs`, e não `.js`, porque o package.json declara
-// `"type": "module"`: um `.js` seria carregado como ESM e o `exports.default`
-// que o electron-builder procura não existiria. O erro que sai nesse caso é um
-// stack trace do resolvedor de módulos, sem nenhuma menção a ESM.
+// The extension is `.cjs`, not `.js`, because package.json declares
+// `"type": "module"`: a `.js` would be loaded as ESM and the `exports.default`
+// electron-builder looks for would not exist. The error you get in that case
+// is a module resolver stack trace, with no mention of ESM whatsoever.
 
 'use strict'
 
@@ -56,30 +58,31 @@ const os = require('node:os')
 const path = require('node:path')
 
 /**
- * Carimbo de tempo. **Não é opcional.**
+ * Timestamp. **It is not optional.**
  *
- * Sem ele a assinatura morre junto com o certificado — em 1 a 3 anos todo
- * instalador já distribuído volta a ser "editor desconhecido", inclusive os que
- * o cliente guardou. Com o carimbo, a assinatura continua válida para sempre
- * para os binários assinados enquanto o certificado valia.
+ * Without it the signature dies along with the certificate — in 1 to 3 years
+ * every installer already distributed goes back to "unknown publisher",
+ * including the ones the customer kept. With the timestamp, the signature
+ * stays valid forever for the binaries signed while the certificate was valid.
  */
 const TIMESTAMP_URL = process.env.ATLANS_SIGN_TIMESTAMP || 'http://timestamp.digicert.com'
 
-/** Quantas vezes tentar. O serviço de timestamp é rede, e rede falha. */
+/** How many times to try. The timestamp service is network, and networks fail. */
 const TENTATIVAS = 3
 
 /**
- * Acha o `signtool.exe`.
+ * Finds `signtool.exe`.
  *
- * Ele não está no PATH numa máquina comum, e o SDK do Windows **não** é
- * pré-requisito deste projeto — nesta máquina de desenvolvimento, por exemplo,
- * não há Windows Kits nenhum. O que sempre existe é a cópia que o próprio
- * electron-builder baixa no pacote `winCodeSign`, e é ela a primeira escolha.
+ * It is not on the PATH on an ordinary machine, and the Windows SDK is **not**
+ * a prerequisite of this project — on this development machine, for example,
+ * there are no Windows Kits at all. What always exists is the copy that
+ * electron-builder itself downloads in the `winCodeSign` package, and that is
+ * the first choice.
  *
- * ⚠️ O signtool do `winCodeSign` é antigo e **não suporta `/dlib`**. Para Azure
- * Trusted Signing ou DigiCert KeyLocker, instale o SDK do Windows e aponte
- * `ATLANS_SIGNTOOL` para o binário de lá — o `/dlib` é justamente o que aquele
- * signtool não conhece, e o erro que ele devolve não menciona a versão.
+ * ⚠️ The `winCodeSign` signtool is old and **does not support `/dlib`**. For
+ * Azure Trusted Signing or DigiCert KeyLocker, install the Windows SDK and
+ * point `ATLANS_SIGNTOOL` to its binary — `/dlib` is precisely what that
+ * signtool does not know, and the error it returns does not mention the version.
  */
 exports.acharSigntool = acharSigntool
 function acharSigntool() {
@@ -102,7 +105,7 @@ function acharSigntool() {
       }
     }
   } catch {
-    // Kits não instalado — segue para o PATH.
+    // Kits not installed — moves on to the PATH.
   }
   return 'signtool.exe'
 }
@@ -120,8 +123,9 @@ function candidatosDoCacheDoBuilder() {
     return []
   }
 
-  // O diretório literal `winCodeSign` é o que a versão atual usa; os numéricos
-  // são caches de versões anteriores. Mais novo primeiro, e o literal na frente.
+  // The literal `winCodeSign` directory is what the current version uses; the
+  // numeric ones are caches from earlier versions. Newest first, and the literal
+  // one in front.
   const ordenadas = [
     ...entradas.filter((e) => e === 'winCodeSign'),
     ...entradas.filter((e) => e !== 'winCodeSign').sort().reverse(),
@@ -132,7 +136,7 @@ function candidatosDoCacheDoBuilder() {
   ])
 }
 
-/** Aceita caminho de arquivo OU o .pfx inteiro em base64 (o que cabe num secret). */
+/** Accepts a file path OR the whole .pfx in base64 (what fits in a secret). */
 function materializarPfx(valor) {
   if (fs.existsSync(valor)) return { arquivo: valor, temporario: false }
 
@@ -158,8 +162,8 @@ function argumentosDo(provedor, temporarios) {
   }
 
   if (provedor === 'dlib') {
-    // Caminho do Azure Trusted Signing e do DigiCert KeyLocker: a chave privada
-    // nunca sai do HSM; a DLL fala com o serviço.
+    // Azure Trusted Signing and DigiCert KeyLocker path: the private key never
+    // leaves the HSM; the DLL talks to the service.
     return ['/dlib', exigir('ATLANS_SIGN_DLIB'), '/dmdf', exigir('ATLANS_SIGN_DLIB_METADATA')]
   }
 
@@ -170,15 +174,14 @@ function argumentosDo(provedor, temporarios) {
 
 /**
  * @param {{ path: string, hash?: string, isNest?: boolean }} configuration
- *   `path` é o arquivo a assinar — o .exe do app e, depois, o do instalador.
+ *   `path` is the file to sign — the app's .exe and, afterwards, the installer's.
  */
 exports.default = async function sign(configuration) {
   const provedor = process.env.ATLANS_SIGN_PROVIDER
   if (!provedor) {
-    // Silencioso de propósito: o build local e o do CI sem segredos são o caso
-    // NORMAL hoje. Um aviso a cada arquivo assinado viraria ruído que se
-    // aprende a ignorar — e aí o dia em que a assinatura falhar de verdade
-    // passa despercebido.
+    // Silent on purpose: the local build and the CI build without secrets are the
+    // NORMAL case today. A warning for every signed file would become noise one
+    // learns to ignore — and then the day signing really fails goes unnoticed.
     return
   }
 
@@ -186,14 +189,14 @@ exports.default = async function sign(configuration) {
   try {
     const args = [
       'sign',
-      // SHA-256 em tudo. SHA-1 ainda é aceito por compatibilidade antiga e é
-      // exatamente o tipo de default que passa despercebido.
+      // SHA-256 everywhere. SHA-1 is still accepted for old compatibility and is
+      // exactly the kind of default that goes unnoticed.
       '/fd', 'sha256',
       '/td', 'sha256',
       '/tr', TIMESTAMP_URL,
       ...argumentosDo(provedor, temporarios),
-      // `isNest` = o arquivo já tem uma assinatura e esta é adicional. Sem
-      // `/as`, a segunda SUBSTITUI a primeira em silêncio.
+      // `isNest` = the file already has a signature and this one is additional.
+      // Without `/as`, the second one silently REPLACES the first.
       ...(configuration.isNest ? ['/as'] : []),
       configuration.path,
     ]
@@ -208,8 +211,8 @@ exports.default = async function sign(configuration) {
         ultimoErro = erro
         if (i < TENTATIVAS) {
           console.warn(`[sign] tentativa ${i}/${TENTATIVAS} falhou; repetindo…`)
-          // Espera curta e crescente: quase toda falha aqui é o servidor de
-          // timestamp recusando por excesso de requisições.
+          // Short, increasing wait: almost every failure here is the timestamp
+          // server refusing because of too many requests.
           Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2000 * i)
         }
       }
@@ -223,7 +226,7 @@ exports.default = async function sign(configuration) {
     )
   } finally {
     for (const t of temporarios) {
-      try { fs.unlinkSync(t) } catch { /* já removido */ }
+      try { fs.unlinkSync(t) } catch { /* already removed */ }
     }
   }
 }

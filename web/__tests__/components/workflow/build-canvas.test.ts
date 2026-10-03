@@ -1,12 +1,12 @@
 /**
- * Montagem de um canvas a partir da definition persistida + catálogo.
+ * Building a canvas from the persisted definition + catalog.
  *
- * Isto vivia dentro do editor, lendo o closure e chamando `setNodes`/`setEdges`.
- * Saiu de lá para que o visualizador de sub-fluxo desenhe o grafo de OUTRO
- * workflow com as mesmas regras — e é a extração que estes testes protegem: o
- * `data` montado em dois lugares diverge, que é o defeito de sintoma bizarro
- * (funciona no nó novo, some ao recarregar) que `contratoDoNo` existe para
- * impedir.
+ * This used to live inside the editor, reading the closure and calling
+ * `setNodes`/`setEdges`. It moved out so the sub-workflow viewer can draw the
+ * graph of ANOTHER workflow with the same rules — and it's the extraction these
+ * tests protect: a `data` built in two places diverges, which is the defect with
+ * the bizarre symptom (works on the new node, disappears on reload) that
+ * `contratoDoNo` exists to prevent.
  */
 import { describe, it, expect } from "vitest"
 
@@ -22,7 +22,7 @@ const catalogo = [
     properties: [
       { name: "code", label: "Código", type: "string", default: "" },
       { name: "ports", label: "Portas", type: "object", default: [] },
-      // Campo que pede NOME DE COLUNA — carrega o marcador de sugestão.
+      // A field that asks for a COLUMN NAME — carries the suggestion marker.
       { name: "coluna", label: "Coluna", type: "string", default: "", suggest_columns: "*" },
     ],
     dynamic_inputs: true,
@@ -38,8 +38,8 @@ const catalogo = [
     branches: true,
   },
   {
-    // Duas saídas REAIS → handles nomeados (default-type desenha um por porta).
-    // É o caso em que restaurar `source_handle` pelo nome faz sentido.
+    // Two REAL outputs → named handles (default-type draws one per port).
+    // It's the case in which restoring `source_handle` by name makes sense.
     name: "DataInput",
     alias: "Entrada de Dados",
     description: "Duas saídas nomeadas",
@@ -63,8 +63,8 @@ describe("buildNodes", () => {
   })
 
   it("campo ausente na definition nasce com o default do catálogo", () => {
-    // É o que permite acrescentar uma propriedade ao schema sem migrar os
-    // workflows já salvos.
+    // It's what allows adding a property to the schema without migrating
+    // already-saved workflows.
     const [no] = buildNodes(
       { nodes: [{ id: "a", name: "PythonScript", properties: {}, position: { x: 0, y: 0 }, type: "action" }] },
       catalogo,
@@ -73,10 +73,10 @@ describe("buildNodes", () => {
   })
 
   it("preserva `suggest_columns` na projeção dos campos", () => {
-    // A regressão clássica desta projeção: o nó recém-arrastado sugeria
-    // colunas (o drawer copia o objeto inteiro do catálogo) e o MESMO nó,
-    // salvo e recarregado, nunca mais — a whitelist descartava o marcador e
-    // `sugerirColunas()` devolvia [] para sempre.
+    // The classic regression of this projection: the freshly dragged node
+    // suggested columns (the drawer copies the whole catalog object) and the
+    // SAME node, saved and reloaded, never again — the whitelist dropped the
+    // marker and `sugerirColunas()` returned [] forever.
     const [no] = buildNodes(
       { nodes: [{ id: "a", name: "PythonScript", properties: {}, position: { x: 0, y: 0 }, type: "action" }] },
       catalogo,
@@ -108,8 +108,8 @@ describe("buildNodes", () => {
   })
 
   it("definition sem nós devolve lista vazia, e não undefined", () => {
-    // O editor passa o retorno direto ao `setNodes`; um undefined aqui virava
-    // canvas quebrado em vez de canvas vazio.
+    // The editor passes the return value straight to `setNodes`; an undefined
+    // here would become a broken canvas instead of an empty one.
     expect(buildNodes(undefined, catalogo)).toEqual([])
     expect(buildNodes({}, catalogo)).toEqual([])
   })
@@ -134,9 +134,9 @@ describe("buildEdges", () => {
   })
 
   it("saída anônima: source_handle fantasma (bug do picker) volta a anônimo", () => {
-    // PythonScript (action) desenha um handle ANÔNIMO — "output" não é handle
-    // nomeado. O seletor antigo gravava esse nome mesmo assim e a aresta sumia;
-    // agora ela volta ao canvas ancorada no handle anônimo (sourceHandle nulo).
+    // PythonScript (action) draws an ANONYMOUS handle — "output" is not a named
+    // handle. The old picker saved that name anyway and the edge disappeared;
+    // now it comes back to the canvas anchored on the anonymous handle (null sourceHandle).
     const nodes = buildNodes(
       { nodes: [
         { id: "a", name: "PythonScript", properties: {}, position: { x: 0, y: 0 }, type: "action" },
@@ -165,15 +165,15 @@ describe("buildEdges", () => {
   })
 
   it("porta ÚNICA: a aresta ancora no handle anônimo, não no nome da porta", () => {
-    // Com UMA porta, `default-type` desenha um HandleTarget ANÔNIMO (sem id) — o
-    // handle nomeado só existe com 2+ portas. Devolver "focos" apontaria a aresta
-    // para um id inexistente: o React Flow não a desenha, ela some do canvas
-    // continuando a executar, e sem linha não há como apagá-la. `targetHandle`
-    // fica indefinido (ancora no anônimo) e o `to_key` sobrevive em `data`, então
-    // o executor ainda roteia pela chave.
+    // With ONE port, `default-type` draws an ANONYMOUS HandleTarget (no id) — the
+    // named handle only exists with 2+ ports. Returning "focos" would point the
+    // edge at a nonexistent id: React Flow doesn't draw it, it disappears from the
+    // canvas while still executing, and with no line there's no way to delete it.
+    // `targetHandle` stays undefined (anchors on the anonymous one) and `to_key`
+    // survives in `data`, so the executor still routes by the key.
     //
-    // REGRESSÃO deste conserto: tirar o `> 1` de `handleDeEntrada` faz o
-    // `targetHandle` voltar a "focos" e derruba SÓ este teste.
+    // REGRESSION of this fix: removing the `> 1` from `handleDeEntrada` makes
+    // `targetHandle` go back to "focos" and breaks ONLY this test.
     const nodes = buildNodes(
       { nodes: [
         { id: "a", name: "PythonScript", properties: {}, position: { x: 0, y: 0 }, type: "action" },
@@ -190,13 +190,13 @@ describe("buildEdges", () => {
 
     const [aresta] = buildEdges({ edges: [{ source: "a", target: "b", to_key: "focos" }] }, nodes)
     expect(aresta.targetHandle).toBeUndefined()
-    // A chave de dado permanece: o executor ainda roteia; some só a âncora visual.
+    // The data key remains: the executor still routes; only the visual anchor goes away.
     expect(aresta.data).toEqual({ to_key: "focos" })
   })
 
   it("2+ portas: `to_key` vira o handle nomeado que existe; fora da lista fica órfã", () => {
-    // Com 2+ portas, `default-type` desenha um HandleTarget por porta (id = nome),
-    // então ancorar pelo nome é legítimo — o ponto de conexão existe.
+    // With 2+ ports, `default-type` draws one HandleTarget per port (id = name),
+    // so anchoring by name is legitimate — the connection point exists.
     const nodes = buildNodes(
       { nodes: [
         { id: "a", name: "PythonScript", properties: {}, position: { x: 0, y: 0 }, type: "action" },
@@ -216,7 +216,7 @@ describe("buildEdges", () => {
 
     const [orfa] = buildEdges({ edges: [{ source: "a", target: "b", to_key: "inexistente" }] }, nodes)
     expect(orfa.targetHandle).toBeUndefined()
-    // A chave de dado permanece: quem se perderia é só a âncora visual.
+    // The data key remains: the only thing that would be lost is the visual anchor.
     expect(orfa.data).toEqual({ to_key: "inexistente" })
   })
 

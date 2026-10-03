@@ -1,11 +1,11 @@
 /**
- * O snapshot não pode realocar tudo a cada janela.
+ * The snapshot must not reallocate everything on every window.
  *
- * `buildTimeline` é pura e cria um `NodeRun` novo para cada nó a cada chamada.
- * Como as linhas do painel são memoizadas por identidade de prop, isso fazia
- * TODAS elas re-renderizarem oito vezes por segundo mesmo quando um único nó
- * mudava. E, com o painel recolhido, essa reconstrução acontecia para ninguém:
- * a barra de 34px só precisa de contagens e status.
+ * `buildTimeline` is pure and creates a new `NodeRun` for each node on every
+ * call. Since the panel rows are memoized by prop identity, this made ALL of
+ * them re-render eight times per second even when a single node changed. And,
+ * with the panel collapsed, that rebuild happened for nobody: the 34px bar only
+ * needs counts and status.
  */
 import { describe, it, expect, beforeEach } from "vitest"
 import { renderHook, act, waitFor } from "@testing-library/react"
@@ -45,8 +45,8 @@ describe("useRunSnapshot — identidade e custo", () => {
       expect(result.current.timeline.nodes.find(n => n.nodeId === "a")!.status).toBe("completed")
     })
 
-    // "b" não foi tocado por nenhum evento: a linha dele tem de ser o MESMO
-    // objeto, senão o `memo` do NodeRow não segura nada.
+    // "b" wasn't touched by any event: its row has to be the SAME object,
+    // otherwise NodeRow's `memo` holds nothing back.
     expect(result.current.timeline.nodes.find(n => n.nodeId === "b")).toBe(linhaB)
     unmount()
   })
@@ -60,11 +60,11 @@ describe("useRunSnapshot — identidade e custo", () => {
     ])
 
     const { result, unmount } = renderHook(() => useRunSnapshot(false))
-    // O resumo continua respondendo "o que está acontecendo": contagens e
-    // status vêm do estado por nó do canvas, sem percorrer os eventos.
+    // The summary still answers "what's happening": counts and status come
+    // from the canvas's per-node state, without walking the events.
     expect(result.current.timeline.counts.total).toBe(1)
     expect(result.current.timeline.workflow.status).toBe("running")
-    // Prints são detalhe do painel aberto — ninguém os desenha com ele fechado.
+    // Prints are a detail of the open panel — nobody draws them while it's closed.
     expect(result.current.timeline.totalPrints).toBe(0)
     unmount()
   })

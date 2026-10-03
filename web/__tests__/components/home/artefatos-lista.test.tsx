@@ -3,9 +3,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { IArtifactItem, IDriveFile } from "@/service/types"
 
 /**
- * O painel "Meu → Artefatos": merge de artefatos + Drive numa lista, degradação
- * por fonte, e o clique num geojson que ENFILEIRA um pedido de camada na store (o
- * HomeView é quem chama `camadaDoGlobo` depois — aqui só provamos o pedido).
+ * The "Meu → Artefatos" panel: merge of artifacts + Drive into one list, degradation
+ * per source, and the click on a geojson that QUEUES a layer request in the store (the
+ * HomeView is what calls `camadaDoGlobo` afterward — here we only prove the request).
  */
 
 const H = vi.hoisted(() => ({
@@ -28,7 +28,7 @@ vi.mock("@/service/GisFlowService", () => ({
   },
 }))
 vi.mock("@/context/WorkspaceContext", () => {
-  // Definido DENTRO da factory: `vi.mock` é içado acima dos consts do módulo.
+  // Defined INSIDE the factory: `vi.mock` is hoisted above the module's consts.
   const ROLE_ORDER = ["viewer", "editor", "operator", "admin", "owner"]
   return {
     ROLE_ORDER,
@@ -43,14 +43,14 @@ vi.mock("@/context/WorkspaceContext", () => {
 })
 vi.mock("@/utils/createToast", () => ({ createToast: { success: vi.fn(), error: vi.fn() } }))
 vi.mock("@/app/components/workspace/workspace-switcher", () => ({ default: () => <div data-testid="ws-switcher" /> }))
-// O `className` passa de propósito: é por ele que o teste de tema vê o
-// `home-portal` que o painel pede ao diálogo.
+// The `className` passes through on purpose: it is through it that the theme test sees the
+// `home-portal` the panel asks of the dialog.
 vi.mock("@/app/components/drive/dialogs", () => ({
   MetadataDialog: (props: { open: boolean; className?: string }) =>
     props.open ? <div data-testid="meta-dialog" className={props.className} /> : null,
 }))
-// O `className` PASSA de propósito — é por ele que os testes de tema
-// (`home-portal`) e de alvo de toque (40px) enxergam o que o componente pediu.
+// The `className` PASSES THROUGH on purpose — it is through it that the theme
+// (`home-portal`) and touch target (40px) tests see what the component asked for.
 vi.mock("@/app/components/ui/dropdown-menu", () => ({
   DropdownMenu: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
@@ -120,10 +120,10 @@ function montar() {
   )
 }
 
-// O nome do arquivo é desenhado em DOIS pedaços (a elipse cai no meio, para o
-// fim — a versão e a extensão — não ser comido em barra estreita), então casar
-// o texto inteiro num elemento só não acha nada. `data-nome` carrega o nome
-// íntegro justamente para isto.
+// The file name is drawn in TWO pieces (the ellipsis falls in the middle, so the
+// end — the version and the extension — is not eaten in a narrow bar), so matching
+// the whole text in a single element finds nothing. `data-nome` carries the
+// full name precisely for this.
 function nome(n: string): HTMLElement {
   const el = document.querySelector<HTMLElement>(`[data-nome="${n}"]`)
   if (!el) throw new Error(`Nenhum nome de arquivo "${n}" na tela`)
@@ -141,10 +141,10 @@ describe("ArtefatosLista", () => {
   })
 
   it("NÃO oferece troca de workspace — o painel segue o workspace da pessoa", async () => {
-    // Decisão do dono: a troca de escopo saiu daqui e volta depois, em outro
-    // lugar da casca. O dublê do `WorkspaceSwitcher` continua registrado DE
-    // PROPÓSITO: se alguém o recolocar no painel, o `ws-switcher` aparece e
-    // este teste cai. Sem o dublê, a asserção passaria por acidente.
+    // The owner's decision: the scope switch left here and comes back later, somewhere
+    // else in the shell. The `WorkspaceSwitcher` double stays registered ON
+    // PURPOSE: if someone puts it back in the panel, `ws-switcher` shows up and
+    // this test fails. Without the double, the assertion would pass by accident.
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [], total: 0 }))
     montar()
@@ -163,8 +163,8 @@ describe("ArtefatosLista", () => {
   })
 
   it("o aviso do Drive sobrevive à lista virtual (>150 itens)", async () => {
-    // É no workspace grande que a falha de uma fonte some sem ninguém notar: o
-    // corpo vira lista virtual e o aviso morava DENTRO do ramo curto.
+    // It is in a large workspace that a source's failure vanishes without anyone noticing: the
+    // body becomes a virtual list and the warning lived INSIDE the short branch.
     const muitos = Array.from({ length: 180 }, (_, i) =>
       artefato({ id_hash: `art-${i}`, filename: `saida-${i}.geojson` }),
     )
@@ -183,14 +183,14 @@ describe("ArtefatosLista", () => {
   })
 
   it("recarga que falha NÃO apaga a lista já carregada — só avisa", async () => {
-    // 1ª carga com o Drive fora: os artefatos entram e o aviso âmbar dá o
-    // "Tentar de novo" que dispara a recarga.
+    // 1st load with the Drive down: the artifacts come in and the amber warning offers the
+    // "Tentar de novo" (try again) that fires the reload.
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockRejectedValue(new Error("drive fora do ar"))
     montar()
     await acharNome("saida.geojson")
 
-    // Agora as DUAS fontes caem: a lista tem de continuar na tela (§3).
+    // Now BOTH sources go down: the list has to stay on screen (§3).
     H.getArtifacts.mockRejectedValue(new Error("caiu"))
     fireEvent.click(screen.getAllByText("Tentar de novo")[0])
     await waitFor(() => expect(screen.getByText(/Não foi possível atualizar o acervo/)).toBeTruthy())
@@ -218,10 +218,10 @@ describe("ArtefatosLista", () => {
     H.getDriveFiles.mockResolvedValue(ok({ items: [], total: 0 }))
     montar()
     await acharNome("saida.geojson")
-    // Portado para o <body>, o menu fica FORA da árvore `.home dark`: sem
-    // `home-portal` ele abre claro sobre a Home quase preta.
+    // Portaled to <body>, the menu sits OUTSIDE the `.home dark` tree: without
+    // `home-portal` it opens light over the near-black Home.
     expect(screen.getByTestId("menu").className).toContain("home-portal")
-    // D5: a regra dos 40px vale para os ITENS, não só para o gatilho.
+    // D5: the 40px rule applies to the ITEMS, not just the trigger.
     for (const rotulo of ["Exibir no globo", "Baixar", "Excluir"]) {
       expect(screen.getByText(rotulo).closest("button")?.className).toContain("max-md:min-h-10")
     }
@@ -239,8 +239,8 @@ describe("ArtefatosLista", () => {
   })
 
   it("Metadados de um arquivo do Drive e Excluir abrem na paleta da Home", async () => {
-    // Os dois diálogos são compartilhados pelo app e nascem sem paleta: a Home
-    // passa `home-portal`, senão abriam brancos sobre #050505.
+    // Both dialogs are shared across the app and are born without a palette: the Home
+    // passes `home-portal`, otherwise they opened white over #050505.
     H.getArtifacts.mockResolvedValue(ok({ items: [artefato()], total: 1 }))
     H.getDriveFiles.mockResolvedValue(ok({ items: [arquivo()], total: 1 }))
     montar()
@@ -261,10 +261,10 @@ describe("ArtefatosLista", () => {
     montar()
     await acharNome("saida.geojson")
 
-    // Só o geojson oferece "Exibir no globo" (o shapefile não é adicionável).
+    // Only the geojson offers "Exibir no globo" (show on globe; the shapefile cannot be added).
     expect(screen.getAllByText("Exibir no globo")).toHaveLength(1)
 
-    // Clicar no geojson enfileira o pedido — via store, não chamando camadaDoGlobo.
+    // Clicking the geojson queues the request — via the store, not by calling camadaDoGlobo.
     fireEvent.click(nome("saida.geojson"))
     const fila = useHomeStore.getState().pedidosDeCamada
     expect(fila.map((p) => p.artifactId)).toContain("art-geo")

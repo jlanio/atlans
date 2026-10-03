@@ -1,5 +1,5 @@
 # tests/unit/test_job_crypto.py
-"""Testes unitários para app/core/job_crypto.py — criptografia de jobs para executores."""
+"""Unit tests for app/core/job_crypto.py — job encryption for executors."""
 import base64
 import copy
 import json
@@ -25,15 +25,15 @@ def _make_ed25519_key_b64() -> str:
 
 
 def _make_x25519_pub_pem() -> str:
-    """Gera chave pública X25519 em PEM SubjectPublicKeyInfo."""
+    """Generates an X25519 public key in PEM SubjectPublicKeyInfo."""
     priv = X25519PrivateKey.generate()
     return priv.public_key().public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode()
 
 
 def _verify_job_signature(message: dict, server_ed25519_pub_b64: str) -> bool:
-    """A verificação que o executor faz (`executor.crypto.verify_signature`),
-    refeita aqui para conferir a assinatura de `build_job_message`: o servidor
-    só assina. O par real servidor↔executor é exercido em
+    """The verification the executor performs (`executor.crypto.verify_signature`),
+    redone here to check the signature of `build_job_message`: the server
+    only signs. The real server↔executor pair is exercised in
     test_contrato_app_executor_cripto.py."""
     try:
         pub_key = Ed25519PublicKey.from_public_bytes(base64.b64decode(server_ed25519_pub_b64))
@@ -48,23 +48,23 @@ def _verify_job_signature(message: dict, server_ed25519_pub_b64: str) -> bool:
         return False
 
 
-# ── Fixtures de escopo de módulo (geração de chave é barata mas desnecessariamente repetida) ──
+# ── Module-scoped fixtures (key generation is cheap but needlessly repeated) ──
 
 @pytest.fixture(scope="module")
 def ed25519_signing_key_b64() -> str:
-    """Chave Ed25519 gerada uma vez por módulo."""
+    """Ed25519 key generated once per module."""
     return _make_ed25519_key_b64()
 
 
 @pytest.fixture(scope="module")
 def x25519_agent_pub_pem() -> str:
-    """Chave pública X25519 do executor gerada uma vez por módulo."""
+    """Executor X25519 public key generated once per module."""
     return _make_x25519_pub_pem()
 
 
 @pytest.fixture
 def with_signing_key(ed25519_signing_key_b64, monkeypatch):
-    """Patcha EXECUTOR_SIGNING_KEY no módulo job_crypto para uma chave válida."""
+    """Patches EXECUTOR_SIGNING_KEY in the job_crypto module to a valid key."""
     monkeypatch.setattr("app.core.job_crypto.EXECUTOR_SIGNING_KEY", ed25519_signing_key_b64)
     monkeypatch.setattr("app.core.config.EXECUTOR_SIGNING_KEY", ed25519_signing_key_b64)
 
@@ -81,7 +81,7 @@ def without_signing_key(monkeypatch):
 class TestBuildJobMessage:
 
     def test_sem_signing_key_lanca_runtime_error(self, without_signing_key, x25519_agent_pub_pem):
-        """Sem EXECUTOR_SIGNING_KEY configurada deve lançar RuntimeError."""
+        """Without EXECUTOR_SIGNING_KEY configured it must raise RuntimeError."""
         from app.core.job_crypto import build_job_message
 
         with pytest.raises(RuntimeError, match="EXECUTOR_SIGNING_KEY"):
@@ -94,7 +94,7 @@ class TestBuildJobMessage:
             )
 
     def test_estrutura_resultado_completa(self, with_signing_key, x25519_agent_pub_pem):
-        """Resultado deve conter exatamente as chaves: envelope, ephemeral_public, ciphertext, signature."""
+        """The result must contain exactly the keys: envelope, ephemeral_public, ciphertext, signature."""
         from app.core.job_crypto import build_job_message
 
         msg = build_job_message(
@@ -108,7 +108,7 @@ class TestBuildJobMessage:
         assert set(msg.keys()) == {"envelope", "ephemeral_public", "ciphertext", "signature"}
 
     def test_campos_envelope(self, with_signing_key, x25519_agent_pub_pem):
-        """Envelope deve conter todos os campos obrigatórios com valores corretos."""
+        """The envelope must contain all required fields with correct values."""
         from app.core.job_crypto import build_job_message
 
         msg = build_job_message(
@@ -127,12 +127,12 @@ class TestBuildJobMessage:
         assert env["job_type"] == "run_workflow"
         assert "issued_at" in env
         assert "expires_at" in env
-        # nonce deve ser 32 bytes em hex = 64 caracteres
+        # nonce must be 32 bytes in hex = 64 characters
         assert len(env["nonce"]) == 64
         assert all(c in "0123456789abcdef" for c in env["nonce"])
 
     def test_job_id_gerado_automaticamente_se_none(self, with_signing_key, x25519_agent_pub_pem):
-        """Sem job_id explícito, deve gerar um UUID4."""
+        """Without an explicit job_id, it must generate a UUID4."""
         from app.core.job_crypto import build_job_message
         import re
 
@@ -151,7 +151,7 @@ class TestBuildJobMessage:
         assert uuid4_pattern.match(job_id), f"job_id não é UUID4: {job_id}"
 
     def test_job_id_customizado_preservado(self, with_signing_key, x25519_agent_pub_pem):
-        """job_id fornecido deve ser preservado no envelope."""
+        """A provided job_id must be preserved in the envelope."""
         from app.core.job_crypto import build_job_message
 
         msg = build_job_message(
@@ -166,7 +166,7 @@ class TestBuildJobMessage:
         assert msg["envelope"]["job_id"] == "my-deterministic-id"
 
     def test_ephemeral_public_e_ciphertext_sao_base64_valido(self, with_signing_key, x25519_agent_pub_pem):
-        """ephemeral_public e ciphertext devem ser strings base64 decodificáveis."""
+        """ephemeral_public and ciphertext must be decodable base64 strings."""
         from app.core.job_crypto import build_job_message
 
         msg = build_job_message(
@@ -177,7 +177,7 @@ class TestBuildJobMessage:
             payload={"data": "test"},
         )
 
-        # Não deve lançar exceção
+        # Must not raise an exception
         ephemeral_raw = base64.b64decode(msg["ephemeral_public"])
         ciphertext_raw = base64.b64decode(msg["ciphertext"])
 
@@ -187,7 +187,7 @@ class TestBuildJobMessage:
         assert len(ciphertext_raw) >= 12 + 16
 
     def test_dois_jobs_geram_ephemeral_keys_diferentes(self, with_signing_key, x25519_agent_pub_pem):
-        """Cada chamada deve gerar um par efêmero X25519 distinto (forward secrecy)."""
+        """Each call must generate a distinct ephemeral X25519 pair (forward secrecy)."""
         from app.core.job_crypto import build_job_message
 
         msg1 = build_job_message("a", "ws", x25519_agent_pub_pem, "run_workflow", {})
@@ -201,7 +201,7 @@ class TestVerifyJobSignature:
     def test_assinatura_valida_retorna_true(
         self, with_signing_key, x25519_agent_pub_pem, ed25519_signing_key_b64
     ):
-        """Mensagem não adulterada deve ter assinatura válida."""
+        """An untampered message must have a valid signature."""
         from app.core.job_crypto import build_job_message, get_server_signing_public_key_b64
 
         msg = build_job_message("executor-1", "ws-1", x25519_agent_pub_pem, "run_workflow", {})
@@ -212,13 +212,13 @@ class TestVerifyJobSignature:
     def test_envelope_adulterado_retorna_false(
         self, with_signing_key, x25519_agent_pub_pem
     ):
-        """Modificar o envelope após assinar deve invalidar a assinatura."""
+        """Modifying the envelope after signing must invalidate the signature."""
         from app.core.job_crypto import build_job_message, get_server_signing_public_key_b64
 
         msg = build_job_message("executor-1", "ws-1", x25519_agent_pub_pem, "run_workflow", {})
         pub_b64 = get_server_signing_public_key_b64()
 
-        # Adultera campo do envelope
+        # Tamper with an envelope field
         tampered = copy.deepcopy(msg)
         tampered["envelope"]["job_id"] = "attacker-injected-id"
 
@@ -244,7 +244,7 @@ class TestVerifyJobSignature:
     def test_chave_ed25519_incorreta_retorna_false(
         self, with_signing_key, x25519_agent_pub_pem
     ):
-        """Verificar com chave pública incorreta deve retornar False."""
+        """Verifying with the wrong public key must return False."""
         from app.core.job_crypto import build_job_message
 
         msg = build_job_message("executor-1", "ws-1", x25519_agent_pub_pem, "run_workflow", {})
@@ -266,7 +266,7 @@ class TestVerifyJobSignature:
         pub_b64 = get_server_signing_public_key_b64()
 
         tampered = copy.deepcopy(msg)
-        # Substitui ephemeral_public por outra chave X25519 gerada
+        # Replace ephemeral_public with another generated X25519 key
         new_priv = X25519PrivateKey.generate()
         new_pub_raw = new_priv.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
         tampered["ephemeral_public"] = base64.b64encode(new_pub_raw).decode()
@@ -305,7 +305,7 @@ class TestRoundTrip:
 class TestGetServerSigningPublicKeyB64:
 
     def test_sem_chave_retorna_none(self, without_signing_key):
-        """Sem EXECUTOR_SIGNING_KEY, deve retornar None."""
+        """Without EXECUTOR_SIGNING_KEY, it must return None."""
         from app.core.job_crypto import get_server_signing_public_key_b64
 
         result = get_server_signing_public_key_b64()
@@ -313,12 +313,12 @@ class TestGetServerSigningPublicKeyB64:
         assert result is None
 
     def test_com_chave_retorna_base64_valido(self, with_signing_key):
-        """Com EXECUTOR_SIGNING_KEY válida, deve retornar base64 de 32 bytes (Ed25519 pub raw)."""
+        """With a valid EXECUTOR_SIGNING_KEY, it must return base64 of 32 bytes (raw Ed25519 pub)."""
         from app.core.job_crypto import get_server_signing_public_key_b64
 
         result = get_server_signing_public_key_b64()
 
         assert result is not None
         pub_raw = base64.b64decode(result)
-        # Chave pública Ed25519 raw = 32 bytes
+        # Raw Ed25519 public key = 32 bytes
         assert len(pub_raw) == 32

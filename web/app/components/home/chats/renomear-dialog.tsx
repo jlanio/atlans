@@ -13,20 +13,20 @@ import type { ResultadoDaEscrita } from "@/app/hooks/home/useConversas"
 import { useTextosDaCasca } from "../i18n/da-casca"
 
 interface RenomearDialogProps {
-  /** A conversa em edição; `null` mantém o diálogo fechado. */
+  /** The conversation being edited; `null` keeps the dialog closed. */
   conversa: IConversaResumo | null
   onClose: () => void
-  /** Pode ser async; o diálogo aguarda e trava enquanto salva. O `erro` do
-   *  resultado vira a mensagem na caixa — um booleano sozinho deixava o diálogo
-   *  aberto e idêntico, e a pessoa clicava Salvar de novo achando que o clique
-   *  não registrara. */
+  /** May be async; the dialog waits and locks while saving. The result's `erro`
+   *  becomes the message in the box — a boolean alone left the dialog open and
+   *  identical, and the person clicked Salvar again thinking the click had not
+   *  registered. */
   onRenomear: (id: string, titulo: string) => Promise<ResultadoDaEscrita> | ResultadoDaEscrita
 }
 
 /**
- * Renomeia uma conversa. Enter salva; título vazio é rejeitado (o backend exige
- * 1..120). Controlado pela presença de `conversa` — assim o Radix anima entrada
- * e saída, e um efeito reinicia o campo a cada conversa nova.
+ * Renames a conversation. Enter saves; an empty title is rejected (the backend
+ * requires 1..120). Controlled by the presence of `conversa` — that way Radix
+ * animates entry and exit, and an effect resets the field for each new conversation.
  */
 export function RenomearDialog({ conversa, onClose, onRenomear }: RenomearDialogProps) {
   const textos = useTextosDaCasca()
@@ -55,9 +55,9 @@ export function RenomearDialog({ conversa, onClose, onRenomear }: RenomearDialog
 
   return (
     <Dialog open={!!conversa} onOpenChange={(v) => { if (!v && !salvando) onClose() }}>
-      {/* `home-portal`: o diálogo é portado para o <body>, FORA da árvore que
-          declara a paleta da Home — sem a classe ele abre na paleta clara do
-          app por cima da Home quase preta. */}
+      {/* `home-portal`: the dialog is portaled to <body>, OUTSIDE the tree that
+          declares the Home palette — without the class it opens in the app's
+          light palette over the near-black Home. */}
       <DialogContent closeDisabled={salvando} className="home-portal" closeLabel={textos.comum.fechar}>
         <DialogHeader>
           <DialogTitle>{t.titulo}</DialogTitle>

@@ -23,14 +23,14 @@ import { LinhaDoMeu, GatilhoDeAcoes } from "../linha"
 import { useFormatos, useIdiomaDaTela, useTextosDaCasca } from "../i18n/da-casca"
 import { resumirNoIdioma } from "./resumo"
 
-// Só a sublista some sozinha no trilho de 3rem; os blocos soltos (erro, aviso)
-// precisam da classe na mão.
+// Only the sublist hides on its own in the 3rem rail; the standalone blocks
+// (error, warning) need the class added by hand.
 const SO_EXPANDIDO = "group-data-[collapsible=icon]:hidden"
 
 /**
- * O fuso do NAVEGADOR, para decidir se vale nomear o do agendamento. Lido uma
- * vez por render da linha e não no módulo: em SSR não há Intl configurado pelo
- * usuário, e o `try` cobre os ambientes sem `resolvedOptions`.
+ * The BROWSER's time zone, to decide whether the schedule's one is worth naming.
+ * Read once per row render and not at module level: in SSR there is no
+ * user-configured Intl, and the `try` covers environments without `resolvedOptions`.
  */
 function fusoDoNavegador(): string | null {
   try {
@@ -41,24 +41,25 @@ function fusoDoNavegador(): string | null {
 }
 
 /**
- * Uma hora de relógio escrita na descrição ("todo dia às 06:00", "seg–sex às
- * 06:00", "dia 5 às 06:00"). É o que o fuso qualifica.
+ * A clock time written in the description ("todo dia às 06:00", "seg–sex às
+ * 06:00", "dia 5 às 06:00"). That is what the time zone qualifies.
  */
 const TEM_HORA = /\d{1,2}:\d{2}/
 
 /**
- * O agendamento roda no fuso que o backend guarda (padrão UTC, ou o
- * AGENDAMENTO_FUSO_PADRAO da instalação),
- * mas a "próxima execução" é formatada no fuso do navegador. Sem dizer qual é
- * qual, a linha mistura duas horas diferentes — "todo dia às 06:00 · amanhã,
- * 07:00" — e não há como saber pela tela qual é a real.
+ * The schedule runs in the time zone the backend stores (UTC by default, or the
+ * installation's AGENDAMENTO_FUSO_PADRAO),
+ * but the "próxima execução" (next run) is formatted in the browser's time zone.
+ * Without saying which is which, the row mixes two different times — "todo dia
+ * às 06:00 · amanhã, 07:00" — and there is no way to tell from the screen which
+ * one is real.
  *
- * O sufixo depende, então, de a descrição TER hora: "a cada 30 min" é a mesma
- * cadência em qualquer fuso, e "a cada 30 min (America/La_Paz)" não quer
- * dizer nada. O teste é a hora na própria descrição, e não a estratégia, porque
- * um cron de passo ("a cada N minutos") também é traduzido como cadência. A
- * expressão CRUA (`descricaoCrua`) fica de fora por outro motivo: ninguém lê o
- * fuso de um cron que a tela não soube traduzir.
+ * The suffix therefore depends on the description HAVING a time: "a cada 30 min"
+ * is the same cadence in any time zone, and "a cada 30 min (America/La_Paz)"
+ * means nothing. The test is the time in the description itself, not the
+ * strategy, because a step cron ("a cada N minutos") is also translated as a
+ * cadence. The RAW expression (`descricaoCrua`) is left out for another reason:
+ * nobody reads the time zone of a cron the screen couldn't translate.
  */
 function sufixoDeFuso(
   timezone: string | null | undefined,
@@ -72,23 +73,24 @@ function sufixoDeFuso(
 }
 
 /**
- * "Meus → Agendamentos": os agendamentos da pessoa, entre todos os workspaces
- * (ativos E pausados). O menu ⋯ (só para quem é operator+ NAQUELE workspace)
- * traz Pausar/Ativar e Rodar agora.
+ * "Meus → Agendamentos" (Mine → Schedules): the person's schedules, across all
+ * workspaces (active AND paused). The ⋯ menu (only for operator+ IN THAT
+ * workspace) offers Pausar/Ativar (pause/activate) and Rodar agora (run now).
  *
- * **A linha não leva mais ao editor.** Por decisão do dono, a Home é a única
- * página de quem não administra o sistema, e essa navegação foi uma das saídas
- * a fechar. A linha virou `<div>`: um `<button>` sem ação prometeria um clique
- * que não acontece, e o leitor de tela ainda o anunciaria como acionável. Rodar
- * e pausar seguem no menu — o que muda é ir embora da Home, não gerir o
- * agendamento.
+ * **The row no longer leads to the editor.** By the owner's decision, the Home is
+ * the only page for those who don't administer the system, and this navigation
+ * was one of the exits to close. The row became a `<div>`: a `<button>` with no
+ * action would promise a click that doesn't happen, and the screen reader would
+ * still announce it as actionable. Run and pause remain in the menu — what
+ * changes is leaving the Home, not managing the schedule.
  *
- * O papel é POR ITEM: `useWorkspace().canExecute` vale só para o workspace ativo,
- * mas esta lista cruza vários — então checa `my_role` do workspace de cada linha.
+ * The role is PER ITEM: `useWorkspace().canExecute` only applies to the active
+ * workspace, but this list spans several — so it checks the `my_role` of each
+ * row's workspace.
  *
- * A lista vem cortada no teto do servidor — o rodapé diz o total e oferece
- * "Ver mais", como Chats e Artefatos, porque não há outra tela de Agendamentos
- * onde procurar o que ficou de fora.
+ * The list comes cut at the server's ceiling — the footer states the total and
+ * offers "Ver mais" (see more), like Chats and Artifacts, because there is no
+ * other Schedules screen in which to look for what was left out.
  */
 export function AgendamentosLista() {
   const {
@@ -127,9 +129,9 @@ export function AgendamentosLista() {
     [refreshActiveRuns, t],
   )
 
-  // Rodar agora precisa do params_schema, que `/me/schedules` não traz: busca o
-  // fluxo no clique e, se tiver parâmetros, abre o diálogo; senão dispara direto.
-  // Mesmo fluxo de projects/index.tsx (handleRunClick).
+  // Run now needs the params_schema, which `/me/schedules` doesn't bring: fetches
+  // the workflow on click and, if it has parameters, opens the dialog; otherwise
+  // fires directly. Same flow as projects/index.tsx (handleRunClick).
   const prepararRun = useCallback(
     async (item: IAgendamentoMeu) => {
       setPreparandoId(item.job_id)
@@ -152,15 +154,15 @@ export function AgendamentosLista() {
     [rodar, t],
   )
 
-  // A lista vem cortada no teto do servidor: sem dizer o total, quem rola até o
-  // fim conclui que viu tudo — e não há outra tela de Agendamentos onde procurar
-  // o que ficou de fora.
+  // The list comes cut at the server's ceiling: without stating the total, whoever
+  // scrolls to the end concludes they saw everything — and there is no other
+  // Schedules screen in which to look for what was left out.
   const faltam = total > agendamentos.length
 
-  // O corpo é escolhido numa VARIÁVEL, não por `return` antecipado: o rodapé
-  // (aviso de recarga falhada + "Ver mais") tem de viver FORA dos ramos. Com a
-  // lista vazia o `return` curto saía antes dele e uma recarga que falhava não
-  // tinha onde aparecer. Mesmo desenho de `artefatos/lista.tsx`.
+  // The body is chosen into a VARIABLE, not via an early `return`: the footer
+  // (failed-reload warning + "Ver mais") has to live OUTSIDE the branches. With
+  // an empty list the short `return` exited before it and a failing reload had
+  // nowhere to appear. Same design as `artefatos/lista.tsx`.
   let corpo: React.ReactNode
   if (carregando) {
     corpo = (
@@ -173,8 +175,8 @@ export function AgendamentosLista() {
       </SidebarMenuSub>
     )
   } else if (erro && !jaCarregou) {
-    // §3: o bloco de erro só toma a lista quando nunca houve carga aceita. Com
-    // agendamentos na tela, a falha vira o aviso âmbar do rodapé.
+    // §3: the error block only takes over the list when there was never an
+    // accepted load. With schedules on screen, the failure becomes the footer's amber warning.
     corpo = (
       <div role="alert" className={`flex flex-col items-start gap-1 px-2 py-1.5 ${SO_EXPANDIDO}`}>
         <p className="text-xs text-sidebar-foreground/70">{erro}</p>
@@ -197,8 +199,8 @@ export function AgendamentosLista() {
     corpo = (
       <SidebarMenuSub aria-busy={atualizando || undefined}>
         {agendamentos.map((item) => {
-          // Em português é o `resumirAgendamento` do gatilho tal e qual; nos
-          // outros idiomas, as mesmas regras com as frases do dicionário.
+          // In Portuguese it is the trigger's `resumirAgendamento` as is; in the
+          // other languages, the same rules with the dictionary's sentences.
           const resumo = resumirNoIdioma(item, item.flag_ative, idioma)
           const permitido = podeMexer(item.workspace_id)
           const preparando = preparandoId === item.job_id
@@ -215,21 +217,22 @@ export function AgendamentosLista() {
           return (
             <SidebarMenuSubItem key={item.job_id}>
               <LinhaDoMeu>
-              {/* A linha NÃO navega mais para o editor: a Home é a única página
-                  de quem não administra o sistema. Por isso é um `<div>` e não
-                  um `<button>` — um botão sem ação seria uma promessa falsa, e
-                  o leitor de tela o anunciaria como acionável. O que se pode
-                  fazer com o agendamento continua no menu `⋯` (pausar/ativar,
-                  rodar agora); o realce no hover é da `LinhaDoMeu`, e é ele que
-                  revela o gatilho do menu — o mesmo desenho das outras listas. */}
+              {/* The row NO longer navigates to the editor: the Home is the only page
+                  for those who don't administer the system. That's why it is a
+                  `<div>` and not a `<button>` — a button with no action would be
+                  a false promise, and the screen reader would announce it as
+                  actionable. What can be done with the schedule remains in the
+                  `⋯` menu (pause/activate, run now); the hover highlight comes
+                  from `LinhaDoMeu`, and it is what reveals the menu trigger —
+                  the same design as the other lists. */}
               <div
                 title={item.workflow_name}
                 className="flex min-w-0 flex-1 flex-col gap-0.5 py-1 text-sidebar-foreground max-md:min-h-10"
               >
                 <span className="flex min-w-0 items-center gap-1.5">
-                  {/* "Rodar agora" fecha o menu e some: o ponto de estado vira
-                      spinner enquanto o params_schema é buscado, senão o clique
-                      passa 1-3 s sem nenhum retorno na tela. */}
+                  {/* "Rodar agora" closes the menu and disappears: the status dot becomes
+                      a spinner while the params_schema is fetched, otherwise the
+                      click goes 1-3 s with no feedback on screen. */}
                   {preparando ? (
                     <TbLoader2
                       className="size-3 shrink-0 animate-spin text-sidebar-foreground/60"
@@ -253,8 +256,8 @@ export function AgendamentosLista() {
                     />
                   )}
                 </span>
-                {/* Segunda linha truncada com o texto inteiro no `title`: "pausado
-                    — workflow inativo" cortado em "pausado — wor…" não diz nada. */}
+                {/* Second line truncated with the full text in `title`: "pausado
+                    — workflow inativo" cut to "pausado — wor…" says nothing. */}
                 {linhaResumo && (
                   <span className="truncate pl-3 text-[11px] text-sidebar-foreground/55" title={linhaResumo}>
                     {linhaResumo}
@@ -267,11 +270,11 @@ export function AgendamentosLista() {
                   <DropdownMenuTrigger asChild>
                     <GatilhoDeAcoes rotulo={item.workflow_name} />
                   </DropdownMenuTrigger>
-                  {/* `home-portal`: o menu é portado para o <body>, FORA da
-                      árvore que declara a paleta da Home — sem a classe ele
-                      abria claro sobre a Home quase preta quando o app está no
-                      tema claro. Os itens ganham 40px no telefone: o gatilho já
-                      era grande o bastante, o destino do toque é que não era. */}
+                  {/* `home-portal`: the menu is portaled to <body>, OUTSIDE the
+                      tree that declares the Home's palette — without the class it
+                      opened light over the near-black Home when the app is in
+                      the light theme. The items get 40px on phones: the trigger
+                      was already big enough, it was the tap target that wasn't. */}
                   <DropdownMenuContent align="end" className="home-portal min-w-40">
                     <DropdownMenuItem
                       onSelect={() => alternarAtivo(item)}
@@ -310,11 +313,11 @@ export function AgendamentosLista() {
     <>
       {corpo}
 
-      {/* O rodapé vive FORA dos ramos: com a lista VAZIA e uma recarga que
-          falhou, o aviso âmbar não tinha onde aparecer. */}
+      {/* The footer lives OUTSIDE the branches: with an EMPTY list and a reload
+          that failed, the amber warning had nowhere to appear. */}
       {((erro && jaCarregou) || faltam) && (
         <div className={`flex flex-col gap-1 px-2 pb-1 ${SO_EXPANDIDO}`}>
-          {/* Recarga que falhou sobre a lista pronta: aviso, não apagar a lista. */}
+          {/* Reload that failed over the ready list: warn, don't erase the list. */}
           {erro && jaCarregou && (
             <AvisoAmbar
               onTentar={recarregar}

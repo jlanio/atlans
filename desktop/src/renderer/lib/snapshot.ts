@@ -1,22 +1,22 @@
 // desktop/src/renderer/lib/snapshot.ts
 //
-// O snapshot do executor chega por CONTEXTO, e não por prop.
+// The executor snapshot arrives via CONTEXT, not via prop.
 //
-// Ele é substituído por um objeto novo a cada segundo. Como prop, obrigava
-// GeoSync e Ajustes — que ficam MONTADAS atrás de `hidden` para não perder
-// edição não salva — a re-renderizar a árvore inteira a 1 Hz: dez cartões, três
-// radiogroups e o QuadroDoModo redesenhados para atualizar quatro números que
-// vivem num canto da tela. O app queimava CPU só por estar aberto e ocioso.
+// It is replaced by a new object every second. As a prop, it forced GeoSync
+// and Ajustes — which stay MOUNTED behind `hidden` so unsaved edits are not
+// lost — to re-render their whole tree at 1 Hz: ten cards, three radiogroups
+// and the QuadroDoModo redrawn to update four numbers that live in a corner of
+// the screen. The app burned CPU just by being open and idle.
 //
-// Pelo contexto, o `memo` das duas telas segura o tick e só quem de fato lê o
-// snapshot re-renderiza: a Situação do GeoSync, o Disco dos Ajustes e a barra de
-// salvar.
+// Through the context, the `memo` of both screens holds back the tick and only
+// what actually reads the snapshot re-renders: GeoSync's Situação, Ajustes'
+// Disco and the save bar.
 import { createContext, useContext } from 'react'
 import type { Snapshot } from '../../shared/events.js'
 
 export const ContextoSnapshot = createContext<Snapshot | null>(null)
 
-/** Último snapshot do executor, ou `null` com ele parado. */
+/** Latest executor snapshot, or `null` when it is stopped. */
 export function useSnapshot(): Snapshot | null {
   return useContext(ContextoSnapshot)
 }

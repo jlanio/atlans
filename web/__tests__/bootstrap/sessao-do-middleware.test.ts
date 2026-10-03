@@ -1,22 +1,22 @@
 /**
- * Repasse da sessão do middleware para o SSR (SESSION_HEADER em auth.ts).
+ * Handoff of the session from the middleware to SSR (SESSION_HEADER in auth.ts).
  *
- * O layout do dashboard chamava `auth()` no Server Component. Esse `auth()` monta
- * a Request a partir de `headers()`, onde o Next NÃO mescla os cookies que o
- * middleware acabou de gravar — então, com o access_token vencido, o RSC via o
- * mesmo `expires_at` vencido e disparava um SEGUNDO POST /auth/refresh por
- * carregamento (cujo Set-Cookie o next-auth ainda descarta no caminho RSC).
- * Dobrar esse tráfego estoura o rate limit de 20/min, que no backend é um balde
- * único para toda a plataforma, e o 429 vira logout em massa.
+ * The dashboard layout called `auth()` in the Server Component. That `auth()` builds
+ * the Request from `headers()`, where Next does NOT merge the cookies the
+ * middleware just wrote — so, with an expired access_token, the RSC saw the
+ * same expired `expires_at` and fired a SECOND POST /auth/refresh per
+ * load (whose Set-Cookie next-auth still discards on the RSC path).
+ * Doubling that traffic blows the 20/min rate limit, which in the backend is a single
+ * bucket for the whole platform, and the 429 becomes a mass logout.
  *
- * Estes testes fixam o contrato do handoff: o que o middleware escreve o layout
- * consegue ler, e o que não tem cara de sessão nossa é recusado (para o layout
- * cair no fallback de `auth()` em vez de hidratar com lixo).
+ * These tests pin the handoff contract: what the middleware writes the layout
+ * can read, and what does not look like one of our sessions is refused (so the layout
+ * falls back to `auth()` instead of hydrating with garbage).
  */
 import { describe, it, expect, vi } from "vitest"
 
-// auth.ts chama NextAuth() no topo do módulo; aqui só interessam os helpers
-// puros de serialização, então o provider e o próprio NextAuth viram stubs.
+// auth.ts calls NextAuth() at the top of the module; here only the pure
+// serialization helpers matter, so the provider and NextAuth itself become stubs.
 vi.mock("next-auth", () => ({
   default: () => ({ handlers: {}, signIn: vi.fn(), signOut: vi.fn(), auth: vi.fn() }),
 }))
@@ -39,16 +39,16 @@ const sessao = {
 
 describe("handoff de sessão middleware → SSR", () => {
   it("o nome do cabeçalho é o mesmo dos dois lados", () => {
-    // Se este valor divergir entre middleware e layout, o layout volta
-    // silenciosamente ao fallback de auth() e o refresh duplicado ressuscita.
+    // If this value diverges between middleware and layout, the layout silently goes
+    // back to the auth() fallback and the duplicate refresh comes back to life.
     expect(SESSION_HEADER).toBe("x-atlans-session")
   })
 
   it("round-trip preserva o access_token e caracteres não-ASCII", () => {
     const raw = encodeSessionHeader(sessao)
     expect(raw).not.toBeNull()
-    // Cabeçalho HTTP não carrega bytes fora do latin-1: o valor tem que sair
-    // percent-encoded, senão o "ã" derruba a escrita do header no Edge.
+    // An HTTP header does not carry bytes outside latin-1: the value has to go out
+    // percent-encoded, otherwise the "ã" breaks writing the header on the Edge.
     expect(raw).toMatch(/^[\x20-\x7E]+$/)
     expect(decodeSessionHeader(raw)).toEqual(sessao)
   })
@@ -62,7 +62,7 @@ describe("handoff de sessão middleware → SSR", () => {
   it("recusa ausência, lixo e sessão sem id_hash", () => {
     expect(decodeSessionHeader(null)).toBeNull()
     expect(decodeSessionHeader("")).toBeNull()
-    expect(decodeSessionHeader("%%%")).toBeNull() // percent-decode inválido
+    expect(decodeSessionHeader("%%%")).toBeNull() // invalid percent-decode
     expect(decodeSessionHeader("nao-e-json")).toBeNull()
     expect(decodeSessionHeader(encodeURIComponent('"texto"'))).toBeNull()
     expect(decodeSessionHeader(encodeURIComponent("{}"))).toBeNull()
@@ -70,8 +70,8 @@ describe("handoff de sessão middleware → SSR", () => {
   })
 
   it("desiste de sessão grande demais em vez de estourar o limite de cabeçalho", () => {
-    // Cabeçalho gigante derruba a requisição inteira no proxy/Node; melhor o
-    // layout cair no fallback de auth() do que a página não carregar.
+    // A giant header kills the whole request in the proxy/Node; better for the
+    // layout to fall back to auth() than for the page not to load.
     const gorda = { user: { ...sessao.user, access_token: "x".repeat(9000) } }
     expect(encodeSessionHeader(gorda)).toBeNull()
   })

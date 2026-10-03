@@ -1,34 +1,34 @@
 /**
- * Identidade visual determinística de workspaces.
+ * Deterministic visual identity for workspaces.
  *
- * Objetivo: dar a cada workspace uma cor + par de iniciais consistentes,
- * SEM migration de DB nem UI de configuração. A cor é escolhida de uma
- * paleta fixa via hash do `id_hash`, então:
+ * Goal: give each workspace a consistent color + pair of initials, WITHOUT a
+ * DB migration or a configuration UI. The color is picked from a fixed
+ * palette via a hash of `id_hash`, so:
  *
- *   - Mesmo workspace sempre tem a mesma cor pra qualquer usuário e sessão.
- *   - Reconhecimento visual rápido (sidebar colapsada mostra só o avatar).
- *   - Ao trocar de workspace, a mudança de cor no header + toast dão
- *     feedback imediato de que o escopo mudou.
+ *   - The same workspace always has the same color for any user and session.
+ *   - Fast visual recognition (the collapsed sidebar shows only the avatar).
+ *   - When switching workspace, the color change in the header + the toast
+ *     give immediate feedback that the scope changed.
  *
- * Paleta: Tailwind `-500` de 10 cores balanceadas. Todas passam WCAG AA
- * com `text-white` — funciona em light e dark mode sem swap adicional.
+ * Palette: Tailwind `-500` of 10 balanced colors. All pass WCAG AA
+ * with `text-white` — works in light and dark mode with no extra swap.
  */
 
 export interface WorkspaceIdentity {
-  /** 1-2 letras maiúsculas, ex: "M", "MK", "FG" */
+  /** 1-2 uppercase letters, e.g. "M", "MK", "FG" */
   initials: string
   /** Classe Tailwind pro fundo do avatar, ex: "bg-emerald-500" */
   bg: string
-  /** Classe Tailwind pro texto do avatar (sempre branco) */
+  /** Tailwind class for the avatar's text (always white) */
   fg: string
   /** Classe Tailwind pra ring de foco/hover, ex: "ring-emerald-500/40" */
   ring: string
 }
 
-// Paleta cuidada: cores -500 que contrastam bem com `text-white` tanto
-// em fundo claro quanto escuro. Ordem determinística — o hash mapeia
-// pra índice, então não reordenar sem plano (mudaria a cor de todos os
-// workspaces existentes na próxima render).
+// Curated palette: -500 colors that contrast well with `text-white` on both
+// light and dark backgrounds. Deterministic order — the hash maps to an
+// index, so do not reorder without a plan (it would change the color of every
+// existing workspace on the next render).
 const PALETTE: ReadonlyArray<Pick<WorkspaceIdentity, "bg" | "ring">> = [
   { bg: "bg-emerald-500", ring: "ring-emerald-500/40" },
   { bg: "bg-blue-500",    ring: "ring-blue-500/40"    },
@@ -43,8 +43,8 @@ const PALETTE: ReadonlyArray<Pick<WorkspaceIdentity, "bg" | "ring">> = [
 ]
 
 /**
- * djb2 — hash simples e rápido, espalhamento suficiente pra 10 buckets.
- * Retorna sempre um inteiro >= 0 (mask com 0x7fffffff).
+ * djb2 — a simple, fast hash, with enough spread for 10 buckets.
+ * Always returns an integer >= 0 (masked with 0x7fffffff).
  */
 function djb2(str: string): number {
   let hash = 5381
@@ -55,17 +55,17 @@ function djb2(str: string): number {
 }
 
 /**
- * Extrai iniciais do nome do workspace:
- *   - Se tem 2+ palavras: 1ª letra da 1ª + 1ª letra da 2ª ("Fluxo Geo" → "FG")
- *   - Se tem 1 palavra: 2 primeiras letras ("Marketing" → "MA")
- *   - Fallback pra 1 letra se nome tem só 1 char, "?" se vazio.
- * Ignora símbolos (`-`, `_`, dígitos) na quebra por espaço.
+ * Extracts initials from the workspace name:
+ *   - With 2+ words: 1st letter of the 1st + 1st letter of the 2nd ("Fluxo Geo" → "FG")
+ *   - With 1 word: the first 2 letters ("Marketing" → "MA")
+ *   - Falls back to 1 letter if the name has only 1 char, "?" if empty.
+ * Ignores symbols (`-`, `_`, digits) when splitting on spaces.
  */
 function extractInitials(name: string): string {
   const trimmed = name.trim()
   if (!trimmed) return "?"
 
-  // Split em espaço, filtra palavras vazias
+  // Split on spaces, filter out empty words
   const words = trimmed.split(/\s+/).filter(Boolean)
 
   if (words.length >= 2) {

@@ -1,16 +1,16 @@
 # tests/unit/test_mcp_sdk_contrato.py
 """
-Contrato do SDK `mcp` pinado em requirements.txt (docs/specs/mcp-server.md).
+Contract of the `mcp` SDK pinned in requirements.txt (docs/specs/mcp-server.md).
 
-A spec do servidor MCP foi escrita contra identificadores de um pacote que
-muda rápido. Este teste é a verificação que ela exige: os nomes que a Fase 1
-vai importar existem NESTA versão, e o transporte streamable HTTP se comporta
-como a spec assume — Host fora da lista é 421, Origin de navegador é 403, e
-`initialize` responde com o nome do servidor.
+The MCP server spec was written against identifiers of a fast-changing package.
+This test is the check it requires: the names Phase 1 will import exist IN THIS
+version, and the streamable HTTP transport behaves as the spec assumes — a Host
+outside the list is 421, a browser Origin is 403, and `initialize` answers with
+the server's name.
 
-Nota para a Fase 1: a validação de Host/Origin acontece DENTRO do transporte,
-depois de qualquer middleware externo. Com a autenticação por PAT na frente,
-um request sem token recebe 401 antes de qualquer 421.
+Note for Phase 1: the Host/Origin validation happens INSIDE the transport,
+after any external middleware. With PAT authentication in front, a request
+without a token gets 401 before any 421.
 """
 from __future__ import annotations
 
@@ -19,14 +19,14 @@ import inspect
 import httpx
 import pytest
 
-# Os identificadores que a spec cita — o import falhar JÁ é o teste.
+# The identifiers the spec cites — the import failing ALREADY is the test.
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.transport_security import TransportSecuritySettings
 
 _JSON = {
     "Content-Type": "application/json",
-    # Sem os dois tipos no Accept o transporte responde 406 antes de olhar o resto.
+    # Without both types in Accept the transport answers 406 before looking at the rest.
     "Accept": "application/json, text/event-stream",
 }
 
@@ -51,8 +51,8 @@ def _servidor():
     app = server.streamable_http_app(
         streamable_http_path="/mcp",
         stateless_http=True,
-        # JSON em vez de SSE só no teste: o que se verifica é Host/Origin e os
-        # identificadores, não o streaming.
+        # JSON instead of SSE only in the test: what is checked is Host/Origin and the
+        # identifiers, not the streaming.
         json_response=True,
         transport_security=TransportSecuritySettings(
             allowed_hosts=["atlans.example.org", "atlans.example.org:*", "localhost:*", "127.0.0.1:*"],
@@ -78,21 +78,21 @@ async def test_transporte_recusa_host_e_origin_fora_da_lista_e_responde_initiali
     async with server.session_manager.run():
         transporte = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transporte, base_url="http://atlans.example.org") as c:
-            # Host estranho: DNS rebinding — 421 antes de qualquer JSON-RPC.
+            # Unknown Host: DNS rebinding — 421 before any JSON-RPC.
             r = await c.post("/mcp", json=_INITIALIZE, headers={**_JSON, "Host": "evil.example"})
             assert r.status_code == 421, r.text
 
-            # Navegador (Origin presente) não é cliente deste servidor: 403.
+            # A browser (Origin present) is not a client of this server: 403.
             r = await c.post("/mcp", json=_INITIALIZE, headers={**_JSON, "Origin": "https://x.example"})
             assert r.status_code == 403, r.text
 
-            # Host permitido, sem Origin: o handshake responde com o nome do servidor.
+            # Allowed Host, no Origin: the handshake answers with the server's name.
             r = await c.post("/mcp", json=_INITIALIZE, headers=_JSON)
             assert r.status_code == 200, r.text
             corpo = r.json()
             assert corpo["result"]["serverInfo"]["name"] == "teste"
 
-            # Stateless: `tools/list` responde sem sessão prévia e lista a tool registrada.
+            # Stateless: `tools/list` answers without a prior session and lists the registered tool.
             r = await c.post(
                 "/mcp", headers=_JSON,
                 json={"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},

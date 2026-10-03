@@ -1,13 +1,13 @@
-"""GET /assistente/camadas/{id} e /assistente/tiles/... — camadas do globo da Home.
+"""GET /assistente/camadas/{id} and /assistente/tiles/... — layers of the Home globe.
 
-Banco real (SQLite) atras da app real; o `client` do conftest autentica como
-`usr-test-001` no workspace `ws-test-001` (via `mock_workspace_ids`). O que se
-afirma e o contrato: portao de MEMBRO (403 para artefato de outro workspace),
-a resolucao geojson/mvt/indisponivel, a guarda de CRS, e os tiles com portao de
-membro (404 uniforme, `private`, sem `Access-Control-Allow-Origin`).
+Real database (SQLite) behind the real app; the conftest's `client` authenticates
+as `usr-test-001` in workspace `ws-test-001` (via `mock_workspace_ids`). What is
+asserted is the contract: MEMBER gate (403 for an artifact from another workspace),
+the geojson/mvt/unavailable resolution, the CRS guard, and the tiles with a member
+gate (uniform 404, `private`, no `Access-Control-Allow-Origin`).
 
-`presigned_get_async` e `tile_mvt` sao dublados: o primeiro falaria com o MinIO,
-o segundo roda `ST_AsMVT` (so PostGIS) — nenhum dos dois existe no SQLite.
+`presigned_get_async` and `tile_mvt` are doubled: the first would talk to MinIO,
+the second runs `ST_AsMVT` (PostGIS only) — neither exists in SQLite.
 """
 from unittest.mock import AsyncMock
 
@@ -51,7 +51,7 @@ async def api(client, sessao, monkeypatch):
         yield sessao
 
     app.dependency_overrides[get_db] = _db
-    monkeypatch.setattr(limiter, "enabled", False)  # o 60/min conta por IP entre testes
+    monkeypatch.setattr(limiter, "enabled", False)  # the 60/min counts per IP across tests
     yield client
     app.dependency_overrides.pop(get_db, None)
 
@@ -135,7 +135,7 @@ async def test_crs_diferente_de_4326_e_indisponivel(api, sessao):
     c = r.json()
     assert c["tipo"] == "indisponivel"
     assert "4326" in c["hint"]
-    # bbox em CRS nativo nao acompanha (a web nao enquadra com ele).
+    # bbox in native CRS is not included (the web can't frame with it).
     assert c["bbox"] is None
 
 
@@ -165,10 +165,11 @@ async def test_formato_nao_geojson_sem_publicacao_e_indisponivel(api, sessao):
     assert r.json()["tipo"] == "indisponivel"
 
 
-# ── `baixavel`: o botao de baixar do painel de camadas ───────────────────────
-# Ele diz se `GET /artifacts/{id}/download` ENTREGARIA o arquivo, e nao se ha
-# previa no globo (`available`). A web esconde a acao quando e falso: um botao
-# vivo que devolve 409/404 e pior que um botao ausente.
+# ── `baixavel`: the download button of the layers panel ──────────────────────
+# It says whether `GET /artifacts/{id}/download` WOULD DELIVER the file, not
+# whether there is a preview on the globe (`available`). The web hides the
+# action when it is false: a live button that returns 409/404 is worse than a
+# missing button.
 
 
 @pytest.mark.asyncio
@@ -184,17 +185,17 @@ async def test_geojson_no_storage_e_baixavel(api, sessao, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_executor_local_nao_e_baixavel(api, sessao):
-    # `keepLocal`: o download responde 409 porque servir o arquivo exigiria que o
-    # servidor o buscasse no executor — exatamente o que a marcacao proibe.
+    # `keepLocal`: the download responds 409 because serving the file would require
+    # the server to fetch it from the executor — exactly what the flag forbids.
     await _artefato(sessao, content_location="executor", s3_key=None)
     assert (await api.get("/assistente/camadas/art-1")).json()["baixavel"] is False
 
 
 @pytest.mark.asyncio
 async def test_publicada_sem_arquivo_no_storage_nao_e_baixavel(api, sessao):
-    # O caso que motiva o campo: a camada APARECE no globo (MVT, conteudo no
-    # PostGIS) e mesmo assim nao ha arquivo para baixar. `available` e `baixavel`
-    # divergem aqui, e so aqui.
+    # The case that motivates the field: the layer SHOWS UP on the globe (MVT,
+    # content in PostGIS) and still there is no file to download. `available` and
+    # `baixavel` diverge here, and only here.
     await _artefato(sessao, is_published=True, s3_key=None)
     sessao.add(PortalLayer(
         workflow_hash="wf-1", run_id="run-1", layer_key="camada_focos",
@@ -253,7 +254,7 @@ async def test_tiles_do_membro_200_protobuf_private_sem_cors(api, sessao, monkey
     assert r.status_code == 200
     assert r.headers["content-type"] == "application/x-protobuf"
     assert r.headers["cache-control"] == "private, max-age=300"
-    # Nunca compartilha entre origens: e camada nao-publicada.
+    # Never shared across origins: it is an unpublished layer.
     assert "access-control-allow-origin" not in {k.lower() for k in r.headers}
 
 
@@ -270,13 +271,13 @@ async def test_tiles_vazio_e_204(api, sessao, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_com_dois_publishmap_devolve_a_camada_do_artefato_pedido(api, sessao):
-    """Duas camadas na mesma execucao: casa pelo layer_key, nao pela ordem fisica.
+    """Two layers in the same run: match by layer_key, not by physical order.
 
-    Sem o discriminador, `.first()` sem ORDER BY entregava a camada do OUTRO no —
-    a pessoa pedia "rios" e o globo desenhava "municipios".
+    Without the discriminator, `.first()` without ORDER BY delivered the OTHER
+    node's layer — the person asked for "rios" and the globe drew "municipios".
     """
     await _artefato(sessao, filename="rios.geojson", output_key="rios", is_published=True)
-    # "municipios" entra PRIMEIRO, para que um `.first()` ingenuo a escolhesse.
+    # "municipios" goes in FIRST, so that a naive `.first()` would pick it.
     sessao.add(PortalLayer(
         workflow_hash="wf-1", run_id="run-1", layer_key="municipios",
         geojson_data={"type": "FeatureCollection", "features": []},
@@ -300,21 +301,21 @@ async def test_run_com_dois_publishmap_devolve_a_camada_do_artefato_pedido(api, 
 
 @pytest.mark.asyncio
 async def test_republicacao_em_outro_run_nao_serve_a_camada_nova(api, sessao, monkeypatch):
-    """A linha de `portal_layers` e reescrita in place a cada publicacao.
+    """The `portal_layers` row is rewritten in place on every publication.
 
-    `portal_router._publicar` faz UPSERT em `(workflow_hash, layer_key)`: geojson,
-    bbox, geometry_type e run_id da linha passam a ser os da ULTIMA execucao.
-    Casar so pelo `layer_key` fazia o artefato da execucao antiga servir os tiles
-    e a bbox da execucao nova, rotulados com o nome do artefato antigo.
+    `portal_router._publicar` UPSERTs on `(workflow_hash, layer_key)`: the row's
+    geojson, bbox, geometry_type and run_id become those of the LATEST run.
+    Matching only by `layer_key` made the old run's artifact serve the tiles and
+    bbox of the new run, labeled with the old artifact's name.
     """
     monkeypatch.setattr(
         "app.api.routers.assistente_camadas_router.presigned_get_async",
         AsyncMock(return_value="https://s3.atlans.example.org/focos.geojson?sig=abc"),
     )
     await _artefato(sessao, is_published=True)  # filename "focos.geojson", run-1
-    await _metrics(sessao)                      # bbox/crs do run-1
-    # Mesma layer_key derivada do filename, mas ja reescrita por uma execucao
-    # POSTERIOR — com outra bbox e outra geometria.
+    await _metrics(sessao)                      # bbox/crs of run-1
+    # Same layer_key derived from the filename, but already rewritten by a LATER
+    # run — with a different bbox and a different geometry.
     sessao.add(PortalLayer(
         workflow_hash="wf-1", run_id="run-5", layer_key="focos",
         geojson_data={"type": "FeatureCollection", "features": []},
@@ -325,17 +326,17 @@ async def test_republicacao_em_outro_run_nao_serve_a_camada_nova(api, sessao, mo
     r = await api.get("/assistente/camadas/art-1")
     assert r.status_code == 200
     c = r.json()
-    # Cai para o GeoJSON do proprio artefato — o dado correto daquele run.
+    # Falls back to the artifact's own GeoJSON — the correct data for that run.
     assert c["tipo"] == "geojson"
     assert c["mvt"] is None
-    # E nem a bbox nem a geometria da execucao nova vazam.
+    # And neither the bbox nor the geometry of the new run leak.
     assert c["bbox"] == [-64.0, -12.0, -60.0, -8.0]
     assert c["geometry_type"] == "Polygon"
 
 
 @pytest.mark.asyncio
 async def test_camada_ambigua_nao_e_adivinhada(api, sessao, monkeypatch):
-    """Duas camadas no run e nenhuma casando pelo nome: nao escolhe em silencio."""
+    """Two layers in the run and none matching by name: does not pick silently."""
     monkeypatch.setattr(
         "app.api.routers.assistente_camadas_router.presigned_get_async",
         AsyncMock(return_value="https://s3.atlans.example.org/focos.geojson?sig=abc"),
@@ -350,32 +351,32 @@ async def test_camada_ambigua_nao_e_adivinhada(api, sessao, monkeypatch):
 
     r = await api.get("/assistente/camadas/art-1")
     assert r.status_code == 200
-    # Cai para o caminho GeoJSON em vez de devolver a camada errada.
+    # Falls back to the GeoJSON path instead of returning the wrong layer.
     assert r.json()["tipo"] == "geojson"
 
 
 @pytest.mark.asyncio
 async def test_no_com_varias_saidas_nao_leva_bbox_de_outra(api, sessao, monkeypatch):
-    """`NodeRunMetrics` e por NO: com duas saidas, o bbox gravado e o da ultima."""
+    """`NodeRunMetrics` is per NODE: with two outputs, the stored bbox is the last one's."""
     monkeypatch.setattr(
         "app.api.routers.assistente_camadas_router.presigned_get_async",
         AsyncMock(return_value="https://s3.atlans.example.org/a.geojson?sig=abc"),
     )
     await _artefato(sessao, id_hash="art-1", output_key="adicionados", filename="adicionados.geojson")
     await _artefato(sessao, id_hash="art-2", output_key="removidos", filename="removidos.geojson")
-    await _metrics(sessao)  # uma unica linha para (run-1, n1)
+    await _metrics(sessao)  # a single row for (run-1, n1)
 
     r = await api.get("/assistente/camadas/art-1")
     assert r.status_code == 200
     c = r.json()
     assert c["tipo"] == "geojson"          # segue desenhavel (o crs continua valendo)
-    assert c["bbox"] is None               # mas nao enquadra pela extensao de outra saida
-    assert c["geometry_type"] is None      # nem rotula a geometria de outra saida
+    assert c["bbox"] is None               # but does not frame by another output's extent
+    assert c["geometry_type"] is None      # nor label the geometry of another output
 
 
 @pytest.mark.asyncio
 async def test_tiles_de_fluxo_apagado_e_404(api, sessao, monkeypatch):
-    """Apagar o fluxo tem de tirar a camada do ar, mesmo para quem tem a URL."""
+    """Deleting the workflow has to take the layer offline, even for whoever has the URL."""
     from app.core.utils.datetime_utils import utc_now_naive
 
     await _com_camada(sessao)

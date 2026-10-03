@@ -33,7 +33,7 @@ function CodeBlock({ code }: { code: string }) {
       <pre className="bg-muted rounded-md p-3 text-[11px] font-mono leading-relaxed overflow-x-auto whitespace-pre text-foreground/80">
         {code}
       </pre>
-      {/* `coarse:`: no telefone não há hover, e copiar o bloco era impossível. */}
+      {/* `coarse:`: phones have no hover, and copying the block was impossible. */}
       <div className="absolute top-1.5 right-1.5 opacity-0 coarse:opacity-70 group-hover:opacity-100 transition-opacity">
         <CopyButton text={code} />
       </div>
@@ -41,7 +41,7 @@ function CodeBlock({ code }: { code: string }) {
   )
 }
 
-/** Converte objeto JS para representação de dict Python (aspas simples). */
+/** Converts a JS object to a Python dict representation (single quotes). */
 function toPythonDict(obj: unknown, indent = 0): string {
   if (obj === null || obj === undefined) return "None"
   if (typeof obj === "boolean") return obj ? "True" : "False"
@@ -118,12 +118,12 @@ console.log("Task iniciada:", task_id);`
 
   return (
     <div className="flex flex-col gap-3 px-1 mt-1">
-      {/* Título */}
+      {/* Title */}
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
         Como acionar via API
       </p>
 
-      {/* URL do endpoint */}
+      {/* Endpoint URL */}
       <div>
         <p className="text-[11px] text-muted-foreground mb-1">Endpoint</p>
         <div className="flex items-center gap-1 bg-muted rounded-md px-2 py-1.5">
@@ -137,7 +137,7 @@ console.log("Task iniciada:", task_id);`
         </div>
       </div>
 
-      {/* Autenticação */}
+      {/* Authentication */}
       {hasSecret && (
         <div className="flex items-start gap-2 bg-amber-500/8 border border-amber-500/20 rounded-md px-2.5 py-2">
           <span className="text-amber-500 text-[10px] font-bold mt-0.5 shrink-0">🔒</span>
@@ -155,13 +155,13 @@ console.log("Task iniciada:", task_id);`
         <CodeBlock code={`{ "task_id": "uuid-da-task" }`} />
       </div>
 
-      {/* Payload de exemplo */}
+      {/* Sample payload */}
       <div>
         <p className="text-[11px] text-muted-foreground mb-1">Estrutura do body</p>
         <CodeBlock code={sampleJsonPretty} />
       </div>
 
-      {/* Abas de código */}
+      {/* Code tabs */}
       <div>
         <div className="flex gap-1 mb-2">
           {TABS.map(({ id, label, icon: Icon }) => (
@@ -182,7 +182,7 @@ console.log("Task iniciada:", task_id);`
         <CodeBlock code={code} />
       </div>
 
-      {/* Nota sobre task_id */}
+      {/* Note about task_id */}
       <p className="text-[11px] text-muted-foreground leading-relaxed">
         O <span className="font-mono bg-muted px-1 rounded">task_id</span> retornado pode ser usado para
         acompanhar a execução em tempo real via WebSocket{" "}

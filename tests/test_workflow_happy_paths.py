@@ -1,7 +1,7 @@
 # tests/test_workflow_happy_paths.py
 """
-Testes de happy path para execução de workflow via executor direto.
-Sem dependência de banco de dados, Redis ou Celery.
+Happy path tests for workflow execution via the executor directly.
+No dependency on a database, Redis or Celery.
 """
 import asyncio
 from unittest.mock import MagicMock
@@ -9,9 +9,9 @@ from unittest.mock import MagicMock
 
 def test_execute_workflow_via_executor():
     """
-    Happy path: execução direta de um workflow mínimo via WorkflowExecutor.
-    Usa um nó Merge que retorna dados simples — sem dependência de banco ou Celery.
-    Nota: teste SÍNCRONO — roda `run()` com asyncio.run, como o executor faz no loop.
+    Happy path: direct execution of a minimal workflow via WorkflowExecutor.
+    Uses a Merge node that returns simple data — no dependency on a database or Celery.
+    Note: SYNCHRONOUS test — runs `run()` with asyncio.run, as the executor does on the loop.
     """
     from flow.executor import WorkflowExecutor
 
@@ -35,7 +35,7 @@ def test_execute_workflow_via_executor():
     executor = WorkflowExecutor(definition, task_id="unit-test-task-001", publisher=publisher)
     asyncio.run(executor.run(initial_inputs={}))
 
-    # Deve haver estatísticas do nó executado
+    # There must be statistics for the executed node
     assert executor.node_stats["merge-1"]["status"] == "completed"
-    # Publisher deve ter sido chamado ao menos uma vez (evento de início ou fim)
+    # The publisher must have been called at least once (start or end event)
     assert publisher.publish_event.called

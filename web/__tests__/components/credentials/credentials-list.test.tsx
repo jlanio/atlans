@@ -2,13 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react"
 
 /**
- * Comportamento da LISTA de credenciais (/credentials):
- * - ações de editar/excluir/duplicar são owner-only — quem só recebeu a
- *   credencial compartilhada não vê o menu (o backend recusaria de qualquer
- *   modo, mas deixar o clique falhar com 403 seria péssima UX);
- * - selo "Compartilhada" / "Compartilhada comigo";
- * - busca filtra a lista;
- * - o aviso de uso na exclusão é uma linha discreta, não um painel de alerta.
+ * Behavior of the credentials LIST (/credentials):
+ * - edit/delete/duplicate actions are owner-only — someone who only received the
+ *   shared credential does not see the menu (the backend would refuse anyway,
+ *   but letting the click fail with a 403 would be terrible UX);
+ * - "Compartilhada" / "Compartilhada comigo" badge;
+ * - search filters the list;
+ * - the usage warning on deletion is a discreet line, not an alert panel.
  */
 
 const getCredentials = vi.fn()
@@ -39,7 +39,7 @@ vi.mock("@/context/WorkspaceContext", () => ({
   useWorkspace: () => ({ current: { id_hash: "ws1", name: "Meu WS" } }),
 }))
 
-// Contexto de credenciais real o suficiente: o index lê `credentials` daqui.
+// A credentials context real enough: the index reads `credentials` from here.
 const CREDS = [
   { id: "c1", name: "pg minha",     type: "postgresql",  owner_id: "me",    workspace_id: null,  created_at: "2026-01-01T00:00:00", updated_at: "2026-01-01T00:00:00" },
   { id: "c2", name: "api de fulano", type: "http_bearer", owner_id: "outro", workspace_id: "ws1", created_at: "2026-01-02T00:00:00", updated_at: "2026-01-02T00:00:00" },
@@ -71,25 +71,25 @@ afterEach(() => cleanup())
 
 async function renderList() {
   render(<CredentialsActions />)
-  // espera sair do skeleton
+  // waits to leave the skeleton
   await screen.findByText("pg minha")
 }
 
 describe("Lista de credenciais — ações owner-only", () => {
   it("mostra o menu de ações só nas credenciais do próprio usuário", async () => {
     await renderList()
-    // Própria (c1) e própria-compartilhada (c3): têm menu.
+    // Own (c1) and own-shared (c3): have a menu.
     expect(screen.getByRole("button", { name: /ações da credencial pg minha/i })).toBeInTheDocument()
     expect(screen.getByRole("button", { name: /ações da credencial s3 compartilhada/i })).toBeInTheDocument()
-    // Compartilhada por outro (c2): NÃO tem menu.
+    // Shared by someone else (c2): does NOT have a menu.
     expect(screen.queryByRole("button", { name: /ações da credencial api de fulano/i })).toBeNull()
   })
 
   it("marca a compartilhada-comigo e a compartilhada-por-mim", async () => {
     await renderList()
-    // c2 é de outro, compartilhada comigo
+    // c2 is someone else's, shared with me
     expect(screen.getByText("Compartilhada comigo")).toBeInTheDocument()
-    // c3 é minha, compartilhada com o workspace
+    // c3 is mine, shared with the workspace
     expect(screen.getByText("Compartilhada")).toBeInTheDocument()
   })
 })
@@ -125,7 +125,7 @@ describe("Exclusão — aviso de uso discreto (não gritante)", () => {
     )
     const aviso = await screen.findByText(/em uso em 2 nós de workflow/i)
     expect(aviso).toBeInTheDocument()
-    // Discreto: uma linha muted, NÃO um painel com role=alert.
+    // Discreet: a muted line, NOT a panel with role=alert.
     expect(aviso.tagName.toLowerCase()).toBe("p")
     expect(aviso.getAttribute("role")).not.toBe("alert")
   })

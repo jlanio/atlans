@@ -1,22 +1,22 @@
 # tests/unit/test_pinning_da_ca_no_install.py
 """
-Pinning do root cert da CA no install.sh servido.
+Pinning of the CA root cert in the served install.sh.
 
-`STEPCA_ROOT_FINGERPRINT` era lida em `app/core/config.py` e nunca usada em
-lugar nenhum do backend, enquanto `docs/mtls-bootstrap.md:77` afirmava que o
-backend a usava "ao montar o install.sh". O executor sempre teve suporte a
-pinning (`ATLANS_CA_SHA256`, em executor/_ca_bootstrap.py) — o que faltava era
-alguem publicar o valor.
+`STEPCA_ROOT_FINGERPRINT` was read in `app/core/config.py` and never used
+anywhere in the backend, while `docs/mtls-bootstrap.md:77` claimed the backend
+used it "when building install.sh". The executor always supported pinning
+(`ATLANS_CA_SHA256`, in executor/_ca_bootstrap.py) — what was missing was
+someone publishing the value.
 
-O efeito da lacuna: o `curl .../ca-bundle` do instalador era TOFU puro. Quem
-conseguisse responder no lugar do servidor entregava a propria CA, e o executor
-passaria a confiar em certs assinados por ela.
+The effect of the gap: the installer's `curl .../ca-bundle` was pure TOFU.
+Anyone able to answer in place of the server delivered their own CA, and the
+executor would start trusting certs signed by it.
 
-Tres niveis de teste, porque cada um pega uma classe diferente de erro:
+Three test levels, because each one catches a different class of error:
 
-  INJECAO    o servidor de fato substitui a linha do script.
-  DEGRADACAO config vazia ou invalida nao pode quebrar o instalador.
-  EXECUCAO   o shell gerado realmente aceita o cert certo e recusa o errado.
+  INJECTION    the server actually replaces the script line.
+  DEGRADATION  empty or invalid config must not break the installer.
+  EXECUTION    the generated shell really accepts the right cert and rejects the wrong one.
 """
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ def test_o_ambiente_ainda_tem_prioridade_sobre_o_injetado(monkeypatch):
     ("  " + "A" * 64 + "\n", "a" * 64),
 ])
 def test_normalizacao_aceita_os_dois_formatos_de_ferramenta(bruto, esperado):
-    """`step certificate fingerprint` da hex puro; `openssl` da com ':'."""
+    """`step certificate fingerprint` gives plain hex; `openssl` gives it with ':'."""
     assert _normalizar_fingerprint(bruto) == esperado
 
 
@@ -81,7 +81,7 @@ def test_sem_configuracao_o_script_sai_intacto(monkeypatch):
 
 @pytest.mark.parametrize("invalido", ["abc", "z" * 64, "a" * 63])
 def test_fingerprint_invalido_nao_e_injetado(monkeypatch, invalido):
-    """Injetar lixo faria TODO instalador abortar numa comparacao impossivel."""
+    """Injecting garbage would make EVERY installer abort on an impossible comparison."""
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", invalido)
     original = INSTALL_SH.read_text(encoding="utf-8")
     assert _injetar_fingerprint_da_ca(original) == original
@@ -100,12 +100,12 @@ def test_o_script_continua_sintaticamente_valido_depois_da_injecao(monkeypatch):
     assert proc.returncode == 0, f"install.sh injetado nao e bash valido:\n{proc.stderr}"
 
 
-# ── EXECUCAO ─────────────────────────────────────────────────────────────────
+# ── EXECUTION ────────────────────────────────────────────────────────────────
 #
-# Recorta o bloco de verificacao do install.sh e roda de verdade, contra um
-# cert gerado na hora. Sem isto, um erro de normalizacao (':' sobrando, hex
-# maiusculo, `cut` no campo errado) passaria por todos os testes acima e
-# quebraria todo enrollment em producao.
+# Cuts the verification block out of install.sh and actually runs it, against a
+# cert generated on the spot. Without this, a normalization error (leftover ':',
+# uppercase hex, `cut` on the wrong field) would pass every test above and
+# break every enrollment in production.
 
 _BLOCO = """
 set -euo pipefail
@@ -197,32 +197,33 @@ def test_cert_errado_aborta_a_instalacao(cert):
 
 
 def test_sem_pin_o_instalador_avisa_e_segue(cert):
-    """Comportamento antigo preservado para servidor sem a variavel."""
+    """Old behavior preserved for a server without the variable."""
     caminho, _ = cert
     r = _rodar(caminho, "")
     assert r.returncode == 0
     assert "WARN sem pin" in r.stdout
 
 
-# ── PERSISTENCIA ─────────────────────────────────────────────────────────────
+# ── PERSISTENCE ──────────────────────────────────────────────────────────────
 #
-# Onde o pin de fato passa a valer a cada boot.
+# Where the pin actually takes effect on every boot.
 #
-# `_ca_bootstrap.bootstrap_ca()` retorna cedo quando `SSL_CERT_FILE` ja esta
-# setado — e o container de enrollment o seta, apontando para o cert que o shell
-# ja verificou. Logo o `-e ATLANS_CA_SHA256` daquele comando e inerte, e a
-# verificacao "a cada boot" so existe se o valor chegar ao servico de longa
-# duracao, que NAO seta SSL_CERT_FILE. O caminho para isso e o `executor/.env`.
+# `_ca_bootstrap.bootstrap_ca()` returns early when `SSL_CERT_FILE` is already
+# set — and the enrollment container sets it, pointing at the cert the shell
+# already verified. So the `-e ATLANS_CA_SHA256` of that command is inert, and
+# the "on every boot" verification only exists if the value reaches the
+# long-running service, which does NOT set SSL_CERT_FILE. The path for that is
+# `executor/.env`.
 
 def _bloco_de_persistencia() -> str:
-    """O trecho do install.sh que grava o pin em executor/.env.
+    """The install.sh snippet that writes the pin to executor/.env.
 
-    Delimitado por marcadores estaveis em vez de fatiar por offset: a versao
-    anterior pegava os 600 caracteres anteriores a uma string e quebrou assim
-    que um comentario foi acrescentado acima dela.
+    Delimited by stable markers instead of slicing by offset: the previous
+    version took the 600 characters before a string and broke as soon as a
+    comment was added above it.
     """
     fonte = INSTALL_SH.read_text(encoding="utf-8")
-    inicio = fonte.index("Persiste o fingerprint no .env")
+    inicio = fonte.index("Persists the fingerprint in the executor's .env")
     fim = fonte.index("chmod 660 executor/.env", inicio)
     return fonte[inicio:fim]
 
@@ -233,14 +234,14 @@ def test_o_instalador_grava_o_pin_no_env_do_executor():
         "o instalador nao persiste o pin em executor/.env — sem isso o servico "
         "de longa duracao nunca reconfere a CA"
     )
-    # A gravacao tem de ser condicional: sem pin publicado, nada a escrever.
+    # The write must be conditional: with no published pin, nothing to write.
     assert 'if [[ -n "$CA_SHA256_PIN" ]]' in bloco, (
         "a gravacao no .env precisa ser condicional ao pin existir"
     )
 
 
 def test_o_pin_gravado_e_normalizado():
-    """O .env e lido por `_expected_pins()`, que espera hex minusculo."""
+    """The .env is read by `_expected_pins()`, which expects lowercase hex."""
     bloco = _bloco_de_persistencia()
     assert "tr 'A-Z' 'a-z'" in bloco and "tr -d ': '" in bloco, (
         "o valor gravado no .env precisa da mesma normalizacao da comparacao"
@@ -248,7 +249,7 @@ def test_o_pin_gravado_e_normalizado():
 
 
 def test_gravar_duas_vezes_nao_duplica_a_chave():
-    """Rodar o instalador de novo (--force) nao pode deixar duas linhas."""
+    """Running the installer again (--force) must not leave two lines."""
     bloco = _bloco_de_persistencia()
     assert "grep -qE '^[[:space:]]*(export[[:space:]]+)?ATLANS_CA_SHA256='" in bloco, (
         "sem checar a existencia (inclusive com `export`), um segundo run "
@@ -257,7 +258,7 @@ def test_gravar_duas_vezes_nao_duplica_a_chave():
 
 
 def test_a_doc_nao_promete_verificacao_no_container_de_enrollment():
-    """A doc ja afirmou uma camada que nao roda; nao pode voltar a afirmar."""
+    """The docs once claimed a layer that does not run; they must not claim it again."""
     doc = (RAIZ / "docs" / "mtls-bootstrap.md").read_text(encoding="utf-8")
     assert "SSL_CERT_FILE" in doc, (
         "a doc precisa explicar por que o container de enrollment nao reverifica"
@@ -265,28 +266,28 @@ def test_a_doc_nao_promete_verificacao_no_container_de_enrollment():
     assert "bootstrap_ca()" in doc
 
 
-# ── REUSO ────────────────────────────────────────────────────────────────────
+# ── REUSE ────────────────────────────────────────────────────────────────────
 #
-# O pin tem de valer no caminho de REUSO, e nao so no download.
+# The pin must hold on the REUSE path, not only on download.
 #
-# `bootstrap_ca()` reusa `atlans-root.crt` quando ele ja existe no cert_dir —
-# que e um volume. O pin so era conferido dentro de `_download_atomic`, entao a
-# verificacao acontecia UMA vez, no primeiro boot que baixou o bundle. Trocar o
-# arquivo no volume e reiniciar instalava a CA do atacante como ancora de
-# confianca, sem nenhum aviso.
+# `bootstrap_ca()` reuses `atlans-root.crt` when it already exists in cert_dir —
+# which is a volume. The pin was only checked inside `_download_atomic`, so the
+# verification happened ONCE, on the first boot that downloaded the bundle.
+# Swapping the file in the volume and restarting installed the attacker's CA as
+# a trust anchor, without any warning.
 
 _TRUST_VARS = ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE", "ATLANS_CA_SHA256")
 
 
 @pytest.fixture(autouse=True)
 def _trust_env_limpo():
-    """Isola as env vars de trust store, na entrada E na saida.
+    """Isolates the trust store env vars, on entry AND on exit.
 
-    monkeypatch nao basta: `_set_env` escreve em os.environ direto, e
-    `monkeypatch.delenv(..., raising=False)` nao registra nada quando a chave
-    esta ausente — as tres vars vazariam para os testes seguintes apontando para
-    um bundle em tmp_path ja apagado. Mesmo motivo (e mesma forma) da fixture
-    autouse de tests/unit/test_ca_bundle_trust_store.py.
+    monkeypatch is not enough: `_set_env` writes to os.environ directly, and
+    `monkeypatch.delenv(..., raising=False)` records nothing when the key is
+    absent — the three vars would leak into the following tests pointing at a
+    bundle in an already deleted tmp_path. Same reason (and same shape) as the
+    autouse fixture in tests/unit/test_ca_bundle_trust_store.py.
     """
     import os as _os
     antes = {v: _os.environ.get(v) for v in _TRUST_VARS}
@@ -302,7 +303,7 @@ def _trust_env_limpo():
 
 @pytest.fixture
 def cert_dir(tmp_path, monkeypatch):
-    """Simula o volume do executor, com um root cert ja instalado."""
+    """Simulates the executor's volume, with a root cert already installed."""
     if not shutil.which("openssl"):
         pytest.skip("openssl ausente")
     d = tmp_path / "certs"
@@ -321,8 +322,8 @@ def cert_dir(tmp_path, monkeypatch):
     fp = saida.split("=", 1)[1].strip().replace(":", "").lower()
 
     monkeypatch.setenv("EXECUTOR_CERT_DIR", str(d))
-    # `_expected_pin` cai no `.env` quando a env var nao existe; aponta para um
-    # arquivo vazio para o teste controlar as duas fontes.
+    # `_expected_pin` falls back to `.env` when the env var does not exist; point it
+    # at an empty file so the test controls both sources.
     (tmp_path / "vazio.env").write_text("", encoding="utf-8")
     monkeypatch.setenv("EXECUTOR_ENV_PATH", str(tmp_path / "vazio.env"))
     return caminho, fp
@@ -341,13 +342,13 @@ def test_reuso_com_pin_correto_segue_normalmente(cert_dir, monkeypatch):
 
 
 def test_cert_TROCADO_no_volume_para_o_boot(cert_dir, monkeypatch):
-    """A regressao de seguranca: swap do arquivo + restart nao pode passar."""
+    """The security regression: file swap + restart must not get through."""
     from executor import _ca_bootstrap
 
     caminho, fp = cert_dir
     # O pin continua sendo o do cert legitimo...
     monkeypatch.setenv("ATLANS_CA_SHA256", fp)
-    # ...mas alguem trocou o arquivo no volume.
+    # ...but someone swapped the file in the volume.
     subprocess.run(
         ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
          "-keyout", str(caminho.parent / "atacante.key"), "-out", str(caminho),
@@ -361,7 +362,7 @@ def test_cert_TROCADO_no_volume_para_o_boot(cert_dir, monkeypatch):
 
 
 def test_sem_pin_o_reuso_continua_como_antes(cert_dir, monkeypatch):
-    """Quem nao configurou pinning nao pode ter o boot quebrado por isto."""
+    """Whoever has not configured pinning must not have their boot broken by this."""
     from executor import _ca_bootstrap
 
     monkeypatch.delenv("ATLANS_CA_SHA256", raising=False)
@@ -372,21 +373,21 @@ def test_sem_pin_o_reuso_continua_como_antes(cert_dir, monkeypatch):
 
 
 def test_ACRESCIMO_de_CA_ao_bundle_tambem_e_barrado(cert_dir, monkeypatch):
-    """O furo que "algum cert casa" deixava passar.
+    """The hole that "some cert matches" let through.
 
-    `_set_env` concatena o arquivo inteiro as CAs publicas e publica o resultado
-    em SSL_CERT_FILE/REQUESTS_CA_BUNDLE/CURL_CA_BUNDLE — TODO cert dentro dele
-    vira ancora de confianca. Com a checagem frouxa, um atacante nao precisava
-    SUBSTITUIR o root: bastava ACRESCENTAR a propria CA ao arquivo. O pin casava
-    com o cert legitimo, a verificacao passava, e a CA extra entrava no trust
-    store em silencio.
+    `_set_env` concatenates the whole file with the public CAs and publishes the
+    result in SSL_CERT_FILE/REQUESTS_CA_BUNDLE/CURL_CA_BUNDLE — EVERY cert in it
+    becomes a trust anchor. With the loose check, an attacker did not need to
+    REPLACE the root: it was enough to APPEND their own CA to the file. The pin
+    matched the legitimate cert, the verification passed, and the extra CA got
+    into the trust store silently.
     """
     from executor import _ca_bootstrap
 
     caminho, fp = cert_dir
     monkeypatch.setenv("ATLANS_CA_SHA256", fp)
 
-    # Root legitimo PRESERVADO; a CA do atacante vem depois, no mesmo arquivo.
+    # Legitimate root PRESERVED; the attacker's CA comes after, in the same file.
     intruso = caminho.parent / "intruso.crt"
     subprocess.run(
         ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
@@ -402,12 +403,12 @@ def test_ACRESCIMO_de_CA_ao_bundle_tambem_e_barrado(cert_dir, monkeypatch):
 
 
 def test_pin_vindo_do_env_file_e_respeitado(cert_dir, monkeypatch, tmp_path):
-    """`bootstrap_ca` roda ANTES do load_dotenv de executor/config.py.
+    """`bootstrap_ca` runs BEFORE the load_dotenv of executor/config.py.
 
-    No compose a variavel chega pelo `env_file` do container e isso nao aparece;
-    nos fluxos nativo e desktop, o pin que o instalador grava em `executor/.env`
-    ficava invisivel — o bootstrap caia no ramo "sem pin" e nao conferia nada,
-    contra o que a doc promete.
+    In compose the variable arrives through the container's `env_file` and this
+    does not show; in the native and desktop flows, the pin the installer writes
+    to `executor/.env` was invisible — the bootstrap fell into the "no pin" branch
+    and checked nothing, contrary to what the docs promise.
     """
     from executor import _ca_bootstrap
 
@@ -419,7 +420,7 @@ def test_pin_vindo_do_env_file_e_respeitado(cert_dir, monkeypatch, tmp_path):
 
     assert _ca_bootstrap._expected_pins() == frozenset({fp})
 
-    # E o pin do .env de fato barra um cert trocado.
+    # And the pin from .env actually blocks a swapped cert.
     subprocess.run(
         ["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
          "-keyout", str(caminho.parent / "outro.key"), "-out", str(caminho),
@@ -442,7 +443,7 @@ def test_ambiente_tem_prioridade_sobre_o_env_file(cert_dir, monkeypatch, tmp_pat
 
 
 def test_emit_de_ERROR_chega_ao_logger(caplog):
-    """A mensagem de pin divergente caia em `debug` e sumia do log persistido."""
+    """The pin-mismatch message fell into `debug` and vanished from the persisted log."""
     import logging
     from executor import _ca_bootstrap
 
@@ -455,11 +456,11 @@ def test_emit_de_ERROR_chega_ao_logger(caplog):
 
 
 def test_multiplos_pins_permitem_rotacao_com_sobreposicao(cert_dir, monkeypatch, tmp_path):
-    """O pin estrito nao pode impedir a troca de CA.
+    """The strict pin must not prevent a CA rotation.
 
-    Durante a rotacao o bundle legitimamente carrega o root velho E o novo. Com
-    um pin unico e a checagem "todos batem", o executor ficaria sem boot ate
-    alguem DESLIGAR o pinning — o desfecho oposto ao pretendido.
+    During rotation the bundle legitimately carries the old root AND the new one.
+    With a single pin and the "all match" check, the executor would not boot until
+    someone TURNED OFF pinning — the opposite of the intended outcome.
     """
     from executor import _ca_bootstrap
 
@@ -477,21 +478,21 @@ def test_multiplos_pins_permitem_rotacao_com_sobreposicao(cert_dir, monkeypatch,
         check=True, capture_output=True, text=True,
     ).stdout.split("=", 1)[1].strip().replace(":", "").lower()
 
-    # Bundle de sobreposicao: os dois roots.
+    # Overlap bundle: both roots.
     caminho.write_bytes(caminho.read_bytes() + b"\n" + novo.read_bytes())
     monkeypatch.setenv("ATLANS_CA_SHA256", f"{fp_velho},{fp_novo}")
 
-    _ca_bootstrap.bootstrap_ca()  # nao levanta
+    _ca_bootstrap.bootstrap_ca()  # does not raise
 
     import os
     assert os.environ.get("SSL_CERT_FILE")
 
 
 def test_rotulo_TRUSTED_CERTIFICATE_tambem_e_contado(cert_dir, monkeypatch):
-    """`CERTIFICATE` nao e o unico rotulo que o OpenSSL carrega como ancora.
+    """`CERTIFICATE` is not the only label OpenSSL loads as an anchor.
 
-    Reconhecer so ele deixava a checagem de acrescimo ser contornada trocando o
-    rotulo do bloco intruso.
+    Recognizing only that one let the append check be bypassed by changing the
+    label of the intruding block.
     """
     from executor import _ca_bootstrap
 
@@ -528,12 +529,12 @@ def test_pin_com_comentario_inline_nao_derruba_o_boot(cert_dir, monkeypatch, tmp
 
 
 def test_a_fixture_de_isolamento_nao_apaga_a_env_do_desenvolvedor(monkeypatch):
-    """Regressao da ordem de fixtures.
+    """Fixture order regression.
 
-    Pedida por `cert_dir`, `_trust_env_limpo` era criada DEPOIS do monkeypatch e
-    restaurava ANTES do teardown dele — e o monkeypatch, que registrou "ausente"
-    para uma var que a fixture ja havia removido, apagava o valor real em
-    seguida. Autouse inverte a ordem.
+    Requested by `cert_dir`, `_trust_env_limpo` was created AFTER monkeypatch and
+    restored BEFORE its teardown — and monkeypatch, which had recorded "absent"
+    for a var the fixture had already removed, then deleted the real value.
+    Autouse inverts the order.
     """
     import os
     assert os.environ.get("SSL_CERT_FILE") is None, (
@@ -542,12 +543,12 @@ def test_a_fixture_de_isolamento_nao_apaga_a_env_do_desenvolvedor(monkeypatch):
 
 
 def test_instalador_recusa_bundle_com_CA_ACRESCENTADA(cert, tmp_path):
-    """O mesmo furo do lado do executor, agora no shell.
+    """The same hole on the executor side, now in the shell.
 
-    `openssl x509 -in <arquivo>` le so o PRIMEIRO bloco PEM. O arquivo inteiro
-    vira trust store, entao [root_legitimo, ca_do_atacante] passava na
-    conferencia da instalacao — e virava o SSL_CERT_FILE do container de
-    enrollment, que carrega o OTP e gera a chave do cert mTLS.
+    `openssl x509 -in <arquivo>` reads only the FIRST PEM block. The whole file
+    becomes the trust store, so [root_legitimo, ca_do_atacante] passed the
+    installation check — and became the SSL_CERT_FILE of the enrollment
+    container, which carries the OTP and generates the mTLS cert's key.
     """
     caminho, fp = cert
     intruso = tmp_path / "intruso.crt"
@@ -605,14 +606,14 @@ def test_instalador_conta_bloco_com_rotulo_TRUSTED(cert, tmp_path):
     assert _rodar(juntos, fp).returncode != 0
 
 
-# ── Bordas encontradas na quinta revisao ─────────────────────────────────────
+# ── Edge cases found in the fifth review ─────────────────────────────────────
 
 def test_bloco_ilegivel_vira_intruso_e_nao_mata_o_script(cert, tmp_path):
-    """Sob `set -euo pipefail`, o openssl falhando abortava o script AQUI.
+    """Under `set -euo pipefail`, a failing openssl aborted the script HERE.
 
-    O ramo de intruso — e com ele o `rm -f` do bundle — nunca rodava: o arquivo
-    do atacante ficava em disco e o instalador morria com "Falha na etapa:
-    cabundle", sem dizer por que.
+    The intruder branch — and with it the bundle's `rm -f` — never ran: the
+    attacker's file stayed on disk and the installer died with "Falha na etapa:
+    cabundle", without saying why.
     """
     caminho, fp = cert
     quebrado = tmp_path / "quebrado.crt"
@@ -629,11 +630,12 @@ def test_bloco_ilegivel_vira_intruso_e_nao_mata_o_script(cert, tmp_path):
 
 
 def test_contagem_de_blocos_sem_padding():
-    """`wc -l` do BSD/macOS pad com espacos — o instalador ja mira macOS.
+    """BSD/macOS `wc -l` pads with spaces — the installer already targets macOS.
 
-    Rodar o bloco real nao testa nada aqui: o GNU `wc` do Linux nao pad, entao a
-    asserção passaria com ou sem o `tr` que ela diz proteger. O teste simula a
-    saida do BSD (`       2`) e verifica que a normalizacao a limpa.
+    Running the real block tests nothing here: Linux's GNU `wc` does not pad, so
+    the assertion would pass with or without the `tr` it claims to protect. The
+    test simulates the BSD output (`       2`) and checks that the normalization
+    cleans it.
     """
     r = subprocess.run(
         ["bash", "-c", "_b=$(printf '       2\n' | tr -d '[:space:]'); printf 'conferido %s' \"$_b\""],
@@ -641,16 +643,16 @@ def test_contagem_de_blocos_sem_padding():
     )
     assert r.stdout == "conferido 2", repr(r.stdout)
 
-    # E o install.sh entregue de fato usa a normalizacao.
+    # And the delivered install.sh actually uses the normalization.
     fonte = INSTALL_SH.read_text(encoding="utf-8")
     assert "wc -l | tr -d '[:space:]'" in fonte
 
 
 def test_servidor_injeta_valor_multi_pin(monkeypatch):
-    """A doc prescreve `<fp_antigo>,<fp_novo>` na rotacao.
+    """The docs prescribe `<fp_antigo>,<fp_novo>` during rotation.
 
-    A validacao de tamanho rejeitava o valor inteiro (129 chars) e o script saia
-    SEM pinning — TOFU puro exatamente na janela em que a CA esta trocando.
+    The length validation rejected the whole value (129 chars) and the script
+    exited WITHOUT pinning — pure TOFU exactly in the window when the CA is changing.
     """
     dois = f"{'a' * 64},{'b' * 64}"
     monkeypatch.setattr("app.core.config.STEPCA_ROOT_FINGERPRINT", dois)
@@ -672,10 +674,10 @@ def test_normalizacao_de_multi_pin():
 
 
 def test_env_var_VAZIA_nao_sombreia_o_pin_do_env_file(cert_dir, monkeypatch, tmp_path):
-    """`ATLANS_CA_SHA256=` sem valor e comum em compose.
+    """`ATLANS_CA_SHA256=` with no value is common in compose.
 
-    Com `if bruto is None`, ela sombreava o pin do .env e desligava o pinning
-    sem nenhum aviso.
+    With `if bruto is None`, it shadowed the pin from .env and turned off
+    pinning without any warning.
     """
     from executor import _ca_bootstrap
 
@@ -689,10 +691,10 @@ def test_env_var_VAZIA_nao_sombreia_o_pin_do_env_file(cert_dir, monkeypatch, tmp
 
 
 def test_remove_env_var_casa_a_MESMA_linha_que_read_env_var(tmp_path):
-    """A tolerancia a `export` tinha sido posta so no read.
+    """The tolerance for `export` had been added only to the read.
 
-    `remove_env_var` deixava de casar a linha que o read reportava, e a migracao
-    de variavel legada (enrollment.py) virava no-op silencioso.
+    `remove_env_var` stopped matching the line the read reported, and the legacy
+    variable migration (enrollment.py) became a silent no-op.
     """
     from executor import _env_utils
 
@@ -705,8 +707,8 @@ def test_remove_env_var_casa_a_MESMA_linha_que_read_env_var(tmp_path):
 
 
 def test_persist_env_var_atualiza_linha_com_export(tmp_path):
-    """Sem isto o persist ACRESCENTAVA uma segunda linha, e o read (primeira
-    ocorrencia vence) continuava devolvendo o valor antigo."""
+    """Without this, persist APPENDED a second line, and the read (first
+    occurrence wins) kept returning the old value."""
     from executor import _env_utils
 
     env = tmp_path / ".env"
@@ -720,24 +722,25 @@ def test_persist_env_var_atualiza_linha_com_export(tmp_path):
 
 
 def test_o_bloco_executavel_do_teste_nao_divergiu_do_install_sh():
-    """`_BLOCO` e uma COPIA do trecho de verificacao do install.sh.
+    """`_BLOCO` is a COPY of the install.sh verification snippet.
 
-    A copia existe para poder rodar o shell de verdade contra certs reais — o
-    que ja pegou tres bugs que nenhum teste de string pegaria. O preco e a
-    sincronia, e ela ja quebrou uma vez: o `|| true` foi para o install.sh e nao
-    para a copia, e o teste do bloco ilegivel passou a exercitar a versao antiga.
+    The copy exists so the real shell can be run against real certs — which
+    has already caught three bugs no string test would catch. The price is
+    keeping them in sync, and that has already broken once: the `|| true` went
+    into install.sh and not into the copy, and the unreadable-block test started
+    exercising the old version.
 
-    Este teste trava os pontos que importam. Nao compara caractere a caractere:
-    o `_BLOCO` e propositalmente reduzido (sem `rm -f`, sem mensagens longas).
+    This test locks the points that matter. It does not compare character by
+    character: `_BLOCO` is deliberately reduced (no `rm -f`, no long messages).
     """
     fonte = INSTALL_SH.read_text(encoding="utf-8")
     for marca in (
         "|| true",                                   # bloco ilegivel nao mata o script
-        "tr -d '[:space:]'",                         # wc -l do BSD
+        "tr -d '[:space:]'",                         # BSD wc -l
         "tr ',;' '\\n\\n'",                          # multi-pin
-        "BEGIN( TRUSTED| X509)? CERTIFICATE",        # rotulos alternativos no awk
-        "s/TRUSTED CERTIFICATE/CERTIFICATE/g",       # normalizacao antes do openssl
-        "grep -qx",                                  # casamento exato do fingerprint
+        "BEGIN( TRUSTED| X509)? CERTIFICATE",        # alternative labels in awk
+        "s/TRUSTED CERTIFICATE/CERTIFICATE/g",       # normalization before openssl
+        "grep -qx",                                  # exact fingerprint match
     ):
         assert marca in fonte, f"install.sh perdeu: {marca!r}"
         assert marca in _BLOCO, (
@@ -747,12 +750,12 @@ def test_o_bloco_executavel_do_teste_nao_divergiu_do_install_sh():
 
 
 def test_instalador_ATUALIZA_linha_com_export_em_vez_de_duplicar(tmp_path):
-    """A rotacao de CA passava a recusar o boot logo apos o instalador rodar.
+    """CA rotation started refusing the boot right after the installer ran.
 
-    O escritor de .env do install.sh so casava `^ATLANS_CA_SHA256=`. Com uma
-    linha `export ATLANS_CA_SHA256=<antigo>`, ele ACRESCENTAVA o novo valor em
-    vez de substituir — e `read_env_var` devolve a PRIMEIRA ocorrencia, entao o
-    executor continuava pinando a CA velha.
+    install.sh's .env writer only matched `^ATLANS_CA_SHA256=`. With a line
+    `export ATLANS_CA_SHA256=<antigo>`, it APPENDED the new value instead of
+    replacing it — and `read_env_var` returns the FIRST occurrence, so the
+    executor kept pinning the old CA.
     """
     env = tmp_path / ".env"
     env.write_text("export ATLANS_CA_SHA256=" + "a" * 64 + "\nOUTRA=x\n", encoding="utf-8")
@@ -787,8 +790,8 @@ fi
 
 
 def test_persist_env_var_preserva_o_export(tmp_path):
-    """Num .env `source`ado, perder o `export` faz a variavel parar de chegar
-    aos processos filhos."""
+    """In a `source`d .env, losing the `export` makes the variable stop reaching
+    child processes."""
     from executor import _env_utils
 
     env = tmp_path / ".env"

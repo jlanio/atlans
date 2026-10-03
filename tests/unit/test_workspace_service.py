@@ -1,21 +1,21 @@
 # tests/unit/test_workspace_service.py
 """
-`listar_workspaces_do_usuario` — a listagem que saiu de `workspace_router.py`.
+`listar_workspaces_do_usuario` — the listing that moved out of `workspace_router.py`.
 
-O router só chama; quem garante o contrato agora é esta função, e o servidor
-MCP vai depender dela sem passar pela rota. Cada teste fixa uma decisão que a
-listagem já tomava e que uma reescrita "equivalente" poderia trocar:
+The router only calls it; what guarantees the contract now is this function, and the MCP
+server will depend on it without going through the route. Each test pins a decision the
+listing already made and that an "equivalent" rewrite could change:
 
-- dono que também consta como membro aparece UMA vez, como "owner" (o papel
-  de membro não rebaixa o dono);
-- workspace na lixeira (`deleted_at`) fica de fora — seja do dono, seja do
-  membro;
-- a ordem é a de sempre: primeiro os próprios (por nome), depois os
-  compartilhados (por nome) — não uma ordenação global;
-- `is_default` é ecoado e `my_role` é o papel do membro nos compartilhados.
+- an owner who is also listed as a member shows up ONCE, as "owner" (the member
+  role does not demote the owner);
+- a workspace in the trash (`deleted_at`) is left out — whether the owner's or the
+  member's;
+- the order is the usual one: first one's own (by name), then the
+  shared ones (by name) — not a global ordering;
+- `is_default` is echoed and `my_role` is the member's role in the shared ones.
 
-Banco de verdade (SQLite em memória): a função é consulta, e um mock de
-`db.execute` só provaria que o mock devolve o que se mandou.
+Real database (in-memory SQLite): the function is a query, and a mock of
+`db.execute` would only prove that the mock returns what it was told to.
 """
 from __future__ import annotations
 
@@ -50,13 +50,13 @@ async def db():
 
 
 async def _semear(sessao) -> None:
-    """Dois usuários, seis workspaces.
+    """Two users, six workspaces.
 
-    u-dono  é dono de "Zeta" (e TAMBÉM membro "viewer" nele), de "Beta"
-            (is_default) e de "Lixo" (na lixeira); é editor em "Alfa" e
-            operator em "Lixo compartilhado" (na lixeira, de u-outro).
-    u-outro é dono de "Alfa", "Lixo compartilhado" e "Ômega" (onde u-dono
-            não está).
+    u-dono  owns "Zeta" (and is ALSO a "viewer" member of it), "Beta"
+            (is_default) and "Lixo" (in the trash); is editor in "Alfa" and
+            operator in "Lixo compartilhado" (in the trash, owned by u-outro).
+    u-outro owns "Alfa", "Lixo compartilhado" and "Ômega" (where u-dono
+            is not).
     """
     from app.models.user import User
     from app.models.workspace import Workspace
@@ -86,18 +86,18 @@ async def test_dono_vence_membro_na_dedup(db):
     lista = await listar_workspaces_do_usuario(db, "u-dono")
     zetas = [w for w in lista if w.id_hash == "ws-zeta"]
     assert len(zetas) == 1
-    assert zetas[0].my_role == "owner"          # a linha "viewer" em WorkspaceMember não rebaixa
+    assert zetas[0].my_role == "owner"          # the "viewer" row in WorkspaceMember does not demote
 
 
 async def test_lixeira_fica_de_fora_para_dono_e_para_membro(db):
     ids = {w.id_hash for w in await listar_workspaces_do_usuario(db, "u-dono")}
-    assert "ws-lixo" not in ids                 # dele, na lixeira
-    assert "ws-lixo-comp" not in ids            # é operator, mas o workspace foi apagado
-    assert "ws-omega" not in ids                # nem dono nem membro
+    assert "ws-lixo" not in ids                 # theirs, in the trash
+    assert "ws-lixo-comp" not in ids            # is operator, but the workspace was deleted
+    assert "ws-omega" not in ids                # neither owner nor member
 
 
 async def test_ordem_proprios_por_nome_depois_compartilhados_por_nome(db):
-    """Não é uma ordenação global: "Alfa" (compartilhado) vem DEPOIS de "Zeta" (próprio)."""
+    """Not a global ordering: "Alfa" (shared) comes AFTER "Zeta" (own)."""
     nomes = [w.name for w in await listar_workspaces_do_usuario(db, "u-dono")]
     assert nomes == ["Beta", "Zeta", "Alfa"]
 
@@ -116,11 +116,11 @@ async def test_usuario_sem_workspaces_recebe_lista_vazia(db):
 
 
 async def test_rota_de_listagem_ecoa_o_que_o_service_devolve(client):
-    """`GET /workspaces` é uma casca: o corpo é a lista do service, sem retoques.
+    """`GET /workspaces` is a shell: the body is the service's list, untouched.
 
-    A rota é exercida de verdade (a app real, pelo `client` do conftest) e o
-    service é dublado: se o handler passar a filtrar, reordenar ou remontar a
-    lista, o corpo deixa de bater.
+    The route is really exercised (the real app, through the conftest's `client`) and the
+    service is doubled: if the handler starts filtering, reordering or rebuilding the
+    list, the body stops matching.
     """
     from app.api.dependencies import get_db
     from app.api.routers import workspace_router
@@ -155,5 +155,5 @@ async def test_rota_de_listagem_ecoa_o_que_o_service_devolve(client):
         {"id_hash": "ws-beta", "name": "Beta", "description": None,
          "owner_id": "u-dono", "is_default": True, "my_role": "owner"},
     ]
-    # E o service foi chamado com a sessão injetada e o usuário autenticado.
+    # And the service was called with the injected session and the authenticated user.
     assert duble.await_args.args[1] == "usr-test-001"

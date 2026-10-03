@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 @register_node
 class UnionNode(BaseNode):
     """
-    Executa a união espacial entre duas camadas (GeoDataFrames).
+    Computes the spatial union between two layers (GeoDataFrames).
     """
 
     @classmethod
@@ -33,12 +33,12 @@ class UnionNode(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, gpd.GeoDataFrame]:
         self.validate()
-        # Obtém e valida as camadas via helper da classe base (recusa CRS diferentes)
+        # Gets and validates the layers via the base class helper (rejects differing CRSs)
         gdf1, gdf2 = self.get_pair(inputs, operacao="união", tipos_suportados=True)
 
         logger.info(f"Executando união entre {len(gdf1)} e {len(gdf2)} feições...")
 
-        # Usa concat se as colunas forem compatíveis
+        # Uses concat if the columns are compatible
         if set(gdf1.columns) == set(gdf2.columns):
             logger.info("Colunas compatíveis. Aplicando concatenação direta (merge).")
             result = await asyncio.to_thread(lambda: gpd.GeoDataFrame(

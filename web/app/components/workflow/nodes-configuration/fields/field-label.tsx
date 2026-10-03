@@ -1,16 +1,16 @@
-// Rotulo de campo de configuracao de no, com a ajuda embutida.
+// Label for a node configuration field, with the built-in help.
 //
-// Este arquivo ja existia para centralizar o `<p className="text-xs
-// text-muted-foreground">` repetido em string-field, numeric-field,
-// boolean-field e companhia — mas so o numeric-field chegou a adota-lo, e os
-// outros seguiram montando o proprio paragrafo. Agora ele e o unico caminho, e
-// mudou de forma: a descricao deixou de ser paragrafo e virou tooltip.
+// This file already existed to centralize the `<p className="text-xs
+// text-muted-foreground">` repeated in string-field, numeric-field,
+// boolean-field and company — but only numeric-field ever adopted it, and the
+// others kept building their own paragraph. Now it is the only path, and it
+// changed shape: the description stopped being a paragraph and became a tooltip.
 //
-// Por que: sao 182 descricoes no catalogo, mediana de 53 caracteres mas com
-// picos de 210. Num no de 7 campos — e os que se configura mais tem de 6 a 10 —
-// o texto auxiliar ocupava mais espaco que os proprios controles, e o painel
-// virava parede cinza. Como tooltip, a explicacao continua inteira e a um hover
-// de distancia, e o painel volta a ser uma lista de campos.
+// Why: there are 182 descriptions in the catalog, median of 53 characters but
+// with peaks of 210. In a 7-field node — and the most configured ones have 6 to
+// 10 — the helper text took more space than the controls themselves, and the
+// panel became a gray wall. As a tooltip, the explanation stays whole and one
+// hover away, and the panel is a list of fields again.
 import { TbHelpCircle } from "react-icons/tb"
 
 import { Label } from "@/app/components/ui/label"
@@ -19,34 +19,35 @@ import { INodesPropertyAPI } from "@/service/types"
 
 interface AjudaProps {
   texto: string
-  /** Para o nome acessivel do gatilho — "Ajuda: Nome do arquivo". */
+  /** For the trigger's accessible name — "Ajuda: Nome do arquivo". */
   rotulo: string
 }
 
 /**
- * O gatilho e um `<button>`, e nao um `<span>`: assim o Radix lhe da foco e o
- * texto fica alcancavel pelo teclado. Trocar paragrafo por tooltip nao pode
- * custar o acesso de quem nao usa mouse — antes o texto era lido por todos e
- * ocupava espaco de todos; agora e o inverso, sem tirar de ninguem.
+ * The trigger is a `<button>`, not a `<span>`: that way Radix gives it focus and
+ * the text is reachable by keyboard. Swapping a paragraph for a tooltip must not
+ * cost access to those who don't use a mouse — before, the text was read by
+ * everyone and took space from everyone; now it is the reverse, without taking
+ * from anyone.
  */
 export const AjudaDoCampo = ({ texto, rotulo }: AjudaProps) => (
-  // `delayDuration` acima de zero (o default do nosso Tooltip) porque os icones
-  // ficam na coluna dos rotulos, bem no caminho do mouse descendo o formulario:
-  // com abertura instantanea, atravessar o painel dispara um tooltip atras do
-  // outro. 300ms e curto para quem mira e suficiente para quem so passa.
+  // `delayDuration` above zero (our Tooltip's default) because the icons sit in
+  // the label column, right in the path of the mouse going down the form: with
+  // instant opening, crossing the panel fires one tooltip after another. 300ms
+  // is short for someone aiming and enough for someone just passing by.
   <Tooltip delayDuration={300}>
     <TooltipTrigger
       type="button"
       aria-label={`Ajuda: ${rotulo}`}
-      // O anel de foco e explicito: `outline-none` sozinho apagaria o unico
-      // sinal de onde o teclado esta, e a mudanca de cor (muted → foreground)
-      // e fraca demais para servir de indicador.
+      // The focus ring is explicit: `outline-none` alone would erase the only
+      // sign of where the keyboard is, and the color change (muted → foreground)
+      // is too weak to serve as an indicator.
       className="text-muted-foreground/70 hover:text-foreground shrink-0 rounded-sm transition-colors outline-none focus-visible:ring-[2px] focus-visible:ring-ring/60"
     >
       <TbHelpCircle size={14} />
     </TooltipTrigger>
-    {/* Largura maxima porque ha descricoes de 200+ caracteres: sem teto, o
-        tooltip vira uma linha unica atravessando a tela. */}
+    {/* Max width because there are 200+ character descriptions: without a ceiling,
+        the tooltip becomes a single line across the screen. */}
     <TooltipContent side="top" align="start" className="max-w-[320px] text-xs leading-relaxed">
       {texto}
     </TooltipContent>
@@ -56,10 +57,10 @@ export const AjudaDoCampo = ({ texto, rotulo }: AjudaProps) => (
 interface FieldLabelProps {
   field: INodesPropertyAPI
   /**
-   * Elemento que o rotulo rotula. `null` para os campos cujo controle e de
-   * terceiros e nao aceita `id` — Monaco no `code`/`sql`, JsonEditor no
-   * `object`. Um `<label for>` apontando para id inexistente e uma associacao
-   * quebrada: o leitor de tela anuncia um rotulo orfao e o clique nao faz nada.
+   * Element the label labels. `null` for fields whose control is third-party
+   * and doesn't accept an `id` — Monaco in `code`/`sql`, JsonEditor in
+   * `object`. A `<label for>` pointing at a nonexistent id is a broken
+   * association: the screen reader announces an orphan label and clicking does nothing.
    */
   htmlFor?: string | null
 }
@@ -71,8 +72,8 @@ export const FieldLabel = ({ field, htmlFor }: FieldLabelProps) => {
     <div className="flex items-center gap-1.5">
       <Label htmlFor={alvo ?? undefined}>
         {texto}
-        {/* O execute() recusa este campo vazio (schema `required`). Sinalização,
-            não bloqueio: a validação dura continua no backend. */}
+        {/* execute() rejects this field when empty (schema `required`). A signal,
+            not a block: the hard validation stays in the backend. */}
         {field.required && <span aria-label="obrigatório" className="text-destructive ml-0.5">*</span>}
       </Label>
       {field.description && <AjudaDoCampo texto={field.description} rotulo={texto} />}

@@ -8,7 +8,7 @@ const NotFoundIcon = (nodeProps: NodeProps<INodeContext> ) => {
 
   return (
     <ActionsIconRoot {...nodeProps}>
-      <TbError404 className="text-3xl" /> {/* Ícone centralizado */}
+      <TbError404 className="text-3xl" /> {/* Centered icon */}
     </ActionsIconRoot>
   )
 }

@@ -1,21 +1,22 @@
 # tests/integration/test_saida_subfluxo_multipla.py
 """
-Varias origens alimentando a saida publica de um sub-fluxo.
+Several sources feeding a sub-workflow's public output.
 
-O `SubWorkflowOutput` aceitava UMA aresta chegando. Para devolver dois valores
-ao pai era preciso um no-funil (SetFields/PythonScript) so para montar o dict —
-um no que nao faz nada alem de existir por causa da restricao.
+`SubWorkflowOutput` accepted ONE incoming edge. To return two values to the
+parent you needed a funnel node (SetFields/PythonScript) just to build the
+dict — a node that does nothing but exist because of the restriction.
 
-A restricao tinha causa real: com um unico ponto de conexao anonimo, duas
-arestas espalham os dois dicts nas MESMAS chaves e a ultima vence. A saida
-depende da ordem das arestas, e o contrato anuncia uma coisa entregando outra.
+The restriction had a real cause: with a single anonymous connection point,
+two edges spread the two dicts onto the SAME keys and the last one wins. The
+output depends on the order of the edges, and the contract announces one thing
+while delivering another.
 
-O que mudou: `ports` passou a declarar tambem os pontos de conexao (o mesmo
-mecanismo do PythonScript). A partir de DUAS portas o editor preenche o `to_key`
-de cada aresta com o nome da porta, e cada origem cai na sua propria chave.
+What changed: `ports` now also declares the connection points (the same
+mechanism as PythonScript). From TWO ports on, the editor fills each edge's
+`to_key` with the port name, and each source lands on its own key.
 
-Estes testes exercitam o EXECUTOR de verdade: o defeito e a correcao estao na
-montagem dos inputs entre nos, que so aparece rodando o grafo.
+These tests exercise the real EXECUTOR: the defect and the fix are in
+assembling the inputs between nodes, which only shows up when running the graph.
 """
 import asyncio
 from unittest.mock import MagicMock
@@ -79,16 +80,16 @@ def test_duas_origens_chegam_cada_uma_na_sua_chave():
 
     assert saida["focos"] == "FOCOS"
     assert saida["mapa"] == "MAPA"
-    # O involucro carrega o mesmo conjunto — e por ele que o pai referencia
-    # tudo de uma vez em Jinja (`{{ Alias.subWorkflowResult }}`).
+    # The wrapper carries the same set — it is through it that the parent
+    # references everything at once in Jinja (`{{ Alias.subWorkflowResult }}`).
     assert saida["subWorkflowResult"] == {"focos": "FOCOS", "mapa": "MAPA"}
 
 
 def test_o_defeito_que_a_regra_evita():
-    """Sem `to_key`, as duas arestas usam o `from_key` como nome.
+    """Without `to_key`, the two edges use the `from_key` as the name.
 
-    Nao e bug do executor a corrigir — e a razao de o editor so liberar varias
-    conexoes quando o node declara duas ou mais portas.
+    It is not an executor bug to fix — it is the reason the editor only allows
+    several connections when the node declares two or more ports.
     """
     sem_to_key = [
         {"source": "a", "target": "out", "from_key": "result"},
@@ -96,17 +97,18 @@ def test_o_defeito_que_a_regra_evita():
     ]
     saida = _rodar_pai(_filho([], sem_to_key))["sub"]
 
-    # Uma unica chave, com o valor de UMA das duas origens: a outra sumiu.
+    # A single key, with the value of ONE of the two sources: the other vanished.
     publico = saida["subWorkflowResult"]
     assert list(publico) == ["result"]
     assert publico["result"] in ("FOCOS", "MAPA")
 
 
 def test_a_allowlist_continua_valendo_sobre_as_portas():
-    """`ports` e ponto de conexao E contrato: o que nao esta na lista nao volta.
+    """`ports` is a connection point AND a contract: what is not in the list does
+    not come back.
 
-    Aqui a aresta entrega `mapa`, que nao foi declarada — o valor e descartado
-    (com aviso no log) em vez de vazar para o pai.
+    Here the edge delivers `mapa`, which was not declared — the value is
+    discarded (with a warning in the log) instead of leaking to the parent.
     """
     saida = _rodar_pai(_filho(["focos"], COM_PORTAS))["sub"]
 
@@ -115,20 +117,21 @@ def test_a_allowlist_continua_valendo_sobre_as_portas():
 
 
 def test_passthrough_sem_portas_continua_devolvendo_tudo():
-    """Sub-fluxo de uso unico: uma aresta, nenhuma porta declarada."""
+    """Single-use sub-workflow: one edge, no declared port."""
     uma_aresta = [{"source": "a", "target": "out", "from_key": "result"}]
     saida = _rodar_pai(_filho([], uma_aresta))["sub"]
 
     assert saida["subWorkflowResult"] == {"result": "FOCOS"}
 
 
-# ── O contrato do node ───────────────────────────────────────────────────────
+# ── The node contract ────────────────────────────────────────────────────────
 
 def test_subworkflowoutput_declara_entradas_dinamicas():
-    """`dynamic_inputs` e o que faz o editor derivar os pontos de conexao da
-    propriedade `ports`. Sem isso o node volta a ter um handle anonimo: os
-    testes acima continuam passando (o executor nao muda), mas no canvas nao ha
-    como ligar cada origem a sua chave — o `to_key` deixa de ser preenchido."""
+    """`dynamic_inputs` is what makes the editor derive the connection points from
+    the `ports` property. Without it the node goes back to one anonymous
+    handle: the tests above keep passing (the executor does not change), but
+    on the canvas there is no way to connect each source to its key — `to_key`
+    stops being filled."""
     from flow.registry import auto_discover_nodes, NODE_REGISTRY
     auto_discover_nodes()
 

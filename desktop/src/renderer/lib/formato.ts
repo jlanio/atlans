@@ -1,17 +1,17 @@
 // desktop/src/renderer/lib/formato.ts
 //
-// Formatação de números para as telas — um lugar só.
+// Number formatting for the screens — in a single place.
 //
-// A duração vivia copiada no Painel (App.tsx) e na lista de Execuções, e as
-// cópias divergiram: o Painel corrigiu o arredondamento e a lista continuou
-// mostrando "60.0s" e "59m 60s".
+// The duration lived copied in the Painel (App.tsx) and in the Execuções list,
+// and the copies diverged: the Painel fixed the rounding and the list kept
+// showing "60.0s" and "59m 60s".
 
-/** Duração em segundos, como se lê num relógio: `12.3s`, `4m 5s`, `2h 10m`. */
+/** Duration in seconds, as read on a clock: `12.3s`, `4m 5s`, `2h 10m`. */
 export function duracao(s: number | null | undefined): string {
   if (s == null) return '—'
-  // Arredonda ANTES de decidir a faixa. Fazendo depois, 59.97s caía em `< 60`
-  // e o toFixed(1) imprimia "60.0s"; e 3599.7s virava "59m 60s" — dois valores
-  // que não existem no relógio, num painel que se olha de relance.
+  // Rounds BEFORE deciding the range. Doing it after, 59.97s fell into `< 60`
+  // and toFixed(1) printed "60.0s"; and 3599.7s became "59m 60s" — two values
+  // that do not exist on a clock, in a dashboard people check at a glance.
   const decimos = Math.round(s * 10) / 10
   if (decimos < 60) return `${decimos.toFixed(1)}s`
   const totalSeg = Math.round(s)

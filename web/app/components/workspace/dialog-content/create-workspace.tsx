@@ -29,8 +29,8 @@ export function CreateWorkspaceDialog({ onClose }: { onClose: () => void }) {
       createToast.success(`Workspace "${ws.name}" criado.`)
       onClose()
     } catch (e) {
-      // O context lança com a mensagem do backend. Substituí-la por um texto
-      // genérico apagava justamente o motivo da recusa.
+      // The context throws with the backend's message. Replacing it with a generic
+      // text erased precisely the reason for the rejection.
       createToast.error(e instanceof Error ? e.message : "Erro ao criar workspace.")
     } finally {
       setSaving(false)

@@ -1,6 +1,6 @@
 /**
- * Gera um objeto de exemplo a partir do payload_schema configurado no WebhookTrigger.
- * Reutilizado pelo WebhookHelper (exemplos curl/Python/JS) e pela aba de teste.
+ * Builds a sample object from the payload_schema configured on the WebhookTrigger.
+ * Reused by WebhookHelper (curl/Python/JS examples) and by the test tab.
  */
 
 const DEFAULTS: Record<string, unknown> = {
@@ -33,7 +33,7 @@ export function generateSampleFromSchema(
     }
   }
 
-  // Envolve em outputKey só se ele foi configurado; caso contrário, os campos
-  // viram o body direto (mesma convencao que o webhook HTTP usa).
+  // Wraps in outputKey only if it was configured; otherwise the fields
+  // become the body directly (same convention the HTTP webhook uses).
   return outputKey ? { [outputKey]: sample } : sample
 }

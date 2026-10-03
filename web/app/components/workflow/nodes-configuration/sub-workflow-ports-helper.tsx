@@ -1,26 +1,27 @@
 "use client"
 
 /**
- * SubWorkflowPortsHelper — editor de portas declaradas em SubWorkflowInput
- * e SubWorkflowOutput.
+ * SubWorkflowPortsHelper — editor for the ports declared in SubWorkflowInput
+ * and SubWorkflowOutput.
  *
- * O modelo de contrato e declarativo via property `ports` (lista de strings).
- * Cada chave nesta lista vira:
- *   - uma entrada na lista de inputs/outputs do contrato (extract_contract)
- *   - uma chave que o pai precisa fornecer/recebera ao chamar este sub-fluxo
+ * The contract model is declarative via the `ports` property (list of strings).
+ * Each key in this list becomes:
+ *   - an entry in the contract's inputs/outputs list (extract_contract)
+ *   - a key the parent must provide/will receive when calling this sub-workflow
  *
- * `ports` e OPCIONAL (contrato opt-in):
- *   - vazio      -> passthrough: aceita/expoe todas as chaves
- *   - preenchido -> allowlist estrita, aplicada NOS DOIS lados. Chave que
- *                   chega fora da lista e descartada (com aviso no log).
+ * `ports` is OPTIONAL (opt-in contract):
+ *   - empty      -> passthrough: accepts/exposes every key
+ *   - filled     -> strict allowlist, applied on BOTH sides. A key that
+ *                   arrives outside the list is dropped (with a log warning).
  *
- * Cada edge que sai do SubWorkflowInput espalha o dict de entrada no seu
- * proprio destino — por isso ele pode alimentar VARIOS nodes.
+ * Each edge leaving SubWorkflowInput spreads the input dict into its own
+ * target — which is why it can feed SEVERAL nodes.
  *
- * No SubWorkflowOutput as portas declaradas viram pontos de conexao: a partir
- * de duas, o editor preenche o `to_key` de cada edge com o nome da porta e cada
- * origem cai na sua chave. Sem portas, sobra um ponto anonimo e apenas UMA edge
- * e aceita — duas disputariam as mesmas chaves, e a ultima venceria.
+ * In SubWorkflowOutput the declared ports become connection points: from two
+ * on, the editor fills each edge's `to_key` with the port name and each
+ * source lands in its own key. With no ports, a single anonymous point is left
+ * and only ONE edge is accepted — two would compete for the same keys, and the
+ * last one would win.
  */
 import { useMemo } from "react"
 import { Label } from "@/app/components/ui/label"
@@ -35,13 +36,14 @@ interface Props {
   setNodeField: (field: string, value: string | number | boolean) => void
   hasUnsaved: boolean
   variant: "input" | "output"
-  /** Arestas chegando a este nó. Só importa na saída: lá as portas são pontos
-   *  de conexão, e mexer nelas com aresta ligada deixaria a aresta apontando
-   *  para um ponto que não existe mais. Na entrada as portas não são handles —
-   *  o nó é um gatilho e nada chega nele.
+  /** Edges arriving at this node. Only matters on the output side: there the
+   *  ports are connection points, and changing them with an edge attached
+   *  would leave the edge pointing at a point that no longer exists. On the
+   *  input side the ports are not handles — the node is a trigger and nothing
+   *  arrives at it.
    *
-   *  Sem valor padrão: um default silencioso faria o editor destravar sozinho
-   *  se alguém esquecesse de ligar a contagem no formulário. */
+   *  No default value: a silent default would unlock the editor on its own if
+   *  someone forgot to wire the count in the form. */
   conexoesDeEntrada: number
 }
 
@@ -63,33 +65,34 @@ function parsePorts(raw: unknown): string[] {
 
 
 function isValidKey(key: string): boolean {
-  // Identificador "saudavel": comeca com letra/underscore, segue com
-  // letra/digito/underscore. Evita chaves com espacos/acentos que quebram
-  // ao referenciar de outros nodes.
+  // "Healthy" identifier: starts with a letter/underscore, continues with
+  // letter/digit/underscore. Avoids keys with spaces/accents that break
+  // when referenced from other nodes.
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(key)
 }
 
 
 /**
- * Nome sob o qual o node SubWorkflow devolve o dict INTEIRO do sub-fluxo ao pai,
- * ao lado das chaves individuais.
+ * Name under which the SubWorkflow node returns the sub-workflow's ENTIRE dict
+ * to the parent, alongside the individual keys.
  *
- * Uma porta de saída com este nome sobrescreveria o envelope: quem no pai lesse
- * `subWorkflowResult` receberia o valor daquela porta em vez do conjunto — sem
- * erro, com o dado errado. O executor recusa o fluxo; aqui o operador vê o
- * motivo enquanto digita, em vez de descobrir na hora de rodar.
+ * An output port with this name would overwrite the envelope: whoever in the
+ * parent read `subWorkflowResult` would get that port's value instead of the
+ * whole set — no error, wrong data. The executor rejects the workflow; here the
+ * operator sees the reason while typing, instead of finding out at run time.
  */
 export const PORTA_RESERVADA = "subWorkflowResult"
 
 
-/** Por que esta porta não serve — ou `null` se serve. */
+/** Why this port is not valid — or `null` if it is. */
 export function problemaNaPorta(
   porta: string,
   variant: "input" | "output",
   duplicada: boolean,
 ): string | null {
-  // Antes do caso geral: espaço é o erro mais comum (a pessoa escreve o nome
-  // como escreveria uma frase) e o único com uma correção óbvia a sugerir.
+  // Before the general case: a space is the most common mistake (people write
+  // the name the way they would write a sentence) and the only one with an
+  // obvious fix to suggest.
   if (/\s/.test(porta)) {
     return "Espaços não são aceitos — use underscore para separar palavras (ex: minha_porta)."
   }
@@ -97,14 +100,15 @@ export function problemaNaPorta(
     return "Use apenas letras, dígitos e underscore (começando por letra ou _)."
   }
   if (duplicada) return "Chave duplicada."
-  // O node descarta toda chave começada por `__` ANTES de aplicar a allowlist
-  // (são os metadados internos do executor). Uma porta assim nunca recebe nada
-  // e nem entra na lista de descartes do log: some sem deixar rastro.
+  // The node drops every key starting with `__` BEFORE applying the allowlist
+  // (they are the executor's internal metadata). A port like that never receives
+  // anything and does not even show up in the log's drop list: it vanishes
+  // without a trace.
   if (porta.startsWith("__")) {
     return "Nomes começados por __ são reservados ao executor e nunca chegam ao pai."
   }
-  // Só na saída: é o valor de retorno que colide com o envelope. Na entrada o
-  // nome não chega ao pai.
+  // Output side only: it is the return value that collides with the envelope.
+  // On the input side the name never reaches the parent.
   if (variant === "output" && porta === PORTA_RESERVADA) {
     return `"${PORTA_RESERVADA}" é reservado: é o nome sob o qual o pai recebe o resultado inteiro do sub-fluxo.`
   }
@@ -140,10 +144,10 @@ export default function SubWorkflowPortsHelper({
   }
 
   function renamePort(index: number, newName: string) {
-    // Sem `trim`: cortar o espaço aqui o fazia sumir enquanto a pessoa digitava,
-    // como se a tecla não funcionasse — e a validação, que já sabe recusá-lo,
-    // nunca chegava a ver o valor para explicar o motivo. Guardar o que foi
-    // digitado é o que permite dizer o que está errado.
+    // No `trim`: cutting the space here made it vanish while the person typed,
+    // as if the key did not work — and the validation, which already knows to
+    // reject it, never got to see the value to explain why. Keeping what was
+    // typed is what makes it possible to say what is wrong.
     const next = ports.slice()
     next[index] = newName
     commit(next)
@@ -182,9 +186,10 @@ export default function SubWorkflowPortsHelper({
       {travado && <AvisoPortasTravadas conexoes={conexoesDeEntrada} />}
 
       {ports.length === 0 ? (
-        // Contrato é opt-in: lista vazia é modo passthrough válido, não erro.
-        // O aviso anterior ("adicione ao menos uma") contradizia essa regra e
-        // empurrava o operador a declarar portas em sub-fluxos de uso único.
+        // The contract is opt-in: an empty list is a valid passthrough mode, not an
+        // error. The previous warning ("adicione ao menos uma", add at least
+        // one) contradicted that rule and pushed the operator into declaring
+        // ports in single-use sub-workflows.
         <div className="rounded-md border border-border bg-muted/30 p-2.5 text-xs flex items-start gap-2">
           <TbInfoCircle className="text-muted-foreground shrink-0 mt-0.5" />
           <span>

@@ -1,12 +1,12 @@
 "use client"
 
-// Tela «Tokens de acesso» (/settings/tokens) — contrato screen-patterns.md.
+// "Tokens de acesso" screen (/settings/tokens) — contract screen-patterns.md.
 //
-// Lista pessoal: os tokens do usuário logado, mais recente primeiro. Cada um
-// vale só para o que a conta já pode fazer, recortado por escopos, workspaces
-// e validade. Revogar é imediato e definitivo, mas o token fica na lista como
-// «Revogado». Molde: `credentials/index.tsx` (cabeçalho, precedência dos 4
-// estados, `atualizadoEm`, Atualizar em ghost e uma única primária).
+// Personal list: the logged-in user's tokens, most recent first. Each one is
+// valid only for what the account can already do, narrowed by scopes, workspaces
+// and expiry. Revoking is immediate and final, but the token stays in the list
+// as "Revogado". Template: `credentials/index.tsx` (header, precedence of the 4
+// states, `atualizadoEm`, Refresh as ghost and a single primary).
 
 import "dayjs/locale/pt-br"
 import { useCallback, useEffect, useMemo, useState } from "react"
@@ -29,9 +29,9 @@ import { ordenarEscopos, rotuloDeEscopo, rotuloDeStatus } from "./escopo-rotulos
 import CreateToken from "./dialog-content/create-token"
 import RevokeToken from "./dialog-content/revoke-token"
 
-// `fromNow()` só fala português depois que alguém carrega o locale — hoje isso
-// acontece como efeito colateral de módulos do canvas. Quem entra direto nesta
-// tela veria «2 hours ago». Mesmo precedente de `workflow/buttons/recent-runs`.
+// `fromNow()` only speaks Portuguese after someone loads the locale — today that
+// happens as a side effect of canvas modules. Whoever lands directly on this
+// screen would see "2 hours ago". Same precedent as `workflow/buttons/recent-runs`.
 dayjs.locale("pt-br")
 
 const ESCOPO_DA_TELA = "Para agentes e integrações — valem só para o que a sua conta já pode fazer"
@@ -39,7 +39,7 @@ const ESCOPO_DA_TELA = "Para agentes e integrações — valem só para o que a 
 /** A partir de quantos dias o selo «Ativo» vira «Expira em N dias». */
 const AVISO_DE_EXPIRACAO_DIAS = 14
 
-/** Dias inteiros até `expires_at` (negativo se já passou); `null` sem data. */
+/** Whole days until `expires_at` (negative if already past); `null` without a date. */
 export function diasAteExpirar(expiresAt: string | null | undefined, agora = Date.now()): number | null {
   const exp = fromBackend(expiresAt)
   if (!exp) return null
@@ -52,9 +52,9 @@ export function textoDeExpiracao(dias: number): string {
 }
 
 /**
- * «Todos os workspaces» quando o token não tem recorte; senão a contagem com
- * os nomes que a lista de workspaces resolveu (sem nomes, só a contagem — a
- * lista pode ter falhado ou o workspace pode ter saído).
+ * "Todos os workspaces" when the token has no restriction; otherwise the count
+ * with the names the workspace list resolved (without names, just the count — the
+ * list may have failed or the workspace may have left).
  */
 export function textoDeWorkspaces(ids: string[] | null, nomes: ReadonlyMap<string, string>): string {
   if (ids == null) return "Todos os workspaces"
@@ -65,7 +65,7 @@ export function textoDeWorkspaces(ids: string[] | null, nomes: ReadonlyMap<strin
   return resolvidos.length > 0 ? `${contagem}: ${resolvidos.join(", ")}` : contagem
 }
 
-/** A lista guarda só os metadados: o segredo não fica no estado da página. */
+/** The list keeps only the metadata: the secret doesn't stay in the page state. */
 function semSegredo(criado: ApiTokenCreated): ApiToken {
   const { id, name, token_prefix, scopes, workspace_ids, expires_at, last_used_at, revoked_at, created_at, status } = criado
   return { id, name, token_prefix, scopes, workspace_ids, expires_at, last_used_at, revoked_at, created_at, status }
@@ -74,15 +74,15 @@ function semSegredo(criado: ApiTokenCreated): ApiToken {
 const TokensDeAcesso = () => {
   const { status } = useSession()
   const [workspaces, setWorkspaces] = useState<IWorkspace[]>([])
-  // A carga da lista é o `useFetchData`: `loading` (o `firstLoad` dele) cobre
-  // só a PRIMEIRA carga (skeleton); `refreshing` é a recarga, com a lista na
-  // tela, opaca, e o botão girando. O gate de sessão também é dele.
+  // The list load is `useFetchData`: `loading` (its `firstLoad`) covers only
+  // the FIRST load (skeleton); `refreshing` is the reload, with the list on
+  // screen, faded, and the button spinning. The session gate is its job too.
   //
-  // Sem o ramo de erro, falha de rede caía no vazio de primeiro uso — a tela
-  // mentiria, dizendo que não há tokens quando não conseguiu carregar. O
-  // cartão de erro só vale sem carga aceita (`atualizadoEm == null`); recarga
-  // que falha sobre lista pronta mantém o que havia e avisa por toast
-  // (contrato §3.2).
+  // Without the error branch, a network failure fell into the first-use empty
+  // state — the screen would lie, saying there are no tokens when it couldn't
+  // load. The error card only applies with no accepted load
+  // (`atualizadoEm == null`); a reload that fails over a ready list keeps what
+  // was there and warns via toast (contract §3.2).
   const {
     data, firstLoad: loading, refreshing, error, atualizadoEm, refetch, setData: setTokens,
   } = useFetchData(() => GisFlowService.listApiTokens(), "Não foi possível carregar os tokens de acesso.", [], 0, {
@@ -93,8 +93,8 @@ const TokensDeAcesso = () => {
   const [createOpen, setCreateOpen] = useState(false)
   const [revokeTarget, setRevokeTarget] = useState<ApiToken | null>(null)
 
-  // Só para traduzir ids em nomes (cartões e caixas do diálogo). Falhar aqui
-  // não é motivo para quebrar a tela: sem nomes, o cartão mostra a contagem.
+  // Only to translate ids into names (cards and the dialog's checkboxes). Failing
+  // here is no reason to break the screen: without names, the card shows the count.
   const carregarWorkspaces = useCallback(async () => {
     const res = await GisFlowService.listWorkspaces()
     if (!res.error) setWorkspaces(res.data ?? [])
@@ -110,7 +110,7 @@ const TokensDeAcesso = () => {
   }
 
   function handleCreated(criado: ApiTokenCreated) {
-    // Mais recente primeiro, como a listagem do backend.
+    // Most recent first, like the backend's listing.
     setTokens(prev => [semSegredo(criado), ...(prev ?? [])])
   }
 
@@ -126,8 +126,8 @@ const TokensDeAcesso = () => {
   const ativos = useMemo(() => tokens.filter(t => t.status === "active").length, [tokens])
   const hasTokens = tokens.length > 0
 
-  // Subtítulo do cabeçalho: o escopo da tela; com tokens, a contagem entra na
-  // frente. O zero some (contrato §7) — «0 ativos» não ajuda ninguém.
+  // Header subtitle: the screen's scope; with tokens, the count goes in
+  // front. Zero disappears (contract §7) — "0 ativos" helps nobody.
   function textoDoSubtitulo(): string {
     if (!hasTokens) return ESCOPO_DA_TELA
     const partes = [plural(tokens.length, "token")]
@@ -135,9 +135,9 @@ const TokensDeAcesso = () => {
     return `${partes.join(" · ")} — valem só para o que a sua conta já pode fazer`
   }
 
-  // Selo de status: sempre traduzido, valor cru em `data-status`. Pares
-  // canônicos do contrato §6 — verde (ativo), âmbar (a vencer), vermelho
-  // (expirado); revogado é neutro, porque não é falha nem aviso.
+  // Status badge: always translated, raw value in `data-status`. Canonical
+  // pairs from contract §6 — green (active), amber (expiring), red
+  // (expired); revoked is neutral, because it's neither a failure nor a warning.
   function seloDeStatus(token: ApiToken) {
     const base = "flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium tabular-nums"
     if (token.status === "revoked") {
@@ -212,8 +212,8 @@ const TokensDeAcesso = () => {
             </div>
           }
           actions={
-            // Revogado não se revoga de novo; expirado ainda pode ser revogado
-            // (deixa de contar como existente para quem audita).
+            // A revoked token can't be revoked again; an expired one can still be revoked
+            // (it stops counting as existing for whoever audits).
             token.status !== "revoked" ? (
               <Button
                 variant="outline"
@@ -234,15 +234,15 @@ const TokensDeAcesso = () => {
 
   return (
     <PageRoot>
-      {/* Cabeçalho fixo do contrato §1: título + subtítulo de escopo à esquerda,
-          ações à direita (Atualizar em ghost e Novo token como única primária).
-          Só duas ações — cabem na linha também no telefone, sem menu ⋯. */}
+      {/* Fixed header from contract §1: title + scope subtitle on the left,
+          actions on the right (Refresh as ghost and New token as the only primary).
+          Only two actions — they fit on the line on the phone too, no ⋯ menu. */}
       <div className="flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         <div className="min-w-0">
           <h1 className="text-2xl font-semibold text-foreground">Tokens de acesso</h1>
-          {/* Região viva estável: o `aria-live` fica no contêiner, que sobrevive
-              à troca Skeleton↔texto, para o leitor de tela anunciar a contagem
-              quando ela muda (ex.: após criar ou revogar). */}
+          {/* Stable live region: the `aria-live` sits on the container, which survives
+              the Skeleton↔text swap, so the screen reader announces the count
+              when it changes (e.g. after creating or revoking). */}
           <div aria-live="polite" aria-atomic="true">
             {loading ? (
               <Skeleton className="mt-1 h-4 w-64" />
@@ -271,8 +271,8 @@ const TokensDeAcesso = () => {
         </div>
       </div>
 
-      {/* Precedência do contrato §3: carregando → erro (só na 1ª carga) →
-          primeiro uso → conteúdo. */}
+      {/* Precedence from contract §3: loading → error (only on the 1st load) →
+          first use → content. */}
       {loading ? (
         <SkeletonDeTokens />
       ) : loadError && atualizadoEm == null ? (
@@ -291,8 +291,8 @@ const TokensDeAcesso = () => {
         </ul>
       )}
 
-      {/* Montado só enquanto aberto: o formulário nasce limpo a cada abertura e
-          o segredo do passo 2 sai da memória junto com o diálogo. */}
+      {/* Mounted only while open: the form is born clean on every opening and
+          the step 2 secret leaves memory together with the dialog. */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         {createOpen && (
           <CreateToken

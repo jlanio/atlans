@@ -1,17 +1,17 @@
 # tests/unit/test_tarefas_de_fundo.py
 """
-Tarefas de fundo da API: o lifespan que as sobe e derruba, os laços periódicos
-com lock no Redis e o `REDIS_URL` que todos leem.
+API background tasks: the lifespan that starts and stops them, the periodic
+loops with a Redis lock, and the `REDIS_URL` they all read.
 
-Os defeitos que a repetição produziu:
+The defects the repetition produced:
 
-- o lifespan subia oito tarefas à mão e as derrubava em blocos copiados; uma
-  delas era cancelada e nunca aguardada — o shutdown seguia e
-  fechava banco e Redis com ela ainda encerrando;
-- três dos quatro laços periódicos abriam um cliente Redis NOVO a cada volta só
-  para pegar o lock, em vez de usar o pool global;
-- o `REDIS_URL` era lido do ambiente em cinco lugares além de `config.py`, e o
-  consumer de resultados tinha outro default (`localhost`).
+- the lifespan started eight tasks by hand and stopped them in copy-pasted
+  blocks; one of them was cancelled and never awaited — the shutdown went on
+  and closed the database and Redis while it was still shutting down;
+- three of the four periodic loops opened a NEW Redis client on every turn just
+  to take the lock, instead of using the global pool;
+- `REDIS_URL` was read from the environment in five places besides `config.py`,
+  and the results consumer had a different default (`localhost`).
 """
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ RAIZ = Path(__file__).resolve().parents[2]
 
 # ── O lifespan ────────────────────────────────────────────────────────────────
 
-# As tarefas de fundo que o lifespan do núcleo sobe, pelo módulo de onde vêm.
+# The background tasks that the core's lifespan starts, by the module they come from.
 TAREFAS_DE_FUNDO = [
     ("app.core.run_result_consumer", "run_consumer_loop"),
     ("app.core.artifact_cleanup", "run_cleanup_loop"),
@@ -41,18 +41,19 @@ TAREFAS_DE_FUNDO = [
     ("app.core.executor_connections", "overdue_acks_monitor"),
     ("app.api.routers.executor_ws_router", "orphan_runs_watchdog"),
 ]
-# E a de uma extensão (app/extensoes), que sobe e encerra junto.
+# And one from an extension (app/extensoes), which starts and stops along with them.
 TAREFA_DA_EXTENSAO = "tarefa_da_extensao"
 
 
 @pytest.fixture
 def lifespan_sem_infra(monkeypatch, registro_de_teste):
-    """O lifespan de `app.main` com banco, Redis, MinIO, scheduler e MCP dublados
-    e cada tarefa de fundo trocada por uma que só espera o cancelamento.
+    """The lifespan of `app.main` with database, Redis, MinIO, scheduler and MCP
+    stubbed, and each background task replaced by one that just waits for
+    cancellation.
 
-    `eventos` guarda a ordem das coisas: ("subiu", t), ("encerrou", t) e
-    ("close_redis",). `lenta` escolhe a tarefa que demora a encerrar — como uma
-    de verdade, que ainda fecha conexão e loga depois do cancelamento."""
+    `eventos` records the order of things: ("subiu", t), ("encerrou", t) and
+    ("close_redis",). `lenta` picks the task that is slow to shut down — like a
+    real one, which still closes a connection and logs after cancellation."""
     from app import main
 
     estado = SimpleNamespace(eventos=[], lenta=None, redis=MagicMock())
@@ -95,14 +96,14 @@ def lifespan_sem_infra(monkeypatch, registro_de_teste):
 
 @pytest.mark.parametrize("lenta", [nome for _, nome in TAREFAS_DE_FUNDO] + [TAREFA_DA_EXTENSAO])
 async def test_shutdown_aguarda_cada_tarefa_de_fundo_antes_de_fechar_o_redis(lifespan_sem_infra, lenta):
-    """Cancelar não basta: o shutdown tem de AGUARDAR cada tarefa, senão fecha
-    banco e Redis com ela ainda no meio do encerramento (e o loop acaba com
-    "Task was destroyed but it is pending!")."""
+    """Cancelling is not enough: the shutdown has to AWAIT each task, otherwise it
+    closes the database and Redis while the task is still mid-shutdown (and the
+    loop ends with "Task was destroyed but it is pending!")."""
     estado = lifespan_sem_infra
     estado.lenta = lenta
 
     async with estado.lifespan(SimpleNamespace(state=SimpleNamespace())):
-        await asyncio.sleep(0)  # as tarefas sobem
+        await asyncio.sleep(0)  # the tasks start
         assert {e[1] for e in estado.eventos if e[0] == "subiu"} == (
             {nome for _, nome in TAREFAS_DE_FUNDO} | {TAREFA_DA_EXTENSAO}
         )
@@ -112,15 +113,16 @@ async def test_shutdown_aguarda_cada_tarefa_de_fundo_antes_de_fechar_o_redis(lif
 
 
 async def test_ping_da_subida_e_no_pool_assincrono(lifespan_sem_infra):
-    """O ping de conexão sai pelo pool assíncrono — antes era um cliente Redis
-    SÍNCRONO, mantido só para isso, que prendia o event loop na subida."""
+    """The connection ping goes through the async pool — it used to be a
+    SYNCHRONOUS Redis client, kept only for this, which blocked the event loop
+    at startup."""
     estado = lifespan_sem_infra
     async with estado.lifespan(SimpleNamespace(state=SimpleNamespace())):
         pass
     estado.redis.ping.assert_awaited_once()
 
 
-# ── Os laços periódicos ───────────────────────────────────────────────────────
+# ── The periodic loops ────────────────────────────────────────────────────────
 
 
 async def test_lock_e_set_nx_ex_no_pool_global(monkeypatch):
@@ -130,12 +132,12 @@ async def test_lock_e_set_nx_ex_no_pool_global(monkeypatch):
     monkeypatch.setattr("app.core.redis._pool", pool)
     assert await tarefas_periodicas.adquirir_lock("x:lock", 600) is True
     assert ("set", "x:lock", True, 600) in pool.chamadas
-    assert await tarefas_periodicas.adquirir_lock("x:lock", 600) is False  # ocupado até o TTL vencer
+    assert await tarefas_periodicas.adquirir_lock("x:lock", 600) is False  # held until the TTL expires
 
 
 async def test_redis_fora_ou_pool_nao_inicializado_prossegue_sem_lock(monkeypatch):
-    """As rotinas protegidas são idempotentes: sem Redis, o pior caso é trabalho
-    repetido, nunca trabalho a menos."""
+    """The protected routines are idempotent: without Redis, the worst case is
+    repeated work, never missing work."""
     from app.core import tarefas_periodicas
 
     class RedisFora(RedisFalso):
@@ -144,7 +146,7 @@ async def test_redis_fora_ou_pool_nao_inicializado_prossegue_sem_lock(monkeypatc
 
     monkeypatch.setattr("app.core.redis._pool", RedisFora())
     assert await tarefas_periodicas.adquirir_lock("x:lock", 600) is True
-    monkeypatch.setattr("app.core.redis._pool", None)  # fora do lifespan
+    monkeypatch.setattr("app.core.redis._pool", None)  # outside the lifespan
     assert await tarefas_periodicas.adquirir_lock("x:lock", 600) is True
 
 
@@ -156,7 +158,7 @@ async def test_laco_trabalha_a_cada_volta_sobrevive_a_erro_e_encerra_no_cancelam
     async def _trabalho():
         voltas.append(len(voltas) + 1)
         if len(voltas) == 1:
-            raise RuntimeError("banco fora")  # não derruba o laço
+            raise RuntimeError("banco fora")  # does not bring down the loop
         if len(voltas) == 3:
             raise asyncio.CancelledError  # o shutdown chega
 
@@ -168,7 +170,7 @@ async def test_laco_com_lock_ocupado_pula_as_voltas(monkeypatch):
     from app.core import tarefas_periodicas
 
     pool = RedisFalso()
-    pool.dados["x:lock"] = "1"  # outro worker pegou
+    pool.dados["x:lock"] = "1"  # another worker took it
     monkeypatch.setattr("app.core.redis._pool", pool)
     voltas = []
 
@@ -178,11 +180,11 @@ async def test_laco_com_lock_ocupado_pula_as_voltas(monkeypatch):
     tarefa = asyncio.create_task(tarefas_periodicas.laco_periodico("teste", 0.01, _trabalho, lock="x:lock"))
     await asyncio.sleep(0.08)
     tarefa.cancel()
-    await tarefa  # o laço trata o cancelamento e termina sozinho
+    await tarefa  # the loop handles the cancellation and finishes on its own
     assert voltas == []
     assert len([c for c in pool.chamadas if c[:2] == ("set", "x:lock")]) >= 2
 
-# (módulo, laço, atributo do intervalo, chave do lock, trabalho de cada volta)
+# (module, loop, interval attribute, lock key, work done on each turn)
 LACOS = [
     ("app.core.artifact_cleanup", "run_cleanup_loop", "_CLEANUP_INTERVAL", "artifact_cleanup:lock", "purge_expired_artifacts"),
     ("app.core.storage_reconciliation", "run_reconciliation_loop", "_RECONCILE_INTERVAL", "storage_reconcile:lock", "run_full_reconciliation"),
@@ -200,12 +202,13 @@ async def test_laco_pega_o_lock_no_pool_global_sem_abrir_cliente_por_volta(
 
 
 
-# ── Um REDIS_URL só ───────────────────────────────────────────────────────────
+# ── A single REDIS_URL ────────────────────────────────────────────────────────
 
 
 async def test_consumer_de_resultados_usa_o_redis_url_da_aplicacao(monkeypatch):
-    """Sem `REDIS_URL` no ambiente, o consumer caía em `localhost` enquanto o
-    pool (e todo o resto) ia para `redis:6379`: dois Redis diferentes."""
+    """Without `REDIS_URL` in the environment, the consumer fell back to
+    `localhost` while the pool (and everything else) went to `redis:6379`: two
+    different Redis instances."""
     import redis.asyncio as aioredis
 
     from app.core import config, run_result_consumer
@@ -214,7 +217,7 @@ async def test_consumer_de_resultados_usa_o_redis_url_da_aplicacao(monkeypatch):
 
     def _from_url(url, **kw):
         urls.append(url)
-        raise asyncio.CancelledError  # só interessa o endereço
+        raise asyncio.CancelledError  # only the address matters
 
     monkeypatch.delenv("REDIS_URL", raising=False)
     monkeypatch.setattr(aioredis, "from_url", _from_url)
@@ -225,9 +228,9 @@ async def test_consumer_de_resultados_usa_o_redis_url_da_aplicacao(monkeypatch):
 
 
 def test_so_config_le_o_redis_url_do_ambiente():
-    """Um default só, em `app/core/config.py`. A exceção declarada é
-    `rate_limiter.py`: ele precisa saber se a variável foi DEFINIDA (ausente =
-    contadores em memória), e o default de `config.py` apagaria essa diferença."""
+    """A single default, in `app/core/config.py`. The declared exception is
+    `rate_limiter.py`: it needs to know whether the variable was SET (absent =
+    in-memory counters), and the `config.py` default would erase that difference."""
     excecoes = {"app/core/config.py", "app/core/rate_limiter.py"}
     leitores = sorted(
         str(arquivo.relative_to(RAIZ))

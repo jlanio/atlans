@@ -1,20 +1,21 @@
 # tests/unit/test_workflow_nome_unico_parcial.py
-"""O nome do workflow e unico apenas entre os VIVOS.
+"""The workflow name is unique only among the LIVE ones.
 
-O delete de workflow e soft (workflow_crud.soft_delete_by_hash grava deleted_at
-e mantem a linha). Enquanto a restricao de nome era total, o nome de tudo que se
-apagava ficava ocupado para sempre — e de forma invisivel, ja que nenhuma
-listagem mostra soft-deletados. A pre-checagem
-(workflow_move_service.nomes_no_workspace) sempre filtrou `deleted_at IS NULL`,
-entao ela e o banco discordavam sobre o que e um nome ocupado.
+Workflow delete is soft (workflow_crud.soft_delete_by_hash writes deleted_at
+and keeps the row). While the name constraint was total, the name of everything
+that got deleted stayed taken forever — and invisibly, since no listing shows
+soft-deleted ones. The pre-check (workflow_move_service.nomes_no_workspace)
+always filtered `deleted_at IS NULL`, so it and the database disagreed about
+what a taken name is.
 
-O caso real: `Cópia de get-CAR` foi criado e excluido em 07/08; quase um mes
-depois, duplicar `get-CAR` propunha esse mesmo nome (livre para a pre-checagem),
-o INSERT batia na restricao e o usuario via "Ja existe um workflow com este nome
-neste workspace" sem nenhum workflow com esse nome a vista.
+The real case: `Cópia de get-CAR` was created and deleted on August 7; almost a
+month later, duplicating `get-CAR` proposed that same name (free according to
+the pre-check), the INSERT hit the constraint and the user saw "Ja existe um
+workflow com este nome neste workspace" (a workflow with this name already
+exists in this workspace) with no workflow by that name in sight.
 
-Os unitarios de duplicacao dublam `db.execute` e nunca exercitam a restricao de
-verdade — por isso este arquivo monta schema real.
+The duplication unit tests stub `db.execute` and never exercise the real
+constraint — which is why this file builds a real schema.
 """
 from datetime import datetime
 
@@ -46,7 +47,7 @@ def _wf(id_hash: str, nome: str, workspace: str = "ws-1", **kw) -> Workflow:
 
 
 async def _inserir(db, wf) -> bool:
-    """True se o banco aceitou; False se recusou por unicidade."""
+    """True if the database accepted; False if it refused on uniqueness."""
     db.add(wf)
     try:
         await db.commit()
@@ -58,11 +59,12 @@ async def _inserir(db, wf) -> bool:
 
 @pytest.mark.asyncio
 async def test_o_predicado_chega_ao_ddl(db):
-    """Sem o WHERE, o indice vira unico TOTAL e a regra volta a ser a antiga.
+    """Without the WHERE, the index becomes TOTALLY unique and the rule reverts to the old one.
 
-    Vale checar o DDL: o predicado e uma opcao por dialeto
-    (`postgresql_where`/`sqlite_where`) e um dialeto sem ela cria o indice em
-    silencio, sem erro nenhum — a regressao so apareceria em producao.
+    Checking the DDL is worth it: the predicate is a per-dialect option
+    (`postgresql_where`/`sqlite_where`) and a dialect without it silently
+    creates the index, with no error at all — the regression would only show up
+    in production.
     """
     ddl = (await db.execute(sa.text(
         "SELECT sql FROM sqlite_master WHERE name = 'uq_workflow_name_workspace'"
@@ -74,7 +76,7 @@ async def test_o_predicado_chega_ao_ddl(db):
 
 @pytest.mark.asyncio
 async def test_dois_vivos_com_o_mesmo_nome_sao_recusados(db):
-    """A regra que nao pode afrouxar."""
+    """The rule that must not loosen."""
     assert await _inserir(db, _wf("a", "Edificações"))
 
     assert not await _inserir(db, _wf("b", "Edificações"))
@@ -82,7 +84,7 @@ async def test_dois_vivos_com_o_mesmo_nome_sao_recusados(db):
 
 @pytest.mark.asyncio
 async def test_excluir_libera_o_nome(db):
-    """O caso do 'Cópia de get-CAR': apagar devolve o nome ao workspace."""
+    """The 'Cópia de get-CAR' case: deleting gives the name back to the workspace."""
     assert await _inserir(db, _wf("a", "get-CAR"))
     assert not await _inserir(db, _wf("b", "get-CAR"))
 
@@ -98,7 +100,7 @@ async def test_excluir_libera_o_nome(db):
 
 @pytest.mark.asyncio
 async def test_dois_excluidos_podem_repetir_o_nome(db):
-    """Decorre do predicado — e e o que o downgrade da migration desempata."""
+    """Follows from the predicate — and it is what the migration's downgrade breaks ties on."""
     assert await _inserir(db, _wf("a", "X", deleted_at=_EXCLUIDO_EM))
 
     assert await _inserir(db, _wf("b", "X", deleted_at=_EXCLUIDO_EM))
@@ -106,7 +108,7 @@ async def test_dois_excluidos_podem_repetir_o_nome(db):
 
 @pytest.mark.asyncio
 async def test_escopo_por_workspace_continua_valendo(db):
-    """Afrouxar por `deleted_at` nao pode afrouxar por workspace."""
+    """Loosening by `deleted_at` must not loosen by workspace."""
     assert await _inserir(db, _wf("a", "Edificações", workspace="ws-1"))
 
     assert await _inserir(db, _wf("b", "Edificações", workspace="ws-2"))
@@ -114,9 +116,9 @@ async def test_escopo_por_workspace_continua_valendo(db):
 
 @pytest.mark.asyncio
 async def test_nome_liberado_volta_a_ser_exclusivo(db):
-    """Reaproveitar o nome de um excluido nao deixa a porta aberta.
+    """Reusing a deleted workflow's name does not leave the door open.
 
-    Um segundo vivo com esse nome tem de ser recusado como qualquer outro.
+    A second live one with that name has to be refused like any other.
     """
     assert await _inserir(db, _wf("a", "X", deleted_at=_EXCLUIDO_EM))
     assert await _inserir(db, _wf("b", "X"))
@@ -126,16 +128,17 @@ async def test_nome_liberado_volta_a_ser_exclusivo(db):
 
 @pytest.mark.asyncio
 async def test_ler_atributo_apos_rollback_e_erro_de_sessao(db):
-    """Fixa POR QUE as mensagens de conflito nao podem ler do objeto ORM.
+    """Pins down WHY the conflict messages cannot read from the ORM object.
 
-    `crud.update` faz setattr e commita; o `except IntegrityError` chama
-    `rollback()`, e o rollback EXPIRA todo objeto da sessao. Ler um atributo
-    depois disso dispara refresh lazy — que numa AsyncSession nao e um SELECT a
-    mais, e `MissingGreenlet`. Uma mensagem de erro que citasse `wf.name` ali
-    trocaria o 409 legivel por um 500, justamente no caminho de erro.
+    `crud.update` does setattr and commits; the `except IntegrityError` calls
+    `rollback()`, and the rollback EXPIRES every object in the session. Reading
+    an attribute after that triggers a lazy refresh — which in an AsyncSession
+    is not one more SELECT, it is `MissingGreenlet`. An error message that cited
+    `wf.name` there would swap the readable 409 for a 500, precisely on the
+    error path.
 
-    Por isso `create_workflow` cita o parametro `name` e `update_workflow`
-    captura o nome ANTES do commit (`nome_tentado`).
+    That is why `create_workflow` cites the `name` parameter and
+    `update_workflow` captures the name BEFORE the commit (`nome_tentado`).
     """
     assert await _inserir(db, _wf("a", "Edificações"))
     assert await _inserir(db, _wf("b", "Outro"))
@@ -144,7 +147,7 @@ async def test_ler_atributo_apos_rollback_e_erro_de_sessao(db):
         sa.select(Workflow).where(Workflow.id_hash == "b")
     )).scalars().first()
 
-    alvo.name = "Edificações"       # colide com o vivo "a"
+    alvo.name = "Edificações"       # collides with the live "a"
     with pytest.raises(IntegrityError):
         await db.commit()
     await db.rollback()

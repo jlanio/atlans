@@ -9,29 +9,30 @@ import type {
 } from "@/service/types"
 
 /**
- * Dados do Dashboard (docs/specs/dashboard.md §3.3).
+ * Dashboard data (docs/specs/dashboard.md §3.3).
  *
- * Cinco fontes escopadas partem juntas por escopo (`Promise.allSettled`):
- * métricas (a ESPINHA — saúde + atenção + indicadores), execuções por dia
- * (gráfico), execuções recentes (atividade), executores (item "no teto" da
- * atenção) e a listagem de workflows (próximas execuções).
+ * Five scoped sources start together per scope (`Promise.allSettled`):
+ * metrics (the SPINE — health + attention + indicators), runs per day
+ * (chart), recent runs (activity), executors ("at ceiling" item of
+ * attention) and the workflow listing (upcoming runs).
  *
- * Só `metrics` bloqueia: se cair na 1ª carga do escopo, `erroEspinha` toma a
- * tela; nas recargas com dado na tela ela degrada por seção (`falhas.metrics`),
- * como as demais. `executores` é a única que não vira aviso — falha → `[]`, e a
- * atenção só perde o item "executor no teto". O instante (`now`) vem só de
- * `metrics` (não do `ActiveRunsContext`, que é do workspace ativo e não serve
- * ao escopo "todos"): um poll de 30 s renova só as métricas, sem piscar a tela.
+ * Only `metrics` blocks: if it fails on the scope's 1st load, `erroEspinha` takes
+ * over the screen; on reloads with data on screen it degrades per section
+ * (`falhas.metrics`), like the others. `executores` is the only one that doesn't
+ * become a warning — failure → `[]`, and attention only loses the "executor at
+ * ceiling" item. The instant (`now`) comes only from `metrics` (not from
+ * `ActiveRunsContext`, which belongs to the active workspace and doesn't serve
+ * the "todos" scope): a 30 s poll renews only the metrics, without flashing the screen.
  *
- * O escopo já chega resolvido em `escopoWorkspaceId` (`null` = "todos"); trocar
- * de escopo reinicia a 1ª carga daquele escopo (skeleton). Quem decide o id a
- * partir de `?escopo=` e do workspace ativo é o `index` — assim o hook não
- * recarrega ao trocar `current` quando o escopo é "todos".
+ * The scope already arrives resolved in `escopoWorkspaceId` (`null` = "todos");
+ * changing scope restarts that scope's 1st load (skeleton). The one that decides
+ * the id from `?escopo=` and the active workspace is `index` — so the hook doesn't
+ * reload when `current` changes while the scope is "todos".
  *
- * A janela chega em `dias` (7/30/90, do `?periodo=`) e escala as três fontes de
- * período — métricas, execuções por dia e executores. Trocar só o período é uma
- * RECARGA (o botão gira, a tela fica e atualiza quando o dado novo chega), como
- * o seletor do Histórico; só a troca de escopo mostra skeleton.
+ * The window arrives in `dias` (7/30/90, from `?periodo=`) and scales the three
+ * period sources — metrics, runs per day and executors. Changing only the period
+ * is a RELOAD (the button spins, the screen stays and updates when the new data
+ * arrives), like History's selector; only a scope change shows the skeleton.
  */
 
 export interface DadosDoDashboard {
@@ -40,28 +41,28 @@ export interface DadosDoDashboard {
   runs: IRunSummary[]
   executores: IExecutorMetrics[]
   workflows: IWorkflow[]
-  /** 1ª carga do escopo atual (skeleton). */
+  /** 1st load of the current scope (skeleton). */
   carregando: boolean
-  /** Recargas seguintes (o botão gira, a tela fica). */
+  /** Subsequent reloads (the button spins, the screen stays). */
   atualizando: boolean
-  /** Por seção que falhou na última carga; o que já havia continua na tela. */
+  /** Per section that failed on the last load; what was already there stays on screen. */
   falhas: { metrics: boolean; dias: boolean; runs: boolean; workflows: boolean }
-  /** Só quando `metrics` cai na 1ª carga do escopo atual (inclui troca de escopo): bloqueia a tela. */
+  /** Only when `metrics` fails on the 1st load of the current scope (including a scope change): blocks the screen. */
   erroEspinha: string | null
-  /** "Atualizar" passa `force: true` para furar o cache das métricas no backend. */
+  /** "Atualizar" passes `force: true` to bypass the metrics cache in the backend. */
   recarregar: (opts?: { force?: boolean }) => void
 }
 
-/** A saúde renova a cada 30 s com a aba visível (spec §3.3); o instante não é janela. */
+/** Health renews every 30 s while the tab is visible (spec §3.3); the instant is not a window. */
 export const INTERVALO_DA_SAUDE_MS = 30_000
-/** Poucas linhas: a atividade recente é um resumo, não uma tabela (spec §3.7). */
+/** Few rows: recent activity is a summary, not a table (spec §3.7). */
 export const LIMITE_DE_RUNS = 6
 
 const ERRO_ESPINHA_PADRAO = "Não foi possível carregar o painel."
 
 const SEM_FALHAS = { metrics: false, dias: false, runs: false, workflows: false }
 
-/** `allSettled` nunca rejeita; o service também não — mas um `throw` inesperado não pode derrubar a tela. */
+/** `allSettled` never rejects; neither does the service — but an unexpected `throw` must not bring down the screen. */
 function resposta<T>(r: PromiseSettledResult<IResponse<T> | null>): IResponse<T> | null {
   return r.status === "fulfilled" ? r.value : null
 }
@@ -74,10 +75,10 @@ function fusoDoNavegador(): string {
   }
 }
 
-// `escopoWorkspaceId`: `null` = "todos"; um id = aquele workspace; `undefined` =
-// escopo ainda indefinido (o workspace ativo está carregando) — NÃO buscar, o
-// skeleton continua. Sem esse terceiro estado, o escopo "ativo" buscava "todos"
-// por um instante (id ainda nulo) e piscava o painel errado antes de recarregar.
+// `escopoWorkspaceId`: `null` = "todos"; an id = that workspace; `undefined` =
+// scope not defined yet (the active workspace is loading) — do NOT fetch, the
+// skeleton stays. Without this third state, the "ativo" scope fetched "todos"
+// for an instant (id still null) and flashed the wrong dashboard before reloading.
 export function useDashboardDados(escopoWorkspaceId: string | null | undefined, periodo: number): DadosDoDashboard {
   const [metrics, setMetrics] = useState<IObservabilityMetrics | null>(null)
   const [dias, setDias] = useState<IRunsByDay[]>([])
@@ -89,34 +90,34 @@ export function useDashboardDados(escopoWorkspaceId: string | null | undefined, 
   const [falhas, setFalhas] = useState(SEM_FALHAS)
   const [erroEspinha, setErroEspinha] = useState<string | null>(null)
 
-  // Carimbo de sequência: trocar de escopo duas vezes seguidas dispara duas
-  // cargas, e a mais lenta pode responder por último. Só a última carga
-  // pedida escreve na tela.
+  // Sequence stamp: changing scope twice in a row fires two loads, and the
+  // slower one may answer last. Only the last load requested writes to the
+  // screen.
   const seq = useRef(0)
-  // Escopo cujos dados estão NA TELA (`undefined` = nunca carregou com espinha;
-  // `null` = "todos"). Separa skeleton (1ª carga do escopo) de "o botão gira".
+  // Scope whose data is ON SCREEN (`undefined` = never loaded with the spine;
+  // `null` = "todos"). Separates skeleton (scope's 1st load) from "the button spins".
   const escopoNaTela = useRef<string | null | undefined>(undefined)
-  // O escopo corrente, lido pelo `recarregar` e pelo poll sem trocar de
-  // identidade a cada render. (`undefined` = ainda indefinido — não busca.)
+  // The current scope, read by `recarregar` and by the poll without changing
+  // identity on every render. (`undefined` = not defined yet — doesn't fetch.)
   const escopoRef = useRef<string | null | undefined>(escopoWorkspaceId)
   escopoRef.current = escopoWorkspaceId
-  // A janela corrente (nº de dias), lida pelo `recarregar` e pelo poll da saúde
-  // sem trocar de identidade a cada render. (`dias`, o estado, é a série do
-  // gráfico — daí o nome `periodo` aqui.)
+  // The current window (number of days), read by `recarregar` and by the health
+  // poll without changing identity on every render. (`dias`, the state, is the
+  // chart series — hence the name `periodo` here.)
   const periodoRef = useRef(periodo)
   periodoRef.current = periodo
-  // Quando um "Atualizar" (force) escreveu métricas frescas. Um tick de fundo
-  // que começou ANTES busca o cache e, chegando depois, sobrescreveria o
-  // fresco pelo velho — os dois não trocam de sequência. O tick confere este
-  // carimbo e desiste (mesmo padrão de `use-projetos-dados`).
+  // When an "Atualizar" (force) wrote fresh metrics. A background tick that
+  // started BEFORE fetches the cache and, arriving later, would overwrite the
+  // fresh data with the stale — the two don't change the sequence. The tick
+  // checks this stamp and gives up (same pattern as `use-projetos-dados`).
   const forcadasEm = useRef(0)
   const tz = useMemo(fusoDoNavegador, [])
 
   const carregar = useCallback(async (alvo: string | null, periodo: number, force: boolean) => {
     const mine = ++seq.current
-    // `primeira` é por ESCOPO: a 1ª carga de um escopo mostra skeleton e esvazia
-    // a seção que falha. Trocar só o período não muda `alvo` → é uma recarga
-    // (o botão gira, a tela fica), como o seletor do Histórico.
+    // `primeira` is per SCOPE: a scope's 1st load shows the skeleton and empties
+    // the section that fails. Changing only the period doesn't change `alvo` → it
+    // is a reload (the button spins, the screen stays), like History's selector.
     const primeira = escopoNaTela.current !== alvo
     if (primeira) setCarregando(true)
     else setAtualizando(true)
@@ -127,8 +128,8 @@ export function useDashboardDados(escopoWorkspaceId: string | null | undefined, 
       GisFlowService.getRunsByDay(periodo, { workspace_id, tz }),
       GisFlowService.getObservabilityRuns({ limit: LIMITE_DE_RUNS, workspace_id }),
       GisFlowService.getExecutorMetrics(periodo, force, { workspace_id }),
-      // Com os do assistente: o painel resume o que existe, e as "Próximas
-      // execuções" sem eles esconderiam justamente o que roda sozinho.
+      // Including the assistant's ones: the dashboard summarizes what exists, and
+      // "Próximas execuções" without them would hide precisely what runs on its own.
       GisFlowService.getWorkflows(workspace_id, { incluirDoAssistente: true }),
     ])
     if (mine !== seq.current) return
@@ -141,10 +142,10 @@ export function useDashboardDados(escopoWorkspaceId: string | null | undefined, 
 
     const novasFalhas = { ...SEM_FALHAS }
 
-    // Espinha. Sucesso limpa o erro. Falha só bloqueia na 1ª carga do escopo
-    // (`primeira`, que a troca de escopo também dispara): aí a tela mostra "não
-    // foi possível carregar" e o dado do escopo anterior não escapa. Numa
-    // recarga do mesmo escopo, degrada por seção e o resto continua.
+    // Spine. Success clears the error. Failure only blocks on the scope's 1st load
+    // (`primeira`, which a scope change also fires): then the screen shows "não
+    // foi possível carregar" and the previous scope's data doesn't leak. On a
+    // reload of the same scope, it degrades per section and the rest carries on.
     if (metricsRes?.data) {
       if (force) forcadasEm.current = Date.now()
       setMetrics(metricsRes.data)
@@ -158,10 +159,10 @@ export function useDashboardDados(escopoWorkspaceId: string | null | undefined, 
       }
     }
 
-    // As demais degradam por seção. Numa RECARGA do mesmo escopo, o que já
-    // estava fica (§3.3, "nunca zerar a tela"); numa TROCA de escopo
-    // (`primeira`), a seção que falha é esvaziada — exibir o dado do workspace
-    // anterior sob o novo escopo confundiria a leitura (§3.10).
+    // The others degrade per section. On a RELOAD of the same scope, what was
+    // there stays (§3.3, "nunca zerar a tela"); on a scope CHANGE
+    // (`primeira`), the section that fails is emptied — showing the previous
+    // workspace's data under the new scope would confuse the reading (§3.10).
     if (diasRes?.data?.days) setDias(diasRes.data.days)
     else { novasFalhas.dias = true; if (primeira) setDias([]) }
 
@@ -171,7 +172,7 @@ export function useDashboardDados(escopoWorkspaceId: string | null | undefined, 
     if (workflowsRes?.data) setWorkflows(workflowsRes.data)
     else { novasFalhas.workflows = true; if (primeira) setWorkflows([]) }
 
-    // Executores é a única opcional que não vira aviso: falha → `[]`.
+    // Executors is the only optional source that doesn't become a warning: failure → `[]`.
     setExecutores(execRes?.data?.executores ?? [])
 
     setFalhas(novasFalhas)
@@ -179,20 +180,20 @@ export function useDashboardDados(escopoWorkspaceId: string | null | undefined, 
     setAtualizando(false)
   }, [tz])
 
-  // Recarrega ao trocar o escopo. Como o `index` só troca `escopoWorkspaceId`
-  // quando o escopo é "ativo" e o `current` muda (no "todos" ele é sempre
-  // `null`), isto já cobre a regra da spec sem o hook conhecer o context.
+  // Reloads when the scope changes. Since `index` only changes `escopoWorkspaceId`
+  // when the scope is "ativo" and `current` changes (in "todos" it is always
+  // `null`), this already covers the spec's rule without the hook knowing the context.
   //
-  // `undefined` = escopo ativo ainda sem id (workspace carregando): não busca,
-  // o skeleton (estado inicial `carregando=true`) fica até o id ser conhecido.
+  // `undefined` = active scope still without an id (workspace loading): doesn't
+  // fetch, the skeleton (initial state `carregando=true`) stays until the id is known.
   useEffect(() => {
     if (escopoWorkspaceId === undefined) return
     carregar(escopoWorkspaceId, periodo, false)
   }, [escopoWorkspaceId, periodo, carregar])
 
-  // Poll silencioso da saúde: só as métricas (onde `now` vive), sem ligar
-  // `carregando`/`atualizando`. Não incrementa a sequência: uma carga completa
-  // pedida no meio vence.
+  // Silent health poll: only the metrics (where `now` lives), without turning on
+  // `carregando`/`atualizando`. Doesn't increment the sequence: a full load
+  // requested in the middle wins.
   useEffect(() => {
     if (INTERVALO_DA_SAUDE_MS <= 0) return
     let ultimo = Date.now()
@@ -203,20 +204,20 @@ export function useDashboardDados(escopoWorkspaceId: string | null | undefined, 
       const inicio = Date.now()
       ultimo = inicio
       const res = await GisFlowService.getObservabilityMetrics(periodoRef.current, false, { workspace_id: alvo ?? undefined })
-      // Falhou, chegou tarde (outra carga assumiu), ou um "Atualizar" escreveu
-      // dados frescos enquanto este tick buscava o cache: fica o que havia.
+      // Failed, arrived late (another load took over), or an "Atualizar" wrote
+      // fresh data while this tick was fetching the cache: what was there stays.
       if (mine !== seq.current || forcadasEm.current > inicio || !res.data) return
       setMetrics(res.data)
       setErroEspinha(null)
-      // Se a saúde do escopo se recupera por aqui (a 1ª carga dele tinha
-      // falhado), o escopo passa a estar "na tela" — um "Tentar de novo" depois
-      // não repete o skeleton à toa.
+      // If the scope's health recovers through here (its 1st load had
+      // failed), the scope becomes "on screen" — a later "Tentar de novo"
+      // doesn't repeat the skeleton for nothing.
       escopoNaTela.current = alvo
     }
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") renovarSaude()
     }, INTERVALO_DA_SAUDE_MS)
-    // Voltar à aba depois de um tempo longe renova na hora, mas não a cada alt-tab.
+    // Coming back to the tab after a long time away renews right away, but not on every alt-tab.
     const onVisibility = () => {
       if (document.visibilityState === "visible" && Date.now() - ultimo >= INTERVALO_DA_SAUDE_MS) renovarSaude()
     }
@@ -228,7 +229,7 @@ export function useDashboardDados(escopoWorkspaceId: string | null | undefined, 
   }, [])
 
   const recarregar = useCallback((opts: { force?: boolean } = {}) => {
-    if (escopoRef.current === undefined) return   // escopo ainda indefinido
+    if (escopoRef.current === undefined) return   // scope not defined yet
     carregar(escopoRef.current, periodoRef.current, opts.force ?? false)
   }, [carregar])
 

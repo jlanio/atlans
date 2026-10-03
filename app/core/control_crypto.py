@@ -1,29 +1,29 @@
 # app/core/control_crypto.py
 """
-Assinatura Ed25519 das mensagens de comando servidor → executor.
+Ed25519 signing of server → executor command messages.
 
-MOTIVAÇÃO (achado S7 da auditoria do executor):
-`job` já trafegava assinado (ver app/core/job_crypto.py), mas `control`
-(revoked / shutdown / config_changed) e `cancel` iam **em texto puro**, protegidos
-apenas pela allowlist de tipos do cliente. Qualquer caminho capaz de escrever no
-WebSocket ou de publicar no canal de relay do Redis derrubava a frota inteira com
-um `{"type":"control","action":"shutdown"}` — sem forjar assinatura nenhuma,
-porque não havia assinatura para forjar. O HMAC do relay (S6) protege apenas o
-salto Redis→worker; um comando capturado ali continuava replayável, e nada
-protegia o salto worker→executor.
+MOTIVATION (finding S7 of the executor audit):
+`job` already traveled signed (see app/core/job_crypto.py), but `control`
+(revoked / shutdown / config_changed) and `cancel` went **in plain text**, protected
+only by the client's type allowlist. Any path able to write to the
+WebSocket or publish to the Redis relay channel brought down the whole fleet with
+a `{"type":"control","action":"shutdown"}` — without forging any signature,
+because there was no signature to forge. The relay HMAC (S6) protects only the
+Redis→worker hop; a command captured there was still replayable, and nothing
+protected the worker→executor hop.
 
-Aqui o comando ganha o mesmo tratamento do job:
-  - assinado com a MESMA chave Ed25519 estática do servidor (EXECUTOR_SIGNING_KEY),
-    que o executor já fixa localmente após o enrollment (ver executor/server_key.py);
-  - amarrado ao destinatário (`target_executor_id`) — um comando capturado não
-    pode ser reproduzido contra outro executor;
-  - com validade curta (`expires_at`) e `nonce` único — reprodução do mesmo
-    comando é rejeitada pelo cache anti-replay do executor.
+Here the command gets the same treatment as the job:
+  - signed with the SAME static Ed25519 server key (EXECUTOR_SIGNING_KEY),
+    which the executor already pins locally after enrollment (see executor/server_key.py);
+  - bound to the recipient (`target_executor_id`) — a captured command cannot
+    be replayed against another executor;
+  - with a short validity (`expires_at`) and a unique `nonce` — a replay of the same
+    command is rejected by the executor's anti-replay cache.
 
-Formato na rede:
+Wire format:
 {
-  "type":      "control",            # ou "cancel"
-  "action":    "revoked",            # campos específicos do tipo…
+  "type":      "control",            # or "cancel"
+  "action":    "revoked",            # type-specific fields…
   "reason":    "…",
   "auth": {
     "target_executor_id": str,
@@ -31,15 +31,15 @@ Formato na rede:
     "expires_at":         str (ISO8601),
     "nonce":              str (32 bytes hex)
   },
-  "signature": str (base64 — Ed25519 sobre os bytes canônicos)
+  "signature": str (base64 — Ed25519 over the canonical bytes)
 }
 
-Bytes canônicos = json.dumps(mensagem_sem_signature, sort_keys=True,
+Canonical bytes = json.dumps(mensagem_sem_signature, sort_keys=True,
                              ensure_ascii=False, separators=(",", ":"))
 
-Assinar a mensagem INTEIRA menos a assinatura (em vez de uma lista fixa de
-campos) faz com que qualquer campo novo do protocolo entre na cobertura
-automaticamente — não há como adicionar um campo e esquecer de assiná-lo.
+Signing the WHOLE message minus the signature (instead of a fixed list of
+fields) makes any new protocol field fall under coverage
+automatically — there is no way to add a field and forget to sign it.
 """
 import base64
 import json
@@ -49,22 +49,22 @@ from datetime import datetime, timedelta, timezone
 
 from app.core.job_crypto import _load_signing_key
 
-# Tipos de mensagem servidor → executor que exigem assinatura. Mantenha em sincronia
-# com _SIGNED_SERVER_MESSAGES em executor/connection.py: um tipo que o executor
-# exige assinado mas o servidor envia cru vira comando silenciosamente descartado.
+# Server → executor message types that require a signature. Keep in sync
+# with _SIGNED_SERVER_MESSAGES in executor/connection.py: a type the executor
+# requires signed but the server sends raw becomes a silently discarded command.
 SIGNED_MESSAGE_TYPES = frozenset({"control", "cancel"})
 
-# Validade de um comando. Muito mais curta que a de um job (300s): comando é
-# interativo (admin clicou em "revogar", usuário clicou em "cancelar") e não tem
-# motivo para continuar válido depois disso. Encurtar reduz a janela de replay.
+# Validity of a command. Much shorter than a job's (300s): a command is
+# interactive (an admin clicked "revoke", a user clicked "cancel") and has no
+# reason to remain valid after that. Shortening it reduces the replay window.
 CONTROL_TTL_SECONDS = int(os.getenv("EXECUTOR_CONTROL_TTL_SECONDS", "120"))
 
 
 def canonical_bytes(message: dict) -> bytes:
-    """Bytes assinados: a mensagem inteira menos o campo `signature`.
+    """Signed bytes: the whole message minus the `signature` field.
 
-    `separators` fixo e `sort_keys=True` eliminam ambiguidade de serialização —
-    os dois lados precisam produzir exatamente os mesmos bytes.
+    Fixed `separators` and `sort_keys=True` remove serialization ambiguity —
+    both sides must produce exactly the same bytes.
     """
     unsigned = {k: v for k, v in message.items() if k != "signature"}
     return json.dumps(
@@ -73,12 +73,12 @@ def canonical_bytes(message: dict) -> bytes:
 
 
 def build_signed_control(payload: dict, executor_id: str) -> dict:
-    """Devolve `payload` acrescido de `auth` + `signature`.
+    """Returns `payload` with `auth` + `signature` added.
 
-    Lança RuntimeError se EXECUTOR_SIGNING_KEY não estiver configurada — o mesmo
-    contrato de `build_job_message`. Falhar alto é proposital: emitir o comando
-    sem assinatura faria o executor descartá-lo, e um "revoked" que não chega é
-    pior calado do que barulhento.
+    Raises RuntimeError if EXECUTOR_SIGNING_KEY is not configured — the same
+    contract as `build_job_message`. Failing loudly is on purpose: emitting the command
+    unsigned would make the executor discard it, and a "revoked" that never arrives is
+    worse silent than noisy.
     """
     signing_key = _load_signing_key()
     if signing_key is None:
@@ -103,16 +103,16 @@ def build_signed_control(payload: dict, executor_id: str) -> dict:
 
 
 def sign_if_needed(data: dict, executor_id: str) -> dict:
-    """Assina `data` quando o tipo exige; devolve inalterado caso contrário.
+    """Signs `data` when the type requires it; returns it unchanged otherwise.
 
-    Ponto único de aplicação, chamado por `ExecutorConnectionRegistry.send_json`.
-    Centralizar aqui evita o modo de falha clássico: alguém adiciona um novo
-    emissor de `control` num router e esquece de assinar.
+    Single point of application, called by `ExecutorConnectionRegistry.send_json`.
+    Centralizing it here avoids the classic failure mode: someone adds a new
+    `control` emitter in a router and forgets to sign.
     """
     if data.get("type") not in SIGNED_MESSAGE_TYPES:
         return data
     if "signature" in data:
-        # Já assinado por um caminho anterior (ex: reenvio) — não assinar de novo,
-        # senão o `auth` seria substituído e a assinatura antiga invalidada.
+        # Already signed by an earlier path (e.g. a resend) — don't sign again,
+        # otherwise `auth` would be replaced and the old signature invalidated.
         return data
     return build_signed_control(data, executor_id)

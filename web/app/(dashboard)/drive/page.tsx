@@ -31,30 +31,30 @@ import {
   ResultadoDoUpload, classifyUploadError, type UploadError,
 } from "@/app/components/drive/resultado-upload"
 
-// O tipo do arquivo mora em service/types.ts (IDriveFile) porque o seletor de
-// arquivo do canvas consome a mesma listagem.
+// The file type lives in service/types.ts (IDriveFile) because the canvas's
+// file picker consumes the same listing.
 type DriveFile = IDriveFile
 
-/** Mesmo default do backend (`page_size`), explicitado aqui porque o rodapé de
- *  paginação calcula "Mostrando X–Y de N" a partir dele. */
+/** Same default as the backend (`page_size`), made explicit here because the
+ *  pagination footer computes "Mostrando X–Y de N" from it. */
 const PAGE_SIZE = 50
 
-// ── Grade da listagem ────────────────────────────────────────────────────────
+// ── Listing grid ─────────────────────────────────────────────────────────────
 //
-// As colunas fixas somam 536px. A área de conteúdo é MAIS ESTREITA em tablet do
-// que em telefone — a sidebar de 16rem entra em `md` e o `max-w-6xl` do PageRoot
-// já não é o limite: sobram ~448px em 768px contra ~703px em 767px. Por isso o
-// corte é `lg` e não `md`: abaixo dele a linha empilha (identidade e ações em
-// cima, tipo/tamanho/data embaixo), e só de `lg` para cima as colunas voltam.
+// The fixed columns add up to 536px. The content area is NARROWER on a tablet
+// than on a phone — the 16rem sidebar comes in at `md` and PageRoot's `max-w-6xl`
+// is no longer the limit: ~448px remain at 768px versus ~703px at 767px. That is
+// why the cutoff is `lg` and not `md`: below it the row stacks (identity and
+// actions on top, type/size/date below), and only from `lg` up do the columns return.
 function gradeDoDrive(podeEditar: boolean) {
   return podeEditar
     ? "grid-cols-[32px_minmax(0,1fr)_auto] lg:grid-cols-[32px_1fr_100px_120px_140px_48px]"
     : "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[1fr_100px_120px_140px_48px]"
 }
-/** Primeira coluna de conteúdo — depois da caixa de seleção, quando ela existe. */
+/** First content column — after the selection checkbox, when there is one. */
 const colunaDoNome = (podeEditar: boolean) => (podeEditar ? "col-start-2" : "col-start-1")
 
-// ── Página principal ──────────────────────────────────────────────────────────
+// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function DrivePage() {
   const { data: session } = useSession()
@@ -76,10 +76,10 @@ export default function DrivePage() {
   const uploadZoneRef = useRef<UploadZoneHandle>(null)
   const token = (session?.user as { access_token?: string })?.access_token
 
-  // ── Fetch da listagem ────────────────────────────────────────────────────
-  // `page`/`page_size` viajam de verdade: o backend sempre cortou em 50 e a UI
-  // nunca mandou nada, então num workspace com 300 arquivos os outros 250 eram
-  // inalcançáveis enquanto o cabeçalho anunciava o total real.
+  // ── Listing fetch ────────────────────────────────────────────────────────
+  // `page`/`page_size` are really sent: the backend always cut at 50 and the UI
+  // never sent anything, so in a workspace with 300 files the other 250 were
+  // unreachable while the header announced the real total.
   const fetcher = useCallback(async () => {
     if (!workspace) return null
     return GisFlowService.getDriveFiles({
@@ -98,10 +98,10 @@ export default function DrivePage() {
     300,
   )
 
-  // Trocar de workspace no seletor do cabeçalho não remonta a tela: sem este
-  // reset, a página/busca/filtro do workspace anterior continuavam valendo. A
-  // seleção também vai junto — ela alimenta "Excluir N", e apagar id_hashes do
-  // workspace anterior é perda de dado.
+  // Switching workspace in the header selector does not remount the screen:
+  // without this reset, the previous workspace's page/search/filter stayed in
+  // effect. The selection goes too — it feeds "Excluir N", and deleting
+  // id_hashes of the previous workspace is data loss.
   useEffect(() => {
     setPage(1)
     setSearch("")
@@ -109,19 +109,19 @@ export default function DrivePage() {
     setSelected(prev => (prev.size > 0 ? new Set() : prev))
   }, [workspace?.id_hash])
 
-  // Durante a troca de workspace o hook mantém a página anterior na tela — é o
-  // que evita a tabela piscar a cada tecla da busca. Mas exibir os arquivos do
-  // workspace anterior sob o nome do novo seria mentira: enquanto a resposta
-  // certa não chega, isto vale como "ainda não há dados".
+  // During a workspace switch the hook keeps the previous page on screen — that
+  // is what keeps the table from flashing on every search keystroke. But showing
+  // the previous workspace's files under the new one's name would be a lie:
+  // until the right response arrives, this counts as "no data yet".
   const data =
     resposta && resposta.items.length > 0 && resposta.items[0].workspace_id !== workspace?.id_hash
       ? null
       : resposta
 
-  // ── Extensões conhecidas para os chips de filtro ─────────────────────────
-  // Acumuladas em vez de derivadas da página atual: com `ext=csv` o servidor só
-  // devolve csv, e a lista derivada perdia todos os outros chips — inclusive o
-  // "Todos", deixando o filtro preso sem como voltar.
+  // ── Known extensions for the filter chips ────────────────────────────────
+  // Accumulated instead of derived from the current page: with `ext=csv` the
+  // server only returns csv, and the derived list lost all the other chips —
+  // including "Todos" (all), leaving the filter stuck with no way back.
   const [extensions, setExtensions] = useState<string[]>([])
   useEffect(() => { setExtensions([]) }, [workspace?.id_hash])
   useEffect(() => {
@@ -134,22 +134,22 @@ export default function DrivePage() {
     })
   }, [data])
 
-  // ── Paginação ────────────────────────────────────────────────────────────
+  // ── Pagination ───────────────────────────────────────────────────────────
   const total = data?.total ?? 0
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const mostrandoDe = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const mostrandoAte = (page - 1) * PAGE_SIZE + (data?.items?.length ?? 0)
   const mostrados = data?.items?.length ?? 0
 
-  /** Rede de segurança para a contagem ENCOLHER debaixo do usuário (exclusão em
-   *  lote na última página, por exemplo): sem isto ele fica numa página que não
-   *  existe mais, vendo a lista vazia. Só clampa com resposta na mão. */
+  /** Safety net for the count SHRINKING under the user (a batch delete on
+   *  the last page, for example): without this they stay on a page that no
+   *  longer exists, looking at an empty list. Only clamps with a response in hand. */
   useEffect(() => {
     if (data && page > totalPages) setPage(1)
   }, [data, page, totalPages])
 
-  /** Toda mudança de filtro volta para a primeira página — senão a busca por um
-   *  termo com 3 resultados na página 4 devolve tela vazia. */
+  /** Every filter change goes back to the first page — otherwise searching for
+   *  a term with 3 results while on page 4 returns an empty screen. */
   function aplicarBusca(valor: string) { setSearch(valor); setPage(1) }
   function aplicarExtensao(ext: string) { setExtFilter(ext); setPage(1) }
   function limparFiltros() { setSearch(""); setExtFilter(""); setPage(1) }
@@ -185,9 +185,9 @@ export default function DrivePage() {
   // ── Download ─────────────────────────────────────────────────────────────
   async function handleDownload(file: DriveFile) {
     if (!token) return
-    // Barrado aqui também, e não só no backend: o item do menu já vem
-    // desabilitado, mas um atalho de teclado ou uma versão em cache da lista
-    // chegariam ao servidor para receber um 409 — melhor explicar na hora.
+    // Blocked here too, and not only in the backend: the menu item already comes
+    // disabled, but a keyboard shortcut or a cached version of the list would
+    // reach the server only to get a 409 — better to explain right away.
     if (isLocalDoExecutor(file)) {
       createToast.error(
         "Este arquivo permanece no executor.",
@@ -198,8 +198,8 @@ export default function DrivePage() {
     }
     const res = await GisFlowService.getDriveDownloadUrl(file.id_hash)
     if (res.error) {
-      // 409 é a recusa por localidade (drive_service._recusar_se_local), não uma
-      // falha: merece o motivo, não "não foi possível baixar".
+      // 409 is the refusal by locality (drive_service._recusar_se_local), not a
+      // failure: it deserves the reason, not "could not download".
       if (res.status === 409 && res.error.message) {
         createToast.error("Download indisponível.", res.error.message)
         return
@@ -212,9 +212,9 @@ export default function DrivePage() {
     if (downloadUrl) window.open(downloadUrl, "_blank")
   }
 
-  // ── Excluir ──────────────────────────────────────────────────────────────
-  // Async: o `DeleteDialog` compartilhado aguarda e trava os botões, então a
-  // trava contra duplo clique vem de graça (sem estado `deleting` na página).
+  // ── Delete ───────────────────────────────────────────────────────────────
+  // Async: the shared `DeleteDialog` awaits and locks the buttons, so the
+  // double-click lock comes for free (no `deleting` state in the page).
   async function confirmDelete() {
     if (!deleteFile || !token) return
     const res = await GisFlowService.deleteDriveFile(deleteFile.id_hash)
@@ -227,7 +227,7 @@ export default function DrivePage() {
     refetch()
   }
 
-  // ── Seleção múltipla ────────────────────────────────────────────────────
+  // ── Multiple selection ──────────────────────────────────────────────────
   function toggleSelect(id: string) {
     setSelected(prev => {
       const next = new Set(prev)
@@ -237,8 +237,8 @@ export default function DrivePage() {
     })
   }
 
-  /** Marca/desmarca a PÁGINA ATUAL, preservando o que já estava selecionado em
-   *  outras páginas — o botão "Excluir N" conta o Set inteiro, não a página. */
+  /** Checks/unchecks the CURRENT PAGE, preserving what was already selected on
+   *  other pages — the "Excluir N" button counts the whole Set, not the page. */
   function toggleAll() {
     if (!data?.items) return
     const idsDaPagina = data.items.map(f => f.id_hash)
@@ -256,9 +256,9 @@ export default function DrivePage() {
   async function handleBatchDelete() {
     if (!token || selected.size === 0) return
     try {
-      // A contagem vem do BACKEND, não de `selected.size`: arquivos catalogados
-      // são pulados no lote (o conteúdo é do executor), e reportar o total
-      // selecionado diria que sumiu o que continua lá.
+      // The count comes from the BACKEND, not from `selected.size`: cataloged files
+      // are skipped in the batch (the content belongs to the executor), and
+      // reporting the selected total would say that what is still there vanished.
       const resposta = await GisFlowService.batchDeleteDriveFiles([...selected])
       if (resposta.error) {
         createToast.error("Não foi possível excluir os arquivos.")
@@ -281,16 +281,17 @@ export default function DrivePage() {
 
   // ── Estados (contrato §3) ──────────────────────────────────────────────────
   const temFiltro = search !== "" || extFilter !== ""
-  // Erro toma a tela só quando não há dados do workspace ATUAL para mostrar
-  // (`data === null`): a 1ª carga que falha, ou uma recarga que falha logo após
-  // trocar de workspace — aí a `resposta` do hook fica obsoleta (do workspace
-  // anterior) e o guard de `data` a anula. Uma recarga que falha com a lista do
-  // workspace atual na tela (`data` não-nulo) a mantém + toast (contrato §3.2).
+  // The error takes over the screen only when there is no data for the CURRENT
+  // workspace to show (`data === null`): a 1st load that fails, or a reload that
+  // fails right after switching workspace — then the hook's `resposta` is stale
+  // (from the previous workspace) and the `data` guard nulls it. A reload that
+  // fails with the current workspace's list on screen (`data` non-null) keeps it
+  // + a toast (contract §3.2).
   const mostrarErro = !!error && data === null
-  // Skeleton cobre qualquer estado sem dados do workspace atual que não seja
-  // erro — inclusive a 1ª carga do novo escopo após trocar de workspace. Com
-  // isso o ramo da lista só é alcançado com `data` não-nulo (sem desreferência
-  // de null quando um refresh pós-troca falha).
+  // The Skeleton covers any state without current-workspace data that is not an
+  // error — including the 1st load of the new scope after switching workspace.
+  // With that, the list branch is only reached with non-null `data` (no null
+  // dereference when a post-switch refresh fails).
   const mostrarSkeleton = !mostrarErro && (firstLoad || data === null)
   const vazio = !!data && data.items.length === 0
   const mostrarFiltros = !mostrarSkeleton && !mostrarErro && (mostrados > 0 || temFiltro)
@@ -308,10 +309,10 @@ export default function DrivePage() {
         onExcluirSelecionados={() => setBatchDelOpen(true)}
       />
 
-      {/* Zona de envio — somente para editores. */}
+      {/* Upload zone — editors only. */}
       {podeEditar && <UploadZone ref={uploadZoneRef} uploading={uploading} onFiles={handleFiles} />}
 
-      {/* Resultado do último envio. */}
+      {/* Result of the last upload. */}
       {(uploadErrors.length > 0 || uploadSuccess > 0) && (
         <ResultadoDoUpload
           sucessos={uploadSuccess}
@@ -331,7 +332,7 @@ export default function DrivePage() {
         />
       )}
 
-      {/* Lista e seus estados. */}
+      {/* List and its states. */}
       {mostrarSkeleton ? (
         <SkeletonDoDrive />
       ) : mostrarErro ? (
@@ -343,19 +344,19 @@ export default function DrivePage() {
           <VazioPrimeiroUso canEdit={podeEditar} onEnviar={() => uploadZoneRef.current?.abrirSeletor()} />
         )
       ) : (
-        // A tabela permanece montada durante a recarga (busca com debounce,
-        // troca de página, botão Atualizar): trocá-la por skeletons fazia o
-        // conteúdo piscar a cada tecla e perdia a rolagem. `overflow-x-auto`
-        // continua como rede: de `lg` para cima uma janela estreita ainda pode
-        // faltar espaço, e sem ele o excesso seria cortado pelo body.
+        // The table stays mounted during a reload (debounced search, page
+        // change, Refresh button): swapping it for skeletons made the content
+        // flash on every keystroke and lost the scroll. `overflow-x-auto`
+        // stays as a net: from `lg` up a narrow window may still run out of
+        // space, and without it the excess would be clipped by the body.
         <section
           aria-labelledby="drive-lista-titulo"
           className={`overflow-x-auto rounded-lg border bg-card shadow-xs transition-opacity duration-200 ${refreshing ? "opacity-60" : ""}`}
         >
           <h2 id="drive-lista-titulo" className="sr-only">Arquivos do workspace</h2>
 
-          {/* Cabeçalho de colunas — só onde há colunas. No empilhamento ele
-              rotularia o que não existe. */}
+          {/* Column header — only where there are columns. When stacked it would
+              label what does not exist. */}
           <div className={`hidden lg:grid lg:min-w-[560px] ${gradeDoDrive(podeEditar)} items-center gap-4 border-b bg-muted/40 px-4 py-2.5 text-xs font-medium text-muted-foreground`}>
             {podeEditar && (
               <Checkbox
@@ -387,7 +388,7 @@ export default function DrivePage() {
                 idx < data!.items.length - 1 ? "border-b border-border/60" : ""
               }`}
             >
-              {/* Checkbox — sempre a primeira célula da primeira linha. */}
+              {/* Checkbox — always the first cell of the first row. */}
               {podeEditar && (
                 <Checkbox
                   aria-label={`Selecionar «${file.original_name}»`}
@@ -405,15 +406,15 @@ export default function DrivePage() {
                 {isLocalDoExecutor(file) && <LocalBadge executorId={file.content_executor_id} />}
               </div>
 
-              {/* Tipo, tamanho e data: uma faixa só embaixo do nome no
-                  empilhamento; `lg:contents` devolve as três células à grade
-                  quando as colunas voltam, sem markup duplicado. */}
+              {/* Type, size and date: a single strip below the name when
+                  stacked; `lg:contents` returns the three cells to the grid
+                  when the columns come back, with no duplicated markup. */}
               <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 row-start-2 col-end-[-1] lg:contents ${colunaDoNome(podeEditar)}`}>
                 <div><ExtBadge ext={file.extension} /></div>
                 <span className="font-mono text-xs text-muted-foreground tabular-nums">
                   {formatBytes(file.size)}
                 </span>
-                {/* Data da última escrita — mesma chave de ordenação do backend. */}
+                {/* Date of the last write — same sort key as the backend. */}
                 <span
                   className="text-xs text-muted-foreground tabular-nums"
                   title={
@@ -426,7 +427,7 @@ export default function DrivePage() {
                 </span>
               </div>
 
-              {/* Ações. */}
+              {/* Actions. */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -456,9 +457,9 @@ export default function DrivePage() {
                   {podeEditar && (
                     <>
                       <DropdownMenuSeparator />
-                      {/* Catalogado: o registro reflete um arquivo que nunca
-                          pertenceu à plataforma. Excluir aqui não apagaria nada
-                          no disco de quem o tem — e o backend recusa com 409. */}
+                      {/* Cataloged: the record reflects a file that never belonged
+                          to the platform. Deleting here would erase nothing on
+                          the disk of whoever has it — and the backend refuses with 409. */}
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive"
                         disabled={isLocalDoExecutor(file)}
@@ -480,9 +481,9 @@ export default function DrivePage() {
         </section>
       )}
 
-      {/* Rodapé de paginação — `page > 1` na condição de propósito: se a lista
-          encolher para caber numa página só, o rodapé é a ÚNICA saída de uma
-          página que já não existe. */}
+      {/* Pagination footer — `page > 1` in the condition on purpose: if the list
+          shrinks to fit on a single page, the footer is the ONLY way out of a
+          page that no longer exists. */}
       {!mostrarSkeleton && !mostrarErro && (total > PAGE_SIZE || page > 1) && (
         <RodapeDePaginacao
           page={page}
@@ -496,7 +497,7 @@ export default function DrivePage() {
         />
       )}
 
-      {/* Diálogos. */}
+      {/* Dialogs. */}
       <MetadataDialog file={metaFile} open={!!metaFile} onClose={() => setMetaFile(null)} />
 
       <Dialog open={!!deleteFile} onOpenChange={v => !v && setDeleteFile(null)}>

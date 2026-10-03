@@ -1,7 +1,7 @@
 # flow/metrics/collector.py
 """
-ResourceTracker — coleta CPU e memoria via psutil.
-MetricsCollector — agrega metricas por no e por run.
+ResourceTracker — collects CPU and memory via psutil.
+MetricsCollector — aggregates metrics per node and per run.
 """
 import math
 import os
@@ -15,15 +15,15 @@ logger = logging.getLogger("flow.metrics")
 
 
 def _bbox_finito(gdf) -> list[float] | None:
-    """Bounding box do GeoDataFrame, ou None quando não é representável.
+    """The GeoDataFrame's bounding box, or None when it is not representable.
 
-    GeoDataFrame VAZIO tem `total_bounds == [nan, nan, nan, nan]`, e
-    `round(float('nan'), 6)` devolve nan sem levantar — então o try/except não
-    protegia nada. Esse nan viajava nos stats até `WorkflowRun.node_stats`, que
-    é JSONB: NaN não existe em JSON e o Postgres recusa o INSERT. O resultado do
-    run inteiro ia para run_dead_letter e o status ficava preso em 'running',
-    embora o workflow tivesse concluído — acontecia sempre que um filtro
-    espacial não retornava feição nenhuma.
+    An EMPTY GeoDataFrame has `total_bounds == [nan, nan, nan, nan]`, and
+    `round(float('nan'), 6)` returns nan without raising — so the try/except
+    protected nothing. That nan traveled in the stats up to `WorkflowRun.node_stats`,
+    which is JSONB: NaN does not exist in JSON and Postgres rejects the INSERT. The
+    whole run's result went to run_dead_letter and the status got stuck at 'running',
+    even though the workflow had finished — it happened whenever a spatial
+    filter returned no features at all.
     """
     try:
         b = gdf.total_bounds
@@ -38,28 +38,28 @@ def _bbox_finito(gdf) -> list[float] | None:
 
 
 class ResourceTracker:
-    """Coleta amostras de CPU e memoria do processo atual."""
+    """Collects CPU and memory samples of the current process."""
 
     def __init__(self):
         import psutil
 
         self._samples: list[dict] = []
-        # O run_tracker (compartilhado) e amostrado no fim de CADA no, e end_node
-        # passou a rodar em `asyncio.to_thread` — varios nos do mesmo batch
-        # amostram concorrentes. Sem o lock, `_samples.append` colidia com a
-        # iteracao de `summary()` ("list changed size during iteration") e o
-        # psutil.Process era tocado de duas threads. Cada tracker tem o seu.
+        # The (shared) run_tracker is sampled at the end of EACH node, and end_node
+        # now runs in `asyncio.to_thread` — several nodes of the same batch
+        # sample concurrently. Without the lock, `_samples.append` collided with
+        # the iteration in `summary()` ("list changed size during iteration") and
+        # the psutil.Process was touched from two threads. Each tracker has its own.
         self._lock = threading.Lock()
         self._proc = psutil.Process(os.getpid())
         # Inicializa medicao de CPU (primeiro chamado retorna 0)
         self._proc.cpu_percent()
 
     def sample(self):
-        """Captura uma amostra de CPU e memoria."""
+        """Captures one CPU and memory sample."""
         try:
-            # Tudo sob o lock: o psutil.Process compartilhado guarda estado entre
-            # chamadas de `cpu_percent()`, entao dois `sample()` concorrentes no
-            # run_tracker tem de serializar (as syscalls sao rapidas).
+            # Everything under the lock: the shared psutil.Process keeps state between
+            # `cpu_percent()` calls, so two concurrent `sample()` calls on the
+            # run_tracker have to be serialized (the syscalls are fast).
             with self._lock:
                 self._samples.append({
                     "cpu_pct": self._proc.cpu_percent(),
@@ -86,14 +86,14 @@ class ResourceTracker:
 
 
 def estimate_size(obj: Any) -> int:
-    """Estima tamanho em bytes de um objeto.
+    """Estimates the size in bytes of an object.
 
-    PERF: usa memory_usage(deep=False) para GeoDataFrames — evita iterar
-    cada valor de cada coluna. Estimativa ~10x mais rápida, precisão ~80%.
+    PERF: uses memory_usage(deep=False) for GeoDataFrames — avoids iterating
+    over every value of every column. Estimate ~10x faster, ~80% accuracy.
     """
     import pandas as pd
 
-    # GeoDataFrame é subclasse de DataFrame: o mesmo ramo cobre os dois.
+    # GeoDataFrame is a subclass of DataFrame: the same branch covers both.
     if isinstance(obj, pd.DataFrame):
         return int(obj.memory_usage(deep=False).sum())
     if isinstance(obj, (dict, list, str, bytes)):
@@ -154,7 +154,7 @@ def extract_spatial_metrics(obj: Any) -> dict:
 
 
 def _extract_lightweight_metrics(gdf) -> dict:
-    """Métricas espaciais rápidas O(1): crs, bbox, feature_count. Sem vertex_count."""
+    """Fast O(1) spatial metrics: crs, bbox, feature_count. No vertex_count."""
     result: dict = {"feature_count": len(gdf)}
     try:
         if gdf.crs:
@@ -169,7 +169,7 @@ def _extract_lightweight_metrics(gdf) -> dict:
 
 
 class NodeMetrics:
-    """Metricas coletadas para um no individual."""
+    """Metrics collected for an individual node."""
 
     def __init__(self, node_id: str, node_name: str, node_type: str):
         self.node_id = node_id
@@ -208,7 +208,7 @@ class NodeMetrics:
 
 
 class MetricsCollector:
-    """Agrega metricas de todos os nos de um run."""
+    """Aggregates the metrics of all nodes of a run."""
 
     def __init__(self):
         self.run_tracker = ResourceTracker()
@@ -234,7 +234,7 @@ class MetricsCollector:
         nm.status = status
         nm.error = error
 
-        # Recursos do no
+        # Node resources
         tracker = self._node_trackers.get(node_id)
         if tracker:
             tracker.sample()
@@ -242,10 +242,10 @@ class MetricsCollector:
             nm.cpu_avg_pct = summary.get("cpu_avg_pct", 0)
             nm.mem_peak_mb = summary.get("mem_peak_mb", 0)
 
-        # Amostra do run
+        # Run sample
         self.run_tracker.sample()
 
-        # PERF: single pass sobre inputs — bytes + features em uma iteração
+        # PERF: single pass over inputs — bytes + features in one iteration
         import geopandas as gpd
 
         for v in inputs.values():
@@ -253,7 +253,7 @@ class MetricsCollector:
             if isinstance(v, gpd.GeoDataFrame):
                 nm.input_features = (nm.input_features or 0) + len(v)
 
-        # PERF: single pass sobre outputs — bytes + features + spatial em uma iteração
+        # PERF: single pass over outputs — bytes + features + spatial in one iteration
         if outputs is not None:
             out_items = outputs.values() if isinstance(outputs, dict) else [outputs]
             for v in out_items:
@@ -263,7 +263,7 @@ class MetricsCollector:
                     nm.spatial = extract_spatial_metrics(v) if debug_mode else _extract_lightweight_metrics(v)
 
     def build_metrics(self) -> dict:
-        """Monta o dict __metrics__ completo para incluir no stats."""
+        """Builds the complete __metrics__ dict to include in the stats."""
         run_summary = self.run_tracker.summary()
         nodes_data = {}
         operation_types: dict[str, int] = {}

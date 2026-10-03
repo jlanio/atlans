@@ -1,21 +1,22 @@
 # tests/unit/test_wfs_cql.py
-"""Nó WFS: o filtro CQL (`CQL_FILTER`, ECQL do GeoServer) aplicado no servidor.
+"""WFS node: the CQL filter (`CQL_FILTER`, GeoServer's ECQL) applied on the server.
 
-O cliente é o do owslib DE VERDADE (`WebFeatureService_2_0_0` montado de um
-GetCapabilities enlatado), então as URLs saem do montador real
-(`getGETGetFeatureRequest`); só o `openURL` é dublado, por um servidor que
-guarda cada URL e responde por tipo de pedido.
+The client is the REAL owslib one (`WebFeatureService_2_0_0` built from a
+canned GetCapabilities), so the URLs come from the real builder
+(`getGETGetFeatureRequest`); only `openURL` is stubbed, by a server that
+records each URL and responds by request type.
 
-O que se protege:
-- o filtro vai ao SERVIDOR em toda página, com o SORTBY e o srsName de sempre;
-- com bbox, o recorte entra no próprio CQL e a KVP `bbox` não vai junto (o
-  GeoServer recusa as duas); a geometria sai do DescribeFeatureType, inclusive
-  de camada de linhas (MultiCurve, que a lista do owslib não conhece);
-- servidor que ignora o parâmetro é recusado com erro; sem conseguir
-  verificar (rede, 5xx), o nó NÃO segue com a camada inteira;
-- camada vazia não "verifica" o servidor;
-- a recusa do servidor por requisição errada não é retentada; a falha
-  transitória segue retentada; as mensagens chegam legíveis.
+What is protected:
+- the filter goes to the SERVER on every page, with the usual SORTBY and srsName;
+- with a bbox, the clip goes into the CQL itself and the `bbox` KVP is not sent
+  along (GeoServer refuses both together); the geometry comes from
+  DescribeFeatureType, including for a line layer (MultiCurve, which owslib's
+  list does not know);
+- a server that ignores the parameter is refused with an error; when it cannot
+  verify (network, 5xx), the node does NOT proceed with the entire layer;
+- an empty layer does not "verify" the server;
+- the server's refusal of a bad request is not retried; a transient failure
+  is still retried; the messages arrive readable.
 """
 from urllib.parse import parse_qsl, urlsplit
 
@@ -49,7 +50,7 @@ _CAPS = b"""<?xml version="1.0" encoding="UTF-8"?>
   </wfs:FeatureTypeList>
 </wfs:WFS_Capabilities>"""
 
-# O DescribeFeatureType do GeoServer para uma camada de LINHAS: MultiCurve.
+# GeoServer's DescribeFeatureType for a LINE layer: MultiCurve.
 _XSD_LINHAS = b"""<?xml version="1.0" encoding="UTF-8"?>
 <xsd:schema xmlns:gml="http://www.opengis.net/gml/3.2" xmlns:ns="http://ns"
     xmlns:xsd="http://www.w3.org/2001/XMLSchema" targetNamespace="http://ns">
@@ -90,18 +91,18 @@ class _Resposta:
 
 
 class _Servidor:
-    """O `openURL` dublado. Responde por tipo de pedido e guarda cada URL.
+    """The stubbed `openURL`. Responds by request type and records each URL.
 
-    - `hits[com_filtro]`: o numberMatched de um `resultType=hits` com/sem CQL;
-    - `paginas`: as páginas do GetFeature, em ordem (a última se repete);
-    - `esquemas`: o DescribeFeatureType por camada;
-    - `falhas`: exceções a levantar, na ordem, antes de responder (uma por pedido).
+    - `hits[com_filtro]`: the numberMatched of a `resultType=hits` with/without CQL;
+    - `paginas`: the GetFeature pages, in order (the last one repeats);
+    - `esquemas`: the DescribeFeatureType per layer;
+    - `falhas`: exceptions to raise, in order, before responding (one per request).
     """
 
     def __init__(self):
         self.urls: list[str] = []
         self.hits = {True: 0, False: 5}
-        self.amostra = {True: 0, False: 1}  # feições na amostra GeoJSON, com/sem CQL
+        self.amostra = {True: 0, False: 1}  # features in the GeoJSON sample, with/without CQL
         self.paginas: list[bytes | Exception] = [_feicoes(1)]
         self.esquemas = {"ns:rodovias": _XSD_LINHAS, "ns:tabela": _XSD_SEM_GEOMETRIA}
         self.falhas: list[Exception] = []
@@ -168,7 +169,7 @@ def servidor(monkeypatch):
     return falso
 
 
-# ── As peças puras ───────────────────────────────────────────────────────────────
+# ── The pure pieces ──────────────────────────────────────────────────────────────
 
 def test_parse_cql_tira_as_pontas_e_vazio_vira_none():
     assert wfs._parse_cql("  sigla_uf = 'MT' ") == "sigla_uf = 'MT'"
@@ -178,8 +179,8 @@ def test_parse_cql_tira_as_pontas_e_vazio_vira_none():
 
 def test_cql_com_bbox_recorta_protege_o_filtro_e_cita_a_geometria():
     cql = wfs._cql_com_bbox("a = 1 OR b = 2", (-64.01, -9.01, -63.82, -8.83), "geom", "EPSG:4674")
-    # O OR de quem escreveu não escapa do recorte; a geometria vai entre aspas
-    # (há camadas cuja geometria se chama `point`, palavra do ECQL).
+    # The author's OR does not escape the clip; the geometry goes in quotes
+    # (some layers have a geometry named `point`, an ECQL word).
     assert cql == "BBOX(\"geom\", -64.01, -9.01, -63.82, -8.83, 'EPSG:4674') AND (a = 1 OR b = 2)"
     assert wfs._cql_com_bbox("x", (0, 0, 1, 1), "point", None).startswith('BBOX("point", 0, 0, 1, 1) AND')
 
@@ -207,23 +208,23 @@ def _xsd(sequencia: str, *, nome_da_camada: str = "camada", extra_ns: str = "") 
 
 
 @pytest.mark.parametrize("sequencia, extra_ns, camada, esperado", [
-    # Esquema de aplicação (INSPIRE): a associação e o identificador vêm antes da geometria.
+    # Application schema (INSPIRE): the association and the identifier come before the geometry.
     ('<xsd:element name="relatedTo" type="gml:FeaturePropertyType"/>'
      '<xsd:element name="inspireId" type="base:IdentifierPropertyType"/>'
      '<xsd:element name="validTime" type="gml:TimePeriodPropertyType"/>'
      '<xsd:element name="geometry" type="gml:GeometryPropertyType"/>',
      'xmlns:base="http://inspire.ec.europa.eu/schemas/base/3.3"', "camada", "geometry"),
-    # Camada sem geometria cujo NOME termina em Property: o elemento de topo não é atributo.
+    # Layer without geometry whose NAME ends in Property: the top-level element is not an attribute.
     ('<xsd:element name="valor" type="xsd:string"/>', "", "landProperty", None),
-    # MapServer: o elemento de topo antes do complexType, e msGeometry.
+    # MapServer: the top-level element before the complexType, and msGeometry.
     ('<xsd:element name="msGeometry" type="gml:GeometryPropertyType"/>', "", "ownedProperty", "msGeometry"),
-    # Um PointPropertyType do próprio esquema não é GML.
+    # A PointPropertyType from the schema itself is not GML.
     ('<xsd:element name="ponto" type="ns:PointPropertyType"/><xsd:element name="geom" type="gml:PointPropertyType"/>',
      "", "camada", "geom"),
     # Duas geometrias: a primeira.
     ('<xsd:element name="centroid" type="gml:PointPropertyType"/><xsd:element name="geom" type="gml:MultiSurfacePropertyType"/>',
      "", "camada", "centroid"),
-    # 3D e compostos também são geometria.
+    # 3D and composite types are geometry too.
     ('<xsd:element name="geom" type="gml:SolidPropertyType"/>', "", "camada", "geom"),
     ('<xsd:element name="geom" type="gml:GeometricPrimitivePropertyType"/>', "", "camada", "geom"),
 ])
@@ -233,9 +234,9 @@ def test_geometria_do_xsd_ignora_o_que_nao_e_geometria_gml(sequencia, extra_ns, 
 
 
 def test_erro_do_servidor_decodifica_e_classifica():
-    # A forma REAL do GeoServer para um erro de sintaxe do CQL: o parser levanta
-    # a ServiceException sem código, e o handler entrega `NoApplicableCode`
-    # (HTTP 400), sem locator. Pelo código sozinho seria retentável.
+    # The REAL GeoServer shape for a CQL syntax error: the parser raises the
+    # ServiceException without a code, and the handler delivers `NoApplicableCode`
+    # (HTTP 400), with no locator. By the code alone it would be retryable.
     invalido = (
         '<ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1"><ows:Exception '
         'exceptionCode="NoApplicableCode"><ows:ExceptionText>'
@@ -246,7 +247,7 @@ def test_erro_do_servidor_decodifica_e_classifica():
     assert isinstance(erro, ValueError)
     assert 'Encountered "=" at line 1' in str(erro)  # entidade decodificada
     assert "Confira o filtro CQL" in str(erro)
-    # Um código de requisição errada decide sozinho, seja qual for o texto.
+    # A bad-request code decides on its own, whatever the text.
     assert isinstance(wfs._erro_do_servidor(
         invalido.replace('exceptionCode="NoApplicableCode"', 'exceptionCode="InvalidParameterValue" locator="cql_filter"'),
         "ns:rodovias", com_cql=True,
@@ -257,18 +258,18 @@ def test_erro_do_servidor_decodifica_e_classifica():
         "pool error Timeout waiting for idle object",
     )
     assert isinstance(wfs._erro_do_servidor(transitorio, "ns:rodovias", com_cql=True), RuntimeError)
-    # O GeoTools falando de um banco que caiu no meio do filtro: retentável.
+    # GeoTools talking about a database that went down mid-filter: retryable.
     assert isinstance(wfs._erro_do_servidor(
         invalido.replace("Could not parse CQL filter list. Encountered &quot;=&quot; at line 1", "Error occured filtering features"),
         "ns:rodovias", com_cql=True,
     ), RuntimeError)
-    # Sem filtro, a mensagem que fala de filtro não muda a classificação.
+    # Without a filter, a message that talks about a filter does not change the classification.
     assert isinstance(wfs._erro_do_servidor("Illegal filter", "ns:rodovias", com_cql=False), RuntimeError)
 
 
 def test_com_parametros_poe_a_chave_na_query_e_nunca_no_fragmento():
-    # Colada no fim de `…/ows#x` a chave cairia no fragmento, e o pedido
-    # seguido depois de um redirecionamento sairia anônimo.
+    # Appended to the end of `…/ows#x` the key would land in the fragment, and the
+    # request followed after a redirect would go out anonymous.
     assert wfs._com_parametros("http://x/ows", {"authkey": "K 1"}) == "http://x/ows?authkey=K%201"  # pragma: allowlist secret
     assert wfs._com_parametros("http://x/ows?a=1", {"authkey": "K"}) == "http://x/ows?a=1&authkey=K"
     assert wfs._com_parametros("http://x/ows#f", {"authkey": "K"}) == "http://x/ows?authkey=K#f"
@@ -277,9 +278,9 @@ def test_com_parametros_poe_a_chave_na_query_e_nunca_no_fragmento():
 
 
 def test_o_exception_code_decide_antes_da_palavra_filter():
-    # O GeoTools escreve "Error occured filtering features" quando o PostGIS
-    # cai: NoApplicableCode, transitório — a palavra "filter" não o torna um
-    # erro do filtro CQL, e a execução segue retentada.
+    # GeoTools writes "Error occured filtering features" when PostGIS goes
+    # down: NoApplicableCode, transient — the word "filter" does not make it a
+    # CQL filter error, and the execution keeps being retried.
     banco_caiu = (
         '<ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1"><ows:Exception '
         'exceptionCode="NoApplicableCode"><ows:ExceptionText>java.io.IOException: Error occured '
@@ -287,8 +288,8 @@ def test_o_exception_code_decide_antes_da_palavra_filter():
     )
     erro = wfs._erro_do_servidor(banco_caiu, "ns:rodovias", com_cql=True)
     assert isinstance(erro, RuntimeError) and "Confira o filtro" not in str(erro)
-    # Sem código (o owslib só entrega o ExceptionText): a frase do parser decide,
-    # e não a palavra solta.
+    # No code (owslib only delivers the ExceptionText): the parser's phrase decides,
+    # not the bare word.
     assert isinstance(wfs._erro_do_servidor("Illegal filter", "ns:rodovias", com_cql=True), ValueError)
     assert isinstance(wfs._erro_do_servidor("Unable to parse CQL", "ns:rodovias", com_cql=True), ValueError)
     assert isinstance(wfs._erro_do_servidor("Error occured filtering features", "ns:rodovias", com_cql=True), RuntimeError)
@@ -302,26 +303,26 @@ def test_a_dica_do_cql_so_entra_quando_o_locator_aponta_o_filtro():
             f'exceptionCode="InvalidParameterValue"{loc}><ows:ExceptionText>{texto}</ows:ExceptionText>'
             f"</ows:Exception></ows:ExceptionReport>"
         )
-    # O servidor não serve GeoJSON: a dica é essa, não "confira o filtro".
+    # The server does not serve GeoJSON: that is the hint, not "check the filter".
     geojson = wfs._erro_do_servidor(relatorio("outputFormat", "Invalid outputFormat value: application/json"), "ns:x", com_cql=True)
     assert isinstance(geojson, ValueError)
     assert "não serve GeoJSON" in str(geojson) and "Confira o filtro" not in str(geojson)
-    # Outro parâmetro apontado: não retenta, mas não culpa o filtro.
+    # Another parameter pointed at: no retry, but the filter is not blamed.
     srs = wfs._erro_do_servidor(relatorio("srsName", "Unknown srs EPSG:99"), "ns:x", com_cql=True)
     assert isinstance(srs, ValueError) and "Confira o filtro" not in str(srs)
-    # Sem locator, com filtro: o filtro é o suspeito de sempre.
+    # No locator, with a filter: the filter is the usual suspect.
     sem = wfs._erro_do_servidor(relatorio(None, "Illegal property name: foo"), "ns:x", com_cql=True)
     assert "Confira o filtro" in str(sem)
 
 
 def test_o_400_do_tomcat_por_url_longa_nao_e_retentado(servidor):
-    # A linha do pedido passou do limite do servidor web: HTML, sem exceptionCode.
+    # The request line exceeded the web server's limit: HTML, no exceptionCode.
     pagina = ("<html><head><title>HTTP Status 400 – Bad Request</title></head><body>"
               "<h1>HTTP Status 400 – Bad Request</h1><p>Request header is too large</p></body></html>")
     servidor.paginas = [ServiceException(pagina)]
     with pytest.raises(ValueError, match="longo demais") as ei:
         wfs._fetch_with_retry(URL, "ns:rodovias", 10, None, None, None, 5, 2, 0.0, "a = 1")
-    assert len(servidor.paginas_pedidas) == 1  # sem retry
+    assert len(servidor.paginas_pedidas) == 1  # no retry
     assert str(wfs._MAX_URL_COM_CQL) in str(ei.value)
 
 
@@ -330,18 +331,18 @@ def test_pagina_html_vira_resumo_sem_tags():
     assert msg == "o servidor respondeu uma página HTML em vez do WFS: Acesso negado WAF & cia"
 
 
-# ── Sem filtro, nada muda ────────────────────────────────────────────────────────
+# ── Without a filter, nothing changes ────────────────────────────────────────────
 
 def test_sem_filtro_o_caminho_e_o_getfeature_de_sempre(servidor):
     wfs._fetch_wfs_features(URL, "ns:rodovias", 10, bbox=(-64.0, -9.0, -63.0, -8.0))
     assert servidor.sondas == []
     (pagina,) = servidor.paginas_pedidas
     assert "CQL_FILTER" not in pagina
-    # A KVP bbox do owslib: eixos trocados para a URN lat/lon da camada.
+    # owslib's bbox KVP: axes swapped for the layer's lat/lon URN.
     assert pagina["bbox"] == "-9.0,-64.0,-8.0,-63.0,urn:ogc:def:crs:EPSG::4674"
 
 
-# ── Com filtro ───────────────────────────────────────────────────────────────────
+# ── With a filter ────────────────────────────────────────────────────────────────
 
 def test_o_filtro_vai_ao_servidor_com_sortby_e_srsname(servidor):
     gdf = wfs._fetch_wfs_features(
@@ -349,16 +350,16 @@ def test_o_filtro_vai_ao_servidor_com_sortby_e_srsname(servidor):
     )
     assert len(gdf) == 1
 
-    (exclude,) = servidor.sondas  # só o EXCLUDE: a página com feição é a prova que falta
+    (exclude,) = servidor.sondas  # only the EXCLUDE: the page with a feature is the missing proof
     assert exclude["CQL_FILTER"] == "EXCLUDE" and exclude["count"] == "1"
-    assert URL in wfs._cql_verificado  # a camada tem feição: a verificação vale
+    assert URL in wfs._cql_verificado  # the layer has a feature: the verification counts
 
     (pagina,) = servidor.paginas_pedidas
     assert pagina["CQL_FILTER"] == "sigla_uf = 'MT'"
     assert pagina["sortby"] == "gid" and pagina["srsname"] == "EPSG:4326"
     assert pagina["typenames"] == "ns:rodovias" and pagina["outputFormat"] == "application/json"
     assert "bbox" not in pagina
-    # Espaço vira %20 (e não +) na URL.
+    # A space becomes %20 (not +) in the URL.
     assert "sigla_uf%20%3D%20%27MT%27" in servidor.urls[-1]
 
 
@@ -370,7 +371,7 @@ def test_com_bbox_o_recorte_entra_no_cql_de_uma_camada_de_linhas(servidor):
     assert pagina["CQL_FILTER"] == (
         "BBOX(\"geom\", -64.01, -9.01, -63.82, -8.83, 'EPSG:4674') AND (sigla_uf = 'MT')"
     )
-    # Com o montador REAL do owslib: a KVP bbox não vai junto (o GeoServer recusa as duas).
+    # With owslib's REAL builder: the bbox KVP is not sent along (GeoServer refuses both).
     assert "bbox" not in pagina
     assert any(p.get("request") == "DescribeFeatureType" and p["typeNames"] == "ns:rodovias" for p in servidor.pedidos)
 
@@ -382,7 +383,7 @@ def test_com_bbox_e_camada_sem_geometria_o_erro_diz_o_que_fazer(servidor):
 
 
 def test_describe_feature_type_fora_do_ar_e_retentado_e_nao_vira_erro_de_configuracao(servidor):
-    wfs._cql_verificado[URL] = float("inf")  # já verificado: só o DescribeFeatureType pede
+    wfs._cql_verificado[URL] = float("inf")  # already verified: only DescribeFeatureType is requested
     servidor.falhas = [requests.HTTPError("503 Server Error: Service Unavailable")]
     gdf = wfs._fetch_with_retry(URL, "ns:rodovias", 10, (1, 2, 3, 4), None, None, 5, 2, 0.0, "a = 1")
     assert len(gdf) == 1  # a 2ª tentativa passou
@@ -399,7 +400,7 @@ def test_o_filtro_vai_em_todas_as_paginas(servidor, monkeypatch):
     paginas = servidor.paginas_pedidas
     assert [p.get("startindex") for p in paginas] == [None, "2", "4"]
     assert [p["count"] for p in paginas] == ["2", "2", "1"]
-    # O filtro (e a ordenação) vão em TODA página: é o servidor que pagina o conjunto filtrado.
+    # The filter (and the sorting) go on EVERY page: it is the server that paginates the filtered set.
     assert all(p["CQL_FILTER"] == "id >= 0" and p["sortby"] == "gid" for p in paginas)
 
 
@@ -415,20 +416,21 @@ def test_servidor_que_ignora_o_filtro_e_recusado_antes_da_primeira_pagina(servid
 def test_contagem_desconhecida_decide_pela_amostra(servidor):
     servidor.hits = {True: "unknown", False: "unknown"}
     servidor.sonda_por_amostra = True
-    servidor.amostra = {True: 1, False: 1}  # EXCLUDE devolveu uma feição: ignorado
+    servidor.amostra = {True: 1, False: 1}  # EXCLUDE returned a feature: ignored
     with pytest.raises(ValueError, match="não aplica o filtro CQL"):
         wfs._fetch_wfs_features(URL, "ns:rodovias", 10, cql_filter="a = 1")
     assert servidor.paginas_pedidas == []
 
     servidor.urls.clear()
-    servidor.amostra = {True: 0, False: 1}  # EXCLUDE vazio e a camada tem feição: aplica
+    servidor.amostra = {True: 0, False: 1}  # EXCLUDE empty and the layer has a feature: applies
     wfs._fetch_wfs_features(URL, "ns:rodovias", 10, cql_filter="a = 1")
     assert len(servidor.paginas_pedidas) == 1 and URL in wfs._cql_verificado
 
 
 def test_servidor_que_nao_diz_a_contagem_nem_fala_geojson_e_recusado(servidor):
-    # Ignora o CQL_FILTER, não informa numberMatched e responde GML ao pedido de
-    # GeoJSON: antes seguia com um aviso no log, e o GDAL lia a camada inteira.
+    # Ignores CQL_FILTER, does not report numberMatched and responds with GML to
+    # a GeoJSON request: before, it went on with a warning in the log, and GDAL
+    # read the entire layer.
     servidor.hits = {True: "unknown", False: "unknown"}
     servidor.sonda_por_amostra = True
     servidor.amostra_em_gml = True
@@ -460,18 +462,18 @@ def test_amostra_recusada_por_outputformat_diz_que_o_servidor_nao_serve_geojson(
     with pytest.raises(ValueError) as ei:
         wfs._fetch_with_retry(URL, "ns:rodovias", 10, None, None, None, 5, 2, 0.0, "a = 1")
     assert "não serve GeoJSON" in str(ei.value) and "Confira o filtro" not in str(ei.value)
-    assert servidor.paginas_pedidas == []  # e sem retry
+    assert servidor.paginas_pedidas == []  # and no retry
 
 
 def test_a_contagem_da_camada_inteira_nao_e_mais_pedida(servidor, monkeypatch):
-    # Um count(*) numa tabela de milhões de linhas estourava o timeout e
-    # derrubava a execução cujo filtro já estava provado. A prova que falta ao
-    # EXCLUDE (a camada tem feição) vem da própria primeira página.
+    # A count(*) on a table with millions of rows blew the timeout and brought
+    # down the execution whose filter had already been proven. The proof the
+    # EXCLUDE lacks (the layer has a feature) comes from the first page itself.
     wfs._fetch_wfs_features(URL, "ns:rodovias", 10, cql_filter="a = 1")
     assert [s.get("CQL_FILTER") for s in servidor.sondas] == ["EXCLUDE"]
     assert URL in wfs._cql_verificado
 
-    # Com o TTL desligado a sondagem se repete a cada execução — e só ela.
+    # With the TTL turned off the probe repeats on every execution — and only the probe.
     monkeypatch.setattr(wfs, "_CAPS_TTL_S", 0)
     monkeypatch.setattr(wfs, "_cql_verificado", {})
     servidor.urls.clear()
@@ -483,7 +485,7 @@ def test_a_contagem_da_camada_inteira_nao_e_mais_pedida(servidor, monkeypatch):
 
 def test_sem_conseguir_perguntar_o_no_nao_segue_com_a_camada_inteira(servidor):
     servidor.hits[True] = 5  # o servidor ignora o CQL...
-    servidor.falhas = [requests.ConnectionError("caiu")]  # ...e a 1ª sondagem nem chega
+    servidor.falhas = [requests.ConnectionError("caiu")]  # ...and the 1st probe does not even arrive
     with pytest.raises(ValueError, match="não aplica o filtro CQL"):
         wfs._fetch_with_retry(URL, "ns:rodovias", 10, None, None, None, 5, 2, 0.0, "a = 1")
     assert servidor.paginas_pedidas == []  # a falha foi retentada, e a sondagem refeita recusou
@@ -496,7 +498,7 @@ def test_camada_vazia_nao_verifica_o_servidor(servidor):
     assert wfs._cql_verificado == {}
     servidor.paginas = [_feicoes(1)]
 
-    # Outra camada do mesmo servidor sonda de novo — e o servidor que ignora é pego.
+    # Another layer of the same server probes again — and the server that ignores it is caught.
     servidor.urls.clear()
     servidor.hits = {True: 5, False: 5}
     with pytest.raises(ValueError, match="não aplica o filtro CQL"):
@@ -516,9 +518,9 @@ def test_o_cache_da_verificacao_tem_teto(servidor, monkeypatch):
     assert len(wfs._cql_verificado) == 2 and "http://a/ows" not in wfs._cql_verificado
 
 
-# ── Recusa do servidor ───────────────────────────────────────────────────────────
+# ── Server refusal ───────────────────────────────────────────────────────────────
 
-# A forma real do GeoServer (ver `test_erro_do_servidor_decodifica_e_classifica`).
+# The real GeoServer shape (see `test_erro_do_servidor_decodifica_e_classifica`).
 _CQL_INVALIDO = (
     '<?xml version="1.0" encoding="UTF-8"?>'
     '<ows:ExceptionReport xmlns:ows="http://www.opengis.net/ows/1.1" version="2.0.0">'
@@ -536,7 +538,7 @@ def test_filtro_invalido_nao_e_retentado_e_chega_legivel(servidor):
     assert msg.startswith("O servidor WFS recusou a consulta:")
     assert 'Could not parse CQL filter list. Encountered "="' in msg
     assert "<ows:" not in msg and "&quot;" not in msg
-    assert len(servidor.paginas_pedidas) == 1  # sem retry
+    assert len(servidor.paginas_pedidas) == 1  # no retry
 
 
 def test_falha_transitoria_do_servidor_segue_retentada(servidor):
@@ -552,7 +554,7 @@ def test_a_excecao_do_wfs200_tambem_e_a_voz_do_servidor(servidor):
     servidor.paginas = [ServiceExceptionWfs200("Cannot do natural order without a primary key")] * 3
     with pytest.raises(RuntimeError) as ei:
         wfs._fetch_with_retry(URL, "ns:rodovias", 10, None, None, None, 5, 2, 0.0)
-    # Retentada (NoApplicableCode implícito), e a tradução acionável de sempre no fim.
+    # Retried (implicit NoApplicableCode), and the usual actionable translation at the end.
     assert "Ordenar por" in str(ei.value)
 
 
@@ -563,7 +565,7 @@ def test_filtro_longo_demais_falha_antes_de_qualquer_pedido(servidor):
     assert servidor.urls == []
 
 
-# ── O nó ─────────────────────────────────────────────────────────────────────────
+# ── The node ─────────────────────────────────────────────────────────────────────
 
 def test_o_no_declara_o_filtro():
     props = {p["name"]: p for p in wfs.WFSNode.description()["properties"]}

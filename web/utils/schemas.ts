@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-// Cria um campo de nome com validação padronizada
+// Creates a name field with standardized validation
 export function nameField({ min = 2, max, label }: { min?: number; max: number; label: string }) {
   const minMsg =
     min <= 1

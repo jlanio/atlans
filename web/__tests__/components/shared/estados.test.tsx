@@ -13,7 +13,7 @@ describe("CartaoDeEstado", () => {
     const alerta = screen.getByRole("alert")
     expect(alerta).toHaveClass("border-destructive/20")
     expect(alerta).toHaveTextContent("CaiuDetalhe")
-    // O círculo do ícone também é destrutivo; o ícone é decorativo.
+    // The icon circle is destructive too; the icon is decorative.
     const icone = alerta.querySelector("svg")!
     expect(icone).toHaveAttribute("aria-hidden", "true")
     expect(icone.parentElement).toHaveClass("bg-destructive/10")

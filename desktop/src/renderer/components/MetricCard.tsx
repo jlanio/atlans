@@ -1,29 +1,29 @@
 // desktop/src/renderer/components/MetricCard.tsx
 //
-// Variante de Card para KPI, seguindo .interface-design/system.md:
-// header `flex-row items-center justify-between pb-2`, valor `text-2xl font-bold`
-// (a unica exceção aceita ao "nao usar font-bold").
+// Card variant for KPIs, following .interface-design/system.md:
+// header `flex-row items-center justify-between pb-2`, value `text-2xl font-bold`
+// (the only accepted exception to "do not use font-bold").
 //
-// O ícone entra num quadrado de fundo tênue, à direita. Ele não decora: quatro
-// cartões com a mesma tipografia e nenhuma marca visual obrigam a LER cada
-// título para achar o que se procura, e o Painel é justamente a tela que se
-// consulta de relance.
-// NOTA DE PADRÃO — `CardHeader` é GRID, não flex.
+// The icon goes in a faintly tinted square, on the right. It is not decoration:
+// four cards with the same typography and no visual mark force you to READ each
+// title to find what you are looking for, and the Painel is precisely the screen
+// people check at a glance.
+// PATTERN NOTE — `CardHeader` is a GRID, not flex.
 //
-// O primitivo (portado do web) declara `grid auto-rows-min grid-rows-[auto_auto]`.
-// Um `flex-row` acrescentado por className não faz nada ali: `flex-direction`
-// não se aplica a um contêiner de grade, e `justify-between` passa a alinhar
-// dentro da célula, não entre irmãos. O efeito era silencioso e visível — cada
-// filho caía numa LINHA própria, esticado na largura toda.
+// The primitive (ported from the web) declares `grid auto-rows-min grid-rows-[auto_auto]`.
+// A `flex-row` added via className does nothing there: `flex-direction` does
+// not apply to a grid container, and `justify-between` ends up aligning within
+// the cell, not between siblings. The effect was silent yet visible — each
+// child dropped onto a ROW of its own, stretched across the full width.
 //
-// A forma certa é a que o próprio primitivo oferece: o que vai à direita entra
-// em `CardAction` (o header tem `has-data-[slot=card-action]:grid-cols-[1fr_auto]`),
-// e o que acompanha o título à esquerda entra DENTRO de `CardTitle`.
+// The right way is the one the primitive itself offers: whatever goes on the
+// right goes into `CardAction` (the header has `has-data-[slot=card-action]:grid-cols-[1fr_auto]`),
+// and whatever accompanies the title on the left goes INSIDE `CardTitle`.
 import type { ComponentType } from 'react'
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from './ui/card.js'
 import { cn } from '../lib/utils.js'
 
-/** Cor do valor. Só onde o número carrega julgamento — o resto fica neutro. */
+/** Value color. Only where the number carries a judgment — the rest stays neutral. */
 const TONS = {
   atencao: 'text-warning',
   erro: 'text-destructive',
@@ -37,18 +37,18 @@ export function MetricCard({
   valor: string
   rodape?: string
   /**
-   * O COMPONENTE do ícone, não um elemento pronto — o tamanho é decidido aqui,
-   * e um `size` embutido na chamada tiraria essa liberdade do cartão.
+   * The icon COMPONENT, not a ready-made element — the size is decided here,
+   * and a `size` baked into the call would take that freedom away from the card.
    */
   icone?: ComponentType<{ size?: number; className?: string }>
   tom?: keyof typeof TONS
 }) {
   return (
     <Card className="gap-0 py-4 transition-colors hover:border-primary/30">
-      {/* Ver a NOTA DE PADRÃO no topo: o ícone vai em `CardAction`, que é o
-          slot que o header reserva à direita. Com `flex-row` ele caía numa
-          linha própria, ABAIXO do título e alinhado à esquerda — o oposto do
-          que o comentário deste arquivo descreve. */}
+      {/* See the PATTERN NOTE at the top: the icon goes in `CardAction`, which
+          is the slot the header reserves on the right. With `flex-row` it
+          dropped onto a row of its own, BELOW the title and left-aligned —
+          the opposite of what this file's comment describes. */}
       <CardHeader className="items-center gap-2 px-4 pb-2">
         <CardTitle className="truncate text-xs font-medium text-muted-foreground">
           {titulo}
@@ -64,8 +64,8 @@ export function MetricCard({
         )}
       </CardHeader>
       <CardContent className="px-4">
-        {/* `tabular-nums` evita o valor "dançar" a cada tick de 1s quando os
-            dígitos trocam de largura. */}
+        {/* `tabular-nums` keeps the value from "dancing" on every 1s tick when
+            the digits change width. */}
         <div className={cn('text-2xl font-bold tabular-nums', tom && TONS[tom])}>{valor}</div>
         {rodape && <p className="mt-0.5 truncate text-xs text-muted-foreground">{rodape}</p>}
       </CardContent>

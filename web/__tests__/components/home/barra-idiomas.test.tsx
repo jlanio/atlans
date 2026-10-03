@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 
 /**
- * A barra do assistente em espanhol e inglês: rótulos, chips do hero e a
- * mensagem enviada. O português continua coberto por barra.test.tsx, intacto.
+ * The assistant bar in Spanish and English: labels, hero chips and the
+ * sent message. Portuguese is still covered by barra.test.tsx, untouched.
  */
 import Barra from "@/app/components/home/assistente/barra"
 import { useHomeStore } from "@/app/stores/homeStore"

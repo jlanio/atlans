@@ -2,12 +2,13 @@ import { Badge } from "@/app/components/ui/badge"
 import type { DispatchTier } from "@/service/types"
 
 /**
- * Selo de ONDE a execução de fato rodou, quando isso difere do esperado.
+ * Badge for WHERE the run actually ran, when that differs from what was expected.
  *
- * `primary` é o caso normal e não ganha selo; runs anteriores à coluna
- * (`null`) também não — não se afirma nada sobre o que não foi registrado.
- * "rodou no pool" só faz sentido para workspace COM executor dedicado: no modo
- * Compartilhado o pool é o único destino, e o selo seria ruído em toda linha.
+ * `primary` is the normal case and gets no badge; runs predating the column
+ * (`null`) don't either — nothing is asserted about what wasn't recorded.
+ * "rodou no pool" (ran on the pool) only makes sense for a workspace WITH a
+ * dedicated executor: in Shared mode the pool is the only destination, and the
+ * badge would be noise on every row.
  */
 export function DispatchTierBadge({
   tier, dedicado,

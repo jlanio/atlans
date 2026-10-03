@@ -1,14 +1,14 @@
 # tests/unit/test_agent_service.py
 """
-Testes unitarios para app/services/executor_service.py apos migracao para mTLS.
+Unit tests for app/services/executor_service.py after the migration to mTLS.
 
-Cobertura:
-  - create_executor (status=pending; credencial vem via enrollment OTP + cert mTLS)
-  - delete_agent, revogar_executor + concluir_revogacoes (revogacao marca
-    cert_serial no Redis blacklist depois do commit)
+Coverage:
+  - create_executor (status=pending; credential comes via enrollment OTP + mTLS cert)
+  - delete_agent, revogar_executor + concluir_revogacoes (revocation marks
+    cert_serial in the Redis blacklist after the commit)
 
-Fluxos cobertos em outro arquivo:
-  - Enrollment OTP e CSR signing — tests/unit/test_agent_enrollment_service.py
+Flows covered in another file:
+  - Enrollment OTP and CSR signing — tests/unit/test_agent_enrollment_service.py
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -26,7 +26,7 @@ def _make_agent(
     public_key: str | None = None,
     cert_serial: str | None = "abc123",
 ) -> Executor:
-    """Constroi um objeto Executor para uso nos testes."""
+    """Builds an Executor object for use in the tests."""
     ag = Executor(
         name="test-executor",
         description="Executor de teste",
@@ -45,7 +45,7 @@ def _make_agent(
 
 
 def _make_db_result(value) -> MagicMock:
-    """Simula o resultado de db.execute com scalar_one_or_none."""
+    """Simulates the result of db.execute with scalar_one_or_none."""
     result = MagicMock()
     result.scalar_one_or_none.return_value = value
     return result
@@ -151,9 +151,9 @@ class TestCreateDedicatedForUser:
 # ── TestCountUserCreatedAgents ────────────────────────────────────────────────
 
 class TestCountUserCreatedAgents:
-    """O contador ignora revoked + soft-deleted — executores nesses estados não
-    ocupam vaga na cota e não bloqueiam criação de novos quando o admin
-    restaura a cota após uma rodada de revogação."""
+    """The counter ignores revoked + soft-deleted — executors in those states do
+    not take up a slot in the quota and do not block creating new ones when the
+    admin restores the quota after a round of revocations."""
 
     @pytest.mark.asyncio
     async def test_retorna_scalar_do_execute(self, mock_db):
@@ -169,7 +169,7 @@ class TestCountUserCreatedAgents:
 
     @pytest.mark.asyncio
     async def test_select_filtra_revoked_e_deleted(self, mock_db):
-        """Compila o statement e verifica que os filtros corretos estão presentes."""
+        """Compiles the statement and checks that the correct filters are present."""
         from app.services.executor_service import count_user_created_executors
 
         captured: dict = {}
@@ -234,7 +234,7 @@ class TestDeleteAgent:
                 await delete_agent(mock_db, "missing")
 
 
-# ── Revogação: revogar_executor + concluir_revogacoes ────────────────────────
+# ── Revocation: revogar_executor + concluir_revogacoes ───────────────────────
 
 def _revogar(ag, **kw):
     from app.services.executor_service import revogar_executor
@@ -255,15 +255,15 @@ class TestRevogarExecutor:
             revogacao = await _revogar(ag, db=mock_db)
 
         assert (ag.status, ag.cert_serial) == ("revoked", None)
-        assert revogacao.serial == "abc123"            # o que a blacklist recebe depois
+        assert revogacao.serial == "abc123"            # what the blacklist receives afterwards
         detach.assert_awaited_once()
         assert detach.await_args.kwargs["reason"] == "revoked"
-        # O commit é de quem chama: a revogação entra na transação dele.
+        # The commit belongs to the caller: the revocation joins its transaction.
         mock_db.commit.assert_not_awaited()
 
     @pytest.mark.asyncio
     async def test_nivel_principal_que_esvaziaria_barra_a_revogacao(self, mock_db):
-        """Sem `force`, o 409 da política vem ANTES de tocar no executor."""
+        """Without `force`, the policy's 409 comes BEFORE touching the executor."""
         from app.core.exceptions import WorkspacePolicyConflictError
 
         ag = _make_agent(status="active", cert_serial="abc123")
@@ -307,8 +307,8 @@ class TestConcluirRevogacoes:
 
     @pytest.mark.asyncio
     async def test_falha_de_um_passo_nao_impede_os_outros(self):
-        """Tudo depois do commit é best-effort: a blacklist fora do ar não pode
-        deixar o executor conectado, nem o de um executor impedir o do outro."""
+        """Everything after the commit is best-effort: the blacklist being down must
+        not leave the executor connected, nor must one executor's stop prevent another's."""
         from app.services import executor_service as svc
 
         revogacoes = [
@@ -357,12 +357,12 @@ class TestRevogarExecutoresDoUsuario:
 
         assert [r.executor_id for r in revogacoes] == [a.id_hash, b.id_hash]
         assert {a.status, b.status} == {"revoked"}
-        # "Revogar todos": níveis da política com força, porque é a conta inteira.
+        # "Revogar todos" (revoke all): policy tiers with force, because it is the whole account.
         assert [c.kwargs["force"] for c in detach.await_args_list] == [True, True]
         assert {c.kwargs["reason"] for c in detach.await_args_list} == {"operator_revoked"}
         assert revogacoes[0].fechamento == "Operador revogado."
         assert "ana" in revogacoes[0].aviso
-        # Um SELECT só (fora o detach de cada um) e nenhum commit próprio.
+        # A single SELECT (apart from each one's detach) and no commit of its own.
         db.execute.assert_awaited_once()
         db.commit.assert_not_awaited()
         sql = str(db.execute.await_args.args[0])
@@ -370,8 +370,8 @@ class TestRevogarExecutoresDoUsuario:
 
     @pytest.mark.asyncio
     async def test_suspensao_nao_tira_dos_niveis(self):
-        """Suspender/excluir a conta (`desanexar=False`) revoga sem detach: o
-        executor fica nos níveis dos workspaces (spec §4.4)."""
+        """Suspending/deleting the account (`desanexar=False`) revokes without detach:
+        the executor stays in the workspaces' tiers (spec §4.4)."""
         from app.services import executor_service as svc
 
         a = _make_agent(cert_serial="serial-a")

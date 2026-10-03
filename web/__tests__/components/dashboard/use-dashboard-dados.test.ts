@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
 import type { IObservabilityMetrics } from "@/service/types"
 
-// Só o serviço é dublado: o hook é testado de verdade (paralelismo escopado,
-// espinha × seções, sequência). Ele recebe o escopo já resolvido, então não há
-// WorkspaceContext para dublar.
+// Only the service is doubled: the hook is tested for real (scoped parallelism,
+// backbone × sections, sequencing). It receives the already resolved scope, so there is no
+// WorkspaceContext to double.
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
     getObservabilityMetrics: vi.fn(),
@@ -20,7 +20,7 @@ import { useDashboardDados } from "@/app/components/dashboard/use-dashboard-dado
 
 const svc = GisFlowService as unknown as Record<string, ReturnType<typeof vi.fn>>
 
-/** Janela padrão passada pelo `index` (do `?periodo=`, default 30). */
+/** Default window passed by `index` (from `?periodo=`, default 30). */
 const DIAS = 30
 
 const ok = <T,>(data: T) => ({ success: true, status: 200, data })
@@ -84,7 +84,7 @@ describe("useDashboardDados", () => {
     await waitFor(() => expect(svc.getObservabilityMetrics).toHaveBeenLastCalledWith(7, false, { workspace_id: "ws1" }))
     expect(svc.getRunsByDay).toHaveBeenLastCalledWith(7, expect.objectContaining({ workspace_id: "ws1" }))
     expect(svc.getExecutorMetrics).toHaveBeenLastCalledWith(7, false, { workspace_id: "ws1" })
-    // Trocar só o período (mesmo escopo) não é 1ª carga: o dado fica na tela, não zera.
+    // Changing only the period (same scope) is not a 1st load: the data stays on screen, it does not reset.
     expect(result.current.metrics).not.toBeNull()
   })
 
@@ -105,7 +105,7 @@ describe("useDashboardDados", () => {
     await waitFor(() => expect(result.current.carregando).toBe(false))
     expect(result.current.dias).toHaveLength(1)
 
-    // Recarrega com essas duas seções falhando: a espinha segue, os dados ficam.
+    // Reloads with these two sections failing: the backbone goes on, the data stays.
     svc.getRunsByDay.mockResolvedValue(falhou())
     svc.getObservabilityRuns.mockResolvedValue(falhou())
     act(() => result.current.recarregar())
@@ -113,7 +113,7 @@ describe("useDashboardDados", () => {
 
     expect(result.current.falhas.runs).toBe(true)
     expect(result.current.erroEspinha).toBeNull()
-    // Sem zerar: o que já havia continua.
+    // No reset: what was already there stays.
     expect(result.current.dias).toHaveLength(1)
     expect(result.current.runs).toHaveLength(1)
   })
@@ -130,7 +130,7 @@ describe("useDashboardDados", () => {
   })
 
   it("resposta atrasada do escopo anterior é descartada (carimbo de sequência)", async () => {
-    // ws1 responde DEPOIS de ws2: a tela tem de ficar com ws2.
+    // ws1 responds AFTER ws2: the screen has to stay with ws2.
     let soltarWs1: (v: unknown) => void = () => {}
     svc.getObservabilityMetrics.mockImplementation((_d: number, _f: boolean, filtros: { workspace_id?: string }) =>
       filtros.workspace_id === "ws1" ? new Promise(r => { soltarWs1 = r }) : Promise.resolve(ok(metrics(2))))

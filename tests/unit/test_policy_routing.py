@@ -1,16 +1,16 @@
 # tests/unit/test_policy_routing.py
 """
-Roteamento por política (spec docs/specs/executor-isolation-routing.md, §5 e §11).
+Policy-based routing (spec docs/specs/executor-isolation-routing.md, §5 and §11).
 
-  - DOURADO: com os dados do backfill (nível 1 = {dedicado}, terminal pool), a
-    cadeia com a flag `on` é IDÊNTICA à lista legada com `off`. É a prova de
-    que ligar a flag não muda nada para ninguém.
-  - Isolado + tudo fora ⇒ 503 com categoria própria e ZERO send_job ao pool.
-  - Fallback: o pool só entra depois de esgotar os níveis; nível 2 antes do pool.
-  - Piso `no_pool` ignora `fallback_terminal='pool'` do banco.
-  - Barreira §5.3: candidato fora do conjunto permitido ⇒ run failed, job não
-    sai, o `dispatch_event` registra `isolation_violation`.
-  - `dispatch_tier` gravado no INSERT e reescrito no failover.
+  - GOLDEN: with the backfill data (tier 1 = {dedicado}, terminal pool), the
+    chain with the flag `on` is IDENTICAL to the legacy list with `off`. It is
+    the proof that turning the flag on changes nothing for anyone.
+  - Isolated + everything down ⇒ 503 with its own category and ZERO send_job to the pool.
+  - Fallback: the pool only comes in after the tiers are exhausted; tier 2 before the pool.
+  - The `no_pool` floor ignores `fallback_terminal='pool'` from the database.
+  - §5.3 barrier: a candidate outside the allowed set ⇒ run failed, the job does
+    not go out, `dispatch_event` records `isolation_violation`.
+  - `dispatch_tier` written in the INSERT and rewritten on failover.
 """
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def _wf(workspace_id="ws-1"):
 
 
 def _registry(*, offline=(), unknown=()):
-    """presence_or_unknown por executor; nenhuma capacidade declarada."""
+    """presence_or_unknown per executor; no declared capacity."""
     reg = MagicMock()
 
     async def _presence(executor_id):
@@ -63,9 +63,9 @@ def _registry(*, offline=(), unknown=()):
 
 
 def _db_legado(dedicado):
-    """db.execute do caminho legado: o JOIN workspace→executor devolve `dedicado`;
-    a contagem de runs em voo (`_contadas_pelo_servidor`, na conexão da
-    sessão, dentro de um savepoint) volta vazia."""
+    """db.execute for the legacy path: the workspace→executor JOIN returns `dedicado`;
+    the count of in-flight runs (`_contadas_pelo_servidor`, on the session's
+    connection, inside a savepoint) comes back empty."""
     res = MagicMock()
     res.scalar_one_or_none = MagicMock(return_value=dedicado)
     conexao = MagicMock()
@@ -77,8 +77,8 @@ def _db_legado(dedicado):
 
 
 def _db():
-    """Sessão do caminho por política: a leitura da política e do pool vêm dos
-    patches; o que chega ao banco é só a contagem de runs em voo, vazia."""
+    """Session for the policy path: reading the policy and the pool come from the
+    patches; all that reaches the database is the in-flight run count, empty."""
     return _db_legado(None)
 
 
@@ -90,26 +90,26 @@ def _policy(primary=(), fallback=(), terminal="fail", floor="none"):
 
 
 def _espiar_evento():
-    """Espião do `dispatch_event` (a linha JSON por decisão), sem calá-lo."""
+    """Spy on `dispatch_event` (the JSON line per decision), without silencing it."""
     return patch.object(svc, "_log_dispatch_event", wraps=svc._log_dispatch_event)
 
 
 def _desfecho(evento) -> dict:
-    """Política, nível e desfecho do ÚNICO `dispatch_event` emitido."""
+    """Policy, tier and outcome of the SINGLE `dispatch_event` emitted."""
     evento.assert_called_once()
     return {chave: evento.call_args.kwargs[chave] for chave in ("mode", "tier", "outcome")}
 
 
 @pytest.fixture(autouse=True)
 def _desempate_estavel():
-    """Empate na ordem de entrada. O dourado compara DUAS listas, e o sorteio
-    entre executores igualmente ocupados as faria diferir sem nada errado."""
+    """Ties broken by input order. The golden test compares TWO lists, and random
+    choice among equally busy executors would make them differ with nothing wrong."""
     with patch.object(svc, "_desempate", lambda: 0.0):
         yield
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# Resolução de candidatos
+# Candidate resolution
 # ══════════════════════════════════════════════════════════════════════════════
 
 class TestDourado:
@@ -159,7 +159,7 @@ class TestContratoPorPolitica:
                 await svc._resolve_candidates(_db(), _wf())
         assert exc.value.category == "no_dedicated_executor"
         assert "NÃO foi enviado ao pool" in exc.value.detail
-        pool_lookup.assert_not_awaited()        # o pool nem foi consultado
+        pool_lookup.assert_not_awaited()        # the pool was not even queried
         reg.send_job.assert_not_awaited()
         assert _desfecho(evento) == {"mode": "isolated", "tier": None, "outcome": "no_candidates"}
 
@@ -195,7 +195,7 @@ class TestContratoPorPolitica:
 
     @pytest.mark.asyncio
     async def test_presenca_desconhecida_mantem_o_candidato(self):
-        """Blip de Redis ou reconexão em curso: o executor é TENTADO (spec §5.1)."""
+        """Redis blip or reconnection in progress: the executor is TRIED (spec §5.1)."""
         ded = _executor("geo-01")
         with patch.object(svc, "executor_registry", _registry(unknown=("geo-01",))), \
              patch.object(svc, "get_default_agents", AsyncMock(return_value=[])), \
@@ -242,7 +242,7 @@ class TestDispatchTierEBarreira:
         run = db.add.call_args.args[0]
         assert result.id == run.task_id
         assert run.host == "executor:pool-a"
-        assert run.dispatch_tier == "pool"          # reescrito no failover
+        assert run.dispatch_tier == "pool"          # rewritten on failover
         assert _desfecho(evento) == {"mode": "dedicated_pool", "tier": "pool", "outcome": "dispatched"}
 
     @pytest.mark.asyncio
@@ -260,7 +260,7 @@ class TestDispatchTierEBarreira:
             with pytest.raises(NoExecutorAvailableError) as exc:
                 await svc._dispatch_job(_wf(), _definition(), cadeia, {}, False, db=db)
         assert exc.value.category == "isolation_violation"
-        cifra.assert_not_called()                  # nunca cifrou para a chave do intruso
+        cifra.assert_not_called()                  # never encrypted for the intruder's key
         reg.send_job.assert_not_awaited()
         run = db.add.call_args.args[0]
         assert run.status == "failed" and "isolamento" in run.error_message
@@ -287,8 +287,8 @@ class TestDispatchTierEBarreira:
 
     @pytest.mark.asyncio
     async def test_lista_crua_sem_politica_continua_funcionando(self):
-        """Compatibilidade: quem passa uma `list` comum (testes antigos, caminho
-        legado sem anotações) não quebra — sem tier, sem barreira."""
+        """Compatibility: whoever passes a plain `list` (old tests, legacy path without
+        annotations) does not break — no tier, no barrier."""
         ag = _executor("ag-1")
         reg = _registry()
         db = _db_dispatch()

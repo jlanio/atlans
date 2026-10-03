@@ -10,17 +10,17 @@ import { serializeEdge } from "@/app/components/workflow/utils/edge-persistence"
 import { viewportsIguais } from "@/app/components/workflow/utils/viewport-salvo"
 
 export interface OpcoesDeSave {
-  /** Save disparado por outra ação (o Executar grava antes de despachar): sem
-   *  toast de erro — quem chamou responde pelo próprio — e sem piscar "Salvo"
-   *  quando não há nada a salvar. O chip continua refletindo o estado. */
+  /** Save triggered by another action (Executar saves before dispatching): no
+   *  error toast — the caller answers with its own — and no "Salvo" (saved) flash
+   *  when there is nothing to save. The chip keeps reflecting the state. */
   silent?: boolean
 }
 
-// Normaliza properties ordenando chaves — JSON.stringify preserva ordem de
-// inserção, então dois objetos com mesmas entradas mas ordens diferentes
-// produzem strings diferentes. ReactFlow pode recriar o objeto internamente
-// com ordem diferente após medição de dimensões, o que dispararia falso
-// positivo no isDirty.
+// Normalizes properties by sorting keys — JSON.stringify preserves insertion
+// order, so two objects with the same entries but different orders produce
+// different strings. ReactFlow may recreate the object internally with a
+// different order after measuring dimensions, which would trigger a false
+// positive in isDirty.
 function normalizeProperties(properties: unknown): Record<string, string> {
   if (!properties || typeof properties !== 'object') return {}
   const source = properties as Record<string, string>
@@ -32,18 +32,18 @@ function normalizeProperties(properties: unknown): Record<string, string> {
 }
 
 /**
- * Projeção persistível do grafo — o que vai para `definition` no backend.
+ * Persistable projection of the graph — what goes into `definition` in the backend.
  *
- * Pura e exportada de propósito: o detector de "não salvo" mora em outro
- * componente (global-save-indicator) e precisa montar EXATAMENTE o mesmo
- * payload que o save grava. Qualquer assimetria entre os dois vira um "Não
- * salvo" que nunca some.
+ * Pure and exported on purpose: the "unsaved" detector lives in another
+ * component (global-save-indicator) and needs to build EXACTLY the same
+ * payload the save writes. Any asymmetry between the two becomes a "Não salvo"
+ * (unsaved) that never goes away.
  */
 export function montarPayloadDoGrafo(nodes: INodeContext[], edges: Edge[]) {
   const nodesReq = nodes.map(node => {
     const { data: { name, alias, properties, type }, position } = node
-    // Normaliza position para { x, y } — descarta campos extras que o
-    // ReactFlow pode ter injetado (positionAbsolute, etc).
+    // Normalizes position to { x, y } — discards extra fields that ReactFlow
+    // may have injected (positionAbsolute, etc).
     return {
       id: node.id,
       name,
@@ -54,8 +54,8 @@ export function montarPayloadDoGrafo(nodes: INodeContext[], edges: Edge[]) {
     } satisfies INodesDefinition
   })
 
-  // A serialização vive em utils/edge-persistence para ficar simétrica com o
-  // loadEdges e testável — o detect-dirty usa esta mesma função.
+  // Serialization lives in utils/edge-persistence to stay symmetric with
+  // loadEdges and testable — detect-dirty uses this same function.
   const edgesReq = edges.map(serializeEdge)
 
   return { nodesReq, edgesReq }
@@ -66,13 +66,13 @@ export const useSaveWorkflow = () => {
   const router = useRouter()
   const { current: currentWorkspace } = useWorkspace()
   const reactFlowInstance = useReactFlow()
-  // Leitura imperativa da store do React Flow em vez de useNodes()/useEdges().
-  // Este hook está montado em vários pontos da árvore do canvas (editor, botão
-  // Salvar, botão Executar, chip de estado): assinar os dois arrays
-  // re-renderizava todos a cada pointermove de um arraste. E ler no momento da
-  // chamada também dispensa as refs que existiam aqui para cobrir closure stale
-  // — a store nunca está atrasada, então o save silencioso do Execute não tem
-  // como gravar vazio.
+  // Imperative read of the React Flow store instead of useNodes()/useEdges().
+  // This hook is mounted at several points of the canvas tree (editor, Save
+  // button, Executar button, state chip): subscribing to both arrays
+  // re-rendered all of them on every pointermove of a drag. And reading at call
+  // time also does away with the refs that existed here to cover stale closures
+  // — the store is never behind, so Execute's silent save has no way of
+  // writing an empty graph.
   const flowStore = useStoreApi()
   const { id } = useParams<{ id: string }>()
   // Acessa a store Zustand — permite GlobalSaveIndicator ver o mesmo status
@@ -88,10 +88,10 @@ export const useSaveWorkflow = () => {
 
 
   function handleSaveWorkflow(opcoes: OpcoesDeSave = {}) {
-    // Guard único — a decisão de iniciar está em saveWorkflow. Antes do
-    // refactor Zustand, handleSaveWorkflow setava isSaving=true aqui; mas
-    // Zustand é síncrono, então o guard seguinte em saveWorkflow bloqueava
-    // tudo imediatamente e nenhum PUT era disparado.
+    // Single guard — the decision to start lives in saveWorkflow. Before the
+    // Zustand refactor, handleSaveWorkflow set isSaving=true here; but
+    // Zustand is synchronous, so the next guard in saveWorkflow blocked
+    // everything immediately and no PUT was ever fired.
     if (useWorkflowSaveStore.getState().isSaving) return
     return saveWorkflow(opcoes)
   }
@@ -102,28 +102,28 @@ export const useSaveWorkflow = () => {
     if (store.isSaving)
       return
 
-    // Captura o valor mais recente da store
+    // Captures the latest value from the store
     const currentName = store.workflowName
     if (!currentName || currentName.trim() === "") {
-      // Nome ausente: marca o status mas NÃO seta isSaving (se ativasse, o
-      // próximo clique — após o usuário preencher o nome no UnsavedDialog —
-      // seria bloqueado pelo guard `if (store.isSaving) return` acima).
+      // Missing name: marks the status but does NOT set isSaving (if it did, the
+      // next click — after the user fills in the name in UnsavedDialog —
+      // would be blocked by the `if (store.isSaving) return` guard above).
       store.setStatus('needs_name')
       return
     }
 
     const { nodesReq, edgesReq, viewportReq } = buildPayload()
 
-    // Guard-rail anti-perda de dados: nunca sobrescreve um workflow existente
-    // com definition vazio. Se o usuário realmente quiser zerar o workflow,
-    // precisa apagar os nós no canvas (que trás isDirty com nodes=[] explícito
-    // como último estado renderizado). Protege contra closures stale que
-    // chamaram saveWorkflow antes do canvas hidratar.
+    // Anti-data-loss guard rail: never overwrites an existing workflow with an
+    // empty definition. If the user really wants to clear the workflow, they
+    // need to delete the nodes on the canvas (which brings isDirty with an
+    // explicit nodes=[] as the last rendered state). Protects against stale
+    // closures that called saveWorkflow before the canvas hydrated.
     if (id && nodesReq.length === 0 && store.lastSavedSnapshot) {
       try {
         const prev = JSON.parse(store.lastSavedSnapshot) as { nodes?: unknown[] }
         if (prev.nodes && prev.nodes.length > 0) {
-          // Workflow tinha nós — recusamos sobrescrever com vazio.
+          // The workflow had nodes — we refuse to overwrite it with an empty one.
           console.warn(
             "[useSaveWorkflow] Tentativa de salvar workflow existente com 0 nós bloqueada "
             + "(provável closure stale pré-hidratação).",
@@ -131,39 +131,40 @@ export const useSaveWorkflow = () => {
           return { data: null, error: null }
         }
       } catch {
-        // snapshot corrompido — não bloqueia
+        // corrupted snapshot — does not block
       }
     }
 
     if (id && !store.isDirty(nodesReq, edgesReq, currentName)) {
-      // O grafo é o salvo. Só o viewport pode ter mudado — e ele é parte do que
-      // se salva ("reabrir no mesmo zoom e posição"), mas não é edição: não
-      // marca "não salvo" e o save silencioso do Executar não o persegue. Vai
-      // junto quando o USUÁRIO pede o save; o backend não abre versão por isso
-      // (`_has_substantial_changes` ignora posição e viewport).
+      // The graph is the saved one. Only the viewport may have changed — and it is
+      // part of what gets saved ("reopen at the same zoom and position"), but it
+      // is not an edit: it does not mark "unsaved" and Executar's silent save
+      // does not chase it. It goes along when the USER asks for the save; the
+      // backend does not open a version for it (`_has_substantial_changes`
+      // ignores position and viewport).
       const viewportMudou = !viewportsIguais(viewportReq, store.lastSavedViewport)
       if (silent || !viewportMudou) {
-        // Nada a gravar — sem PUT. Mas um Ctrl+S que não responde nada é
-        // indistinguível de um atalho quebrado: pisca "Salvo" para confirmar que
-        // está tudo gravado. Nenhum reset de status é necessário, pois
-        // startSaving() ainda não foi chamado.
+        // Nothing to write — no PUT. But a Ctrl+S that answers nothing is
+        // indistinguishable from a broken shortcut: flash "Salvo" to confirm that
+        // everything is saved. No status reset is needed, since
+        // startSaving() has not been called yet.
         if (!silent) store.flashSaved()
         return { data: null, error: null }
       }
     }
 
-    // Só agora marca como saving — haverá PUT a partir daqui.
-    // Qualquer caminho abaixo sai via completeSave/failSave/catch que limpam
-    // isSaving. (Antes o start ficava em handleSaveWorkflow e os early-returns
-    // acima deixavam isSaving=true preso).
+    // Only now mark as saving — there will be a PUT from here on.
+    // Every path below exits via completeSave/failSave/catch, which clear
+    // isSaving. (Before, the start was in handleSaveWorkflow and the early
+    // returns above left isSaving=true stuck).
     store.startSaving()
 
     try {
       if (id) {
-        // Payload mínimo: apenas os campos que o canvas edita. Enviar
-        // flag_ative/description/version/priority aqui SOBRESCREVERIA os
-        // valores reais no backend (ex: workflow desativado via switch
-        // voltava a ficar ativo em toda edição).
+        // Minimal payload: only the fields the canvas edits. Sending
+        // flag_ative/description/version/priority here WOULD OVERWRITE the
+        // real values in the backend (e.g. a workflow deactivated via the switch
+        // became active again on every edit).
         const data = await GisFlowService.updateWorkflowById(id, {
           name: currentName,
           definition: {
@@ -175,31 +176,32 @@ export const useSaveWorkflow = () => {
 
         if (data.error) {
           store.failSave(data.error.message)
-          // Em save silent (disparado pelo Execute antes do dispatch), o chip
-          // já mostra "Falha ao salvar" — o toast aqui seria o segundo aviso.
+          // On a silent save (triggered by Execute before dispatch), the chip
+          // already shows "Falha ao salvar" (save failed) — a toast here would
+          // be the second warning.
           if (!silent) createToast.error(`Workflow não salvo`, data.error.message)
           return data
         }
 
         const snapshot = JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq })
-        // Sem toast de sucesso: o chip ao lado do caminho do workflow diz
-        // "Salvo" e continua dizendo "Salvo há N min". Um toast a cada Ctrl+S
-        // era ruído sobre a mesma informação.
+        // No success toast: the chip next to the workflow path says "Salvo"
+        // and keeps saying "Salvo há N min" (saved N min ago). A toast on every
+        // Ctrl+S was noise about the same information.
         store.completeSave(snapshot, viewportReq)
-        // Salvou, mas o agendamento pode não ter sido aplicado (workflow
-        // inativo, expressão inválida): o backend devolve o motivo em
-        // `schedule_notices`. Nesse caso o "Salvo" no chip esconderia uma
-        // ressalva importante — mostra um toast âmbar (mesmo em save silent:
-        // o usuário precisa saber que o agendamento não valeu).
+        // Saved, but the schedule may not have been applied (inactive workflow,
+        // invalid expression): the backend returns the reason in
+        // `schedule_notices`. In that case the "Salvo" on the chip would hide an
+        // important caveat — show an amber toast (even on a silent save: the user
+        // needs to know the schedule did not take effect).
         for (const aviso of data.data?.schedule_notices ?? []) {
           createToast.warning("Agendamento não aplicado", aviso.message)
         }
         return data
       }
 
-      // Workflow novo: defaults razoáveis para campos de metadado.
-      // created_by_id/updated_by_id são preenchidos pelo backend a partir
-      // do usuário autenticado — não são enviados pelo frontend.
+      // New workflow: reasonable defaults for the metadata fields.
+      // created_by_id/updated_by_id are filled in by the backend from the
+      // authenticated user — they are not sent by the frontend.
       const data = await GisFlowService.createWorkflow({
         flag_ative: true,
         name: currentName,
@@ -222,11 +224,11 @@ export const useSaveWorkflow = () => {
 
       store.completeSave(JSON.stringify({ name: currentName, nodes: nodesReq, edges: edgesReq }), viewportReq)
 
-      // O workflow agora existe: a URL passa a ser a dele, e o editor continua
-      // aberto. Antes, o botão mandava para a lista de projetos (abandonando o
-      // que se estava editando) e o Ctrl+S ficava em /workflow/create sem id —
-      // o Ctrl+S seguinte criava uma cópia. `replace`, e não `push`: voltar
-      // para /create no histórico seria voltar para "criar outro".
+      // The workflow now exists: the URL becomes its URL, and the editor stays
+      // open. Before, the button sent you to the project list (abandoning what
+      // you were editing) and Ctrl+S stayed on /workflow/create with no id —
+      // the next Ctrl+S created a copy. `replace`, not `push`: going back to
+      // /create in the history would mean going back to "create another".
       const novoId = data.data?.id_hash
       if (novoId) router.replace(`/workflow/${novoId}`)
 
@@ -239,18 +241,18 @@ export const useSaveWorkflow = () => {
   }
 
   /**
-   * Inicializa o snapshot de referência com o estado carregado do backend.
-   * Deve ser chamado UMA VEZ após hidratação do canvas (loadNodes+loadEdges).
-   * Com o snapshot preenchido, isDirty() retorna false quando o usuário não
-   * editou nada — evitando um PUT desnecessário antes do POST /execute.
+   * Initializes the reference snapshot with the state loaded from the backend.
+   * Must be called ONCE after the canvas hydrates (loadNodes+loadEdges).
+   * With the snapshot filled in, isDirty() returns false when the user has not
+   * edited anything — avoiding an unnecessary PUT before POST /execute.
    *
-   * `savedAt` é o `updated_at` do servidor (epoch ms): é o que o chip mostra em
-   * repouso antes do primeiro save desta sessão. `viewport` é o que veio na
-   * `definition`: referência para saber se um save explícito tem viewport novo
-   * a gravar.
+   * `savedAt` is the server's `updated_at` (epoch ms): it is what the chip shows
+   * at rest before this session's first save. `viewport` is what came in the
+   * `definition`: a reference to know whether an explicit save has a new
+   * viewport to write.
    *
-   * IMPORTANTE: o formato de nodesReq/edgesReq deve ser idêntico ao que
-   * buildPayload() produz (INodesDefinition[] / IEdgeDefinition[]).
+   * IMPORTANT: the shape of nodesReq/edgesReq must be identical to what
+   * buildPayload() produces (INodesDefinition[] / IEdgeDefinition[]).
    */
   function initSnapshot(nodesReq: INodesDefinition[], edgesReq: IEdgeDefinition[], name: string, savedAt?: number | null, viewport?: Viewport | null) {
     const store = useWorkflowSaveStore.getState()

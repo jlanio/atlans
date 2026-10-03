@@ -1,26 +1,27 @@
 /**
- * Alias de um nó como o EXECUTOR o registra no contexto Jinja.
+ * A node's alias as the EXECUTOR registers it in the Jinja context.
  *
- * Espelha `_resolve_alias` em flow/executor/core.py: o alias customizado só
- * vale se for um identificador válido; caso contrário o executor cai no `name`
- * da classe do nó.
+ * Mirrors `_resolve_alias` in flow/executor/core.py: the custom alias only
+ * counts if it is a valid identifier; otherwise the executor falls back to the
+ * node class's `name`.
  *
- * Sem isso, o autocomplete sugeria o rótulo de exibição — "Caixa Delimitadora",
- * "Entrada de Dados" — que tem espaço e não é identificador. A expressão saía
- * apontando para um nome inexistente no contexto, e o próprio autocomplete
- * parava de reconhecer o texto que acabara de inserir (o regex de gatilho usa
- * \w, que não casa espaço), então o "." nunca listava os campos.
+ * Without this, the autocomplete suggested the display label — "Caixa
+ * Delimitadora", "Entrada de Dados" — which has spaces and is not an
+ * identifier. The expression ended up pointing at a name that does not exist
+ * in the context, and the autocomplete itself stopped recognizing the text it
+ * had just inserted (the trigger regex uses \w, which does not match a space),
+ * so "." never listed the fields.
  */
 
-/** Colidem com chaves fixas do contexto — ver RESERVED_ALIASES em flow/core/aliases.py. */
+/** These collide with fixed context keys — see RESERVED_ALIASES in flow/core/aliases.py. */
 export const RESERVED_ALIASES: ReadonlySet<string> = new Set([
   "inputs", "nodes", "named", "now", "uuid", "env",
 ])
 
 /**
- * Equivalente ao `str.isidentifier()` do Python — aceita identificadores
- * Unicode, então acento e ç valem. Exportado como fonte para quem precisa
- * compor um regex maior (o autocomplete varre `Alias.campo` no texto).
+ * Equivalent to Python's `str.isidentifier()` — accepts Unicode identifiers,
+ * so accents and ç are fine. Exported as a source for anyone who needs to
+ * compose a larger regex (the autocomplete scans `Alias.campo` in the text).
  */
 export const IDENTIFIER_SOURCE = "[\\p{ID_Start}_][\\p{ID_Continue}]*"
 const IDENTIFIER = new RegExp(`^${IDENTIFIER_SOURCE}$`, "u")
@@ -31,21 +32,23 @@ export function isValidAlias(alias: string | undefined | null): boolean {
 }
 
 /**
- * Nome pelo qual o nó é referenciável numa expressão (`$Alias.campo`).
+ * Name by which the node can be referenced in an expression (`$Alias.campo`).
  *
- * Réplica fiel de `_resolve_alias`, incluindo a semântica do `or` do Python:
+ * A faithful replica of `_resolve_alias`, including the semantics of Python's `or`:
  *
  *     custom = node_def.get("alias", "") or node_def["properties"].get("alias", "")
  *     return custom if custom.isidentifier() and custom not in RESERVADOS else node_def["name"]
  *
- * O `or` escolhe por VERACIDADE, não por validade — um `alias` preenchido mas
- * inutilizável (o rótulo do catálogo, "Caixa Delimitadora") faz o executor cair
- * direto no `name` da classe, sem sequer olhar `properties.alias`. Aproximar
- * isso por "o primeiro candidato válido" faria o autocomplete sugerir um nome
- * que o executor não registra — o bug que este módulo existe para evitar.
+ * The `or` chooses by TRUTHINESS, not validity — an `alias` that is filled but
+ * unusable (the catalog label, "Caixa Delimitadora") makes the executor fall
+ * straight to the class `name`, without even looking at `properties.alias`.
+ * Approximating that as "the first valid candidate" would make the autocomplete
+ * suggest a name the executor does not register — the bug this module exists
+ * to prevent.
  *
- * Na prática `data.alias` já carrega o alias do usuário: o modal o promove ao
- * salvar. `properties.alias` cobre o nó cujo `alias` veio vazio do banco.
+ * In practice `data.alias` already carries the user's alias: the modal promotes
+ * it on save. `properties.alias` covers the node whose `alias` came empty from
+ * the database.
  */
 export function resolveNodeAlias(data: {
   alias?: unknown

@@ -1,22 +1,22 @@
 /**
- * Tela de Artefatos — o que a pessoa vê enquanto a lista carrega, pagina,
- * recarrega, filtra e falha.
+ * Artifacts screen — what the person sees while the list loads, paginates,
+ * reloads, filters and fails.
  *
- * Caracterização escrita ANTES de o `useArtifactsQuery` trocar o estado feito à
- * mão (seq, offset, loading/loadingMore) pelo `useInfiniteQuery`: os mesmos
- * testes passam nas duas versões. A tela é montada inteira — o contrato é o
- * que aparece (skeleton, contagens, cartão, aviso âmbar, "Ver mais"), não o
- * formato do hook.
+ * Characterization written BEFORE `useArtifactsQuery` replaced the hand-rolled
+ * state (seq, offset, loading/loadingMore) with `useInfiniteQuery`: the same
+ * tests pass on both versions. The whole screen is mounted — the contract is
+ * what shows up (skeleton, counts, card, amber warning, "Ver mais"), not the
+ * shape of the hook.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { configure, render, screen, waitFor, fireEvent, within, act } from "@testing-library/react"
 import { QueryClientProvider } from "@tanstack/react-query"
 import type { IArtifactItem } from "@/service/types"
 
-// Cem linhas com Checkbox do Radix custam centenas de ms no jsdom; com a suíte
-// inteira em paralelo, o 1 s padrão do `waitFor` viraria intermitência. E o
-// prazo de cada teste tem de caber mais de um `waitFor` desses: com os 5 s
-// padrão, um só consumia o teste inteiro sob carga.
+// A hundred rows with Radix Checkbox cost hundreds of ms in jsdom; with the whole
+// suite in parallel, `waitFor`'s default 1 s would turn into flakiness. And each
+// test's timeout has to fit more than one of those `waitFor`s: with the default
+// 5 s, a single one used up the whole test under load.
 configure({ asyncUtilTimeout: 5000 })
 vi.setConfig({ testTimeout: 20_000 })
 
@@ -30,8 +30,8 @@ vi.mock("@/service/GisFlowService", () => ({
   },
 }))
 
-// Workspace trocável: o seletor do cabeçalho troca o contexto SEM remontar a
-// página. `loading` é o gate do `enabled` (a lista espera o workspace).
+// Switchable workspace: the header selector switches the context WITHOUT remounting the
+// page. `loading` is the gate for `enabled` (the list waits for the workspace).
 const ws: { current: { id_hash: string; name: string } | null; loading: boolean } = {
   current: { id_hash: "ws-a", name: "A" },
   loading: false,
@@ -64,7 +64,7 @@ function artefato(id: string, extra: Partial<IArtifactItem> = {}): IArtifactItem
   }
 }
 
-/** `n` artefatos com ids `${prefixo}${de}`…, na ordem do servidor. */
+/** `n` artifacts with ids `${prefixo}${de}`…, in server order. */
 function itens(prefixo: string, de: number, n: number, extra: Partial<IArtifactItem> = {}) {
   return Array.from({ length: n }, (_, i) => artefato(`${prefixo}${de + i}`, extra))
 }
@@ -75,7 +75,7 @@ const ok = (items: IArtifactItem[], total: number): Resposta =>
 const falha = (message?: string): Resposta =>
   ({ success: false, status: 500, error: { name: "AxiosError", message } }) as Resposta
 
-/** Servidor de mentira: `total` artefatos por aba, fatiados por limit/offset. */
+/** Fake server: `total` artifacts per tab, sliced by limit/offset. */
 function servidor(totais: { execution?: number; publication?: number }) {
   getArtifacts.mockImplementation(async (p = {}) => {
     const total = totais[p.kind ?? "execution"] ?? 0
@@ -104,7 +104,7 @@ function renderizar() {
   return { ...r, rerenderizar: () => r.rerender(arvore()) }
 }
 
-// ── O que a tela mostra ─────────────────────────────────────────────────────
+// ── What the screen shows ───────────────────────────────────────────────────
 
 const linhas = () => document.querySelectorAll("tbody tr").length
 const skeleton = () => screen.queryByRole("status", { name: "Carregando os artefatos" })
@@ -114,13 +114,13 @@ const verMais = () => screen.queryByRole("button", { name: /^(Ver mais|Carregand
 const aba = (nome: string) => within(screen.getByRole("group", { name: "Tipo de artefato" })).getByRole("button", { name: nome })
 const ultimaChamada = () => getArtifacts.mock.calls.at(-1)![0]!
 
-/** A frase sob o título, ou `null` quando ela é o esqueleto. */
+/** The sentence under the title, or `null` when it is the skeleton. */
 function subtitulo(): string | null {
   const irmao = screen.getByRole("heading", { name: "Artefatos" }).nextElementSibling
   return irmao?.tagName === "P" ? irmao.textContent : null
 }
 
-/** O contador da aba ativa (o total do servidor), ou `null` se não há. */
+/** The active tab's counter (the server total), or `null` if there is none. */
 function contagemDaAba(): string | null {
   const ativa = within(screen.getByRole("group", { name: "Tipo de artefato" }))
     .getAllByRole("button")
@@ -128,7 +128,7 @@ function contagemDaAba(): string | null {
   return ativa.querySelector("span")?.textContent ?? null
 }
 
-/** Um tique a mais para uma resposta atrasada ter a chance de (não) pintar. */
+/** One more tick so a late response gets the chance to (not) paint. */
 const mais_um_tique = () => act(async () => { await new Promise(r => setTimeout(r, 20)) })
 
 beforeEach(() => {
@@ -171,7 +171,7 @@ describe("Artefatos — 1ª carga", () => {
     })
     expect(skeleton()).toBeInTheDocument()
     expect(subtitulo()).toBeNull()
-    // A barra de filtros espera a 1ª carga: não há o que filtrar ainda.
+    // The filter bar waits for the 1st load: there is nothing to filter yet.
     expect(busca()).toBeNull()
     expect(botaoAtualizar()).toBeDisabled()
 
@@ -207,7 +207,7 @@ describe("Artefatos — 1ª carga", () => {
     await mais_um_tique()
     expect(getArtifacts).toHaveBeenCalledTimes(1)
 
-    // "Tentar de novo" volta ao skeleton e pede a 1ª página.
+    // "Tentar de novo" (try again) goes back to the skeleton and requests the 1st page.
     const segunda = deferido<Resposta>()
     getArtifacts.mockReturnValueOnce(segunda.promise)
     fireEvent.click(within(cartao).getByRole("button", { name: "Tentar de novo" }))
@@ -234,7 +234,7 @@ describe("Artefatos — 1ª carga", () => {
     renderizar()
 
     await waitFor(() => expect(subtitulo()).toBe("Nenhum artefato ainda"))
-    // O subtítulo e o título do cartão de primeiro uso.
+    // The subtitle and the title of the first-use card.
     expect(screen.getAllByText("Nenhum artefato ainda")).toHaveLength(2)
     expect(contagemDaAba()).toBeNull()
     expect(verMais()).toBeNull()
@@ -244,7 +244,7 @@ describe("Artefatos — 1ª carga", () => {
   })
 })
 
-// ── Ver mais ────────────────────────────────────────────────────────────────
+// ── Ver mais (see more) ─────────────────────────────────────────────────────
 
 describe("Artefatos — Ver mais", () => {
   it("pede o offset acumulado, trava o botão sem trocar a tabela por skeleton e soma até o fim", async () => {
@@ -258,7 +258,7 @@ describe("Artefatos — Ver mais", () => {
     await waitFor(() => expect(verMais()).toHaveTextContent("Carregando…"))
     expect(verMais()).toBeDisabled()
     expect(ultimaChamada()).toMatchObject({ offset: 50, limit: 50 })
-    // Paginar não é recarregar: a tabela, o subtítulo e o Atualizar ficam.
+    // Paginating is not reloading: the table, the subtitle and Atualizar (refresh) stay.
     expect(linhas()).toBe(50)
     expect(skeleton()).toBeNull()
     expect(subtitulo()).toBe("120 artefatos de execução")
@@ -292,10 +292,10 @@ describe("Artefatos — Ver mais", () => {
     expect(verMais()).toBeEnabled()
     expect(subtitulo()).toBe("120 artefatos de execução")
     expect(contagemDaAba()).toBe("120")
-    // Com erro na tela, a contagem "N de M" sai da barra.
+    // With an error on screen, the "N de M" count leaves the bar.
     expect(screen.queryByText("50 de 120 artefatos")).toBeNull()
 
-    // Tentar de novo: o aviso sai já no clique, não só quando a página chega.
+    // Try again: the warning goes away right on the click, not only when the page arrives.
     const denovo = deferido<Resposta>()
     getArtifacts.mockReturnValueOnce(denovo.promise)
     fireEvent.click(verMais()!)
@@ -328,7 +328,7 @@ describe("Artefatos — recarga", () => {
     expect(verMais()).toBeNull()
     expect(subtitulo()).toBeNull()
     expect(botaoAtualizar()).toBeDisabled()
-    // A barra e as contagens do que havia ficam durante a recarga.
+    // The bar and the counts of what was there stay during the reload.
     expect(busca()).toBeInTheDocument()
     expect(screen.getByText("100 de 120 artefatos")).toBeInTheDocument()
     expect(contagemDaAba()).toBe("120")
@@ -342,7 +342,7 @@ describe("Artefatos — recarga", () => {
     expect(screen.getByText("50 de 121 artefatos")).toBeInTheDocument()
     expect(verMais()).toHaveTextContent("Ver mais (71 restantes)")
 
-    // O Ver mais seguinte continua do que a recarga trouxe.
+    // The next Ver mais continues from what the reload brought.
     fireEvent.click(verMais()!)
     await waitFor(() => expect(ultimaChamada()).toMatchObject({ offset: 50 }))
   })
@@ -365,8 +365,8 @@ describe("Artefatos — recarga", () => {
     expect(subtitulo()).toBe("120 artefatos de execução")
     expect(botaoAtualizar()).toBeEnabled()
 
-    // O Tentar de novo do aviso é a mesma recarga: o aviso sai no clique, o
-    // skeleton entra, e a contagem do que havia volta à barra enquanto isso.
+    // The warning's Tentar de novo is the same reload: the warning goes away on the click, the
+    // skeleton comes in, and the count of what was there returns to the bar meanwhile.
     const denovo = deferido<Resposta>()
     getArtifacts.mockReturnValueOnce(denovo.promise)
     fireEvent.click(within(linhaAmbar).getByRole("button", { name: "Tentar de novo" }))
@@ -466,15 +466,15 @@ describe("Artefatos — filtros", () => {
     fireEvent.click(aba("Execução"))
     await waitFor(() => expect(skeleton()).toBeInTheDocument())
     expect(linhas()).toBe(0)
-    // Nada da visita anterior enquanto a lista não chega: nem o total da aba,
-    // nem o "N de M".
+    // Nothing from the previous visit while the list has not arrived: not the tab total,
+    // not the "N de M".
     expect(contagemDaAba()).toBeNull()
     expect(screen.queryByText(/ de 120 artefatos$/)).toBeNull()
     expect(ultimaChamada()).toMatchObject({ kind: "execution", offset: 0 })
 
     volta.resolve(ok(itens("a", 0, 50), 120))
     await waitFor(() => expect(linhas()).toBe(50))
-    // Só a 1ª página, com uma requisição — não as duas que estavam abertas.
+    // Only the 1st page, with one request — not the two that were open.
     expect(getArtifacts.mock.calls.length).toBe(antes + 1)
     expect(verMais()).toHaveTextContent("Ver mais (70 restantes)")
   })
@@ -513,7 +513,7 @@ describe("Artefatos — filtros", () => {
     fireEvent.click(within(grupo).getByRole("button", { name: "CSV" }))
     await waitFor(() => expect(linhas()).toBe(1))
     expect(ultimaChamada()).toMatchObject({ fmt: "csv", offset: 0 })
-    // O servidor só devolveu CSV, e os chips continuam todos.
+    // The server returned only CSV, and the chips are all still there.
     const depois = screen.getByRole("group", { name: "Formato" })
     expect(within(depois).getAllByRole("button").map(b => b.textContent)).toEqual(["Todos", "CSV", "GEOJSON"])
   })
@@ -569,7 +569,7 @@ describe("Artefatos — filtros", () => {
     fireEvent.change(busca()!, { target: { value: "rio" } })
     const aviso = await screen.findByText("Busca indisponível")
     expect(aviso.closest('[role="status"]')).toBeInTheDocument()
-    // Não é o cartão de erro: a barra fica, com o termo, para a pessoa sair dele.
+    // It is not the error card: the bar stays, with the term, so the person can get out of it.
     expect(screen.queryByRole("alert")).toBeNull()
     expect(busca()).toHaveValue("rio")
     expect(screen.getByText("Nenhum artefato com «rio»")).toBeInTheDocument()

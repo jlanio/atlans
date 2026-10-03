@@ -50,7 +50,7 @@ describe("extrairViolacoes", () => {
     expect(extrairViolacoes(null)).toEqual([]);
     expect(extrairViolacoes("texto")).toEqual([]);
     expect(extrairViolacoes([1, "a", { "csp-report": "x" }])).toEqual([]);
-    // sem diretiva não há o que decidir
+    // no directive, nothing to decide
     expect(extrairViolacoes({ "csp-report": { "blocked-uri": "x" } })).toEqual([]);
   });
 

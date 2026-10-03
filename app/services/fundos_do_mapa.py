@@ -1,20 +1,20 @@
 # app/services/fundos_do_mapa.py
 """
-Os fundos de mapa da instalação nos nós Carta.
+The installation's map basemaps in Carta nodes.
 
-A Carta oferece fundos com nome (satélite, satélite com rótulos, ruas), e a URL
-de cada um é da INSTALAÇÃO (MAPA_*_URL, `app/core/config.py`), não do código.
-Quem roda a Carta é o executor, que não tem essa configuração: o servidor a
-põe no nó ao despachar, como faz com as credenciais (`credential_resolver`).
+Carta offers named basemaps (satellite, satellite with labels, streets), and each
+one's URL belongs to the INSTALLATION (MAPA_*_URL, `app/core/config.py`), not to the code.
+What runs Carta is the executor, which does not have that configuration: the server
+puts it into the node when dispatching, as it does with credentials (`credential_resolver`).
 
-O valor injetado SEMPRE substitui o que vier na definição, nas duas formas
-de propriedades que um nó pode ter (`properties`, a que o executor lê, e
-`data.properties`, a do canvas): um `fundo_da_instalacao` escrito à mão no
-workflow não passa por fundo da instalação. Sem configuração para o fundo
-escolhido, vai com a URL vazia — e é a chave `url` que diz ao executor que o
-servidor respondeu: a instalação não tem aquele fundo, e ele cai no próprio
-ambiente ou, para "ruas", no OpenStreetMap. Sem a chave, quem despachou foi
-um servidor anterior a esta versão.
+The injected value ALWAYS replaces whatever comes in the definition, in both forms
+of properties a node can have (`properties`, the one the executor reads, and
+`data.properties`, the canvas's): a `fundo_da_instalacao` written by hand in the
+workflow does not pass for an installation basemap. With no configuration for the
+chosen basemap, it goes with an empty URL — and it is the `url` key that tells the
+executor the server answered: the installation does not have that basemap, and it
+falls back to its own environment or, for "ruas" (streets), to OpenStreetMap. Without
+the key, the dispatcher was a server older than this version.
 """
 from __future__ import annotations
 
@@ -29,8 +29,8 @@ SEM_FUNDO: dict[str, str] = {"url": "", "credito": ""}
 
 
 def _propriedades(no: dict) -> list[dict]:
-    """Todos os dicionários de propriedades do nó: o executor lê `properties`,
-    e o canvas grava em `data.properties`."""
+    """Every property dictionary of the node: the executor reads `properties`,
+    and the canvas writes to `data.properties`."""
     achadas = []
     if isinstance(no.get("properties"), dict):
         achadas.append(no["properties"])
@@ -41,7 +41,7 @@ def _propriedades(no: dict) -> list[dict]:
 
 
 def injetar_fundos_de_mapa(definition: dict, fundos: dict[str, dict[str, str]] | None = None) -> dict:
-    """A definição com o fundo da instalação em cada nó Carta (cópia, se mudar)."""
+    """The definition with the installation basemap in each Carta node (a copy, if it changes)."""
     nos = definition.get("nodes") if isinstance(definition, dict) else None
     if not nos or not any(isinstance(n, dict) and n.get("name") == NO_DA_CARTA for n in nos):
         return definition

@@ -1,24 +1,24 @@
 # app/api/routers/assistente/editor_router.py
 """
-O assistente no editor — /assistente/editor.
+The assistant in the editor — /assistente/editor.
 
-Três rotas, e a primeira é a única que faz trabalho: `POST /conversa` devolve a
-resposta como `text/event-stream`, quadro a quadro, enquanto o laço de
-ferramentas roda contra o servidor MCP deste processo.
+Three routes, and the first is the only one that does any work: `POST /conversa`
+returns the answer as `text/event-stream`, frame by frame, while the tool loop
+runs against this process's MCP server.
 
-**Por que um router normal, e não um `add_route` por fora como o `/mcp`.** O
-`/mcp` sai da pilha de middleware porque o transporte dele tem exigências
-próprias. Aqui a pergunta era se SSE sobrevive ao `SecurityHeadersMiddleware`
-(um `BaseHTTPMiddleware`) e ao GZip — e a resposta foi **medida**, com uvicorn
-num socket de verdade: os quadros chegam espaçados, os cabeçalhos de segurança
-são aplicados, e o GZip do Starlette 1.6 exclui `text/event-stream` por dentro.
-Não há motivo para escapar da pilha.
+**Why a regular router, and not an `add_route` on the side like `/mcp`.** `/mcp`
+leaves the middleware stack because its transport has requirements of its own.
+Here the question was whether SSE survives `SecurityHeadersMiddleware` (a
+`BaseHTTPMiddleware`) and GZip — and the answer was **measured**, with uvicorn
+on a real socket: the frames arrive spaced out, the security headers are
+applied, and Starlette 1.6's GZip excludes `text/event-stream` internally.
+There is no reason to escape the stack.
 
-**A armadilha do `Depends(get_db)`.** A sessão do request fecha quando o handler
-RETORNA, e o gerador do `StreamingResponse` roda depois disso. Nada que precise
-de banco pode acontecer lá dentro. Por isso os workspaces são resolvidos ANTES
-do `return`; daí em diante quem abre sessão é cada ferramenta, pelo
-`infra.sessao` do MCP, com o ciclo de vida dela mesma.
+**The `Depends(get_db)` pitfall.** The request session closes when the handler
+RETURNS, and the `StreamingResponse` generator runs after that. Nothing that
+needs the database can happen in there. That is why the workspaces are resolved
+BEFORE the `return`; from then on, each tool opens its own session, through the
+MCP's `infra.sessao`, with its own lifecycle.
 """
 from __future__ import annotations
 
@@ -58,17 +58,17 @@ MOTIVO_DESLIGADO = (
 
 
 def _exigir_ligado() -> None:
-    """503, e não 404: quem instalou sem a chave precisa saber que o recurso existe."""
+    """503, not 404: whoever installed without the key needs to know the feature exists."""
     if not ASSISTENTE_ATIVO:
         raise HTTPException(status_code=503, detail=MOTIVO_DESLIGADO)
 
 
 def _quadro(evento: assistente.Evento) -> bytes:
-    """Um `Evento` virando quadro SSE.
+    """An `Evento` turned into an SSE frame.
 
-    `event:` nomeado em vez de tudo num canal só: o painel assina por tipo e não
-    precisa desempacotar um envelope para saber se aquilo é texto, progresso ou
-    o fim da conversa.
+    A named `event:` instead of everything on a single channel: the panel
+    subscribes by type and does not need to unpack an envelope to know whether
+    it is text, progress or the end of the conversation.
     """
     corpo = json.dumps(evento.dados, ensure_ascii=False, default=str)
     return f"event: {evento.tipo}\ndata: {corpo}\n\n".encode("utf-8")
@@ -82,26 +82,26 @@ async def conversar(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Manda uma mensagem e recebe a resposta em `text/event-stream`.
+    """Sends a message and receives the answer as `text/event-stream`.
 
-    O histórico daquele fluxo é carregado e salvo pelo servidor: o cliente manda
-    só a mensagem nova. Ver a nota 2 de `assistente_service.py` — um transcrito
-    vindo do navegador permitiria forjar resultado de ferramenta.
+    The history of that workflow is loaded and saved by the server: the client
+    sends only the new message. See note 2 of `assistente_service.py` — a
+    transcript coming from the browser would allow forging a tool result.
     """
     _exigir_ligado()
 
-    # ANTES do `return`: a sessão morre quando este handler sai de cena.
+    # BEFORE the `return`: the session dies when this handler leaves the scene.
     workspace_ids = await listar_workspace_ids(db, current_user.id_hash)
     escopo = assistente.escopo_do_editor_para(current_user, workspace_ids)
 
     servidor = getattr(request.app.state, "mcp_server", None)
-    if servidor is None:  # pragma: no cover - só se o boot mudar
+    if servidor is None:  # pragma: no cover - only if the boot changes
         raise HTTPException(status_code=503, detail="Servidor de ferramentas indisponível.")
 
     return StreamingResponse(
-        # `com_batimento`: um `: ping` a cada 15 s de silencio, senao um turno
-        # longo (montar e rodar um fluxo) fica minutos mudo e o proxy derruba o
-        # SSE antes do primeiro quadro. Mesmo batimento que o assistente da Home.
+        # `com_batimento`: a `: ping` every 15 s of silence, otherwise a long turn
+        # (building and running a workflow) stays mute for minutes and the proxy
+        # drops the SSE before the first frame. Same heartbeat as the Home assistant.
         com_batimento(
             _transmitir(
                 escopo=escopo,
@@ -113,20 +113,20 @@ async def conversar(
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            # Desliga o buffer de proxy que exista no caminho. O Traefik não
-            # bufferiza por padrão, mas o cabeçalho é barato e o dia em que
-            # alguém puser um nginx na frente ele já está aqui.
+            # Turns off any proxy buffering along the way. Traefik does not buffer
+            # by default, but the header is cheap, and the day someone puts an
+            # nginx in front it is already here.
             "X-Accel-Buffering": "no",
         },
     )
 
 
 async def _transmitir(*, escopo, servidor, workflow_id, mensagem) -> AsyncIterator[bytes]:
-    """O gerador do SSE: trava, carrega, conversa, salva — e salva mesmo se der errado.
+    """The SSE generator: lock, load, converse, save — and save even if it fails.
 
-    O `finally` do `salvar` é o que faz fechar a aba no meio da resposta não
-    apagar a conversa. A cota já está protegida sem ele: `conversar` cobra
-    depois de CADA chamada ao modelo, dentro do laço, e não no fim.
+    The `finally` around `salvar` is what keeps closing the tab mid-answer from
+    wiping the conversation. The quota is already protected without it:
+    `conversar` charges after EACH model call, inside the loop, not at the end.
     """
     redis = infra.redis_ou_none()
     transcrito: list[dict] = []
@@ -146,21 +146,21 @@ async def _transmitir(*, escopo, servidor, workflow_id, mensagem) -> AsyncIterat
                         transcrito = evento.dados.get("transcrito") or transcrito
                     yield _quadro(evento)
             finally:
-                # Blindado contra o CANCELAMENTO do gerador: quando o cliente
-                # fecha a aba no meio da resposta, o `finally` roda com o
-                # cancelamento pendente e um `await` cru levantaria
-                # `CancelledError` antes de gravar — o turno inteiro se perderia.
-                # O `shield` deixa a gravacao terminar mesmo assim (mesmo padrao
-                # do `_fechar_protegido` do assistente da Home).
+                # Shielded against the generator's CANCELLATION: when the client
+                # closes the tab mid-answer, the `finally` runs with the
+                # cancellation pending and a bare `await` would raise
+                # `CancelledError` before writing — the whole turn would be lost.
+                # The `shield` lets the write finish anyway (same pattern as the
+                # Home assistant's `_fechar_protegido`).
                 gravacao = asyncio.ensure_future(
                     assistente.salvar_conversa(redis, escopo.user_id, workflow_id, transcrito)
                 )
                 with suppress(asyncio.CancelledError):
                     await asyncio.shield(gravacao)
     except ToolError as exc:
-        # Recusa declarada (cota estourada, conversa em andamento). Vai como
-        # quadro de erro, e não como status HTTP, porque a resposta já começou —
-        # e porque assim o painel tem UM caminho de erro só.
+        # Declared refusal (quota exceeded, conversation in progress). It goes out
+        # as an error frame, not as an HTTP status, because the response has
+        # already started — and because this way the panel has ONE error path only.
         yield _quadro(assistente.Evento("erro", _corpo_do_erro(exc)))
         yield _quadro(assistente.Evento("fim", {"transcrito": transcrito, "ok": False}))
     except Exception:
@@ -175,7 +175,7 @@ async def _transmitir(*, escopo, servidor, workflow_id, mensagem) -> AsyncIterat
 
 
 def _corpo_do_erro(exc: ToolError) -> dict:
-    """O JSON que `erro()` monta, ou um envelope equivalente quando não for JSON."""
+    """The JSON that `erro()` builds, or an equivalent envelope when it is not JSON."""
     try:
         corpo = json.loads(str(exc))
     except (TypeError, ValueError):
@@ -188,23 +188,25 @@ async def estado(
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """O que o painel consulta antes de aparecer na tela.
+    """What the panel checks before showing up on screen.
 
-    Não usa `_exigir_ligado`: responder 503 aqui obrigaria o painel a tratar
-    erro para descobrir uma coisa que é só um estado.
+    Does not use `_exigir_ligado`: answering 503 here would force the panel to
+    handle an error to find out something that is just a state.
     """
     if not ASSISTENTE_ATIVO:
         return EstadoDoAssistente(ativo=False, motivo=MOTIVO_DESLIGADO)
 
     redis = infra.redis_ou_none()
     gasto, falta = await cotas.gasto_e_prazo(redis, current_user.id_hash)
-    # O teto pode ser do PLANO (com a extensao de planos). Este handler e comum
-    # (sem gerador SSE), entao a sessao do `Depends` vive ate o `return` e pode
-    # ser reusada — o laco da conversa, que nao tem sessao, e que abre a propria.
-    # Os dois juntos, e não o plano seguido do teto dele: o teto que vale pode
-    # ser o CONTRATADO (maior que o vigente, depois de um corte), e mostrar o
-    # vigente aqui faria o donut anunciar um limite mais apertado do que a cota
-    # de fato aplica — a pessoa pararia de conversar antes da hora.
+    # The ceiling may come from the PLAN (with the plans extension). This handler
+    # is ordinary (no SSE generator), so the `Depends` session lives until the
+    # `return` and can be reused — it is the conversation loop, which has no
+    # session, that opens its own.
+    # Both together, and not the plan followed by its ceiling: the ceiling that
+    # applies may be the CONTRACTED one (higher than the current one, after a
+    # downgrade), and showing the current one here would make the donut announce
+    # a tighter limit than the quota actually enforces — the person would stop
+    # chatting too early.
     plano, teto = await teto_do_assistente.plano_e_teto(
         current_user.id_hash, db=db, redis=redis
     )
@@ -225,7 +227,7 @@ async def esquecer(
     workflow_id: str | None = None,
     current_user=Depends(get_current_user),
 ):
-    """Recomeça do zero naquele fluxo. Não apaga fluxo nenhum — só o histórico."""
+    """Starts over from scratch on that workflow. Deletes no workflow — only the history."""
     _exigir_ligado()
     await assistente.esquecer_conversa(infra.redis_ou_none(), current_user.id_hash, workflow_id)
     return None

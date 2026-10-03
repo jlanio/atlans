@@ -1,9 +1,9 @@
-"""O limite do gatilho por webhook conta por cliente, não pelo proxy.
+"""The webhook trigger limit counts per client, not per proxy.
 
-A chave (IP, workflow) usava o `get_remote_address` do slowapi, que atrás do
-Traefik devolve o IP do proxy para todo chamador: um balde só por workflow,
-dividido pelo mundo inteiro. Com os contadores globais no Redis, quem
-soubesse a URL de um webhook esgotaria os 20/min do workflow para os demais.
+The (IP, workflow) key used slowapi's `get_remote_address`, which behind
+Traefik returns the proxy's IP for every caller: a single bucket per workflow,
+shared by the whole world. With the global counters in Redis, anyone who
+knew a webhook's URL would exhaust the workflow's 20/min for everyone else.
 """
 import importlib
 from types import SimpleNamespace

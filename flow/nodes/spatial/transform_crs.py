@@ -44,7 +44,7 @@ class TransformCRS(BaseNode):
         if not target_crs:
             raise ValueError("Parâmetro obrigatório ausente: 'targetCrs'.")
 
-        # Obtém o GeoDataFrame de entrada via helper da classe base
+        # Gets the input GeoDataFrame via the base class helper
         gdf = self.get_first_gdf(inputs)
 
         require_crs(gdf)

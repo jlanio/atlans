@@ -3,7 +3,7 @@ from app.models.base import Base
 
 
 class PlatformFileSettings(Base):
-    """Configurações globais de upload — singleton (sempre id=1)."""
+    """Global upload settings — singleton (always id=1)."""
     __tablename__ = "platform_file_settings"
 
     id          = Column(Integer, primary_key=True, default=1)
@@ -12,7 +12,7 @@ class PlatformFileSettings(Base):
 
 
 class AllowedFileExtension(Base):
-    """Extensões de arquivo aceitas pela plataforma."""
+    """File extensions accepted by the platform."""
     __tablename__ = "allowed_file_extensions"
 
     id         = Column(Integer, primary_key=True, index=True)

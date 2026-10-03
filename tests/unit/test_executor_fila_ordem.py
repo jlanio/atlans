@@ -1,11 +1,11 @@
 # tests/unit/test_executor_fila_ordem.py
 """
-Ordem da fila local do executor (executor/job_queue.py).
+Order of the executor's local queue (executor/job_queue.py).
 
-O heap da PriorityQueue não é estável, e o servidor não manda prioridade: todo
-job empata no 5. Sem desempate, com dez jobs esperando, o segundo a chegar era
-o nono a rodar — e ficava "Em andamento" na tela esse tempo todo. O `seq` de
-chegada desempata; a prioridade explícita continua valendo.
+The PriorityQueue heap is not stable, and the server sends no priority: every
+job ties at 5. Without a tiebreaker, with ten jobs waiting, the second to arrive
+was the ninth to run — and stayed "Em andamento" (in progress) on the screen
+that whole time. The arrival `seq` breaks the tie; explicit priority still applies.
 """
 from __future__ import annotations
 
@@ -21,8 +21,8 @@ def _job(job_id, **envelope):
 
 
 async def _ordem_de_execucao(mensagens):
-    """Enfileira tudo ANTES de ligar o único worker — a ordem de saída é a da
-    fila, sem corrida entre o enqueue e o consumo."""
+    """Enqueues everything BEFORE starting the single worker — the output order is
+    the queue's, with no race between enqueue and consumption."""
     ordem: list[str] = []
 
     async def _executar(msg):

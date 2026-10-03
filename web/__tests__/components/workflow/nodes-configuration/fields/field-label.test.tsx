@@ -1,16 +1,16 @@
 /**
- * A ajuda dos campos é tooltip, não parágrafo.
+ * Field help is a tooltip, not a paragraph.
  *
- * O painel de configuração virava parede de texto: cada campo imprimia a
- * descrição inteira abaixo do controle, e num nó de 7 campos (os que mais se
- * configura têm de 6 a 10) o texto auxiliar ocupava mais espaço que os próprios
- * controles. São 182 descrições no catálogo, mediana de 53 caracteres mas com
- * picos de 210.
+ * The configuration panel had become a wall of text: each field printed its
+ * whole description below the control, and on a 7-field node (the most
+ * configured ones have 6 to 10) the helper text took up more space than the
+ * controls themselves. There are 182 descriptions in the catalog, median of 53
+ * characters but with peaks of 210.
  *
- * O teste que importa é o NEGATIVO — a descrição não pode estar no documento
- * antes do hover. O parágrafo volta sozinho no dia em que alguém copiar o
- * padrão antigo (`<Label>` + `<p className="text-xs text-muted-foreground">`)
- * para um campo novo, e nada além disto perceberia.
+ * The test that matters is the NEGATIVE one — the description must not be in
+ * the document before hover. The paragraph comes back on its own the day
+ * someone copies the old pattern (`<Label>` + `<p className="text-xs text-muted-foreground">`)
+ * into a new field, and nothing besides this would notice.
  */
 import { describe, it, expect, afterEach } from "vitest"
 import { render, screen, cleanup, fireEvent, within } from "@testing-library/react"
@@ -43,7 +43,7 @@ const props = { setNodeField: () => {}, values: {} }
 
 afterEach(cleanup)
 
-// ── O rótulo ────────────────────────────────────────────────────────────────
+// ── The label ───────────────────────────────────────────────────────────────
 
 describe("FieldLabel", () => {
   it("mostra o rótulo e esconde a descrição até o hover", async () => {
@@ -53,17 +53,17 @@ describe("FieldLabel", () => {
     expect(screen.queryByText(AJUDA)).not.toBeInTheDocument()
 
     fireEvent.focus(screen.getByRole("button", { name: /^Ajuda:/ }))
-    // O Radix duplica o conteúdo (um visível, um para leitor de tela), então
-    // `getAllBy`: `getBy` falharia por múltiplos elementos, o que seria um
-    // falso negativo.
+    // Radix duplicates the content (one visible, one for screen readers), hence
+    // `getAllBy`: `getBy` would fail on multiple elements, which would be a
+    // false negative.
     expect((await screen.findAllByText(AJUDA)).length).toBeGreaterThan(0)
   })
 
   it("o gatilho é um button com nome acessível", () => {
     render(<FieldLabel field={campo()} />)
     const gatilho = screen.getByRole("button", { name: "Ajuda: Sobrescrever se já existir" })
-    // `type="button"` porque o painel tem um form em volta: sem isso, apertar
-    // Enter no campo dispararia o tooltip em vez de salvar.
+    // `type="button"` because the panel has a form around it: without it,
+    // pressing Enter in the field would trigger the tooltip instead of saving.
     expect(gatilho).toHaveAttribute("type", "button")
   })
 
@@ -73,7 +73,7 @@ describe("FieldLabel", () => {
   })
 })
 
-// ── Nenhum campo imprime a descrição direto na tela ─────────────────────────
+// ── No field prints the description directly on the screen ──────────────────
 
 describe("os campos não imprimem mais parágrafo de ajuda", () => {
   const casos: Array<[string, React.ReactElement]> = [
@@ -90,17 +90,17 @@ describe("os campos não imprimem mais parágrafo de ajuda", () => {
   })
 })
 
-// ── Regressões pontuais ─────────────────────────────────────────────────────
+// ── Specific regressions ────────────────────────────────────────────────────
 
 describe("regressões", () => {
   it("StringField não usa a descrição como placeholder", () => {
-    // Aparecia DUAS vezes: no placeholder e no parágrafo. Placeholder é para
-    // exemplo de valor, não para a documentação do campo.
+    // It appeared TWICE: in the placeholder and in the paragraph. A placeholder
+    // is for an example value, not for the field's documentation.
     //
-    // Precisa do `nodeFound` para cair no ramo do ExpressionInput — é lá que o
-    // placeholder existia. Sem ele o componente renderiza o `<Input>` simples e
-    // o teste passaria sem tocar no código que interessa. E o ExpressionInput
-    // usa `useNodes`/`useEdges`, daí o ReactFlowProvider.
+    // It needs `nodeFound` to fall into the ExpressionInput branch — that's
+    // where the placeholder existed. Without it the component renders the plain
+    // `<Input>` and the test would pass without touching the code that matters.
+    // And ExpressionInput uses `useNodes`/`useEdges`, hence the ReactFlowProvider.
     const nodeFound = {
       id: "n1",
       data: { inputs: [], properties: {}, fields: [] },
@@ -116,33 +116,33 @@ describe("regressões", () => {
   })
 
   it("BooleanField é uma linha, não um cartão", () => {
-    // Era o único campo com moldura e sombra. Numa lista mista, isso fazia um
-    // toggle pesar mais que o select que governa o nó inteiro.
+    // It was the only field with a frame and shadow. In a mixed list, that made
+    // a toggle weigh more than the select that governs the whole node.
     const { container } = render(<BooleanField field={campo()} {...props} />)
     const raiz = container.firstElementChild as HTMLElement
     expect(raiz.className).not.toMatch(/\bborder\b/)
     expect(raiz.className).not.toMatch(/shadow/)
-    // E continua sendo um switch operável.
+    // And it's still an operable switch.
     expect(within(raiz).getByRole("switch")).toBeInTheDocument()
   })
 })
 
-// ── Achados da revisão da própria mudança ───────────────────────────────────
+// ── Findings from reviewing the change itself ───────────────────────────────
 
 describe("associação rótulo ↔ controle", () => {
   it("aponta para o controle quando ele existe", () => {
     const { container } = render(<BooleanField field={campo()} {...props} />)
     const label = container.querySelector("label")
-    // O Switch do Radix é um `<button role="switch">`, e button é elemento
-    // rotulável: clicar no rótulo alterna o campo.
+    // Radix's Switch is a `<button role="switch">`, and button is a labelable
+    // element: clicking the label toggles the field.
     expect(label).toHaveAttribute("for", "overwrite")
     expect(container.querySelector("#overwrite")).toBeInTheDocument()
   })
 
   it("não aponta para nada quando o controle é de terceiros", () => {
-    // `<label for>` para um id inexistente é associação QUEBRADA: o leitor de
-    // tela anuncia um rótulo órfão e o clique não faz nada. Acontecia no
-    // ObjectField (JsonEditor) e nos dois campos com Monaco.
+    // A `<label for>` pointing to a nonexistent id is a BROKEN association: the
+    // screen reader announces an orphan label and clicking does nothing. It
+    // happened in ObjectField (JsonEditor) and in the two Monaco fields.
     render(<FieldLabel field={campo()} htmlFor={null} />)
     expect(document.querySelector("label")).not.toHaveAttribute("for")
   })
@@ -150,9 +150,9 @@ describe("associação rótulo ↔ controle", () => {
 
 describe("o ícone de ajuda é operável pelo teclado", () => {
   it("mantém indicador de foco visível", () => {
-    // `outline-none` sem substituto apagaria o único sinal de onde o teclado
-    // está — e o gatilho não tem texto, então a mudança de cor sozinha é fraca
-    // demais para servir de indicador.
+    // `outline-none` without a replacement would erase the only sign of where
+    // the keyboard is — and the trigger has no text, so a color change alone is
+    // too weak to serve as an indicator.
     render(<FieldLabel field={campo()} />)
     const gatilho = screen.getByRole("button", { name: /^Ajuda:/ })
     expect(gatilho.className).toMatch(/focus-visible:ring/)

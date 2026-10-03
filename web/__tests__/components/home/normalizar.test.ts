@@ -6,9 +6,9 @@ import { textosDe } from "@/app/components/home/i18n"
 import type { IArtifactItem, IDriveFile } from "@/service/types"
 
 /**
- * O normalizador do acervo é puro: junta artefato e arquivo do Drive numa forma
- * só, decide a escada de estado (local > efêmero > permanente) e o "adicionável
- * ao globo". Testado sem montar nada.
+ * The collection normalizer is pure: it merges artifact and Drive file into a single
+ * shape, decides the state ladder (local > ephemeral > permanent) and the "can be added
+ * to the globe" flag. Tested without mounting anything.
  */
 
 function artefato(extra: Partial<IArtifactItem> = {}): IArtifactItem {
@@ -42,7 +42,7 @@ describe("estadoDoAcervo", () => {
     expect(estadoDoAcervo({ content_location: "minio", expires_at: "2027-01-01T00:00:00Z" })).toBe("efemero")
   })
   it("local vence, mesmo com expires_at", () => {
-    // A escada: local > efêmero. Um artefato no executor com prazo é LOCAL.
+    // The ladder: local > ephemeral. An artifact on the executor with an expiry is LOCAL.
     expect(estadoDoAcervo({ content_location: "executor", expires_at: "2027-01-01T00:00:00Z" })).toBe("local")
   })
 })
@@ -84,9 +84,9 @@ describe("normalizarArtefato", () => {
   })
 
   it("publicado SEM camada de portal NÃO é adicionável — o backend recusaria", () => {
-    // `is_portal_active` é o casamento (is_published E o run tem PortalLayer)
-    // que o endpoint da camada refaz: por `is_published` a lista prometia uma
-    // prévia que voltaria "indisponível".
+    // `is_portal_active` is the match (is_published AND the run has a PortalLayer)
+    // that the layer endpoint redoes: going by `is_published` the list promised a
+    // preview that would come back "indisponível" (unavailable).
     const i = normalizarArtefato(artefato({ format: "json", is_published: true }))
     expect(i.adicionavel).toBe(false)
     expect(i.motivo).toBe("semCamadaNoPortal")
@@ -96,11 +96,11 @@ describe("normalizarArtefato", () => {
     const i = normalizarArtefato(artefato({ format: formato, filename: `carta.${formato}` }))
     expect(i.adicionavel).toBe(false)
     expect(i.motivo).toBe("cartaImagem")
-    // A frase que a lista mostra para esse motivo.
+    // The sentence the list shows for that reason.
     const frase = textosDe("pt-BR").listas.artefatos.semPrevia.cartaImagem
     expect(frase).toMatch(/carta imagem/)
     expect(frase).toMatch(/baixe/)
-    // Nem "publique o mapa": publicar não poria uma imagem no globo.
+    // Nor "publique o mapa" (publish the map): publishing would not put an image on the globe.
     expect(frase).not.toMatch(/publique/)
   })
 
@@ -116,7 +116,7 @@ describe("normalizarArquivoDoDrive", () => {
     expect(i.fonte).toBe("drive")
     expect(i.estado).toBe("permanente")
     expect(i.expiresAt).toBeNull()
-    expect(i.adicionavel).toBe(false) // Drive não vai ao globo na v1
+    expect(i.adicionavel).toBe(false) // Drive does not go to the globe in v1
     expect(i.motivo).toBe("drive")
     expect(i.chave).toBe("drv:drv-1")
     expect(i.nome).toBe("dados.geojson")
@@ -129,7 +129,7 @@ describe("normalizarArquivoDoDrive", () => {
   })
 
   it("ordena pela última escrita de conteúdo, não pela criação", () => {
-    // O que /drive mostra no topo: um arquivo antigo sobrescrito hoje.
+    // What /drive shows at the top: an old file overwritten today.
     const i = normalizarArquivoDoDrive(arquivo({ content_written_at: "2026-09-18T09:00:00Z" }))
     expect(i.ordenadoEm).toBe("2026-09-18T09:00:00Z")
   })
