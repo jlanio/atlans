@@ -18,12 +18,16 @@ vi.mock("maplibre-gl", () => ({ setWorkerUrl }))
 
 import "@/app/components/share/MapLibreMap"
 
+// The call happens on import, before the test runs. Vitest 5 clears mocks
+// before each test (`clearMocks` defaults to true), so copy the calls now.
+const workerUrlCalls = [...setWorkerUrl.mock.calls]
+
 const WEB = path.resolve(__dirname, "..", "..", "..")
 
 describe("worker do maplibre-gl", () => {
   it("a URL configurada aponta para o worker copiado, com tudo o que ele importa ao lado", () => {
-    expect(setWorkerUrl).toHaveBeenCalledTimes(1)
-    const url: string = setWorkerUrl.mock.calls[0][0]
+    expect(workerUrlCalls).toHaveLength(1)
+    const url: string = workerUrlCalls[0][0]
     expect(url).toMatch(/^\/maplibre\/[^/]+\.mjs$/)
 
     execFileSync(process.execPath, [path.join(WEB, "scripts", "copiar-maplibre.mjs")], { stdio: "pipe" })
