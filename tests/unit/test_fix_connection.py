@@ -44,7 +44,7 @@ from websockets.frames import Close
 
 from executor import connection as conn_mod
 from executor.connection import ExecutorConnection
-from flow.utils.publisher.reducao import TETO_NODE_EVENT_BYTES
+from flow.utils.publisher.reducao import NODE_EVENT_BYTES_CEILING
 
 
 def _closed(code=1006, reason=""):
@@ -57,15 +57,15 @@ class _WS:
     def __init__(self, raise_exc=None, raise_times=None, send_delay=0.0):
         self.enviadas = []
         self._raise_exc = raise_exc
-        self._restantes = raise_times  # None = always
+        self._remaining = raise_times  # None = always
         self._send_delay = send_delay
 
     async def send(self, raw):
         if self._send_delay:
             await asyncio.sleep(self._send_delay)
-        if self._raise_exc is not None and (self._restantes is None or self._restantes > 0):
-            if self._restantes is not None:
-                self._restantes -= 1
+        if self._raise_exc is not None and (self._remaining is None or self._remaining > 0):
+            if self._remaining is not None:
+                self._remaining -= 1
             raise self._raise_exc
         self.enviadas.append(raw)
 
@@ -88,7 +88,7 @@ class _SessionWS:
         # the exception would be raised outside asyncio.wait and the test would
         # pass via the wrong path.
         self._send_exc = send_exc
-        self._send_restantes_ok = send_exc_after
+        self._send_remaining_ok = send_exc_after
         self._send_delay = send_delay
         self._recv_exc = recv_exc
         self._recv_delay = recv_delay
@@ -97,8 +97,8 @@ class _SessionWS:
         if self._send_delay:
             await asyncio.sleep(self._send_delay)
         if self._send_exc is not None:
-            if self._send_restantes_ok > 0:
-                self._send_restantes_ok -= 1
+            if self._send_remaining_ok > 0:
+                self._send_remaining_ok -= 1
             else:
                 raise self._send_exc
         self.enviadas.append(raw)
@@ -144,7 +144,7 @@ def _conn(results=None, events=None):
     )
 
 
-async def _rodar(coro_fn, timeout=3.0):
+async def _run(coro_fn, timeout=3.0):
     """Runs a sender_loop in a task and cancels it when it goes idle."""
     task = asyncio.create_task(coro_fn)
     await asyncio.sleep(0)
@@ -154,7 +154,7 @@ async def _rodar(coro_fn, timeout=3.0):
 # ── B3: the task_done balance closes on ALL paths ────────────────────────────
 
 @pytest.mark.asyncio
-async def test_event_join_resolve_apos_falha_de_envio(monkeypatch):
+async def test_event_join_resolves_after_send_failure(monkeypatch):
     """The case that froze the executor: a generic failure sending a node_event.
 
     Before: put() without task_done => _unfinished_tasks never returned to zero
@@ -167,7 +167,7 @@ async def test_event_join_resolve_apos_falha_de_envio(monkeypatch):
     ws = _WS(raise_exc=RuntimeError("WS em estado invalido"), raise_times=2)
 
     await events.put({"node": "n1", "status": "running"})
-    task = await _rodar(c._event_sender_loop(ws))
+    task = await _run(c._event_sender_loop(ws))
 
     await asyncio.wait_for(events.join(), timeout=3.0)
     task.cancel()
@@ -178,7 +178,7 @@ async def test_event_join_resolve_apos_falha_de_envio(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_event_descartado_apos_teto_de_tentativas(monkeypatch):
+async def test_event_dropped_after_attempt_ceiling(monkeypatch):
     """A deterministic error (impossible payload) must not recycle forever."""
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
     events = asyncio.Queue(maxsize=500)
@@ -186,7 +186,7 @@ async def test_event_descartado_apos_teto_de_tentativas(monkeypatch):
     ws = _WS(raise_exc=RuntimeError("sempre falha"))
 
     await events.put({"node": "n1", "status": "error"})
-    task = await _rodar(c._event_sender_loop(ws))
+    task = await _run(c._event_sender_loop(ws))
 
     await asyncio.wait_for(events.join(), timeout=3.0)
     task.cancel()
@@ -197,7 +197,7 @@ async def test_event_descartado_apos_teto_de_tentativas(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_contador_de_tentativas_nunca_vai_no_payload(monkeypatch):
+async def test_attempt_counter_is_never_sent_in_the_payload(monkeypatch):
     """The internal retry key must not leak into the node_event protocol."""
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
     events = asyncio.Queue(maxsize=500)
@@ -205,7 +205,7 @@ async def test_contador_de_tentativas_nunca_vai_no_payload(monkeypatch):
     ws = _WS(raise_exc=RuntimeError("falha unica"), raise_times=1)
 
     await events.put({"node": "n1", "status": "ok"})
-    task = await _rodar(c._event_sender_loop(ws))
+    task = await _run(c._event_sender_loop(ws))
     await asyncio.wait_for(events.join(), timeout=3.0)
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
@@ -215,7 +215,7 @@ async def test_contador_de_tentativas_nunca_vai_no_payload(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_requeue_em_fila_cheia_nao_deadlocka():
+async def test_requeue_on_full_queue_does_not_deadlock():
     """`await put()` numa fila cheia travaria o unico consumidor dela."""
     events = asyncio.Queue(maxsize=1)
     c = _conn(events=events)
@@ -227,7 +227,7 @@ async def test_requeue_em_fila_cheia_nao_deadlocka():
 
 
 @pytest.mark.asyncio
-async def test_connection_closed_no_event_loop_nao_faz_task_done_duplo():
+async def test_connection_closed_in_event_loop_does_not_double_task_done():
     """Com o finally incondicional, o task_done explicito viraria duplo
     (ValueError: task_done() called too many times)."""
     events = asyncio.Queue(maxsize=500)
@@ -244,7 +244,7 @@ async def test_connection_closed_no_event_loop_nao_faz_task_done_duplo():
 
 
 @pytest.mark.asyncio
-async def test_result_join_resolve_apos_falha_de_envio(monkeypatch):
+async def test_result_join_resolves_after_send_failure(monkeypatch):
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
     from executor import result_store
     monkeypatch.setattr(result_store, "increment_attempts", lambda *_a: None)
@@ -255,7 +255,7 @@ async def test_result_join_resolve_apos_falha_de_envio(monkeypatch):
     ws = _WS(raise_exc=RuntimeError("falha transitoria"), raise_times=1)
 
     await results.put({"job_id": "j1", "run_id": "j1", "status": "success"})
-    task = await _rodar(c._result_sender_loop(ws))
+    task = await _run(c._result_sender_loop(ws))
 
     await asyncio.wait_for(results.join(), timeout=3.0)
     task.cancel()
@@ -266,7 +266,7 @@ async def test_result_join_resolve_apos_falha_de_envio(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_connection_closed_no_result_loop_nao_faz_task_done_duplo(monkeypatch):
+async def test_connection_closed_in_result_loop_does_not_double_task_done(monkeypatch):
     from executor import result_store
     monkeypatch.setattr(result_store, "mark_sent", lambda *_a: None)
 
@@ -284,7 +284,7 @@ async def test_connection_closed_no_result_loop_nao_faz_task_done_duplo(monkeypa
 # ── R1: the result loop also needs a cap ─────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_result_descartado_apos_teto_e_continua_no_outbox(monkeypatch):
+async def test_result_dropped_after_ceiling_stays_in_the_outbox(monkeypatch):
     """An 'immortal' result held the only consumer and the shutdown's join().
 
     Real scenario: stats with a circular reference => json.dumps always raises.
@@ -306,7 +306,7 @@ async def test_result_descartado_apos_teto_e_continua_no_outbox(monkeypatch):
     ws = _WS(raise_exc=ValueError("Circular reference detected"))
 
     await results.put({"job_id": "j1", "run_id": "j1", "status": "success"})
-    task = await _rodar(c._result_sender_loop(ws))
+    task = await _run(c._result_sender_loop(ws))
 
     await asyncio.wait_for(results.join(), timeout=3.0)
     task.cancel()
@@ -319,7 +319,7 @@ async def test_result_descartado_apos_teto_e_continua_no_outbox(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_contador_de_tentativas_do_result_nao_vai_no_payload(monkeypatch):
+async def test_result_attempt_counter_is_not_sent_in_the_payload(monkeypatch):
     monkeypatch.setattr(conn_mod, "_SEND_RETRY_PAUSE", 0)
     from executor import result_store
     monkeypatch.setattr(result_store, "increment_attempts", lambda *_a: None)
@@ -330,7 +330,7 @@ async def test_contador_de_tentativas_do_result_nao_vai_no_payload(monkeypatch):
     ws = _WS(raise_exc=RuntimeError("falha unica"), raise_times=1)
 
     await results.put({"job_id": "j1", "status": "success"})
-    task = await _rodar(c._result_sender_loop(ws))
+    task = await _run(c._result_sender_loop(ws))
     await asyncio.wait_for(results.join(), timeout=3.0)
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
@@ -339,7 +339,7 @@ async def test_contador_de_tentativas_do_result_nao_vai_no_payload(monkeypatch):
     assert conn_mod._ATTEMPTS_KEY not in ws.enviadas[0]
 
 
-async def test_resultado_enviado_fica_lembrado_para_o_inventario(monkeypatch):
+async def test_sent_result_is_remembered_for_the_inventory(monkeypatch):
     """`mark_sent` deletes the outbox as soon as the send returns, but the server
     may not even have processed the result yet. Until then the inventory keeps
     saying the job finished here — otherwise the server would close the run as lost."""
@@ -352,19 +352,19 @@ async def test_resultado_enviado_fica_lembrado_para_o_inventario(monkeypatch):
     ws = _WS()
 
     await results.put({"job_id": "j1", "run_id": "j1", "status": "success"})
-    task = await _rodar(c._result_sender_loop(ws))
+    task = await _run(c._result_sender_loop(ws))
     await asyncio.wait_for(results.join(), timeout=3.0)
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
 
     assert len(ws.enviadas) == 1
-    assert c._montar_inventario()["resultados"] == ["j1"]
+    assert c._build_inventory()["resultados"] == ["j1"]
 
 
 # ── R2: cancellation during ws.send must not lose the item ───────────────────
 
 @pytest.mark.asyncio
-async def test_result_volta_para_a_fila_quando_cancelado_durante_o_send(monkeypatch):
+async def test_result_returns_to_the_queue_when_cancelled_during_send(monkeypatch):
     """`for task in pending: task.cancel()` runs on EVERY session drop.
 
     If the cancellation catches the loop inside `ws.send`, the result has
@@ -391,7 +391,7 @@ async def test_result_volta_para_a_fila_quando_cancelado_durante_o_send(monkeypa
 
 
 @pytest.mark.asyncio
-async def test_event_volta_para_a_fila_quando_cancelado_durante_o_send():
+async def test_event_returns_to_the_queue_when_cancelled_during_send():
     events = asyncio.Queue(maxsize=500)
     c = _conn(events=events)
     ws = _WS(send_delay=1.0)
@@ -408,13 +408,13 @@ async def test_event_volta_para_a_fila_quando_cancelado_durante_o_send():
 
 # ── R3: node_event serialization has its OWN cap ─────────────────────────────
 
-def test_dumps_event_reduz_evento_gigante_aos_campos_de_controle():
+def test_dumps_event_reduces_huge_event_to_the_control_fields():
     """The job_result truncation (by 'stats') did not work for node_event.
 
     Reused, it returned a string LARGER than the input, injected a 'stats' key
     that node_event never had and logged 'job_result descartado' (discarded).
     """
-    grande = "x" * (TETO_NODE_EVENT_BYTES + 5_000)
+    grande = "x" * (NODE_EVENT_BYTES_CEILING + 5_000)
     evento = {
         "type": "node_event", "run_id": "r1", "node": "n1", "status": "log",
         "kind": "stdout", "level": "info", "timestamp": 1.0,
@@ -423,35 +423,35 @@ def test_dumps_event_reduz_evento_gigante_aos_campos_de_controle():
 
     raw = conn_mod._dumps_event(evento)
 
-    assert len(raw) < TETO_NODE_EVENT_BYTES, "nao reduziu nada"
+    assert len(raw) < NODE_EVENT_BYTES_CEILING, "nao reduziu nada"
     payload = json.loads(raw)
     assert payload["type"] == "node_event"      # without this the server does not route
     assert payload["run_id"] == "r1"
     assert payload["node"] == "n1"
     assert payload["status"] == "log"
     assert payload["__truncated__"] is True
-    assert payload["__original_size__"] > TETO_NODE_EVENT_BYTES
+    assert payload["__original_size__"] > NODE_EVENT_BYTES_CEILING
     assert "extra" not in payload, "o campo pesado tinha que sair"
     assert "stats" not in payload, "chave espuria do truncador de job_result"
 
 
-def test_dumps_event_nao_mexe_em_evento_normal():
+def test_dumps_event_does_not_touch_normal_event():
     evento = {"type": "node_event", "run_id": "r1", "node": "n1", "status": "completed",
               "extra": {"branch": "a"}}
     payload = json.loads(conn_mod._dumps_event(evento))
     assert payload == evento
 
 
-def test_dumps_event_coage_campo_de_controle_nao_escalar():
+def test_dumps_event_coerces_non_scalar_control_field():
     """A cap has to be a guarantee: a giant 'node' must not get through whole."""
     evento = {"type": "node_event", "run_id": "r1",
-              "node": {"lixo": "y" * (TETO_NODE_EVENT_BYTES + 100)},
+              "node": {"lixo": "y" * (NODE_EVENT_BYTES_CEILING + 100)},
               "status": "log"}
     raw = conn_mod._dumps_event(evento)
-    assert len(raw) < TETO_NODE_EVENT_BYTES
+    assert len(raw) < NODE_EVENT_BYTES_CEILING
 
 
-def test_dumps_result_preserva_chaves_de_controle_ao_truncar(monkeypatch):
+def test_dumps_result_preserves_control_keys_when_truncating(monkeypatch):
     """Truncation by 'stats' is still alive — in the right place (job_result)."""
     monkeypatch.setattr(conn_mod, "_MAX_WS_PAYLOAD", 2_000)
     obj = {"type": "job_result", "job_id": "j1", "status": "success",
@@ -467,7 +467,7 @@ def test_dumps_result_preserva_chaves_de_controle_ao_truncar(monkeypatch):
 # ── P2: the result goes whole; main.py is the one that discards 'output' ─────
 
 @pytest.mark.asyncio
-async def test_result_enviado_sem_filtro_local(monkeypatch):
+async def test_result_sent_without_local_filter(monkeypatch):
     from executor import result_store
     monkeypatch.setattr(result_store, "mark_sent", lambda *_a: None)
 
@@ -477,7 +477,7 @@ async def test_result_enviado_sem_filtro_local(monkeypatch):
 
     await results.put({"job_id": "j1", "run_id": "j1", "status": "success",
                        "stats": {"__response__": {"ok": True}}})
-    task = await _rodar(c._result_sender_loop(ws))
+    task = await _run(c._result_sender_loop(ws))
     await asyncio.wait_for(results.join(), timeout=3.0)
     task.cancel()
     await asyncio.gather(task, return_exceptions=True)
@@ -490,16 +490,16 @@ async def test_result_enviado_sem_filtro_local(monkeypatch):
 # ── B4: backoff must not be reset by a short session ─────────────────────────
 
 @pytest.mark.asyncio
-async def test_retorno_limpo_ainda_dorme_antes_de_reconectar(monkeypatch):
+async def test_clean_return_still_sleeps_before_reconnecting(monkeypatch):
     """A session that ends without an exception is still a disconnection: it needs a sleep."""
-    dormidas = []
+    sleeps = []
     tentativas = {"n": 0}
 
     # The backoff wait became `_esperar_retry` (a wait_for interruptible by the
     # panel's 'r' key), so that is where the test observes — the intent stays
     # the same: do not reconnect without waiting.
-    async def _fake_espera(self, d):
-        dormidas.append(d)
+    async def _fake_wait(self, d):
+        sleeps.append(d)
         return False  # timeout normal, ninguem pediu retry antecipado
 
     async def _fake_connect(self):
@@ -508,21 +508,21 @@ async def test_retorno_limpo_ainda_dorme_antes_de_reconectar(monkeypatch):
             self._should_reconnect = False  # encerra o teste
         return  # "clean" return, without an exception
 
-    monkeypatch.setattr(ExecutorConnection, "_esperar_retry", _fake_espera)
+    monkeypatch.setattr(ExecutorConnection, "_esperar_retry", _fake_wait)
     monkeypatch.setattr(ExecutorConnection, "_connect_and_run", _fake_connect)
 
     c = _conn()
     await asyncio.wait_for(c.run(), timeout=3.0)
 
-    assert len(dormidas) == 3, "reconectou sem sleep em algum ciclo"
+    assert len(sleeps) == 3, "reconectou sem sleep em algum ciclo"
     # Backoff grows: a short session does not reset the delay to 1.
-    assert dormidas[-1] > dormidas[0]
+    assert sleeps[-1] > sleeps[0]
 
 
 @pytest.mark.asyncio
-async def test_sessao_longa_reseta_o_backoff(monkeypatch):
+async def test_long_session_resets_the_backoff(monkeypatch):
     relogio = {"t": 0.0}
-    dormidas = []
+    sleeps = []
 
     # Fake clock only for the connection module — patching the global
     # time.monotonic would break the event loop's own timers (loop.time()).
@@ -534,8 +534,8 @@ async def test_sessao_longa_reseta_o_backoff(monkeypatch):
     monkeypatch.setattr(conn_mod, "time", _FakeTime)
 
     # See the note in the previous test: the backoff wait is now `_esperar_retry`.
-    async def _fake_espera(self, d):
-        dormidas.append(d)
+    async def _fake_wait(self, d):
+        sleeps.append(d)
         return False
 
     tentativas = {"n": 0}
@@ -547,7 +547,7 @@ async def test_sessao_longa_reseta_o_backoff(monkeypatch):
             self._should_reconnect = False
         raise RuntimeError("queda de rede")
 
-    monkeypatch.setattr(ExecutorConnection, "_esperar_retry", _fake_espera)
+    monkeypatch.setattr(ExecutorConnection, "_esperar_retry", _fake_wait)
     monkeypatch.setattr(ExecutorConnection, "_connect_and_run", _fake_connect)
 
     c = _conn()
@@ -555,13 +555,13 @@ async def test_sessao_longa_reseta_o_backoff(monkeypatch):
 
     # 1a sessao durou 600s > _SESSION_STABLE_SECONDS => delay volta a 1
     # (jitter mantem o sleep entre 0.5 e 1.0).
-    assert dormidas[0] <= 1.0
+    assert sleeps[0] <= 1.0
 
 
 # ── B4/R5: sessao REAL (websockets.connect falso, _connect_and_run de verdade) ─
 
 @pytest.mark.asyncio
-async def test_excecao_do_receive_loop_propaga_e_encerra_por_close_terminal(monkeypatch):
+async def test_receive_loop_exception_propagates_and_ends_via_terminal_close(monkeypatch):
     """End-to-end propagation: close 4403 -> first_exc -> classifier.
 
     Runs the REAL `_connect_and_run`. The previous version of this test replaced
@@ -580,7 +580,7 @@ async def test_excecao_do_receive_loop_propaga_e_encerra_por_close_terminal(monk
 
 
 @pytest.mark.asyncio
-async def test_close_terminal_sobrevive_a_loop_auxiliar_que_termina_primeiro(monkeypatch):
+async def test_terminal_close_survives_auxiliary_loop_that_ends_first(monkeypatch):
     """An auxiliary loop that handles ConnectionClosed with `break` ends CLEANLY.
 
     If it wins the race against _receive_loop, `done` has no exception at all
@@ -611,7 +611,7 @@ async def test_close_terminal_sobrevive_a_loop_auxiliar_que_termina_primeiro(mon
 
 
 @pytest.mark.asyncio
-async def test_cancelar_a_conexao_encerra_todos_os_loops_filhos(monkeypatch):
+async def test_cancelling_the_connection_ends_all_child_loops(monkeypatch):
     """`asyncio.wait` does NOT cancel what it awaits.
 
     Without the try/finally, canceling conn_task (SIGTERM) made the

@@ -284,11 +284,11 @@ row and becomes a `flex-wrap` band of facts, in the same order as the columns.
 
 | Constant               | Where               | What it does                                |
 |------------------------|---------------------|---------------------------------------------|
-| `CABECALHO_DE_COLUNAS` | `<thead>`           | disappears where there are no columns        |
-| `LINHA_EMPILHADA`      | data `<tr>`         | becomes a card; zeroes the cells' padding    |
-| `DESTAQUE_DA_FICHA`    | identifying `<td>`  | takes the first line by itself               |
-| `CELULA_COM_ROTULO`    | numeric `<td>`      | carries its label along (`data-rotulo`)      |
-| `LINHA_EXPANDIDA`      | `<tr>` with `colSpan` | block, not card                            |
+| `COLUMN_HEADER` | `<thead>`           | disappears where there are no columns        |
+| `STACKED_ROW`      | data `<tr>`         | becomes a card; zeroes the cells' padding    |
+| `CARD_HIGHLIGHT`    | identifying `<td>`  | takes the first line by itself               |
+| `LABELED_CELL`    | numeric `<td>`      | carries its label along (`data-rotulo`)      |
+| `EXPANDED_ROW`      | `<tr>` with `colSpan` | block, not card                            |
 
 **Rules:**
 - All the classes are `max-md:`. From `md` up the table is the same as before —

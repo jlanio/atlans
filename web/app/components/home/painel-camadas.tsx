@@ -4,13 +4,13 @@ import { TbDownload, TbEye, TbEyeOff, TbFocus2, TbStack2, TbTrash, TbX } from "r
 import { cn } from "@/lib/utils"
 import { useIsMobile } from "@/hooks/use-mobile"
 import type { MapLayer } from "@/app/components/share/MapLibreMap"
-import type { AvisoDeCamada } from "@/app/hooks/home/useCamadas"
-import { useTextos } from "./i18n"
+import type { LayerNotice } from "@/app/hooks/home/useCamadas"
+import { useTexts } from "./i18n"
 
 interface Props {
   camadas: MapLayer[]
   /** artifact_id → "no preview" notice. */
-  avisos: Record<string, AvisoDeCamada>
+  avisos: Record<string, LayerNotice>
   /** artifact_id → label of what is being fetched right now. */
   carregando?: Record<string, string>
   onAlternar: (id: string) => void
@@ -21,7 +21,7 @@ interface Props {
   onBaixar: (artifactId: string, nome: string) => void
 }
 
-const TITULO = "camadas-do-globo"
+const TITLE = "camadas-do-globo"
 
 /**
  * The list of layers active on the globe, with eye/zoom-to/remove, in the
@@ -44,26 +44,26 @@ const TITULO = "camadas-do-globo"
 export default function PainelCamadas({
   camadas, avisos, carregando = {}, onAlternar, onRemover, onEnquadrar, onDispensarAviso, onBaixar,
 }: Props) {
-  const t = useTextos().casca.camadas
+  const t = useTexts().casca.camadas
   const isMobile = useIsMobile()
-  const [expandidoManual, setExpandidoManual] = useState<boolean | null>(null)
+  const [manuallyExpanded, setManuallyExpanded] = useState<boolean | null>(null)
 
   const semPrevia = Object.entries(avisos)
   const buscando = Object.entries(carregando)
   const total = camadas.length + buscando.length
   if (total === 0 && semPrevia.length === 0) return null
 
-  const expandido = expandidoManual ?? !isMobile
+  const expandido = manuallyExpanded ?? !isMobile
 
   return (
     <section
-      aria-labelledby={TITULO}
+      aria-labelledby={TITLE}
       className="home dark absolute left-6 top-6 z-40 w-64 max-w-[calc(100%-3rem)] overflow-hidden rounded-xl border border-border bg-background/95 pl-safe shadow-2xl backdrop-blur"
     >
-      <h2 id={TITULO}>
+      <h2 id={TITLE}>
         <button
           type="button"
-          onClick={() => setExpandidoManual(!expandido)}
+          onClick={() => setManuallyExpanded(!expandido)}
           aria-expanded={expandido}
           className="flex w-full items-center gap-1.5 border-b border-border px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground transition-colors hover:text-foreground max-md:py-3"
         >
@@ -78,7 +78,7 @@ export default function PainelCamadas({
             // MVT layer with no useful bbox: the geometry comes from the tiles and
             // `fitToLayer` has no way to compute the framing. A live button
             // that does nothing is worse than a disabled button.
-            const podeEnquadrar = !!c.bbox || (c.geojson?.features?.length ?? 0) > 0
+            const canFit = !!c.bbox || (c.geojson?.features?.length ?? 0) > 0
             return (
               <li key={c.id} className="group/camada flex items-center gap-1.5 rounded-md px-1.5 py-1 hover:bg-accent/50 max-md:gap-2">
                 <span
@@ -95,28 +95,28 @@ export default function PainelCamadas({
                     there the download would answer 409/404, and a live button
                     that fails is worse than a missing button. */}
                 {c.baixavel && (
-                  <BotaoIcone
+                  <IconButton
                     label={t.baixar(c.label)}
                     onClick={() => onBaixar(idDoArtefato(c.id), c.label)}
                     soNoHover
                   >
                     <TbDownload size={14} />
-                  </BotaoIcone>
+                  </IconButton>
                 )}
-                <BotaoIcone
+                <IconButton
                   label={t.enquadrar(c.label)}
                   onClick={() => onEnquadrar(c.id)}
-                  desabilitado={!podeEnquadrar}
-                  titulo={podeEnquadrar ? undefined : t.semExtensao}
+                  desabilitado={!canFit}
+                  titulo={canFit ? undefined : t.semExtensao}
                 >
                   <TbFocus2 size={14} />
-                </BotaoIcone>
-                <BotaoIcone label={c.visible ? t.ocultar(c.label) : t.mostrar(c.label)} onClick={() => onAlternar(c.id)}>
+                </IconButton>
+                <IconButton label={c.visible ? t.ocultar(c.label) : t.mostrar(c.label)} onClick={() => onAlternar(c.id)}>
                   {c.visible ? <TbEye size={14} /> : <TbEyeOff size={14} />}
-                </BotaoIcone>
-                <BotaoIcone label={t.remover(c.label)} onClick={() => onRemover(c.id)} destaque>
+                </IconButton>
+                <IconButton label={t.remover(c.label)} onClick={() => onRemover(c.id)} destaque>
                   <TbTrash size={14} />
-                </BotaoIcone>
+                </IconButton>
               </li>
             )
           })}
@@ -139,9 +139,9 @@ export default function PainelCamadas({
                     <span className="min-w-0 flex-1 break-words italic">
                       {aviso.nome ? `${aviso.nome} — ` : t.semPrevia}{aviso.motivo}
                     </span>
-                    <BotaoIcone label={t.dispensarAviso(aviso.nome ?? null)} onClick={() => onDispensarAviso(id)}>
+                    <IconButton label={t.dispensarAviso(aviso.nome ?? null)} onClick={() => onDispensarAviso(id)}>
                       <TbX size={13} />
-                    </BotaoIcone>
+                    </IconButton>
                   </li>
                 ))}
               </ul>
@@ -154,11 +154,11 @@ export default function PainelCamadas({
 }
 
 /** `art:<artifact_id>` → `<artifact_id>`. The prefix comes from `useCamadas`. */
-export function idDoArtefato(idDaCamada: string): string {
-  return idDaCamada.startsWith("art:") ? idDaCamada.slice(4) : idDaCamada
+export function idDoArtefato(layerId: string): string {
+  return layerId.startsWith("art:") ? layerId.slice(4) : layerId
 }
 
-function BotaoIcone({
+function IconButton({
   label, onClick, destaque, desabilitado, soNoHover, titulo, children,
 }: {
   label: string

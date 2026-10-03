@@ -28,7 +28,7 @@ SUPPORTED_PROTOCOL_VERSIONS = frozenset({PROTOCOL_VERSION})
 # ── Message types ────────────────────────────────────────────────────────────
 # Executor → server: what the server's receive loop handles
 # (executor_ws_router.py). A type not listed here has no effect there.
-TIPOS_DO_EXECUTOR = frozenset({
+EXECUTOR_TYPES = frozenset({
     "handshake", "heartbeat", "capacity", "job_result", "node_event",
     "sync_event", "ack", "inventario",
 })
@@ -38,18 +38,18 @@ TIPOS_DO_EXECUTOR = frozenset({
 # handshake, unsupported version) and the detail of the reason. Informational
 # only: the refused message has already been discarded, and the executor just
 # logs it.
-TIPO_ERRO = "error"
+ERROR_TYPE = "error"
 
 # Server → executor. This is the executor's allowlist: the rest is discarded
 # before any processing. `control` and `cancel` additionally require an Ed25519
 # signature (_SIGNED_SERVER_MESSAGES in executor/connection.py).
-TIPOS_DO_SERVIDOR = frozenset({"job", "drive_event", "control", "cancel", TIPO_ERRO})
+SERVER_TYPES = frozenset({"job", "drive_event", "control", "cancel", ERROR_TYPE})
 
 # ── Reserved keys of the job_result's `stats` ─────────────────────────────────
 # Control: they survive truncation, which only drops the per-node stats. Without
 # `__response__` the synchronous webhook's BRPOP hangs until the timeout; the
 # others feed artifacts, metrics and pins.
-CHAVES_DE_CONTROLE_STATS = (
+STATS_CONTROL_KEYS = (
     "__response__",
     "__artifacts__",
     "__metrics__",
@@ -59,21 +59,21 @@ CHAVES_DE_CONTROLE_STATS = (
 # Truncation markers. `__control_dropped__` says not even the control keys
 # fit: the server turns this into an explicit error for the synchronous
 # webhook, instead of letting BRPOP wait for the timeout.
-STATS_TRUNCADO = "__truncated__"
-STATS_TAMANHO_ORIGINAL = "__original_size__"
-STATS_CONTROLE_DESCARTADO = "__control_dropped__"
+STATS_TRUNCATED = "__truncated__"
+STATS_ORIGINAL_SIZE = "__original_size__"
+STATS_CONTROL_DROPPED = "__control_dropped__"
 
 
-def reduzir_stats(
+def shrink_stats(
     stats: dict,
-    tamanho_original: int,
+    original_size: int,
     teto: int,
     serializar: Callable[[dict], str],
 ) -> tuple[dict, str, bool]:
     """Truncates the `stats` of a job_result that exceeded `teto`, in two steps.
 
-    1. Drops the per-node stats and preserves CHAVES_DE_CONTROLE_STATS;
-    2. if not even those fit, drops everything and sets STATS_CONTROLE_DESCARTADO.
+    1. Drops the per-node stats and preserves STATS_CONTROL_KEYS;
+    2. if not even those fit, drops everything and sets STATS_CONTROL_DROPPED.
 
     Both sides apply it, each with its own ceiling and its own yardstick: the
     executor measures the whole message against the WS frame (`_dumps_result`); the
@@ -81,30 +81,30 @@ def reduzir_stats(
     (`_cap_job_result`). That is why `serializar` belongs to the caller: it receives
     the reduced stats and returns the JSON that is measured against `teto`.
 
-    `tamanho_original` goes into STATS_TAMANHO_ORIGINAL in both steps — it is the
+    `original_size` goes into STATS_ORIGINAL_SIZE in both steps — it is the
     size before any cut.
 
     Returns `(stats_reduzidos, json_medido, controle_preservado)`.
     """
     mantidas = (
-        {k: stats[k] for k in CHAVES_DE_CONTROLE_STATS if k in stats}
+        {k: stats[k] for k in STATS_CONTROL_KEYS if k in stats}
         if isinstance(stats, dict) else {}
     )
-    reduzidos = {**mantidas, STATS_TRUNCADO: True, STATS_TAMANHO_ORIGINAL: tamanho_original}
+    reduced = {**mantidas, STATS_TRUNCATED: True, STATS_ORIGINAL_SIZE: original_size}
     try:
-        serializado = serializar(reduzidos)
+        serializado = serializar(reduced)
     except (TypeError, ValueError):
         # Non-serializable (or recursive) control key: counts as large.
         serializado = None
     if serializado is not None and len(serializado) <= teto:
-        return reduzidos, serializado, True
+        return reduced, serializado, True
 
-    reduzidos = {
-        STATS_TRUNCADO: True,
-        STATS_TAMANHO_ORIGINAL: tamanho_original,
-        STATS_CONTROLE_DESCARTADO: True,
+    reduced = {
+        STATS_TRUNCATED: True,
+        STATS_ORIGINAL_SIZE: original_size,
+        STATS_CONTROL_DROPPED: True,
     }
-    return reduzidos, serializar(reduzidos), False
+    return reduced, serializar(reduced), False
 
 
 # ── Handshake `system_info` ──────────────────────────────────────────────────
@@ -113,8 +113,8 @@ def reduzir_stats(
 # (`_sanitize_system_info` in app/api/routers/executor_ws/protocolo.py). A new
 # field in the executor that is not added here is discarded by the server — with a
 # WARNING on every connection.
-SYSTEM_INFO_TEXTOS = ("hostname", "os_name", "os_version")
+SYSTEM_INFO_TEXTS = ("hostname", "os_name", "os_version")
 
-SYSTEM_INFO_NUMEROS = ("cpu_cores", "ram_total_gb", "disk_total_gb")
+SYSTEM_INFO_NUMBERS = ("cpu_cores", "ram_total_gb", "disk_total_gb")
 
-SYSTEM_INFO_BOOLEANOS = ("container",)
+SYSTEM_INFO_BOOLEANS = ("container",)

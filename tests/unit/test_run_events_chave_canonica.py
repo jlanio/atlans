@@ -26,14 +26,14 @@ from app.services.observability_service import ObservabilityService
 # Reuses the MCP harness's list instead of building another: `get_run_detail`
 # joins `users` and `workspaces` to resolve authorship and the workspace name, and
 # discovering that table by table is time spent in the wrong place.
-from tests.unit._mcp_harness import TABELAS
+from tests.unit._mcp_harness import TABLES
 
 TASK = "1f0c9a7e-0000-4a11-9c2e-000000000001"
 WS = "ws-1"
 WF = "wf-1"
 
 
-class _RedisFalso:
+class _FakeRedis:
     """Only `lrange`, and it records the requested keys — looking at the key is
     how one proves which run the log was read from."""
 
@@ -46,7 +46,7 @@ class _RedisFalso:
         return self.itens
 
 
-class _Usuario:
+class _FakeUser:
     id_hash = "usr-1"
     username = "quem-consulta"
     role = "user"
@@ -60,7 +60,7 @@ async def db():
         connect_args={"check_same_thread": False},
     )
     async with eng.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=TABELAS)
+        await conn.run_sync(Base.metadata.create_all, tables=TABLES)
     async with AsyncSession(eng) as sessao:
         sessao.add(Workflow(id_hash=WF, name="Fluxo", definition={}, workspace_id=WS))
         sessao.add(WorkflowRun(task_id=TASK, workflow_hash=WF, workspace_id=WS, status="success"))
@@ -71,22 +71,22 @@ async def db():
 
 @pytest.fixture
 def redis(monkeypatch):
-    def _instalar(itens=None):
-        falso = _RedisFalso(itens)
+    def _install(itens=None):
+        falso = _FakeRedis(itens)
         monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: falso)
         return falso
-    return _instalar
+    return _install
 
 
-async def _numero_da_linha(db):
+async def _row_number(db):
     from sqlalchemy import select
     return str((await db.execute(select(WorkflowRun.id).where(WorkflowRun.task_id == TASK))).scalar())
 
 
-class TestChaveCanonica:
+class TestCanonicalKey:
 
     @pytest.mark.asyncio
-    async def test_entrando_pelo_id_numerico_le_a_chave_do_task_id(self, db, redis):
+    async def test_entering_by_numeric_id_reads_the_task_id_key(self, db, redis):
         """The defect, through the REST path.
 
         Against today's code: the key read is `workflow:{numero}:history`, and the
@@ -94,9 +94,9 @@ class TestChaveCanonica:
         the other key.
         """
         falso = redis(['{"node": "n1", "kind": "lifecycle"}'])
-        numero = await _numero_da_linha(db)
+        numero = await _row_number(db)
 
-        out = await ObservabilityService.get_run_events(db, numero, _Usuario(), [WS])
+        out = await ObservabilityService.get_run_events(db, numero, _FakeUser(), [WS])
 
         assert falso.chaves == [f"workflow:{TASK}:history"], (
             "leu o histórico pelo id digitado, não pelo task_id que autorizou"
@@ -107,20 +107,20 @@ class TestChaveCanonica:
         assert out["run_id"] == TASK
 
     @pytest.mark.asyncio
-    async def test_entrando_pelo_task_id_nada_muda(self, db, redis):
+    async def test_entering_by_task_id_nothing_changes(self, db, redis):
         """O caminho comum (a web manda o task_id) continua igual."""
         falso = redis(['{"node": "n1"}'])
 
-        out = await ObservabilityService.get_run_events(db, TASK, _Usuario(), [WS])
+        out = await ObservabilityService.get_run_events(db, TASK, _FakeUser(), [WS])
 
         assert falso.chaves == [f"workflow:{TASK}:history"]
         assert out["run_id"] == TASK
 
     @pytest.mark.asyncio
-    async def test_redis_fora_do_ar_ainda_responde_pelo_id_canonico(self, db, redis):
+    async def test_redis_down_still_answers_by_the_canonical_id(self, db, redis):
         """The failure branch also learned the right id — otherwise the error response
         would identify itself by an id the client does not recognize."""
-        class _Explode(_RedisFalso):
+        class _Explode(_FakeRedis):
             async def lrange(self, chave, inicio, fim):
                 self.chaves.append(chave)
                 raise RuntimeError("redis fora do ar")
@@ -130,8 +130,8 @@ class TestChaveCanonica:
         original = mod.get_redis_pool
         mod.get_redis_pool = lambda: falso
         try:
-            numero = await _numero_da_linha(db)
-            out = await ObservabilityService.get_run_events(db, numero, _Usuario(), [WS])
+            numero = await _row_number(db)
+            out = await ObservabilityService.get_run_events(db, numero, _FakeUser(), [WS])
         finally:
             mod.get_redis_pool = original
 
@@ -139,10 +139,10 @@ class TestChaveCanonica:
         assert out["expired"] is True
 
 
-class TestUmaAutorizacaoSo:
+class TestSingleAuthorization:
 
     @pytest.mark.asyncio
-    async def test_a_variante_com_detalhe_autoriza_uma_vez_e_devolve_os_dois(self, db, redis):
+    async def test_the_detail_variant_authorizes_once_and_returns_both(self, db, redis):
         """The MCP tool needs the events AND the detail.
 
         Before, it loaded the detail from the outside and the service loaded it
@@ -163,8 +163,8 @@ class TestUmaAutorizacaoSo:
 
         ObservabilityService.get_run_detail = staticmethod(espiao)
         try:
-            eventos, detalhe = await ObservabilityService.get_run_events_com_detalhe(
-                db, TASK, _Usuario(), [WS],
+            eventos, detalhe = await ObservabilityService.get_run_events_with_detail(
+                db, TASK, _FakeUser(), [WS],
             )
         finally:
             ObservabilityService.get_run_detail = staticmethod(original)
@@ -175,9 +175,9 @@ class TestUmaAutorizacaoSo:
         assert detalhe["status"] == "success"
 
 
-class TestRetencaoImportada:
+class TestImportedRetention:
 
-    def test_a_tool_usa_a_constante_do_nucleo_e_nao_uma_copia(self):
+    def test_the_tool_uses_the_core_constant_not_a_copy(self):
         """With the value duplicated, changing the TTL in the core made the tool lie in
         `availability` and in `retention_seconds` without anything breaking — the
         worst kind of divergence, the one with no symptom.
@@ -186,6 +186,6 @@ class TestRetencaoImportada:
         would keep passing by value, so it asserts IDENTITY.
         """
         from app.core.constants import REDIS_TTL_1H
-        from app.mcp.tools.execucao import RETENCAO_DOS_EVENTOS_S
+        from app.mcp.tools.execucao import EVENTS_RETENTION_S
 
-        assert RETENCAO_DOS_EVENTOS_S is REDIS_TTL_1H
+        assert EVENTS_RETENTION_S is REDIS_TTL_1H

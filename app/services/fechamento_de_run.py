@@ -42,7 +42,7 @@ from app.services import run_events_service
 logger = get_logger(__name__)
 
 # The states of runs that have not finished yet.
-ABERTOS = ("pending", "running")
+OPEN_STATUSES = ("pending", "running")
 
 # The completion event's `extra`, in the flow taxonomy, for runs that failed through
 # no fault of the content (executor vanished, send never arrived, no executor accepted):
@@ -84,7 +84,7 @@ async def fechar_runs(
         task_id = run if isinstance(run, str) else run.task_id
         deste = dict(valores)
         if duracao:
-            deste["duration_seconds"] = _duracao(run, agora)
+            deste["duration_seconds"] = _duration(run, agora)
         condicao = [
             WorkflowRun.task_id == task_id,
             WorkflowRun.status == de[0] if len(de) == 1 else WorkflowRun.status.in_(de),
@@ -101,7 +101,7 @@ async def fechar_runs(
     if not fechados:
         return []
 
-    objetos = await _objetos(db, fechados)
+    objetos = await _run_objects(db, fechados)
     task_ids = [run.task_id for run in objetos]
     # A failure in the accounting rolls back (see `account_terminal_run`), and the
     # rollback EXPIRES every object in the session: the next run would be counted
@@ -110,10 +110,10 @@ async def fechar_runs(
     # completion did not go out. The closing is already written: reloading brings the same
     # outcome.
     for run in objetos:
-        await _recarregar_se_expirou(db, run)
+        await _reload_if_expired(db, run)
         await run_result_consumer.account_terminal_run(db, run)
     for run in objetos:
-        await _recarregar_se_expirou(db, run)
+        await _reload_if_expired(db, run)
     try:
         await run_events_service.publicar_conclusao(
             task_ids, status=para, mensagem=mensagem, extra=extra,
@@ -125,19 +125,19 @@ async def fechar_runs(
     return objetos
 
 
-async def _recarregar_se_expirou(db: AsyncSession, run: WorkflowRun) -> None:
+async def _reload_if_expired(db: AsyncSession, run: WorkflowRun) -> None:
     estado = inspect(run)
     if estado.expired or estado.expired_attributes:
         await db.refresh(run)
 
 
-async def _objetos(db: AsyncSession, fechados: list) -> list[WorkflowRun]:
+async def _run_objects(db: AsyncSession, fechados: list) -> list[WorkflowRun]:
     """The closed runs as objects, with what was written mirrored. Those that came
     by task_id are loaded in a single query."""
-    por_id = [run for run, _ in fechados if isinstance(run, str)]
+    by_task_id = [run for run, _ in fechados if isinstance(run, str)]
     carregados = {}
-    if por_id:
-        linhas = await db.execute(select(WorkflowRun).where(WorkflowRun.task_id.in_(por_id)))
+    if by_task_id:
+        linhas = await db.execute(select(WorkflowRun).where(WorkflowRun.task_id.in_(by_task_id)))
         carregados = {r.task_id: r for r in linhas.scalars().all()}
     objetos = []
     for run, gravado in fechados:
@@ -150,7 +150,7 @@ async def _objetos(db: AsyncSession, fechados: list) -> list[WorkflowRun]:
     return objetos
 
 
-def _duracao(run, agora: datetime) -> float | None:
+def _duration(run, agora: datetime) -> float | None:
     inicio = getattr(run, "start_time", None)
     if inicio is None:
         return None

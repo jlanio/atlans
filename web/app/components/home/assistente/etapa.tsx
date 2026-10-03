@@ -17,13 +17,13 @@
 // the raw tool name never reaches the screen.
 
 import MarcaAnimada from "./marca-animada"
-import { detalheDaChamada, rotuloDaFerramenta } from "@/app/components/home/assistente/rotulos"
-import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
+import { callDetail, toolLabel } from "@/app/components/home/assistente/rotulos"
+import type { AssistantTurn } from "@/app/components/home/assistente/quadros"
 import { cn } from "@/lib/utils"
-import { IDIOMA_PADRAO, type Idioma } from "@/lib/idioma"
+import { DEFAULT_LANGUAGE, type Idioma } from "@/lib/idioma"
 import { textosDe } from "../i18n"
 
-export interface Etapa {
+export interface Stage {
   tipo: "pensando" | "ferramenta"
   rotulo: string
   detalhe?: string
@@ -40,12 +40,12 @@ export interface Etapa {
  *   shows up in the strip, and a "step" there would be noise.
  */
 export function etapaDaConversa(
-  turnos: TurnoDoAssistente[],
+  turnos: AssistantTurn[],
   correndo: boolean,
-  idioma: Idioma = IDIOMA_PADRAO,
-): Etapa | null {
+  idioma: Idioma = DEFAULT_LANGUAGE,
+): Stage | null {
   if (!correndo) return null
-  let ultimo: TurnoDoAssistente | undefined
+  let ultimo: AssistantTurn | undefined
   for (let i = turnos.length - 1; i >= 0; i--) {
     if (turnos[i].papel === "assistant") { ultimo = turnos[i]; break }
   }
@@ -53,8 +53,8 @@ export function etapaDaConversa(
 
   const bloco = ultimo.blocos[ultimo.blocos.length - 1]
   if (bloco?.tipo === "ferramenta" && bloco.estado === "correndo") {
-    const detalhe = detalheDaChamada(bloco.argumentos)
-    return { tipo: "ferramenta", rotulo: rotuloDaFerramenta(bloco.nome, idioma), detalhe: detalhe ?? undefined }
+    const detalhe = callDetail(bloco.argumentos)
+    return { tipo: "ferramenta", rotulo: toolLabel(bloco.nome, idioma), detalhe: detalhe ?? undefined }
   }
   if (!bloco || bloco.tipo === "pensando" || bloco.tipo === "ferramenta") {
     return { tipo: "pensando", rotulo: textosDe(idioma).assistente.etapa.pensando }
@@ -63,7 +63,7 @@ export function etapaDaConversa(
 }
 
 /** The step line: the site's animated logo + the label (the "…" sweeps while thinking). */
-export function IndicadorDeEtapa({ etapa, className }: { etapa: Etapa; className?: string }) {
+export function IndicadorDeEtapa({ etapa, className }: { etapa: Stage; className?: string }) {
   return (
     <p
       role="status"

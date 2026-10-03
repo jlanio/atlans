@@ -439,6 +439,6 @@ for whoever talks directly to the API.
 - **Raster remains outside** the workflow engine, and the guide tells the model so.
 - **The conversation lock (Redis, 300 s) is renewed** while the turn runs, so that it does not expire in the middle of
   a long conversation and let a second tab into the same transcript; and the daily quota key
-  gets its expiry in the same transaction as the `INCRBY` (`contar_na_janela`, in `app/core/redis.py`), so that the
+  gets its expiry in the same transaction as the `INCRBY` (`count_in_window`, in `app/core/redis.py`), so that the
   ceiling never becomes immortal and locks the assistant forever — the same counter as the MCP quotas and the
   WebSocket rate limit.

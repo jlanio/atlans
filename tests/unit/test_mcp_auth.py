@@ -1,6 +1,6 @@
 # tests/unit/test_mcp_auth.py
 """
-`AutenticacaoPAT` — the only line between a token and the user's data.
+`PATAuthentication` — the only line between a token and the user's data.
 
 The tests here are, for the most part, about what must NOT happen:
 
@@ -35,37 +35,37 @@ from sqlalchemy import select
 
 from app.core.utils.datetime_utils import utc_now_naive
 from app.mcp import infra
-from app.mcp.auth import AutenticacaoPAT
+from app.mcp.auth import PATAuthentication
 from app.mcp.escopo import ESCOPO_ATUAL
 from app.models.api_token import ApiToken
 from tests.unit._mcp_harness import (
-    RedisFalso,
-    banco_em_memoria,
-    criar_pat,
-    criar_usuario,
-    criar_workspace,
-    sessao_de,
+    FakeRedis,
+    in_memory_db,
+    create_pat,
+    create_user,
+    create_workspace,
+    session_from,
 )
 
 
 @pytest.fixture
 async def ambiente(monkeypatch):
     """In-memory database with one user, one workspace and the MCP infrastructure redirected."""
-    async with banco_em_memoria() as fabrica:
+    async with in_memory_db() as fabrica:
         async with fabrica() as db:
-            await criar_usuario(db, "usr-1", "ana")
-            await criar_usuario(db, "usr-2", "bruno")
-            await criar_workspace(db, "ws-1", "usr-1", "Principal")
-            await criar_workspace(db, "ws-2", "usr-1", "Segundo")
-            await criar_workspace(db, "ws-alheio", "usr-2", "De outro")
+            await create_user(db, "usr-1", "ana")
+            await create_user(db, "usr-2", "bruno")
+            await create_workspace(db, "ws-1", "usr-1", "Principal")
+            await create_workspace(db, "ws-2", "usr-1", "Segundo")
+            await create_workspace(db, "ws-alheio", "usr-2", "De outro")
 
-        redis = RedisFalso()
-        monkeypatch.setattr(infra, "sessao", sessao_de(fabrica))
+        redis = FakeRedis()
+        monkeypatch.setattr(infra, "sessao", session_from(fabrica))
         monkeypatch.setattr(infra, "redis_ou_none", lambda: redis)
-        yield _Ambiente(fabrica, redis)
+        yield _Environment(fabrica, redis)
 
 
-class _Ambiente:
+class _Environment:
     def __init__(self, fabrica, redis):
         self.fabrica = fabrica
         self.redis = redis
@@ -88,7 +88,7 @@ class _Ambiente:
             )
             await send({"type": "http.response.body", "body": corpo})
 
-        return AutenticacaoPAT(adiante)
+        return PATAuthentication(adiante)
 
     def cliente(self):
         return httpx.AsyncClient(
@@ -98,13 +98,13 @@ class _Ambiente:
 
 async def _pat(ambiente, *, user_id="usr-1", scopes=("workflows:read",), workspace_ids=None) -> str:
     async with ambiente.fabrica() as db:
-        return await criar_pat(db, user_id, scopes, workspace_ids)
+        return await create_pat(db, user_id, scopes, workspace_ids)
 
 
 # ── Method and lifecycle ──────────────────────────────────────────────────────
 
 
-async def test_get_no_mcp_e_405_com_allow_post(ambiente):
+async def test_get_on_mcp_is_405_with_allow_post(ambiente):
     """With `stateless_http` there is no server stream: the GET would only hold a worker.
 
     And the refusal comes before the database — not even a valid token gets resolved.
@@ -119,7 +119,7 @@ async def test_get_no_mcp_e_405_com_allow_post(ambiente):
     assert ambiente.visto == {}
 
 
-async def test_get_sem_token_nenhum_tambem_e_405(ambiente):
+async def test_get_without_any_token_is_also_405(ambiente):
     """The method does not work with any token — and the response does not become an oracle."""
     async with ambiente.cliente() as c:
         r = await c.get("/mcp")
@@ -127,7 +127,7 @@ async def test_get_sem_token_nenhum_tambem_e_405(ambiente):
     assert "www-authenticate" not in r.headers
 
 
-async def test_lifespan_e_respondido_sem_alcancar_o_app_interno(ambiente):
+async def test_lifespan_is_answered_without_reaching_the_inner_app(ambiente):
     """One extra `run()` on the same session manager would be fatal.
 
     The manager is a single-use context; if a refactor swaps the route for a
@@ -139,7 +139,7 @@ async def test_lifespan_e_respondido_sem_alcancar_o_app_interno(ambiente):
     async def adiante(scope, receive, send):  # pragma: no cover - must not run
         chegou.append(scope.get("type"))
 
-    app = AutenticacaoPAT(adiante)
+    app = PATAuthentication(adiante)
     recebidos = [{"type": "lifespan.startup"}, {"type": "lifespan.shutdown"}]
     enviados = []
 
@@ -158,7 +158,7 @@ async def test_lifespan_e_respondido_sem_alcancar_o_app_interno(ambiente):
 # ── Recusas ───────────────────────────────────────────────────────────────────
 
 
-async def test_sem_cabecalho_authorization_e_401_com_desafio(ambiente):
+async def test_missing_authorization_header_is_401_with_challenge(ambiente):
     async with ambiente.cliente() as c:
         r = await c.post("/mcp", json={})
     assert r.status_code == 401
@@ -167,7 +167,7 @@ async def test_sem_cabecalho_authorization_e_401_com_desafio(ambiente):
     assert "escopo" not in ambiente.visto
 
 
-async def test_jwt_de_sessao_nao_vale_no_mcp(ambiente):
+async def test_session_jwt_is_not_valid_on_mcp(ambiente):
     # Assembled in pieces on purpose: a whole JWT in the source would trip the
     # CI's secret scanner, which does not tell an example from a real credential.
     jwt = ".".join(["eyJhbGciOiJIUzI1NiJ9", "eyJzdWIiOiJ1c3ItMSJ9", "assinatura"])
@@ -179,20 +179,20 @@ async def test_jwt_de_sessao_nao_vale_no_mcp(ambiente):
     assert "invalid_token" not in r.headers["www-authenticate"]
 
 
-async def test_esquema_que_nao_e_bearer_e_recusado(ambiente):
+async def test_non_bearer_scheme_is_refused(ambiente):
     async with ambiente.cliente() as c:
         r = await c.post("/mcp", json={}, headers={"Authorization": "Basic YWJjOjEyMw=="})
     assert r.status_code == 401
 
 
-async def test_prefixo_errado_e_recusado(ambiente):
+async def test_wrong_prefix_is_refused(ambiente):
     async with ambiente.cliente() as c:
         r = await c.post("/mcp", json={}, headers={"Authorization": "Bearer ghp_" + "a" * 43})
     assert r.status_code == 401
 
 
 @pytest.mark.parametrize("parametro", ["access_token", "token"])
-async def test_token_na_query_string_e_recusado_mesmo_com_header_valido(ambiente, parametro):
+async def test_token_in_query_string_is_refused_even_with_valid_header(ambiente, parametro):
     segredo = await _pat(ambiente)
     async with ambiente.cliente() as c:
         r = await c.post(
@@ -202,7 +202,7 @@ async def test_token_na_query_string_e_recusado_mesmo_com_header_valido(ambiente
     assert "escopo" not in ambiente.visto
 
 
-async def test_token_revogado_e_401_indistinguivel_de_inexistente(ambiente):
+async def test_revoked_token_is_401_indistinguishable_from_nonexistent(ambiente):
     segredo = await _pat(ambiente)
     async with ambiente.fabrica() as db:
         token = (await db.execute(select(ApiToken))).scalar_one()
@@ -219,7 +219,7 @@ async def test_token_revogado_e_401_indistinguivel_de_inexistente(ambiente):
     assert 'error="invalid_token"' in revogado.headers["www-authenticate"]
 
 
-async def test_token_expirado_e_401(ambiente):
+async def test_expired_token_is_401(ambiente):
     segredo = await _pat(ambiente)
     async with ambiente.fabrica() as db:
         token = (await db.execute(select(ApiToken))).scalar_one()
@@ -231,7 +231,7 @@ async def test_token_expirado_e_401(ambiente):
     assert r.status_code == 401
 
 
-async def test_usuario_suspenso_derruba_o_token_ainda_valido(ambiente):
+async def test_suspended_user_kills_the_still_valid_token(ambiente):
     segredo = await _pat(ambiente)
     async with ambiente.fabrica() as db:
         from app.models.user import User
@@ -245,7 +245,7 @@ async def test_usuario_suspenso_derruba_o_token_ainda_valido(ambiente):
     assert r.status_code == 401
 
 
-async def test_a_mensagem_de_recusa_nunca_diz_o_motivo(ambiente):
+async def test_the_refusal_message_never_says_the_reason(ambiente):
     async with ambiente.cliente() as c:
         r = await c.post("/mcp", json={}, headers={"Authorization": "Bearer atl_pat_" + "z" * 43})
     texto = json.dumps(r.json()).lower()
@@ -253,7 +253,7 @@ async def test_a_mensagem_de_recusa_nunca_diz_o_motivo(ambiente):
         assert palavra not in texto
 
 
-async def test_a_recusa_diz_onde_se_cria_o_token_e_quem_alcanca_a_pagina(ambiente):
+async def test_the_refusal_says_where_the_token_is_created_and_who_reaches_the_page(ambiente):
     """`/settings/tokens`, like every page outside the Home, sends to `/` whoever does not
     administer the system (`web/proxy.ts`), and the token is personal: the admin only
     creates tokens for their OWN account. The refusal says both things, without telling
@@ -269,7 +269,7 @@ async def test_a_recusa_diz_onde_se_cria_o_token_e_quem_alcanca_a_pagina(ambient
 # ── Sucesso ───────────────────────────────────────────────────────────────────
 
 
-async def test_escopo_chega_em_request_state_e_no_contextvar(ambiente):
+async def test_scope_reaches_request_state_and_the_contextvar(ambiente):
     segredo = await _pat(ambiente, scopes=("workflows:read", "drive:read"))
     async with ambiente.cliente() as c:
         r = await c.post("/mcp", json={}, headers={"Authorization": f"Bearer {segredo}"})
@@ -282,14 +282,14 @@ async def test_escopo_chega_em_request_state_e_no_contextvar(ambiente):
     assert escopo.token_prefix.startswith("atl_pat_")
 
 
-async def test_contextvar_e_resetado_depois_da_request(ambiente):
+async def test_contextvar_is_reset_after_the_request(ambiente):
     segredo = await _pat(ambiente)
     async with ambiente.cliente() as c:
         await c.post("/mcp", json={}, headers={"Authorization": f"Bearer {segredo}"})
     assert ESCOPO_ATUAL.get() is None
 
 
-async def test_marcar_uso_carimba_pelo_throttle_do_redis(ambiente):
+async def test_mark_usage_stamps_through_the_redis_throttle(ambiente):
     segredo = await _pat(ambiente)
     async with ambiente.cliente() as c:
         await c.post("/mcp", json={}, headers={"Authorization": f"Bearer {segredo}"})
@@ -301,7 +301,7 @@ async def test_marcar_uso_carimba_pelo_throttle_do_redis(ambiente):
         assert token.last_used_at is not None
 
 
-async def test_sem_redis_a_autenticacao_continua_funcionando(ambiente, monkeypatch):
+async def test_without_redis_authentication_keeps_working(ambiente, monkeypatch):
     monkeypatch.setattr(infra, "redis_ou_none", lambda: None)
     segredo = await _pat(ambiente)
     async with ambiente.cliente() as c:
@@ -313,10 +313,10 @@ async def test_sem_redis_a_autenticacao_continua_funcionando(ambiente, monkeypat
 # ── Reach per workspace ───────────────────────────────────────────────────────
 
 
-async def test_token_sem_lista_alcanca_workspace_criado_depois_da_emissao(ambiente):
+async def test_token_without_list_reaches_workspace_created_after_issuance(ambiente):
     segredo = await _pat(ambiente, workspace_ids=None)
     async with ambiente.fabrica() as db:
-        await criar_workspace(db, "ws-novo", "usr-1", "Criado depois")
+        await create_workspace(db, "ws-novo", "usr-1", "Criado depois")
 
     async with ambiente.cliente() as c:
         await c.post("/mcp", json={}, headers={"Authorization": f"Bearer {segredo}"})
@@ -325,10 +325,10 @@ async def test_token_sem_lista_alcanca_workspace_criado_depois_da_emissao(ambien
     assert "ws-novo" in escopo.workspace_ids
 
 
-async def test_lista_explicita_nao_alcanca_workspace_criado_depois(ambiente):
+async def test_explicit_list_does_not_reach_workspace_created_later(ambiente):
     segredo = await _pat(ambiente, workspace_ids=["ws-1"])
     async with ambiente.fabrica() as db:
-        await criar_workspace(db, "ws-novo", "usr-1", "Criado depois")
+        await create_workspace(db, "ws-novo", "usr-1", "Criado depois")
 
     async with ambiente.cliente() as c:
         await c.post("/mcp", json={}, headers={"Authorization": f"Bearer {segredo}"})
@@ -337,7 +337,7 @@ async def test_lista_explicita_nao_alcanca_workspace_criado_depois(ambiente):
     assert escopo.workspace_ids == frozenset({"ws-1"})
 
 
-async def test_workspace_que_o_usuario_perdeu_sai_do_alcance(ambiente):
+async def test_workspace_the_user_lost_leaves_the_reach(ambiente):
     """The intersection is with the user's CURRENT workspaces, not with the token's list."""
     segredo = await _pat(ambiente, workspace_ids=["ws-1", "ws-2"])
     async with ambiente.fabrica() as db:
@@ -352,7 +352,7 @@ async def test_workspace_que_o_usuario_perdeu_sai_do_alcance(ambiente):
     assert ambiente.visto["escopo"].workspace_ids == frozenset({"ws-1"})
 
 
-async def test_token_nao_alcanca_workspace_de_outro_usuario(ambiente):
+async def test_token_does_not_reach_another_users_workspace(ambiente):
     segredo = await _pat(ambiente, workspace_ids=None)
     async with ambiente.cliente() as c:
         await c.post("/mcp", json={}, headers={"Authorization": f"Bearer {segredo}"})

@@ -41,7 +41,7 @@ def _codes(avisos):
 
 # ── Property collector ───────────────────────────────────────────────────────
 
-def test_coletor_le_data_properties_e_properties():
+def test_collector_reads_data_properties_and_properties():
     """The canvas writes to data.properties; reading only `properties` would
     produce a false negative precisely in the most common format."""
     definition = {"nodes": [
@@ -54,7 +54,7 @@ def test_coletor_le_data_properties_e_properties():
     assert achado == {"f-1": ["n1"], "f-2": ["n2"]}
 
 
-def test_coletor_de_subworkflow_usa_a_mesma_cadeia():
+def test_subworkflow_collector_uses_the_same_chain():
     """flow/'s `collect_subworkflow_references` reads only `properties` — which is
     why the report has its own collector."""
     definition = {"nodes": [
@@ -64,7 +64,7 @@ def test_coletor_de_subworkflow_usa_a_mesma_cadeia():
     assert rep._collect_subworkflow_refs(definition) == {"wf-b": ["s1"]}
 
 
-def test_coletor_ignora_valores_vazios():
+def test_collector_ignores_empty_values():
     definition = {"nodes": [_node("n1", "DataInput", {"driveFileId": "  "})]}
 
     assert rep._collect_prop(definition, "driveFileId") == {}
@@ -72,11 +72,11 @@ def test_coletor_ignora_valores_vazios():
 
 # ── Credenciais ──────────────────────────────────────────────────────────────
 
-def _db_com(linhas_por_chamada):
+def _db_with(rows_per_call):
     """`db.execute` devolvendo resultados diferentes a cada chamada."""
     db = MagicMock()
     resultados = []
-    for linhas in linhas_por_chamada:
+    for linhas in rows_per_call:
         r = MagicMock()
         r.all.return_value = linhas
         r.scalars.return_value.all.return_value = linhas
@@ -87,11 +87,11 @@ def _db_com(linhas_por_chamada):
 
 
 @pytest.mark.asyncio
-async def test_avisa_credencial_cujo_dono_nao_alcanca_o_destino():
+async def test_warns_about_credential_whose_owner_cannot_reach_the_target():
     """The credential scope comes from the members of the workflow's workspace.
     Without a warning, the symptom at runtime is just a WARNING in the server log."""
     definition = {"nodes": [_node("n1", "WFS", {"credential_id": "11111111-1111-1111-1111-111111111111"})]}
-    db = _db_com([[("11111111-1111-1111-1111-111111111111", "Banco Prod", "usr-alheio")]])
+    db = _db_with([[("11111111-1111-1111-1111-111111111111", "Banco Prod", "usr-alheio")]])
 
     with patch.object(rep, "workspace_credential_owners", new=AsyncMock(return_value={"usr-membro"})):
         avisos = await rep._avisar_credenciais(db, definition, DESTINO)
@@ -102,9 +102,9 @@ async def test_avisa_credencial_cujo_dono_nao_alcanca_o_destino():
 
 
 @pytest.mark.asyncio
-async def test_nao_avisa_quando_o_dono_e_membro_do_destino():
+async def test_does_not_warn_when_the_owner_is_a_target_member():
     definition = {"nodes": [_node("n1", "WFS", {"credential_id": "11111111-1111-1111-1111-111111111111"})]}
-    db = _db_com([[("11111111-1111-1111-1111-111111111111", "Banco Prod", "usr-membro")]])
+    db = _db_with([[("11111111-1111-1111-1111-111111111111", "Banco Prod", "usr-membro")]])
 
     with patch.object(rep, "workspace_credential_owners", new=AsyncMock(return_value={"usr-membro"})):
         avisos = await rep._avisar_credenciais(db, definition, DESTINO)
@@ -113,13 +113,13 @@ async def test_nao_avisa_quando_o_dono_e_membro_do_destino():
 
 
 @pytest.mark.asyncio
-async def test_credencial_em_trigger_e_marcada():
+async def test_credential_in_trigger_is_flagged():
     """In a trigger the effect is noisy (403 on trigger), not silent — the
     message needs to say so."""
     definition = {"nodes": [
         _node("t1", "WebhookTrigger", {"credential_id": "11111111-1111-1111-1111-111111111111"}, ntype="trigger"),
     ]}
-    db = _db_com([[("11111111-1111-1111-1111-111111111111", "Token", "usr-alheio")]])
+    db = _db_with([[("11111111-1111-1111-1111-111111111111", "Token", "usr-alheio")]])
 
     with patch.object(rep, "workspace_credential_owners", new=AsyncMock(return_value=set())):
         avisos = await rep._avisar_credenciais(db, definition, DESTINO)
@@ -129,9 +129,9 @@ async def test_credencial_em_trigger_e_marcada():
 
 
 @pytest.mark.asyncio
-async def test_credencial_inexistente_tem_codigo_proprio():
+async def test_nonexistent_credential_has_its_own_code():
     definition = {"nodes": [_node("n1", "WFS", {"credential_id": "11111111-1111-1111-1111-111111111111"})]}
-    db = _db_com([[]])
+    db = _db_with([[]])
 
     with patch.object(rep, "workspace_credential_owners", new=AsyncMock(return_value={"usr-1"})):
         avisos = await rep._avisar_credenciais(db, definition, DESTINO)
@@ -140,7 +140,7 @@ async def test_credencial_inexistente_tem_codigo_proprio():
 
 
 @pytest.mark.asyncio
-async def test_sem_credenciais_nao_consulta_o_banco():
+async def test_without_credentials_does_not_query_the_database():
     db = MagicMock(execute=AsyncMock())
 
     assert await rep._avisar_credenciais(db, {"nodes": []}, DESTINO) == []
@@ -150,9 +150,9 @@ async def test_sem_credenciais_nao_consulta_o_banco():
 # ── Sub-workflows ────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_avisa_subworkflow_que_fica_fora_do_destino():
+async def test_warns_about_subworkflow_left_outside_the_target():
     definition = {"nodes": [_node("s1", "SubWorkflow", {"workflowHash": "wf-b"}, ntype="control")]}
-    db = _db_com([[("wf-b", "Consolidação", ORIGEM)]])
+    db = _db_with([[("wf-b", "Consolidação", ORIGEM)]])
 
     avisos = await rep._avisar_subworkflows(db, definition, DESTINO)
 
@@ -160,9 +160,9 @@ async def test_avisa_subworkflow_que_fica_fora_do_destino():
 
 
 @pytest.mark.asyncio
-async def test_nao_avisa_subworkflow_que_ja_esta_no_destino():
+async def test_does_not_warn_about_subworkflow_already_in_target():
     definition = {"nodes": [_node("s1", "SubWorkflow", {"workflowHash": "wf-b"}, ntype="control")]}
-    db = _db_com([[("wf-b", "Consolidação", DESTINO)]])
+    db = _db_with([[("wf-b", "Consolidação", DESTINO)]])
 
     assert await rep._avisar_subworkflows(db, definition, DESTINO) == []
 
@@ -170,10 +170,10 @@ async def test_nao_avisa_subworkflow_que_ja_esta_no_destino():
 # ── Dependentes reversos ─────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_avisa_dependente_reverso():
+async def test_warns_about_reverse_dependent():
     """Collateral that is not in the moved workflow's definition, but in the others'."""
-    dependente_def = {"nodes": [_node("s1", "SubWorkflow", {"workflowHash": "wf-1"}, ntype="control")]}
-    db = _db_com([[("wf-a", "Relatório mensal", dependente_def)]])
+    dependent_def = {"nodes": [_node("s1", "SubWorkflow", {"workflowHash": "wf-1"}, ntype="control")]}
+    db = _db_with([[("wf-a", "Relatório mensal", dependent_def)]])
 
     avisos = await rep._avisar_dependentes(db, "wf-1", ORIGEM)
 
@@ -182,10 +182,10 @@ async def test_avisa_dependente_reverso():
 
 
 @pytest.mark.asyncio
-async def test_pre_filtro_com_falso_positivo_e_descartado():
+async def test_prefilter_false_positive_is_discarded():
     """The LIKE on the JSON may match the hash in another field; the confirmation is done in Python."""
-    outro_def = {"nodes": [_node("n1", "DataInput", {"driveFileId": "wf-1"})]}
-    db = _db_com([[("wf-a", "Outro", outro_def)]])
+    other_def = {"nodes": [_node("n1", "DataInput", {"driveFileId": "wf-1"})]}
+    db = _db_with([[("wf-a", "Outro", other_def)]])
 
     assert await rep._avisar_dependentes(db, "wf-1", ORIGEM) == []
 
@@ -193,9 +193,9 @@ async def test_pre_filtro_com_falso_positivo_e_descartado():
 # ── Arquivos ─────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_avisa_arquivo_de_drive_da_origem():
+async def test_warns_about_drive_file_from_source():
     definition = {"nodes": [_node("n1", "DataInput", {"driveFileId": "f-1"})]}
-    db = _db_com([[("f-1", "malha.geojson", ORIGEM)]])
+    db = _db_with([[("f-1", "malha.geojson", ORIGEM)]])
 
     avisos = await rep._avisar_arquivos(db, definition, DESTINO)
 
@@ -204,9 +204,9 @@ async def test_avisa_arquivo_de_drive_da_origem():
 
 
 @pytest.mark.asyncio
-async def test_avisa_artefato_da_origem():
+async def test_warns_about_artifact_from_source():
     definition = {"nodes": [_node("n1", "DataInput", {"artifactId": "a-1"})]}
-    db = _db_com([[("a-1", "saida.parquet", ORIGEM)]])
+    db = _db_with([[("a-1", "saida.parquet", ORIGEM)]])
 
     avisos = await rep._avisar_arquivos(db, definition, DESTINO)
 
@@ -214,9 +214,9 @@ async def test_avisa_artefato_da_origem():
 
 
 @pytest.mark.asyncio
-async def test_nao_avisa_arquivo_ja_no_destino():
+async def test_does_not_warn_about_file_already_in_target():
     definition = {"nodes": [_node("n1", "DataInput", {"driveFileId": "f-1"})]}
-    db = _db_com([[("f-1", "malha.geojson", DESTINO)]])
+    db = _db_with([[("f-1", "malha.geojson", DESTINO)]])
 
     assert await rep._avisar_arquivos(db, definition, DESTINO) == []
 
@@ -224,8 +224,8 @@ async def test_nao_avisa_arquivo_ja_no_destino():
 # ── Workspace configuration ──────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_avisa_troca_de_executor():
-    db = _db_com([[
+async def test_warns_about_executor_change():
+    db = _db_with([[
         (ORIGEM, "Origem", "exec-a", None),
         (DESTINO, "Destino", "exec-b", None),
     ]])
@@ -236,8 +236,8 @@ async def test_avisa_troca_de_executor():
 
 
 @pytest.mark.asyncio
-async def test_destino_sem_executor_menciona_o_pool_padrao():
-    db = _db_com([[
+async def test_target_without_executor_mentions_the_default_pool():
+    db = _db_with([[
         (ORIGEM, "Origem", "exec-a", None),
         (DESTINO, "Destino", None, None),
     ]])
@@ -248,8 +248,8 @@ async def test_destino_sem_executor_menciona_o_pool_padrao():
 
 
 @pytest.mark.asyncio
-async def test_nao_avisa_quando_o_executor_e_o_mesmo():
-    db = _db_com([[
+async def test_does_not_warn_when_the_executor_is_the_same():
+    db = _db_with([[
         (ORIGEM, "Origem", "exec-a", None),
         (DESTINO, "Destino", "exec-a", None),
     ]])
@@ -258,8 +258,8 @@ async def test_nao_avisa_quando_o_executor_e_o_mesmo():
 
 
 @pytest.mark.asyncio
-async def test_avisa_notification_url_fora_da_allowlist():
-    db = _db_com([[
+async def test_warns_about_notification_url_outside_the_allowlist():
+    db = _db_with([[
         (ORIGEM, "Origem", "exec-a", None),
         (DESTINO, "Destino", "exec-a", ["parceiro.com"]),
     ]])
@@ -271,9 +271,9 @@ async def test_avisa_notification_url_fora_da_allowlist():
 
 
 @pytest.mark.asyncio
-async def test_allowlist_vazia_nao_gera_aviso():
+async def test_empty_allowlist_raises_no_warning():
     """Without an allowlist only the default SSRF check applies — nothing changes with the move."""
-    db = _db_com([[
+    db = _db_with([[
         (ORIGEM, "Origem", "exec-a", None),
         (DESTINO, "Destino", "exec-a", []),
     ]])
@@ -283,8 +283,8 @@ async def test_allowlist_vazia_nao_gera_aviso():
 
 
 @pytest.mark.asyncio
-async def test_url_permitida_pela_allowlist_nao_gera_aviso():
-    db = _db_com([[
+async def test_url_allowed_by_the_allowlist_raises_no_warning():
+    db = _db_with([[
         (ORIGEM, "Origem", "exec-a", None),
         (DESTINO, "Destino", "exec-a", ["*.parceiro.com"]),
     ]])
@@ -296,10 +296,10 @@ async def test_url_permitida_pela_allowlist_nao_gera_aviso():
 # ── Estado ───────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_active_runs_reporta_o_total_e_nao_o_tamanho_da_amostra():
+async def test_active_runs_reports_the_total_not_the_sample_size():
     """The run_ids sample is capped at 5; counting its result would make the
     message say '5' for any number above that."""
-    db = _db_com([
+    db = _db_with([
         12,                              # COUNT of runs in progress
         ["r1", "r2", "r3", "r4", "r5"],  # amostra (limit 5)
         0,                               # total de runs (history_left_behind)
@@ -315,8 +315,8 @@ async def test_active_runs_reporta_o_total_e_nao_o_tamanho_da_amostra():
 
 
 @pytest.mark.asyncio
-async def test_sem_runs_em_andamento_nao_gera_aviso():
-    db = _db_com([0, 0, 0])
+async def test_no_runs_in_progress_raises_no_warning():
+    db = _db_with([0, 0, 0])
 
     avisos = await rep._avisar_estado(db, _wf(), {"nodes": []})
 
@@ -326,7 +326,7 @@ async def test_sem_runs_em_andamento_nao_gera_aviso():
 # ── Resiliencia ──────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_falha_no_relatorio_nao_derruba_o_move():
+async def test_report_failure_does_not_break_the_move():
     """The feature's contract is that moving does not fail. An empty report would
     be read as 'no impact' — hence the explicit code."""
     db = MagicMock(execute=AsyncMock(side_effect=RuntimeError("banco fora do ar")))
@@ -337,7 +337,7 @@ async def test_falha_no_relatorio_nao_derruba_o_move():
 
 
 @pytest.mark.asyncio
-async def test_warnings_vem_antes_dos_infos():
+async def test_warnings_come_before_infos():
     """On screen, what breaks needs to show up first."""
     avisos = [
         {"code": "a", "severity": "info", "message": "", "details": {}},

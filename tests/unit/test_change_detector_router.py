@@ -119,7 +119,7 @@ SWAP_URL = "/internal/change-detector/wf:wfh-abc:n-xyz"
 
 
 @pytest.mark.asyncio
-async def test_swap_primeira_vez_devolve_previous_none_e_grava(client, fake_redis):
+async def test_swap_first_time_returns_previous_none_and_writes(client, fake_redis):
     payload = {"hash": "c" * 64, "ttl_seconds": 7200}
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
         resp = await client.post(SWAP_URL, json=payload)
@@ -130,7 +130,7 @@ async def test_swap_primeira_vez_devolve_previous_none_e_grava(client, fake_redi
 
 
 @pytest.mark.asyncio
-async def test_swap_devolve_o_anterior_e_grava_o_novo(client, fake_redis):
+async def test_swap_returns_the_previous_and_writes_the_new(client, fake_redis):
     """The single operation: decision (previous) and write (new) in the same round
     trip — without the read→decide→write window in which two simultaneous runs
     read the same old hash and both decided 'Mudou' (changed)."""
@@ -144,7 +144,7 @@ async def test_swap_devolve_o_anterior_e_grava_o_novo(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_swap_sem_ttl_grava_sem_expiracao(client, fake_redis):
+async def test_swap_without_ttl_writes_without_expiration(client, fake_redis):
     payload = {"hash": "d" * 64, "ttl_seconds": 0}
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
         resp = await client.post(SWAP_URL, json=payload)
@@ -154,7 +154,7 @@ async def test_swap_sem_ttl_grava_sem_expiracao(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_swap_hash_invalido_retorna_422(client, fake_redis):
+async def test_swap_invalid_hash_returns_422(client, fake_redis):
     """A hash that isn't SHA-256 hex (64 lowercase chars) is rejected."""
     payload = {"hash": "nao-eh-sha256", "ttl_seconds": 3600}
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
@@ -163,7 +163,7 @@ async def test_swap_hash_invalido_retorna_422(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_swap_ttl_negativo_retorna_422(client, fake_redis):
+async def test_swap_negative_ttl_returns_422(client, fake_redis):
     payload = {"hash": "e" * 64, "ttl_seconds": -1}
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
         resp = await client.post(SWAP_URL, json=payload)
@@ -171,7 +171,7 @@ async def test_swap_ttl_negativo_retorna_422(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_swap_ttl_excessivo_retorna_422(client, fake_redis):
+async def test_swap_excessive_ttl_returns_422(client, fake_redis):
     payload = {"hash": "f" * 64, "ttl_seconds": 99_999_999}  # > 1 ano
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
         resp = await client.post(SWAP_URL, json=payload)
@@ -179,7 +179,7 @@ async def test_swap_ttl_excessivo_retorna_422(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_swap_formato_chave_invalido_retorna_400(client, fake_redis):
+async def test_swap_invalid_key_format_returns_400(client, fake_redis):
     """Keys outside the allowed prefix (wf:/ws:) are rejected."""
     payload = {"hash": "a" * 64, "ttl_seconds": 0}
     with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
@@ -188,13 +188,13 @@ async def test_swap_formato_chave_invalido_retorna_400(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_swap_redis_indisponivel_retorna_503(client):
+async def test_swap_redis_unavailable_returns_503(client):
     """Failure to connect to Redis → 503; the executor decides the branch by the
     node's on_backend_error policy."""
-    redis_falho = AsyncMock()
-    redis_falho.set = AsyncMock(side_effect=ConnectionError("redis down"))
+    failing_redis = AsyncMock()
+    failing_redis.set = AsyncMock(side_effect=ConnectionError("redis down"))
     payload = {"hash": "a" * 64, "ttl_seconds": 0}
-    with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=redis_falho):
+    with _bypass_auth_and_db(), patch("app.api.routers.change_detector_router.get_redis_pool", return_value=failing_redis):
         resp = await client.post(SWAP_URL, json=payload)
     assert resp.status_code == 503
 
@@ -202,7 +202,7 @@ async def test_swap_redis_indisponivel_retorna_503(client):
 # ── Escopo (cross-tenant) ─────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_workflow_de_outro_workspace_retorna_403(client, fake_redis):
+async def test_workflow_from_another_workspace_returns_403(client, fake_redis):
     """An executor must not touch the state of a workflow outside its workspaces:
     the out-of-scope swap is blocked BEFORE touching Redis."""
     fake_redis._store["change_detector:wf:wfh-alheio:n-xyz"] = "h" * 64
@@ -215,7 +215,7 @@ async def test_workflow_de_outro_workspace_retorna_403(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_workflow_inexistente_retorna_403(client, fake_redis):
+async def test_nonexistent_workflow_returns_403(client, fake_redis):
     """Doesn't distinguish 'doesn't exist' from 'isn't yours' — prevents enumeration."""
     with _bypass_auth_and_db(workflow_workspace_id=None), \
             patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
@@ -225,7 +225,7 @@ async def test_workflow_inexistente_retorna_403(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_escopo_ws_alheio_retorna_403(client, fake_redis):
+async def test_scope_foreign_ws_returns_403(client, fake_redis):
     """A 'ws:' key for a workspace outside the executor's list is denied."""
     with _bypass_auth_and_db(), \
             patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
@@ -235,7 +235,7 @@ async def test_escopo_ws_alheio_retorna_403(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_escopo_ws_proprio_permitido(client, fake_redis):
+async def test_scope_own_ws_allowed(client, fake_redis):
     fake_redis._store["change_detector:ws:ws-test-001:shared-key"] = "i" * 64
     with _bypass_auth_and_db(), \
             patch("app.api.routers.change_detector_router.get_redis_pool", return_value=fake_redis):
@@ -246,7 +246,7 @@ async def test_escopo_ws_proprio_permitido(client, fake_redis):
 
 
 @pytest.mark.asyncio
-async def test_swap_e_uma_unica_operacao_atomica(client):
+async def test_swap_is_a_single_atomic_operation(client):
     """Atomicity is not observable in a serialized fake, so this test locks down
     the PATTERN: the whole swap must be a single SET ... GET. A separate GET
     followed by a SET would reopen exactly the race window (two simultaneous runs

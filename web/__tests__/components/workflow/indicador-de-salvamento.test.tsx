@@ -26,7 +26,7 @@ vi.mock("@/app/hooks/workflow/useSaveWorkflow", async (importOriginal) => {
 
 import GlobalSaveIndicator from "@/app/components/workflow/global-save-indicator"
 import { useWorkflowSaveStore } from "@/app/stores/workflowSaveStore"
-import { montarPayloadDoGrafo } from "@/app/hooks/workflow/useSaveWorkflow"
+import { buildGraphPayload } from "@/app/hooks/workflow/useSaveWorkflow"
 import type { INodeContext } from "@/context/useFlowContext"
 
 const MIN = 60_000
@@ -43,7 +43,7 @@ const store = () => useWorkflowSaveStore.getState()
 /** "Hydrated" baseline: snapshot equal to the current canvas, self-correction
  *  window already closed (what's tested here is what comes AFTER hydration). */
 function hidratar(savedAt: number | null = AGORA - 5 * MIN) {
-  const { nodesReq, edgesReq } = montarPayloadDoGrafo(nodes as INodeContext[], [])
+  const { nodesReq, edgesReq } = buildGraphPayload(nodes as INodeContext[], [])
   store().initSnapshot(nodesReq, edgesReq, "wf", savedAt)
   useWorkflowSaveStore.setState({ snapshotIniciadoEm: null })
 }

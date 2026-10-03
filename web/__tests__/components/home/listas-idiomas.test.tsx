@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
-import type { IAgendamentoMeu, IArtifactItem, IConversaResumo, IDriveFile } from "@/service/types"
+import type { IMySchedule, IArtifactItem, IConversationSummary, IDriveFile } from "@/service/types"
 
 /**
  * The three lists of the Meus group (Chats, Agendamentos, Artefatos) in English and
- * Spanish: the language arrives through the `IdiomaProvider`, as in the dashboard layout.
+ * Spanish: the language arrives through the `LanguageProvider`, as in the dashboard layout.
  * The hooks are the real ones, with the service doubled — so the microcopy the
  * HOOK chooses (the load failure, a toast's fallback) is also checked.
  *
@@ -57,7 +57,7 @@ vi.mock("@/context/WorkspaceContext", () => {
   }
 })
 vi.mock("@/context/ActiveRunsContext", () => ({ useActiveRuns: () => ({ refresh: H.refresh }) }))
-// The route decides whether the screen follows the language (`EscopoPelaRota`): only the Home is translated.
+// The route decides whether the screen follows the language (`ScopeByRoute`): only the Home is translated.
 vi.mock("next/navigation", () => ({ usePathname: () => H.rota, useRouter: () => ({ push: vi.fn() }) }))
 vi.mock("@/utils/createToast", () => ({
   createToast: {
@@ -84,7 +84,7 @@ vi.mock("@/app/components/ui/dropdown-menu", () => ({
 }))
 
 import { SidebarProvider } from "@/app/components/ui/sidebar"
-import { EscopoPelaRota, IdiomaProvider, useIdioma } from "@/context/IdiomaContext"
+import { ScopeByRoute, LanguageProvider, useLanguage } from "@/context/IdiomaContext"
 import type { Idioma } from "@/lib/idioma"
 import { formatLocal } from "@/lib/dayjs"
 import { ChatsLista } from "@/app/components/home/chats/lista"
@@ -104,13 +104,13 @@ const falhou = (status = 500, message?: string) => ({
 })
 const nunca = () => new Promise(() => {})
 
-const conversa = (id: string, titulo: string): IConversaResumo => ({
+const conversa = (id: string, titulo: string): IConversationSummary => ({
   id, titulo, workflow_id: null, tokens_total: 0,
   created_at: "2026-09-10T12:00:00Z", updated_at: "2026-09-10T12:00:00Z",
 })
 
-const pagina = (itens: IAgendamentoMeu[], total = itens.length) => ok({ itens, total })
-function ag(extra: Partial<IAgendamentoMeu> = {}): IAgendamentoMeu {
+const pagina = (itens: IMySchedule[], total = itens.length) => ok({ itens, total })
+function ag(extra: Partial<IMySchedule> = {}): IMySchedule {
   return {
     job_id: "job-1", id_hash: "sch-1", active: true, strategy: "interval", interval: 6, unit: "hours",
     next_run_at: new Date(Date.now() + 3_600_000).toISOString(), last_run_at: null,
@@ -144,15 +144,15 @@ function arquivo(extra: Partial<IDriveFile> = {}): IDriveFile {
 }
 
 // 3.5 days ahead: the retention hint says "3 dias" (3 days) in any time zone.
-const daquiATresDias = () => new Date(Date.now() + 3.5 * 86_400_000).toISOString()
+const inThreeDays = () => new Date(Date.now() + 3.5 * 86_400_000).toISOString()
 
 /** The usual collection: geojson, shapefile (inert), an ephemeral one and a Drive file. */
-function acervoPadrao() {
+function defaultCollection() {
   H.getArtifacts.mockResolvedValue(ok({
     items: [
       artefato(),
       artefato({ id_hash: "art-shp", filename: "malha.zip", format: "shapefile" }),
-      artefato({ id_hash: "art-efe", filename: "temporario.geojson", expires_at: daquiATresDias() }),
+      artefato({ id_hash: "art-efe", filename: "temporario.geojson", expires_at: inThreeDays() }),
     ],
     total: 700,
   }))
@@ -160,8 +160,8 @@ function acervoPadrao() {
 }
 
 const WS = { id_hash: "ws-1", name: "WS", description: null, owner_id: null, is_default: true, my_role: "operator" }
-const FUSO_LOCAL = Intl.DateTimeFormat().resolvedOptions().timeZone
-const OUTRO_FUSO = FUSO_LOCAL === "America/La_Paz" ? "Europe/Lisbon" : "America/La_Paz"
+const LOCAL_TIMEZONE = Intl.DateTimeFormat().resolvedOptions().timeZone
+const OTHER_TIMEZONE = LOCAL_TIMEZONE === "America/La_Paz" ? "Europe/Lisbon" : "America/La_Paz"
 
 beforeAll(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -185,21 +185,21 @@ beforeEach(() => {
     total: 300,
   }))
   H.getMySchedules.mockResolvedValue(pagina([ag()], 3))
-  acervoPadrao()
+  defaultCollection()
 })
 
 /** A button that switches the language through the context, as Preferências does. */
-function TrocarIdioma({ para }: { para: Idioma }) {
-  const { escolher } = useIdioma()
+function SwitchLanguage({ para }: { para: Idioma }) {
+  const { escolher } = useLanguage()
   return <button type="button" onClick={() => escolher(para)}>trocar idioma</button>
 }
 
 function montar(idioma: Idioma, lista: React.ReactNode, trocarPara?: Idioma) {
   return render(
-    <IdiomaProvider inicial={{ idioma, detectado: idioma, escolhido: idioma }}>
+    <LanguageProvider inicial={{ idioma, detectado: idioma, escolhido: idioma }}>
       <SidebarProvider>{lista}</SidebarProvider>
-      {trocarPara && <TrocarIdioma para={trocarPara} />}
-    </IdiomaProvider>,
+      {trocarPara && <SwitchLanguage para={trocarPara} />}
+    </LanguageProvider>,
   )
 }
 
@@ -209,8 +209,8 @@ function nome(n: string): HTMLElement {
   if (!el) throw new Error(`Nenhum nome de arquivo "${n}" na tela`)
   return el
 }
-const acharNome = (n: string) => waitFor(() => nome(n))
-const menuDaLinha = (i = 0) => screen.getAllByTestId("menu")[i]
+const findName = (n: string) => waitFor(() => nome(n))
+const rowMenu = (i = 0) => screen.getAllByTestId("menu")[i]
 
 // ── English ─────────────────────────────────────────────────────────────────
 
@@ -219,8 +219,8 @@ describe("em inglês — Chats", () => {
     montar("en", <ChatsLista />)
     expect(await screen.findByText("Focos em Rondônia")).toBeTruthy()
     expect(screen.getByText("Untitled")).toBeTruthy()
-    expect(within(menuDaLinha()).getByText("Rename")).toBeTruthy()
-    expect(within(menuDaLinha()).getByText("Delete")).toBeTruthy()
+    expect(within(rowMenu()).getByText("Rename")).toBeTruthy()
+    expect(within(rowMenu()).getByText("Delete")).toBeTruthy()
     expect(screen.getByText("showing 2 of 300")).toBeTruthy()
     expect(screen.getByText("Show more")).toBeTruthy()
   })
@@ -248,7 +248,7 @@ describe("em inglês — Chats", () => {
     montar("en", <ChatsLista />)
     await screen.findByText("Focos em Rondônia")
 
-    fireEvent.click(within(menuDaLinha()).getByText("Rename"))
+    fireEvent.click(within(rowMenu()).getByText("Rename"))
     const renomear = await screen.findByRole("dialog")
     expect(within(renomear).getByText("Rename chat")).toBeTruthy()
     expect(within(renomear).getByText("Choose a new title for this chat.")).toBeTruthy()
@@ -258,7 +258,7 @@ describe("em inglês — Chats", () => {
     fireEvent.click(within(renomear).getByRole("button", { name: "Cancel" }))
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
 
-    fireEvent.click(within(menuDaLinha()).getByText("Delete"))
+    fireEvent.click(within(rowMenu()).getByText("Delete"))
     const apagar = await screen.findByRole("dialog")
     expect(within(apagar).getByText("Delete chat")).toBeTruthy()
     expect(within(apagar).getByText(
@@ -279,14 +279,14 @@ describe("em inglês — Agendamentos", () => {
       ag({ job_id: "job-2", workflow_name: "Parado", flag_ative: false }),
       ag({
         job_id: "job-3", workflow_name: "Do assistente", origem: "assistente",
-        strategy: "cron", cron_expression: "0 6 * * *", interval: null, unit: null, timezone: OUTRO_FUSO,
+        strategy: "cron", cron_expression: "0 6 * * *", interval: null, unit: null, timezone: OTHER_TIMEZONE,
       }),
     ], 5))
     montar("en", <AgendamentosLista />)
     await screen.findByText("Fluxo A")
     expect(screen.getByText(/^every 6 h · (today|tomorrow), /)).toBeTruthy()
     expect(screen.getByText("paused — workflow inactive")).toBeTruthy()
-    expect(screen.getByText(new RegExp(`^every day at 6:00\\sAM \\(${OUTRO_FUSO}\\) · `))).toBeTruthy()
+    expect(screen.getByText(new RegExp(`^every day at 6:00\\sAM \\(${OTHER_TIMEZONE}\\) · `))).toBeTruthy()
     expect(screen.getByLabelText("Assistant workflow")).toBeTruthy()
     expect(screen.getAllByText("Pause")).toHaveLength(3)
     expect(screen.getAllByText("Run now")).toHaveLength(3)
@@ -351,7 +351,7 @@ describe("em inglês — Agendamentos", () => {
 describe("em inglês — Artefatos", () => {
   it("o menu, as dicas da linha, a retenção e o rodapé", async () => {
     montar("en", <ArtefatosLista />)
-    await acharNome("saida.geojson")
+    await findName("saida.geojson")
     expect(screen.getAllByText("Show on the globe")).toHaveLength(2)
     expect(screen.getAllByText("Download")).toHaveLength(4)
     expect(screen.getAllByText("Metadata")).toHaveLength(1)
@@ -374,8 +374,8 @@ describe("em inglês — Artefatos", () => {
   it("excluir: o diálogo e o toast em inglês", async () => {
     H.deleteArtifact.mockResolvedValue(falhou(500))
     montar("en", <ArtefatosLista />)
-    await acharNome("saida.geojson")
-    fireEvent.click(within(menuDaLinha(0)).getByText("Delete"))
+    await findName("saida.geojson")
+    fireEvent.click(within(rowMenu(0)).getByText("Delete"))
     const dialogo = await screen.findByRole("dialog")
     expect(within(dialogo).getByText("Delete artifact")).toBeTruthy()
     expect(within(dialogo).getByText('"saida.geojson" will be deleted. This can’t be undone.')).toBeTruthy()
@@ -387,8 +387,8 @@ describe("em inglês — Artefatos", () => {
   it("o arquivo do Drive: excluir fala de arquivo, e baixar que falha avisa", async () => {
     H.getDriveDownloadUrl.mockResolvedValue(falhou(500))
     montar("en", <ArtefatosLista />)
-    await acharNome("dados.csv")
-    const menuDoDrive = menuDaLinha(3)
+    await findName("dados.csv")
+    const menuDoDrive = rowMenu(3)
     fireEvent.click(within(menuDoDrive).getByText("Download"))
     await waitFor(() => expect(H.toastErro).toHaveBeenCalledWith("Couldn’t download the file", "Try again."))
 
@@ -442,7 +442,7 @@ describe("em espanhol — Chats", () => {
     expect(screen.getByText("mostrando 2 de 300")).toBeTruthy()
     expect(screen.getByText("Ver más")).toBeTruthy()
 
-    fireEvent.click(within(menuDaLinha()).getByText("Renombrar"))
+    fireEvent.click(within(rowMenu()).getByText("Renombrar"))
     const renomear = await screen.findByRole("dialog")
     expect(within(renomear).getByText("Renombrar conversación")).toBeTruthy()
     expect(within(renomear).getByText("Elige un nuevo título para esta conversación.")).toBeTruthy()
@@ -452,7 +452,7 @@ describe("em espanhol — Chats", () => {
     fireEvent.click(within(renomear).getByRole("button", { name: "Cancelar" }))
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
 
-    fireEvent.click(within(menuDaLinha()).getByText("Eliminar"))
+    fireEvent.click(within(rowMenu()).getByText("Eliminar"))
     const apagar = await screen.findByRole("dialog")
     expect(within(apagar).getByText("Eliminar conversación")).toBeTruthy()
     expect(within(apagar).getByText(
@@ -480,7 +480,7 @@ describe("em espanhol — Agendamentos", () => {
       ag({ job_id: "job-2", workflow_name: "Parado", flag_ative: false }),
       ag({
         job_id: "job-3", workflow_name: "Do assistente", origem: "assistente",
-        strategy: "cron", cron_expression: "0 6 * * *", interval: null, unit: null, timezone: OUTRO_FUSO,
+        strategy: "cron", cron_expression: "0 6 * * *", interval: null, unit: null, timezone: OTHER_TIMEZONE,
       }),
     ], 5))
     H.updateSchedule.mockResolvedValue(ok({}))
@@ -488,7 +488,7 @@ describe("em espanhol — Agendamentos", () => {
     await screen.findByText("Fluxo A")
     expect(screen.getAllByText("pausado")).toHaveLength(1)
     expect(screen.getByText("pausado — flujo inactivo")).toBeTruthy()
-    expect(screen.getByText(new RegExp(`^todos los días a las 6:00 \\(${OUTRO_FUSO}\\) · `))).toBeTruthy()
+    expect(screen.getByText(new RegExp(`^todos los días a las 6:00 \\(${OTHER_TIMEZONE}\\) · `))).toBeTruthy()
     expect(screen.getByLabelText("Flujo del asistente")).toBeTruthy()
     expect(screen.getAllByText("Pausar")).toHaveLength(2)
     expect(screen.getAllByText("Ejecutar ahora")).toHaveLength(3)
@@ -518,7 +518,7 @@ describe("em espanhol — Agendamentos", () => {
 describe("em espanhol — Artefatos", () => {
   it("o menu, a linha inerte, a retenção, o rodapé e a exclusão", async () => {
     montar("es", <ArtefatosLista />)
-    await acharNome("saida.geojson")
+    await findName("saida.geojson")
     expect(screen.getAllByText("Mostrar en el globo")).toHaveLength(2)
     expect(screen.getAllByText("Descargar")).toHaveLength(4)
     expect(screen.getAllByText("Metadatos")).toHaveLength(1)
@@ -531,7 +531,7 @@ describe("em espanhol — Artefatos", () => {
     expect(dica.getAttribute("title")).toMatch(/^Eliminado automáticamente el \d{2}\/\d{2}\/\d{4}, \d{1,2}:\d{2}$/)
     expect(screen.getByText("mostrando 4 de 900")).toBeTruthy()
 
-    fireEvent.click(within(menuDaLinha(0)).getByText("Eliminar"))
+    fireEvent.click(within(rowMenu(0)).getByText("Eliminar"))
     const dialogo = await screen.findByRole("dialog")
     expect(within(dialogo).getByText("Eliminar artefacto")).toBeTruthy()
     expect(within(dialogo).getByText('"saida.geojson" se eliminará. Esta acción no se puede deshacer.')).toBeTruthy()
@@ -542,7 +542,7 @@ describe("em espanhol — Artefatos", () => {
   it("a falha do Drive e a falha total", async () => {
     H.getDriveFiles.mockRejectedValue(new Error("drive fora do ar"))
     montar("es", <ArtefatosLista />)
-    await acharNome("saida.geojson")
+    await findName("saida.geojson")
     const aviso = screen.getByRole("status")
     expect(within(aviso).getByText("No se pudieron listar los archivos del Drive.")).toBeTruthy()
     expect(within(aviso).getByText("Intentar de nuevo")).toBeTruthy()
@@ -580,7 +580,7 @@ describe("trocar de idioma nas Preferências, com a lista na tela", () => {
 
   it("o motivo da linha inerte também — o acervo guardado não é normalizado de novo", async () => {
     montar("en", <ArtefatosLista />, "es")
-    await acharNome("malha.zip")
+    await findName("malha.zip")
     expect(screen.getByText("no preview on the globe for this format — publish the map to show it")).toBeTruthy()
     fireEvent.click(screen.getByText("trocar idioma"))
     expect(await screen.findByText("formato sin vista previa en el globo — publica el mapa para mostrarlo")).toBeTruthy()
@@ -595,11 +595,11 @@ describe("fora da Home, a lista fica inteira em português", () => {
       ag({ strategy: "cron", cron_expression: "0 6 * * *", interval: null, unit: null }),
     ]))
     render(
-      <IdiomaProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
-        <EscopoPelaRota>
+      <LanguageProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
+        <ScopeByRoute>
           <SidebarProvider><AgendamentosLista /></SidebarProvider>
-        </EscopoPelaRota>
-      </IdiomaProvider>,
+        </ScopeByRoute>
+      </LanguageProvider>,
     )
     await screen.findByText("Fluxo A")
     expect(screen.getByText(/^todo dia às 06:00 · /)).toBeTruthy()
@@ -628,7 +628,7 @@ describe("compartilhados com o painel de administração: sem os textos, o portu
   })
 
   it("RetencaoHint: as três frases e o title com o formatLocal", () => {
-    const exp = daquiATresDias()
+    const exp = inThreeDays()
     const { rerender } = render(<RetencaoHint expiresAt={exp} />)
     const dica = screen.getByText("expira em 3 dias")
     expect(dica.getAttribute("title")).toBe(`Removido automaticamente em ${formatLocal(exp)}`)
@@ -642,14 +642,14 @@ describe("compartilhados com o painel de administração: sem os textos, o portu
   })
 
   it("a Home em português passa ao RetencaoHint exatamente o que ele diria sozinho", async () => {
-    const exp = daquiATresDias()
+    const exp = inThreeDays()
     H.getArtifacts.mockResolvedValue(ok({
       items: [artefato({ id_hash: "art-efe", filename: "temporario.geojson", expires_at: exp })],
       total: 1,
     }))
     // No provider: it is the Home in Portuguese, with the dictionary's texts.
     render(<SidebarProvider><ArtefatosLista /></SidebarProvider>)
-    await acharNome("temporario.geojson")
+    await findName("temporario.geojson")
     const naHome = screen.getByText("expira em 3 dias")
 
     const { container } = render(<RetencaoHint expiresAt={exp} />)

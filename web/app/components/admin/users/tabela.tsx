@@ -20,9 +20,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/app/components/ui/tooltip"
-import { CABECALHO_DE_COLUNAS, LINHA_EMPILHADA } from "@/app/components/shared/tabela-empilhada"
+import { COLUMN_HEADER, STACKED_ROW } from "@/app/components/shared/tabela-empilhada"
 import { cn } from "@/lib/utils"
-import { formatarInteiro } from "@/lib/formatos"
+import { formatInteger } from "@/lib/formatos"
 import {
   SuspendUserDialog, ReactivateUserDialog, DeleteUserDialog,
   ChangeRoleDialog, ChangeAgentQuotaDialog,
@@ -39,30 +39,30 @@ import {
 
 // ── Cores de status e role (pares claro/escuro sancionados, contrato §6) ────────
 
-const COR_STATUS: Record<IAdminUser["status"], string> = {
+const STATUS_COLOR: Record<IAdminUser["status"], string> = {
   active:    "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400",
   suspended: "bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-400",
   deleted:   "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400",
 }
 
-const ROTULO_STATUS: Record<IAdminUser["status"], string> = {
+const STATUS_LABEL: Record<IAdminUser["status"], string> = {
   active:    "Ativo",
   suspended: "Suspenso",
   deleted:   "Excluído",
 }
 
-function StatusUsuarioBadge({ status }: { status: IAdminUser["status"] }) {
+function UserStatusBadge({ status }: { status: IAdminUser["status"] }) {
   return (
     <span
       data-status={status}
-      className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium select-none", COR_STATUS[status])}
+      className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium select-none", STATUS_COLOR[status])}
     >
-      {ROTULO_STATUS[status]}
+      {STATUS_LABEL[status]}
     </span>
   )
 }
 
-function RoleUsuarioBadge({ role, quota }: { role: string; quota: number }) {
+function UserRoleBadge({ role, quota }: { role: string; quota: number }) {
   const admin = role === "admin"
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
@@ -111,7 +111,7 @@ interface Props {
 // React.memo: the page re-renders on every keystroke in the search, but the props
 // here already come stable (memoized in the page) — the memo avoids repainting the
 // ~25 Radix rows on every keystroke.
-export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
+export const UsersTable = memo(function UsersTable({
   users, loading, currentUserId,
   selected, selectableUsers, allOnPageSelected, onToggleSelect, onToggleSelectAll,
   sortBy, sortOrder, onSort,
@@ -137,7 +137,7 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
       <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full text-sm md:min-w-[720px]">
-            <thead className={CABECALHO_DE_COLUNAS}>
+            <thead className={COLUMN_HEADER}>
               <tr className="border-b bg-muted/50">
                 <th className="w-10 px-3 py-2.5">
                   <Checkbox
@@ -147,11 +147,11 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
                     aria-label="Selecionar todos os usuários da página"
                   />
                 </th>
-                <ColunaOrdenavel col="username" label="Usuário" {...{ sortBy, sortOrder, onSort }} />
-                <ColunaOrdenavel col="status" label="Status" {...{ sortBy, sortOrder, onSort }} />
-                <ColunaOrdenavel col="role" label="Role" {...{ sortBy, sortOrder, onSort }} />
-                <ColunaOrdenavel col="last_login_at" label="Último login" className="hidden md:table-cell" {...{ sortBy, sortOrder, onSort }} />
-                <ColunaOrdenavel col="created_at" label="Criado em" className="hidden lg:table-cell" {...{ sortBy, sortOrder, onSort }} />
+                <SortableColumn col="username" label="Usuário" {...{ sortBy, sortOrder, onSort }} />
+                <SortableColumn col="status" label="Status" {...{ sortBy, sortOrder, onSort }} />
+                <SortableColumn col="role" label="Role" {...{ sortBy, sortOrder, onSort }} />
+                <SortableColumn col="last_login_at" label="Último login" className="hidden md:table-cell" {...{ sortBy, sortOrder, onSort }} />
+                <SortableColumn col="created_at" label="Criado em" className="hidden lg:table-cell" {...{ sortBy, sortOrder, onSort }} />
                 <th className="w-12 px-3 py-2.5" />
               </tr>
             </thead>
@@ -164,7 +164,7 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
                     key={user.id_hash}
                     className={cn(
                       "border-b last:border-b-0 transition-colors hover:bg-accent/40",
-                      LINHA_EMPILHADA,
+                      STACKED_ROW,
                     )}
                   >
                     <td className="px-3 py-3">
@@ -196,10 +196,10 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
                       </div>
                     </td>
                     <td className="px-3 py-3">
-                      <StatusUsuarioBadge status={user.status} />
+                      <UserStatusBadge status={user.status} />
                     </td>
                     <td className="px-3 py-3">
-                      <RoleUsuarioBadge role={user.role} quota={user.agent_quota} />
+                      <UserRoleBadge role={user.role} quota={user.agent_quota} />
                     </td>
                     <td className="px-3 py-3 text-xs text-muted-foreground tabular-nums hidden md:table-cell">
                       {formatLocal(user.last_login_at)}
@@ -248,8 +248,8 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
       {total > 0 && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground tabular-nums">
-            Mostrando <span className="font-medium text-foreground">{formatarInteiro(showFrom)}</span>–<span className="font-medium text-foreground">{formatarInteiro(showTo)}</span> de{" "}
-            <span className="font-medium text-foreground">{formatarInteiro(total)}</span>
+            Mostrando <span className="font-medium text-foreground">{formatInteger(showFrom)}</span>–<span className="font-medium text-foreground">{formatInteger(showTo)}</span> de{" "}
+            <span className="font-medium text-foreground">{formatInteger(total)}</span>
           </span>
           <div className="flex items-center gap-2">
             <Button
@@ -287,7 +287,7 @@ export const TabelaDeUsuarios = memo(function TabelaDeUsuarios({
  * header and a `react-icons/tb` icon instead of a ▲/▼ glyph. Inactive, it shows
  * the faded neutral arrow to say "you can sort by this".
  */
-function ColunaOrdenavel({
+function SortableColumn({
   col, label, className, sortBy, sortOrder, onSort,
 }: {
   col: string

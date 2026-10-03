@@ -20,14 +20,14 @@ from executor import config
 logger = logging.getLogger(__name__)
 
 
-# Tombstone of a job canceled BEFORE it reached this executor (see `lapidar`).
+# Tombstone of a job canceled BEFORE it reached this executor (see `add_tombstone`).
 # The job may be in transit — dispatched by an API worker whose send has not
 # gone out yet — and, if it arrives after the cancellation, it is discarded
 # instead of running a run the server has already closed. Ten minutes comfortably
 # cover the server's send deadline; the ceiling keeps a buggy server from filling
 # memory.
-_LAPIDE_TTL_S = 600.0
-_LAPIDE_MAX = 1000
+_TOMBSTONE_TTL_S = 600.0
+_TOMBSTONE_MAX = 1000
 
 
 @dataclass(order=True)
@@ -94,8 +94,8 @@ class ExecutorJobQueue:
         # the set grew without bound and the UI said "cancelamento solicitado"
         # (cancellation requested) for a job that did not even exist on this instance.
         self._known: set[str] = set()
-        # job_id → (monotonic) instant at which the tombstone expires. See `lapidar`.
-        self._lapides: dict[str, float] = {}
+        # job_id → (monotonic) instant at which the tombstone expires. See `add_tombstone`.
+        self._tombstones: dict[str, float] = {}
         # Signals "no job running". Replaces shutdown's 0.5s polling — the
         # `await` wakes up the instant the last job finishes.
         self._idle = asyncio.Event()
@@ -384,35 +384,35 @@ class ExecutorJobQueue:
         logger.info("Cancelamento ignorado: job '%s' nao esta neste executor.", job_id)
         return "unknown"
 
-    def job_ids_ativos(self) -> list[str]:
+    def active_job_ids(self) -> list[str]:
         """Jobs accepted and not yet finished: in the queue, stuck on the semaphore
         or running. It is the inventory the server checks — a run it thinks is
         here and is not in this list (nor has a pending result) has been
         lost."""
         return sorted(self._known)
 
-    async def encerrar_desconhecido(self, job_id: str, motivo: str) -> None:
+    async def close_unknown(self, job_id: str, motivo: str) -> None:
         """Closes a job that is not here: tombstone + 'cancelled' result through
         the same path as normal cancellations (`on_cancelled`)."""
-        self.lapidar(job_id)
+        self.add_tombstone(job_id)
         await self._notify_cancelled({"envelope": {"job_id": job_id}}, reason=motivo)
 
-    def lapidar(self, job_id: str) -> None:
+    def add_tombstone(self, job_id: str) -> None:
         """Marks a job that was canceled without being here. If it arrives later,
-        `cancelado_antes_de_chegar` discards it."""
+        `cancelled_before_arrival` discards it."""
         agora = time.monotonic()
-        if len(self._lapides) >= _LAPIDE_MAX:
-            for jid in [j for j, vence in self._lapides.items() if vence <= agora]:
-                del self._lapides[jid]
-            while len(self._lapides) >= _LAPIDE_MAX:
+        if len(self._tombstones) >= _TOMBSTONE_MAX:
+            for jid in [j for j, vence in self._tombstones.items() if vence <= agora]:
+                del self._tombstones[jid]
+            while len(self._tombstones) >= _TOMBSTONE_MAX:
                 # The dict keeps insertion order: the oldest tombstone goes first.
-                del self._lapides[next(iter(self._lapides))]
-        self._lapides[job_id] = agora + _LAPIDE_TTL_S
+                del self._tombstones[next(iter(self._tombstones))]
+        self._tombstones[job_id] = agora + _TOMBSTONE_TTL_S
 
-    def cancelado_antes_de_chegar(self, job_id: str) -> bool:
+    def cancelled_before_arrival(self, job_id: str) -> bool:
         """True if the job was canceled (and closed on the server) before arriving.
         Consumes the tombstone."""
-        vence = self._lapides.pop(job_id, None)
+        vence = self._tombstones.pop(job_id, None)
         return vence is not None and vence > time.monotonic()
 
     # ── Capacidade (para back-pressure e reporting) ───────────────────────────
@@ -431,7 +431,7 @@ class ExecutorJobQueue:
             #
             # We announce saturation: queued = queue ceiling + concurrency ceiling.
             #   - full by declared load -> dispatch puts us LAST
-            #     (`_chave_de_ordem`, the group of full ones);
+            #     (`_sort_key`, the group of full ones);
             #   - queued+running >= max_concurrent+max_queue -> the server's
             #     `is_full()` (ExecutorConnection.is_full) returns True and `send_job`
             #     refuses, making dispatch fall through to the next candidate.

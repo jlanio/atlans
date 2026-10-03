@@ -22,26 +22,26 @@
 // connection's country would only say where its server is: Googlebot comes
 // from the US and would index the Home in English.
 
-export const IDIOMAS = ["pt-BR", "en", "es"] as const
-export type Idioma = (typeof IDIOMAS)[number]
+export const LANGUAGES = ["pt-BR", "en", "es"] as const
+export type Idioma = (typeof LANGUAGES)[number]
 
-export const IDIOMA_PADRAO: Idioma = "pt-BR"
+export const DEFAULT_LANGUAGE: Idioma = "pt-BR"
 
 /** The explicit-choice cookie — same model as `theme` (ThemeContext). */
-export const COOKIE_DO_IDIOMA = "idioma"
+export const LANGUAGE_COOKIE = "idioma"
 
 /** Each language's name in itself: that is how people recognize it in a list. */
-export const NOME_DO_IDIOMA: Record<Idioma, string> = {
+export const LANGUAGE_NAME: Record<Idioma, string> = {
   "pt-BR": "Português (Brasil)",
   en: "English",
   es: "Español",
 }
 
 export function ehIdioma(valor: unknown): valor is Idioma {
-  return typeof valor === "string" && (IDIOMAS as readonly string[]).includes(valor)
+  return typeof valor === "string" && (LANGUAGES as readonly string[]).includes(valor)
 }
 
-function _idiomaDaEtiqueta(etiqueta: string): Idioma | null {
+function _languageFromTag(etiqueta: string): Idioma | null {
   const base = etiqueta.trim().toLowerCase().split(/[-_]/)[0]
   if (base === "pt") return "pt-BR"
   if (base === "en") return "en"
@@ -69,14 +69,14 @@ export function idiomaDoAcceptLanguage(cabecalho: string | null | undefined): Id
     // Highest weight first; on a tie, the header's order wins.
     .sort((a, b) => b.peso - a.peso || a.ordem - b.ordem)
   for (const { etiqueta } of itens) {
-    const idioma = _idiomaDaEtiqueta(etiqueta)
+    const idioma = _languageFromTag(etiqueta)
     if (idioma) return idioma
   }
   return null
 }
 
-const PAISES_LUSOFONOS = new Set(["BR", "PT", "AO", "MZ", "CV", "GW", "ST", "TL"])
-const PAISES_HISPANOFONOS = new Set([
+const PORTUGUESE_SPEAKING_COUNTRIES = new Set(["BR", "PT", "AO", "MZ", "CV", "GW", "ST", "TL"])
+const SPANISH_SPEAKING_COUNTRIES = new Set([
   "ES", "MX", "GT", "HN", "SV", "NI", "CR", "PA", "CU", "DO", "PR",
   "CO", "VE", "EC", "PE", "BO", "CL", "AR", "PY", "UY", "GQ",
 ])
@@ -88,12 +88,12 @@ const PAISES_HISPANOFONOS = new Set([
 export function idiomaDoPais(pais: string | null | undefined): Idioma | null {
   const codigo = (pais ?? "").trim().toUpperCase()
   if (!/^[A-Z]{2}$/.test(codigo) || codigo === "XX" || codigo === "T1") return null
-  if (PAISES_LUSOFONOS.has(codigo)) return "pt-BR"
-  if (PAISES_HISPANOFONOS.has(codigo)) return "es"
+  if (PORTUGUESE_SPEAKING_COUNTRIES.has(codigo)) return "pt-BR"
+  if (SPANISH_SPEAKING_COUNTRIES.has(codigo)) return "es"
   return "en"
 }
 
-export interface IdiomaResolvido {
+export interface ResolvedLanguage {
   /** What the screen uses: the choice, or the detected one when there is no choice. */
   idioma: Idioma
   /** What automatic detection would give — Preferences shows it under "Automático". */
@@ -106,11 +106,11 @@ export function resolverIdioma(sinais: {
   cookie?: string | null
   acceptLanguage?: string | null
   pais?: string | null
-}): IdiomaResolvido {
+}): ResolvedLanguage {
   const escolhido = ehIdioma(sinais.cookie) ? sinais.cookie : null
   const cabecalho = sinais.acceptLanguage?.trim()
   const detectado = cabecalho
     ? idiomaDoAcceptLanguage(cabecalho) ?? idiomaDoPais(sinais.pais) ?? "en"
-    : IDIOMA_PADRAO
+    : DEFAULT_LANGUAGE
   return { idioma: escolhido ?? detectado, detectado, escolhido }
 }

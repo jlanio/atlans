@@ -61,13 +61,13 @@ describe("VisaoWorkflows", () => {
   })
 
   it("clique na linha e no nome levam às execuções do workflow", () => {
-    const onVer = vi.fn()
-    render(<VisaoWorkflows linhas={[linha()]} carregando={false} isAdmin={false} onVerExecucoes={onVer} onAlternarAtivo={() => {}} />)
+    const onView = vi.fn()
+    render(<VisaoWorkflows linhas={[linha()]} carregando={false} isAdmin={false} onVerExecucoes={onView} onAlternarAtivo={() => {}} />)
     const botao = screen.getByRole("button", { name: "Ver execuções de Integração SICAR" })
     fireEvent.click(botao)
     fireEvent.click(botao.closest("tr")!)
-    expect(onVer).toHaveBeenCalledTimes(2)
-    expect(onVer).toHaveBeenCalledWith("wf-1")
+    expect(onView).toHaveBeenCalledTimes(2)
+    expect(onView).toHaveBeenCalledWith("wf-1")
   })
 
   it("admin: desligar pede confirmação; ligar não", async () => {

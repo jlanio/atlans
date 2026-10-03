@@ -4,10 +4,10 @@ import { TbRefresh } from "react-icons/tb"
 import { Button } from "@/app/components/ui/button"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-import { formatarInteiro } from "@/lib/formatos"
-import { PERIODOS, type EstadoDoEscopo, type Periodo } from "./dashboard-url"
+import { formatInteger } from "@/lib/formatos"
+import { PERIODS, type ScopeState, type Period } from "./dashboard-url"
 
-interface ContagensDoSubtitulo {
+interface SubtitleCounts {
   /** Name of the active workspace; used only in the "ativo" (active) scope. */
   workspaceNome: string | null
   /** How many workspaces the user has; used only in the "todos" (all) scope. */
@@ -16,18 +16,18 @@ interface ContagensDoSubtitulo {
   ativos: number | null
 }
 
-interface Props extends ContagensDoSubtitulo {
-  escopo: EstadoDoEscopo
-  onEscopo: (escopo: EstadoDoEscopo) => void
-  periodo: Periodo
-  onPeriodo: (periodo: Periodo) => void
+interface Props extends SubtitleCounts {
+  escopo: ScopeState
+  onEscopo: (escopo: ScopeState) => void
+  periodo: Period
+  onPeriodo: (periodo: Period) => void
   atualizando: boolean
   onAtualizar: () => void
 }
 
 /** "N workflow(s) ativo(s)" — the plural from the number, not the spec's fixed form. */
-function ativosTexto(n: number): string {
-  return `${formatarInteiro(n)} ${n === 1 ? "workflow ativo" : "workflows ativos"}`
+function activeText(n: number): string {
+  return `${formatInteger(n)} ${n === 1 ? "workflow ativo" : "workflows ativos"}`
 }
 
 /**
@@ -37,13 +37,13 @@ function ativosTexto(n: number): string {
  * `ativos` is the 1st load — the caller (the header) swaps in a skeleton
  * instead of writing "— ativos".
  */
-export function textoDoSubtitulo(escopo: EstadoDoEscopo, { workspaceNome, workspaces, ativos }: ContagensDoSubtitulo): string {
+export function textoDoSubtitulo(escopo: ScopeState, { workspaceNome, workspaces, ativos }: SubtitleCounts): string {
   const n = ativos ?? 0
   if (escopo === "todos") {
-    const ws = `${formatarInteiro(workspaces)} ${workspaces === 1 ? "workspace" : "workspaces"}`
-    return `Todos os workspaces · ${ws} · ${ativosTexto(n)}`
+    const ws = `${formatInteger(workspaces)} ${workspaces === 1 ? "workspace" : "workspaces"}`
+    return `Todos os workspaces · ${ws} · ${activeText(n)}`
   }
-  return `«${workspaceNome ?? "workspace"}» · ${ativosTexto(n)}`
+  return `«${workspaceNome ?? "workspace"}» · ${activeText(n)}`
 }
 
 /**
@@ -90,12 +90,12 @@ export function CabecalhoDoDashboard({
             aria-label="Escopo do painel"
             className="inline-flex h-8 w-full overflow-hidden rounded-md border bg-card max-md:h-10 sm:w-auto"
           >
-            <BotaoDeEscopo
+            <ScopeButton
               ativo={escopo === "ativo"}
               rotulo={`«${workspaceNome ?? "workspace"}»`}
               onClick={() => onEscopo("ativo")}
             />
-            <BotaoDeEscopo
+            <ScopeButton
               ativo={escopo === "todos"}
               rotulo="Todos os workspaces"
               onClick={() => onEscopo("todos")}
@@ -110,7 +110,7 @@ export function CabecalhoDoDashboard({
           aria-label="Período"
           className="inline-flex h-8 w-full overflow-hidden rounded-md border bg-card max-md:h-10 sm:w-auto"
         >
-          {PERIODOS.map(p => {
+          {PERIODS.map(p => {
             const ativo = p === periodo
             return (
               <button
@@ -135,7 +135,7 @@ export function CabecalhoDoDashboard({
   )
 }
 
-function BotaoDeEscopo({ ativo, rotulo, onClick }: { ativo: boolean; rotulo: string; onClick: () => void }) {
+function ScopeButton({ ativo, rotulo, onClick }: { ativo: boolean; rotulo: string; onClick: () => void }) {
   return (
     <button
       type="button"

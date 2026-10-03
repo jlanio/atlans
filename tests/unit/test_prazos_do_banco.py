@@ -19,47 +19,47 @@ import pytest
 
 from app.core import db
 
-_RAIZ = Path(__file__).resolve().parents[2]
+_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_os_dois_prazos_viram_connect_args_do_asyncpg():
-    assert db._prazos(60, 90) == {
+def test_both_timeouts_become_asyncpg_connect_args():
+    assert db._timeouts(60, 90) == {
         "server_settings": {"statement_timeout": "60000"},   # milissegundos
         "command_timeout": 90,
     }
 
 
-def test_zero_desliga_cada_prazo():
-    assert db._prazos(0, 90) == {"command_timeout": 90}
-    assert db._prazos(60, 0) == {"server_settings": {"statement_timeout": "60000"}}
-    assert db._prazos(0, 0) == {}
+def test_zero_disables_each_timeout():
+    assert db._timeouts(0, 90) == {"command_timeout": 90}
+    assert db._timeouts(60, 0) == {"server_settings": {"statement_timeout": "60000"}}
+    assert db._timeouts(0, 0) == {}
 
 
-def test_avisa_quando_o_asyncpg_desistiria_antes_do_postgres(caplog):
+def test_warns_when_asyncpg_would_give_up_before_postgres(caplog):
     with caplog.at_level(logging.WARNING, logger=db.logger.name):
-        db._prazos(60, 60)
+        db._timeouts(60, 60)
     assert "DB_COMMAND_TIMEOUT" in caplog.text
 
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger=db.logger.name):
-        db._prazos(60, 90)
+        db._timeouts(60, 90)
     assert caplog.text == ""
 
 
-def _em_processo_novo(codigo: str, **env: str) -> dict:
+def _in_new_process(codigo: str, **env: str) -> dict:
     """The config is read at import: each scenario in a clean interpreter."""
-    ambiente = {**os.environ, "PYTHONPATH": str(_RAIZ), **env}
+    ambiente = {**os.environ, "PYTHONPATH": str(_ROOT), **env}
     saida = subprocess.run(
-        [sys.executable, "-c", codigo], cwd=_RAIZ, env=ambiente,
+        [sys.executable, "-c", codigo], cwd=_ROOT, env=ambiente,
         capture_output=True, text=True, timeout=120, check=True,
     )
     return json.loads(saida.stdout.strip().splitlines()[-1])
 
 
-def test_variavel_vazia_vale_o_padrao():
+def test_empty_variable_uses_the_default():
     """Compose passes through `${DB_STATEMENT_TIMEOUT:-}`: empty must not bring down
     the import with `int('')`."""
-    lido = _em_processo_novo(
+    lido = _in_new_process(
         "import json; from app.core import config as c;"
         "print(json.dumps([c.DB_STATEMENT_TIMEOUT, c.DB_COMMAND_TIMEOUT]))",
         DB_STATEMENT_TIMEOUT="", DB_COMMAND_TIMEOUT="",
@@ -67,7 +67,7 @@ def test_variavel_vazia_vale_o_padrao():
     assert lido == [60, 90]
 
 
-_CAPTURA_DO_CONNECT = """
+_CONNECT_CAPTURE = """
 import asyncio, json
 import asyncpg
 
@@ -97,10 +97,10 @@ print(json.dumps({
 """
 
 
-def test_os_prazos_chegam_ao_asyncpg_connect_sem_perder_o_ssl():
+def test_the_timeouts_reach_asyncpg_connect_without_losing_ssl():
     """What matters is what SQLAlchemy hands to asyncpg.connect, not the dict."""
-    lido = _em_processo_novo(
-        _CAPTURA_DO_CONNECT,
+    lido = _in_new_process(
+        _CONNECT_CAPTURE,
         DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:1/x",  # pragma: allowlist secret
         DB_STATEMENT_TIMEOUT="45", DB_COMMAND_TIMEOUT="70",
     )
@@ -113,15 +113,15 @@ def test_os_prazos_chegam_ao_asyncpg_connect_sem_perder_o_ssl():
     ("99999999", 2_147_483),                               # above this Postgres rejects the connection
     ("120", 120),
 ])
-def test_valor_estranho_nao_derruba_a_importacao(bruto, esperado):
-    lido = _em_processo_novo(
+def test_odd_value_does_not_break_the_import(bruto, esperado):
+    lido = _in_new_process(
         "import json; from app.core import config as c; print(json.dumps(c.DB_STATEMENT_TIMEOUT))",
         DB_STATEMENT_TIMEOUT=bruto,
     )
     assert lido == esperado
 
 
-_OUVINTE = """
+_LISTENER = """
 import asyncio, json
 from app.core import db
 from sqlalchemy import event
@@ -151,11 +151,11 @@ print(json.dumps({"registrado": registrado, **resultado}))
 """
 
 
-def test_conexao_invalidada_por_prazo_ou_cancelamento_e_abortada():
+def test_connection_invalidated_by_timeout_or_cancellation_is_aborted():
     """Without this, with the network silent, asyncpg's polite close waited for the
     cancellation confirmation with no timeout: neither command_timeout nor a
     wait_for around the write returned (measured with a proxy that freezes)."""
-    lido = _em_processo_novo(_OUVINTE, DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:1/x")  # pragma: allowlist secret
+    lido = _in_new_process(_LISTENER, DATABASE_URL="postgresql+asyncpg://u:p@127.0.0.1:1/x")  # pragma: allowlist secret
     assert lido == {
         "registrado": True,
         "timeout_asyncio": ["terminate"], "timeout": ["terminate"], "cancelado": ["terminate"],
@@ -163,11 +163,11 @@ def test_conexao_invalidada_por_prazo_ou_cancelamento_e_abortada():
     }
 
 
-def test_a_cli_de_manutencao_roda_sem_prazo():
+def test_the_maintenance_cli_runs_without_timeout():
     """migrar-nos scans whole tables: the API's 60 s would cut it off."""
     codigo = (
         "import json, app.cli; from app.core import config as c;"
         "print(json.dumps([c.DB_STATEMENT_TIMEOUT, c.DB_COMMAND_TIMEOUT]))"
     )
-    assert _em_processo_novo(codigo, DB_STATEMENT_TIMEOUT="", DB_COMMAND_TIMEOUT="") == [0, 0]
-    assert _em_processo_novo(codigo, DB_STATEMENT_TIMEOUT="30", DB_COMMAND_TIMEOUT="40") == [30, 40]
+    assert _in_new_process(codigo, DB_STATEMENT_TIMEOUT="", DB_COMMAND_TIMEOUT="") == [0, 0]
+    assert _in_new_process(codigo, DB_STATEMENT_TIMEOUT="30", DB_COMMAND_TIMEOUT="40") == [30, 40]

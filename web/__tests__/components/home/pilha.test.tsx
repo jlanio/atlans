@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 
-import Pilha, { ITENS_AO_CENTRO } from "@/app/components/home/assistente/pilha"
+import Pilha, { CENTER_ITEMS } from "@/app/components/home/assistente/pilha"
 import { useHomeStore } from "@/app/stores/homeStore"
-import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
+import type { AssistantTurn } from "@/app/components/home/assistente/quadros"
 
 /**
  * The conversation in the center: the SAME conversation as the panel, cut down to the last exchange and
@@ -13,12 +13,12 @@ import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros
  * then the footer — and the exit to the side.
  */
 
-function pergunta(id: string, texto: string): TurnoDoAssistente {
-  return { id, papel: "user", texto, blocos: [] } as TurnoDoAssistente
+function pergunta(id: string, texto: string): AssistantTurn {
+  return { id, papel: "user", texto, blocos: [] } as AssistantTurn
 }
 
-function resposta(id: string, texto: string): TurnoDoAssistente {
-  return { id, papel: "assistant", blocos: [{ tipo: "texto", texto }] } as TurnoDoAssistente
+function resposta(id: string, texto: string): AssistantTurn {
+  return { id, papel: "assistant", blocos: [{ tipo: "texto", texto }] } as AssistantTurn
 }
 
 const confirmar = vi.fn()
@@ -41,7 +41,7 @@ describe("Pilha — a última troca ao centro", () => {
     ]
     render(<Pilha turnos={turnos} correndo={false} confirmar={confirmar} enviar={enviar} />)
 
-    expect(ITENS_AO_CENTRO).toBe(2)
+    expect(CENTER_ITEMS).toBe(2)
     expect(screen.getByText("cruza com terras indígenas")).toBeTruthy()
     expect(screen.getByText("212 focos caem em 9 TIs.")).toBeTruthy()
     expect(screen.queryByText("focos de calor em MT")).toBeNull()

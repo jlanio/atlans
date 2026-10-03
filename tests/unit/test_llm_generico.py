@@ -9,11 +9,11 @@ its public app ranking), the catalog never carried the key (a gateway or
 a vLLM with a key refused) and the model id had to be `provider/name` —
 Ollama's `qwen3:14b` was rejected.
 
-  NOMES       (names) LLM_API_KEY and LLM_BASE_URL; the old names still work
+  PROMPT_NAMES       (names) LLM_API_KEY and LLM_BASE_URL; the old names still work
   ATRIBUIÇÃO  (attribution) off by default; ASSISTENTE_ATRIBUICAO turns it on in all three paths
   CATÁLOGO    (catalog) from the configured base, with the key when there is one
   ID          the name in any provider's catalog; a URL or a space, no
-  PEDIDO      (request) outside OpenRouter, only the OpenAI API format — and the usage comes
+  REQUEST      (request) outside OpenRouter, only the OpenAI API format — and the usage comes
 """
 from __future__ import annotations
 
@@ -29,16 +29,16 @@ import pytest
 
 from app.core import config
 from app.services import openrouter
-from app.services.assistente_config_service import formato_valido
+from app.services.assistente_config_service import is_valid_format
 
 RAIZ = Path(__file__).resolve().parents[2]
-CHAVE_ANTIGA = "sk-or-v1-antiga"  # pragma: allowlist secret
-CHAVE_LOCAL = "local"  # pragma: allowlist secret
+OLD_KEY = "sk-or-v1-antiga"  # pragma: allowlist secret
+LOCAL_KEY = "local"  # pragma: allowlist secret
 
 
-# ── NOMES ────────────────────────────────────────────────────────────────────
+# ── PROMPT_NAMES ────────────────────────────────────────────────────────────────────
 
-def _config_com(ambiente: dict[str, str]) -> list[str]:
+def _config_with(ambiente: dict[str, str]) -> list[str]:
     """The config is read at import: each combination runs in its own process."""
     codigo = (
         "import app.core.config as c\n"
@@ -53,50 +53,50 @@ def _config_com(ambiente: dict[str, str]) -> list[str]:
     return r.stdout.splitlines()
 
 
-def test_sem_nada_o_assistente_nao_tem_chave_e_a_base_e_a_do_openrouter():
-    assert _config_com({}) == ["", "https://openrouter.ai/api/v1", "False"]
+def test_with_nothing_set_assistant_has_no_key_and_base_is_openrouter():
+    assert _config_with({}) == ["", "https://openrouter.ai/api/v1", "False"]
 
 
-def test_os_nomes_antigos_continuam_valendo():
-    assert _config_com({
-        "OPENROUTER_API_KEY": CHAVE_ANTIGA, "OPENROUTER_BASE_URL": "https://gateway.example.org/v1",
-    })[:2] == [CHAVE_ANTIGA, "https://gateway.example.org/v1"]
+def test_old_names_still_work():
+    assert _config_with({
+        "OPENROUTER_API_KEY": OLD_KEY, "OPENROUTER_BASE_URL": "https://gateway.example.org/v1",
+    })[:2] == [OLD_KEY, "https://gateway.example.org/v1"]
 
 
-def test_os_nomes_genericos_vencem_os_antigos():
+def test_generic_names_win_over_old_ones():
     # Compose passes all four; an empty one does not erase the other.
-    assert _config_com({
-        "LLM_API_KEY": CHAVE_LOCAL, "LLM_BASE_URL": "http://ollama:11434/v1",
-        "OPENROUTER_API_KEY": CHAVE_ANTIGA, "OPENROUTER_BASE_URL": "",
-    })[:2] == [CHAVE_LOCAL, "http://ollama:11434/v1"]
-    assert _config_com({"LLM_API_KEY": "  ", "OPENROUTER_API_KEY": CHAVE_ANTIGA})[0] == CHAVE_ANTIGA
+    assert _config_with({
+        "LLM_API_KEY": LOCAL_KEY, "LLM_BASE_URL": "http://ollama:11434/v1",
+        "OPENROUTER_API_KEY": OLD_KEY, "OPENROUTER_BASE_URL": "",
+    })[:2] == [LOCAL_KEY, "http://ollama:11434/v1"]
+    assert _config_with({"LLM_API_KEY": "  ", "OPENROUTER_API_KEY": OLD_KEY})[0] == OLD_KEY
 
 
 @pytest.mark.parametrize("valor, ligada", [
     ("", "False"), ("false", "False"), ("talvez", "False"),
     ("true", "True"), ("1", "True"), ("sim", "True"), (" TRUE ", "True"),
 ])
-def test_atribuicao_so_com_valor_explicito(valor, ligada):
-    assert _config_com({"ASSISTENTE_ATRIBUICAO": valor})[2] == ligada
+def test_attribution_only_with_explicit_value(valor, ligada):
+    assert _config_with({"ASSISTENTE_ATRIBUICAO": valor})[2] == ligada
 
 
 # ── ATRIBUIÇÃO (attribution) ─────────────────────────────────────────────────
 
-def test_o_cliente_sem_titulo_nem_referer_nao_se_identifica():
-    cabecalhos = openrouter.ClienteOpenRouter("k")._cabecalhos()
+def test_client_without_title_or_referer_does_not_identify_itself():
+    cabecalhos = openrouter.ClienteOpenRouter("k")._headers()
     assert "X-Title" not in cabecalhos and "HTTP-Referer" not in cabecalhos
 
 
-def test_o_cliente_com_titulo_e_referer_se_identifica():
+def test_client_with_title_and_referer_identifies_itself():
     cabecalhos = openrouter.ClienteOpenRouter(
         "k", titulo="Atlans", referer="https://atlans.example.org",
-    )._cabecalhos()
+    )._headers()
     assert cabecalhos["X-Title"] == "Atlans"
     assert cabecalhos["HTTP-Referer"] == "https://atlans.example.org"
 
 
 @pytest.mark.parametrize("atribuicao", [False, True])
-def test_a_conversa_so_se_identifica_com_a_atribuicao(monkeypatch, atribuicao):
+def test_chat_identifies_itself_only_with_attribution(monkeypatch, atribuicao):
     from app.services.assistente_service import criar_cliente
 
     monkeypatch.setattr(config, "OPENROUTER_API_KEY", "k")
@@ -105,7 +105,7 @@ def test_a_conversa_so_se_identifica_com_a_atribuicao(monkeypatch, atribuicao):
     monkeypatch.setattr(config, "ASSISTENTE_ATRIBUICAO", atribuicao)
 
     cliente = criar_cliente()
-    cabecalhos = cliente._cabecalhos()
+    cabecalhos = cliente._headers()
 
     assert cliente._url == "http://ollama:11434/v1/chat/completions"
     if atribuicao:
@@ -116,21 +116,21 @@ def test_a_conversa_so_se_identifica_com_a_atribuicao(monkeypatch, atribuicao):
 
 
 @pytest.mark.parametrize("atribuicao", [False, True])
-async def test_a_sonda_so_se_identifica_com_a_atribuicao(monkeypatch, atribuicao):
+async def test_probe_identifies_itself_only_with_attribution(monkeypatch, atribuicao):
     from app.api.routers import admin_assistente_router as R
 
     visto: dict = {}
 
-    async def _sondar(modelo, **kw):
+    async def _probe(modelo, **kw):
         visto.update(kw)
 
     monkeypatch.setattr(R, "OPENROUTER_API_KEY", "k")
     monkeypatch.setattr(R, "OPENROUTER_BASE_URL", "http://ollama:11434/v1")
-    monkeypatch.setattr(R.openrouter, "sondar_modelo", _sondar)
+    monkeypatch.setattr(R.openrouter, "sondar_modelo", _probe)
     monkeypatch.setattr(config, "FRONTEND_URL", "https://atlans.example.org")
     monkeypatch.setattr(config, "ASSISTENTE_ATRIBUICAO", atribuicao)
 
-    await R._sondar_ou_400("qwen3:14b")
+    await R._probe_or_400("qwen3:14b")
 
     assert visto["base_url"] == "http://ollama:11434/v1"
     if atribuicao:
@@ -141,7 +141,7 @@ async def test_a_sonda_so_se_identifica_com_a_atribuicao(monkeypatch, atribuicao
 
 # ── CATÁLOGO (catalog) ───────────────────────────────────────────────────────
 
-async def _pedido_do_catalogo(**kw) -> httpx.Request:
+async def _catalog_request(**kw) -> httpx.Request:
     pedidos: list[httpx.Request] = []
 
     def handler(pedido: httpx.Request) -> httpx.Response:
@@ -163,14 +163,14 @@ async def _pedido_do_catalogo(**kw) -> httpx.Request:
     return pedido
 
 
-async def test_o_catalogo_leva_a_chave_quando_ha():
-    pedido = await _pedido_do_catalogo(chave="sk-local")
+async def test_catalog_carries_key_when_present():
+    pedido = await _catalog_request(chave="sk-local")
     assert str(pedido.url) == "http://ollama:11434/v1/models"
     assert pedido.headers["authorization"] == "Bearer sk-local"
 
 
-async def test_o_catalogo_sem_chave_nao_manda_authorization():
-    pedido = await _pedido_do_catalogo()
+async def test_catalog_without_key_sends_no_authorization():
+    pedido = await _catalog_request()
     assert "authorization" not in pedido.headers
 
 
@@ -184,8 +184,8 @@ async def test_o_catalogo_sem_chave_nao_manda_authorization():
     "meta-llama/Llama-3.1-8B-Instruct",  # vLLM (o id do Hugging Face)
     "org/grupo/modelo",                 # path with more than one slash
 ])
-def test_id_de_qualquer_provedor_e_aceito(modelo):
-    assert formato_valido(modelo)
+def test_any_provider_id_is_accepted(modelo):
+    assert is_valid_format(modelo)
 
 
 @pytest.mark.parametrize("modelo", [
@@ -194,21 +194,21 @@ def test_id_de_qualquer_provedor_e_aceito(modelo):
     "/claude", "anthropic/", "anthropic//claude", "x" * 121,
 ])
 def test_colagem_errada_e_recusada(modelo):
-    assert not formato_valido(modelo)
+    assert not is_valid_format(modelo)
 
 
-# ── PEDIDO (request) ─────────────────────────────────────────────────────────
+# ── REQUEST (request) ─────────────────────────────────────────────────────────
 #
 # `usage`, `reasoning` and `cache_control` are OpenRouter parameters. The OpenAI
 # API (and vLLM, LiteLLM, Ollama) only sends `usage` in the stream with
 # `stream_options.include_usage` — without it, the daily quota counted nothing on a
 # paid gateway. And OpenAI itself rejects fields it does not know.
 
-SISTEMA = [
+SYSTEM = [
     {"type": "text", "text": "política"},
     {"type": "text", "text": "guia", "cache_control": {"type": "ephemeral"}},
 ]
-FERRAMENTA = openrouter.ferramenta("ping", "responde", {"type": "object", "properties": {}})
+TOOL = openrouter.ferramenta("ping", "responde", {"type": "object", "properties": {}})
 
 
 @pytest.mark.parametrize("base, e_dele", [
@@ -226,15 +226,15 @@ def test_quem_e_o_openrouter(base, e_dele):
     assert openrouter.e_openrouter(base) is e_dele
 
 
-def test_fora_do_openrouter_o_pedido_e_o_da_api_da_openai():
+def test_outside_openrouter_request_is_openai_api_one():
     corpo = openrouter.montar_pedido(
-        modelo="qwen3:14b", sistema=SISTEMA, conversa=[{"role": "user", "content": "oi"}],
-        ferramentas=[FERRAMENTA], max_tokens=100, esforco="high", openrouter=False,
+        modelo="qwen3:14b", sistema=SYSTEM, conversa=[{"role": "user", "content": "oi"}],
+        ferramentas=[TOOL], max_tokens=100, esforco="high", openrouter=False,
     )
     assert corpo["stream_options"] == {"include_usage": True}
     assert "usage" not in corpo
     assert "reasoning" not in corpo
-    assert corpo["tools"] == [FERRAMENTA]
+    assert corpo["tools"] == [TOOL]
     assert corpo["messages"] == [
         {"role": "system", "content": "política\n\nguia"},
         {"role": "user", "content": "oi"},
@@ -242,10 +242,10 @@ def test_fora_do_openrouter_o_pedido_e_o_da_api_da_openai():
     assert "cache_control" not in json.dumps(corpo)
 
 
-def test_no_openrouter_o_pedido_nao_muda():
+def test_on_openrouter_request_does_not_change():
     corpo = openrouter.montar_pedido(
-        modelo="anthropic/claude-opus-5", sistema=SISTEMA, conversa=[{"role": "user", "content": "oi"}],
-        ferramentas=[FERRAMENTA], max_tokens=100, esforco="high",
+        modelo="anthropic/claude-opus-5", sistema=SYSTEM, conversa=[{"role": "user", "content": "oi"}],
+        ferramentas=[TOOL], max_tokens=100, esforco="high",
     )
     assert corpo["usage"] == {"include": True}
     assert corpo["reasoning"] == {"effort": "high"}
@@ -257,56 +257,56 @@ def _sse(*quadros) -> bytes:
     return "".join(f"data: {json.dumps(q)}\n\n" for q in quadros).encode() + b"data: [DONE]\n\n"
 
 
-def _quadro(delta=None, parada=None, usage=None, escolhas=True):
+def _frame(delta=None, parada=None, usage=None, with_choices=True):
     q = {"object": "chat.completion.chunk", "model": "qwen3:14b",
-         "choices": [{"index": 0, "delta": delta or {}, "finish_reason": parada}] if escolhas else []}
+         "choices": [{"index": 0, "delta": delta or {}, "finish_reason": parada}] if with_choices else []}
     if usage is not None:
         q["usage"] = usage
     return q
 
 
-async def _conversa(base_url: str, corpo_da_resposta: bytes):
+async def _chat(base_url: str, response_body: bytes):
     pedidos: list[httpx.Request] = []
 
     def handler(pedido: httpx.Request) -> httpx.Response:
         pedidos.append(pedido)
-        return httpx.Response(200, content=corpo_da_resposta, headers={"content-type": "text/event-stream"})
+        return httpx.Response(200, content=response_body, headers={"content-type": "text/event-stream"})
 
     cliente = openrouter.ClienteOpenRouter(
-        CHAVE_LOCAL, base_url=base_url, http=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+        LOCAL_KEY, base_url=base_url, http=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
     )
     pedacos = [p async for p in cliente.transmitir(
-        modelo="qwen3:14b", sistema=SISTEMA, conversa=[{"role": "user", "content": "oi"}],
-        ferramentas=[FERRAMENTA], max_tokens=100, esforco="high",
+        modelo="qwen3:14b", sistema=SYSTEM, conversa=[{"role": "user", "content": "oi"}],
+        ferramentas=[TOOL], max_tokens=100, esforco="high",
     )]
     (pedido,) = pedidos
     return json.loads(pedido.content), pedacos[-1]
 
 
-async def test_o_cliente_decide_pela_base_e_a_cota_conta_o_uso_da_openai():
+async def test_client_decides_by_base_and_quota_counts_openai_usage():
     """The last frame of the OpenAI API carries `usage` with empty `choices`."""
     resposta = _sse(
-        _quadro({"content": "ok"}),
-        _quadro(parada="stop"),
-        _quadro(usage={"prompt_tokens": 120, "completion_tokens": 7, "total_tokens": 127}, escolhas=False),
+        _frame({"content": "ok"}),
+        _frame(parada="stop"),
+        _frame(usage={"prompt_tokens": 120, "completion_tokens": 7, "total_tokens": 127}, with_choices=False),
     )
-    corpo, fim = await _conversa("http://ollama:11434/v1", resposta)
+    corpo, fim = await _chat("http://ollama:11434/v1", resposta)
     assert corpo["stream_options"] == {"include_usage": True}
     assert "usage" not in corpo and "reasoning" not in corpo
     assert (fim.uso["entrada"], fim.uso["saida"]) == (120, 7)
 
-    corpo, _ = await _conversa(openrouter.URL_PADRAO, resposta)
+    corpo, _ = await _chat(openrouter.URL_PADRAO, resposta)
     assert corpo["usage"] == {"include": True}
     assert "stream_options" not in corpo
 
 
-async def test_sem_uso_na_resposta_o_log_avisa_uma_vez(monkeypatch, caplog):
+async def test_without_usage_in_response_log_warns_once(monkeypatch, caplog):
     """A server that ignores `include_usage` leaves the quota uncounted: that is
     what the operator needs to know — once, not on every turn."""
     monkeypatch.setattr(openrouter, "_avisou_sem_uso", False)
-    resposta = _sse(_quadro({"content": "ok"}), _quadro(parada="stop"))
+    resposta = _sse(_frame({"content": "ok"}), _frame(parada="stop"))
     with caplog.at_level(logging.WARNING, logger="app.assistente.openrouter"):
-        await _conversa("http://ollama:11434/v1", resposta)
-        await _conversa("http://ollama:11434/v1", resposta)
+        await _chat("http://ollama:11434/v1", resposta)
+        await _chat("http://ollama:11434/v1", resposta)
     avisos = [r for r in caplog.records if "não informou o uso" in r.getMessage()]
     assert len(avisos) == 1

@@ -19,7 +19,7 @@ from sqlalchemy import Column, DateTime, Index, Integer, Numeric, String, func, 
 from app.models.base import Base
 
 
-class UsoDoAssistente(Base):
+class AssistantUsage(Base):
     __tablename__ = "uso_do_assistente"
     __table_args__ = (
         # The table's two questions: how much this person consumes per day, and

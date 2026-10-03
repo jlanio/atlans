@@ -9,7 +9,7 @@ import numpy as np
 
 # ── P1: Jinja template compilation cache ─────────────────────────────────────
 
-def test_template_cache_compila_uma_vez_e_preserva_render():
+def test_template_cache_compiles_once_and_preserves_render():
     from flow.utils.expression_service import ExpressionService
 
     svc = ExpressionService()
@@ -23,7 +23,7 @@ def test_template_cache_compila_uma_vez_e_preserva_render():
     assert len(svc._template_cache) == 2
 
 
-def test_template_cache_respeita_o_teto():
+def test_template_cache_respects_the_ceiling():
     from flow.utils import expression_service as mod
 
     svc = mod.ExpressionService()
@@ -37,7 +37,7 @@ def test_template_cache_respeita_o_teto():
         mod._TEMPLATE_CACHE_MAX = orig
 
 
-def test_alias_ainda_funciona_com_cache():
+def test_alias_still_works_with_cache():
     """The alias path ($X -> X) must render via the cache too."""
     from flow.utils.expression_service import ExpressionService
 
@@ -47,7 +47,7 @@ def test_alias_ainda_funciona_com_cache():
 
 # ── P4: vetorizacao de bbox (comportamento identico) ─────────────────────────
 
-def test_compute_bbox_per_feature_vetorizado_bate_com_scalar():
+def test_compute_bbox_per_feature_vectorized_matches_scalar():
     import geopandas as gpd
     from shapely.geometry import Point, box
 
@@ -68,7 +68,7 @@ def test_compute_bbox_per_feature_vetorizado_bate_com_scalar():
         assert v.equals(e), "box vetorizado deve ser identico ao escalar"
 
 
-def test_heatmap_grid_vetorizado_bate_com_scalar():
+def test_heatmap_grid_vectorized_matches_scalar():
     import shapely
     from shapely.geometry import box
 
@@ -85,7 +85,7 @@ def test_heatmap_grid_vetorizado_bate_com_scalar():
 
 # ── P3: gpd.concat nao existe (o bug corrigido) ──────────────────────────────
 
-def test_geopandas_nao_tem_concat_e_pd_concat_preserva_tipo():
+def test_geopandas_has_no_concat_and_pd_concat_preserves_type():
     """Proves the WFS bug: gpd.concat does not exist; pd.concat preserves GeoDataFrame."""
     import geopandas as gpd
     import pandas as pd

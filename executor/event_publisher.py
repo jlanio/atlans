@@ -21,12 +21,12 @@ logger = logging.getLogger(__name__)
 # shared by all jobs and by GeoSync: without priority, a noisy node (print in a
 # loop, debug mode) filled the 500 slots and the victim of the drop was the
 # `completed` of a node from ANOTHER workflow — telemetry the UI cannot recover.
-_LIMIAR_PRIORIDADE = 0.8
+_PRIORITY_THRESHOLD = 0.8
 # Kinds that can be dropped under pressure: they are log, not graph state.
-_KINDS_DESCARTAVEIS = frozenset({KIND_STDOUT, KIND_DEBUG})
+_DROPPABLE_KINDS = frozenset({KIND_STDOUT, KIND_DEBUG})
 
 
-class ColetorDeLifecycle:
+class LifecycleCollector:
     """Keeps the LAST lifecycle per (run_id, node) that could not be sent.
 
     It exists because of TWO scenarios, and the second is the more common:
@@ -55,30 +55,30 @@ class ColetorDeLifecycle:
     _MAX_ENTRADAS = 2_000
 
     def __init__(self) -> None:
-        self._por_no: Dict[tuple, Dict[str, Any]] = {}
-        self._avisou_estouro = False
+        self._by_node: Dict[tuple, Dict[str, Any]] = {}
+        self._warned_overflow = False
 
     def registrar(self, event: Dict[str, Any]) -> None:
         """Records a dropped event. Ignores everything that is not lifecycle."""
         if not isinstance(event, dict) or event.get("kind") != KIND_LIFECYCLE:
             return
         chave = (event.get("run_id"), event.get("node"))
-        anterior = self._por_no.get(chave)
+        anterior = self._by_node.get(chave)
         if anterior is not None:
             # Last status wins — but only if it really is the most recent: the requeue
             # can return an old event after a new one has already gone through.
             if (anterior.get("timestamp") or 0.0) > (event.get("timestamp") or 0.0):
                 return
-        elif len(self._por_no) >= self._MAX_ENTRADAS:
-            if not self._avisou_estouro:
-                self._avisou_estouro = True
+        elif len(self._by_node) >= self._MAX_ENTRADAS:
+            if not self._warned_overflow:
+                self._warned_overflow = True
                 logger.error(
                     "Buffer de ressincronizacao cheio (%d nos) — o canvas pode ficar "
                     "desatualizado para os nos que terminarem enquanto o WebSocket "
                     "estiver fora.", self._MAX_ENTRADAS,
                 )
             return
-        self._por_no[chave] = event
+        self._by_node[chave] = event
 
     def drenar(self) -> list:
         """Returns and forgets the accumulated snapshot.
@@ -86,25 +86,25 @@ class ColetorDeLifecycle:
         Called on (re)connect AND whenever the event queue frees up with the
         session alive — see `ExecutorConnection._ressincronizar_lifecycle`.
         """
-        pendentes = list(self._por_no.values())
-        self._por_no.clear()
-        self._avisou_estouro = False
+        pendentes = list(self._by_node.values())
+        self._by_node.clear()
+        self._warned_overflow = False
         return pendentes
 
-    def esquecer_run(self, run_id) -> None:
+    def forget_run(self, run_id) -> None:
         """Discards the retained lifecycle of a run that has already finished.
 
         Without this, a late resend (reconnecting hours later) revived the
-        per-run entries of the queue counters that `esquecer_run` had just
+        per-run entries of the queue counters that `forget_run` had just
         purged — and nothing removed them again. Besides resending node_events
         of runs the server has already closed as terminal, which it rejects.
         """
-        for chave in [k for k in self._por_no if k[0] == run_id]:
-            del self._por_no[chave]
+        for chave in [k for k in self._by_node if k[0] == run_id]:
+            del self._by_node[chave]
 
     def __len__(self) -> int:
         """Quantos eventos aguardam reenvio. Barato — o sender consulta a cada volta."""
-        return len(self._por_no)
+        return len(self._by_node)
 
 
 class ExecutorEventPublisher(WorkflowEventPublisher):
@@ -120,45 +120,45 @@ class ExecutorEventPublisher(WorkflowEventPublisher):
         self._queue = event_queue
         # Captures the main event loop at the moment the publisher is created
         self._loop = asyncio.get_running_loop()
-        self._descartados_por_pressao = 0
+        self._dropped_under_pressure = 0
 
     def _safe_enqueue(self, event: Dict[str, Any]) -> None:
         """Enqueues the event, giving priority to the lifecycle.
 
-        Two rules, in order: (1) above _LIMIAR_PRIORIDADE occupancy, only
+        Two rules, in order: (1) above _PRIORITY_THRESHOLD occupancy, only
         lifecycle gets in — a noisy node's stdout/debug cannot cost another
         job's `completed`; (2) if the queue is still full, the dropped
         lifecycle goes to the collector, which resends it on reconnect.
         """
-        if self._e_descartavel_sob_pressao(event):
+        if self._is_droppable_under_pressure(event):
             return
         try:
             self._queue.put_nowait(event)
         except asyncio.QueueFull:
-            self._registrar_descarte(event)
+            self._record_drop(event)
             logger.warning(
                 "Fila de eventos cheia — evento '%s' do nó '%s' (run=%s) descartado.",
                 event.get("status"), event.get("node"), event.get("run_id"),
             )
 
-    def _e_descartavel_sob_pressao(self, event: Dict[str, Any]) -> bool:
+    def _is_droppable_under_pressure(self, event: Dict[str, Any]) -> bool:
         """True when the event is log and the queue is already close to the limit."""
-        if event.get("kind") not in _KINDS_DESCARTAVEIS:
+        if event.get("kind") not in _DROPPABLE_KINDS:
             return False
         maxsize = getattr(self._queue, "maxsize", 0) or 0
-        if not maxsize or self._queue.qsize() < maxsize * _LIMIAR_PRIORIDADE:
+        if not maxsize or self._queue.qsize() < maxsize * _PRIORITY_THRESHOLD:
             return False
-        self._descartados_por_pressao += 1
-        if self._descartados_por_pressao % 500 == 1:
+        self._dropped_under_pressure += 1
+        if self._dropped_under_pressure % 500 == 1:
             logger.warning(
                 "Fila de eventos a %d%% — descartando '%s' do nó '%s' para preservar "
                 "o ciclo de vida dos jobs (%d descartado(s) até agora).",
-                int(_LIMIAR_PRIORIDADE * 100), event.get("kind"), event.get("node"),
-                self._descartados_por_pressao,
+                int(_PRIORITY_THRESHOLD * 100), event.get("kind"), event.get("node"),
+                self._dropped_under_pressure,
             )
         return True
 
-    def _registrar_descarte(self, event: Dict[str, Any]) -> None:
+    def _record_drop(self, event: Dict[str, Any]) -> None:
         """Hands the lost event to the queue's collector, when there is one."""
         coletor = getattr(self._queue, "coletor", None)
         if coletor is not None:

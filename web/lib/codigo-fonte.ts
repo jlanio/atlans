@@ -14,7 +14,7 @@
 // Without the variable, no link appears: the code ships no address at all.
 
 /** The URL from CODIGO_FONTE_URL, or null when empty or without an http(s) scheme. */
-export function lerCodigoFonteDoAmbiente(env: Record<string, string | undefined>): string | null {
+export function readSourceCodeFromEnv(env: Record<string, string | undefined>): string | null {
   const url = (env.CODIGO_FONTE_URL ?? "").trim()
   return /^https?:\/\/\S+$/i.test(url) ? url : null
 }

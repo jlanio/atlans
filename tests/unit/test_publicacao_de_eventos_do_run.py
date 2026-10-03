@@ -19,7 +19,7 @@ import pytest
 
 from app.api.routers.executor_ws import protocolo as P
 from app.api.routers.executor_ws import resultados as RES
-from app.core.constants import MAX_EVENTOS_NO_HISTORICO, REDIS_TTL_1H, WORKFLOW_COMPLETE_NODE
+from app.core.constants import MAX_EVENTS_IN_HISTORY, REDIS_TTL_1H, WORKFLOW_COMPLETE_NODE
 from app.core.executor_connections import executor_registry
 from app.services import run_events_service
 
@@ -84,7 +84,7 @@ class _Redis:
 # ── Today's format: publicar_conclusao ───────────────────────────────────────
 
 
-async def test_publicar_conclusao_nao_leva_duration_ms_e_carimba_um_instante_so(monkeypatch):
+async def test_publish_completion_omits_duration_ms_and_stamps_a_single_instant(monkeypatch):
     """The server does not measure the duration of what it closes: the key never
     went out on this path, and all runs of the same closing carry the SAME instant."""
     rc = _Redis()
@@ -112,7 +112,7 @@ async def test_publicar_conclusao_nao_leva_duration_ms_e_carimba_um_instante_so(
         for run_id, ev in (("r-1", eventos[0]), ("r-2", eventos[1]))
         for cmd in (
             ("rpush", f"workflow:{run_id}:history", ev),
-            ("ltrim", f"workflow:{run_id}:history", -MAX_EVENTOS_NO_HISTORICO, -1),
+            ("ltrim", f"workflow:{run_id}:history", -MAX_EVENTS_IN_HISTORY, -1),
             ("expire", f"workflow:{run_id}:history", REDIS_TTL_1H),
             ("publish", f"workflow:{run_id}:events", ev),
         )
@@ -120,7 +120,7 @@ async def test_publicar_conclusao_nao_leva_duration_ms_e_carimba_um_instante_so(
 
 
 @pytest.mark.parametrize(("status", "level"), [("cancelled", "info"), ("success", "info"), ("failed", "error")])
-async def test_publicar_conclusao_nivel_so_e_erro_na_falha(monkeypatch, status, level):
+async def test_publish_completion_level_is_error_only_on_failure(monkeypatch, status, level):
     rc = _Redis()
     monkeypatch.setattr(run_events_service, "get_redis_pool", lambda: rc)
 
@@ -133,13 +133,13 @@ async def test_publicar_conclusao_nivel_so_e_erro_na_falha(monkeypatch, status, 
 # ── Today's format: batched node_events ──────────────────────────────────────
 
 
-async def test_node_events_de_dois_runs_saem_num_pipeline_com_a_sequencia_de_sempre(monkeypatch):
+async def test_node_events_of_two_runs_go_out_in_one_pipeline_with_the_usual_sequence(monkeypatch):
     rc = _Redis()
 
-    async def _dono(_executor_id, _run_id):
+    async def _owner(_executor_id, _run_id):
         return True
 
-    monkeypatch.setattr(RES, "_run_belongs_to_agent", _dono)
+    monkeypatch.setattr(RES, "_run_belongs_to_agent", _owner)
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
 
     await RES._publish_node_events("ex-1", [
@@ -153,12 +153,12 @@ async def test_node_events_de_dois_runs_saem_num_pipeline_com_a_sequencia_de_sem
     b1 = json.dumps({"run_id": "b", "node": "n2", "status": "started"})
     assert rc.executados == [[
         ("rpush", "workflow:a:history", a1, a2),
-        ("ltrim", "workflow:a:history", -MAX_EVENTOS_NO_HISTORICO, -1),
+        ("ltrim", "workflow:a:history", -MAX_EVENTS_IN_HISTORY, -1),
         ("expire", "workflow:a:history", REDIS_TTL_1H),
         ("publish", "workflow:a:events", a1),
         ("publish", "workflow:a:events", a2),
         ("rpush", "workflow:b:history", b1),
-        ("ltrim", "workflow:b:history", -MAX_EVENTOS_NO_HISTORICO, -1),
+        ("ltrim", "workflow:b:history", -MAX_EVENTS_IN_HISTORY, -1),
         ("expire", "workflow:b:history", REDIS_TTL_1H),
         ("publish", "workflow:b:events", b1),
     ]]
@@ -167,27 +167,27 @@ async def test_node_events_de_dois_runs_saem_num_pipeline_com_a_sequencia_de_sem
 # ── A single place ───────────────────────────────────────────────────────────
 
 
-def test_as_chaves_do_run_tem_um_dono():
+def test_the_run_keys_have_an_owner():
     assert run_events_service.chave_do_historico("r-1") == "workflow:r-1:history"
     assert run_events_service.canal_do_run("r-1") == "workflow:r-1:events"
 
 
-def test_anexar_eventos_grava_o_historico_com_teto_e_ttl_e_publica_cada_um():
+def test_append_events_writes_history_with_ceiling_and_ttl_and_publishes_each():
     rc = _Redis()
     pipe = _Pipe(rc)
 
-    run_events_service.anexar_eventos(pipe, "r-1", ["e1", "e2"])
+    run_events_service.append_events(pipe, "r-1", ["e1", "e2"])
 
     assert pipe.cmds == [
         ("rpush", "workflow:r-1:history", "e1", "e2"),
-        ("ltrim", "workflow:r-1:history", -MAX_EVENTOS_NO_HISTORICO, -1),
+        ("ltrim", "workflow:r-1:history", -MAX_EVENTS_IN_HISTORY, -1),
         ("expire", "workflow:r-1:history", REDIS_TTL_1H),
         ("publish", "workflow:r-1:events", "e1"),
         ("publish", "workflow:r-1:events", "e2"),
     ]
 
 
-def test_evento_de_conclusao_monta_as_tres_variantes_de_hoje():
+def test_completion_event_builds_the_three_current_variants():
     # Closing by the server (`publicar_conclusao`): without the duration key.
     assert run_events_service.evento_de_conclusao(
         "r-1", "cancelled", erro="Cancelado antes.", timestamp=10.5,
@@ -217,13 +217,13 @@ def test_evento_de_conclusao_monta_as_tres_variantes_de_hoje():
 
 
 @pytest.fixture
-def chaves_marcadas(monkeypatch):
+def marked_keys(monkeypatch):
     """Swaps the owner of the keys: whoever still builds their own by hand shows up in the test."""
     monkeypatch.setattr(run_events_service, "chave_do_historico", lambda run_id: f"H<{run_id}>")
     monkeypatch.setattr(run_events_service, "canal_do_run", lambda run_id: f"C<{run_id}>")
 
 
-def _chaves_usadas(rc: _Redis) -> set[str]:
+def _used_keys(rc: _Redis) -> set[str]:
     usadas = set()
     for cmd in rc.comandos():
         if cmd[0] in ("rpush", "ltrim", "expire", "publish", "lrange"):
@@ -231,11 +231,11 @@ def _chaves_usadas(rc: _Redis) -> set[str]:
     return usadas
 
 
-async def test_todos_os_escritores_usam_as_chaves_do_dono(monkeypatch, chaves_marcadas):
+async def test_all_writers_use_the_owner_keys(monkeypatch, marked_keys):
     rc = _Redis()
     conn = SimpleNamespace(executor_ip=None, run_auth_cache={}, db_auth_cooldown_until=0.0)
 
-    async def _dono(_executor_id, _run_id):
+    async def _owner(_executor_id, _run_id):
         return True
 
     async def _snapshot(_run_id):
@@ -243,17 +243,17 @@ async def test_todos_os_escritores_usam_as_chaves_do_dono(monkeypatch, chaves_ma
 
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
     monkeypatch.setattr(run_events_service, "get_redis_pool", lambda: rc)
-    monkeypatch.setattr(RES, "_run_belongs_to_agent", _dono)
+    monkeypatch.setattr(RES, "_run_belongs_to_agent", _owner)
     monkeypatch.setattr(RES, "_query_run_snapshot", _snapshot)
     monkeypatch.setattr(executor_registry, "get", lambda _id: conn)
     monkeypatch.setattr(P, "_rate_state", {})
 
     await RES._publish_node_events("ex-1", [{"run_id": "r-ne", "node": "n1"}])
     await RES._handle_job_result("ex-1", {"job_id": "r-jr", "run_id": "r-jr", "status": "ok"})
-    await RES._fechar_run_inconclusivo("ex-1", "r-inc", "teste")
+    await RES._close_inconclusive_run("ex-1", "r-inc", "teste")
     await run_events_service.publicar_conclusao(["r-pc"], status="failed", mensagem="x")
 
-    usadas = _chaves_usadas(rc) - {"webhook_response:r-inc"}
+    usadas = _used_keys(rc) - {"webhook_response:r-inc"}
     assert usadas == {
         f"{prefixo}<{run_id}>"
         for run_id in ("r-ne", "r-jr", "r-inc", "r-pc")
@@ -261,14 +261,14 @@ async def test_todos_os_escritores_usam_as_chaves_do_dono(monkeypatch, chaves_ma
     }
 
 
-async def test_leitores_usam_as_chaves_do_dono(monkeypatch, chaves_marcadas):
+async def test_readers_use_the_owner_keys(monkeypatch, marked_keys):
     from app.services.observability_service import ObservabilityService
 
     rc = _Redis()
 
     class _PubSub:
         def __init__(self):
-            self.canais: list[str] = []
+            self.channels: list[str] = []
 
         async def __aenter__(self):
             return self
@@ -277,7 +277,7 @@ async def test_leitores_usam_as_chaves_do_dono(monkeypatch, chaves_marcadas):
             return False
 
         async def subscribe(self, canal):
-            self.canais.append(canal)
+            self.channels.append(canal)
 
         async def listen(self):  # pragma: no cover - the replay already ends it
             if False:
@@ -286,45 +286,45 @@ async def test_leitores_usam_as_chaves_do_dono(monkeypatch, chaves_marcadas):
     pubsub = _PubSub()
     sub = SimpleNamespace(pubsub=lambda: pubsub)
 
-    async def _fechar():
+    async def _close():
         return None
 
-    sub.aclose = _fechar
+    sub.aclose = _close
 
-    async def _lrange_completo(chave, inicio, fim):
+    async def _lrange_complete(chave, inicio, fim):
         rc.soltos.append(("lrange", chave, inicio, fim))
         return [json.dumps({"node": WORKFLOW_COMPLETE_NODE})]
 
-    async def _detalhe(*_a, **_kw):
+    async def _detail(*_a, **_kw):
         return {"run_id": "r-obs"}
 
     monkeypatch.setattr(run_events_service, "new_pubsub_client", lambda: sub)
-    monkeypatch.setattr(run_events_service, "get_redis_pool", lambda: SimpleNamespace(lrange=_lrange_completo))
+    monkeypatch.setattr(run_events_service, "get_redis_pool", lambda: SimpleNamespace(lrange=_lrange_complete))
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
-    monkeypatch.setattr(ObservabilityService, "get_run_detail", staticmethod(_detalhe))
+    monkeypatch.setattr(ObservabilityService, "get_run_detail", staticmethod(_detail))
 
     lotes = [lote async for lote in run_events_service.iter_run_events("r-it", timeout_s=1)]
-    await ObservabilityService.get_run_events_com_detalhe(None, "r-obs", object(), ["ws-1"])
+    await ObservabilityService.get_run_events_with_detail(None, "r-obs", object(), ["ws-1"])
 
     assert lotes and lotes[-1].completo is True
-    assert pubsub.canais == ["C<r-it>"]
+    assert pubsub.channels == ["C<r-it>"]
     assert [cmd[1] for cmd in rc.soltos if cmd[0] == "lrange"] == ["H<r-it>", "H<r-obs>"]
 
 
-async def test_os_tres_publicadores_da_conclusao_montam_o_evento_no_mesmo_lugar(monkeypatch):
+async def test_the_three_completion_publishers_build_the_event_in_the_same_place(monkeypatch):
     rc = _Redis()
     conn = SimpleNamespace(executor_ip=None, run_auth_cache={}, db_auth_cooldown_until=0.0)
     montados: list[tuple] = []
     real = run_events_service.evento_de_conclusao
 
-    def _espiao(run_id, status, **kw):
+    def _spy(run_id, status, **kw):
         montados.append((run_id, status))
         return real(run_id, status, **kw)
 
     async def _snapshot(_run_id):
         return ("executor:ex-1", "running", None)
 
-    monkeypatch.setattr(run_events_service, "evento_de_conclusao", _espiao)
+    monkeypatch.setattr(run_events_service, "evento_de_conclusao", _spy)
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
     monkeypatch.setattr(run_events_service, "get_redis_pool", lambda: rc)
     monkeypatch.setattr(RES, "_query_run_snapshot", _snapshot)
@@ -332,7 +332,7 @@ async def test_os_tres_publicadores_da_conclusao_montam_o_evento_no_mesmo_lugar(
     monkeypatch.setattr(P, "_rate_state", {})
 
     await RES._handle_job_result("ex-1", {"job_id": "r-jr", "run_id": "r-jr", "status": "cancelled"})
-    await RES._fechar_run_inconclusivo("ex-1", "r-inc", "teste")
+    await RES._close_inconclusive_run("ex-1", "r-inc", "teste")
     await run_events_service.publicar_conclusao(["r-pc"], status="failed", mensagem="x")
 
     assert montados == [("r-jr", "cancelled"), ("r-inc", "failed"), ("r-pc", "failed")]

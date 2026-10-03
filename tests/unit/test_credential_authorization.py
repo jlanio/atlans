@@ -24,8 +24,8 @@ from app.core.authorization.credential_loader import (
 from app.core.exceptions import CredentialAccessDeniedError
 
 DONO = "user-dono"
-MEMBRO = "user-membro"
-ESTRANHO = "user-de-outro-workspace"
+MEMBER = "user-membro"
+OUTSIDER = "user-de-outro-workspace"
 
 
 def _cred(owner_id: str, cid=None) -> MagicMock:
@@ -37,11 +37,11 @@ def _cred(owner_id: str, cid=None) -> MagicMock:
     return c
 
 
-def _session_com(credenciais: list) -> MagicMock:
+def _session_with(credenciais: list) -> MagicMock:
     """Session that returns only what the query's WHERE would let through.
 
     The real filter is SQL; here the test inspects the statement to make sure
-    owner_id went into it — see test_query_filtra_por_owner_id.
+    owner_id went into it — see test_query_filters_by_owner_id.
     """
     session = MagicMock()
     result = MagicMock()
@@ -97,7 +97,7 @@ def _where(session) -> str:
     return _sql(session).split("WHERE", 1)[1]
 
 
-def _db_com_linhas(linhas: list) -> MagicMock:
+def _db_with_rows(linhas: list) -> MagicMock:
     """Request session for the /validate guards: `.all()` returns `linhas`,
     that is, only the ids the WHERE would let through."""
     db = MagicMock()
@@ -118,33 +118,33 @@ def _decrypt():
 
 # ── Escopo obrigatorio ───────────────────────────────────────────────────────
 
-async def test_sem_escopo_levanta_em_vez_de_resolver():
+async def test_without_scope_raises_instead_of_resolving():
     """Fail-closed: call site novo que esquecer o escopo quebra em teste."""
     with pytest.raises(CredentialScopeMissing):
         await resolve_credentials_from_ids([str(uuid4())])
 
 
-async def test_escopo_vazio_nao_resolve_nada():
+async def test_empty_scope_resolves_nothing():
     """A workflow without a workspace lands here — it must not become open resolution."""
-    with _patch_session(_session_com([])):
+    with _patch_session(_session_with([])):
         assert await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids=set()) == {}
 
 
-async def test_contextvar_serve_de_escopo():
+async def test_contextvar_serves_as_scope():
     """Simulation path: `simulate()` does not receive context parameters."""
     cred = _cred(DONO)
-    with _patch_session(_session_com([cred])), credential_scope({DONO}):
+    with _patch_session(_session_with([cred])), credential_scope({DONO}):
         out = await resolve_credentials_from_ids([str(cred.id)])
 
     assert str(cred.id) in out
 
 
-async def test_contextvar_carrega_shared_workspace_id():
+async def test_contextvar_carries_shared_workspace_id():
     """/validate with a workspace: `simulate()` receives no parameters, so the
     ContextVar has to carry BOTH dimensions — owner AND shared workspace.
     Otherwise the guard would accept the shared credential and the simulation
     would not resolve it."""
-    session = _session_com([])
+    session = _session_with([])
     with _patch_session(session), credential_scope({DONO}, shared_workspace_id="ws-1"):
         await resolve_credentials_from_ids([str(uuid4())])
 
@@ -154,23 +154,23 @@ async def test_contextvar_carrega_shared_workspace_id():
     assert " OR " in where
 
 
-async def test_kwargs_explicitos_nao_se_misturam_com_o_contextvar():
+async def test_explicit_kwargs_do_not_mix_with_the_contextvar():
     """Explicit kwargs are the ENTIRE scope: the ContextVar never fills in the
     missing dimension. Otherwise a call site passing only `allowed_owner_ids`
     inside a `credential_scope(..., shared_workspace_id=...)` would inherit the
     workspace without knowing — and vice versa."""
     # Explicit owner inside a ctx with owner AND workspace: only the explicit one applies.
-    session = _session_com([])
+    session = _session_with([])
     with _patch_session(session), credential_scope({DONO}, shared_workspace_id="ws-1"):
-        await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids={MEMBRO})
+        await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids={MEMBER})
 
     where = _where(session)
-    assert MEMBRO in where
+    assert MEMBER in where
     assert DONO not in where
     assert "ws-1" not in where
 
     # Explicit workspace alone: no owner clause, even with an active ctx.
-    session = _session_com([])
+    session = _session_with([])
     with _patch_session(session), credential_scope({DONO}, shared_workspace_id="ws-1"):
         await resolve_credentials_from_ids([str(uuid4())], shared_workspace_id="ws-2")
 
@@ -183,16 +183,16 @@ async def test_kwargs_explicitos_nao_se_misturam_com_o_contextvar():
 
 # ── Filter by owner ──────────────────────────────────────────────────────────
 
-async def test_query_filtra_por_owner_id():
+async def test_query_filters_by_owner_id():
     """The fence has to be in the SQL, not just in the caller.
 
     Checks the WHERE specifically: `select(Credential)` already lists owner_id
     among the selected columns, so searching the whole statement would pass
     even with no filter at all.
     """
-    session = _session_com([])
+    session = _session_with([])
     with _patch_session(session):
-        await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids={DONO, MEMBRO})
+        await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids={DONO, MEMBER})
 
     stmt = str(session.execute.await_args_list[0].args[0].compile(
         compile_kwargs={"literal_binds": True},
@@ -202,24 +202,24 @@ async def test_query_filtra_por_owner_id():
     assert DONO in where
 
 
-async def test_credencial_de_membro_do_workspace_resolve():
+async def test_workspace_member_credential_resolves():
     """B runs A's workflow: A's credential still applies."""
     cred = _cred(DONO)
-    with _patch_session(_session_com([cred])):
+    with _patch_session(_session_with([cred])):
         out = await resolve_credentials_from_ids(
-            [str(cred.id)], allowed_owner_ids={DONO, MEMBRO},
+            [str(cred.id)], allowed_owner_ids={DONO, MEMBER},
         )
 
     assert out[str(cred.id)]["connectionString"] == "postgres://x"
 
 
-async def test_credencial_sem_dono_nao_resolve():
+async def test_ownerless_credential_does_not_resolve():
     """A NULL owner_id never matches IN — that is the desired behavior.
 
     Today those credentials are readable by ANY authenticated user,
     including the secrets via GET /credentials/{id}/data.
     """
-    session = _session_com([])   # the database WHERE would not return it
+    session = _session_with([])   # the database WHERE would not return it
     with _patch_session(session):
         out = await resolve_credentials_from_ids([str(uuid4())], allowed_owner_ids={DONO})
 
@@ -228,9 +228,9 @@ async def test_credencial_sem_dono_nao_resolve():
 
 # ── Scope D: owner (who triggered) OR shared with the workspace ──────────────
 
-async def test_escopo_d_no_sql_e_dono_ou_workspace_sem_orfa():
+async def test_scope_d_in_sql_is_owner_or_workspace_without_orphan():
     """The clause is (owner IS NOT NULL) AND (owner IN allowed OR workspace_id == ws)."""
-    session = _session_com([])
+    session = _session_with([])
     with _patch_session(session):
         await resolve_credentials_from_ids(
             [str(uuid4())], allowed_owner_ids={DONO}, shared_workspace_id="ws-1",
@@ -244,9 +244,9 @@ async def test_escopo_d_no_sql_e_dono_ou_workspace_sem_orfa():
     assert " OR " in where
 
 
-async def test_escopo_d_sem_usuario_so_compartilhadas_no_sql():
+async def test_scope_d_without_user_only_shared_in_sql():
     """triggered_by=None (cron/webhook): no owner clause, only the workspace one."""
-    session = _session_com([])
+    session = _session_with([])
     with _patch_session(session):
         await resolve_credentials_from_ids(
             [str(uuid4())], allowed_owner_ids=set(), shared_workspace_id="ws-1",
@@ -259,24 +259,24 @@ async def test_escopo_d_sem_usuario_so_compartilhadas_no_sql():
     assert "owner_id IS NOT NULL" in where           # but an orphan is still blocked
 
 
-async def test_credencial_compartilhada_resolve_mesmo_nao_sendo_de_quem_disparou():
+async def test_shared_credential_resolves_even_if_not_the_triggerers():
     """Shared with the workspace resolves for whoever triggered, even when it
     belongs to another owner (the database returns it via the workspace_id clause)."""
     cred = _cred("outro-dono")
-    with _patch_session(_session_com([cred])):
+    with _patch_session(_session_with([cred])):
         out = await resolve_credentials_from_ids(
-            [str(cred.id)], allowed_owner_ids={MEMBRO}, shared_workspace_id="ws-1",
+            [str(cred.id)], allowed_owner_ids={MEMBER}, shared_workspace_id="ws-1",
         )
     assert out[str(cred.id)]["connectionString"] == "postgres://x"
 
 
-async def test_credencial_privada_de_outro_nao_resolve():
+async def test_someone_elses_private_credential_does_not_resolve():
     """Not shared and not belonging to whoever triggered, the database does not
     return it — the WHERE excludes it. We simulate this with the session that
     only delivers what the filter would allow."""
-    with _patch_session(_session_com([])):    # the WHERE (owner/ws) would not return it
+    with _patch_session(_session_with([])):    # the WHERE (owner/ws) would not return it
         out = await resolve_credentials_from_ids(
-            [str(uuid4())], allowed_owner_ids={MEMBRO}, shared_workspace_id="ws-1",
+            [str(uuid4())], allowed_owner_ids={MEMBER}, shared_workspace_id="ws-1",
         )
     assert out == {}
 
@@ -288,7 +288,7 @@ def _statements(session):
     return [c.args[0] for c in session.execute.await_args_list]
 
 
-async def test_last_used_carimbado_e_commitado_na_sessao_propria():
+async def test_last_used_stamped_and_committed_in_own_session():
     """Own session (simulate): issues an UPDATE on last_used_at and COMMITS.
 
     get_session_async rolls back on exit — without an explicit commit the stamp
@@ -297,7 +297,7 @@ async def test_last_used_carimbado_e_commitado_na_sessao_propria():
     from sqlalchemy.sql.dml import Update
 
     cred = _cred(DONO)
-    session = _session_com([cred])
+    session = _session_with([cred])
     with _patch_session(session), credential_scope({DONO}):
         out = await resolve_credentials_from_ids([str(cred.id)])
 
@@ -307,7 +307,7 @@ async def test_last_used_carimbado_e_commitado_na_sessao_propria():
     session.commit.assert_awaited_once()
 
 
-async def test_last_used_grava_horario_utc_sem_fuso():
+async def test_last_used_writes_naive_utc_time():
     """`Credential.last_used_at` is a `DateTime` without a time zone: asyncpg
     rejects a time-zone-AWARE datetime ("can't subtract offset-naive and
     offset-aware datetimes"), and the stamp's savepoint swallowed the error — on
@@ -318,23 +318,23 @@ async def test_last_used_grava_horario_utc_sem_fuso():
     from sqlalchemy.sql.dml import Update
 
     cred = _cred(DONO)
-    session = _session_com([cred])
+    session = _session_with([cred])
     await resolve_credentials_from_ids([str(cred.id)], allowed_owner_ids={DONO}, db=session)
 
     (update,) = [s for s in _statements(session) if isinstance(s, Update)]
     carimbo = update.compile().params["last_used_at"]
     assert carimbo.tzinfo is None
-    agora_utc = datetime.now(timezone.utc).replace(tzinfo=None)
-    assert abs(agora_utc - carimbo) < timedelta(seconds=5)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    assert abs(now_utc - carimbo) < timedelta(seconds=5)
 
 
-async def test_last_used_nao_commita_na_sessao_do_request():
+async def test_last_used_does_not_commit_in_the_request_session():
     """Request session (db=): issues the UPDATE but does NOT commit — the caller
     commits, so as not to accidentally write its pending work."""
     from sqlalchemy.sql.dml import Update
 
     cred = _cred(DONO)
-    session = _session_com([cred])
+    session = _session_with([cred])
     out = await resolve_credentials_from_ids(
         [str(cred.id)], allowed_owner_ids={DONO}, db=session,
     )
@@ -344,12 +344,12 @@ async def test_last_used_nao_commita_na_sessao_do_request():
     session.commit.assert_not_awaited()
 
 
-async def test_last_used_falha_nao_derruba_resolucao():
+async def test_last_used_failure_does_not_break_resolution():
     """If the audit UPDATE fails, the resolution still delivers the credentials."""
     from sqlalchemy.sql.dml import Update
 
     cred = _cred(DONO)
-    session = _session_com([cred])
+    session = _session_with([cred])
     result = session.execute.return_value
 
     async def _execute(stmt, *a, **k):
@@ -365,7 +365,7 @@ async def test_last_used_falha_nao_derruba_resolucao():
     assert out[str(cred.id)]["connectionString"] == "postgres://x"
 
 
-async def test_last_used_falha_na_sessao_do_request_nao_faz_rollback():
+async def test_last_used_failure_does_not_roll_back_the_request_session():
     """In the request's SHARED session, the stamp failure must not call
     rollback — that would discard the caller's pending work. The SAVEPOINT has
     already reverted what was ours; the resolution still delivers the
@@ -374,7 +374,7 @@ async def test_last_used_falha_na_sessao_do_request_nao_faz_rollback():
     from sqlalchemy.sql.dml import Update
 
     cred = _cred(DONO)
-    session = _session_com([cred])
+    session = _session_with([cred])
     result = session.execute.return_value
 
     async def _execute(stmt, *a, **k):
@@ -393,19 +393,19 @@ async def test_last_used_falha_na_sessao_do_request_nao_faz_rollback():
 
 # ── Workspace scope helper ───────────────────────────────────────────────────
 
-async def test_workspace_credential_owners_une_dono_e_membros():
+async def test_workspace_credential_owners_unites_owner_and_members():
     """Owner and members come from a single query (outerjoin), not two SELECTs."""
     db = MagicMock()
     res = MagicMock()
     # One row per member; the owner repeats in all of them.
-    res.all.return_value = [(DONO, MEMBRO), (DONO, None)]
+    res.all.return_value = [(DONO, MEMBER), (DONO, None)]
     db.execute = AsyncMock(return_value=res)
 
-    assert await workspace_credential_owners(db, "ws-1") == {DONO, MEMBRO}
+    assert await workspace_credential_owners(db, "ws-1") == {DONO, MEMBER}
     assert db.execute.await_count == 1
 
 
-async def test_workspace_credential_owners_sem_workspace():
+async def test_workspace_credential_owners_without_workspace():
     """Legacy workflow without a workspace: empty scope, without going to the database."""
     db = MagicMock(execute=AsyncMock())
 
@@ -415,7 +415,7 @@ async def test_workspace_credential_owners_sem_workspace():
 
 # ── Validation credential guard (assert_credentials_accessible) ─────────────
 
-async def test_assert_recusa_credencial_alheia():
+async def test_assert_rejects_foreign_credential():
     """IDOR: the definition comes from the body and simulate() connects to the database."""
     alheia = uuid4()
     db = MagicMock()
@@ -424,24 +424,24 @@ async def test_assert_recusa_credencial_alheia():
     db.execute = AsyncMock(return_value=res)
 
     with pytest.raises(CredentialAccessDeniedError, match=str(alheia)):
-        await assert_credentials_accessible(db, [str(alheia)], MEMBRO)
+        await assert_credentials_accessible(db, [str(alheia)], MEMBER)
 
 
-async def test_assert_aceita_credencial_propria():
+async def test_assert_accepts_own_credential():
     minha = uuid4()
     db = MagicMock()
     res = MagicMock()
     res.all.return_value = [(minha,)]
     db.execute = AsyncMock(return_value=res)
 
-    await assert_credentials_accessible(db, [str(minha)], MEMBRO)
+    await assert_credentials_accessible(db, [str(minha)], MEMBER)
 
 
-async def test_assert_recusa_uuid_invalido():
+async def test_assert_rejects_invalid_uuid():
     db = MagicMock(execute=AsyncMock())
 
     with pytest.raises(CredentialAccessDeniedError):
-        await assert_credentials_accessible(db, ["nao-e-uuid"], MEMBRO)
+        await assert_credentials_accessible(db, ["nao-e-uuid"], MEMBER)
 
 
 # ── Validation guard with a workspace: same clause as the dispatch ──────────
@@ -451,55 +451,55 @@ async def test_assert_recusa_uuid_invalido():
 # list — otherwise one member would validate (and simulate() would CONNECT) with
 # another member's PRIVATE credential.
 
-async def test_assert_accessible_sql_e_dono_ou_workspace_sem_orfa_e_sem_membros():
-    db = _db_com_linhas([])
+async def test_assert_accessible_sql_is_owner_or_workspace_without_orphan_or_members():
+    db = _db_with_rows([])
     with pytest.raises(CredentialAccessDeniedError):
         await assert_credentials_accessible(
-            db, [str(uuid4())], MEMBRO, shared_workspace_id="ws-1",
+            db, [str(uuid4())], MEMBER, shared_workspace_id="ws-1",
         )
 
     where = _where(db)
     assert "owner_id IS NOT NULL" in where             # a shared orphan does not pass
-    assert MEMBRO in where                             # o proprio usuario
+    assert MEMBER in where                             # o proprio usuario
     assert "workspace_id" in where and "ws-1" in where  # or shared with the ws
     assert " OR " in where
     assert "workspace_members" not in _sql(db)         # members do not get in, not even via join
 
 
-async def test_assert_accessible_sem_workspace_so_dono():
+async def test_assert_accessible_without_workspace_owner_only():
     """Without a workspace the clause does not even enter the SQL — it does not
     become `workspace_id = NULL` (would never match) nor `IS NULL` (would match
     any owner's private one)."""
-    db = _db_com_linhas([])
+    db = _db_with_rows([])
     with pytest.raises(CredentialAccessDeniedError):
-        await assert_credentials_accessible(db, [str(uuid4())], MEMBRO)
+        await assert_credentials_accessible(db, [str(uuid4())], MEMBER)
 
     where = _where(db)
-    assert MEMBRO in where
+    assert MEMBER in where
     assert "owner_id IS NOT NULL" in where
     assert "workspace_id" not in where
 
 
-async def test_assert_accessible_aceita_o_que_o_banco_devolve():
+async def test_assert_accessible_accepts_what_the_db_returns():
     """The decision belongs to the SQL: if the WHERE returned all the ids (own or
     shared), it passes silently, with no second check in Python."""
     minha, compartilhada = uuid4(), uuid4()
-    db = _db_com_linhas([(minha,), (compartilhada,)])
+    db = _db_with_rows([(minha,), (compartilhada,)])
 
     await assert_credentials_accessible(
-        db, [str(minha), str(compartilhada)], MEMBRO, shared_workspace_id="ws-1",
+        db, [str(minha), str(compartilhada)], MEMBER, shared_workspace_id="ws-1",
     )
 
 
-async def test_assert_accessible_mensagem_cita_o_workspace_e_o_uuid():
+async def test_assert_accessible_message_cites_the_workspace_and_the_uuid():
     """Whoever gets the 403 needs to know WHAT was rejected (the UUID, to find the
     node) and that sharing with the workspace was already considered — the way
     out is to share the credential, not to ask the owner for the password."""
     alheia = uuid4()
-    db = _db_com_linhas([])
+    db = _db_with_rows([])
     with pytest.raises(CredentialAccessDeniedError) as exc:
         await assert_credentials_accessible(
-            db, [str(alheia)], MEMBRO, shared_workspace_id="ws-1",
+            db, [str(alheia)], MEMBER, shared_workspace_id="ws-1",
         )
 
     msg = str(exc.value)
@@ -507,13 +507,13 @@ async def test_assert_accessible_mensagem_cita_o_workspace_e_o_uuid():
     assert "workspace" in msg
 
 
-async def test_assert_accessible_sem_workspace_nao_cita_workspace():
+async def test_assert_accessible_without_workspace_does_not_cite_workspace():
     """Without a workspace the guard is "owner only": the workspace dimension
     appears neither in the SQL nor in the rejection message."""
     alheia = uuid4()
-    db = _db_com_linhas([])
+    db = _db_with_rows([])
     with pytest.raises(CredentialAccessDeniedError) as exc:
-        await assert_credentials_accessible(db, [str(alheia)], MEMBRO)
+        await assert_credentials_accessible(db, [str(alheia)], MEMBER)
 
     msg = str(exc.value)
     assert str(alheia) in msg
@@ -526,7 +526,7 @@ async def test_assert_accessible_sem_workspace_nao_cita_workspace():
 # Execution scope = {who triggered (triggered_by)} + credentials shared with
 # the workflow's workspace. Being a MEMBER of the workspace is not enough.
 
-def _svc_com_workflow(workspace_id):
+def _svc_with_workflow(workspace_id):
     from app.services.workflow_service import WorkflowService
 
     wf = MagicMock(id_hash="wf-1", workspace_id=workspace_id, flag_ative=True)
@@ -555,12 +555,12 @@ def _patches_do_dispatch(wf, resolve_fn):
     ]
 
 
-async def test_start_analysis_escopo_e_quem_disparou_mais_compartilhadas():
+async def test_start_analysis_scope_is_triggerer_plus_shared():
     """Option D: scope = {who triggered} + the workflow's shared_workspace_id —
     NOT the set of workspace members."""
     from contextlib import ExitStack
 
-    svc, wf = _svc_com_workflow("ws-1")
+    svc, wf = _svc_with_workflow("ws-1")
     capturado = {}
 
     async def _resolve(ids, *, allowed_owner_ids=None, shared_workspace_id=None, db=None):
@@ -572,10 +572,10 @@ async def test_start_analysis_escopo_e_quem_disparou_mais_compartilhadas():
     with ExitStack() as stack:
         for p in _patches_do_dispatch(wf, _resolve):
             stack.enter_context(p)
-        await svc.start_analysis("wf-1", triggered_by=MEMBRO)
+        await svc.start_analysis("wf-1", triggered_by=MEMBER)
 
     # Only whoever triggered enters as owner; DONO (another member) does NOT.
-    assert capturado["allowed"] == {MEMBRO}
+    assert capturado["allowed"] == {MEMBER}
     assert DONO not in capturado["allowed"]
     assert capturado["shared_ws"] == "ws-1"
     # The request session goes along: without it the resolver opened a second
@@ -583,12 +583,12 @@ async def test_start_analysis_escopo_e_quem_disparou_mais_compartilhadas():
     assert capturado["db"] is svc.crud.db
 
 
-async def test_start_analysis_cron_sem_usuario_so_alcanca_compartilhadas():
+async def test_start_analysis_cron_without_user_only_reaches_shared():
     """Trigger without a user (triggered_by=None): empty owner, only the
     credentials shared with the workspace resolve."""
     from contextlib import ExitStack
 
-    svc, wf = _svc_com_workflow("ws-1")
+    svc, wf = _svc_with_workflow("ws-1")
     capturado = {}
 
     async def _resolve(ids, *, allowed_owner_ids=None, shared_workspace_id=None, db=None):
@@ -605,11 +605,11 @@ async def test_start_analysis_cron_sem_usuario_so_alcanca_compartilhadas():
     assert capturado["shared_ws"] == "ws-1"
 
 
-async def test_start_analysis_recusa_workflow_sem_workspace():
+async def test_start_analysis_rejects_workflow_without_workspace():
     """Without a workspace there is no one to trust — fails instead of resolving openly."""
     from contextlib import ExitStack
 
-    svc, wf = _svc_com_workflow(None)
+    svc, wf = _svc_with_workflow(None)
 
     async def _resolve(ids, *, allowed_owner_ids=None, shared_workspace_id=None, db=None):  # pragma: no cover
         raise AssertionError("não deveria resolver credencial sem workspace")
@@ -618,4 +618,4 @@ async def test_start_analysis_recusa_workflow_sem_workspace():
         for p in _patches_do_dispatch(wf, _resolve):
             stack.enter_context(p)
         with pytest.raises(CredentialAccessDeniedError):
-            await svc.start_analysis("wf-1", triggered_by=MEMBRO)
+            await svc.start_analysis("wf-1", triggered_by=MEMBER)

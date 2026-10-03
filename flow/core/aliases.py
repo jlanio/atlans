@@ -18,7 +18,7 @@ from typing import Any, Mapping
 RESERVED_ALIASES = frozenset({"inputs", "nodes", "named", "now", "uuid", "env"})
 
 
-def alias_declarado(node_def: Mapping[str, Any]) -> str:
+def declared_alias(node_def: Mapping[str, Any]) -> str:
     """User-written alias: the top-level one beats `properties.alias`.
 
     The choice is by TRUTHINESS, not validity: a top-level alias that is filled in
@@ -32,14 +32,14 @@ def alias_declarado(node_def: Mapping[str, Any]) -> str:
     return str(custom) if custom else ""
 
 
-def alias_e_valido(alias: str) -> bool:
+def is_valid_alias(alias: str) -> bool:
     """Python identifier (Unicode is fine — "Área" passes) and not reserved."""
     return bool(alias) and alias.isidentifier() and alias not in RESERVED_ALIASES
 
 
 def resolve_alias(node_def: Mapping[str, Any]) -> str:
     """The node's Jinja-safe alias: the custom one if valid, otherwise `name`."""
-    custom = alias_declarado(node_def)
-    if alias_e_valido(custom):
+    custom = declared_alias(node_def)
+    if is_valid_alias(custom):
         return custom
     return node_def["name"]

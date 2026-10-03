@@ -33,36 +33,36 @@ ESCOPOS: tuple[str, ...] = (
     "drive:write",
 )
 
-VALIDADE_PADRAO_DIAS = 90
-VALIDADE_MAX_DIAS = 365
-MAX_TOKENS_ATIVOS_POR_USUARIO = 20
-TAMANHO_PREFIXO_EXIBIVEL = 12  # "atl_pat_" + 4 chars — enough to recognize, useless for guessing
+DEFAULT_VALIDITY_DAYS = 90
+MAX_VALIDITY_DAYS = 365
+MAX_ACTIVE_TOKENS_PER_USER = 20
+DISPLAYABLE_PREFIX_LENGTH = 12  # "atl_pat_" + 4 chars — enough to recognize, useless for guessing
 
 # 43 = len(base64url(32 bytes)) sem o padding.
-REGEX_SEGREDO = re.compile(r"atl_pat_[A-Za-z0-9_-]{43}")
+SECRET_REGEX = re.compile(r"atl_pat_[A-Za-z0-9_-]{43}")
 
 
-def gerar_segredo() -> str:
+def generate_secret() -> str:
     """New secret: prefix + 43 url-safe chars. Exists only in memory and in the creation response."""
     return PREFIXO + secrets.token_urlsafe(32)
 
 
-def hash_segredo(segredo: str) -> str:
+def hash_secret(segredo: str) -> str:
     """SHA-256 hex of the secret — this is what goes in the `token_hash` column."""
     return hashlib.sha256(segredo.encode("utf-8")).hexdigest()
 
 
-def prefixo_exibivel(segredo: str) -> str:
+def displayable_prefix(segredo: str) -> str:
     """The first 12 characters, for the screen to show `atl_pat_Ab3d…`."""
-    return segredo[:TAMANHO_PREFIXO_EXIBIVEL]
+    return segredo[:DISPLAYABLE_PREFIX_LENGTH]
 
 
-def e_segredo_pat(valor: str | None) -> bool:
+def is_pat_secret(valor: str | None) -> bool:
     """True if the value has exactly the format of a PAT (without querying the database)."""
-    return bool(valor) and REGEX_SEGREDO.fullmatch(valor) is not None
+    return bool(valor) and SECRET_REGEX.fullmatch(valor) is not None
 
 
-def escopos_invalidos(escopos: list[str]) -> list[str]:
+def invalid_scopes(escopos: list[str]) -> list[str]:
     """The scopes that do not exist, in the order they appeared."""
     return [e for e in escopos if e not in ESCOPOS]
 

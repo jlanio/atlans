@@ -17,7 +17,7 @@ import { Badge } from "@/app/components/ui/badge"
  * brand orange is `primary`, it doesn't become a category color; teal/emerald
  * are not in the set.
  */
-const EXT_ESTILO: Record<string, string> = {
+const EXT_STYLE: Record<string, string> = {
   geojson: "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400",
   json:    "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400",
   csv:     "bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-400",
@@ -49,7 +49,7 @@ export function ExtIcon({ ext }: { ext: string }) {
 }
 
 export function ExtBadge({ ext }: { ext: string }) {
-  const cls = EXT_ESTILO[ext] ?? "bg-muted text-muted-foreground"
+  const cls = EXT_STYLE[ext] ?? "bg-muted text-muted-foreground"
   return (
     <Badge variant="secondary" className={`gap-1 font-mono text-[10px] uppercase ${cls}`}>
       <ExtIcon ext={ext} />

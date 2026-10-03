@@ -12,13 +12,13 @@ import path from 'node:path'
 import { CERT_DIR, ENV_FILE } from '../paths.js'
 import { SERVIDOR } from '../../shared/servidor.js'
 import {
-  ESTRATEGIAS, INTERVALO_SYNC, MODOS_SYNC, PADRAO_SYNC,
-  type EstrategiaConflito, type ModoSync,
+  ESTRATEGIAS, SYNC_INTERVAL, SYNC_MODES, SYNC_DEFAULTS,
+  type ConflictStrategy, type SyncMode,
 } from '../../shared/geosync.js'
 import { LIMITES, inteiroDoEnv } from '../../shared/limites.js'
 
 /** Files the enrollment produces. Without both, `assert_enrolled` blocks the boot. */
-const CERT_OBRIGATORIOS = ['cert.pem', 'key.pem']
+const REQUIRED_CERTS = ['cert.pem', 'key.pem']
 
 /**
  * Identity material of THIS executor, discarded when redoing the enrollment.
@@ -33,26 +33,26 @@ const CERT_OBRIGATORIOS = ['cert.pem', 'key.pem']
  *     CA, built by `_ca_bootstrap`. It has nothing to do with the executor's
  *     identity, and downgrading it only costs one extra download.
  */
-const ARQUIVOS_DE_IDENTIDADE = [
+const IDENTITY_FILES = [
   'cert.pem', 'chain.pem', 'ca.pem', 'key.pem', 'x25519_key.pem',
 ]
 
-export interface EstadoConfiguracao {
+export interface ConfigState {
   configurado: boolean
   executorId: string | null
   /** Missing step — mirrors the `step` of the `state: failed` event. */
   falta: 'config' | 'enrollment' | null
 }
 
-export function lerConfiguracao(): EstadoConfiguracao {
+export function lerConfiguracao(): ConfigState {
   const env = lerEnv()
   const executorId = (env.EXECUTOR_ID || '').trim() || null
-  const temCertificado = CERT_OBRIGATORIOS.every((f) => fs.existsSync(path.join(CERT_DIR, f)))
+  const hasCertificate = REQUIRED_CERTS.every((f) => fs.existsSync(path.join(CERT_DIR, f)))
 
   return {
-    configurado: Boolean(executorId) && temCertificado,
+    configurado: Boolean(executorId) && hasCertificate,
     executorId,
-    falta: !executorId ? 'config' : !temCertificado ? 'enrollment' : null,
+    falta: !executorId ? 'config' : !hasCertificate ? 'enrollment' : null,
   }
 }
 
@@ -71,7 +71,7 @@ export function lerConfiguracao(): EstadoConfiguracao {
  */
 export function descartarEnrollment(): { removidos: string[] } {
   const removidos: string[] = []
-  for (const nome of ARQUIVOS_DE_IDENTIDADE) {
+  for (const nome of IDENTITY_FILES) {
     const alvo = path.join(CERT_DIR, nome)
     if (!fs.existsSync(alvo)) continue
     try {
@@ -99,30 +99,30 @@ export function descartarEnrollment(): { removidos: string[] } {
  */
 export interface ConfigGeoSync {
   pasta: string | null
-  modo: ModoSync
-  conflito: EstrategiaConflito
+  modo: SyncMode
+  conflito: ConflictStrategy
   workspaceId: string | null
 }
 
 export function lerGeoSync(): ConfigGeoSync {
   const env = lerEnv()
-  const modo = env.EXECUTOR_SYNC_MODE as ModoSync
-  const conflito = env.EXECUTOR_SYNC_CONFLICT_STRATEGY as EstrategiaConflito
+  const modo = env.EXECUTOR_SYNC_MODE as SyncMode
+  const conflito = env.EXECUTOR_SYNC_CONFLICT_STRATEGY as ConflictStrategy
 
   return {
     // Only the first one gets in: a `.env` with several folders (hand-edited, or
     // coming from an earlier configuration) must not make the screen show
     // something it cannot represent.
     pasta: (env.EXECUTOR_SYNC_DIRS ?? '').split(',').map((p) => p.trim()).filter(Boolean)[0] ?? null,
-    // Without a valid value, whatever the executor uses — see PADRAO_SYNC.
-    modo: MODOS_SYNC.includes(modo) ? modo : PADRAO_SYNC.modo,
-    conflito: ESTRATEGIAS.includes(conflito) ? conflito : PADRAO_SYNC.conflito,
+    // Without a valid value, whatever the executor uses — see SYNC_DEFAULTS.
+    modo: SYNC_MODES.includes(modo) ? modo : SYNC_DEFAULTS.modo,
+    conflito: ESTRATEGIAS.includes(conflito) ? conflito : SYNC_DEFAULTS.conflito,
     workspaceId: (env.EXECUTOR_WORKSPACE_ID || '').trim() || null,
   }
 }
 
-/** Folder rejected on save. See `validarPasta`. */
-export interface PastaInvalida { caminho: string; motivo: string }
+/** Folder rejected on save. See `validateFolder`. */
+export interface InvalidFolder { caminho: string; motivo: string }
 
 /**
  * `EXECUTOR_SYNC_DIRS` is a COMMA-separated list, and Python splits it blindly
@@ -131,7 +131,7 @@ export interface PastaInvalida { caminho: string; motivo: string }
  * saying why. Blocking it in the UI is the only place where this can be
  * explained.
  */
-export function validarPasta(pasta: string | null): PastaInvalida | null {
+export function validateFolder(pasta: string | null): InvalidFolder | null {
   if (!pasta) return null
   if (pasta.includes(',')) {
     return { caminho: pasta, motivo: 'o caminho contém vírgula, que separa as pastas na configuração' }
@@ -144,7 +144,7 @@ export function gravarGeoSync(cfg: ConfigGeoSync): void {
   gravarEnv({
     EXECUTOR_SYNC_DIRS: cfg.pasta ?? '',
     EXECUTOR_SYNC_MODE: cfg.modo,
-    EXECUTOR_SYNC_INTERVAL: String(INTERVALO_SYNC),
+    EXECUTOR_SYNC_INTERVAL: String(SYNC_INTERVAL),
     EXECUTOR_SYNC_CONFLICT_STRATEGY: cfg.conflito,
     // Empty is valid: it means "auto-detect", which is what the executor does
     // when there is exactly one accessible workspace.
@@ -158,16 +158,16 @@ export function gravarGeoSync(cfg: ConfigGeoSync): void {
  * The server is not here: it is the constant {@link SERVIDOR}, and that is why
  * it is not a setting. See the header of `shared/servidor.ts`.
  */
-export interface ConfigExecucao {
+export interface RunConfig {
   workers: number
   filaMax: number
   timeoutS: number
   artifactsDir: string
-  nivelLog: NivelLog
+  nivelLog: LogLevel
 }
 
-export type NivelLog = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR'
-export const NIVEIS_LOG: NivelLog[] = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
+export type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR'
+export const LOG_LEVELS: LogLevel[] = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
 
 /**
  * The numbers go through the ranges in `shared/limites.ts`, the mirror of
@@ -176,19 +176,19 @@ export const NIVEIS_LOG: NivelLog[] = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
  * UI show 500 workers with the executor running 4, with nothing explaining the
  * difference.
  */
-export function lerExecucao(artifactsDirPadrao: string): ConfigExecucao {
+export function lerExecucao(defaultArtifactsDir: string): RunConfig {
   const env = lerEnv()
-  const nivel = (env.LOG_LEVEL || '').toUpperCase() as NivelLog
+  const nivel = (env.LOG_LEVEL || '').toUpperCase() as LogLevel
   return {
     workers: inteiroDoEnv(env.EXECUTOR_MAX_CONCURRENT, LIMITES.workers),
     filaMax: inteiroDoEnv(env.EXECUTOR_MAX_QUEUE_SIZE, LIMITES.filaMax),
     timeoutS: inteiroDoEnv(env.EXECUTOR_JOB_TIMEOUT, LIMITES.timeoutS),
-    artifactsDir: (env.EXECUTOR_ARTIFACTS_DIR || '').trim() || artifactsDirPadrao,
-    nivelLog: NIVEIS_LOG.includes(nivel) ? nivel : 'INFO',
+    artifactsDir: (env.EXECUTOR_ARTIFACTS_DIR || '').trim() || defaultArtifactsDir,
+    nivelLog: LOG_LEVELS.includes(nivel) ? nivel : 'INFO',
   }
 }
 
-export function gravarExecucao(cfg: ConfigExecucao): void {
+export function gravarExecucao(cfg: RunConfig): void {
   gravarEnv({
     EXECUTOR_MAX_CONCURRENT: String(inteiroDoEnv(String(cfg.workers), LIMITES.workers)),
     EXECUTOR_MAX_QUEUE_SIZE: String(inteiroDoEnv(String(cfg.filaMax), LIMITES.filaMax)),
@@ -198,7 +198,7 @@ export function gravarExecucao(cfg: ConfigExecucao): void {
     // the `.env` to another address, saving any setting brings the file back
     // to the correct server instead of preserving the change.
     EXECUTOR_SERVER_URL: SERVIDOR,
-    LOG_LEVEL: NIVEIS_LOG.includes(cfg.nivelLog) ? cfg.nivelLog : 'INFO',
+    LOG_LEVEL: LOG_LEVELS.includes(cfg.nivelLog) ? cfg.nivelLog : 'INFO',
   })
 }
 
@@ -228,8 +228,8 @@ export function lerEnv(): Record<string, string> {
     // what Python sees. Without this, `EXECUTOR_SYNC_MODE=bidirectional # x`
     // was not recognized, the screen fell back to the default and saving
     // GeoSync changed the executor's mode.
-    const entreAspas = /^(["'])(.*)\1(?:\s+#.*)?$/.exec(valor)
-    valor = entreAspas ? entreAspas[2]! : valor.replace(/\s+#.*$/, '')
+    const quoted = /^(["'])(.*)\1(?:\s+#.*)?$/.exec(valor)
+    valor = quoted ? quoted[2]! : valor.replace(/\s+#.*$/, '')
     valores[chave] = valor
   }
   return valores

@@ -29,7 +29,7 @@ def _script(node_id, code, saida="result"):
             "properties": {"code": code, "output_vars": saida, "timeout": 20}}
 
 
-def _filho(portas, edges_para_saida):
+def _child(portas, edges_to_output):
     return {
         "nodes": [
             {"id": "in", "type": "trigger", "name": "SubWorkflowInput",
@@ -42,12 +42,12 @@ def _filho(portas, edges_para_saida):
         "edges": [
             {"source": "in", "target": "a"},
             {"source": "in", "target": "b"},
-            *edges_para_saida,
+            *edges_to_output,
         ],
     }
 
 
-def _rodar_pai(filho):
+def _run_parent(filho):
     from flow.executor import WorkflowExecutor
 
     pai = {
@@ -69,14 +69,14 @@ def _rodar_pai(filho):
     )
 
 
-COM_PORTAS = [
+WITH_PORTS = [
     {"source": "a", "target": "out", "from_key": "result", "to_key": "focos"},
     {"source": "b", "target": "out", "from_key": "result", "to_key": "mapa"},
 ]
 
 
-def test_duas_origens_chegam_cada_uma_na_sua_chave():
-    saida = _rodar_pai(_filho(["focos", "mapa"], COM_PORTAS))["sub"]
+def test_two_sources_each_arrive_in_their_own_key():
+    saida = _run_parent(_child(["focos", "mapa"], WITH_PORTS))["sub"]
 
     assert saida["focos"] == "FOCOS"
     assert saida["mapa"] == "MAPA"
@@ -85,17 +85,17 @@ def test_duas_origens_chegam_cada_uma_na_sua_chave():
     assert saida["subWorkflowResult"] == {"focos": "FOCOS", "mapa": "MAPA"}
 
 
-def test_o_defeito_que_a_regra_evita():
+def test_the_defect_the_rule_prevents():
     """Without `to_key`, the two edges use the `from_key` as the name.
 
     It is not an executor bug to fix — it is the reason the editor only allows
     several connections when the node declares two or more ports.
     """
-    sem_to_key = [
+    without_to_key = [
         {"source": "a", "target": "out", "from_key": "result"},
         {"source": "b", "target": "out", "from_key": "result"},
     ]
-    saida = _rodar_pai(_filho([], sem_to_key))["sub"]
+    saida = _run_parent(_child([], without_to_key))["sub"]
 
     # A single key, with the value of ONE of the two sources: the other vanished.
     publico = saida["subWorkflowResult"]
@@ -103,30 +103,30 @@ def test_o_defeito_que_a_regra_evita():
     assert publico["result"] in ("FOCOS", "MAPA")
 
 
-def test_a_allowlist_continua_valendo_sobre_as_portas():
+def test_allowlist_still_applies_over_the_ports():
     """`ports` is a connection point AND a contract: what is not in the list does
     not come back.
 
     Here the edge delivers `mapa`, which was not declared — the value is
     discarded (with a warning in the log) instead of leaking to the parent.
     """
-    saida = _rodar_pai(_filho(["focos"], COM_PORTAS))["sub"]
+    saida = _run_parent(_child(["focos"], WITH_PORTS))["sub"]
 
     assert saida["subWorkflowResult"] == {"focos": "FOCOS"}
     assert "mapa" not in saida
 
 
-def test_passthrough_sem_portas_continua_devolvendo_tudo():
+def test_passthrough_without_ports_still_returns_everything():
     """Single-use sub-workflow: one edge, no declared port."""
-    uma_aresta = [{"source": "a", "target": "out", "from_key": "result"}]
-    saida = _rodar_pai(_filho([], uma_aresta))["sub"]
+    single_edge = [{"source": "a", "target": "out", "from_key": "result"}]
+    saida = _run_parent(_child([], single_edge))["sub"]
 
     assert saida["subWorkflowResult"] == {"result": "FOCOS"}
 
 
 # ── The node contract ────────────────────────────────────────────────────────
 
-def test_subworkflowoutput_declara_entradas_dinamicas():
+def test_subworkflowoutput_declares_dynamic_inputs():
     """`dynamic_inputs` is what makes the editor derive the connection points from
     the `ports` property. Without it the node goes back to one anonymous
     handle: the tests above keep passing (the executor does not change), but

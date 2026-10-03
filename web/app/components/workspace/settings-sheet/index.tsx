@@ -55,7 +55,7 @@ export function WorkspaceSettingsSheet({ workspace, currentUserId, initialSectio
   const [section, setSection] = useState<SectionId>(initialSection)
   const [memberCount, setMemberCount] = useState<number | null>(null)
   const [executorAlert, setExecutorAlert] = useState(false)
-  const [notificacoesAlert, setNotificacoesAlert] = useState(false)
+  const [notificationsAlert, setNotificationsAlert] = useState(false)
 
   const canManage = hasMinRole(workspace?.my_role, "admin")
 
@@ -63,7 +63,7 @@ export function WorkspaceSettingsSheet({ workspace, currentUserId, initialSectio
   // new function on every render would put them in an update loop.
   const handleMemberCount = useCallback((n: number) => setMemberCount(n), [])
   const handleExecutorAlert = useCallback((v: boolean) => setExecutorAlert(v), [])
-  const handleNotificacoesAlert = useCallback((v: boolean) => setNotificacoesAlert(v), [])
+  const handleNotificationsAlert = useCallback((v: boolean) => setNotificationsAlert(v), [])
 
   async function copyId() {
     if (!workspace) return
@@ -143,7 +143,7 @@ export function WorkspaceSettingsSheet({ workspace, currentUserId, initialSectio
                   const ativo = section === id
                   const alerta =
                     (id === "executor" && executorAlert) ||
-                    (id === "notificacoes" && notificacoesAlert)
+                    (id === "notificacoes" && notificationsAlert)
                   return (
                     <button
                       key={id}
@@ -205,7 +205,7 @@ export function WorkspaceSettingsSheet({ workspace, currentUserId, initialSectio
                   <NotificationsSection
                     workspaceId={workspace.id_hash}
                     canManage={canManage}
-                    onAlertChange={handleNotificacoesAlert}
+                    onAlertChange={handleNotificationsAlert}
                   />
                 </div>
                 <div hidden={section !== "perigo"}>

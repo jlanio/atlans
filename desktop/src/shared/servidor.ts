@@ -22,4 +22,4 @@ declare const __ATLANS_SERVIDOR__: string
 export const SERVIDOR: string = __ATLANS_SERVIDOR__
 
 /** Host of {@link SERVIDOR} — the only one accepted in an enrollment deep link. */
-export const SERVIDOR_HOST = new URL(SERVIDOR).hostname
+export const SERVER_HOST = new URL(SERVIDOR).hostname

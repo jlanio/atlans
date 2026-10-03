@@ -22,7 +22,7 @@ Fields:
   and any other caller (a tool here, a script, a job) could cancel any
   account's run. Repeating it in the tool would cost one more query and reopen
   the chance of the two copies diverging. What guarantees it stays there is
-  `test_cancelar_com_papel_de_viewer_e_recusado_pelo_servico_de_verdade`, the
+  `test_cancel_with_viewer_role_is_refused_by_the_real_service`, the
   only cancellation test that does not stub the service;
 - `cota`: extra rate limit bucket ("validate", "run"); None = only the general one;
 - `read_only` / `idempotente`: become `readOnlyHint`/`idempotentHint` in the
@@ -158,7 +158,7 @@ GUARDAS: dict[str, Guarda] = {
     # ── Drive writing ───────────────────────────────────────────────────────
     # `editor`, not `operator`: adding and removing files is changing the
     # workspace's collection, not firing a run. Same yardstick the REST route
-    # applies (`exigir_papel_no_workspace(..., ROLE_EDITOR)` in `drive_router`).
+    # applies (`require_workspace_role(..., ROLE_EDITOR)` in `drive_router`).
     #
     # `create_drive_upload_url` is not idempotent because each call creates a new
     # pending ROW and signs a new URL — repeating after a network error would

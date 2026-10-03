@@ -18,27 +18,27 @@
 /** The three basemaps the map knows. */
 export type Basemap = "streets" | "satellite" | "hybrid"
 
-export interface FundoDoMapa {
+export interface MapBasemap {
   /** Template com {z}, {x} e {y}. */
   url: string
   /** The attribution required by the provider, in plain text. */
   credito: string
 }
 
-export interface FundosDoMapa {
-  ruas: FundoDoMapa
-  satelite?: FundoDoMapa
-  hibrido?: FundoDoMapa
+export interface MapBasemaps {
+  ruas: MapBasemap
+  satelite?: MapBasemap
+  hibrido?: MapBasemap
 }
 
-export const RUAS_PADRAO: FundoDoMapa = {
+export const RUAS_PADRAO: MapBasemap = {
   url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
   credito: "© OpenStreetMap contributors",
 }
 
-export const FUNDOS_PADRAO: FundosDoMapa = { ruas: RUAS_PADRAO }
+export const DEFAULT_BASEMAPS: MapBasemaps = { ruas: RUAS_PADRAO }
 
-function lerFundo(env: Record<string, string | undefined>, prefixo: string): FundoDoMapa | undefined {
+function readBasemap(env: Record<string, string | undefined>, prefixo: string): MapBasemap | undefined {
   const url = (env[`MAPA_${prefixo}_URL`] ?? "").trim()
   if (!url) return undefined
   if (!/^https?:\/\//.test(url) || !["{z}", "{x}", "{y}"].every(m => url.includes(m))) {
@@ -49,17 +49,17 @@ function lerFundo(env: Record<string, string | undefined>, prefixo: string): Fun
 }
 
 /** This installation's basemaps, from the server's environment (MAPA_*). */
-export function lerFundosDoAmbiente(env: Record<string, string | undefined>): FundosDoMapa {
-  const fundos: FundosDoMapa = { ruas: lerFundo(env, "RUAS") ?? RUAS_PADRAO }
-  const satelite = lerFundo(env, "SATELITE")
-  const hibrido = lerFundo(env, "HIBRIDO")
+export function lerFundosDoAmbiente(env: Record<string, string | undefined>): MapBasemaps {
+  const fundos: MapBasemaps = { ruas: readBasemap(env, "RUAS") ?? RUAS_PADRAO }
+  const satelite = readBasemap(env, "SATELITE")
+  const hibrido = readBasemap(env, "HIBRIDO")
   if (satelite) fundos.satelite = satelite
   if (hibrido) fundos.hibrido = hibrido
   return fundos
 }
 
 /** The credit goes as HTML in MapLibre's attribution control: escaped. */
-function escapar(texto: string): string {
+function escapeText(texto: string): string {
   return texto.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!)
 }
 
@@ -68,10 +68,10 @@ function escapar(texto: string): string {
  * satellite, and satellite to streets, when the installation has not
  * configured them.
  */
-export function conjuntoDoFundo(fundos: FundosDoMapa, basemap: Basemap): { tiles: string[]; attribution: string } {
+export function conjuntoDoFundo(fundos: MapBasemaps, basemap: Basemap): { tiles: string[]; attribution: string } {
   const fundo =
     basemap === "hybrid" ? fundos.hibrido ?? fundos.satelite ?? fundos.ruas
     : basemap === "satellite" ? fundos.satelite ?? fundos.ruas
     : fundos.ruas
-  return { tiles: [fundo.url], attribution: escapar(fundo.credito) }
+  return { tiles: [fundo.url], attribution: escapeText(fundo.credito) }
 }

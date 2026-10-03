@@ -26,25 +26,25 @@ from pydantic import ValidationError
 from app.api.routers import workflows_router as WR
 from app.schemas.workflow import WorkflowMove, WorkflowUpdate
 
-_ORIGEM = "Requer role 'admin' ou 'owner' no workspace de origem para mover workflows."
-_DESTINO = "Requer role 'admin' ou 'owner' no workspace de destino para mover workflows."
+_SOURCE = "Requer role 'admin' ou 'owner' no workspace de origem para mover workflows."
+_TARGET = "Requer role 'admin' ou 'owner' no workspace de destino para mover workflows."
 
-_ROTAS_DE_MOVER = ["/workflows/{id_hash}/move", "/workflows/{id_hash}/move/preview"]
+_MOVE_ROUTES = ["/workflows/{id_hash}/move", "/workflows/{id_hash}/move/preview"]
 
 
-def _guarda_da_origem(caminho: str):
+def _source_guard(caminho: str):
     """The role dependency the route declares — the one that runs in production."""
     (rota,) = [r for r in WR.router.routes if r.path == caminho]
     (guarda,) = [d.call for d in rota.dependant.dependencies if hasattr(d.call, "papel_minimo")]
     return guarda
 
 
-async def _origem(papel, caminho=_ROTAS_DE_MOVER[0]):
+async def _origin(papel, caminho=_MOVE_ROUTES[0]):
     wf = SimpleNamespace(id_hash="wf-1", workspace_id="ws-origem")
-    return await _guarda_da_origem(caminho)((wf, papel))
+    return await _source_guard(caminho)((wf, papel))
 
 
-async def _mover(papel_no_destino):
+async def _mover(role_in_target):
     """`_move` with the destination role decided by the test; returns the service."""
     service = SimpleNamespace(move_workflow=AsyncMock(return_value={
         "id": "wf-1", "name": "Fluxo", "renamed": False, "from_workspace_id": "ws-origem",
@@ -52,7 +52,7 @@ async def _mover(papel_no_destino):
     }))
     with patch(
         "app.core.authorization.workflow_access.get_workspace_member_role",
-        new=AsyncMock(return_value=papel_no_destino),
+        new=AsyncMock(return_value=role_in_target),
     ):
         await WR._move(
             WorkflowMove(target_workspace_id="ws-destino"), service,
@@ -64,52 +64,52 @@ async def _mover(papel_no_destino):
 
 # ── Casos negados ────────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("caminho", _ROTAS_DE_MOVER)
+@pytest.mark.parametrize("caminho", _MOVE_ROUTES)
 @pytest.mark.parametrize("origem", ["viewer", "editor", "operator"])
-async def test_403_quando_o_papel_na_origem_e_insuficiente(origem, caminho):
+async def test_403_when_the_source_role_is_insufficient(origem, caminho):
     """Move and preview declare the SAME guard: a preview without it would become
     an oracle about the contents of other people's workspaces."""
     with pytest.raises(HTTPException) as exc:
-        await _origem(origem, caminho)
+        await _origin(origem, caminho)
 
     assert exc.value.status_code == 403
-    assert exc.value.detail == _ORIGEM
+    assert exc.value.detail == _SOURCE
 
 
 @pytest.mark.parametrize("destino", ["viewer", "editor", "operator"])
-async def test_403_quando_o_papel_no_destino_e_insuficiente(destino):
+async def test_403_when_the_target_role_is_insufficient(destino):
     with pytest.raises(HTTPException) as exc:
         await _mover(destino)
 
     assert exc.value.status_code == 403
-    assert exc.value.detail == _DESTINO
+    assert exc.value.detail == _TARGET
 
 
-async def test_403_quando_admin_apenas_na_origem():
-    await _origem("admin")                      # a origem passa...
+async def test_403_when_admin_only_in_source():
+    await _origin("admin")                      # a origem passa...
     with pytest.raises(HTTPException) as exc:   # ...e o destino barra
         await _mover(None)
     assert exc.value.status_code == 403
 
 
-async def test_403_quando_admin_apenas_no_destino():
+async def test_403_when_admin_only_in_target():
     with pytest.raises(HTTPException) as exc:
-        await _origem(None)
+        await _origin(None)
     assert exc.value.status_code == 403
 
 
-async def test_nao_membro_e_workspace_inexistente_dao_a_mesma_resposta():
+async def test_non_member_and_nonexistent_workspace_give_the_same_response():
     """`get_workspace_member_role` returns None for a non-member, a nonexistent
     workspace and a workspace in the trash. Distinguishing them would allow
     enumerating other people's workspaces by guessing ids."""
-    with pytest.raises(HTTPException) as nao_membro:
+    with pytest.raises(HTTPException) as non_member:
         await _mover(None)
 
-    assert nao_membro.value.status_code == 403
-    assert nao_membro.value.detail == _DESTINO
+    assert non_member.value.status_code == 403
+    assert non_member.value.detail == _TARGET
 
 
-async def test_destino_insuficiente_nao_chega_ao_service():
+async def test_insufficient_target_does_not_reach_the_service():
     service = SimpleNamespace(move_workflow=AsyncMock())
     with patch(
         "app.core.authorization.workflow_access.get_workspace_member_role",
@@ -127,17 +127,17 @@ async def test_destino_insuficiente_nao_chega_ao_service():
 
 @pytest.mark.parametrize("origem", ["admin", "owner"])
 @pytest.mark.parametrize("destino", ["admin", "owner"])
-async def test_admin_ou_owner_nos_dois_lados_passa(origem, destino):
+async def test_admin_or_owner_on_both_sides_passes(origem, destino):
     """`owner` ranks above `admin` in WORKSPACE_ROLE_ORDER, so the minimum check
     already covers it — there is no special branch for the owner."""
-    await _origem(origem)
+    await _origin(origem)
     service = await _mover(destino)
     service.move_workflow.assert_awaited_once()
 
 
 # ── Regression: the PUT still cannot change tenant ───────────────────────────
 
-def test_workspace_id_continua_proibido_no_update():
+def test_workspace_id_still_forbidden_on_update():
     """This route exists precisely so that the PUT does not need to accept the
     field. If `extra="forbid"` goes away, the IDOR hole comes back through the
     old door."""

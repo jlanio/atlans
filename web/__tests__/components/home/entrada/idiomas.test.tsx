@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 /**
- * The sign-in modal in English and Spanish. With the `IdiomaProvider`, what the
+ * The sign-in modal in English and Spanish. With the `LanguageProvider`, what the
  * Home chooses — titles, supporting sentences, labels, hints, buttons and the errors
  * built on the client — follows the language; the message the SERVER returns
  * shows up as it came. Portuguese (no provider) is covered by modal-de-entrada.test.
@@ -17,7 +17,7 @@ vi.mock("next-auth/react", () => ({ signIn: auth.signIn }))
 
 import ModalDeEntrada from "@/app/components/home/entrada/modal-de-entrada"
 import * as entrada from "@/app/components/home/i18n/secoes/entrada"
-import { IdiomaProvider } from "@/context/IdiomaContext"
+import { LanguageProvider } from "@/context/IdiomaContext"
 import type { Idioma } from "@/lib/idioma"
 
 beforeEach(() => {
@@ -30,9 +30,9 @@ afterEach(cleanup)
 
 function montar(idioma: Idioma, props: Partial<React.ComponentProps<typeof ModalDeEntrada>> = {}) {
   return render(
-    <IdiomaProvider inicial={{ idioma, detectado: idioma, escolhido: idioma }}>
+    <LanguageProvider inicial={{ idioma, detectado: idioma, escolhido: idioma }}>
       <ModalDeEntrada modo="entrar" onFechar={() => {}} onEntrou={() => {}} {...props} />
-    </IdiomaProvider>,
+    </LanguageProvider>,
   )
 }
 
@@ -59,28 +59,28 @@ function textos(o: unknown): string[] {
 }
 
 /** No Portuguese sign-in text on screen — except what is the same in both languages ("Enviando…"). */
-function semPortugues(idioma: "en" | "es", texto: string) {
-  const doIdioma = new Set(textos(entrada[idioma]))
+function withoutPortuguese(idioma: "en" | "es", texto: string) {
+  const fromLanguage = new Set(textos(entrada[idioma]))
   for (const pt of textos(entrada.pt)) {
-    if (!doIdioma.has(pt)) expect(texto, pt).not.toContain(pt)
+    if (!fromLanguage.has(pt)) expect(texto, pt).not.toContain(pt)
   }
 }
 
 /** The body the server's `http_exception_handler` writes — the one for every refusal of ITS OWN. */
-function doServidor(status: number, message: string, headers: Record<string, string> = {}) {
+function fromServer(status: number, message: string, headers: Record<string, string> = {}) {
   return { response: { status, headers, data: { error: "http_exception", message, status_code: status } } }
 }
 
 // What is NOT a server refusal: the per-IP limiter, the /terra proxy being
 // down, the unexpected 500 and a CDN's error page.
-const LIMITADOR_429 = { response: { status: 429, headers: {}, data: { detail: "Too Many Requests" } } }
+const RATE_LIMITER_429 = { response: { status: 429, headers: {}, data: { detail: "Too Many Requests" } } }
 const PROXY_502 = { response: { status: 502, headers: {}, data: { detail: "Serviço indisponível" } } }
-const INESPERADO_500 = {
+const UNEXPECTED_500 = {
   response: { status: 500, headers: {}, data: { error: "internal_server_error", message: "Unexpected error occurred" } },
 }
 const CDN_403 = { response: { status: 403, headers: {}, data: "<html><body>Access denied</body></html>" } }
 
-const ESPERADO = {
+const EXPECTED = {
   en: {
     tituloEntrar: "Sign in",
     apoioEntrar: "Sign in to continue.",
@@ -196,7 +196,7 @@ const ESPERADO = {
 } satisfies Record<"en" | "es", Record<string, string>>
 
 describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
-  const txt = ESPERADO[idioma]
+  const txt = EXPECTED[idioma]
 
   it("entrar: título, apoio, rótulos, botões e rodapé — sem português", () => {
     montar(idioma)
@@ -207,7 +207,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     expect(screen.getByRole("button", { name: txt.esqueceu })).toBeTruthy()
     expect(screen.getByRole("button", { name: txt.entrar })).toBeTruthy()
     expect(dialogo.textContent).toContain(txt.naoTemConta)
-    semPortugues(idioma, dialogo.textContent ?? "")
+    withoutPortuguese(idioma, dialogo.textContent ?? "")
 
     fireEvent.click(screen.getByRole("button", { name: txt.criarConta }))
     expect(screen.getByRole("dialog", { name: txt.tituloCadastro })).toBeTruthy()
@@ -244,20 +244,20 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
       http.post.mockRejectedValueOnce(erro)
       submeter(senha)
       await waitFor(() => expect(alerta()).toContain(esperado))
-      semPortugues(idioma, alerta())
+      withoutPortuguese(idioma, alerta())
     }
 
-    await recusa(doServidor(401, "Credenciais inválidas."), txt.credenciais)
+    await recusa(fromServer(401, "Credenciais inválidas."), txt.credenciais)
     await recusa(
-      doServidor(403, "E-mail não verificado. Verifique sua caixa de entrada.", { "x-error-code": "email_not_verified" }),
+      fromServer(403, "E-mail não verificado. Verifique sua caixa de entrada.", { "x-error-code": "email_not_verified" }),
       txt.naoVerificado,
     )
     // Suspended, deleted or deactivated: the status does not say which.
-    await recusa(doServidor(403, "Conta suspensa. Entre em contato com o administrador."), txt.contaIndisponivel)
+    await recusa(fromServer(403, "Conta suspensa. Entre em contato com o administrador."), txt.contaIndisponivel)
     expect(alerta()).not.toMatch(/Conta suspensa/)
 
     // A server refusal the screen does not know passes through as it came.
-    http.post.mockRejectedValueOnce(doServidor(400, "Mensagem nova do servidor."))
+    http.post.mockRejectedValueOnce(fromServer(400, "Mensagem nova do servidor."))
     submeter(senha)
     await waitFor(() => expect(alerta()).toContain("Mensagem nova do servidor."))
   })
@@ -269,7 +269,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     preencher(txt.identificador, "fulana")
     const senha = preencher(txt.senha, "x")
     const alerta = () => screen.getByRole("alert").textContent ?? ""
-    for (const erro of [PROXY_502, INESPERADO_500, CDN_403]) {
+    for (const erro of [PROXY_502, UNEXPECTED_500, CDN_403]) {
       http.post.mockRejectedValueOnce(erro)
       submeter(senha)
       await waitFor(() => expect(alerta()).toContain(txt.erroAoEntrar))
@@ -283,7 +283,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     ["o bloqueio da conta sem Retry-After", null, "bloqueadaSemPrazo"],
   ] as const)("entrar: %s", async (_, retryAfter, chave) => {
     http.post.mockRejectedValueOnce(
-      doServidor(429, "Conta bloqueada por excesso de tentativas. Tente novamente em 2 minuto(s).", retryAfter ? { "retry-after": retryAfter } : {}),
+      fromServer(429, "Conta bloqueada por excesso de tentativas. Tente novamente em 2 minuto(s).", retryAfter ? { "retry-after": retryAfter } : {}),
     )
     montar(idioma)
     preencher(txt.identificador, "fulana")
@@ -296,7 +296,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
   })
 
   it("entrar: o 429 do limitador por conexão não diz que a conta foi bloqueada", async () => {
-    http.post.mockRejectedValueOnce(LIMITADOR_429)
+    http.post.mockRejectedValueOnce(RATE_LIMITER_429)
     montar(idioma)
     preencher(txt.identificador, "fulana")
     submeter(preencher(txt.senha, "x"))
@@ -306,7 +306,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
   })
 
   it("cadastro: o 'já em uso' do servidor sai no idioma; o proxy fora do ar, no texto do idioma", async () => {
-    http.post.mockRejectedValueOnce(doServidor(400, "Usuário ou e-mail já em uso."))
+    http.post.mockRejectedValueOnce(fromServer(400, "Usuário ou e-mail já em uso."))
     montar(idioma, { modo: "cadastro" })
     preencher(txt.usuario, "fulana")
     preencher(txt.email, "fulana@exemplo.com")
@@ -356,7 +356,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     expect(http.post).not.toHaveBeenCalled()
     expect(screen.getByRole("button", { name: txt.cadastrar })).toBeTruthy()
     expect(dialogo.textContent).toContain(txt.jaTemConta)
-    semPortugues(idioma, dialogo.textContent ?? "")
+    withoutPortuguese(idioma, dialogo.textContent ?? "")
 
     fireEvent.click(screen.getByRole("button", { name: txt.irParaEntrar }))
     expect(screen.getByRole("dialog", { name: txt.tituloEntrar })).toBeTruthy()
@@ -377,10 +377,10 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     montar(idioma, { modo: "recuperar" })
     expect(screen.getByRole("dialog", { name: txt.tituloRecuperar })).toBeTruthy()
     expect(screen.getByRole("button", { name: txt.enviarLink })).toBeTruthy()
-    semPortugues(idioma, screen.getByRole("dialog").textContent ?? "")
+    withoutPortuguese(idioma, screen.getByRole("dialog").textContent ?? "")
     submeter(preencher(txt.email, "ana@exemplo.com"))
     expect(await screen.findByText(new RegExp(txt.avisoDoLink))).toBeTruthy()
-    semPortugues(idioma, screen.getByRole("dialog").textContent ?? "")
+    withoutPortuguese(idioma, screen.getByRole("dialog").textContent ?? "")
     fireEvent.click(screen.getByRole("button", { name: txt.voltarParaEntrar }))
     expect(screen.getByRole("dialog", { name: txt.tituloEntrar })).toBeTruthy()
   })
@@ -393,25 +393,25 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     expect(screen.getAllByText(txt.senhasNaoCoincidem).length).toBeGreaterThan(0)
     expect(screen.getByRole("button", { name: txt.redefinirSenha })).toBeTruthy()
     expect(http.post).not.toHaveBeenCalled()
-    semPortugues(idioma, screen.getByRole("dialog").textContent ?? "")
+    withoutPortuguese(idioma, screen.getByRole("dialog").textContent ?? "")
 
     cleanup()
     montar(idioma, { modo: "redefinir" })
     expect(screen.getByText(txt.linkInvalido)).toBeTruthy()
     expect(screen.getByRole("button", { name: txt.pedirLinkNovo })).toBeTruthy()
-    semPortugues(idioma, screen.getByRole("dialog").textContent ?? "")
+    withoutPortuguese(idioma, screen.getByRole("dialog").textContent ?? "")
   })
 
   it("redefinir: o token recusado pelo servidor sai no idioma", async () => {
-    http.post.mockRejectedValueOnce(doServidor(400, "Token inválido ou expirado."))
+    http.post.mockRejectedValueOnce(fromServer(400, "Token inválido ou expirado."))
     montar(idioma, { modo: "redefinir", tokenDoLink: "tok-velho" })
     preencher(txt.novaSenha, "Senha-nova-1") // pragma: allowlist secret
     const confirmar = preencher(txt.confirmarNovaSenha, "Senha-nova-1") // pragma: allowlist secret
     submeter(confirmar)
     expect((await screen.findByRole("alert")).textContent).toContain(txt.tokenInvalido)
-    semPortugues(idioma, screen.getByRole("dialog").textContent ?? "")
+    withoutPortuguese(idioma, screen.getByRole("dialog").textContent ?? "")
 
-    http.post.mockRejectedValueOnce(LIMITADOR_429)
+    http.post.mockRejectedValueOnce(RATE_LIMITER_429)
     submeter(confirmar)
     await waitFor(() => expect(screen.getByRole("alert").textContent).toContain(txt.linkMuitasTentativas))
   })
@@ -426,13 +426,13 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     submeter(reenvio)
     expect((await screen.findByRole("alert")).textContent).toContain(txt.erroAoReenviar)
     expect(screen.getByRole("button", { name: txt.jaVerifiquei })).toBeTruthy()
-    semPortugues(idioma, screen.getByRole("dialog").textContent ?? "")
+    withoutPortuguese(idioma, screen.getByRole("dialog").textContent ?? "")
   })
 
   it.each([
-    ["o token recusado (400)", doServidor(400, "Token inválido ou expirado."), "tokenInvalido"],
-    ["a conta que sumiu (404)", doServidor(404, "Usuário não encontrado."), "tokenInvalido"],
-    ["o limite por conexão (429)", LIMITADOR_429, "linkMuitasTentativas"],
+    ["o token recusado (400)", fromServer(400, "Token inválido ou expirado."), "tokenInvalido"],
+    ["a conta que sumiu (404)", fromServer(404, "Usuário não encontrado."), "tokenInvalido"],
+    ["o limite por conexão (429)", RATE_LIMITER_429, "linkMuitasTentativas"],
     ["o proxy fora do ar (502)", PROXY_502, "servidorIndisponivel"],
     ["sem resposta", new Error("Network Error"), "servidorIndisponivel"],
   ] as const)("verificar: %s sai no idioma, não no português do servidor", async (_, erro, chave) => {
@@ -440,12 +440,12 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
     montar(idioma, { modo: "verificar", tokenDoLink: "tok-velho" })
     const alerta = await screen.findByRole("alert")
     expect(alerta.textContent).toContain(txt[chave])
-    semPortugues(idioma, alerta.textContent ?? "")
+    withoutPortuguese(idioma, alerta.textContent ?? "")
     expect(alerta.textContent).not.toMatch(/Token inválido ou expirado|Usuário não encontrado|Serviço indisponível/)
   })
 
   it("verificar: a tela da falha — título, reenvio e volta — no idioma", async () => {
-    http.get.mockRejectedValue(doServidor(400, "Token inválido ou expirado."))
+    http.get.mockRejectedValue(fromServer(400, "Token inválido ou expirado."))
     montar(idioma, { modo: "verificar", tokenDoLink: "tok-velho" })
     expect((await screen.findByRole("alert")).textContent).toContain(txt.tokenInvalido)
     expect(await screen.findByRole("dialog", { name: txt.tituloFalhou })).toBeTruthy()
@@ -456,7 +456,7 @@ describe.each(["en", "es"] as const)("entrada em %s", (idioma) => {
 
 describe.each(["en", "es"] as const)("as peças de components/auth em %s", (idioma) => {
   const auth = entrada[idioma].auth
-  const txt = ESPERADO[idioma]
+  const txt = EXPECTED[idioma]
 
   it("campo de senha: mostrar/ocultar e o aviso de Caps Lock", () => {
     montar(idioma)
@@ -504,11 +504,11 @@ describe("em português, a recusa do servidor como veio", () => {
     preencher("E-mail ou usuário", "fulana")
     const senha = preencher("Senha", "x")
     for (const [erro, esperado] of [
-      [doServidor(401, "Credenciais inválidas X."), "Credenciais inválidas X."],
-      [doServidor(403, "Conta suspensa X."), "Conta suspensa X."],
-      [doServidor(403, "E-mail não verificado X.", { "x-error-code": "email_not_verified" }), "E-mail não verificado X."],
+      [fromServer(401, "Credenciais inválidas X."), "Credenciais inválidas X."],
+      [fromServer(403, "Conta suspensa X."), "Conta suspensa X."],
+      [fromServer(403, "E-mail não verificado X.", { "x-error-code": "email_not_verified" }), "E-mail não verificado X."],
       [PROXY_502, "Serviço indisponível"],
-      [doServidor(429, "Conta bloqueada X.", { "retry-after": "61" }), "Conta bloqueada X."],
+      [fromServer(429, "Conta bloqueada X.", { "retry-after": "61" }), "Conta bloqueada X."],
     ] as const) {
       http.post.mockRejectedValueOnce(erro)
       submeter(senha)
@@ -523,8 +523,8 @@ describe("em português, a recusa do servidor como veio", () => {
     preencher("Senha", "S3nha-forte")
     const confirmar = preencher("Confirmar senha", "S3nha-forte")
     for (const [erro, esperado] of [
-      [doServidor(400, "Já em uso X."), "Já em uso X."],
-      [doServidor(429, "Devagar X."), "Devagar X."],
+      [fromServer(400, "Já em uso X."), "Já em uso X."],
+      [fromServer(429, "Devagar X."), "Devagar X."],
     ] as const) {
       http.post.mockRejectedValueOnce(erro)
       submeter(confirmar)
@@ -533,12 +533,12 @@ describe("em português, a recusa do servidor como veio", () => {
   })
 
   it("verificar e redefinir: o token recusado", async () => {
-    http.get.mockRejectedValue(doServidor(400, "Token recusado X."))
+    http.get.mockRejectedValue(fromServer(400, "Token recusado X."))
     montar("pt-BR", { modo: "verificar", tokenDoLink: "tok-velho" })
     expect((await screen.findByRole("alert")).textContent).toContain("Token recusado X.")
 
     cleanup()
-    http.post.mockRejectedValueOnce(doServidor(400, "Token recusado Y."))
+    http.post.mockRejectedValueOnce(fromServer(400, "Token recusado Y."))
     montar("pt-BR", { modo: "redefinir", tokenDoLink: "tok-velho" })
     preencher("Nova senha", "Senha-nova-1") // pragma: allowlist secret
     submeter(preencher("Confirmar nova senha", "Senha-nova-1")) // pragma: allowlist secret

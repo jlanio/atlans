@@ -17,13 +17,13 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
-from tests.unit._mcp_harness import TABELAS
+from tests.unit._mcp_harness import TABLES
 
-LEITURAS = ("/workflows/wf-n", "/workflows/wf-n/contract", "/workflows/wf-n/versions")
+READ_ROUTES = ("/workflows/wf-n", "/workflows/wf-n/contract", "/workflows/wf-n/versions")
 
 
 @pytest.fixture
-async def api_sem_dono(client, monkeypatch):
+async def ownerless_api(client, monkeypatch):
     from app.api.dependencies import get_current_user, get_db, get_user_workspace_ids
     from app.core.rate_limiter import limiter
     from app.main import app
@@ -36,7 +36,7 @@ async def api_sem_dono(client, monkeypatch):
 
     engine = create_async_engine("sqlite+aiosqlite://", poolclass=StaticPool)
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=[*TABELAS, WorkflowGroup.__table__])
+        await conn.run_sync(Base.metadata.create_all, tables=[*TABLES, WorkflowGroup.__table__])
     fabrica = async_sessionmaker(engine, expire_on_commit=False)
     async with fabrica() as db:
         db.add_all([
@@ -56,13 +56,13 @@ async def api_sem_dono(client, monkeypatch):
         async with fabrica() as sessao:
             yield sessao
 
-    async def _quem(request: Request):
+    async def _who(request: Request):
         uid = request.headers["x-usuario"]
         return SimpleNamespace(id_hash=uid, username=uid, email=f"{uid}@t", role="user", is_active=True)
 
     anteriores = dict(app.dependency_overrides)
     app.dependency_overrides[get_db] = _db
-    app.dependency_overrides[get_current_user] = _quem
+    app.dependency_overrides[get_current_user] = _who
     # The real membership (`listar_workspace_ids`), not the conftest's fixed list.
     app.dependency_overrides.pop(get_user_workspace_ids, None)
     monkeypatch.setattr(limiter, "enabled", False)
@@ -78,27 +78,27 @@ async def api_sem_dono(client, monkeypatch):
 
 
 @pytest.mark.parametrize("usuario", ["u-viewer", "u-admin"])
-async def test_membro_de_workspace_sem_dono_le_o_workflow(api_sem_dono, usuario):
-    lista = await api_sem_dono.get("/workflows?workspace_id=ws-n", headers={"x-usuario": usuario})
+async def test_member_of_ownerless_workspace_reads_the_workflow(ownerless_api, usuario):
+    lista = await ownerless_api.get("/workflows?workspace_id=ws-n", headers={"x-usuario": usuario})
     assert lista.status_code == 200
-    for url in LEITURAS:
-        resposta = await api_sem_dono.get(url, headers={"x-usuario": usuario})
+    for url in READ_ROUTES:
+        resposta = await ownerless_api.get(url, headers={"x-usuario": usuario})
         assert resposta.status_code == 200, (url, resposta.text)
 
 
-async def test_membro_de_workspace_sem_dono_nao_age_nem_como_admin(api_sem_dono):
+async def test_member_of_ownerless_workspace_does_not_act_even_as_admin(ownerless_api):
     """With no role, no route with a minimum passes, with the 403 for someone not in the
     workspace: the same response as before the single guard."""
     cabecalho = {"x-usuario": "u-admin"}
-    pins = await api_sem_dono.get("/workflows/wf-n/pins", headers=cabecalho)
-    renomear = await api_sem_dono.put("/workflows/wf-n", json={"name": "G"}, headers=cabecalho)
+    pins = await ownerless_api.get("/workflows/wf-n/pins", headers=cabecalho)
+    renomear = await ownerless_api.put("/workflows/wf-n", json={"name": "G"}, headers=cabecalho)
     for resposta in (pins, renomear):
         assert resposta.status_code == 403
         assert resposta.json()["message"] == "Acesso negado a este recurso."
 
 
-async def test_quem_nao_e_membro_segue_sem_ler(api_sem_dono):
-    for url in LEITURAS:
-        resposta = await api_sem_dono.get(url, headers={"x-usuario": "u-fora"})
+async def test_non_member_still_cannot_read(ownerless_api):
+    for url in READ_ROUTES:
+        resposta = await ownerless_api.get(url, headers={"x-usuario": "u-fora"})
         assert resposta.status_code == 403, url
         assert resposta.json()["message"] == "Acesso negado a este recurso."

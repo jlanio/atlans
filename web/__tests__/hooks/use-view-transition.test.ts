@@ -3,8 +3,8 @@ import { renderHook, act } from "@testing-library/react"
 
 const push = vi.fn()
 // A single instance, as the App Router's `useRouter` actually returns.
-const routerFalso = { push, replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }
-vi.mock("next/navigation", () => ({ useRouter: () => routerFalso }))
+const fakeRouter = { push, replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }
+vi.mock("next/navigation", () => ({ useRouter: () => fakeRouter }))
 
 import { useViewTransitionRouter } from "@/app/hooks/useViewTransition"
 

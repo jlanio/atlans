@@ -7,7 +7,7 @@ import pandas as pd
 from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
-from flow.utils.geo_helpers import para_crs_metrico
+from flow.utils.geo_helpers import to_metric_crs
 from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 
@@ -157,7 +157,7 @@ class Conditional(BaseNode):
             # (the estimate also goes to the thread: it walks total_bounds)
             if gdf.crs and gdf.crs.is_geographic:
                 try:
-                    (gdf,) = await asyncio.to_thread(para_crs_metrico, gdf)
+                    (gdf,) = await asyncio.to_thread(to_metric_crs, gdf)
                 except Exception as e:
                     raise RuntimeError(f"Falha ao reprojetar para UTM: {e}")
             val = gdf.geometry.area.sum()

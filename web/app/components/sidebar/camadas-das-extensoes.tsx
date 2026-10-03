@@ -7,7 +7,7 @@
 
 import { EXTENSOES, LimiteDaExtensao } from "@/extensoes"
 
-export function CamadasDasExtensoes() {
+export function ExtensionLayers() {
   return (
     <>
       {EXTENSOES.flatMap(extensao =>

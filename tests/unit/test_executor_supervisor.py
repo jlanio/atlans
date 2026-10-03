@@ -21,65 +21,65 @@ from executor import supervisor
 
 # ── Reading the variable ─────────────────────────────────────────────────────
 
-def test_sem_variavel_nao_ha_o_que_vigiar(monkeypatch):
+def test_without_variable_there_is_nothing_to_watch(monkeypatch):
     """Running `python -m executor` by hand does not set the variable — the
     watchdog simply does not start."""
     monkeypatch.delenv(supervisor.VAR_PID, raising=False)
-    assert supervisor.pid_configurado() is None
+    assert supervisor.configured_pid() is None
 
 
 @pytest.mark.parametrize("valor", ["", "   ", "abc", "0", "-5", "12.5"])
-def test_valor_invalido_desativa_em_vez_de_derrubar(monkeypatch, valor):
+def test_invalid_value_disables_instead_of_crashing(monkeypatch, valor):
     """A malformed variable must not prevent the executor from starting."""
     monkeypatch.setenv(supervisor.VAR_PID, valor)
-    assert supervisor.pid_configurado() is None
+    assert supervisor.configured_pid() is None
 
 
-def test_valor_valido_e_lido(monkeypatch):
+def test_valid_value_is_read(monkeypatch):
     monkeypatch.setenv(supervisor.VAR_PID, " 4321 ")
-    assert supervisor.pid_configurado() == 4321
+    assert supervisor.configured_pid() == 4321
 
 
 # ── Process identity ─────────────────────────────────────────────────────────
 
-class _ProcFalso:
+class _FakeProc:
     def __init__(self, *, rodando=True, criado=1000.0, status="running"):
-        self._rodando, self._criado, self._status = rodando, criado, status
+        self._running, self._created, self._status = rodando, criado, status
 
-    def is_running(self): return self._rodando
-    def create_time(self): return self._criado
+    def is_running(self): return self._running
+    def create_time(self): return self._created
     def status(self): return self._status
 
 
 def _monitor(proc, criado=1000.0):
     m = supervisor.MonitorSupervisor(4321, intervalo=0.01)
-    m._proc, m._criado_em = proc, criado
+    m._proc, m._created_at = proc, criado
     return m
 
 
-def test_supervisor_vivo():
-    assert _monitor(_ProcFalso()).vivo() is True
+def test_supervisor_alive():
+    assert _monitor(_FakeProc()).vivo() is True
 
 
-def test_supervisor_encerrado():
-    assert _monitor(_ProcFalso(rodando=False)).vivo() is False
+def test_supervisor_ended():
+    assert _monitor(_FakeProc(rodando=False)).vivo() is False
 
 
-def test_pid_reciclado_por_outro_processo_conta_como_morto():
+def test_pid_recycled_by_another_process_counts_as_dead():
     """The core of the test: same PID, different `create_time` — it is another
     program that inherited the number, not the supervisor. Comparing only the
     PID would keep the orphan alive forever."""
-    assert _monitor(_ProcFalso(criado=2000.0), criado=1000.0).vivo() is False
+    assert _monitor(_FakeProc(criado=2000.0), criado=1000.0).vivo() is False
 
 
-def test_zumbi_nao_conta_como_vivo():
+def test_zombie_does_not_count_as_alive():
     """A zombie process still answers True to `is_running()`, but supervises
     nobody."""
     import psutil
-    assert _monitor(_ProcFalso(status=psutil.STATUS_ZOMBIE)).vivo() is False
+    assert _monitor(_FakeProc(status=psutil.STATUS_ZOMBIE)).vivo() is False
 
 
-def test_excecao_do_psutil_conta_como_morto():
+def test_psutil_exception_counts_as_dead():
     """NoSuchProcess, AccessDenied on a process that changed owner — all of them
     mean 'the supervisor I knew is gone'."""
     class _Explode:
@@ -88,20 +88,20 @@ def test_excecao_do_psutil_conta_como_morto():
     assert _monitor(_Explode()).vivo() is False
 
 
-def test_sem_vincular_conta_como_morto():
+def test_without_binding_counts_as_dead():
     assert supervisor.MonitorSupervisor(4321).vivo() is False
 
 
 # ── Vinculo ──────────────────────────────────────────────────────────────────
 
-def test_vincular_no_proprio_processo_funciona():
+def test_binding_to_own_process_works():
     import os
     m = supervisor.MonitorSupervisor(os.getpid())
     assert m.vincular() is True
     assert m.vivo() is True
 
 
-def test_vincular_em_pid_inexistente_falha_sem_levantar():
+def test_binding_to_nonexistent_pid_fails_without_raising():
     # Absurd PID: above the limit of any system in use.
     m = supervisor.MonitorSupervisor(2 ** 31 - 1)
     assert m.vincular() is False
@@ -110,49 +110,49 @@ def test_vincular_em_pid_inexistente_falha_sem_levantar():
 # ── Loop ─────────────────────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_vigiar_dispara_o_shutdown_quando_o_supervisor_some():
-    disparos = []
-    m = _monitor(_ProcFalso(rodando=False))
-    await asyncio.wait_for(m.vigiar(lambda: disparos.append(True)), timeout=2.0)
-    assert disparos == [True]
+async def test_watch_triggers_the_shutdown_when_the_supervisor_disappears():
+    firings = []
+    m = _monitor(_FakeProc(rodando=False))
+    await asyncio.wait_for(m.watch(lambda: firings.append(True)), timeout=2.0)
+    assert firings == [True]
 
 
 @pytest.mark.asyncio
-async def test_vigiar_nao_dispara_enquanto_vivo():
-    disparos = []
-    m = _monitor(_ProcFalso())
+async def test_watch_does_not_trigger_while_alive():
+    firings = []
+    m = _monitor(_FakeProc())
     with pytest.raises(asyncio.TimeoutError):
-        await asyncio.wait_for(m.vigiar(lambda: disparos.append(True)), timeout=0.1)
-    assert disparos == []
+        await asyncio.wait_for(m.watch(lambda: firings.append(True)), timeout=0.1)
+    assert firings == []
 
 
 @pytest.mark.asyncio
-async def test_handler_que_levanta_nao_deixa_a_task_estourar():
-    """The task is watched by `_observar_task`; an error here would become an ERROR
+async def test_handler_that_raises_does_not_let_the_task_blow_up():
+    """The task is watched by `_watch_task`; an error here would become an ERROR
     in the log on every boot."""
-    m = _monitor(_ProcFalso(rodando=False))
+    m = _monitor(_FakeProc(rodando=False))
     await asyncio.wait_for(
-        m.vigiar(lambda: (_ for _ in ()).throw(RuntimeError("boom"))), timeout=2.0)
+        m.watch(lambda: (_ for _ in ()).throw(RuntimeError("boom"))), timeout=2.0)
 
 
 @pytest.mark.asyncio
-async def test_criar_task_sem_variavel_devolve_none(monkeypatch):
+async def test_create_task_without_variable_returns_none(monkeypatch):
     monkeypatch.delenv(supervisor.VAR_PID, raising=False)
     assert supervisor.criar_task(lambda: None) is None
 
 
 @pytest.mark.asyncio
-async def test_supervisor_ja_morto_no_start_encerra_na_hora(monkeypatch):
+async def test_supervisor_already_dead_on_start_ends_immediately(monkeypatch):
     """If the supervisor died between the spawn and the boot, shutting down right
     away is correct: nobody will consume the NDJSON channel or stop this process later."""
     monkeypatch.setenv(supervisor.VAR_PID, str(2 ** 31 - 1))
-    disparos = []
-    assert supervisor.criar_task(lambda: disparos.append(True)) is None
-    assert disparos == [True]
+    firings = []
+    assert supervisor.criar_task(lambda: firings.append(True)) is None
+    assert firings == [True]
 
 
 @pytest.mark.asyncio
-async def test_criar_task_com_supervisor_vivo_sobe_a_task(monkeypatch):
+async def test_create_task_with_live_supervisor_starts_the_task(monkeypatch):
     import os
     monkeypatch.setenv(supervisor.VAR_PID, str(os.getpid()))
     task = supervisor.criar_task(lambda: None, intervalo=0.01)

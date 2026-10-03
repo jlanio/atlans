@@ -51,40 +51,40 @@ from flow.registry import register_node
 from flow.utils.artifact_helpers import (
     EXECUTOR,
     artifacts_root,
-    descrever_localidade,
+    describe_locality,
     persistir_artefato,
-    propriedade_localidade,
-    resolver_localidade,
+    locality_property,
+    resolve_locality,
 )
 from flow.utils.backoff import espera_exponencial
 from flow.utils.carta import (
     FORMATOS,
     PALETA,
-    FUNDOS_COM_NOME,
-    TAMANHO_DO_TILE,
-    comprimento_da_escala,
-    cor_valida,
-    creditos_com_fundo,
-    crs_da_carta,
-    crs_e_projetado,
-    dimensoes_da_pagina,
-    escurecer,
-    extensao_com_margem,
-    extensao_dos_tiles,
-    fundo_configurado,
-    servidor_injetou,
-    extensao_no_quadro,
-    fator_de_escala_3857,
+    NAMED_BASEMAPS,
+    TILE_SIZE,
+    scale_length,
+    valid_color,
+    credits_with_basemap,
+    image_map_crs,
+    crs_is_projected,
+    page_dimensions,
+    darken,
+    extent_with_margin,
+    tiles_extent,
+    configured_basemap,
+    server_injected,
+    extent_in_frame,
+    scale_factor_3857,
     lon_lat_de_3857,
-    marcas_da_grade,
-    parse_mapa,
-    quadro_do_mapa,
-    rotulo_da_escala,
-    rotulo_da_porta,
-    rotulo_de_coordenada,
-    tiles_da_extensao,
+    grid_ticks,
+    parse_map,
+    map_frame,
+    scale_label,
+    port_label,
+    coordinate_label,
+    tiles_for_extent,
     url_do_tile,
-    validar_template,
+    validate_template,
     zoom_para,
 )
 from flow.utils.executor_http import slugify
@@ -95,20 +95,20 @@ from flow.utils.workflow_contract import _parse_ports
 
 logger = get_logger(__name__)
 
-TENTATIVAS_POR_TILE = 3
-STATUS_TRANSITORIOS = frozenset({502, 503, 504})
-TETO_DE_BYTES_POR_TILE = 2_000_000
-CONEXOES_SIMULTANEAS = 2      # the OpenStreetMap usage policy
-AVISO_DE_FEICOES = 200_000    # acima disto o desenho fica lento e o PDF sai rasterizado
+ATTEMPTS_PER_TILE = 3
+TRANSIENT_STATUSES = frozenset({502, 503, 504})
+MAX_BYTES_PER_TILE = 2_000_000
+CONCURRENT_CONNECTIONS = 2      # the OpenStreetMap usage policy
+FEATURE_WARNING = 200_000    # acima disto o desenho fica lento e o PDF sai rasterizado
 
-MENSAGEM_SEM_MATPLOTLIB = (
+NO_MATPLOTLIB_MESSAGE = (
     "A carta imagem precisa do matplotlib no executor: atualize a imagem do "
     "executor (Docker) ou o app desktop para uma versao que o inclua."
 )
 
 
 @dataclass
-class _Camada:
+class _Layer:
     porta: str
     rotulo: str
     cor: str
@@ -146,7 +146,7 @@ def _importar_matplotlib():
     return matplotlib
 
 
-def _carregar_matplotlib():
+def _load_matplotlib():
     """Lazy import + Agg backend, both BEFORE any drawing.
 
     `gdf.plot` imports pyplot internally (geopandas.plotting), and pyplot
@@ -168,7 +168,7 @@ def _carregar_matplotlib():
     try:
         matplotlib = _importar_matplotlib()
     except ImportError as exc:
-        raise RuntimeError(MENSAGEM_SEM_MATPLOTLIB) from exc
+        raise RuntimeError(NO_MATPLOTLIB_MESSAGE) from exc
     matplotlib.use("Agg")
     return matplotlib
 
@@ -307,7 +307,7 @@ class CartaImagem(BaseNode):
                     # There is no download to protect on an artifact that stays on the executor.
                     "visibleWhen": {"field": "localidade", "in": ["herdar"]},
                 },
-                propriedade_localidade(),
+                locality_property(),
             ],
         }
 
@@ -318,16 +318,16 @@ class CartaImagem(BaseNode):
 
         # format, size and basemap already validated against the options by
         # self.validate(); the options are the keys of FORMATOS, TAMANHOS and
-        # FUNDOS_COM_NOME (see test_carta_imagem).
+        # NAMED_BASEMAPS (see test_carta_imagem).
         formato = self.get_param("formato", "png")
         mime, ext = FORMATOS[formato]
         tamanho = self.get_param("tamanho", "a4-paisagem")
         dpi = self.get_param_int("dpi", 150)
-        largura_pol, altura_pol, largura_px, altura_px = dimensoes_da_pagina(tamanho, dpi)
+        largura_pol, altura_pol, largura_px, altura_px = page_dimensions(tamanho, dpi)
 
         titulo = (self.get_param("titulo", "") or "").strip() or "Carta"
         subtitulo = (self.get_param("subtitulo", "") or "").strip()
-        creditos_param = (self.get_param("creditos", "") or "").strip()
+        credits_param = (self.get_param("creditos", "") or "").strip()
         opacidade = min(1.0, max(0.0, self.get_param_float("opacidade", 0.7)))
         legenda = self.get_param_bool("legenda", True)
         escala = self.get_param_bool("escala", True)
@@ -339,14 +339,14 @@ class CartaImagem(BaseNode):
         template: str | None = None
         atribuicao: str | None = None
         if fundo == "personalizado":
-            template = validar_template(self.get_param("fundo_url", ""))
+            template = validate_template(self.get_param("fundo_url", ""))
         elif fundo != "nenhum":
             injetado = self.get_param("fundo_da_instalacao")
-            configurado = fundo_configurado(fundo, injetado)
-            variavel = FUNDOS_COM_NOME[fundo][0] + (
+            configurado = configured_basemap(fundo, injetado)
+            variavel = NAMED_BASEMAPS[fundo][0] + (
                 " ou MAPA_SATELITE_URL" if fundo == "hibrido" else ""
             )
-            if configurado is None and servidor_injetou(injetado):
+            if configurado is None and server_injected(injetado):
                 raise ValueError(
                     f"O fundo '{fundo}' nao esta configurado nesta instalacao "
                     f"({variavel} no servidor). Use 'Ruas' ou uma URL personalizada de tiles."
@@ -362,15 +362,15 @@ class CartaImagem(BaseNode):
             template, atribuicao = configurado
 
         portas = _parse_ports(self.parameters.get("ports"))
-        rotulos = parse_mapa(self.get_param("rotulos", {}))
-        cores = parse_mapa(self.get_param("cores", {}))
+        rotulos = parse_map(self.get_param("rotulos", {}))
+        cores = parse_map(self.get_param("cores", {}))
         for porta, cor in cores.items():
-            if not cor_valida(cor):
+            if not valid_color(cor):
                 raise ValueError(
                     f"Cor '{cor}' da porta '{porta}' invalida: use hexadecimal, ex.: #e7723b."
                 )
 
-        localidade, quem = resolver_localidade(self.get_param("localidade", None))
+        localidade, quem = resolve_locality(self.get_param("localidade", None))
         credential_id = self.get_param("credential_id", "") or None
         if localidade == EXECUTOR:
             # There is no download to protect on an artifact that stays on the executor.
@@ -379,25 +379,25 @@ class CartaImagem(BaseNode):
         workspace_id, task_id = self.require_execution_context()
 
         filename = f"{slugify(titulo)}.{ext}"
-        self._reservar_nome(filename)
+        self._reserve_name(filename)
 
-        camadas = self._camadas(inputs, portas, rotulos, cores)
+        camadas = self._layers(inputs, portas, rotulos, cores)
         total = sum(len(c.gdf) for c in camadas)
 
         # ── CRS: order matters — no CRS means 4326, BEFORE any reprojection ──
-        caixa_4326 = await asyncio.to_thread(self._caixa_4326, camadas)
-        crs_texto, aviso = crs_da_carta(caixa_4326, crs_param, fundo)
+        bbox_4326 = await asyncio.to_thread(self._bbox_4326, camadas)
+        crs_texto, aviso = image_map_crs(bbox_4326, crs_param, fundo)
         if aviso:
             self.log(aviso)
         camadas = await asyncio.to_thread(_reprojetar, camadas, crs_texto)
-        projetado = crs_e_projetado(crs_texto)
+        projetado = crs_is_projected(crs_texto)
         crs_e_3857 = _e_3857(crs_texto)
-        caixa = _caixa_das_camadas(camadas)
+        caixa = _layers_bbox(camadas)
         # The frame is fixed (the box on the page); the extent grows to its
         # aspect ratio — and it is THIS extent that the basemap must cover.
-        _e, _b, largura_q, altura_q = quadro_do_mapa(legenda)
-        proporcao = (largura_q * largura_pol) / (altura_q * altura_pol)
-        extensao = extensao_no_quadro(extensao_com_margem(caixa, projetado), proporcao)
+        _e, _b, width_q, height_q = map_frame(legenda)
+        aspect_ratio = (width_q * largura_pol) / (height_q * altura_pol)
+        extensao = extent_in_frame(extent_with_margin(caixa, projetado), aspect_ratio)
 
         if escala and not projetado:
             self.log(
@@ -406,12 +406,12 @@ class CartaImagem(BaseNode):
             )
             escala = False
 
-        fundo_img, fundo_extensao = None, None
+        basemap_img, fundo_extensao = None, None
         if template:
-            fundo_img, fundo_extensao = await self._baixar_fundo(template, extensao, largura_px)
-        creditos = creditos_com_fundo(creditos_param, atribuicao)
+            basemap_img, fundo_extensao = await self._download_basemap(template, extensao, largura_px)
+        creditos = credits_with_basemap(credits_param, atribuicao)
 
-        if total > AVISO_DE_FEICOES:
+        if total > FEATURE_WARNING:
             self.log(
                 f"{total} feicoes na carta: o desenho fica lento e o PDF sai rasterizado. "
                 "Simplifique ou filtre as camadas antes se precisar de vetor puro."
@@ -422,8 +422,8 @@ class CartaImagem(BaseNode):
             largura_pol=largura_pol, altura_pol=altura_pol, largura_px=largura_px,
             altura_px=altura_px, dpi=dpi, formato=formato, titulo=titulo,
             subtitulo=subtitulo, creditos=creditos, opacidade=opacidade, legenda=legenda,
-            escala=escala, norte=norte, grade=grade, fundo=fundo_img,
-            fundo_extensao=fundo_extensao, rasterizar=total > AVISO_DE_FEICOES,
+            escala=escala, norte=norte, grade=grade, fundo=basemap_img,
+            fundo_extensao=fundo_extensao, rasterizar=total > FEATURE_WARNING,
         )
         content = await asyncio.to_thread(_renderizar, render)
 
@@ -440,7 +440,7 @@ class CartaImagem(BaseNode):
             features=total,
             credential_id=credential_id,
         )
-        self.log(descrever_localidade(localidade, quem))
+        self.log(describe_locality(localidade, quem))
         onde = "neste executor" if localidade == EXECUTOR else "no MinIO"
         self.log(
             f"Carta salva {onde}: {s3_key} ({formato}, {largura_px}x{altura_px} px, "
@@ -463,7 +463,7 @@ class CartaImagem(BaseNode):
 
     # ── Partes ───────────────────────────────────────────────────────────────
 
-    def _reservar_nome(self, filename: str) -> None:
+    def _reserve_name(self, filename: str) -> None:
         """Two nodes with the same title would write the SAME S3 key and the server
         would silently deduplicate, leaving a single image map. The record lives
         in the run's `context` (shared by all nodes), and it is made
@@ -482,22 +482,22 @@ class CartaImagem(BaseNode):
             )
         usados[filename] = self.node_id
 
-    def _camadas(self, inputs: Dict[str, Any], portas: list, rotulos: dict, cores: dict) -> list:
+    def _layers(self, inputs: Dict[str, Any], portas: list, rotulos: dict, cores: dict) -> list:
         import geopandas as gpd
 
-        def e_camada(v: Any) -> bool:
+        def is_layer(v: Any) -> bool:
             return isinstance(v, gpd.GeoDataFrame) and not v.empty and bool(v.geometry.notna().any())
 
-        camadas: list[_Camada] = []
+        camadas: list[_Layer] = []
         if len(portas) >= 2:
             for i, porta in enumerate(portas):
                 valor = (inputs or {}).get(porta)
-                if not e_camada(valor):
+                if not is_layer(valor):
                     self.log(f"Porta '{porta}' sem camada (nao ligada ou vazia): fora da carta.")
                     continue
-                camadas.append(_Camada(
+                camadas.append(_Layer(
                     porta=porta,
-                    rotulo=rotulo_da_porta(porta, rotulos),
+                    rotulo=port_label(porta, rotulos),
                     cor=cores.get(porta) or PALETA[i % len(PALETA)],
                     gdf=valor[valor.geometry.notna()],
                 ))
@@ -505,7 +505,7 @@ class CartaImagem(BaseNode):
         else:
             # Anonymous edge: the parent's dict was spread into the inputs. The layer is
             # the first GeoDataFrame that arrived (the get_first_gdf criterion).
-            candidatos = [k for k, v in (inputs or {}).items() if e_camada(v)]
+            candidatos = [k for k, v in (inputs or {}).items() if is_layer(v)]
             if candidatos:
                 if len({id(inputs[k]) for k in candidatos}) > 1:
                     self.log(
@@ -513,9 +513,9 @@ class CartaImagem(BaseNode):
                         f"'{candidatos[0]}'. Declare duas ou mais portas para desenhar varias."
                     )
                 nome = portas[0] if portas else "camada"
-                rotulo = rotulo_da_porta(nome, rotulos) if portas else (rotulos.get(nome) or "Camada")
+                rotulo = port_label(nome, rotulos) if portas else (rotulos.get(nome) or "Camada")
                 valor = inputs[candidatos[0]]
-                camadas.append(_Camada(
+                camadas.append(_Layer(
                     porta=nome, rotulo=rotulo,
                     cor=cores.get(nome) or PALETA[0],
                     gdf=valor[valor.geometry.notna()],
@@ -532,7 +532,7 @@ class CartaImagem(BaseNode):
             )
         return camadas
 
-    def _caixa_4326(self, camadas: list) -> tuple:
+    def _bbox_4326(self, camadas: list) -> tuple:
         """The extent of all layers in lon/lat, to estimate the CRS.
 
         A layer without a CRS is treated as EPSG:4326 HERE, before any
@@ -556,7 +556,7 @@ class CartaImagem(BaseNode):
             max(b[2] for b in caixas), max(b[3] for b in caixas),
         )
 
-    async def _baixar_fundo(self, template: str, extensao_3857: tuple, largura_px: int):
+    async def _download_basemap(self, template: str, extent_3857: tuple, largura_px: int):
         """Downloads and assembles the tile mosaic that covers the extent (EPSG:3857).
 
         Each URL goes through the SSRF guard (`safe_httpx_request` pins the IP,
@@ -565,11 +565,11 @@ class CartaImagem(BaseNode):
         metadata. Two connections at a time and retry only on transient errors
         (the OpenStreetMap usage policy); 4xx is a definitive error.
         """
-        z = zoom_para(extensao_3857, largura_px)
-        z, tx0, tx1, ty0, ty1 = tiles_da_extensao(extensao_3857, z)
+        z = zoom_para(extent_3857, largura_px)
+        z, tx0, tx1, ty0, ty1 = tiles_for_extent(extent_3857, z)
         await asyncio.to_thread(validate_url_ssrf, url_do_tile(template, z, tx0, ty0))
 
-        semaforo = asyncio.Semaphore(CONEXOES_SIMULTANEAS)
+        semaforo = asyncio.Semaphore(CONCURRENT_CONNECTIONS)
         # The installation's site in the User-Agent, as the OSM policy asks
         # (flow/utils/identidade.py).
         cabecalhos = {"User-Agent": user_agent("carta")}
@@ -577,13 +577,13 @@ class CartaImagem(BaseNode):
         async def um_tile(x: int, y: int):
             url = url_do_tile(template, z, x, y)
             async with semaforo:
-                for tentativa in range(TENTATIVAS_POR_TILE):
-                    ultima = tentativa == TENTATIVAS_POR_TILE - 1
+                for tentativa in range(ATTEMPTS_PER_TILE):
+                    ultima = tentativa == ATTEMPTS_PER_TILE - 1
                     try:
                         resposta = await safe_httpx_request(
                             "GET", url, timeout=20.0,
                             headers=cabecalhos,
-                            max_response_bytes=TETO_DE_BYTES_POR_TILE,
+                            max_response_bytes=MAX_BYTES_PER_TILE,
                         )
                     except httpx.TransportError as exc:
                         if ultima:
@@ -592,7 +592,7 @@ class CartaImagem(BaseNode):
                             ) from exc
                         await asyncio.sleep(espera_exponencial(tentativa, teto=5.0, inicial=0.5))
                         continue
-                    if resposta.status_code in STATUS_TRANSITORIOS and not ultima:
+                    if resposta.status_code in TRANSIENT_STATUSES and not ultima:
                         await asyncio.sleep(espera_exponencial(tentativa, teto=5.0, inicial=0.5))
                         continue
                     if resposta.status_code >= 400:
@@ -606,9 +606,9 @@ class CartaImagem(BaseNode):
         tiles = await asyncio.gather(*(
             um_tile(x, y) for y in range(ty0, ty1 + 1) for x in range(tx0, tx1 + 1)
         ))
-        imagem = await asyncio.to_thread(_montar_mosaico, tiles, tx0, tx1, ty0, ty1)
+        imagem = await asyncio.to_thread(_build_mosaic, tiles, tx0, tx1, ty0, ty1)
         self.log(f"Fundo de mapa: {len(tiles)} tile(s) no zoom {z}.")
-        return imagem, extensao_dos_tiles(tx0, tx1, ty0, ty1, z)
+        return imagem, tiles_extent(tx0, tx1, ty0, ty1, z)
 
 
 # ── Module functions (run in a thread, without `self`) ──────────────────────
@@ -639,7 +639,7 @@ def _reprojetar(camadas: list, crs_texto: str) -> list:
     return camadas
 
 
-def _caixa_das_camadas(camadas: list) -> tuple:
+def _layers_bbox(camadas: list) -> tuple:
     caixas = [tuple(float(v) for v in c.gdf.total_bounds) for c in camadas]
     return (
         min(b[0] for b in caixas), min(b[1] for b in caixas),
@@ -647,7 +647,7 @@ def _caixa_das_camadas(camadas: list) -> tuple:
     )
 
 
-def _tipo_de_geometria(gdf: Any) -> str:
+def _geometry_type(gdf: Any) -> str:
     tipos = set(gdf.geom_type.dropna().str.replace("Multi", "", regex=False))
     if tipos and tipos <= {"Point"}:
         return "ponto"
@@ -656,17 +656,17 @@ def _tipo_de_geometria(gdf: Any) -> str:
     return "poligono"
 
 
-def _montar_mosaico(tiles: list, tx0: int, tx1: int, ty0: int, ty1: int):
+def _build_mosaic(tiles: list, tx0: int, tx1: int, ty0: int, ty1: int):
     from PIL import Image
 
-    largura = (tx1 - tx0 + 1) * TAMANHO_DO_TILE
-    altura = (ty1 - ty0 + 1) * TAMANHO_DO_TILE
+    largura = (tx1 - tx0 + 1) * TILE_SIZE
+    altura = (ty1 - ty0 + 1) * TILE_SIZE
     mosaico = Image.new("RGB", (largura, altura), "white")
     for x, y, conteudo in tiles:
         tile = Image.open(io.BytesIO(conteudo)).convert("RGB")
-        if tile.size != (TAMANHO_DO_TILE, TAMANHO_DO_TILE):
-            tile = tile.resize((TAMANHO_DO_TILE, TAMANHO_DO_TILE))
-        mosaico.paste(tile, ((x - tx0) * TAMANHO_DO_TILE, (y - ty0) * TAMANHO_DO_TILE))
+        if tile.size != (TILE_SIZE, TILE_SIZE):
+            tile = tile.resize((TILE_SIZE, TILE_SIZE))
+        mosaico.paste(tile, ((x - tx0) * TILE_SIZE, (y - ty0) * TILE_SIZE))
     return mosaico
 
 
@@ -677,7 +677,7 @@ def _renderizar(r: _Render) -> bytes:
     `rc_context` (global state shared across threads) — sizes and colors go
     per artist.
     """
-    _carregar_matplotlib()
+    _load_matplotlib()
     import numpy as np
     from matplotlib.backends.backend_agg import FigureCanvasAgg
     from matplotlib.figure import Figure
@@ -689,10 +689,10 @@ def _renderizar(r: _Render) -> bytes:
     FigureCanvasAgg(fig)
 
     # The map on the left; the right column exists only with a legend. The extent
-    # already came in this frame's aspect ratio (extensao_no_quadro), so the
+    # already came in this frame's aspect ratio (extent_in_frame), so the
     # axis does not shrink.
-    caixa_mapa = list(quadro_do_mapa(r.legenda))
-    ax = fig.add_axes(caixa_mapa)
+    map_box = list(map_frame(r.legenda))
+    ax = fig.add_axes(map_box)
     x0, y0, x1, y1 = r.extensao
 
     if r.fundo is not None and r.fundo_extensao is not None:
@@ -710,40 +710,40 @@ def _renderizar(r: _Render) -> bytes:
 
     # Simplification to 1 pixel: this is what keeps large layers drawable without
     # changing anything visible.
-    largura_px_mapa = max(caixa_mapa[2] * r.largura_px, 1.0)
-    tolerancia = (x1 - x0) / largura_px_mapa
+    map_width_px = max(map_box[2] * r.largura_px, 1.0)
+    tolerancia = (x1 - x0) / map_width_px
 
-    alcas: list = []
+    handles: list = []
     for i, c in enumerate(r.camadas):
         gdf = c.gdf
         geometria = gdf.geometry.simplify(tolerancia, preserve_topology=True)
         gdf = gdf.set_geometry(geometria)
-        borda = escurecer(c.cor)
+        borda = darken(c.cor)
         comum = dict(ax=ax, zorder=1 + i, alpha=r.opacidade, rasterized=r.rasterizar)
-        tipo = _tipo_de_geometria(gdf)
+        tipo = _geometry_type(gdf)
         if tipo == "ponto":
             gdf.plot(color=c.cor, edgecolor=borda, linewidth=0.4, markersize=18, **comum)
-            alcas.append(Line2D(
+            handles.append(Line2D(
                 [0], [0], linestyle="", marker="o", markerfacecolor=c.cor,
                 markeredgecolor=borda, markersize=7, alpha=r.opacidade,
             ))
         elif tipo == "linha":
             gdf.plot(color=c.cor, linewidth=1.4, **comum)
-            alcas.append(Line2D([0], [0], color=c.cor, linewidth=2, alpha=r.opacidade))
+            handles.append(Line2D([0], [0], color=c.cor, linewidth=2, alpha=r.opacidade))
         else:
             gdf.plot(color=c.cor, edgecolor=borda, linewidth=0.6, **comum)
-            alcas.append(Patch(facecolor=c.cor, edgecolor=borda, alpha=r.opacidade))
+            handles.append(Patch(facecolor=c.cor, edgecolor=borda, alpha=r.opacidade))
     # gdf.plot may touch the limits (autoscale); the map's extent wins.
     ax.set_xlim(x0, x1)
     ax.set_ylim(y0, y1)
 
     if r.grade:
-        xs, ys = marcas_da_grade(r.extensao, r.crs_texto)
+        xs, ys = grid_ticks(r.extensao, r.crs_texto)
         ax.xaxis.set_major_locator(FixedLocator(xs))
         ax.yaxis.set_major_locator(FixedLocator(ys))
         crs_texto = r.crs_texto
-        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _p: rotulo_de_coordenada(v, "x", crs_texto)))
-        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: rotulo_de_coordenada(v, "y", crs_texto)))
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _p: coordinate_label(v, "x", crs_texto)))
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _p: coordinate_label(v, "y", crs_texto)))
         ax.grid(True, linestyle=":", linewidth=0.5, color="#555555", zorder=30)
         ax.tick_params(labelsize=6.5, length=2, colors="#333333")
         for rotulo in ax.get_yticklabels():
@@ -766,13 +766,13 @@ def _renderizar(r: _Render) -> bytes:
         )
 
     if r.escala:
-        fator = 1.0
+        factor = 1.0
         if r.crs_e_3857:
             _lon, lat_c = lon_lat_de_3857((x0 + x1) / 2, (y0 + y1) / 2)
-            fator = fator_de_escala_3857(lat_c)
-        metros = comprimento_da_escala((x1 - x0) * fator)
+            factor = scale_factor_3857(lat_c)
+        metros = scale_length((x1 - x0) * factor)
         if metros > 0:
-            comprimento = metros / fator            # in map units
+            comprimento = metros / factor            # in map units
             bx = x0 + 0.03 * (x1 - x0)
             by = y0 + 0.04 * (y1 - y0)
             h = 0.012 * (y1 - y0)
@@ -786,14 +786,14 @@ def _renderizar(r: _Render) -> bytes:
             ax.add_patch(Rectangle((bx + comprimento / 2, by), comprimento / 2, h,
                                    facecolor="white", edgecolor="#111111", linewidth=0.6, zorder=41))
             ax.text(bx, by + h * 1.7, "0", fontsize=7, ha="center", va="bottom", zorder=42)
-            ax.text(bx + comprimento, by + h * 1.7, rotulo_da_escala(metros), fontsize=7,
+            ax.text(bx + comprimento, by + h * 1.7, scale_label(metros), fontsize=7,
                     ha="center", va="bottom", zorder=42)
 
     if r.legenda:
         ax_leg = fig.add_axes([0.76, 0.11, 0.22, 0.79])
         ax_leg.axis("off")
         ax_leg.legend(
-            alcas, [c.rotulo for c in r.camadas], loc="upper left", frameon=False,
+            handles, [c.rotulo for c in r.camadas], loc="upper left", frameon=False,
             title="Legenda", title_fontsize=10, fontsize=9, borderaxespad=0.0,
         )
 

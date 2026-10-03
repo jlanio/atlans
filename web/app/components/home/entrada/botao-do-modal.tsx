@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
  * via the `home-portal` tokens) with the spinner and the loading label. `submit`
  * by default, as befits a form button.
  */
-export function BotaoDoModal({
+export function ModalButton({
   loading = false,
   loadingLabel,
   disabled,

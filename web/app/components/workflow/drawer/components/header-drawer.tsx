@@ -12,16 +12,16 @@ const HeaderDrawer = ({ title, description }: HeaderDrawerProps) => {
   const drawerAddNodes = useWorkflowCatalogStore(s => s.nodesDrawerState)
   // A boolean instead of `useNodes()`: only "empty canvas" changes the header,
   // and subscribing to the whole list re-rendered the drawer on every drag frame.
-  const canvasVazio = useStore(s => s.nodeLookup.size === 0)
+  const canvasEmpty = useStore(s => s.nodeLookup.size === 0)
 
   return (
     <div className="flex items-center gap-3 px-4 py-3.5 select-none min-h-[56px]">
 
-      {(!canvasVazio && drawerAddNodes === "opened" || drawerAddNodes === "closed") &&
+      {(!canvasEmpty && drawerAddNodes === "opened" || drawerAddNodes === "closed") &&
         <CloseDrawerButton />
       }
 
-      {(canvasVazio || (drawerAddNodes !== "opened" && drawerAddNodes !== "closed")) &&
+      {(canvasEmpty || (drawerAddNodes !== "opened" && drawerAddNodes !== "closed")) &&
         <ReturnDrawerButton />
       }
 

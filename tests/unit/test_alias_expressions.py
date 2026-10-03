@@ -26,26 +26,26 @@ def svc():
 
 # ── Registration in the context ──────────────────────────────────────────────
 
-def test_alias_customizado_valido_e_usado():
+def test_valid_custom_alias_is_used():
     assert _resolve_alias({"alias": "Caixa", "name": "ComputeBoundingBox"}) == "Caixa"
 
 
-def test_rotulo_do_catalogo_cai_no_name():
+def test_catalog_label_falls_back_to_name():
     """"Caixa Delimitadora" has a space — it is not an identifier."""
     node = {"alias": "Caixa Delimitadora", "name": "ComputeBoundingBox"}
 
     assert _resolve_alias(node) == "ComputeBoundingBox"
 
 
-def test_alias_reservado_cai_no_name():
+def test_reserved_alias_falls_back_to_name():
     assert _resolve_alias({"alias": "inputs", "name": "DataInput"}) == "DataInput"
 
 
-def test_alias_acentuado_e_aceito_no_registro():
+def test_accented_alias_is_accepted_in_registry():
     assert _resolve_alias({"alias": "Área", "name": "ComputeArea"}) == "Área"
 
 
-def test_alias_em_properties_so_vale_com_alias_vazio():
+def test_alias_in_properties_only_applies_with_empty_alias():
     """_resolve_alias's `or` picks by truthiness, not by validity."""
     preenchido = {"alias": "Caixa Delimitadora",
                   "properties": {"alias": "Caixa"}, "name": "ComputeBoundingBox"}
@@ -57,57 +57,57 @@ def test_alias_em_properties_so_vale_com_alias_vazio():
 
 # ── $Alias syntax in the text ────────────────────────────────────────────────
 
-def test_renderiza_alias_ascii(svc):
+def test_renders_ascii_alias(svc):
     ctx = {"ComputeBoundingBox": {"bbox_string": "-63,-13,-60,-10"}}
 
     assert svc.render("{{$ComputeBoundingBox.bbox_string}}", ctx) == "-63,-13,-60,-10"
 
 
-def test_renderiza_alias_comecado_por_letra_acentuada(svc):
+def test_renders_alias_starting_with_accented_letter(svc):
     """Regressao: `[A-Za-z_]` recusava o primeiro caractere e o `$` vazava."""
     ctx = {"Área": {"total": 42}}
 
     assert svc.render("{{$Área.total}}", ctx) == "42"
 
 
-def test_renderiza_campo_com_acento(svc):
-    """Coluna de shapefile costuma vir acentuada."""
+def test_renders_accented_field(svc):
+    """Coluna de shapefile costuma vir accented."""
     ctx = {"Municipios": {"população": 1500}}
 
     assert svc.render("{{$Municipios.população}}", ctx) == "1500"
 
 
-def test_alias_acentuado_no_meio_ja_funcionava(svc):
+def test_alias_accented_in_the_middle_already_worked(svc):
     ctx = {"Bifurcação": {"branch": True}}
 
     assert svc.render("{{$Bifurcação.branch}}", ctx) == "True"
 
 
-def test_alias_sem_chaves_e_envolvido_em_jinja(svc):
+def test_alias_without_braces_is_wrapped_in_jinja(svc):
     ctx = {"Área": {"total": 7}}
 
     assert svc.render("$Área.total", ctx) == "7"
 
 
-def test_alias_interpolado_no_meio_do_texto(svc):
+def test_alias_interpolated_in_the_middle_of_text(svc):
     ctx = {"Área": {"total": 7}}
 
     assert svc.render("total={{$Área.total}}ha", ctx) == "total=7ha"
 
 
-def test_cifrao_seguido_de_digito_nao_e_alias(svc):
+def test_dollar_followed_by_digit_is_not_alias(svc):
     """`R$100` is ordinary text — it must not become a variable."""
     assert svc.find_alias("preço R$100") is None
     assert svc.render("preço R$100", {}) == "preço R$100"
 
 
-def test_alias_ausente_no_contexto_levanta(svc):
+def test_alias_missing_from_context_raises(svc):
     """StrictUndefined: an explicit error instead of a silent empty string."""
     with pytest.raises(Exception):
         svc.render("{{$NaoExiste.campo}}", {})
 
 
-def test_find_alias_captura_o_caminho_completo(svc):
+def test_find_alias_captures_the_full_path(svc):
     m = svc.find_alias("{{$Área.sub.campo}}")
 
     assert m is not None
@@ -146,21 +146,21 @@ def _r(template):
     return _ES().render(template, dict(_CTX))
 
 
-def test_alias_sozinho_continua_igual():
+def test_alias_alone_stays_the_same():
     assert _r("$Pedido.id") == "42"
 
 
-def test_alias_no_meio_da_url():
+def test_alias_in_the_middle_of_url():
     """Before: TemplateSyntaxError "expected token 'end of print statement',
     got ':'" — whoever wrote a URL got a template parser error."""
     assert _r("https://api.org/v1/$Pedido.id/dados") == "https://api.org/v1/42/dados"
 
 
-def test_alias_no_meio_do_texto():
+def test_alias_in_the_middle_of_text():
     assert _r("bairro $Pedido.nome fim") == "bairro Centro fim"
 
 
-def test_corpo_json_continua_json():
+def test_json_body_stays_json():
     """The worst of the three, and silent: the whole string was evaluated as a
     Python expression, the body became a dict repr (single quotes, invalid
     JSON) and the quoted alias became literal TEXT — with no error at all."""
@@ -168,32 +168,32 @@ def test_corpo_json_continua_json():
     assert _json.loads(saida) == {"id": 42, "n": "Centro"}
 
 
-def test_alias_dentro_de_bloco_jinja_nao_e_embrulhado_de_novo():
+def test_alias_inside_jinja_block_is_not_wrapped_again():
     """Inside `{{ }}` you are already in an expression: turning it into
     `{{ {{ x }} }}` would break everything."""
     assert _r("{{ $Pedido.id }}") == "42"
 
 
-def test_misturar_as_duas_sintaxes_funciona():
+def test_mixing_both_syntaxes_works():
     """Before, the `$Alias` became literal text, also silently."""
     assert _r("https://api.org/{{ Pedido.id }}/b/$Pedido.nome") == "https://api.org/42/b/Centro"
 
 
-def test_alias_dentro_de_statement():
+def test_alias_inside_statement():
     assert _r("{% if $Pedido.id > 10 %}alto{% else %}baixo{% endif %}") == "alto"
 
 
-def test_alias_repetido_no_mesmo_texto():
+def test_alias_repeated_in_the_same_text():
     assert _r("$Pedido.nome-$Pedido.id-$Pedido.nome") == "Centro-42-Centro"
 
 
-def test_alias_desconhecido_falha_alto():
+def test_unknown_alias_fails_loudly():
     """StrictUndefined: better than the parser error that came before."""
     with _pytest.raises(Exception):
         _r("https://api.org/$Outro.id/x")
 
 
-def test_tipo_nativo_sobrevive_ao_novo_preprocessamento():
+def test_native_type_survives_the_new_preprocessing():
     """`render_native` shares the same preprocessing — a lone alias must keep
     returning the value, not the text."""
     assert _ES().render_native("$Pedido.id", dict(_CTX)) == 42

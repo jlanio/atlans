@@ -10,13 +10,13 @@ import { describe, it, expect } from "vitest"
 
 import {
   colunasQueChegam,
-  SEM_SUGESTAO,
+  NO_SUGGESTION,
   sugestaoParaNo,
-  type ColunasConhecidasDoNo,
-  type NoComColunas,
+  type NodeKnownColumns,
+  type NodeWithColumns,
 } from "@/app/components/workflow/utils/colunas-conhecidas"
 
-const NOS: NoComColunas[] = [
+const NODES: NodeWithColumns[] = [
   { id: "malha", output_columns: { output: ["cod", "nome", "geometry"] } },
   { id: "censo", output_columns: { result: ["cod", "populacao", "renda"] } },
   { id: "sem_run", output_columns: null },
@@ -29,7 +29,7 @@ describe("colunasQueChegam", () => {
       { source: "malha", target: "join", data: { from_key: "output", to_key: "layerA" } },
       { source: "censo", target: "join", data: { from_key: "result", to_key: "layerB" } },
     ]
-    expect(colunasQueChegam(arestas, NOS, "join")).toEqual({
+    expect(colunasQueChegam(arestas, NODES, "join")).toEqual({
       layerA: ["cod", "nome", "geometry"],
       layerB: ["cod", "populacao", "renda"],
     })
@@ -37,14 +37,14 @@ describe("colunasQueChegam", () => {
 
   it("sem to_key, a porta é o próprio from_key", () => {
     const arestas = [{ source: "censo", target: "x", data: { from_key: "result" } }]
-    expect(colunasQueChegam(arestas, NOS, "x")).toEqual({
+    expect(colunasQueChegam(arestas, NODES, "x")).toEqual({
       result: ["cod", "populacao", "renda"],
     })
   })
 
   it("sem from_key, o nó anterior espalha todas as saídas", () => {
     const arestas = [{ source: "censo", target: "x", data: {} }]
-    expect(colunasQueChegam(arestas, NOS, "x")).toEqual({
+    expect(colunasQueChegam(arestas, NODES, "x")).toEqual({
       result: ["cod", "populacao", "renda"],
     })
   })
@@ -54,35 +54,35 @@ describe("colunasQueChegam", () => {
       { source: "malha", target: "x", data: { from_key: "output", to_key: "p" } },
       { source: "censo", target: "x", data: { from_key: "result", to_key: "p" } },
     ]
-    expect(colunasQueChegam(arestas, NOS, "x").p).toEqual([
+    expect(colunasQueChegam(arestas, NODES, "x").p).toEqual([
       "cod", "nome", "geometry", "populacao", "renda",
     ])
   })
 
   it("ignora arestas que não chegam neste nó", () => {
     const arestas = [{ source: "censo", target: "outro", data: { from_key: "result" } }]
-    expect(colunasQueChegam(arestas, NOS, "x")).toEqual({})
+    expect(colunasQueChegam(arestas, NODES, "x")).toEqual({})
   })
 
   it("nó que nunca executou não contribui", () => {
     // No wrong suggestions: without a run, there's nothing to know.
     const arestas = [{ source: "sem_run", target: "x", data: { from_key: "output" } }]
-    expect(colunasQueChegam(arestas, NOS, "x")).toEqual({})
+    expect(colunasQueChegam(arestas, NODES, "x")).toEqual({})
   })
 
   it("from_key que não existe na saída gravada não inventa porta", () => {
     const arestas = [{ source: "censo", target: "x", data: { from_key: "inexistente" } }]
-    expect(colunasQueChegam(arestas, NOS, "x")).toEqual({})
+    expect(colunasQueChegam(arestas, NODES, "x")).toEqual({})
   })
 
   it("nó de origem fora do canvas não quebra", () => {
     const arestas = [{ source: "fantasma", target: "x", data: { from_key: "output" } }]
-    expect(colunasQueChegam(arestas, NOS, "x")).toEqual({})
+    expect(colunasQueChegam(arestas, NODES, "x")).toEqual({})
   })
 })
 
 describe("sugestaoParaNo", () => {
-  const porNo = new Map<string, ColunasConhecidasDoNo>([
+  const porNo = new Map<string, NodeKnownColumns>([
     ["malha", { porPorta: { output: ["cod", "nome"] }, fresh: true }],
     ["censo", { porPorta: { result: ["cod", "renda"] }, fresh: false }],
   ])
@@ -102,10 +102,10 @@ describe("sugestaoParaNo", () => {
   })
 
   it("todos os pais ao vivo → sem aviso de frescor", () => {
-    const soAoVivo = new Map([["malha", { porPorta: { output: ["cod"] }, fresh: true }]])
+    const liveOnly = new Map([["malha", { porPorta: { output: ["cod"] }, fresh: true }]])
     expect(sugestaoParaNo(
       [{ source: "malha", target: "x", data: { from_key: "output" } }],
-      soAoVivo, "x",
+      liveOnly, "x",
     )).toEqual({ porPorta: { output: ["cod"] }, todas: ["cod"], desatualizadas: false, parciais: false })
   })
 
@@ -119,7 +119,7 @@ describe("sugestaoParaNo", () => {
   })
 
   it("sem colunas conhecidas, o objeto estável de vazio", () => {
-    expect(sugestaoParaNo(arestas, new Map(), "join")).toBe(SEM_SUGESTAO)
+    expect(sugestaoParaNo(arestas, new Map(), "join")).toBe(NO_SUGGESTION)
   })
 
   it("sem coluna nenhuma chegando, não há o que rotular", () => {
@@ -130,12 +130,12 @@ describe("sugestaoParaNo", () => {
   })
 
   it("pai com stat truncado marca a lista como parcial", () => {
-    const comCorte = new Map([
+    const truncated = new Map([
       ["malha", { porPorta: { output: ["cod"] }, fresh: false, parciais: true }],
     ])
     expect(sugestaoParaNo(
       [{ source: "malha", target: "x", data: { from_key: "output" } }],
-      comCorte, "x",
+      truncated, "x",
     )).toMatchObject({ parciais: true })
   })
 })

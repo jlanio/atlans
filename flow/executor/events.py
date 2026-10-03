@@ -60,7 +60,7 @@ def publish_completed(
         # the run finishes, without a second trip to the server. In an event above the
         # protocol ceiling it survives: the reduction (flow/utils/publisher/reducao.py)
         # cuts the traceback and schema_drift first — a new heavy key in this
-        # `extra` goes into CHAVES_PESADAS_DO_EXTRA there.
+        # `extra` goes into HEAVY_EXTRA_KEYS there.
         if output_columns:
             extra["output_columns"] = output_columns
         if branch_result is not None:

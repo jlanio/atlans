@@ -106,9 +106,9 @@ async def list_workspace_policies(
         select(WorkspaceExecutor.workspace_id, WorkspaceExecutor.tier, sa_func.count())
         .group_by(WorkspaceExecutor.workspace_id, WorkspaceExecutor.tier)
     )).all()
-    por_ws: dict[str, dict[int, int]] = {}
+    by_ws: dict[str, dict[int, int]] = {}
     for ws_id, tier, n in contagem:
-        por_ws.setdefault(ws_id, {})[int(tier)] = int(n)
+        by_ws.setdefault(ws_id, {})[int(tier)] = int(n)
 
     owner_ids = {w.owner_id for w in ws_rows if w.owner_id}
     donos: dict[str, str] = {}
@@ -120,8 +120,8 @@ async def list_workspace_policies(
 
     saida: list[WorkspacePolicyAdminOut] = []
     for w in ws_rows:
-        niveis = por_ws.get(w.id_hash, {})
-        principais = niveis.get(politica.TIER_PRIMARY, 0)
+        tiers = by_ws.get(w.id_hash, {})
+        principais = tiers.get(politica.TIER_PRIMARY, 0)
         floor = w.isolation_floor or politica.FLOOR_NONE
         terminal = w.fallback_terminal or politica.TERMINAL_FAIL
         saida.append(WorkspacePolicyAdminOut(
@@ -135,7 +135,7 @@ async def list_workspace_policies(
             fallback_terminal=terminal,
             effective_terminal=politica.effective_terminal_of(floor, terminal),
             primary_count=principais,
-            fallback_count=niveis.get(politica.TIER_FALLBACK, 0),
+            fallback_count=tiers.get(politica.TIER_FALLBACK, 0),
         ))
     return saida
 

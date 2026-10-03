@@ -13,10 +13,10 @@ import pytest
 
 from app.core.exceptions import NoExecutorAvailableError
 
-DETALHE_INTERNO = "Workspace isolado: nenhum dos 2 executores dedicados (geo-01, geo-02) está disponível."
+INTERNAL_DETAIL = "Workspace isolado: nenhum dos 2 executores dedicados (geo-01, geo-02) está disponível."
 
 
-def _wf_com_webhook():
+def _wf_with_webhook():
     wf = MagicMock()
     wf.id_hash = "wf-1"
     wf.flag_ative = True
@@ -25,22 +25,22 @@ def _wf_com_webhook():
 
 
 @pytest.fixture
-def servico_sem_executor(client):
+def service_without_executor(client):
     from app.api.dependencies import get_workflow_service
     from app.main import app
 
     service = MagicMock()
-    service.get_workflow_by_hash = AsyncMock(return_value=_wf_com_webhook())
+    service.get_workflow_by_hash = AsyncMock(return_value=_wf_with_webhook())
     service.start_analysis = AsyncMock(
-        side_effect=NoExecutorAvailableError(DETALHE_INTERNO, category="no_dedicated_executor"),
+        side_effect=NoExecutorAvailableError(INTERNAL_DETAIL, category="no_dedicated_executor"),
     )
     app.dependency_overrides[get_workflow_service] = lambda: service
     yield client, service
     app.dependency_overrides.pop(get_workflow_service, None)
 
 
-async def test_503_generico_com_retry_after(servico_sem_executor):
-    client, service = servico_sem_executor
+async def test_generic_503_with_retry_after(service_without_executor):
+    client, service = service_without_executor
     resp = await client.post("/webhook/execute/wf-1", json={"x": 1})
     assert resp.status_code == 503
     assert resp.headers.get("retry-after") == "60"
@@ -52,10 +52,10 @@ async def test_503_generico_com_retry_after(servico_sem_executor):
     service.start_analysis.assert_awaited_once()
 
 
-async def test_reenvio_com_a_mesma_chave_tenta_de_novo(servico_sem_executor):
+async def test_resend_with_the_same_key_tries_again(service_without_executor):
     """The idempotency key is only written after a successful dispatch
     (workflow_service.py, step 7): two 503s in a row = two real attempts."""
-    client, service = servico_sem_executor
+    client, service = service_without_executor
     for _ in range(2):
         resp = await client.post("/webhook/execute/wf-1", json={}, headers={"Idempotency-Key": "abc"})
         assert resp.status_code == 503

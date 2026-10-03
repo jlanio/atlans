@@ -43,7 +43,7 @@ def chaves(monkeypatch):
     whoever ran first. It is the same pattern as `tests/unit/test_job_crypto.py`.
     """
     servidor = Ed25519PrivateKey.generate()
-    servidor_priv_b64 = base64.b64encode(
+    server_priv_b64 = base64.b64encode(
         servidor.private_bytes(Encoding.Raw, PrivateFormat.Raw, NoEncryption())
     ).decode()
     servidor_pub_b64 = base64.b64encode(
@@ -56,8 +56,8 @@ def chaves(monkeypatch):
     ).decode()
 
     import app.core.job_crypto as jc
-    monkeypatch.setattr(jc, "EXECUTOR_SIGNING_KEY", servidor_priv_b64)
-    monkeypatch.setattr("app.core.config.EXECUTOR_SIGNING_KEY", servidor_priv_b64)
+    monkeypatch.setattr(jc, "EXECUTOR_SIGNING_KEY", server_priv_b64)
+    monkeypatch.setattr("app.core.config.EXECUTOR_SIGNING_KEY", server_priv_b64)
 
     return {
         "jc": jc,
@@ -67,7 +67,7 @@ def chaves(monkeypatch):
     }
 
 
-def _montar(chaves, payload=None, job_type="run_workflow"):
+def _build(chaves, payload=None, job_type="run_workflow"):
     return chaves["jc"].build_job_message(
         executor_id="exec-1",
         workspace_id="ws-1",
@@ -79,69 +79,69 @@ def _montar(chaves, payload=None, job_type="run_workflow"):
 
 # ── O round-trip ─────────────────────────────────────────────────────────────
 
-def test_o_executor_verifica_a_assinatura_que_o_servidor_produz(chaves):
+def test_the_executor_verifies_the_signature_the_server_produces(chaves):
     """If the canonical bytes diverge between the sides, this breaks."""
     from executor import crypto as ec
 
-    msg = _montar(chaves)
+    msg = _build(chaves)
     assert ec.verify_signature(msg, chaves["servidor_pub_b64"]) is True
 
 
-def test_o_executor_decifra_o_payload_que_o_servidor_cifrou(chaves):
+def test_the_executor_decrypts_the_payload_the_server_encrypted(chaves):
     """Covers ECDH, HKDF (algorithm, length, salt and info) and AES-GCM at once."""
     from executor import crypto as ec
 
     original = {"definition": {"nodes": [{"id": "1", "name": "DataInput"}]}, "n": 42}
-    msg = _montar(chaves, payload=original)
+    msg = _build(chaves, payload=original)
 
     assert ec.decrypt_job_payload(msg, chaves["executor_priv"]) == original
 
 
-def test_payload_em_bytes_produz_o_mesmo_resultado_que_o_dict(chaves):
+def test_bytes_payload_produces_the_same_result_as_the_dict(chaves):
     """build_job_message accepts already-serialized JSON on the failover path."""
     from executor import crypto as ec
 
     original = {"definition": {"nodes": []}, "x": "acentuação"}
-    msg = _montar(chaves, payload=json.dumps(original).encode())
+    msg = _build(chaves, payload=json.dumps(original).encode())
 
     assert ec.decrypt_job_payload(msg, chaves["executor_priv"]) == original
 
 
 # ── The contract also has to REJECT ──────────────────────────────────────────
 
-def test_envelope_adulterado_invalida_a_assinatura(chaves):
+def test_tampered_envelope_invalidates_the_signature(chaves):
     from executor import crypto as ec
 
-    msg = _montar(chaves)
+    msg = _build(chaves)
     msg["envelope"]["workspace_id"] = "ws-do-atacante"
     assert ec.verify_signature(msg, chaves["servidor_pub_b64"]) is False
 
 
-def test_ciphertext_adulterado_invalida_a_assinatura(chaves):
+def test_tampered_ciphertext_invalidates_the_signature(chaves):
     from executor import crypto as ec
 
-    msg = _montar(chaves)
+    msg = _build(chaves)
     msg["ciphertext"] = base64.b64encode(b"lixo").decode()
     assert ec.verify_signature(msg, chaves["servidor_pub_b64"]) is False
 
 
-def test_assinatura_de_outro_servidor_e_recusada(chaves):
+def test_signature_from_another_server_is_rejected(chaves):
     from executor import crypto as ec
 
     outro = Ed25519PrivateKey.generate()
-    outro_pub_b64 = base64.b64encode(
+    other_pub_b64 = base64.b64encode(
         outro.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
     ).decode()
 
-    msg = _montar(chaves)
-    assert ec.verify_signature(msg, outro_pub_b64) is False
+    msg = _build(chaves)
+    assert ec.verify_signature(msg, other_pub_b64) is False
 
 
-def test_chave_de_executor_errada_nao_decifra(chaves):
+def test_wrong_executor_key_does_not_decrypt(chaves):
     """A job addressed to one executor cannot be opened by another."""
     from executor import crypto as ec
 
-    msg = _montar(chaves)
+    msg = _build(chaves)
     intruso = X25519PrivateKey.generate()
 
     with pytest.raises(ValueError):

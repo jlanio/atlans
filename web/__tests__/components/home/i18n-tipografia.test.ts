@@ -25,8 +25,8 @@ function textos(o: unknown, caminho: string): Array<[string, string]> {
 
 describe("a tipografia dos dicionários", () => {
   it.each(["en", "es"] as const)("em %s, nenhum apóstrofo reto entre letras", (idioma) => {
-    const retos = textos(textosDe(idioma), idioma).filter(([, t]) => /[A-Za-z]'[A-Za-z]/.test(t))
-    expect(retos).toEqual([])
+    const straight = textos(textosDe(idioma), idioma).filter(([, t]) => /[A-Za-z]'[A-Za-z]/.test(t))
+    expect(straight).toEqual([])
   })
 
   it("a amostragem enxerga os textos (inclusive os que são função)", () => {

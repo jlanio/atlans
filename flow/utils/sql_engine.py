@@ -61,10 +61,10 @@ def get_engine(cache: EngineCache, conn_str: str, *, label: str = "SQL") -> sqla
 # Limit of bind parameters per statement in the Postgres protocol. pandas'
 # `method="multi"` builds ONE `INSERT ... VALUES (...), (...), ...` with
 # one parameter per cell, so `linhas × colunas` (rows × columns) cannot exceed this.
-_MAX_PARAMETROS_POR_INSTRUCAO = 65535
+_MAX_PARAMS_PER_STATEMENT = 65535
 
 
-def lote_seguro(n_colunas: int, escolhido: int | None) -> int:
+def safe_batch_size(n_columns: int, escolhido: int | None) -> int:
     """How many rows fit in one statement, respecting the protocol's ceiling.
 
     Without this, writing a 10-column table with more than ~6,500 rows builds
@@ -77,7 +77,7 @@ def lote_seguro(n_colunas: int, escolhido: int | None) -> int:
     it: how many rows go per statement is performance tuning, and no
     performance value justifies building a statement the database rejects.
     """
-    teto = max(1, _MAX_PARAMETROS_POR_INSTRUCAO // max(1, n_colunas))
+    teto = max(1, _MAX_PARAMS_PER_STATEMENT // max(1, n_columns))
     if not escolhido or escolhido <= 0:
         return teto
     return min(int(escolhido), teto)

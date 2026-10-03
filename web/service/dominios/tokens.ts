@@ -1,6 +1,6 @@
 // service/dominios/tokens.ts — recorte de GisFlowService (F5/A12).
 
-import { get, post, delComRetorno } from "../http"
+import { get, post, delWithResponse } from "../http"
 import { resolveResponse } from "../resolveResponse"
 import type {
   ApiToken, ApiTokenCreate, ApiTokenCreated,
@@ -24,5 +24,5 @@ export function createApiToken(payload: ApiTokenCreate) {
 /** Revocation, not deletion: the backend returns the token already marked as
  *  `revoked`, and the list keeps showing it. */
 export function revokeApiToken(id: string) {
-  return delComRetorno<ApiToken>(`/auth/tokens/${encodeURIComponent(id)}`)
+  return delWithResponse<ApiToken>(`/auth/tokens/${encodeURIComponent(id)}`)
 }

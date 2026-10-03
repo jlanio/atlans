@@ -20,10 +20,10 @@ import { GisFlowService } from "@/service/GisFlowService"
 import { createToast } from "@/utils/createToast";
 import ActionsButton from "./buttons";
 import RunPanel from "./run-panel";
-import AssistentePainel from "./assistente";
-import type { ResultadoDaProposta } from "./utils/aplicar-proposta"
+import AssistantPanel from "./assistente";
+import type { ProposalResult } from "./utils/aplicar-proposta"
 import {
-  cabeNoEnquadrado, semMovimento, ZOOM_MAXIMO_DO_ENQUADRAMENTO, DURACAO_DO_ENQUADRAMENTO,
+  cabeNoEnquadrado, semMovimento, FIT_MAX_ZOOM, FIT_DURATION,
   type Caixa,
 } from "./utils/enquadrar";
 import WorkflowDrawer from "./drawer";
@@ -48,7 +48,7 @@ import { useRunPanelStore } from "@/app/stores/runPanelStore";
 import { useCanvasViewStore } from "@/app/stores/canvasViewStore";
 import { useSubflowDrilldownStore } from "@/app/stores/subflowDrilldownStore";
 import { getCandidateKeys, resolveToKey } from "./utils/resolve-edge-keys";
-import { MENSAGEM_DE_RECUSA, validarConexao } from "./utils/valida-conexao";
+import { REJECTION_MESSAGE, validarConexao } from "./utils/valida-conexao";
 import { toast } from "sonner";
 import { contratoDoNo } from "./utils/node-ports"
 import { buildEdges, buildNodes } from "./utils/build-canvas";
@@ -80,7 +80,7 @@ interface IReactFlowComponent {
  * rebuild three string signatures over the whole graph just to conclude that
  * nothing changed.
  */
-function useNosEstruturais(nodes: INodeContext[]): INodeContext[] {
+function useStructuralNodes(nodes: INodeContext[]): INodeContext[] {
   const anterior = useRef<INodeContext[]>([])
   const igual =
     anterior.current.length === nodes.length &&
@@ -105,21 +105,21 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   const [nodes, setNodes, onNodesChange] = useNodesState<INodeContext>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   // None of the three syncs reacts to position — they all read `id` and `data`.
-  const nosEstruturais = useNosEstruturais(nodes);
+  const structuralNodes = useStructuralNodes(nodes);
   // Syncs the dynamic ports of SubWorkflow nodes with the target workflow's
   // contract (SubWorkflowInput/SubWorkflowOutput).
-  useSubWorkflowContractSync(nosEstruturais);
+  useSubWorkflowContractSync(structuralNodes);
   // Python Script ports: `data.inputs` follows the `ports` property.
   // Without this, defining the ports would only take effect on page reload.
-  useDynamicPortsSync(nosEstruturais);
+  useDynamicPortsSync(structuralNodes);
   // A connection point added to an already rendered node is drawn by React
   // but doesn't enter ReactFlow's registry: it shows on screen and doesn't accept
   // connections. Applies to Python Script ports and to sub-workflow ports.
-  useHandleRegistrySync(nosEstruturais);
+  useHandleRegistrySync(structuralNodes);
   const { saveSnapshot, captureBaseline, undo, redo, canUndo, canRedo } = useCanvasHistory()
 
   /** The last box the camera framed, in graph coordinates. */
-  const enquadradoRef = useRef<Caixa | null>(null)
+  const fittedRef = useRef<Caixa | null>(null)
 
   /** What the assistant draws enters the canvas: animated, and in view.
    *
@@ -145,7 +145,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
    *    would stay on the node object forever; without the selection, the whole
    *    workflow would blink on every added node.
    */
-  const aplicarDoAssistente = useCallback((resultado: ResultadoDaProposta) => {
+  const applyFromAssistant = useCallback((resultado: ProposalResult) => {
     saveSnapshot()
     setNodes(resultado.nodes.map(no => (
       resultado.idsNovos.has(no.id) ? { ...no, className: "assistente-entrando" } : no
@@ -159,12 +159,12 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     // After React draws: measuring before that would measure the old canvas.
     requestAnimationFrame(() => {
       const caixa = reactFlowInstance.getNodesBounds(reactFlowInstance.getNodes())
-      if (cabeNoEnquadrado(caixa, enquadradoRef.current)) return
-      enquadradoRef.current = caixa
+      if (cabeNoEnquadrado(caixa, fittedRef.current)) return
+      fittedRef.current = caixa
       reactFlowInstance.fitView({
         padding: 0.2,
-        maxZoom: ZOOM_MAXIMO_DO_ENQUADRAMENTO,
-        duration: semMovimento() ? 0 : DURACAO_DO_ENQUADRAMENTO,
+        maxZoom: FIT_MAX_ZOOM,
+        duration: semMovimento() ? 0 : FIT_DURATION,
       })
     })
 
@@ -186,7 +186,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   // about adapting — hitting an 8px handle with a finger, in a graph where pan
   // uses the same gesture as drag, produces more accidental edits than edits.
   // See canvas-interaction for why the gate is width and not pointer.
-  const canvasSomenteLeitura = useCanvasReadOnlyRoot()
+  const canvasReadOnly = useCanvasReadOnlyRoot()
   const { saveWorkflow, saveStatus, initSnapshot, buildPayload } = useSaveWorkflow()
   // `workflow` (prop) is undefined both on /workflow/create and on
   // /workflow/[id] before the fetch responds; only the route tells which is which.
@@ -195,7 +195,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   // The graph has already been put on the canvas (loadNodes/loadEdges). It is
   // state, not the `hidratadoPara` ref, because it needs to re-render: it is what
   // removes the loading animation and enables the add-node button.
-  const [hidratado, setHidratado] = useState(false)
+  const [hidratado, setHydrated] = useState(false)
   // Only the route with an id waits for anything; the creation screen is born ready.
   const carregando = Boolean(idDaRota) && !hidratado
   usePinExpirationTimer()
@@ -210,7 +210,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   // saved nothing — if the canvas has something, the "unsaved" warning comes
   // back (the detector only runs when the graph changes, so here the decision
   // is immediate).
-  const fecharSemNomear = useCallback(() => {
+  const closeWithoutNaming = useCallback(() => {
     const store = useWorkflowSaveStore.getState()
     if (store.saveStatus !== 'needs_name') return
     const { nodesReq, edgesReq } = buildPayload()
@@ -418,7 +418,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     // And the viewport one: B's is B's, not the framing done for A.
     initialFitDone.current = false
     // The canvas goes back to waiting until B's graph comes in.
-    setHidratado(false)
+    setHydrated(false)
   }, [workflow?.id_hash, idDaRota])
 
   // Loads the workflow's pins
@@ -461,19 +461,19 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
   // state and the next save wrote that reversal to the backend. Only what truly
   // needs to re-hydrate (restoring a version via reloadWorkflow) swaps the
   // `workflow` OBJECT, and that is what the guard lets through.
-  const hidratadoPara = useRef<IWorkflow | null>(null)
-  const catalogoDeNosPronto = nodesAPI.length > 0
+  const hydratedFor = useRef<IWorkflow | null>(null)
+  const nodeCatalogReady = nodesAPI.length > 0
   useEffect(() => {
-    if (!workflow || !catalogoDeNosPronto) return
-    if (hidratadoPara.current === workflow) return
-    hidratadoPara.current = workflow
+    if (!workflow || !nodeCatalogReady) return
+    if (hydratedFor.current === workflow) return
+    hydratedFor.current = workflow
     // loadEdges needs the ports declared by each node to resolve the source
     // handle — which is why it consumes loadNodes' return value.
     const loadedNodes = loadNodes()
     loadEdges(loadedNodes)
-    setHidratado(true)
+    setHydrated(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workflow, catalogoDeNosPronto])
+  }, [workflow, nodeCatalogReady])
 
   // Initializes the reference snapshot AFTER ReactFlow processes nodes/edges.
   // Uses buildPayload() — the same function isDirty uses — to guarantee full
@@ -581,7 +581,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
     // explains what the refused line doesn't say.
     const recusa = validarConexao(connections, nodes as never[], edges)
     if (recusa) {
-      toast.warning(MENSAGEM_DE_RECUSA[recusa])
+      toast.warning(REJECTION_MESSAGE[recusa])
       return
     }
 
@@ -631,10 +631,10 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
         open={showUnsavedDialog}
         onOpenChange={aberto => {
           setShowUnsavedDialog(aberto)
-          if (!aberto) fecharSemNomear()
+          if (!aberto) closeWithoutNaming()
         }}
         onSave={() => { setShowUnsavedDialog(false); saveWorkflow() }}
-        onDiscard={() => { setShowUnsavedDialog(false); fecharSemNomear() }}
+        onDiscard={() => { setShowUnsavedDialog(false); closeWithoutNaming() }}
       />
 
       <WorkflowDrawer />
@@ -655,7 +655,7 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
         {/* While the workflow loads the button is hidden (and doesn't pulse): the
             canvas is empty because the graph hasn't arrived yet, not because the
             workflow is new. */}
-        {!canvasSomenteLeitura && (
+        {!canvasReadOnly && (
           <Button
             size="icon"
             onClick={() => setNodesDrawerState('opened')}
@@ -692,10 +692,10 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
           // anchors — turning it off would take navigation away along with
           // editing. `deleteKeyCode` goes away because an external keyboard (or
           // the system's own) can still reach the canvas.
-          nodesDraggable={!canvasSomenteLeitura}
-          nodesConnectable={!canvasSomenteLeitura}
-          edgesReconnectable={!canvasSomenteLeitura}
-          deleteKeyCode={canvasSomenteLeitura ? null : undefined}
+          nodesDraggable={!canvasReadOnly}
+          nodesConnectable={!canvasReadOnly}
+          edgesReconnectable={!canvasReadOnly}
+          deleteKeyCode={canvasReadOnly ? null : undefined}
         >
 
           <CanvasInteractionProvider>
@@ -735,10 +735,10 @@ const ReactFlowComponent = ({ workflow, reloadWorkflow }: IReactFlowComponent) =
 
             The snapshot comes BEFORE `setNodes`: it is what lets Ctrl+Z undo
             an apply, which is the safety net of a destructive button. */}
-        <AssistentePainel
+        <AssistantPanel
           workflowId={workflow?.id_hash}
           abrirPorPadrao={!idDaRota}
-          onAplicar={aplicarDoAssistente}
+          onAplicar={applyFromAssistant}
         />
 
         {/* Overlaid on the canvas, not inside it: it is a second React Flow, with

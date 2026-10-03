@@ -20,7 +20,7 @@ vi.mock("@/app/components/ui/sidebar", () => ({
 }))
 
 import { AppHeader } from "@/app/components/app-header"
-import { IdiomaProvider } from "@/context/IdiomaContext"
+import { LanguageProvider } from "@/context/IdiomaContext"
 
 beforeEach(() => cleanup())
 
@@ -49,9 +49,9 @@ describe("AppHeader", () => {
   it("na Home (/) em inglês, o gatilho fala inglês — é o único menu do telefone", () => {
     nav.pathname = "/"
     render(
-      <IdiomaProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
+      <LanguageProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
         <AppHeader />
-      </IdiomaProvider>,
+      </LanguageProvider>,
     )
     const gatilho = screen.getByTestId("trigger")
     expect(gatilho.getAttribute("aria-label")).toBe("Open menu")

@@ -67,7 +67,7 @@ function servidor(prefixo: string) {
   })
 }
 
-function deferido<T>() {
+function deferred<T>() {
   let resolve!: (v: T) => void
   const promise = new Promise<T>(r => { resolve = r })
   return { promise, resolve }
@@ -77,8 +77,8 @@ const linhas = () => document.querySelectorAll("tbody tr").length
 const verMais = () => screen.queryByRole("button", { name: /^(Ver mais|Carregando…)/ })
 const aba = (nome: string) =>
   within(screen.getByRole("group", { name: "Tipo de artefato" })).getByRole("button", { name: nome })
-const tique = () => act(async () => { await new Promise(r => setTimeout(r, 30)) })
-const buscasDaPrimeiraPagina = () =>
+const tick = () => act(async () => { await new Promise(r => setTimeout(r, 30)) })
+const firstPageFetches = () =>
   getArtifacts.mock.calls.filter(c => (c[0]?.kind ?? "execution") === "execution" && (c[0]?.offset ?? 0) === 0).length
 
 function montar(cliente: QueryClient) {
@@ -86,13 +86,13 @@ function montar(cliente: QueryClient) {
 }
 
 /** List with 50 of 120 and a pending "Ver mais", which responds with `velho…`. */
-async function comVerMaisEmVoo() {
+async function withSeeMoreInFlight() {
   await waitFor(() => expect(linhas()).toBe(50))
-  const pagina2 = deferido<Resposta>()
-  getArtifacts.mockImplementationOnce(() => pagina2.promise)
+  const page2 = deferred<Resposta>()
+  getArtifacts.mockImplementationOnce(() => page2.promise)
   fireEvent.click(verMais()!)
   await waitFor(() => expect(verMais()).toHaveTextContent("Carregando…"))
-  return () => pagina2.resolve(ok(itens("velho", 50, 50), 120))
+  return () => page2.resolve(ok(itens("velho", 50, 50), 120))
 }
 
 beforeEach(() => {
@@ -104,20 +104,20 @@ describe("Artefatos — Ver mais em voo e a saída da chave", () => {
   it("ida e volta de aba: a aba volta do zero e a página velha não entra", async () => {
     servidor("a")
     montar(criarClienteDeConsultas())
-    const responderVelho = await comVerMaisEmVoo()
+    const respondStale = await withSeeMoreInFlight()
 
     servidor("n")
-    const antes = buscasDaPrimeiraPagina()
+    const antes = firstPageFetches()
     fireEvent.click(aba("Publicação"))
     await waitFor(() => expect(linhas()).toBe(3))
     fireEvent.click(aba("Execução"))
 
     await waitFor(() => expect(screen.getByLabelText("Selecionar n0.geojson")).toBeInTheDocument())
-    expect(buscasDaPrimeiraPagina() - antes).toBe(1)
+    expect(firstPageFetches() - antes).toBe(1)
     expect(linhas()).toBe(50)
 
-    responderVelho()
-    await tique()
+    respondStale()
+    await tick()
     expect(screen.queryByLabelText("Selecionar velho50.geojson")).toBeNull()
     expect(linhas()).toBe(50)
   })
@@ -126,19 +126,19 @@ describe("Artefatos — Ver mais em voo e a saída da chave", () => {
     const cliente = criarClienteDeConsultas()
     servidor("a")
     const primeira = montar(cliente)
-    const responderVelho = await comVerMaisEmVoo()
+    const respondStale = await withSeeMoreInFlight()
 
     servidor("n")
     primeira.unmount()
-    const antes = buscasDaPrimeiraPagina()
+    const antes = firstPageFetches()
     montar(cliente)
 
     expect(screen.getByRole("status", { name: "Carregando os artefatos" })).toBeInTheDocument()
     await waitFor(() => expect(screen.getByLabelText("Selecionar n0.geojson")).toBeInTheDocument())
-    expect(buscasDaPrimeiraPagina() - antes).toBe(1)
+    expect(firstPageFetches() - antes).toBe(1)
 
-    responderVelho()
-    await tique()
+    respondStale()
+    await tick()
     expect(screen.queryByLabelText("Selecionar velho50.geojson")).toBeNull()
     expect(linhas()).toBe(50)
   })

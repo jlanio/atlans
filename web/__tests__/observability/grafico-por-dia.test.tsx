@@ -5,13 +5,13 @@ import type { IRunsByDay } from "@/service/types"
 // Recharts comes in through `dynamic()` and paints nothing in jsdom (ResponsiveContainer
 // measures 0×0). What's tested here is the card: title, subtitle, legend, states.
 vi.mock("next/dynamic", () => ({
-  default: () => function BarrasDubladas({ dias }: { dias: IRunsByDay[] }) {
+  default: () => function StubbedBars({ dias }: { dias: IRunsByDay[] }) {
     return <div data-testid="barras">{dias.length} dias</div>
   },
 }))
 
-import { GraficoPorDia, subtituloDoGrafico } from "@/app/components/observability/grafico-por-dia"
-import { intervaloDosTicks } from "@/app/components/observability/grafico-por-dia-barras"
+import { GraficoPorDia, chartSubtitle } from "@/app/components/observability/grafico-por-dia"
+import { tickInterval } from "@/app/components/observability/grafico-por-dia-barras"
 
 afterEach(cleanup)
 
@@ -48,11 +48,11 @@ describe("GraficoPorDia", () => {
   })
 
   it("subtítulo e ticks", () => {
-    expect(subtituloDoGrafico([])).toBeNull()
-    expect(subtituloDoGrafico([dias[0]])).toBe("8 ago · pico de 40 em 8 ago")
-    expect(subtituloDoGrafico(dias.map(d => ({ ...d, total: 0 })))).toBe("de 8 ago a 10 ago")
-    expect(intervaloDosTicks(7)).toBe(0)
-    expect(intervaloDosTicks(30)).toBe(4)
-    expect(intervaloDosTicks(90)).toBe(12)
+    expect(chartSubtitle([])).toBeNull()
+    expect(chartSubtitle([dias[0]])).toBe("8 ago · pico de 40 em 8 ago")
+    expect(chartSubtitle(dias.map(d => ({ ...d, total: 0 })))).toBe("de 8 ago a 10 ago")
+    expect(tickInterval(7)).toBe(0)
+    expect(tickInterval(30)).toBe(4)
+    expect(tickInterval(90)).toBe(12)
   })
 })

@@ -12,7 +12,7 @@
  * sense to offer; `totalConhecido` (unfiltered) is what triggers the ceiling
  * warning.
  */
-import { MAX_COLUNAS_SUGERIDAS } from "./chips-field"
+import { MAX_SUGGESTED_COLUMNS } from "./chips-field"
 
 interface Props {
   /** Names to offer — already without the ones the current field uses (offering
@@ -31,7 +31,7 @@ interface Props {
   parciais?: boolean
 }
 
-const SugestoesDeColunas = ({ nomes, onEscolher, totalConhecido, desatualizadas = false, parciais = false }: Props) => {
+const ColumnSuggestions = ({ nomes, onEscolher, totalConhecido, desatualizadas = false, parciais = false }: Props) => {
   if (nomes.length === 0) return null
   return (
     <div className="flex flex-col gap-1">
@@ -40,9 +40,9 @@ const SugestoesDeColunas = ({ nomes, onEscolher, totalConhecido, desatualizadas 
           ? "Vistas em execução anterior (podem ter mudado) — clique para adicionar"
           : "Vistas na última execução — clique para adicionar"}
         {parciais && " (lista parcial)"}
-        {/* The executor cuts at MAX_COLUNAS per output. Without this warning, a
+        {/* The executor cuts at MAX_COLUMNS per output. Without this warning, a
             wide table would look like it had only 200 columns. */}
-        {(totalConhecido ?? nomes.length) >= MAX_COLUNAS_SUGERIDAS && " (as primeiras 200)"}:
+        {(totalConhecido ?? nomes.length) >= MAX_SUGGESTED_COLUMNS && " (as primeiras 200)"}:
       </p>
       <div className="flex flex-wrap gap-1">
         {nomes.map(nome => (
@@ -60,4 +60,4 @@ const SugestoesDeColunas = ({ nomes, onEscolher, totalConhecido, desatualizadas 
   )
 }
 
-export default SugestoesDeColunas
+export default ColumnSuggestions

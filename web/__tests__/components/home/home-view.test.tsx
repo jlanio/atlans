@@ -21,7 +21,7 @@ vi.mock("@/hooks/use-mobile", () => ({ useIsMobile: () => false }))
 vi.mock("@/app/components/share/MapLibreMap", async () => {
   const React = await import("react")
   return {
-    default: React.forwardRef(function MapLibreFalso(p: { giroLento?: boolean }) {
+    default: React.forwardRef(function FakeMapLibre(p: { giroLento?: boolean }) {
       // `data-giro` exposes what the HomeView asked of the globe: spin in the hero, stop afterward.
       return React.createElement("div", { "data-testid": "maplibre", "data-giro": String(!!p.giroLento) })
     }),
@@ -51,10 +51,10 @@ vi.mock("@/app/components/home/entrada/modal-de-entrada", () => ({
 import HomeView, { SAIDA_MS } from "@/app/components/home"
 import { pt } from "@/app/components/home/i18n/secoes/assistente"
 import { useHomeStore } from "@/app/stores/homeStore"
-import { IdiomaProvider, useIdioma } from "@/context/IdiomaContext"
+import { LanguageProvider, useLanguage } from "@/context/IdiomaContext"
 
 // The hero's sentences and chips in Portuguese (the dictionary the bar reads).
-const { sugestoes: SUGESTOES, chips: CHIPS } = pt.barra
+const { sugestoes: SUGGESTIONS, chips: CHIPS } = pt.barra
 
 const ATIVO = { ativo: true, cota: { gasto: 0, teto: 1_000_000, reabre_em_segundos: null } }
 
@@ -116,9 +116,9 @@ describe("HomeView — o assistente e o /assistente/estado", () => {
       success: true, data: { ativo: false, motivo: "O assistente está desligado. Defina OPENROUTER_API_KEY." },
     })
     render(
-      <IdiomaProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
+      <LanguageProvider inicial={{ idioma: "en", detectado: "en", escolhido: "en" }}>
         <HomeView />
-      </IdiomaProvider>,
+      </LanguageProvider>,
     )
     expect(await screen.findByText("The assistant isn’t available on this installation.")).toBeTruthy()
     expect(screen.queryByText(/OPENROUTER_API_KEY/)).toBeNull()
@@ -140,12 +140,12 @@ describe("HomeView — o assistente e o /assistente/estado", () => {
     expect(useHomeStore.getState().painel).toBe("barra")
 
     // Collapsing UNMOUNTS the panel: the text has to reappear in the bar.
-    const naBarra = screen.getByLabelText(/Mensagem para o assistente/i) as HTMLInputElement
-    expect(naBarra.value).toBe("buffer de 500 m")
+    const barInput = screen.getByLabelText(/Mensagem para o assistente/i) as HTMLInputElement
+    expect(barInput.value).toBe("buffer de 500 m")
 
     act(() => {
-      naBarra.focus()
-      fireEvent.keyDown(naBarra, { key: "i", ctrlKey: true })
+      barInput.focus()
+      fireEvent.keyDown(barInput, { key: "i", ctrlKey: true })
     })
     expect(useHomeStore.getState().painel).toBe("aberto")
     // The bar is still leaving (fade) for an instant; the panel's field is the textarea.
@@ -157,7 +157,7 @@ describe("HomeView — o assistente e o /assistente/estado", () => {
 
 describe("HomeView — o lang do <html>", () => {
   function TrocarPara({ idioma }: { idioma: "es" }) {
-    const { escolher } = useIdioma()
+    const { escolher } = useLanguage()
     return <button onClick={() => escolher(idioma)}>trocar</button>
   }
 
@@ -167,10 +167,10 @@ describe("HomeView — o lang do <html>", () => {
     document.documentElement.lang = "pt-BR"
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     const { unmount } = render(
-      <IdiomaProvider inicial={{ idioma: "en", detectado: "en", escolhido: null }}>
+      <LanguageProvider inicial={{ idioma: "en", detectado: "en", escolhido: null }}>
         <HomeView />
         <TrocarPara idioma="es" />
-      </IdiomaProvider>,
+      </LanguageProvider>,
     )
     await waitFor(() => expect(servico.estadoDoAgente).toHaveBeenCalled())
     expect(document.documentElement.lang).toBe("en")
@@ -232,7 +232,7 @@ describe("HomeView — camadas", () => {
     ].join("")
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
       if (String(url).includes("/assistente/conversa")) {
-        return { ok: true, body: corpoSSE(sse) }
+        return { ok: true, body: sseBody(sse) }
       }
       return { ok: true, json: async () => ({ type: "FeatureCollection", features: [] }) }
     })
@@ -261,7 +261,7 @@ describe("HomeView — camadas", () => {
       'event: fim\ndata: {"ok":true}\n\n',
     ].join("")
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
-      if (String(url).includes("/assistente/conversa")) return { ok: true, body: corpoSSE(sse) }
+      if (String(url).includes("/assistente/conversa")) return { ok: true, body: sseBody(sse) }
       return { ok: true, json: async () => ({ type: "FeatureCollection", features: [] }) }
     })
 
@@ -290,7 +290,7 @@ describe("HomeView — o hero do primeiro acesso", () => {
   })
 
   function veu() { return document.querySelector(".home-veu")?.getAttribute("data-visivel") }
-  function textoDoHero() { return document.querySelector(".home-hero-texto")?.getAttribute("data-visivel") ?? null }
+  function heroText() { return document.querySelector(".home-hero-texto")?.getAttribute("data-visivel") ?? null }
 
   it("é o estado inicial: título, chips, barra grande e véu — sem painel nem pilha", async () => {
     await montar()
@@ -312,7 +312,7 @@ describe("HomeView — o hero do primeiro acesso", () => {
       'event: texto\ndata: {"texto":"Achei 1 284 focos."}\n\n',
       'event: fim\ndata: {"ok":true}\n\n',
     ].join("")
-    ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, body: corpoSSE(sse) })
+    ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({ ok: true, body: sseBody(sse) })
     await montar()
 
     const campo = await screen.findByLabelText(/Mensagem para o assistente/i)
@@ -329,26 +329,26 @@ describe("HomeView — o hero do primeiro acesso", () => {
     // The spin stops — and the map goes back to Brazil (the Globo's `center`).
     expect(screen.getByTestId("maplibre").dataset.giro).toBe("false")
     // The title stays in the DOM until the transition ends, already invisible.
-    expect(textoDoHero()).toBe("false")
+    expect(heroText()).toBe("false")
     // And the panel stays closed: the conversation is in the center.
     expect(useHomeStore.getState().painel).toBe("barra")
   })
 
   it("a resposta traz respostas rápidas; clicar uma manda a frase como a próxima mensagem", async () => {
-    const comChips = [
+    const withChips = [
       'event: conversa\ndata: {"conversa_id":"c1","nova":true}\n\n',
       'event: texto\ndata: {"texto":"Achei 1 284 focos."}\n\n',
       'event: respostas_rapidas\ndata: {"opcoes":["Só os últimos 7 dias","Cruzar com o CAR"]}\n\n',
       'event: fim\ndata: {"ok":true}\n\n',
     ].join("")
-    const semChips = [
+    const withoutChips = [
       'event: conversa\ndata: {"conversa_id":"c1","nova":false}\n\n',
       'event: texto\ndata: {"texto":"Cruzei: 37 sobreposições."}\n\n',
       'event: fim\ndata: {"ok":true}\n\n',
     ].join("")
-    const fila = [comChips, semChips]
-    const fetchFalso = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
-    fetchFalso.mockImplementation(async () => ({ ok: true, body: corpoSSE(fila.shift() ?? semChips) }))
+    const fila = [withChips, withoutChips]
+    const fakeFetch = globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+    fakeFetch.mockImplementation(async () => ({ ok: true, body: sseBody(fila.shift() ?? withoutChips) }))
     await montar()
 
     const campo = await screen.findByLabelText(/Mensagem para o assistente/i)
@@ -359,9 +359,9 @@ describe("HomeView — o hero do primeiro acesso", () => {
     await act(async () => { fireEvent.click(chip) })
 
     // The second POST carries the chip's sentence; and the new turn takes the chips off the screen.
-    await waitFor(() => expect(fetchFalso).toHaveBeenCalledTimes(2))
-    const corpos = fetchFalso.mock.calls.map((c) => JSON.parse(String((c[1] as RequestInit).body)) as { mensagem: string })
-    expect(corpos.map((b) => b.mensagem)).toEqual(["focos de calor em MT", "Cruzar com o CAR"])
+    await waitFor(() => expect(fakeFetch).toHaveBeenCalledTimes(2))
+    const bodies = fakeFetch.mock.calls.map((c) => JSON.parse(String((c[1] as RequestInit).body)) as { mensagem: string })
+    expect(bodies.map((b) => b.mensagem)).toEqual(["focos de calor em MT", "Cruzar com o CAR"])
     await screen.findByText(/37 sobreposições/)
     expect(screen.queryByRole("button", { name: "Cruzar com o CAR" })).toBeNull()
     expect(screen.queryByRole("group", { name: /respostas rápidas/i })).toBeNull()
@@ -401,7 +401,7 @@ describe("HomeView — o hero do primeiro acesso", () => {
     const enc = new TextEncoder()
     let resolver: ((r: { done: boolean; value?: Uint8Array }) => void) | null = null
     const fila: { done: boolean; value?: Uint8Array }[] = []
-    const empurrar = (texto: string | null) => {
+    const pushChunk = (texto: string | null) => {
       const item = texto === null ? { done: true, value: undefined } : { done: false, value: enc.encode(texto) }
       if (resolver) { const r = resolver; resolver = null; r(item) } else fila.push(item)
     }
@@ -422,7 +422,7 @@ describe("HomeView — o hero do primeiro acesso", () => {
 
     // Reasoning: the bar has already moved down and the step says "Pensando…".
     await act(async () => {
-      empurrar('event: conversa\ndata: {"conversa_id":"c1","nova":true}\n\nevent: pensando\ndata: {"texto":"preciso do catálogo"}\n\n')
+      pushChunk('event: conversa\ndata: {"conversa_id":"c1","nova":true}\n\nevent: pensando\ndata: {"texto":"preciso do catálogo"}\n\n')
     })
     await waitFor(() => expect(screen.getByTestId("etapa-da-barra").textContent).toContain("Pensando"))
     expect(screen.getByTestId("barra").dataset.variante).toBe("rodape")
@@ -430,15 +430,15 @@ describe("HomeView — o hero do primeiro acesso", () => {
     // Tool in progress: the step switches to its LABEL, with the detail —
     // it is the "show the stages" the owner asked for.
     await act(async () => {
-      empurrar('event: ferramenta\ndata: {"id":"t1","nome":"get_authoring_guide","argumentos":{"topic":"edges"}}\n\n')
+      pushChunk('event: ferramenta\ndata: {"id":"t1","nome":"get_authoring_guide","argumentos":{"topic":"edges"}}\n\n')
     })
     await waitFor(() => expect(screen.getByTestId("etapa-da-barra").textContent).toContain("Consultando o guia"))
     expect(screen.getByTestId("etapa-da-barra").textContent).toContain("edges")
 
     // Writing: the step goes away — the answer already shows up in the strip.
     await act(async () => {
-      empurrar('event: texto\ndata: {"texto":"Achei 1 284 focos."}\n\nevent: fim\ndata: {"ok":true}\n\n')
-      empurrar(null)
+      pushChunk('event: texto\ndata: {"texto":"Achei 1 284 focos."}\n\nevent: fim\ndata: {"ok":true}\n\n')
+      pushChunk(null)
     })
     await waitFor(() => expect(screen.queryByTestId("etapa-da-barra")).toBeNull())
     expect(screen.getByTestId("pilha").textContent).toContain("Achei 1 284 focos.")
@@ -525,14 +525,14 @@ describe("HomeView — o hero do primeiro acesso", () => {
 
     expect(screen.getByTestId("barra").dataset.variante).toBe("rodape")
     expect(veu()).toBe("false")
-    expect(textoDoHero()).toBe("false")
+    expect(heroText()).toBe("false")
     // The globe spinning against the new layer's framing was half the bug.
     expect(screen.getByTestId("maplibre").dataset.giro).toBe("false")
   })
 })
 
 /** A response body that delivers the SSE in a single chunk. */
-function corpoSSE(texto: string) {
+function sseBody(texto: string) {
   const bytes = new TextEncoder().encode(texto)
   let entregue = false
   return {
@@ -552,7 +552,7 @@ describe("HomeView — a cota acompanha a conversa", () => {
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     const sse = 'event: texto\ndata: {"texto":"oi"}\n\nevent: fim\ndata: {"ok":true}\n\n'
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
-      if (String(url).includes("/assistente/conversa")) return { ok: true, body: corpoSSE(sse) }
+      if (String(url).includes("/assistente/conversa")) return { ok: true, body: sseBody(sse) }
       return { ok: true, json: async () => ({}) }
     })
     await montar()
@@ -576,26 +576,26 @@ describe("HomeView — a cota acompanha a conversa", () => {
 describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entrada", () => {
   const store = () => useHomeStore.getState()
   const modal = () => screen.getByTestId("modal-de-entrada")
-  const fetchFalso = () => globalThis.fetch as unknown as ReturnType<typeof vi.fn>
+  const fakeFetch = () => globalThis.fetch as unknown as ReturnType<typeof vi.fn>
 
-  function semSessao() {
+  function withoutSession() {
     sessao.status = "unauthenticated"
     sessao.data = null
   }
-  function comSessao() {
+  function withSession() {
     sessao.status = "authenticated"
     sessao.data = { user: { id_hash: "u1" } }
   }
   /** Mounts anonymously and asserts the essentials: the bar is there and NOTHING was queried. */
-  async function montarAnonimo(props: React.ComponentProps<typeof HomeView> = {}) {
-    semSessao()
+  async function mountAnonymous(props: React.ComponentProps<typeof HomeView> = {}) {
+    withoutSession()
     useHomeStore.setState({ painel: "barra" })
     const r = render(<HomeView {...props} />)
     await screen.findByLabelText(/Mensagem para o assistente/i)
     expect(servico.estadoDoAgente).not.toHaveBeenCalled()
     return r
   }
-  async function digitarEEnviar(texto: string) {
+  async function typeAndSend(texto: string) {
     const campo = screen.getByLabelText(/Mensagem para o assistente/i) as HTMLInputElement
     await act(async () => { fireEvent.change(campo, { target: { value: texto } }) })
     await act(async () => { fireEvent.keyDown(campo, { key: "Enter" }) })
@@ -603,7 +603,7 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
   }
 
   it("o hero inteiro, sem consultar o assistente e sem aviso; o modal fechado", async () => {
-    await montarAnonimo()
+    await mountAnonymous()
     expect(screen.getByRole("heading", { name: /menos ferramentas\. mais respostas/i })).toBeTruthy()
     expect(screen.getByRole("group", { name: /sugestões/i })).toBeTruthy()
     expect(screen.getByTestId("barra").dataset.variante).toBe("hero")
@@ -613,36 +613,36 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
   })
 
   it("digitar + Enter abre o modal com a mensagem pendente; o texto FICA na barra; nada vai ao servidor", async () => {
-    await montarAnonimo()
-    const campo = await digitarEEnviar("focos de calor em MT")
+    await mountAnonymous()
+    const campo = await typeAndSend("focos de calor em MT")
     expect(store().entrada).toBe("entrar")
     expect(store().envioPendente).toBe("focos de calor em MT")
     expect(campo.value).toBe("focos de calor em MT")
     expect(modal().dataset.modo).toBe("entrar")
     expect(modal().dataset.pendente).toBe("true")
-    expect(fetchFalso()).not.toHaveBeenCalled()
+    expect(fakeFetch()).not.toHaveBeenCalled()
   })
 
   it("um chip e o botão Enviar também pedem a entrada", async () => {
-    await montarAnonimo()
+    await mountAnonymous()
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: CHIPS[0] })) })
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Enviar" })) })
     expect(store().envioPendente).toBe(CHIPS[0])
     expect(modal().dataset.modo).toBe("entrar")
-    expect(fetchFalso()).not.toHaveBeenCalled()
+    expect(fakeFetch()).not.toHaveBeenCalled()
   })
 
   it("Enter no campo vazio manda a sugestão da vez ao modal", async () => {
-    await montarAnonimo()
+    await mountAnonymous()
     const campo = screen.getByLabelText(/Mensagem para o assistente/i)
     await act(async () => { fireEvent.keyDown(campo, { key: "Enter" }) })
-    expect(SUGESTOES).toContain(store().envioPendente)
+    expect(SUGGESTIONS).toContain(store().envioPendente)
     expect(modal().dataset.modo).toBe("entrar")
   })
 
   it("fechar o modal sem entrar desiste do envio, mas o texto fica na barra", async () => {
-    await montarAnonimo()
-    const campo = await digitarEEnviar("focos de calor em MT")
+    await mountAnonymous()
+    const campo = await typeAndSend("focos de calor em MT")
     await act(async () => { fireEvent.click(screen.getByText("fechar-modal")) })
     expect(store().entrada).toBeNull()
     expect(store().envioPendente).toBeNull()
@@ -651,7 +651,7 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
   })
 
   it("o painel (Ctrl+I) abre para o anônimo com o convite, e o Enter dele também pede a entrada", async () => {
-    await montarAnonimo()
+    await mountAnonymous()
     const campo = screen.getByLabelText(/Mensagem para o assistente/i)
     act(() => { campo.focus(); fireEvent.keyDown(campo, { key: "i", ctrlKey: true }) })
     await waitFor(() => expect(screen.queryByTestId("barra")).toBeNull())
@@ -663,12 +663,12 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
     await act(async () => { fireEvent.keyDown(textarea, { key: "Enter" }) })
     expect(store().entrada).toBe("entrar")
     expect(store().envioPendente).toBe("cruze o CAR")
-    expect(fetchFalso()).not.toHaveBeenCalled()
+    expect(fakeFetch()).not.toHaveBeenCalled()
   })
 
   it("o login deu certo: a mensagem pendente vai sozinha assim que o assistente responde", async () => {
-    const r = await montarAnonimo()
-    await digitarEEnviar("focos de calor em MT")
+    const r = await mountAnonymous()
+    await typeAndSend("focos de calor em MT")
     expect(store().entrada).toBe("entrar")
 
     // The signIn (no redirect) updated the tab's session; the modal reports that it signed in.
@@ -678,13 +678,13 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
       'event: texto\ndata: {"texto":"Achei 1 284 focos."}\n\n',
       'event: fim\ndata: {"ok":true}\n\n',
     ].join("")
-    fetchFalso().mockResolvedValue({ ok: true, body: corpoSSE(sse) })
+    fakeFetch().mockResolvedValue({ ok: true, body: sseBody(sse) })
     await act(async () => { fireEvent.click(screen.getByText("entrou-modal")) })
-    comSessao()
+    withSession()
     r.rerender(<HomeView />)
 
-    await waitFor(() => expect(fetchFalso()).toHaveBeenCalledTimes(1))
-    const [url, init] = fetchFalso().mock.calls[0] as [string, RequestInit]
+    await waitFor(() => expect(fakeFetch()).toHaveBeenCalledTimes(1))
+    const [url, init] = fakeFetch().mock.calls[0] as [string, RequestInit]
     expect(String(url)).toMatch(/\/assistente\/conversa$/)
     expect(JSON.parse(String(init.body)).mensagem).toBe("focos de calor em MT")
     expect(store().entrada).toBeNull()
@@ -695,28 +695,28 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
   })
 
   it("com a cota estourada a mensagem fica na caixa, com o aviso — a regra da barra", async () => {
-    const r = await montarAnonimo()
-    const campo = await digitarEEnviar("focos de calor em MT")
+    const r = await mountAnonymous()
+    const campo = await typeAndSend("focos de calor em MT")
     servico.estadoDoAgente.mockResolvedValue({
       success: true, data: { ativo: true, cota: { gasto: 10, teto: 10, reabre_em_segundos: 3600 } },
     })
     await act(async () => { fireEvent.click(screen.getByText("entrou-modal")) })
-    comSessao()
+    withSession()
     r.rerender(<HomeView />)
 
     await screen.findByText(/cota de hoje/i)
-    expect(fetchFalso()).not.toHaveBeenCalled()
+    expect(fakeFetch()).not.toHaveBeenCalled()
     expect(store().envioPendente).toBe("focos de calor em MT")
     expect(campo.value).toBe("focos de calor em MT")
   })
 
   it("?cadastro=1 abre o modal na chegada — e, logado, a query é ignorada", async () => {
-    await montarAnonimo({ entrada: "cadastro" })
+    await mountAnonymous({ entrada: "cadastro" })
     expect(modal().dataset.modo).toBe("cadastro")
 
     cleanup()
     useHomeStore.setState({ entrada: null })
-    comSessao()
+    withSession()
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     render(<HomeView entrada="entrar" />)
     await waitFor(() => expect(servico.estadoDoAgente).toHaveBeenCalled())
@@ -731,7 +731,7 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
     for (const modo of ["verificar", "recuperar", "redefinir"] as const) {
       cleanup()
       useHomeStore.setState({ entrada: null })
-      comSessao()
+      withSession()
       servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
       render(<HomeView entrada={modo} tokenDoLink="tok-abc" />)
       await waitFor(() => expect(modal().dataset.modo).toBe(modo))
@@ -740,12 +740,12 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
   })
 
   it("a sessão chegando NÃO fecha um painel do e-mail: o token é de uso único", async () => {
-    const r = await montarAnonimo()
+    const r = await mountAnonymous()
     await act(async () => { store().pedirEntrada("verificar") })
     expect(modal().dataset.modo).toBe("verificar")
 
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
-    comSessao()
+    withSession()
     r.rerender(<HomeView entrada="verificar" tokenDoLink="tok-abc" />)
     await waitFor(() => expect(servico.estadoDoAgente).toHaveBeenCalled())
     expect(store().entrada).toBe("verificar")
@@ -753,9 +753,9 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
   })
 
   it("com callbackUrl, entrar leva à página pedida — e o pendente não vai", async () => {
-    const r = await montarAnonimo({ entrada: "entrar", callbackUrl: "/projects" })
+    const r = await mountAnonymous({ entrada: "entrar", callbackUrl: "/projects" })
     expect(modal().dataset.modo).toBe("entrar")
-    await digitarEEnviar("focos de calor em MT")
+    await typeAndSend("focos de calor em MT")
     expect(store().envioPendente).toBe("focos de calor em MT")
 
     await act(async () => { fireEvent.click(screen.getByText("entrou-modal")) })
@@ -763,20 +763,20 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
     expect(nav.refresh).toHaveBeenCalled()
     expect(store().envioPendente).toBeNull()
 
-    comSessao()
+    withSession()
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     r.rerender(<HomeView entrada="entrar" callbackUrl="/projects" />)
     await waitFor(() => expect(servico.estadoDoAgente).toHaveBeenCalled())
-    expect(fetchFalso()).not.toHaveBeenCalled()
+    expect(fakeFetch()).not.toHaveBeenCalled()
   })
 
   it("a sessão chegando noutra aba com o modal aberto o fecha e consulta o assistente", async () => {
-    const r = await montarAnonimo()
+    const r = await mountAnonymous()
     await act(async () => { store().pedirEntrada("entrar") })
     expect(modal().dataset.modo).toBe("entrar")
 
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
-    comSessao()
+    withSession()
     r.rerender(<HomeView />)
     await waitFor(() => expect(servico.estadoDoAgente).toHaveBeenCalledTimes(1))
     expect(store().entrada).toBeNull()
@@ -784,7 +784,7 @@ describe("HomeView — sem sessão: a Home abre, e o primeiro envio pede a entra
   })
 
   it("Ctrl+I com o foco dentro de um diálogo não alterna o painel por trás", async () => {
-    await montarAnonimo()
+    await mountAnonymous()
     const dialogo = document.createElement("div")
     dialogo.setAttribute("role", "dialog")
     const campo = document.createElement("input")

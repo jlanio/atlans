@@ -81,7 +81,7 @@ def publish_stdout(publisher, run_id: str, node_id: str, lines: Sequence[str]) -
     `extra['lines']` is the ONLY source of truth (one entry per printed line).
     There is no `extra['message']` anymore: publishing the same text twice doubled
     the payload, and a batch of 200 lines of ~160 characters exceeded the 64 KB of
-    `TETO_NODE_EVENT_BYTES` (flow/utils/publisher/reducao.py); the sender then
+    `NODE_EVENT_BYTES_CEILING` (flow/utils/publisher/reducao.py); the sender then
     reduced the event to the control fields — which did not include `extra` — and
     the panel lost all 200 lines at once, silently. Today the reduction keeps the
     prefix of `lines` that fits, but the batch still has to fit whole. Consumers

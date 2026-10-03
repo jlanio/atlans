@@ -11,48 +11,48 @@
 // No function here accepts a channel name as a parameter: if it did, an XSS
 // flaw in the renderer could invoke any handler in main.
 import { contextBridge, ipcRenderer } from 'electron'
-import { CANAIS } from '../shared/ipc.js'
+import { CHANNELS } from '../shared/ipc.js'
 import type { AtlasApi } from '../shared/ipc.js'
 import type { CommandName } from '../shared/events.js'
-import type { EstadoApp } from '../main/state/store.js'
+import type { AppState } from '../main/state/store.js'
 
 function assinar<T>(canal: string, fn: (dado: T) => void): () => void {
-  const ouvinte = (_e: unknown, dado: T) => fn(dado)
-  ipcRenderer.on(canal, ouvinte)
+  const listener = (_e: unknown, dado: T) => fn(dado)
+  ipcRenderer.on(canal, listener)
   // Returning the unsubscribe is not a courtesy: without it, each React
   // component remount accumulates a listener, and Electron warns of a memory
   // leak after the eleventh.
-  return () => ipcRenderer.removeListener(canal, ouvinte)
+  return () => ipcRenderer.removeListener(canal, listener)
 }
 
 const api: AtlasApi = {
-  estado: () => ipcRenderer.invoke(CANAIS.estado),
-  info: () => ipcRenderer.invoke(CANAIS.info),
-  configuracao: () => ipcRenderer.invoke(CANAIS.configuracao),
-  enrolar: (pedido) => ipcRenderer.invoke(CANAIS.enrolar, pedido),
-  refazerEnrollment: () => ipcRenderer.invoke(CANAIS.refazerEnrollment),
-  iniciar: () => ipcRenderer.invoke(CANAIS.iniciar),
-  parar: () => ipcRenderer.invoke(CANAIS.parar),
-  reiniciar: () => ipcRenderer.invoke(CANAIS.reiniciar),
-  forcar: () => ipcRenderer.invoke(CANAIS.forcar),
-  comando: (cmd: CommandName) => ipcRenderer.invoke(CANAIS.comando, cmd),
-  escolherPasta: (atual?: string) => ipcRenderer.invoke(CANAIS.escolherPasta, atual),
-  abrirCaminho: (caminho: string) => ipcRenderer.invoke(CANAIS.abrirCaminho, caminho),
-  autostart: (ativar?: boolean) => ipcRenderer.invoke(CANAIS.autostart, ativar),
-  janela: (acao) => ipcRenderer.invoke(CANAIS.janela, acao),
-  geosync: () => ipcRenderer.invoke(CANAIS.geosync),
-  salvarGeosync: (cfg) => ipcRenderer.invoke(CANAIS.salvarGeosync, cfg),
-  workspaces: (atualizar?: boolean) => ipcRenderer.invoke(CANAIS.workspaces, atualizar),
-  deepLinkPendente: () => ipcRenderer.invoke(CANAIS.deepLinkPendente),
-  execucao: () => ipcRenderer.invoke(CANAIS.execucao),
-  salvarExecucao: (cfg) => ipcRenderer.invoke(CANAIS.salvarExecucao, cfg),
-  exportarLog: (texto) => ipcRenderer.invoke(CANAIS.exportarLog, texto),
-  abrirJanelaLog: () => ipcRenderer.invoke(CANAIS.abrirJanelaLog),
-  log: () => ipcRenderer.invoke(CANAIS.log),
+  estado: () => ipcRenderer.invoke(CHANNELS.estado),
+  info: () => ipcRenderer.invoke(CHANNELS.info),
+  configuracao: () => ipcRenderer.invoke(CHANNELS.configuracao),
+  enrolar: (pedido) => ipcRenderer.invoke(CHANNELS.enrolar, pedido),
+  refazerEnrollment: () => ipcRenderer.invoke(CHANNELS.refazerEnrollment),
+  iniciar: () => ipcRenderer.invoke(CHANNELS.iniciar),
+  parar: () => ipcRenderer.invoke(CHANNELS.parar),
+  reiniciar: () => ipcRenderer.invoke(CHANNELS.reiniciar),
+  forcar: () => ipcRenderer.invoke(CHANNELS.forcar),
+  comando: (cmd: CommandName) => ipcRenderer.invoke(CHANNELS.comando, cmd),
+  escolherPasta: (atual?: string) => ipcRenderer.invoke(CHANNELS.escolherPasta, atual),
+  abrirCaminho: (caminho: string) => ipcRenderer.invoke(CHANNELS.abrirCaminho, caminho),
+  autostart: (ativar?: boolean) => ipcRenderer.invoke(CHANNELS.autostart, ativar),
+  janela: (acao) => ipcRenderer.invoke(CHANNELS.janela, acao),
+  geosync: () => ipcRenderer.invoke(CHANNELS.geosync),
+  salvarGeosync: (cfg) => ipcRenderer.invoke(CHANNELS.salvarGeosync, cfg),
+  workspaces: (atualizar?: boolean) => ipcRenderer.invoke(CHANNELS.workspaces, atualizar),
+  deepLinkPendente: () => ipcRenderer.invoke(CHANNELS.deepLinkPendente),
+  execucao: () => ipcRenderer.invoke(CHANNELS.execucao),
+  salvarExecucao: (cfg) => ipcRenderer.invoke(CHANNELS.salvarExecucao, cfg),
+  exportarLog: (texto) => ipcRenderer.invoke(CHANNELS.exportarLog, texto),
+  abrirJanelaLog: () => ipcRenderer.invoke(CHANNELS.abrirJanelaLog),
+  log: () => ipcRenderer.invoke(CHANNELS.log),
 
-  aoAtualizarEstado: (fn: (e: EstadoApp) => void) => assinar(CANAIS.aoAtualizarEstado, fn),
-  aoReceberLog: (fn) => assinar(CANAIS.aoReceberLog, fn),
-  aoReceberDeepLink: (fn) => assinar(CANAIS.aoReceberDeepLink, fn),
+  aoAtualizarEstado: (fn: (e: AppState) => void) => assinar(CHANNELS.aoAtualizarEstado, fn),
+  aoReceberLog: (fn) => assinar(CHANNELS.aoReceberLog, fn),
+  aoReceberDeepLink: (fn) => assinar(CHANNELS.aoReceberDeepLink, fn),
 }
 
 contextBridge.exposeInMainWorld('atlas', api)

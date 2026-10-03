@@ -25,31 +25,31 @@ import { useAssistenteEditor } from "@/app/hooks/workflow/useAssistenteEditor"
 const ATIVO = { ativo: true, motivo: null, cota: null }
 
 /** The piece of the interface the two hooks have in common and this test uses. */
-interface ConsumidorDoStream {
+interface StreamConsumer {
   correndo: boolean
   enviar: (mensagem: string) => Promise<void>
   parar: () => void
 }
 
-const HOOKS: [string, () => ConsumidorDoStream][] = [
+const HOOKS: [string, () => StreamConsumer][] = [
   ["Home (useAssistente)", () => useAssistente({})],
   ["editor (useAssistenteEditor)", () => useAssistenteEditor("wf-1")],
 ]
 
-let fetchFalso: ReturnType<typeof vi.fn>
+let fakeFetch: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
   servico.estadoDoAssistente.mockResolvedValue({ success: true, data: ATIVO })
-  fetchFalso = vi.fn()
-  vi.stubGlobal("fetch", fetchFalso)
+  fakeFetch = vi.fn()
+  vi.stubGlobal("fetch", fakeFetch)
 })
 afterEach(() => { vi.unstubAllGlobals() })
 
 describe.each(HOOKS)("o leitor do stream — %s", (_nome, usar) => {
   it("'Parar' no meio da leitura solta o leitor", async () => {
     const cancel = vi.fn(async () => {})
-    fetchFalso.mockImplementation(async (_url: string, init: RequestInit) => ({
+    fakeFetch.mockImplementation(async (_url: string, init: RequestInit) => ({
       ok: true,
       status: 200,
       body: {
@@ -75,7 +75,7 @@ describe.each(HOOKS)("o leitor do stream — %s", (_nome, usar) => {
     const cancel = vi.fn(async () => {})
     const bytes = new TextEncoder().encode('event: texto\ndata: {"texto":"oi"}\n\n')
     let lidas = 0
-    fetchFalso.mockResolvedValue({
+    fakeFetch.mockResolvedValue({
       ok: true,
       status: 200,
       body: {

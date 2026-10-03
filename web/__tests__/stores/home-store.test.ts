@@ -5,14 +5,14 @@
  * crossing 768px.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
-import { useHomeStore, MEU_PADRAO } from "@/app/stores/homeStore"
+import { useHomeStore, DEFAULT_MINE } from "@/app/stores/homeStore"
 
 const CHAVE = "atlans:home:meu"
 const estado = () => useHomeStore.getState()
 
 beforeEach(() => {
   window.localStorage.clear()
-  useHomeStore.setState({ meu: { ...MEU_PADRAO }, hidratado: false })
+  useHomeStore.setState({ meu: { ...DEFAULT_MINE }, hidratado: false })
 })
 afterEach(() => vi.restoreAllMocks())
 
@@ -46,13 +46,13 @@ describe("homeStore — o grupo Meu", () => {
     window.localStorage.clear()
     estado().hidratar()
     expect(window.localStorage.getItem(CHAVE)).toBeNull()
-    expect(estado().meu).toEqual(MEU_PADRAO)
+    expect(estado().meu).toEqual(DEFAULT_MINE)
   })
 
   it("JSON corrompido, parcial ou com lixo cai no padrão chave a chave", () => {
     window.localStorage.setItem(CHAVE, "{{")
     estado().hidratar()
-    expect(estado().meu).toEqual(MEU_PADRAO)
+    expect(estado().meu).toEqual(DEFAULT_MINE)
 
     window.localStorage.setItem(CHAVE, JSON.stringify({ artefatos: true, chats: "sim" }))
     estado().hidratar()

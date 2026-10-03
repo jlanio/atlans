@@ -15,7 +15,7 @@ from app.schemas.credential import (
 )
 from app.services.credential_service import (
     create_credential,
-    erro_de_validacao,
+    validation_error,
     get_credential_metadata,
     list_credential_metadata,
     delete_credential,
@@ -71,7 +71,7 @@ async def credential_usage(
     ~10 KB each) and iterated node by node in Python: the worker's event loop
     was busy deserializing JSON while every other request on that worker
     waited — and the whole scan repeated every time a credential modal was
-    closed. Same path already used by `workflow_crud._tem_node`.
+    closed. Same path already used by `workflow_crud._has_node`.
     """
     from sqlalchemy import bindparam, text
 
@@ -132,7 +132,7 @@ async def test_credential(
     same as on save) and, when possible, tests the real connectivity.
     Persists nothing — it only serves as immediate feedback to the user.
     """
-    error = erro_de_validacao(data.type, data.data)
+    error = validation_error(data.type, data.data)
     if error:
         raise HTTPException(status_code=422, detail=error)
 
@@ -199,8 +199,8 @@ async def _test_s3_connection(data: dict) -> dict:
         try:
             # The same client that the SaveToS3 node builds with the resolved
             # credential: the test approves exactly what the execution will use.
-            from flow.utils.s3_cliente import cliente_s3
-            cliente_s3(data).list_buckets()
+            from flow.utils.s3_cliente import s3_client
+            s3_client(data).list_buckets()
             return {"ok": True, "message": "Credenciais S3 válidas!"}
         except ImportError:
             return {"ok": True, "message": "Campos validados (boto3 não instalado para teste real)."}

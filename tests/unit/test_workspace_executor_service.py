@@ -73,19 +73,19 @@ def _db_returning(*results):
 
 # ── terminal efetivo e modo ───────────────────────────────────────────────────
 
-class TestTerminalEfetivo:
-    def test_piso_no_pool_vence_o_terminal_pool(self):
+class TestEffectiveTerminal:
+    def test_no_pool_floor_beats_the_terminal_pool(self):
         assert svc.effective_terminal_of("no_pool", "pool") == "fail"
 
-    def test_sem_piso_vale_o_configurado(self):
+    def test_without_floor_the_configured_applies(self):
         assert svc.effective_terminal_of("none", "pool") == "pool"
         assert svc.effective_terminal_of("none", "fail") == "fail"
 
-    def test_valor_desconhecido_cai_para_fail(self):
+    def test_unknown_value_falls_back_to_fail(self):
         assert svc.effective_terminal_of(None, "banana") == "fail"
         assert svc.effective_terminal_of(None, None) == "fail"
 
-    def test_modo_derivado(self):
+    def test_derived_mode(self):
         p = svc.WorkspacePolicy(workspace_id="ws")
         assert p.mode == svc.MODE_POOL and p.allows_pool
         p.primary = [_executor()]
@@ -99,7 +99,7 @@ class TestTerminalEfetivo:
 # ── adding to a tier ──────────────────────────────────────────────────────────
 
 class TestModeOf:
-    def test_a_mesma_conta_da_dataclass(self):
+    def test_the_same_computation_as_the_dataclass(self):
         assert svc.mode_of(False, "none", "fail") == svc.MODE_POOL
         assert svc.mode_of(False, "no_pool", "pool") == svc.MODE_ISOLATED
         assert svc.mode_of(True, "none", "fail") == svc.MODE_ISOLATED
@@ -107,23 +107,23 @@ class TestModeOf:
         assert svc.mode_of(True, "no_pool", "pool") == svc.MODE_ISOLATED
 
 
-class TestPisoSemPrincipal:
-    def test_piso_no_pool_sem_principal_e_isolado_e_nunca_pool(self):
+class TestFloorWithoutPrimary:
+    def test_no_pool_floor_without_primary_is_isolated_and_never_pool(self):
         p = svc.WorkspacePolicy(workspace_id="ws", floor="no_pool", terminal_configured="pool")
         assert p.mode == svc.MODE_ISOLATED
         assert not p.allows_pool
         assert p.terminal_effective == "fail"
 
-    def test_sem_piso_e_sem_principal_e_pool(self):
+    def test_without_floor_and_without_primary_is_pool(self):
         p = svc.WorkspacePolicy(workspace_id="ws")
         assert p.mode == svc.MODE_POOL and p.allows_pool
 
 
-class TestReplacePrimaryLegado:
+class TestReplacePrimaryLegacy:
     """Endpoint legado `PUT /workspaces/{id}/executor` (dual-write)."""
 
     @pytest.mark.asyncio
-    async def test_executor_do_pool_limpa_os_niveis_e_o_terminal(self):
+    async def test_pool_executor_clears_the_tiers_and_the_terminal(self):
         ws = _workspace(terminal="pool")
         rows = [_row("ex-1", 1), _row("ex-2", 2)]
         db = _db_returning(rows, _executor("pool-a", is_default=True), None)
@@ -134,14 +134,14 @@ class TestReplacePrimaryLegado:
         assert any(c.args[0].action == "workspace.executor_policy.cleared" for c in db.add.call_args_list)
 
     @pytest.mark.asyncio
-    async def test_nulo_limpa_e_reseta_terminal(self):
+    async def test_null_clears_and_resets_terminal(self):
         ws = _workspace(terminal="pool")
         db = _db_returning([_row("ex-1", 1)], None)
         await svc.replace_primary(db, ws, None, actor_id="u")
         assert ws.fallback_terminal == "fail"
 
     @pytest.mark.asyncio
-    async def test_nivel_1_nascendo_do_vazio_reproduz_o_legado_com_terminal_pool(self):
+    async def test_tier_1_born_from_empty_reproduces_the_legacy_with_terminal_pool(self):
         # Today this workspace overflows to the pool when the dedicated one goes down;
         # the policy needs to start out the same so that flipping the flag changes nothing.
         ws = _workspace(terminal="fail")
@@ -151,14 +151,14 @@ class TestReplacePrimaryLegado:
         assert any(type(c.args[0]).__name__ == "WorkspaceExecutor" for c in db.add.call_args_list)
 
     @pytest.mark.asyncio
-    async def test_nivel_1_nascendo_sob_piso_fica_fail(self):
+    async def test_tier_1_born_under_floor_stays_fail(self):
         ws = _workspace(terminal="fail", floor="no_pool")
         db = _db_returning([], _executor("ex-1"), None, None)
         await svc.replace_primary(db, ws, "ex-1", actor_id="u")
         assert ws.fallback_terminal == "fail"
 
     @pytest.mark.asyncio
-    async def test_trocar_o_principal_existente_mantem_o_terminal_escolhido(self):
+    async def test_replacing_the_existing_primary_keeps_the_chosen_terminal(self):
         ws = _workspace(terminal="fail")
         db = _db_returning([_row("ex-1", 1)], _executor("ex-2"), None, None)
         await svc.replace_primary(db, ws, "ex-2", actor_id="u")
@@ -167,7 +167,7 @@ class TestReplacePrimaryLegado:
 
 class TestRemoveMember:
     @pytest.mark.asyncio
-    async def test_esvaziar_o_principal_apaga_a_reserva_e_reseta_o_terminal(self, monkeypatch):
+    async def test_emptying_the_primary_deletes_the_fallback_and_resets_the_terminal(self, monkeypatch):
         monkeypatch.setattr(svc, "_notify_executor", AsyncMock())
         ws = _workspace(terminal="pool")
         rows = [_row("ex-1", 1), _row("ex-2", 2)]
@@ -177,7 +177,7 @@ class TestRemoveMember:
         assert ws.fallback_terminal == "fail"
 
     @pytest.mark.asyncio
-    async def test_remover_reserva_mantem_o_terminal(self, monkeypatch):
+    async def test_removing_fallback_keeps_the_terminal(self, monkeypatch):
         monkeypatch.setattr(svc, "_notify_executor", AsyncMock())
         ws = _workspace(terminal="pool")
         db = _db_returning([_row("ex-1", 1), _row("ex-2", 2)], None)
@@ -185,14 +185,14 @@ class TestRemoveMember:
         assert ws.fallback_terminal == "pool"
 
 
-class TestUniaoLegadoENiveis:
+class TestUnionOfLegacyAndTiers:
     @pytest.mark.asyncio
-    async def test_workspace_ids_for_executor_une_ponteiro_e_niveis(self):
+    async def test_workspace_ids_for_executor_joins_pointer_and_tiers(self):
         db = _db_returning(["ws-legado"], ["ws-nivel", "ws-legado"])
         assert await svc.workspace_ids_for_executor(db, "ex-1") == {"ws-legado", "ws-nivel"}
 
     @pytest.mark.asyncio
-    async def test_executor_ids_for_workspaces_vazio_nao_consulta(self):
+    async def test_executor_ids_for_workspaces_empty_does_not_query(self):
         db = _db_returning()
         assert await svc.executor_ids_for_workspaces(db, []) == set()
         db.execute.assert_not_awaited()
@@ -200,13 +200,13 @@ class TestUniaoLegadoENiveis:
 
 class TestAddMember:
     @pytest.mark.asyncio
-    async def test_recusa_executor_do_pool(self):
+    async def test_refuses_pool_executor(self):
         db = _db_returning(_executor(is_default=True))
         with pytest.raises(WorkspacePolicyError, match="pool compartilhado"):
             await svc.add_member(db, _workspace(), "ex-1", 1, actor_id="u-1")
 
     @pytest.mark.asyncio
-    async def test_recusa_inativo_e_sem_chave(self):
+    async def test_refuses_inactive_and_keyless(self):
         db = _db_returning(_executor(status="pending"))
         with pytest.raises(WorkspacePolicyError, match="não está ativo"):
             await svc.add_member(db, _workspace(), "ex-1", 1, actor_id="u-1")
@@ -215,25 +215,25 @@ class TestAddMember:
             await svc.add_member(db, _workspace(), "ex-1", 1, actor_id="u-1")
 
     @pytest.mark.asyncio
-    async def test_nivel_2_exige_nivel_1(self):
+    async def test_tier_2_requires_tier_1(self):
         db = _db_returning(_executor(), [])  # executor ok; no row yet
         with pytest.raises(WorkspacePolicyError, match="nível principal"):
             await svc.add_member(db, _workspace(), "ex-1", 2, actor_id="u-1")
 
     @pytest.mark.asyncio
-    async def test_um_executor_nao_fica_em_dois_niveis(self):
+    async def test_one_executor_does_not_stay_in_two_tiers(self):
         db = _db_returning(_executor(), [_row("ex-1", 1)])
         with pytest.raises(WorkspacePolicyError, match="um nível só"):
             await svc.add_member(db, _workspace(), "ex-1", 2, actor_id="u-1")
 
     @pytest.mark.asyncio
-    async def test_sem_acesso_ao_executor(self):
+    async def test_without_access_to_the_executor(self):
         db = _db_returning(_executor())
         with pytest.raises(WorkspaceAccessDeniedError, match="acesso"):
             await svc.add_member(db, _workspace(), "ex-1", 1, actor_id="u-1", accessible_ids={"outro"})
 
     @pytest.mark.asyncio
-    async def test_inclusao_valida_grava_e_audita(self, monkeypatch):
+    async def test_valid_inclusion_writes_and_audits(self, monkeypatch):
         monkeypatch.setattr(svc, "_notify_executor", AsyncMock())
         db = _db_returning(_executor(), [])
         row = await svc.add_member(db, _workspace(), "ex-1", 1, actor_id="u-1", accessible_ids={"ex-1"})
@@ -248,27 +248,27 @@ class TestAddMember:
 
 class TestTerminalEPiso:
     @pytest.mark.asyncio
-    async def test_pool_recusado_sob_piso(self):
+    async def test_pool_refused_under_floor(self):
         db = _db_returning()
         with pytest.raises(WorkspacePolicyFloorError):
             await svc.set_terminal(db, _workspace(floor="no_pool"), "pool", actor_id="u-1")
 
     @pytest.mark.asyncio
-    async def test_terminal_invalido(self):
+    async def test_invalid_terminal(self):
         with pytest.raises(WorkspacePolicyError):
             await svc.set_terminal(_db_returning(), _workspace(), "esperar", actor_id="u-1")
 
     @pytest.mark.asyncio
-    async def test_piso_no_pool_forca_terminal_fail_e_avisa(self):
+    async def test_no_pool_floor_forces_terminal_fail_and_warns(self):
         db = _db_returning()
         ws = _workspace(terminal="pool")
-        forcou = await svc.set_floor(db, ws, "no_pool", actor_id="admin")
-        assert forcou is True
+        forced = await svc.set_floor(db, ws, "no_pool", actor_id="admin")
+        assert forced is True
         assert ws.fallback_terminal == "fail" and ws.isolation_floor == "no_pool"
         db.commit.assert_awaited()
 
     @pytest.mark.asyncio
-    async def test_piso_no_pool_sem_forcar_quando_ja_era_fail(self):
+    async def test_no_pool_floor_does_not_force_when_already_fail(self):
         ws = _workspace(terminal="fail")
         assert await svc.set_floor(_db_returning(), ws, "no_pool", actor_id="admin") is False
 
@@ -277,7 +277,7 @@ class TestTerminalEPiso:
 
 class TestDetach:
     @pytest.mark.asyncio
-    async def test_esvaziar_principal_sem_force_e_409(self, monkeypatch):
+    async def test_emptying_primary_without_force_is_409(self, monkeypatch):
         deps = [{"workspace_id": "ws-1", "workspace_name": "Bacia", "owner_id": "u-1",
                  "tier": 1, "primary_count": 1, "would_empty_primary": True}]
         monkeypatch.setattr(svc, "workspaces_depending_on", AsyncMock(return_value=deps))
@@ -289,7 +289,7 @@ class TestDetach:
         db.execute.assert_not_awaited()  # nada apagado
 
     @pytest.mark.asyncio
-    async def test_force_apaga_e_limpa_fallback_do_esvaziado(self, monkeypatch):
+    async def test_force_deletes_and_clears_fallback_of_the_emptied(self, monkeypatch):
         deps = [{"workspace_id": "ws-1", "workspace_name": "Bacia", "owner_id": "u-1",
                  "tier": 1, "primary_count": 1, "would_empty_primary": True}]
         monkeypatch.setattr(svc, "workspaces_depending_on", AsyncMock(return_value=deps))
@@ -304,7 +304,7 @@ class TestDetach:
         assert any(type(c.args[0]).__name__ == "AuditEvent" for c in db.add.call_args_list)
 
     @pytest.mark.asyncio
-    async def test_sem_dependente_vivo_ainda_apaga_linhas_de_lixeira(self, monkeypatch):
+    async def test_without_live_dependent_still_deletes_trash_rows(self, monkeypatch):
         # Workspace in the trash with the executor in tier 1: restored later, it must
         # not come back with a revoked executor in the primary.
         monkeypatch.setattr(svc, "workspaces_depending_on", AsyncMock(return_value=[]))
@@ -313,7 +313,7 @@ class TestDetach:
         assert out == [] and db.execute.await_count == 1
 
     @pytest.mark.asyncio
-    async def test_sem_esvaziar_nao_bloqueia(self, monkeypatch):
+    async def test_without_emptying_does_not_block(self, monkeypatch):
         deps = [{"workspace_id": "ws-1", "workspace_name": "Bacia", "owner_id": "u-1",
                  "tier": 2, "primary_count": 2, "would_empty_primary": False}]
         monkeypatch.setattr(svc, "workspaces_depending_on", AsyncMock(return_value=deps))

@@ -19,9 +19,9 @@
 import { app } from 'electron'
 import type { AppUpdater } from 'electron-updater'
 
-const INTERVALO_MS = 6 * 60 * 60 * 1000   // 6 h
+const INTERVAL_MS = 6 * 60 * 60 * 1000   // 6 h
 
-export interface EstadoUpdate {
+export interface UpdateState {
   versao: string | null
   baixado: boolean
 }
@@ -29,16 +29,16 @@ export interface EstadoUpdate {
 let updater: AppUpdater | null = null
 let timer: NodeJS.Timeout | null = null
 
-const estado: EstadoUpdate = { versao: null, baixado: false }
+const estado: UpdateState = { versao: null, baixado: false }
 
-export function estadoDoUpdate(): EstadoUpdate {
+export function updateState(): UpdateState {
   return { ...estado }
 }
 
 /**
  * @param aoMudar  notified when an update finishes downloading.
  */
-export async function iniciarUpdater(aoMudar: (e: EstadoUpdate) => void): Promise<void> {
+export async function startUpdater(aoMudar: (e: UpdateState) => void): Promise<void> {
   // In dev there is nothing to update, and electron-updater logs a flashy error
   // ("dev-app-update.yml not found") that only confuses.
   if (!app.isPackaged) return
@@ -51,12 +51,12 @@ export async function iniciarUpdater(aoMudar: (e: EstadoUpdate) => void): Promis
   // Downloading early makes the update ready when the window of opportunity
   // shows up.
   autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = false   // see `instalarAgora`
+  autoUpdater.autoInstallOnAppQuit = false   // see `installNow`
 
   autoUpdater.on('update-downloaded', (info) => {
     estado.baixado = true
     estado.versao = info.version
-    aoMudar(estadoDoUpdate())
+    aoMudar(updateState())
   })
 
   // An update failure must NOT crash or alarm: the app works the same without
@@ -70,7 +70,7 @@ export async function iniciarUpdater(aoMudar: (e: EstadoUpdate) => void): Promis
   }
 
   verificar()
-  timer = setInterval(verificar, INTERVALO_MS)
+  timer = setInterval(verificar, INTERVAL_MS)
 }
 
 /**
@@ -78,14 +78,14 @@ export async function iniciarUpdater(aoMudar: (e: EstadoUpdate) => void): Promis
  * — the "can we restart now?" decision belongs to the caller, which must stop
  * the executor in an orderly way BEFORE.
  */
-export function instalarAgora(): boolean {
+export function installNow(): boolean {
   if (!updater || !estado.baixado) return false
   // `isSilent: false` mostra o instalador; `isForceRunAfter: true` reabre o app.
   updater.quitAndInstall(false, true)
   return true
 }
 
-export function pararUpdater(): void {
+export function stopUpdater(): void {
   if (timer) {
     clearInterval(timer)
     timer = null

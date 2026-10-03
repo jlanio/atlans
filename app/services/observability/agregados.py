@@ -14,23 +14,23 @@ from app.models.models import WorkflowRun
 # Stuck-run criterion (spec §3.1): more than
 # 3x the workflow's median, never less than 15 min; with no median, 1 h. The floor
 # exists because a 10 s workflow "stuck" for 40 s may still just be the queue.
-_PRESA_MULTIPLO_P50 = 3
-_PRESA_MINIMO_SEGUNDOS = 900
-_PRESA_SEM_P50_SEGUNDOS = 3600
+_STUCK_P50_MULTIPLE = 3
+_STUCK_MIN_SECONDS = 900
+_STUCK_NO_P50_SECONDS = 3600
 # How many old active runs the "stuck" calculation looks at. Since no
 # run can be stuck before the 900 s floor, the query already cuts by
 # `start_time <= now - 900 s`; the ceiling is only a guard against a
 # pathological queue of thousands of pending ones — in that case `stuck_count` saturates.
-_PRESA_TETO_CANDIDATAS = 500
+_STUCK_CANDIDATES_CEILING = 500
 
 # Statuses that count as "in progress" at query time and in the
 # `running` bucket of the per-day chart (spec §3.2).
-_STATUS_ATIVOS = ("running", "pending")
+_ACTIVE_STATUSES = ("running", "pending")
 
 
-from app.services.observability.escopo import _como_utc, _iso
-from app.services.observability.estatisticas import _p50_por_workflow, _resumir_erro, _ultima_execucao_por_workflow
-from app.services.observability.frota import _confirmacoes_atrasadas, _executor_id_do_host, _executores_do_escopo, _nomes_de_executores, _presenca
+from app.services.observability.escopo import _as_utc, _iso
+from app.services.observability.estatisticas import _p50_por_workflow, _summarize_error, _last_run_per_workflow
+from app.services.observability.frota import _confirmacoes_atrasadas, _executor_id_do_host, _executores_do_escopo, _executor_names, _presenca
 from app.services.observability.runs import _resolve_workflow_meta
 
 # ── Helpers that depend on the service (below, for top-down reading) ─────────
@@ -42,15 +42,15 @@ def _parse_iso(texto: str) -> datetime:
     return datetime.fromisoformat(texto.strip().replace("Z", "+00:00"))
 
 
-def _balde_do_status(status: Optional[str]) -> str:
+def _status_bucket(status: Optional[str]) -> str:
     if status in ("success", "failed", "cancelled"):
         return status
-    if status in _STATUS_ATIVOS:
+    if status in _ACTIVE_STATUSES:
         return "running"
     return "other"
 
 
-async def _top_falhas(db: AsyncSession, run_f: list, since: datetime) -> list[dict]:
+async def _top_failures(db: AsyncSession, run_f: list, since: datetime) -> list[dict]:
     """Top 5 workflows by failures in the window, with rate (failures ÷ total OF THE
     WORKFLOW in the window) and the last error. Three fixed queries: the aggregation,
     each one's last failure (window function) and the names."""
@@ -72,7 +72,7 @@ async def _top_falhas(db: AsyncSession, run_f: list, since: datetime) -> list[di
         return []
 
     hashes = [linha.workflow_hash for linha in linhas]
-    ultimas = await _ultima_execucao_por_workflow(
+    ultimas = await _last_run_per_workflow(
         db, [WorkflowRun.status == "failed", WorkflowRun.start_time >= since, *run_f], hashes,
     )
     meta = await _resolve_workflow_meta(db, hashes)
@@ -88,7 +88,7 @@ async def _top_falhas(db: AsyncSession, run_f: list, since: datetime) -> list[di
             "failure_count":  falhou,
             "total_runs":     total,
             "failure_rate":   round(falhou / total, 4) if total else 0.0,
-            "last_error":     _resumir_erro(ultima.error_message) if ultima else None,
+            "last_error":     _summarize_error(ultima.error_message) if ultima else None,
             "last_error_category": ultima.error_category if ultima else None,
             "last_failed_at": _iso(ultima.start_time) if ultima else None,
         })
@@ -102,37 +102,37 @@ async def _execucoes_presas(db: AsyncSession, run_f: list, now: datetime) -> tup
     below it can be stuck — and each one's threshold comes from the median of
     its workflow over 90 days. Returns `(how many, the 5 oldest)`.
     """
-    limite = now - timedelta(seconds=_PRESA_MINIMO_SEGUNDOS)
+    limite = now - timedelta(seconds=_STUCK_MIN_SECONDS)
     result = await db.execute(
         select(
             WorkflowRun.task_id, WorkflowRun.id, WorkflowRun.workflow_hash,
             WorkflowRun.host, WorkflowRun.start_time,
         )
-        .where(WorkflowRun.status.in_(_STATUS_ATIVOS), WorkflowRun.start_time <= limite, *run_f)
+        .where(WorkflowRun.status.in_(_ACTIVE_STATUSES), WorkflowRun.start_time <= limite, *run_f)
         .order_by(WorkflowRun.start_time.asc())
-        .limit(_PRESA_TETO_CANDIDATAS)
+        .limit(_STUCK_CANDIDATES_CEILING)
     )
-    candidatas = result.all()
-    if not candidatas:
+    candidates = result.all()
+    if not candidates:
         return 0, []
 
-    tipicos = await _p50_por_workflow(db, [c.workflow_hash for c in candidatas], now)
+    typical_by_workflow = await _p50_por_workflow(db, [c.workflow_hash for c in candidates], now)
     presas = []
-    for c in candidatas:
-        tipico = tipicos.get(c.workflow_hash)
-        if tipico:
-            limiar = max(_PRESA_MULTIPLO_P50 * tipico, _PRESA_MINIMO_SEGUNDOS)
+    for c in candidates:
+        typical = typical_by_workflow.get(c.workflow_hash)
+        if typical:
+            limiar = max(_STUCK_P50_MULTIPLE * typical, _STUCK_MIN_SECONDS)
         else:
-            limiar = _PRESA_SEM_P50_SEGUNDOS
-        decorrido = (now - _como_utc(c.start_time)).total_seconds()
+            limiar = _STUCK_NO_P50_SECONDS
+        decorrido = (now - _as_utc(c.start_time)).total_seconds()
         if decorrido > limiar:
-            presas.append((c, decorrido, tipico))
+            presas.append((c, decorrido, typical))
 
     top = presas[:5]
     if not top:
         return 0, []
     meta = await _resolve_workflow_meta(db, [c.workflow_hash for c, _, _ in top])
-    nomes = await _nomes_de_executores(
+    nomes = await _executor_names(
         db, [_executor_id_do_host(c.host) for c, _, _ in top if _executor_id_do_host(c.host)]
     )
     return len(presas), [
@@ -144,13 +144,13 @@ async def _execucoes_presas(db: AsyncSession, run_f: list, now: datetime) -> tup
             "executor_name":   nomes.get(_executor_id_do_host(c.host)) if _executor_id_do_host(c.host) else None,
             "started_at":      _iso(c.start_time),
             "elapsed_seconds": int(decorrido),
-            "typical_seconds": tipico,
+            "typical_seconds": typical,
         }
-        for c, decorrido, tipico in top
+        for c, decorrido, typical in top
     ]
 
 
-async def _bloco_agora(
+async def _now_block(
     db: AsyncSession, user, run_f: list, now: datetime, *, como_admin: bool = False,
 ) -> dict:
     """The `now` block of spec §3.1: the moment of the query, with NO window. What
@@ -162,7 +162,7 @@ async def _bloco_agora(
         select(
             func.count(WorkflowRun.id).filter(WorkflowRun.status == "running").label("running"),
             func.count(WorkflowRun.id).filter(WorkflowRun.status == "pending").label("pending"),
-        ).where(WorkflowRun.status.in_(_STATUS_ATIVOS), *run_f)
+        ).where(WorkflowRun.status.in_(_ACTIVE_STATUSES), *run_f)
     )).one()
 
     stuck_count, stuck = await _execucoes_presas(db, run_f, now)
@@ -171,7 +171,7 @@ async def _bloco_agora(
     online, capacidade = await _presenca([e["id_hash"] for e in frota])
     # Queue summed only over those that publish capacity: `null` distinguishes "nobody
     # publishes" from "empty queue", which the screen shows differently.
-    filas = [
+    queues = [
         cap["queued"] for eid, cap in capacidade.items()
         if online.get(eid) and cap is not None and cap.get("queued") is not None
     ]
@@ -182,6 +182,6 @@ async def _bloco_agora(
         "stuck_count": stuck_count,
         "stuck":       stuck,
         "executors":   {"online": sum(1 for v in online.values() if v), "total": len(frota)},
-        "queued_on_executors": int(sum(filas)) if filas else None,
+        "queued_on_executors": int(sum(queues)) if queues else None,
         "overdue_acks": (await _confirmacoes_atrasadas()) if como_admin else None,
     }

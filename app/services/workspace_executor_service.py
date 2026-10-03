@@ -259,19 +259,19 @@ async def remove_member(
     # and the terminal goes back to `fail`: "pool as a last resort" is a choice
     # made WITH a main tier on the table; without it, it cannot survive hidden
     # to reappear on the next executor added without confirmation.
-    resto_primario = [r for r in rows if r.tier == TIER_PRIMARY and r.id != alvo.id]
-    apagou_fallback = False
-    if alvo.tier == TIER_PRIMARY and not resto_primario:
+    remaining_primaries = [r for r in rows if r.tier == TIER_PRIMARY and r.id != alvo.id]
+    deleted_fallback = False
+    if alvo.tier == TIER_PRIMARY and not remaining_primaries:
         await db.execute(
             delete(WorkspaceExecutor).where(
                 WorkspaceExecutor.workspace_id == ws.id_hash,
                 WorkspaceExecutor.tier == TIER_FALLBACK,
             )
         )
-        apagou_fallback = any(r.tier == TIER_FALLBACK for r in rows)
+        deleted_fallback = any(r.tier == TIER_FALLBACK for r in rows)
         _reset_terminal(ws)
     _audit(db, ws.id_hash, actor_id, "workspace.executor_policy.member_removed",
-           {"executor_id": executor_id, "tier": alvo.tier, "fallback_cleared": apagou_fallback})
+           {"executor_id": executor_id, "tier": alvo.tier, "fallback_cleared": deleted_fallback})
     await db.commit()
     await _notify_executor(executor_id, "Workspace removeu este executor da política.")
 
@@ -298,10 +298,10 @@ async def replace_primary(
                    {"via": "legacy_endpoint", "target_executor_id": executor_id})
         _reset_terminal(ws)
         return
-    primarios = [r for r in rows if r.tier == TIER_PRIMARY]
-    if len(primarios) == 1 and primarios[0].executor_id == executor_id:
+    primaries = [r for r in rows if r.tier == TIER_PRIMARY]
+    if len(primaries) == 1 and primaries[0].executor_id == executor_id:
         return
-    tinha_primario = bool(primarios)
+    had_primary = bool(primaries)
     await db.execute(
         delete(WorkspaceExecutor).where(
             WorkspaceExecutor.workspace_id == ws.id_hash,
@@ -318,8 +318,8 @@ async def replace_primary(
     db.add(WorkspaceExecutor(
         workspace_id=ws.id_hash, executor_id=executor_id, tier=TIER_PRIMARY, added_by=actor_id,
     ))
-    terminal_ajustado = False
-    if not tinha_primario and (ws.isolation_floor or FLOOR_NONE) != FLOOR_NO_POOL \
+    terminal_adjusted = False
+    if not had_primary and (ws.isolation_floor or FLOOR_NONE) != FLOOR_NO_POOL \
             and ws.fallback_terminal != TERMINAL_POOL:
         # Tier 1 born through the LEGACY path: today this workspace overflows to the
         # pool when the dedicated one goes down, and that is what the policy
@@ -327,10 +327,10 @@ async def replace_primary(
         # Isolating is an explicit decision, made in the editor — not a side
         # effect of the quick selector.
         ws.fallback_terminal = TERMINAL_POOL
-        terminal_ajustado = True
+        terminal_adjusted = True
     _audit(db, ws.id_hash, actor_id, "workspace.executor_policy.primary_replaced",
            {"executor_id": executor_id, "via": "legacy_endpoint",
-            "terminal_set_to_pool": terminal_ajustado})
+            "terminal_set_to_pool": terminal_adjusted})
 
 
 # ── Escrita: terminal e piso ─────────────────────────────────────────────────
@@ -362,16 +362,16 @@ async def set_floor(
     if floor not in FLOORS:
         raise WorkspacePolicyError("Piso inválido: use 'none' ou 'no_pool'.")
     anterior = ws.isolation_floor or FLOOR_NONE
-    forcou = False
+    forced = False
     if floor == FLOOR_NO_POOL and ws.fallback_terminal == TERMINAL_POOL:
         ws.fallback_terminal = TERMINAL_FAIL
-        forcou = True
-    if anterior != floor or forcou:
+        forced = True
+    if anterior != floor or forced:
         ws.isolation_floor = floor
         _audit(db, ws.id_hash, actor_id, "workspace.executor_policy.floor_changed",
-               {"from": anterior, "to": floor, "terminal_forced_to_fail": forcou})
+               {"from": anterior, "to": floor, "terminal_forced_to_fail": forced})
         await db.commit()
-    return forcou
+    return forced
 
 
 # ── Cascatas: o executor some ou vira pool ───────────────────────────────────
@@ -394,17 +394,17 @@ async def workspaces_depending_on(db: AsyncSession, executor_id: str) -> list[di
             WorkspaceExecutor.tier == TIER_PRIMARY,
         )
     )
-    primarios: dict[str, int] = {}
+    primaries: dict[str, int] = {}
     for ws_id, _ in contagem.all():
-        primarios[ws_id] = primarios.get(ws_id, 0) + 1
+        primaries[ws_id] = primaries.get(ws_id, 0) + 1
     return [
         {
             "workspace_id": ws.id_hash,
             "workspace_name": ws.name,
             "owner_id": ws.owner_id,
             "tier": row.tier,
-            "primary_count": primarios.get(ws.id_hash, 0),
-            "would_empty_primary": row.tier == TIER_PRIMARY and primarios.get(ws.id_hash, 0) <= 1,
+            "primary_count": primaries.get(ws.id_hash, 0),
+            "would_empty_primary": row.tier == TIER_PRIMARY and primaries.get(ws.id_hash, 0) <= 1,
         }
         for row, ws in pares
     ]
@@ -444,11 +444,11 @@ async def detach_executor(
                 WorkspaceExecutor.tier == TIER_FALLBACK,
             )
         )
-        ws_esvaziado = (await db.execute(
+        emptied_ws = (await db.execute(
             select(Workspace).where(Workspace.id_hash == d["workspace_id"])
         )).scalar_one_or_none()
-        if ws_esvaziado is not None:
-            _reset_terminal(ws_esvaziado)
+        if emptied_ws is not None:
+            _reset_terminal(emptied_ws)
     for d in deps:
         _audit(db, d["workspace_id"], actor_id, "workspace.executor_policy.member_detached",
                {"executor_id": executor_id, "tier": d["tier"], "reason": reason,
@@ -470,12 +470,12 @@ async def workspace_ids_for_executor(db: AsyncSession, executor_id: str) -> set[
             Workspace.deleted_at.is_(None),
         )
     )
-    niveis = await db.execute(
+    tiers = await db.execute(
         select(Workspace.id_hash)
         .join(WorkspaceExecutor, WorkspaceExecutor.workspace_id == Workspace.id_hash)
         .where(WorkspaceExecutor.executor_id == executor_id, Workspace.deleted_at.is_(None))
     )
-    return set(legado.scalars().all()) | set(niveis.scalars().all())
+    return set(legado.scalars().all()) | set(tiers.scalars().all())
 
 
 async def executor_ids_for_workspaces(db: AsyncSession, workspace_ids: list[str] | set[str]) -> set[str]:
@@ -488,10 +488,10 @@ async def executor_ids_for_workspaces(db: AsyncSession, workspace_ids: list[str]
             Workspace.id_hash.in_(ids), Workspace.target_executor_id.isnot(None),
         )
     )
-    niveis = await db.execute(
+    tiers = await db.execute(
         select(WorkspaceExecutor.executor_id).where(WorkspaceExecutor.workspace_id.in_(ids))
     )
-    return set(legado.scalars().all()) | set(niveis.scalars().all())
+    return set(legado.scalars().all()) | set(tiers.scalars().all())
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────

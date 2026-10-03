@@ -41,11 +41,11 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
   // the whole node list.
   const statusCanvas = useWorkflowExecutionStore(s => s.statusById.get(id))
   const workflowStatus = useWorkflowExecutionStore(s => s.statusWorkflow?.status)
-  const emRamoPerdedor = useWorkflowExecutionStore(s => !!s.losingNodeIds?.has(id))
+  const inLosingBranch = useWorkflowExecutionStore(s => !!s.losingNodeIds?.has(id))
   // Filled only when the node is being drawn inside the sub-workflow
   // viewer — see subflow-viewer/scope.
-  const noVisualizador = useSubflowReadOnly()
-  const somenteLeitura = useCanvasReadOnly()
+  const inViewer = useSubflowReadOnly()
+  const readOnly = useCanvasReadOnly()
   const subflowStatus = useSubflowStatus()
   const isNew = id === newlyAddedNodeId
 
@@ -75,18 +75,18 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
   const runDePe = workflowStatus === "queued" || workflowStatus === "running"
   const isPending = runDePe && (statusNode?.status ?? "idle") === "idle"
 
-  const abrirConfiguracao = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
+  const openConfiguration = useCallback((e: React.MouseEvent<HTMLDivElement, MouseEvent>) => {
     // In the sub-workflow viewer, double-click belongs to navigation (going down
     // one level), and the node isn't even editable from there. Opening the
     // configuration here would point the modal at an id that doesn't exist on
     // the editor canvas.
-    if (noVisualizador) return
+    if (inViewer) return
     if (configNodeIdParam === id)
       return removeConfigNodeParam()
     if (onDoubleClick)
       onDoubleClick(e)
     setConfigNodeParam(id)
-  }, [configNodeIdParam, id, removeConfigNodeParam, onDoubleClick, setConfigNodeParam, noVisualizador])
+  }, [configNodeIdParam, id, removeConfigNodeParam, onDoubleClick, setConfigNodeParam, inViewer])
 
   // On a phone the gesture is a SINGLE TAP. Double tap exists in the browser, but
   // it competes with the canvas zoom and is slow by nature (the browser waits for
@@ -94,9 +94,9 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
   // node toolbar, which on desktop also opens the configuration, depends on
   // hover and doesn't appear. React Flow tells a tap from a drag, so panning
   // with a finger over a node doesn't open the modal.
-  const gestoDeAbrir = somenteLeitura
-    ? { onClick: abrirConfiguracao }
-    : { onDoubleClick: abrirConfiguracao }
+  const openGesture = readOnly
+    ? { onClick: openConfiguration }
+    : { onDoubleClick: openConfiguration }
 
   const style = TYPE_STYLES[nodeType ?? ""] ?? DEFAULT_STYLE
 
@@ -104,12 +104,12 @@ const IconRoot = ({ id, children, className, nodeType, title, onDoubleClick, ...
   // the child's graph. Applying it inside the viewer would desaturate a
   // sub-workflow node just because its local id matches that of a losing branch
   // of the parent — losing branches in there stay unmarked.
-  const isLosing = !noVisualizador && emRamoPerdedor
+  const isLosing = !inViewer && inLosingBranch
 
   return (
     <div
       {...props}
-      {...gestoDeAbrir}
+      {...openGesture}
       data-status={statusNode?.status}
       data-losing={isLosing ? "true" : "false"}
       data-pending={isPending ? "true" : "false"}

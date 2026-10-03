@@ -56,14 +56,14 @@ def _iso(delta: timedelta) -> str:
 
 
 @pytest.fixture
-def sem_jwt(monkeypatch):
+def without_jwt(monkeypatch):
     """No Bearer is accepted as a JWT — forces the credential-token path."""
-    async def _nao(*_a, **_k):
+    async def _deny(*_a, **_k):
         return False
-    monkeypatch.setattr(ar, "_jwt_has_workspace_access", _nao)
+    monkeypatch.setattr(ar, "_jwt_has_workspace_access", _deny)
 
 
-def _credencial(monkeypatch, token="segredo", expires_at=None):
+def _stub_credential(monkeypatch, token="segredo", expires_at=None):
     async def _resolve(*_a, **_k):
         return token, expires_at
     monkeypatch.setattr(ar, "_resolve_bearer_credential", _resolve)
@@ -71,9 +71,9 @@ def _credencial(monkeypatch, token="segredo", expires_at=None):
 
 # ── EXPIRA ───────────────────────────────────────────────────────────────────
 
-async def test_token_expirado_recebe_403(monkeypatch, sem_jwt):
+async def test_expired_token_gets_403(monkeypatch, without_jwt):
     """The central regression: an expired token no longer downloads."""
-    _credencial(monkeypatch, expires_at=_iso(timedelta(hours=-1)))
+    _stub_credential(monkeypatch, expires_at=_iso(timedelta(hours=-1)))
 
     with pytest.raises(HTTPException) as exc:
         await ar._autorizar_download(_FakeArtifact(), _FakeRequest("Bearer segredo"), None)
@@ -82,47 +82,47 @@ async def test_token_expirado_recebe_403(monkeypatch, sem_jwt):
     assert "expirado" in exc.value.detail.lower()
 
 
-async def test_token_valido_dentro_da_validade_baixa(monkeypatch, sem_jwt):
-    _credencial(monkeypatch, expires_at=_iso(timedelta(hours=1)))
+async def test_valid_token_within_validity_downloads(monkeypatch, without_jwt):
+    _stub_credential(monkeypatch, expires_at=_iso(timedelta(hours=1)))
     await ar._autorizar_download(_FakeArtifact(), _FakeRequest("Bearer segredo"), None)
 
 
-async def test_expiracao_ingenua_e_tratada_como_utc(monkeypatch, sem_jwt):
+async def test_naive_expiration_is_treated_as_utc(monkeypatch, without_jwt):
     """An expires_at without a time zone must not become TypeError -> 500 in authorization."""
-    ingenuo = (datetime.now(tz=timezone.utc) - timedelta(hours=1)).replace(tzinfo=None).isoformat()
-    _credencial(monkeypatch, expires_at=ingenuo)
+    naive = (datetime.now(tz=timezone.utc) - timedelta(hours=1)).replace(tzinfo=None).isoformat()
+    _stub_credential(monkeypatch, expires_at=naive)
 
     with pytest.raises(HTTPException) as exc:
         await ar._autorizar_download(_FakeArtifact(), _FakeRequest("Bearer segredo"), None)
     assert exc.value.status_code == 403
 
 
-def test_formato_invalido_de_expires_at_e_500():
+def test_invalid_expires_at_format_is_500():
     """Same semantics as _validate_webhook_token: a broken format does not grant access."""
     with pytest.raises(HTTPException) as exc:
-        ar._recusar_se_token_expirado("nao-e-uma-data")
+        ar._reject_if_token_expired("nao-e-uma-data")
     assert exc.value.status_code == 500
 
 
 # ── NO FIELD ─────────────────────────────────────────────────────────────────
 
-async def test_credencial_sem_expires_at_continua_baixando(monkeypatch, sem_jwt):
-    _credencial(monkeypatch, expires_at=None)
+async def test_credential_without_expires_at_still_downloads(monkeypatch, without_jwt):
+    _stub_credential(monkeypatch, expires_at=None)
     await ar._autorizar_download(_FakeArtifact(), _FakeRequest("Bearer segredo"), None)
 
 
-def test_expires_at_vazio_nao_recusa():
-    ar._recusar_se_token_expirado(None)
-    ar._recusar_se_token_expirado("")
+def test_empty_expires_at_does_not_reject():
+    ar._reject_if_token_expired(None)
+    ar._reject_if_token_expired("")
 
 
 # ── ORDEM ────────────────────────────────────────────────────────────────────
 
-async def test_jwt_de_membro_tem_prioridade_e_nao_consulta_credencial(monkeypatch):
+async def test_member_jwt_takes_priority_and_does_not_query_credential(monkeypatch):
     """A valid JWT grants access without touching the credential — even if it is expired."""
-    async def _sim(*_a, **_k):
+    async def _allow(*_a, **_k):
         return True
-    monkeypatch.setattr(ar, "_jwt_has_workspace_access", _sim)
+    monkeypatch.setattr(ar, "_jwt_has_workspace_access", _allow)
 
     async def _explode(*_a, **_k):
         raise AssertionError("JWT valido nao pode consultar a credencial")
@@ -131,27 +131,27 @@ async def test_jwt_de_membro_tem_prioridade_e_nao_consulta_credencial(monkeypatc
     await ar._autorizar_download(_FakeArtifact(), _FakeRequest("Bearer jwt-valido"), None)
 
 
-async def test_artefato_sem_credencial_e_publico(monkeypatch):
+async def test_artifact_without_credential_is_public(monkeypatch):
     """Without a credential_id there is nothing to authorize — not even a header is required."""
     await ar._autorizar_download(_FakeArtifact(credential_id=None), _FakeRequest(), None)
 
 
-async def test_sem_header_authorization_e_401(sem_jwt):
+async def test_without_authorization_header_is_401(without_jwt):
     with pytest.raises(HTTPException) as exc:
         await ar._autorizar_download(_FakeArtifact(), _FakeRequest(), None)
     assert exc.value.status_code == 401
 
 
-async def test_token_diferente_e_401(monkeypatch, sem_jwt):
-    _credencial(monkeypatch, token="segredo")
+async def test_different_token_is_401(monkeypatch, without_jwt):
+    _stub_credential(monkeypatch, token="segredo")
     with pytest.raises(HTTPException) as exc:
         await ar._autorizar_download(_FakeArtifact(), _FakeRequest("Bearer errado"), None)
     assert exc.value.status_code == 401
 
 
-async def test_credencial_irresolvivel_e_401(monkeypatch, sem_jwt):
+async def test_unresolvable_credential_is_401(monkeypatch, without_jwt):
     """A missing/unreadable credential must not turn into granted access."""
-    _credencial(monkeypatch, token=None)
+    _stub_credential(monkeypatch, token=None)
     with pytest.raises(HTTPException) as exc:
         await ar._autorizar_download(_FakeArtifact(), _FakeRequest("Bearer qualquer"), None)
     assert exc.value.status_code == 401
@@ -159,7 +159,7 @@ async def test_credencial_irresolvivel_e_401(monkeypatch, sem_jwt):
 
 # ── UM SO LUGAR ──────────────────────────────────────────────────────────────
 
-def test_o_endpoint_usa_o_helper_unico():
+def test_the_endpoint_uses_the_single_helper():
     """Prevents the authorization block from being copied inline again."""
     fonte = inspect.getsource(ar.download_artifact)
     assert "_autorizar_download" in fonte, (

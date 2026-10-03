@@ -20,13 +20,13 @@ from app.services.workflow_execution_service import (
     _dispatch_job,
 )
 from app.services.workflow_service import WorkflowService, DispatchResult
-from flow.utils.credencial import obter_conexao
+from flow.utils.credencial import get_connection
 
-CRED_PAI = "cred-do-pai"
-CRED_FILHO = "cred-do-filho"
+CRED_PARENT = "cred-do-pai"
+CRED_CHILD = "cred-do-filho"
 
 
-def _def_pai(child_hash="child-1"):
+def _parent_def(child_hash="child-1"):
     return {
         "nodes": [
             {"id": "trigger-1", "name": "WebhookTrigger", "properties": {}},
@@ -37,12 +37,12 @@ def _def_pai(child_hash="child-1"):
     }
 
 
-def _def_filho():
+def _child_def():
     return {
         "nodes": [
             {"id": "in", "name": "SubWorkflowInput"},
             {"id": "db", "name": "DatabaseSpatialQuery",
-             "properties": {"credential_id": CRED_FILHO, "query": "SELECT 1"}},
+             "properties": {"credential_id": CRED_CHILD, "query": "SELECT 1"}},
             {"id": "out", "name": "SubWorkflowOutput"},
         ],
         "edges": [],
@@ -51,43 +51,43 @@ def _def_filho():
 
 # ── collecting the ids ──────────────────────────────────────────────────────
 
-class TestColetaDeIds:
+class TestIdCollection:
 
-    def test_junta_as_credenciais_do_pai_e_do_filho(self):
-        pai = _def_pai()
+    def test_merges_parent_and_child_credentials(self):
+        pai = _parent_def()
         pai["nodes"].append(
             {"id": "db-pai", "name": "DatabaseQuery",
-             "properties": {"credential_id": CRED_PAI}}
+             "properties": {"credential_id": CRED_PARENT}}
         )
-        ids = _collect_credential_ids(pai, _def_filho())
-        assert set(ids) == {CRED_PAI, CRED_FILHO}
+        ids = _collect_credential_ids(pai, _child_def())
+        assert set(ids) == {CRED_PARENT, CRED_CHILD}
 
-    def test_so_a_raiz_continua_funcionando(self):
+    def test_root_only_still_works(self):
         # The signature now accepts several definitions; the call with just one
         # is the one the rest of the code makes.
-        assert _collect_credential_ids(_def_filho()) == [CRED_FILHO]
+        assert _collect_credential_ids(_child_def()) == [CRED_CHILD]
 
-    def test_tolera_definition_vazia_ou_nula(self):
-        assert _collect_credential_ids({}, None, _def_filho()) == [CRED_FILHO]
+    def test_tolerates_empty_or_null_definition(self):
+        assert _collect_credential_ids({}, None, _child_def()) == [CRED_CHILD]
 
 
 # ── resolution at dispatch ──────────────────────────────────────────────────
 
-class TestResolucaoNoDispatch:
+class TestResolutionInDispatch:
 
     @pytest.mark.asyncio
-    async def test_a_credencial_do_filho_e_resolvida(self):
+    async def test_the_child_credential_is_resolved(self):
         """Without this, `pre_resolved` did not contain the child's credential and
         the injection had nothing to inject, even after it started walking the
         sub-workflows."""
         pai = MagicMock()
         pai.id_hash, pai.workspace_id, pai.flag_ative = "parent-A", "ws-test", True
         pai.pinned_outputs = pai.pin_metadata = None
-        pai.definition = _def_pai()
+        pai.definition = _parent_def()
 
         filho = MagicMock()
         filho.id_hash, filho.workspace_id, filho.flag_ative = "child-1", "ws-test", True
-        filho.definition = _def_filho()
+        filho.definition = _child_def()
 
         scalars = MagicMock()
         scalars.all = MagicMock(return_value=[filho])
@@ -102,7 +102,7 @@ class TestResolucaoNoDispatch:
         service._resolve_candidates = AsyncMock(return_value=[MagicMock()])
         service._dispatch_job = AsyncMock(return_value=DispatchResult(id="task-1"))
 
-        resolver = AsyncMock(return_value={CRED_FILHO: {"connectionString": "dsn://x"}})
+        resolver = AsyncMock(return_value={CRED_CHILD: {"connectionString": "dsn://x"}})
         with (
             patch("app.services.disabled_nodes_service.disabled_names",
                   new=AsyncMock(return_value=set())),
@@ -114,12 +114,12 @@ class TestResolucaoNoDispatch:
 
         resolver.assert_awaited()
         pedidos = resolver.await_args.args[0]
-        assert CRED_FILHO in pedidos, (
+        assert CRED_CHILD in pedidos, (
             f"a credencial do sub-fluxo não foi pedida ao resolver: {pedidos}"
         )
 
     @pytest.mark.asyncio
-    async def test_o_envelope_leva_o_dsn_dentro_do_subfluxo(self):
+    async def test_the_envelope_carries_the_dsn_inside_the_subworkflow(self):
         """What the executor actually receives: `connectionString` in the child's
         node, and `credential_id` removed."""
         wf = MagicMock()
@@ -137,7 +137,7 @@ class TestResolucaoNoDispatch:
         db.execute = AsyncMock(return_value=transicao)
         capturado: dict = {}
 
-        def _capturar(**kwargs):
+        def _capture(**kwargs):
             # The payload arrives already serialized: the dispatch does the json.dumps
             # only once, outside the candidates loop.
             import json as _json
@@ -151,16 +151,16 @@ class TestResolucaoNoDispatch:
 
         with (
             patch("app.services.workflow_execution_service.inject_credentials",
-                  new=AsyncMock(side_effect=_injetar_falso)),
+                  new=AsyncMock(side_effect=_fake_inject)),
             patch("app.services.workflow_execution_service.build_job_message",
-                  new=MagicMock(side_effect=_capturar)),
+                  new=MagicMock(side_effect=_capture)),
             patch("app.services.workflow_execution_service.executor_registry.send_job",
                   new=AsyncMock(return_value=True)),
         ):
             await _dispatch_job(
-                wf, _def_pai(), [agente], None, False, db=db,
-                pre_resolved={CRED_FILHO: {"connectionString": "dsn://filho"}},
-                subworkflow_definitions={"child-1": _def_filho()},
+                wf, _parent_def(), [agente], None, False, db=db,
+                pre_resolved={CRED_CHILD: {"connectionString": "dsn://filho"}},
+                subworkflow_definitions={"child-1": _child_def()},
             )
 
         no_db = capturado["subworkflow_definitions"]["child-1"]["nodes"][1]
@@ -173,7 +173,7 @@ class TestResolucaoNoDispatch:
         )
 
 
-async def _injetar_falso(definition, pre_resolved=None, **_):
+async def _fake_inject(definition, pre_resolved=None, **_):
     """Same contract as `inject_credentials`, without touching the database."""
     from app.services.credential_resolver import inject_credentials
     return await inject_credentials(definition, pre_resolved=pre_resolved or {})
@@ -181,27 +181,27 @@ async def _injetar_falso(definition, pre_resolved=None, **_):
 
 # ── the message the operator reads ──────────────────────────────────────────
 
-class TestMensagemDoNo:
+class TestNodeMessage:
 
-    def test_devolve_o_dsn_quando_resolvido(self):
-        assert obter_conexao({"connectionString": " dsn://x "}) == "dsn://x"
+    def test_returns_the_dsn_when_resolved(self):
+        assert get_connection({"connectionString": " dsn://x "}) == "dsn://x"
 
-    def test_credencial_escolhida_mas_nao_resolvida_culpa_o_servidor(self):
+    def test_credential_chosen_but_not_resolved_blames_the_server(self):
         # `credential_id` surviving is the trail: `inject_credentials` removes it
         # precisely when injecting the DSN.
         with pytest.raises(ValueError) as exc:
-            obter_conexao({"credential_id": CRED_FILHO})
+            get_connection({"credential_id": CRED_CHILD})
         msg = str(exc.value)
         assert "servidor não a resolveu" in msg
         assert "Escolha uma" not in msg, "manda configurar algo que já está configurado"
 
-    def test_sem_credencial_nenhuma_manda_configurar_o_no(self):
+    def test_without_any_credential_asks_to_configure_the_node(self):
         with pytest.raises(ValueError) as exc:
-            obter_conexao({})
+            get_connection({})
         msg = str(exc.value)
         assert "Nenhuma credencial" in msg and "Credencial" in msg
         assert "servidor" not in msg, "acusa o servidor de um erro de configuração"
 
-    def test_string_em_branco_conta_como_ausente(self):
+    def test_blank_string_counts_as_absent(self):
         with pytest.raises(ValueError, match="Nenhuma credencial"):
-            obter_conexao({"connectionString": "   ", "credential_id": "  "})
+            get_connection({"connectionString": "   ", "credential_id": "  "})

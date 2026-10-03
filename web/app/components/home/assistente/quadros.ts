@@ -12,7 +12,7 @@
 // The frame contract is in `docs/assistente/editor.md` §"The SSE frames".
 import type { CanvasDefinition } from "@/service/types"
 
-export interface QuadroSSE {
+export interface SSEFrame {
   evento: string
   dados: Record<string, unknown>
 }
@@ -30,7 +30,7 @@ export interface QuadroSSE {
  * DURING the turn, without querying `/estado`. The server only emits it when
  * there is Redis to count; a malformed frame counts as none.
  */
-export function cotaDoQuadro(quadro: QuadroSSE): { gasto: number; teto: number } | null {
+export function cotaDoQuadro(quadro: SSEFrame): { gasto: number; teto: number } | null {
   if (quadro.evento !== "cota") return null
   const { gasto, teto } = quadro.dados
   if (typeof gasto !== "number" || typeof teto !== "number") return null
@@ -41,7 +41,7 @@ export function cotaDoQuadro(quadro: QuadroSSE): { gasto: number; teto: number }
 export function criarDecodificador() {
   let resto = ""
 
-  return function alimentar(pedaco: string): QuadroSSE[] {
+  return function feed(pedaco: string): SSEFrame[] {
     // Normalize on the accumulated buffer, not on the chunk: a `\r\n` cut in the
     // middle (the `\r` in one chunk, the `\n` in the next) only becomes a line
     // ending after the two are joined.
@@ -50,11 +50,11 @@ export function criarDecodificador() {
     const partes = resto.split("\n\n")
     resto = partes.pop() ?? ""
 
-    return partes.map(decodificarUm).filter((q): q is QuadroSSE => q !== null)
+    return partes.map(decodificarUm).filter((q): q is SSEFrame => q !== null)
   }
 }
 
-function decodificarUm(bruto: string): QuadroSSE | null {
+function decodificarUm(bruto: string): SSEFrame | null {
   let evento = ""
   const dados: string[] = []
 
@@ -87,7 +87,7 @@ function decodificarUm(bruto: string): QuadroSSE | null {
 
 // ── A conversa ───────────────────────────────────────────────────────────────
 
-export interface ErroDoAssistente {
+export interface AssistantError {
   code: string
   message: string
   hint?: string
@@ -95,7 +95,7 @@ export interface ErroDoAssistente {
   teto?: number
 }
 
-export interface PropostaDeFluxo {
+export interface WorkflowProposal {
   definicao: CanvasDefinition
   nos: number
   arestas: number
@@ -126,13 +126,13 @@ export interface Progresso {
 // The editor never emits them; they are additive and the editor panel ignores them.
 
 /** A workflow the assistant created — the badge next to the chat opens `/workflow/{id}`. */
-export interface FluxoDoAssistente {
+export interface AssistantWorkflow {
   workflow_id: string
   nome: string
 }
 
 /** Pointer to an output on the globe; the source of truth is `GET /assistente/camadas/{id}`. */
-export interface CamadaDoAssistente {
+export interface AssistantLayer {
   artifact_id: string
   nome?: string
   format?: string
@@ -141,13 +141,13 @@ export interface CamadaDoAssistente {
 }
 
 /** An action that touches what already existed, waiting for the confirmation click. */
-export interface ConfirmacaoDoAssistente {
+export interface AssistantConfirmation {
   tool_use_id: string
   token: string
   acao: { tool: string; argumentos: Record<string, unknown>; alvo?: string }
 }
 
-export type BlocoDoAssistente =
+export type AssistantBlock =
   | { tipo: "texto"; texto: string }
   | { tipo: "pensando"; texto: string }
   | {
@@ -158,25 +158,25 @@ export type BlocoDoAssistente =
       estado: "correndo" | "ok" | "erro"
       progresso?: Progresso
     }
-  | { tipo: "proposta"; proposta: PropostaDeFluxo }
-  | { tipo: "fluxo"; fluxo: FluxoDoAssistente }
-  | { tipo: "camada"; camada: CamadaDoAssistente }
-  | { tipo: "confirmacao"; confirmacao: ConfirmacaoDoAssistente }
+  | { tipo: "proposta"; proposta: WorkflowProposal }
+  | { tipo: "fluxo"; fluxo: AssistantWorkflow }
+  | { tipo: "camada"; camada: AssistantLayer }
+  | { tipo: "confirmacao"; confirmacao: AssistantConfirmation }
   // Quick replies from the Home assistant: short continuations the person picks
   // with a click. They hold only for that one time — whoever draws them only
   // does so on the last turn, outside the stream.
   | { tipo: "respostas_rapidas"; opcoes: string[] }
-  | { tipo: "erro"; erro: ErroDoAssistente }
+  | { tipo: "erro"; erro: AssistantError }
 
-export interface TurnoDoAssistente {
+export interface AssistantTurn {
   id: string
   papel: "user" | "assistant"
   /** Only for `papel: "user"`. The model turn is a list of blocks. */
   texto?: string
-  blocos: BlocoDoAssistente[]
+  blocos: AssistantBlock[]
 }
 
-export const turnoVazio = (id: string): TurnoDoAssistente => ({
+export const emptyTurn = (id: string): AssistantTurn => ({
   id,
   papel: "assistant",
   blocos: [],
@@ -194,15 +194,15 @@ export const turnoVazio = (id: string): TurnoDoAssistente => ({
  * which is precisely the explanation that keeps someone from applying a workflow
  * without understanding it.
  */
-export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): TurnoDoAssistente {
+export function aplicarQuadro(turno: AssistantTurn, quadro: SSEFrame): AssistantTurn {
   const { evento, dados } = quadro
 
   switch (evento) {
     case "texto":
-      return { ...turno, blocos: acumular(turno.blocos, "texto", texto(dados.texto)) }
+      return { ...turno, blocos: accumulate(turno.blocos, "texto", texto(dados.texto)) }
 
     case "pensando":
-      return { ...turno, blocos: acumular(turno.blocos, "pensando", texto(dados.texto)) }
+      return { ...turno, blocos: accumulate(turno.blocos, "pensando", texto(dados.texto)) }
 
     case "ferramenta":
       return {
@@ -227,7 +227,7 @@ export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): Turn
       const dono = dados.id == null ? null : String(dados.id)
       return {
         ...turno,
-        blocos: mapearFerramenta(
+        blocos: mapTool(
           turno.blocos,
           b => (dono !== null ? b.id === dono : b.estado === "correndo"),
           b => ({
@@ -245,7 +245,7 @@ export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): Turn
     case "ferramenta_fim":
       return {
         ...turno,
-        blocos: mapearFerramenta(
+        blocos: mapTool(
           turno.blocos,
           b => b.id === String(dados.id ?? ""),
           b => ({ ...b, estado: dados.erro ? "erro" : "ok" }),
@@ -308,7 +308,7 @@ export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): Turn
         ...turno,
         blocos: [
           ...turno.blocos,
-          { tipo: "confirmacao", confirmacao: confirmacaoDe(dados) },
+          { tipo: "confirmacao", confirmacao: confirmationFrom(dados) },
         ],
       }
 
@@ -357,11 +357,11 @@ export function aplicarQuadro(turno: TurnoDoAssistente, quadro: QuadroSSE): Turn
 }
 
 /** Text that arrives in chunks becomes ONE block, not one block per delta. */
-function acumular(
-  blocos: BlocoDoAssistente[],
+function accumulate(
+  blocos: AssistantBlock[],
   tipo: "texto" | "pensando",
   novo: string,
-): BlocoDoAssistente[] {
+): AssistantBlock[] {
   if (!novo) return blocos
 
   const ultimo = blocos[blocos.length - 1]
@@ -372,11 +372,11 @@ function acumular(
 }
 
 /** Applies `mudar` to the LAST tool that matches `casa`. */
-function mapearFerramenta(
-  blocos: BlocoDoAssistente[],
-  casa: (b: Extract<BlocoDoAssistente, { tipo: "ferramenta" }>) => boolean,
-  mudar: (b: Extract<BlocoDoAssistente, { tipo: "ferramenta" }>) => BlocoDoAssistente,
-): BlocoDoAssistente[] {
+function mapTool(
+  blocos: AssistantBlock[],
+  casa: (b: Extract<AssistantBlock, { tipo: "ferramenta" }>) => boolean,
+  mudar: (b: Extract<AssistantBlock, { tipo: "ferramenta" }>) => AssistantBlock,
+): AssistantBlock[] {
   for (let i = blocos.length - 1; i >= 0; i--) {
     const bloco = blocos[i]
     if (bloco.tipo === "ferramenta" && casa(bloco)) {
@@ -406,7 +406,7 @@ const textos = (v: unknown, teto = 3): string[] => {
 }
 
 /** Extracts the confirmation from the frame: token and the action (tool + summarized args + target). */
-function confirmacaoDe(dados: Record<string, unknown>): ConfirmacaoDoAssistente {
+function confirmationFrom(dados: Record<string, unknown>): AssistantConfirmation {
   const acao = objeto(dados.acao)
   return {
     tool_use_id: String(dados.tool_use_id ?? ""),

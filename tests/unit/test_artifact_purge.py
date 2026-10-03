@@ -26,7 +26,7 @@ def artefatos(tmp_path, monkeypatch):
     return raiz
 
 
-def _criar(raiz: Path, rel: str, conteudo: bytes = b"x") -> Path:
+def _create(raiz: Path, rel: str, conteudo: bytes = b"x") -> Path:
     alvo = raiz / rel
     alvo.parent.mkdir(parents=True, exist_ok=True)
     alvo.write_bytes(conteudo)
@@ -35,8 +35,8 @@ def _criar(raiz: Path, rel: str, conteudo: bytes = b"x") -> Path:
 
 # ── Caminho feliz ────────────────────────────────────────────────────────────
 
-def test_remove_o_arquivo_pedido(artefatos):
-    alvo = _criar(artefatos, "ws-1/run-1/saida.geojson")
+def test_removes_the_requested_file(artefatos):
+    alvo = _create(artefatos, "ws-1/run-1/saida.geojson")
 
     n = artifact_purge.purgar([{"id_hash": "a1", "local_path": "ws-1/run-1/saida.geojson"}])
 
@@ -44,9 +44,9 @@ def test_remove_o_arquivo_pedido(artefatos):
     assert not alvo.exists()
 
 
-def test_remove_varios_de_uma_vez(artefatos):
-    _criar(artefatos, "ws-1/run-1/a.json")
-    _criar(artefatos, "ws-1/run-2/b.json")
+def test_removes_several_at_once(artefatos):
+    _create(artefatos, "ws-1/run-1/a.json")
+    _create(artefatos, "ws-1/run-2/b.json")
 
     n = artifact_purge.purgar([
         {"id_hash": "a", "local_path": "ws-1/run-1/a.json"},
@@ -55,9 +55,9 @@ def test_remove_varios_de_uma_vez(artefatos):
     assert n == 2
 
 
-def test_diretorios_vazios_sao_removidos(artefatos):
+def test_empty_directories_are_removed(artefatos):
     """Without this, `artifacts/` accumulates an empty tree per run, forever."""
-    _criar(artefatos, "ws-1/run-1/a.json")
+    _create(artefatos, "ws-1/run-1/a.json")
     artifact_purge.purgar([{"id_hash": "a", "local_path": "ws-1/run-1/a.json"}])
 
     assert not (artefatos / "ws-1" / "run-1").exists()
@@ -65,15 +65,15 @@ def test_diretorios_vazios_sao_removidos(artefatos):
     assert artefatos.exists(), "a raiz de artefatos nunca pode ser removida"
 
 
-def test_diretorio_com_outros_arquivos_e_preservado(artefatos):
-    _criar(artefatos, "ws-1/run-1/a.json")
-    _criar(artefatos, "ws-1/run-1/b.json")
+def test_directory_with_other_files_is_preserved(artefatos):
+    _create(artefatos, "ws-1/run-1/a.json")
+    _create(artefatos, "ws-1/run-1/b.json")
 
     artifact_purge.purgar([{"id_hash": "a", "local_path": "ws-1/run-1/a.json"}])
     assert (artefatos / "ws-1" / "run-1" / "b.json").is_file()
 
 
-def test_arquivo_ja_ausente_nao_e_erro(artefatos):
+def test_already_missing_file_is_not_an_error(artefatos):
     """Repeated order, or a file deleted by hand: there is nothing to fix."""
     assert artifact_purge.purgar([{"id_hash": "a", "local_path": "ws-1/run-1/sumiu.json"}]) == 0
 
@@ -89,7 +89,7 @@ def test_arquivo_ja_ausente_nao_e_erro(artefatos):
     "C:\\Windows\\System32\\drivers\\etc\\hosts",
     "/absoluto/qualquer",
 ])
-def test_caminho_que_escapa_da_raiz_e_recusado(artefatos, tmp_path, malicioso):
+def test_path_escaping_the_root_is_rejected(artefatos, tmp_path, malicioso):
     vitima = tmp_path / "fora.txt"
     vitima.write_bytes(b"nao me apague")
 
@@ -99,9 +99,9 @@ def test_caminho_que_escapa_da_raiz_e_recusado(artefatos, tmp_path, malicioso):
     assert vitima.read_bytes() == b"nao me apague"
 
 
-def test_caminho_recusado_nao_impede_os_demais(artefatos):
+def test_rejected_path_does_not_block_the_others(artefatos):
     """One hostile entry in the batch must not abort the legitimate cleanup."""
-    ok = _criar(artefatos, "ws-1/run-1/ok.json")
+    ok = _create(artefatos, "ws-1/run-1/ok.json")
 
     n = artifact_purge.purgar([
         {"id_hash": "mau", "local_path": "../../fora.txt"},
@@ -111,7 +111,7 @@ def test_caminho_recusado_nao_impede_os_demais(artefatos):
     assert not ok.exists()
 
 
-def test_symlink_apontando_para_fora_nao_apaga_o_alvo(artefatos, tmp_path):
+def test_symlink_pointing_outside_does_not_delete_the_target(artefatos, tmp_path):
     """The textual check doesn't catch symlinks — what catches them is `resolve()`."""
     vitima = tmp_path / "segredo.txt"
     vitima.write_bytes(b"dado")
@@ -130,10 +130,10 @@ def test_symlink_apontando_para_fora_nao_apaga_o_alvo(artefatos, tmp_path):
 # ── Entrada malformada ───────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("entrada", [None, "texto", 42, {"a": 1}])
-def test_payload_nao_lista_nao_derruba(artefatos, entrada):
+def test_non_list_payload_does_not_crash(artefatos, entrada):
     assert artifact_purge.purgar(entrada) == 0
 
 
 @pytest.mark.parametrize("item", [None, "texto", 42, {}, {"id_hash": "a"}, {"local_path": ""}])
-def test_item_malformado_e_ignorado(artefatos, item):
+def test_malformed_item_is_ignored(artefatos, item):
     assert artifact_purge.purgar([item]) == 0

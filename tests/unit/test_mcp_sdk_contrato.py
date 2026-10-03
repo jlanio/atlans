@@ -40,7 +40,7 @@ _INITIALIZE = {
 }
 
 
-def _servidor():
+def _server():
     server = MCPServer("teste")
 
     @server.tool()
@@ -62,7 +62,7 @@ def _servidor():
     return server, app
 
 
-def test_identificadores_da_spec_existem():
+def test_spec_identifiers_exist():
     assert inspect.isclass(Context)
     assert issubclass(ToolError, Exception)
     assert callable(getattr(MCPServer, "tool"))
@@ -73,8 +73,8 @@ def test_identificadores_da_spec_existem():
 
 
 @pytest.mark.asyncio
-async def test_transporte_recusa_host_e_origin_fora_da_lista_e_responde_initialize():
-    server, app = _servidor()
+async def test_transport_refuses_host_and_origin_outside_the_list_and_answers_initialize():
+    server, app = _server()
     async with server.session_manager.run():
         transporte = httpx.ASGITransport(app=app)
         async with httpx.AsyncClient(transport=transporte, base_url="http://atlans.example.org") as c:

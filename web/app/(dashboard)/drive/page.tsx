@@ -19,16 +19,16 @@ import { TbDotsVertical, TbDownload, TbFileInfo, TbTrash } from "react-icons/tb"
 import { createToast } from "@/utils/createToast"
 import { formatLocal } from "@/lib/dayjs"
 import { formatBytes } from "@/utils/formatters"
-import { formatarInteiro, formatarQuando, plural } from "@/lib/formatos"
-import { CabecalhoDoDrive } from "@/app/components/drive/cabecalho"
+import { formatInteger, formatarQuando, plural } from "@/lib/formatos"
+import { DriveHeader } from "@/app/components/drive/cabecalho"
 import { ErroDeCarga, SemResultado, SkeletonDoDrive, VazioPrimeiroUso } from "@/app/components/drive/estados"
 import { ExtBadge, ExtIcon } from "@/app/components/drive/ext"
-import { FiltrosDoDrive } from "@/app/components/drive/filtros"
-import { MetadataDialog, foiReescrito, lastWrite } from "@/app/components/drive/dialogs"
-import { RodapeDePaginacao } from "@/app/components/drive/paginacao"
+import { DriveFilters } from "@/app/components/drive/filtros"
+import { MetadataDialog, wasRewritten, lastWrite } from "@/app/components/drive/dialogs"
+import { PaginationFooter } from "@/app/components/drive/paginacao"
 import { UploadZone, type UploadZoneHandle } from "@/app/components/drive/upload-zone"
 import {
-  ResultadoDoUpload, classifyUploadError, type UploadError,
+  UploadResult, classifyUploadError, type UploadError,
 } from "@/app/components/drive/resultado-upload"
 
 // The file type lives in service/types.ts (IDriveFile) because the canvas's
@@ -52,7 +52,7 @@ function gradeDoDrive(podeEditar: boolean) {
     : "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[1fr_100px_120px_140px_48px]"
 }
 /** First content column — after the selection checkbox, when there is one. */
-const colunaDoNome = (podeEditar: boolean) => (podeEditar ? "col-start-2" : "col-start-1")
+const nameColumn = (podeEditar: boolean) => (podeEditar ? "col-start-2" : "col-start-1")
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ export default function DrivePage() {
   const [uploadErrors, setUploadErrors] = useState<UploadError[]>([])
   const [uploadSuccess, setUploadSuccess] = useState(0)
 
-  const [metaFile, setMetaFile] = useState<DriveFile | null>(null)
+  const [metadataFile, setMetadataFile] = useState<DriveFile | null>(null)
   const [deleteFile, setDeleteFile] = useState<DriveFile | null>(null)
 
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -150,8 +150,8 @@ export default function DrivePage() {
 
   /** Every filter change goes back to the first page — otherwise searching for
    *  a term with 3 results while on page 4 returns an empty screen. */
-  function aplicarBusca(valor: string) { setSearch(valor); setPage(1) }
-  function aplicarExtensao(ext: string) { setExtFilter(ext); setPage(1) }
+  function applySearch(valor: string) { setSearch(valor); setPage(1) }
+  function applyExtension(ext: string) { setExtFilter(ext); setPage(1) }
   function limparFiltros() { setSearch(""); setExtFilter(""); setPage(1) }
 
   // ── Upload ───────────────────────────────────────────────────────────────
@@ -241,12 +241,12 @@ export default function DrivePage() {
    *  other pages — the "Excluir N" button counts the whole Set, not the page. */
   function toggleAll() {
     if (!data?.items) return
-    const idsDaPagina = data.items.map(f => f.id_hash)
-    const todosMarcados = idsDaPagina.every(id => selected.has(id))
+    const pageIds = data.items.map(f => f.id_hash)
+    const allChecked = pageIds.every(id => selected.has(id))
     setSelected(prev => {
       const next = new Set(prev)
-      for (const id of idsDaPagina) {
-        if (todosMarcados) next.delete(id)
+      for (const id of pageIds) {
+        if (allChecked) next.delete(id)
         else next.add(id)
       }
       return next
@@ -268,8 +268,8 @@ export default function DrivePage() {
       const pulados = res?.no_executor ?? 0
       createToast.success(
         pulados > 0
-          ? `${formatarInteiro(res.deleted)} arquivo(s) excluído(s). ${formatarInteiro(pulados)} mantido(s): o conteúdo está no executor.`
-          : `${formatarInteiro(res.deleted)} arquivo(s) excluído(s).`,
+          ? `${formatInteger(res.deleted)} arquivo(s) excluído(s). ${formatInteger(pulados)} mantido(s): o conteúdo está no executor.`
+          : `${formatInteger(res.deleted)} arquivo(s) excluído(s).`,
       )
       setSelected(new Set())
       setBatchDelOpen(false)
@@ -280,26 +280,26 @@ export default function DrivePage() {
   }
 
   // ── Estados (contrato §3) ──────────────────────────────────────────────────
-  const temFiltro = search !== "" || extFilter !== ""
+  const hasFilter = search !== "" || extFilter !== ""
   // The error takes over the screen only when there is no data for the CURRENT
   // workspace to show (`data === null`): a 1st load that fails, or a reload that
   // fails right after switching workspace — then the hook's `resposta` is stale
   // (from the previous workspace) and the `data` guard nulls it. A reload that
   // fails with the current workspace's list on screen (`data` non-null) keeps it
   // + a toast (contract §3.2).
-  const mostrarErro = !!error && data === null
+  const showError = !!error && data === null
   // The Skeleton covers any state without current-workspace data that is not an
   // error — including the 1st load of the new scope after switching workspace.
   // With that, the list branch is only reached with non-null `data` (no null
   // dereference when a post-switch refresh fails).
-  const mostrarSkeleton = !mostrarErro && (firstLoad || data === null)
+  const showSkeleton = !showError && (firstLoad || data === null)
   const vazio = !!data && data.items.length === 0
-  const mostrarFiltros = !mostrarSkeleton && !mostrarErro && (mostrados > 0 || temFiltro)
+  const showFilters = !showSkeleton && !showError && (mostrados > 0 || hasFilter)
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
     <PageRoot>
-      <CabecalhoDoDrive
+      <DriveHeader
         total={data ? total : null}
         mostrados={mostrados}
         atualizando={loading}
@@ -314,7 +314,7 @@ export default function DrivePage() {
 
       {/* Result of the last upload. */}
       {(uploadErrors.length > 0 || uploadSuccess > 0) && (
-        <ResultadoDoUpload
+        <UploadResult
           sucessos={uploadSuccess}
           erros={uploadErrors}
           onFechar={() => { setUploadErrors([]); setUploadSuccess(0) }}
@@ -322,23 +322,23 @@ export default function DrivePage() {
       )}
 
       {/* Filtros. */}
-      {mostrarFiltros && (
-        <FiltrosDoDrive
+      {showFilters && (
+        <DriveFilters
           busca={search}
-          onBusca={aplicarBusca}
+          onBusca={applySearch}
           ext={extFilter}
-          onExt={aplicarExtensao}
+          onExt={applyExtension}
           extensoes={extensions}
         />
       )}
 
       {/* List and its states. */}
-      {mostrarSkeleton ? (
+      {showSkeleton ? (
         <SkeletonDoDrive />
-      ) : mostrarErro ? (
+      ) : showError ? (
         <ErroDeCarga mensagem={error!} onTentar={refetch} />
       ) : vazio ? (
-        temFiltro ? (
+        hasFilter ? (
           <SemResultado busca={search} ext={extFilter} onLimpar={limparFiltros} />
         ) : (
           <VazioPrimeiroUso canEdit={podeEditar} onEnviar={() => uploadZoneRef.current?.abrirSeletor()} />
@@ -398,7 +398,7 @@ export default function DrivePage() {
                 />
               )}
               {/* Nome. */}
-              <div className={`flex min-w-0 items-center gap-2 row-start-1 lg:col-auto lg:row-auto ${colunaDoNome(podeEditar)}`}>
+              <div className={`flex min-w-0 items-center gap-2 row-start-1 lg:col-auto lg:row-auto ${nameColumn(podeEditar)}`}>
                 <span className="shrink-0 text-muted-foreground">
                   <ExtIcon ext={file.extension} />
                 </span>
@@ -409,7 +409,7 @@ export default function DrivePage() {
               {/* Type, size and date: a single strip below the name when
                   stacked; `lg:contents` returns the three cells to the grid
                   when the columns come back, with no duplicated markup. */}
-              <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 row-start-2 col-end-[-1] lg:contents ${colunaDoNome(podeEditar)}`}>
+              <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 row-start-2 col-end-[-1] lg:contents ${nameColumn(podeEditar)}`}>
                 <div><ExtBadge ext={file.extension} /></div>
                 <span className="font-mono text-xs text-muted-foreground tabular-nums">
                   {formatBytes(file.size)}
@@ -418,7 +418,7 @@ export default function DrivePage() {
                 <span
                   className="text-xs text-muted-foreground tabular-nums"
                   title={
-                    foiReescrito(file)
+                    wasRewritten(file)
                       ? `Atualizado em ${formatLocal(lastWrite(file))} · enviado em ${formatLocal(file.created_at)}`
                       : formatLocal(lastWrite(file))
                   }
@@ -440,7 +440,7 @@ export default function DrivePage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setMetaFile(file)}>
+                  <DropdownMenuItem onClick={() => setMetadataFile(file)}>
                     <TbFileInfo size={13} className="mr-2" /> Metadados
                   </DropdownMenuItem>
                   <DropdownMenuItem
@@ -484,8 +484,8 @@ export default function DrivePage() {
       {/* Pagination footer — `page > 1` in the condition on purpose: if the list
           shrinks to fit on a single page, the footer is the ONLY way out of a
           page that no longer exists. */}
-      {!mostrarSkeleton && !mostrarErro && (total > PAGE_SIZE || page > 1) && (
-        <RodapeDePaginacao
+      {!showSkeleton && !showError && (total > PAGE_SIZE || page > 1) && (
+        <PaginationFooter
           page={page}
           totalPages={totalPages}
           total={total}
@@ -498,7 +498,7 @@ export default function DrivePage() {
       )}
 
       {/* Dialogs. */}
-      <MetadataDialog file={metaFile} open={!!metaFile} onClose={() => setMetaFile(null)} />
+      <MetadataDialog file={metadataFile} open={!!metadataFile} onClose={() => setMetadataFile(null)} />
 
       <Dialog open={!!deleteFile} onOpenChange={v => !v && setDeleteFile(null)}>
         {deleteFile && (
@@ -517,7 +517,7 @@ export default function DrivePage() {
           title={`Excluir ${plural(selected.size, "arquivo")}`}
           description="Esta ação não pode ser desfeita. Os arquivos selecionados serão removidos permanentemente do Drive."
           note="Arquivos cujo conteúdo está no executor são mantidos — os bytes não estão na plataforma."
-          confirmLabel={`Excluir ${formatarInteiro(selected.size)}`}
+          confirmLabel={`Excluir ${formatInteger(selected.size)}`}
           loadingLabel="Excluindo…"
           onConfirm={handleBatchDelete}
         />

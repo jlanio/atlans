@@ -12,7 +12,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
 import type { IExecutor, IExecutorMetrics } from "@/service/GisFlowService"
 import type { IExecutorUserAssignment } from "@/service/types"
-import { estiloDoTipo } from "@/consts/ExecutorTypeStyles"
+import { typeStyle } from "@/consts/ExecutorTypeStyles"
 import { cn } from "@/lib/utils"
 import { fromBackend } from "@/lib/dayjs"
 import { Button } from "@/app/components/ui/button"
@@ -32,7 +32,7 @@ import {
   TbCpu, TbDeviceDesktop, TbDatabase, TbChevronDown, TbChevronRight,
   TbShieldLock,
 } from "react-icons/tb"
-import { formatarPercentual, formatarDuracao, formatarQuando, plural } from "@/lib/formatos"
+import { formatPercent, formatarDuracao, formatarQuando, plural } from "@/lib/formatos"
 import { successRateColor } from "@/utils/formatters"
 import { EnrollmentOtpDialog } from "./enroll"
 import { EditAgentDialog, RevokeAgentDialog, DeleteAgentDialog } from "./dialogs"
@@ -43,7 +43,7 @@ import { EditAgentDialog, RevokeAgentDialog, DeleteAgentDialog } from "./dialogs
 // which translates RUN statuses (success/failed/running…): the vocabularies
 // don't overlap — an executor's "pending" is "aguardando enrollment", not "na
 // fila" — so the executor's translation lives here, in its own domain.
-const ROTULO_STATUS_EXECUTOR: Record<IExecutor["status"], string> = {
+const EXECUTOR_STATUS_LABEL: Record<IExecutor["status"], string> = {
   active:   "Ativo",
   pending:  "Pendente",
   inactive: "Inativo",
@@ -51,7 +51,7 @@ const ROTULO_STATUS_EXECUTOR: Record<IExecutor["status"], string> = {
 }
 
 /** Uptime in seconds, to format in long form via `formatarDuracao`. */
-function uptimeEmSegundos(connectedAt: string | null): number | null {
+function uptimeInSeconds(connectedAt: string | null): number | null {
   if (!connectedAt) return null
   const start = fromBackend(connectedAt)?.valueOf()
   if (!start) return null
@@ -73,23 +73,23 @@ function uptimeEmSegundos(connectedAt: string | null): number | null {
 //   < md   phone — two lines per executor, no columns (see ExecutorRow)
 //   md     lean rail — type and version go away; the name is what tells rows apart
 //   lg     full rail
-const TRILHO_COLUNAS = cn(
+const RAIL_COLUMNS = cn(
   "grid-cols-[1.25rem_minmax(0,1fr)_auto]",
   "md:grid-cols-[1.25rem_minmax(0,1fr)_6rem_5rem_2rem]",
   "lg:grid-cols-[1.25rem_minmax(0,1fr)_6rem_4.5rem_5rem_2rem]",
 )
 /** Type column — only in the full rail. In the `md` band the group header already
  *  names the type, and repeating it per row cost 120px the name was missing. */
-const TRILHO_COLUNAS_TIPO = "lg:grid-cols-[1.25rem_minmax(0,1fr)_7.5rem_6rem_4.5rem_5rem_2rem]"
+const RAIL_COLUMNS_WITH_TYPE = "lg:grid-cols-[1.25rem_minmax(0,1fr)_7.5rem_6rem_4.5rem_5rem_2rem]"
 
 /** Column header of the rail. */
-export function CabecalhoDoTrilho({ mostrarTipo }: { mostrarTipo: boolean }) {
+export function RailHeader({ mostrarTipo }: { mostrarTipo: boolean }) {
   return (
     // `hidden md:grid`: on phones the row has no columns, and a column header
     // over a stack would label what doesn't exist.
     // font-mono here is intentional — uppercase column labels give the rail its
     // "terminal" tone; they are not numbers (see contract §5 on tabular-nums).
-    <div className={cn("hidden md:grid gap-3", TRILHO_COLUNAS, mostrarTipo && TRILHO_COLUNAS_TIPO,
+    <div className={cn("hidden md:grid gap-3", RAIL_COLUMNS, mostrarTipo && RAIL_COLUMNS_WITH_TYPE,
       "items-center px-3 py-1.5 bg-muted/50 border-b border-border",
       "font-mono text-[10px] uppercase tracking-wider text-muted-foreground select-none")}>
       <span />
@@ -109,7 +109,7 @@ export function CabecalhoDoTrilho({ mostrarTipo }: { mostrarTipo: boolean }) {
  *  color, text badge and the sentence "Conectado há…". And the four could
  *  disagree — `status: "active"` with `online: false` gave an amber strip, a
  *  gray icon and a green "Ativo" badge at the same time. */
-export function EstadoDoExecutor({ status, online, className }: {
+export function ExecutorState({ status, online, className }: {
   status: IExecutor["status"]; online: boolean; className?: string
 }) {
   const { classe, titulo } =
@@ -130,7 +130,7 @@ export function EstadoDoExecutor({ status, online, className }: {
  *  `running` and `max_concurrent` are DISCRETE counts. `LoadBar` drew a
  *  continuous bar, and there 4/4 and 4/4-with-six-queued became the same full
  *  bar. The queue cells sit BEYOND the limit, showing the excess. */
-export function MedidorDeSlots({ running, queued, maxConcurrent, online }: {
+export function SlotsMeter({ running, queued, maxConcurrent, online }: {
   running: number; queued: number; maxConcurrent: number; online: boolean
 }) {
   if (!online) return <span className="hidden md:inline text-[11px] tabular-nums text-muted-foreground">—</span>
@@ -214,10 +214,10 @@ export function ExecutorHistoricMetrics({ metrics }: { metrics: IExecutorMetrics
         <span className="font-medium tabular-nums text-foreground">{metrics.total_runs}</span> execuções
       </span>
       <span>
-        {/* Percentage in pt-BR: "96,4%" with a comma (formatarPercentual), not
+        {/* Percentage in pt-BR: "96,4%" with a comma (formatPercent), not
             "96.4%" with a period. The color follows the unified successRate rule. */}
         <span className={cn("font-medium tabular-nums", successRateColor(metrics.success_rate, "amber"))}>
-          {formatarPercentual(metrics.success_rate)}
+          {formatPercent(metrics.success_rate)}
         </span> sucesso
       </span>
       {metrics.avg_duration_seconds != null && (
@@ -406,11 +406,11 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
   // each executor take ~200px of height, and they are precisely what isn't
   // compared between machines — out of the scan, back on demand.
   const [aberto, setAberto] = useState(false)
-  const estiloTipo = estiloDoTipo(executor.executor_type)
-  const IconeTipo = estiloTipo.icone
+  const executorTypeStyle = typeStyle(executor.executor_type)
+  const TypeIcon = executorTypeStyle.icone
   const isOnline = executor.online
   const cap = executor.capacity
-  const uptimeSecs = uptimeEmSegundos(executor.connected_at)
+  const uptimeSecs = uptimeInSeconds(executor.connected_at)
   // Owner = created the executor (created_by). Can generate an OTP and revoke/remove their own executor,
   // but has no admin-only actions (edit, default pool).
   const isOwner = !isAdmin && !!currentUserId && executor.created_by === currentUserId
@@ -439,17 +439,17 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
   return (
     <div className="border-b border-border/60 last:border-b-0">
       {/* Compact row — the grid is the SAME as the column header's (see
-          CabecalhoDoTrilho), and that is what makes every executor's memory
+          RailHeader), and that is what makes every executor's memory
           land on the same x. */}
       <div
         onClick={() => setAberto(v => !v)}
-        className={cn("grid gap-x-3 gap-y-1.5 md:gap-3", TRILHO_COLUNAS, mostrarTipo && TRILHO_COLUNAS_TIPO,
+        className={cn("grid gap-x-3 gap-y-1.5 md:gap-3", RAIL_COLUMNS, mostrarTipo && RAIL_COLUMNS_WITH_TYPE,
           "items-center px-3 py-2 min-h-[2.75rem] cursor-pointer transition-colors hover:bg-accent/50")}
       >
         {/* Status — a single LED, instead of strip + icon + badge saying the
             same thing. On phones the three cells of the first line are positioned
             by hand — status, name and actions — and the rest drops to the second. */}
-        <EstadoDoExecutor
+        <ExecutorState
           status={executor.status}
           online={isOnline}
           className="col-start-1 row-start-1 md:col-auto md:row-auto"
@@ -486,7 +486,7 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
           </div>
           <span className="block font-mono text-[10px] text-muted-foreground truncate">
             {executor.status !== "active" && (
-              <span className="font-sans font-medium text-foreground/80">{ROTULO_STATUS_EXECUTOR[executor.status]} · </span>
+              <span className="font-sans font-medium text-foreground/80">{EXECUTOR_STATUS_LABEL[executor.status]} · </span>
             )}
             {executor.system_info?.hostname ?? executor.description ?? "—"}
             {executor.system_info?.cpu_cores != null && ` · ${executor.system_info.cpu_cores}c`}
@@ -503,17 +503,17 @@ export const ExecutorRow = React.memo(function ExecutorRow({ executor, metrics, 
           {mostrarTipo && (
             <span className={cn(
               "inline-flex items-center gap-1 w-fit text-[10px] font-medium px-1.5 py-0.5 rounded",
-              // hidden in the `md` band along with the column (see TRILHO_COLUNAS_TIPO);
+              // hidden in the `md` band along with the column (see RAIL_COLUMNS_WITH_TYPE);
               // on phones it stays visible, since there is spare width on the 2nd line.
               "md:hidden lg:inline-flex",
-              estiloTipo.fundo, estiloTipo.texto,
+              executorTypeStyle.fundo, executorTypeStyle.texto,
             )}>
-              <IconeTipo size={11} aria-hidden="true" /> {estiloTipo.nome}
+              <TypeIcon size={11} aria-hidden="true" /> {executorTypeStyle.nome}
             </span>
           )}
 
           {/* Slots — one cell per slot. */}
-          <MedidorDeSlots
+          <SlotsMeter
             running={cap?.running ?? 0}
             queued={cap?.queued ?? 0}
             maxConcurrent={cap?.max_concurrent ?? executor.max_concurrent_jobs}

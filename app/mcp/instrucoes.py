@@ -9,7 +9,7 @@ workflow by mistake. Short on purpose: a list of actionable rules, no tutorial
 """
 from __future__ import annotations
 
-INSTRUCOES = """\
+INSTRUCTIONS = """\
 Servidor do Atlans: ler, construir e executar fluxos de automação geoespacial.
 
 Regras de trabalho

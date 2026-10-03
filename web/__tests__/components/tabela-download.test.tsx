@@ -33,7 +33,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn())
 })
 
-function renderTabela(it: IArtifactItem) {
+function renderTable(it: IArtifactItem) {
   return render(
     <ArtifactTable
       items={[it]}
@@ -52,7 +52,7 @@ describe("download de artefato — navega para a URL pré-assinada, sem blob", (
       error: null,
       data: { download_url: "https://s3/presigned?sig=x", filename: "focos.geojson" },
     })
-    renderTabela(item())
+    renderTable(item())
 
     fireEvent.click(screen.getByRole("button", { name: /Download/ }))
 

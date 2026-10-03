@@ -37,11 +37,11 @@ describe("NomeDeArquivo — a elipse cai no MEIO", () => {
     // A LONE surrogate — a high one without the low, or a low one without the high. A whole
     // emoji is a surrogate pair, so matching the entire class would flag the
     // legitimate ones too.
-    const SOLTO = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
+    const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/
     const { container } = render(<NomeDeArquivo nome={nome} />)
     expect(container.textContent).toBe(nome)
     for (const pedaco of Array.from(container.firstElementChild!.children)) {
-      expect(pedaco.textContent, pedaco.textContent ?? "").not.toMatch(SOLTO)
+      expect(pedaco.textContent, pedaco.textContent ?? "").not.toMatch(LONE_SURROGATE)
     }
   })
 

@@ -7,7 +7,7 @@ from flow.nodes.base import BaseNode
 from flow.utils.artifact_helpers import artifacts_root, exigir_envio_permitido
 from flow.utils.executor_http import get_agent_http_config, slugify
 from flow.utils.geo_helpers import gdf_para_geojson
-from flow.utils.parameter_validation import colunas_pedidas
+from flow.utils.parameter_validation import requested_columns
 
 
 def _write_text(path: str, text: str) -> None:
@@ -129,7 +129,7 @@ class PublishMap(BaseNode):
         crs            = str(self.get_param("crs", "EPSG:4326")).strip() or "EPSG:4326"
         # Tag field: accepts a list, a JSON string (what the screen saves) and the
         # CSV of old definitions.
-        visible_fields = colunas_pedidas(self.get_param("visible_fields", []))
+        visible_fields = requested_columns(self.get_param("visible_fields", []))
 
         workflow_hash = getattr(self, "_workflow_hash", None)
         workspace_id  = getattr(self, "_workspace_id", None)

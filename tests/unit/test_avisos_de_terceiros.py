@@ -5,7 +5,7 @@ The THIRD-PARTY-NOTICES.md generator (scripts/avisos_de_terceiros.py).
 What is protected:
 
 - **The right license for each PyPI package.** The declared SPDX expression
-  beats everything; without it, the one read in the package (LIDAS_NO_PACOTE),
+  beats everything; without it, the one read in the package (READ_FROM_PACKAGE),
   the short name and the classifier, in that order. A vague field (a whole text,
   "BSD" without saying which) must not become a license the package didn't
   declare.
@@ -43,38 +43,38 @@ def avisos():
 
 # ── The license of a PyPI package ────────────────────────────────────────────
 
-def test_a_expressao_declarada_ganha_de_tudo(avisos):
+def test_the_declared_expression_beats_everything(avisos):
     info = {"license_expression": "Apache-2.0 OR BSD-3-Clause", "license": "MIT", "classifiers": ["License :: OSI Approved :: MIT License"]}
-    assert avisos.licenca_do_pypi("jinja2", info) == "Apache-2.0 OR BSD-3-Clause"
+    assert avisos.pypi_license("jinja2", info) == "Apache-2.0 OR BSD-3-Clause"
 
 
-def test_sem_expressao_vale_a_lida_no_pacote(avisos):
+def test_without_expression_the_one_read_from_package_applies(avisos):
     info = {"license": "BSD", "classifiers": ["License :: OSI Approved :: BSD License"]}
-    assert avisos.licenca_do_pypi("pandas", info) == "BSD-3-Clause"
+    assert avisos.pypi_license("pandas", info) == "BSD-3-Clause"
 
 
-def test_a_licenca_composta_lida_no_pacote_vai_para_a_revisao(avisos, monkeypatch):
+def test_compound_license_read_from_package_goes_to_review(avisos, monkeypatch):
     # A LICENSE that also covers what came from outside (that was passlib's case:
     # md5-crypt under Beerware, UnixCrypt with its own notice) goes in whole
-    # in LIDAS_NO_PACOTE, and with AND the license only passes if all pass.
-    monkeypatch.setitem(avisos.LIDAS_NO_PACOTE, "pacote-composto",
+    # in READ_FROM_PACKAGE, and with AND the license only passes if all pass.
+    monkeypatch.setitem(avisos.READ_FROM_PACKAGE, "pacote-composto",
                         "BSD-3-Clause AND Beerware AND LicenseRef-UnixCrypt")
     info = {"license": "BSD", "classifiers": ["License :: OSI Approved :: BSD License"]}
-    licenca = avisos.licenca_do_pypi("pacote-composto", info)
+    licenca = avisos.pypi_license("pacote-composto", info)
     assert licenca.startswith("BSD-3-Clause AND ")
     assert not avisos.compativel(licenca)
 
 
-def test_o_campo_curto_nao_apaga_a_outra_licenca_de_um_pacote_duplo(avisos):
+def test_the_short_field_does_not_erase_the_other_license_of_a_dual_package(avisos):
     # uvloop: "MIT" in the field, and the MIT and Apache classifiers.
     info = {"license": "MIT", "classifiers": [
         "License :: OSI Approved :: Apache Software License",
         "License :: OSI Approved :: MIT License",
     ]}
-    assert avisos.licenca_do_pypi("uvloop", info) == "Apache-2.0 OR MIT"
+    assert avisos.pypi_license("uvloop", info) == "Apache-2.0 OR MIT"
     # The field that says something else still wins.
     info["license"] = "BSD 3-Clause"
-    assert avisos.licenca_do_pypi("pacote", info) == "BSD-3-Clause"
+    assert avisos.pypi_license("pacote", info) == "BSD-3-Clause"
 
 
 @pytest.mark.parametrize(("campo", "esperada"), [
@@ -84,21 +84,21 @@ def test_o_campo_curto_nao_apaga_a_outra_licenca_de_um_pacote_duplo(avisos):
     ("BSD 3-Clause", "BSD-3-Clause"),
     ("MPL-2.0", "MPL-2.0"),
 ])
-def test_o_nome_curto_vira_spdx(avisos, campo, esperada):
-    assert avisos.licenca_do_pypi("pacote", {"license": campo}) == esperada
+def test_the_short_name_becomes_spdx(avisos, campo, esperada):
+    assert avisos.pypi_license("pacote", {"license": campo}) == esperada
 
 
-def test_um_texto_inteiro_nao_e_licenca_e_cai_no_classificador(avisos):
+def test_a_full_text_is_not_a_license_and_falls_to_the_classifier(avisos):
     info = {
         "license": "MIT License\n\nCopyright (c) 2020 Alguém\n\nPermission is hereby granted…",
         "classifiers": ["License :: OSI Approved", "License :: OSI Approved :: MIT License"],
     }
-    assert avisos.licenca_do_pypi("pacote", info) == "MIT"
+    assert avisos.pypi_license("pacote", info) == "MIT"
 
 
-def test_dois_classificadores_sao_a_escolha_entre_eles(avisos):
+def test_two_classifiers_are_a_choice_between_them(avisos):
     info = {"classifiers": ["License :: OSI Approved :: MIT License", "License :: OSI Approved :: Apache Software License"]}
-    assert avisos.licenca_do_pypi("pacote", info) == "Apache-2.0 OR MIT"
+    assert avisos.pypi_license("pacote", info) == "Apache-2.0 OR MIT"
 
 
 @pytest.mark.parametrize("info", [
@@ -106,8 +106,8 @@ def test_dois_classificadores_sao_a_escolha_entre_eles(avisos):
     {"license": "Dual License", "classifiers": ["License :: OSI Approved :: BSD License"]},
     {"license": "", "classifiers": ["License :: OSI Approved :: BSD License", "License :: OSI Approved :: MIT License"]},
 ])
-def test_o_vago_fica_desconhecido(avisos, info):
-    assert avisos.licenca_do_pypi("pacote", info) == avisos.DESCONHECIDA
+def test_the_vague_stays_unknown(avisos, info):
+    assert avisos.pypi_license("pacote", info) == avisos.UNKNOWN
 
 
 # ── Compatible or not ────────────────────────────────────────────────────────
@@ -133,13 +133,13 @@ def test_o_vago_fica_desconhecido(avisos, info):
     ("MIT WITH", False),
     ("", False),
 ])
-def test_compativel(avisos, licenca, esperado):
+def test_compatible(avisos, licenca, esperado):
     assert avisos.compativel(licenca) is esperado
 
 
 # ── The lockfiles ────────────────────────────────────────────────────────────
 
-def test_do_npm_fica_so_o_que_vai_para_producao(avisos, tmp_path):
+def test_from_npm_only_what_goes_to_production_stays(avisos, tmp_path):
     lock = tmp_path / "package-lock.json"
     lock.write_text(json.dumps({"packages": {
         "": {"name": "raiz", "version": "1.0.0", "license": "AGPL-3.0-only"},
@@ -153,17 +153,17 @@ def test_do_npm_fica_so_o_que_vai_para_producao(avisos, tmp_path):
         "node_modules/ligado": {"resolved": "../outro", "link": True},
     }}), encoding="utf-8")
 
-    assert avisos.pacotes_npm(lock) == {
+    assert avisos.npm_packages(lock) == {
         ("react", "19.0.0"): "MIT",
         ("tailwindcss", "4.3.3"): "MIT",
         ("@img/sharp-linux-x64", "0.35.0"): "Apache-2.0",
         ("b", "2.0.0"): "BSD-2-Clause",
         ("c", "3.0.0"): "MIT OR Apache-2.0",
-        ("sem-licenca", "0.1.0"): avisos.DESCONHECIDA,
+        ("sem-licenca", "0.1.0"): avisos.UNKNOWN,
     }
 
 
-def test_do_pypi_vem_cada_pino_com_o_nome_normalizado(avisos, tmp_path):
+def test_from_pypi_each_pin_comes_with_the_normalized_name(avisos, tmp_path):
     lock = tmp_path / "requirements.txt"
     lock.write_text(
         "# cabeçalho do pip-compile\n"
@@ -172,12 +172,12 @@ def test_do_pypi_vem_cada_pino_com_o_nome_normalizado(avisos, tmp_path):
         "uvicorn[standard]==0.53.0 \\\n    --hash=sha256:" + "2" * 64 + "\n",
         encoding="utf-8",
     )
-    assert avisos.pinos_pypi(lock) == {("jinja2", "3.1.6"), ("typing-extensions", "4.16.0"), ("uvicorn", "0.53.0")}
+    assert avisos.pypi_pins(lock) == {("jinja2", "3.1.6"), ("typing-extensions", "4.16.0"), ("uvicorn", "0.53.0")}
 
 
 # ── O arquivo ────────────────────────────────────────────────────────────────
 
-def test_o_arquivo_junta_quem_usa_conta_e_separa_o_que_revisar(avisos, tmp_path, monkeypatch):
+def test_the_file_groups_who_uses_counts_and_separates_what_to_review(avisos, tmp_path, monkeypatch):
     (tmp_path / "web").mkdir()
     (tmp_path / "desktop").mkdir()
     (tmp_path / "web" / "package-lock.json").write_text(json.dumps({"packages": {
@@ -192,7 +192,7 @@ def test_o_arquivo_junta_quem_usa_conta_e_separa_o_que_revisar(avisos, tmp_path,
     monkeypatch.setattr(avisos, "RAIZ", tmp_path)
     monkeypatch.setattr(avisos, "LOCKS_NPM", [("web", "web/package-lock.json"), ("desktop", "desktop/package-lock.json")])
     monkeypatch.setattr(avisos, "LOCKS_PYPI", [("API", "api.txt"), ("executor", "exec.txt")])
-    monkeypatch.setattr(avisos, "consultar_pypi", lambda pinos: {pino: "MIT" for pino in pinos})
+    monkeypatch.setattr(avisos, "consultar_pypi", lambda pins: {pin: "MIT" for pin in pins})
 
     texto, fora = avisos.gerar()
 
@@ -204,23 +204,23 @@ def test_o_arquivo_junta_quem_usa_conta_e_separa_o_que_revisar(avisos, tmp_path,
     assert "| npm | `proprietario` | 1.0.0 | SEE LICENSE IN LICENSE.txt |" in texto
 
 
-def test_o_que_mora_no_repositorio_tem_a_licenca_ao_lado(avisos):
+def test_what_lives_in_the_repo_has_the_license_alongside(avisos):
     # A third-party work copied here (the Inter font, for example) goes
     # with the license text, and the license coexists with AGPL-3.0.
-    for obra, onde, licenca, textos in avisos.NO_REPOSITORIO:
+    for work, onde, licenca, textos in avisos.IN_REPOSITORY:
         for caminho in onde:
-            assert (RAIZ / caminho).exists(), (obra, caminho)
+            assert (RAIZ / caminho).exists(), (work, caminho)
         for texto in textos:
-            assert (RAIZ / texto).is_file(), (obra, texto)
-        # A font served separately may be OFL (AGREGAVEIS); what is compiled
+            assert (RAIZ / texto).is_file(), (work, texto)
+        # A font served separately may be OFL (AGGREGABLE); what is compiled
         # together with the program has to be truly compatible.
-        agregada = "separate file" in obra
-        assert avisos.compativel(licenca) or (agregada and licenca in avisos.AGREGAVEIS), obra
+        aggregated = "separate file" in work
+        assert avisos.compativel(licenca) or (aggregated and licenca in avisos.AGGREGABLE), work
 
 
-def test_o_dev_que_vai_no_build_e_o_que_o_css_importa(avisos):
+def test_the_dev_dep_in_the_build_is_what_the_css_imports(avisos):
     # An `@import "<pacote>"` in the CSS takes the package into the stylesheet the
-    # installation serves: either it is a production one, or it is in DEV_QUE_VAI_NO_BUILD.
+    # installation serves: either it is a production one, or it is in DEV_SHIPPED_IN_BUILD.
     importados = set()
     for base, lock in (("web", "web/package-lock.json"), ("desktop/src", "desktop/package-lock.json")):
         pacotes = json.loads((RAIZ / lock).read_text(encoding="utf-8"))["packages"]
@@ -232,13 +232,13 @@ def test_o_dev_que_vai_no_build_e_o_que_o_css_importa(avisos):
                 dados = pacotes.get(f"node_modules/{pacote}")
                 assert dados is not None, (css, pacote)
                 if dados.get("dev"):
-                    assert pacote in avisos.DEV_QUE_VAI_NO_BUILD, (css, pacote)
+                    assert pacote in avisos.DEV_SHIPPED_IN_BUILD, (css, pacote)
                     importados.add(pacote)
     # And the list doesn't keep what no CSS imports anymore.
-    assert importados == avisos.DEV_QUE_VAI_NO_BUILD
+    assert importados == avisos.DEV_SHIPPED_IN_BUILD
 
 
-def test_os_conjuntos_de_icones_saem_dos_fontes_e_nao_dos_testes(avisos, tmp_path, monkeypatch):
+def test_icon_sets_come_from_the_sources_and_not_the_tests(avisos, tmp_path, monkeypatch):
     (tmp_path / "web" / "app").mkdir(parents=True)
     (tmp_path / "web" / "app" / "a.tsx").write_text('import { TbX } from "react-icons/tb"\nimport { FaEye } from \'react-icons/fa\'\n', encoding="utf-8")
     (tmp_path / "web" / "app" / "b.test.tsx").write_text('import { SiX } from "react-icons/si"\n', encoding="utf-8")
@@ -250,17 +250,17 @@ def test_os_conjuntos_de_icones_saem_dos_fontes_e_nao_dos_testes(avisos, tmp_pat
     (tmp_path / "desktop" / "src" / "e.ts").write_text('import { XyZ } from "react-icons/novo"\n', encoding="utf-8")
     monkeypatch.setattr(avisos, "RAIZ", tmp_path)
 
-    icones = avisos.conjuntos_de_icones()
+    icons = avisos.icon_sets()
 
-    assert list(icones) == ["fa", "novo", "tb"]
-    assert icones["fa"][1] == "CC-BY-4.0"
-    assert icones["tb"][1] == "MIT"
-    assert icones["novo"][1] == avisos.DESCONHECIDA
+    assert list(icons) == ["fa", "novo", "tb"]
+    assert icons["fa"][1] == "CC-BY-4.0"
+    assert icons["tb"][1] == "MIT"
+    assert icons["novo"][1] == avisos.UNKNOWN
 
 
-def test_as_wheels_com_bibliotecas_nativas_estao_nos_locks(avisos):
-    pinos = set()
-    for _quem, lock in avisos.LOCKS_PYPI:
-        pinos |= {nome for nome, _versao in avisos.pinos_pypi(RAIZ / lock)}
-    for pacote, *_resto in avisos.NATIVAS_NAS_WHEELS:
-        assert avisos.normalizar(pacote) in pinos, pacote
+def test_wheels_with_native_libraries_are_in_the_locks(avisos):
+    pins = set()
+    for _who, lock in avisos.LOCKS_PYPI:
+        pins |= {nome for nome, _version in avisos.pypi_pins(RAIZ / lock)}
+    for pacote, *_rest in avisos.NATIVE_IN_WHEELS:
+        assert avisos.normalizar(pacote) in pins, pacote

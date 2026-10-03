@@ -25,7 +25,7 @@ import {
 } from "@/app/components/ui/dropdown-menu"
 import { useHomeStore } from "@/app/stores/homeStore"
 import { cn } from "@/lib/utils"
-import { useTextos } from "../i18n"
+import { useTexts } from "../i18n"
 
 /** lat/lon with 4 decimal places (~11 m) — the rest is noise to the assistant. */
 function coord(n: number): string {
@@ -46,7 +46,7 @@ export function BotaoMais({
   className?: string
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
-  const t = useTextos().assistente.mais
+  const t = useTexts().assistente.mais
 
   return (
     <>
@@ -108,7 +108,7 @@ export function ChipDeLocalizacao({ className }: { className?: string }) {
   const compartilhar = useHomeStore((s) => s.compartilharLocalizacao)
   const localizacao = useHomeStore((s) => s.localizacao)
   const limpar = useHomeStore((s) => s.limparLocalizacao)
-  const t = useTextos().assistente.mais
+  const t = useTexts().assistente.mais
   if (!compartilhar || !localizacao) return null
 
   const precisao = localizacao.precisao_m != null && Number.isFinite(localizacao.precisao_m)

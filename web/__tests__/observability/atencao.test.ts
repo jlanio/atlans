@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  MAXIMO_DE_ITENS, haQuantoTempo, montarAtencao, textoDeVazio,
+  MAX_ITEMS, haQuantoTempo, montarAtencao, textoDeVazio,
 } from "@/app/components/observability/atencao"
 import type { IExecutorMetrics, IObservabilityMetrics, IStuckRun, ITopFailingWorkflow } from "@/service/types"
 
@@ -51,11 +51,11 @@ describe("montarAtencao", () => {
       executores: [executor()],
       origemDoWorkflow: hash => (hash === "wf-a" ? "assistente" : "usuario"),
     })
-    const porTipo = Object.fromEntries(itens.map(i => [i.tipo, i]))
-    expect(porTipo.presa.origem).toBe("assistente")
-    expect(porTipo.falhas.origem).toBe("usuario")
+    const byType = Object.fromEntries(itens.map(i => [i.tipo, i]))
+    expect(byType.presa.origem).toBe("assistente")
+    expect(byType.falhas.origem).toBe("usuario")
     // An executor at its ceiling doesn't belong to a workflow: no made-up origin.
-    expect(porTipo.saturado.origem).toBeUndefined()
+    expect(byType.saturado.origem).toBeUndefined()
   })
 
   it("sem o resolvedor, nenhum item afirma origem (a tela simplesmente não pinta o selo)", () => {
@@ -163,7 +163,7 @@ describe("montarAtencao", () => {
       }),
       executores: [executor()],
     })
-    expect(itens).toHaveLength(MAXIMO_DE_ITENS)
+    expect(itens).toHaveLength(MAX_ITEMS)
     expect(itens.map(i => i.tipo)).toEqual(["presa", "presa", "presa", "falhas", "falhas"])
     expect(itens.map(i => i.chave)).toEqual(["presa:run-1", "presa:run-2", "presa:run-3", "falhas:wf-sicar", "falhas:wf-b"])
   })
@@ -172,8 +172,8 @@ describe("montarAtencao", () => {
 describe("textoDeVazio", () => {
   const agora = new Date(2026, 8, 6, 12, 0)
   it("diz quando foi a última falha", () => {
-    const ha3dias = new Date(2026, 8, 3, 9, 0).toISOString()
-    const m = metricas({ failed_runs: 4, top_failing_workflows: [falhando({ last_failed_at: ha3dias })] })
+    const threeDaysAgo = new Date(2026, 8, 3, 9, 0).toISOString()
+    const m = metricas({ failed_runs: 4, top_failing_workflows: [falhando({ last_failed_at: threeDaysAgo })] })
     expect(textoDeVazio(m, agora)).toBe("Nada pendente. Última falha há 3 dias.")
   })
   it("sem falha no período", () => {

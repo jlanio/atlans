@@ -15,7 +15,7 @@ import { INodeStatusWorkFlow } from "@/context/useFlowContext"
 
 const T0 = 1_700_000_000_000
 
-function doFilho(
+function fromChild(
   no: string,
   status: string,
   atMs: number,
@@ -36,7 +36,7 @@ function doFilho(
   }
 }
 
-const canvasPai = {
+const parentCanvas = {
   id: "pai",
   status: "started",
   position: { x: 0, y: 0 },
@@ -60,7 +60,7 @@ describe("toRunEvent", () => {
 
 describe("buildTimeline com eventos de sub-fluxo", () => {
   it("amarra a linha ao nó SubWorkflow do canvas", () => {
-    const t = buildTimeline([doFilho("c", "started", 100)], [canvasPai], T0)
+    const t = buildTimeline([fromChild("c", "started", 100)], [parentCanvas], T0)
     const linha = t.nodes.find(n => n.nodeId === "pai::c")!
 
     // Without this, focusing/highlighting/opening the configuration did nothing:
@@ -74,7 +74,7 @@ describe("buildTimeline com eventos de sub-fluxo", () => {
   it("nó do próprio fluxo continua apontando para si mesmo", () => {
     const t = buildTimeline(
       [{ seq: 0, ts: T0, node: "pai", kind: "lifecycle", level: "info", status: "started", raw: {} }],
-      [canvasPai],
+      [parentCanvas],
       T0,
     )
     const linha = t.nodes.find(n => n.nodeId === "pai")!
@@ -84,14 +84,14 @@ describe("buildTimeline com eventos de sub-fluxo", () => {
 
   it("cai no id do nó SubWorkflow quando ele não está no canvas", () => {
     // Happens when opening a historical run of a workflow that has changed since.
-    const t = buildTimeline([doFilho("c", "started", 100)], [], T0)
+    const t = buildTimeline([fromChild("c", "started", 100)], [], T0)
     expect(t.nodes[0].subFlow).toBe("pai")
   })
 
   it("sem node_name, mostra o nome do nó filho e não o id prefixado", () => {
     const t = buildTimeline(
-      [doFilho("c", "started", 100, { node_name: undefined })],
-      [canvasPai],
+      [fromChild("c", "started", 100, { node_name: undefined })],
+      [parentCanvas],
       T0,
     )
     expect(t.nodes[0].name).toBe("c")
@@ -100,10 +100,10 @@ describe("buildTimeline com eventos de sub-fluxo", () => {
   it("a falha dentro do filho vira um problema atribuído ao nó do canvas", () => {
     const t = buildTimeline(
       [
-        doFilho("c", "started", 100),
-        doFilho("c", "failed", 300, { message: "division by zero", duration_ms: 200 }),
+        fromChild("c", "started", 100),
+        fromChild("c", "failed", 300, { message: "division by zero", duration_ms: 200 }),
       ],
-      [canvasPai],
+      [parentCanvas],
       T0,
     )
     expect(t.problems).toHaveLength(1)

@@ -3,7 +3,7 @@
 import { TbFile, TbSearch, TbWorld } from "react-icons/tb"
 import { Input } from "@/app/components/ui/input"
 import { cn } from "@/lib/utils"
-import { formatarInteiro } from "@/lib/formatos"
+import { formatInteger } from "@/lib/formatos"
 import type { ArtifactTab } from "@/app/(dashboard)/artifacts/use-artifacts-query"
 
 /**
@@ -50,7 +50,7 @@ export function AbasDeArtefatos({ tab, total, onTab }: {
                 a second request. */}
             {ativo && total > 0 && (
               <span className="rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] tabular-nums">
-                {formatarInteiro(total)}
+                {formatInteger(total)}
               </span>
             )}
           </button>
@@ -61,7 +61,7 @@ export function AbasDeArtefatos({ tab, total, onTab }: {
 }
 
 /** Search field (the debounce and the trip to the server live in the page). */
-export function BuscaDeArtefatos({ valor, onChange }: {
+export function ArtifactsSearch({ valor, onChange }: {
   valor: string; onChange: (v: string) => void
 }) {
   return (
@@ -83,7 +83,7 @@ export function BuscaDeArtefatos({ valor, onChange }: {
  * appears when there is more than one accumulated format (otherwise the filter
  * separates nothing).
  */
-export function FiltroDeFormato({ formatos, atual, onFormato }: {
+export function FormatFilter({ formatos, atual, onFormato }: {
   formatos: string[]; atual: string; onFormato: (f: string) => void
 }) {
   if (formatos.length <= 1) return null

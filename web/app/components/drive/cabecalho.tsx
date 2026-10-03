@@ -3,7 +3,7 @@
 import { TbRefresh, TbTrash } from "react-icons/tb"
 import { Button } from "@/app/components/ui/button"
 import { Skeleton } from "@/app/components/ui/skeleton"
-import { formatarInteiro, plural } from "@/lib/formatos"
+import { formatInteger, plural } from "@/lib/formatos"
 
 interface Props {
   /** Total for the whole filter; null on the 1st load (the subtitle becomes a skeleton). */
@@ -26,7 +26,7 @@ interface Props {
 export function textoDoSubtitulo(total: number, mostrados: number): string {
   if (total === 0) return "Nenhum arquivo"
   if (mostrados > 0 && mostrados < total) {
-    return `${plural(mostrados, "arquivo")} · ${formatarInteiro(total)} no total`
+    return `${plural(mostrados, "arquivo")} · ${formatInteger(total)} no total`
   }
   return plural(total, "arquivo")
 }
@@ -36,7 +36,7 @@ export function textoDoSubtitulo(total: number, mostrados: number): string {
  * (delete N) as the destructive action (only when there is a selection) and
  * "Atualizar" as ghost.
  */
-export function CabecalhoDoDrive({
+export function DriveHeader({
   total, mostrados, atualizando, selecionados, canEdit, onAtualizar, onExcluirSelecionados,
 }: Props) {
   return (
@@ -59,7 +59,7 @@ export function CabecalhoDoDrive({
             className="gap-1.5 max-md:h-10"
           >
             <TbTrash size={14} aria-hidden="true" />
-            Excluir {formatarInteiro(selecionados)}
+            Excluir {formatInteger(selecionados)}
           </Button>
         )}
         <Button

@@ -18,13 +18,13 @@ from flow.utils.query_param_formatter import prepare_query
 
 # ── What must be replaced ───────────────────────────────────────────────────
 
-def test_placeholder_simples():
+def test_simple_placeholder():
     q, v = prepare_query("SELECT * FROM t WHERE b = :bairro", {"bairro": "Centro"})
     assert q == "SELECT * FROM t WHERE b = $1"
     assert v == ["Centro"]
 
 
-def test_placeholder_repetido_reusa_o_indice():
+def test_repeated_placeholder_reuses_the_index():
     q, v = prepare_query(
         "SELECT * FROM t WHERE a = :id OR b = :id AND c = :outro",
         {"id": 5, "outro": "x"},
@@ -33,25 +33,25 @@ def test_placeholder_repetido_reusa_o_indice():
     assert v == [5, "x"]
 
 
-def test_cast_com_dois_pontos_nao_e_placeholder():
+def test_double_colon_cast_is_not_placeholder():
     q, v = prepare_query("SELECT id::text FROM t WHERE b = :b", {"b": 1})
     assert q == "SELECT id::text FROM t WHERE b = $1"
 
 
-def test_parametro_ausente_falha_alto():
+def test_missing_parameter_fails_loudly():
     with pytest.raises(ValueError, match="'bairro' não fornecido"):
         prepare_query("SELECT * FROM t WHERE b = :bairro", {})
 
 
 # ── What must NOT be touched ────────────────────────────────────────────────
 
-def test_dois_pontos_dentro_de_string_nao_vira_parametro():
+def test_colon_inside_string_does_not_become_parameter():
     q, v = prepare_query("SELECT * FROM notas WHERE obs = 'urgente:revisar'", {})
     assert q == "SELECT * FROM notas WHERE obs = 'urgente:revisar'"
     assert v == []
 
 
-def test_string_nao_e_corrompida_quando_o_nome_existe_nos_params():
+def test_string_is_not_corrupted_when_the_name_exists_in_params():
     """The worst case: the literal's text was replaced by a bind, and the query
     started comparing something else — with no error at all."""
     q, v = prepare_query(
@@ -63,28 +63,28 @@ def test_string_nao_e_corrompida_quando_o_nome_existe_nos_params():
     assert v == [7]
 
 
-def test_comentario_de_linha_e_ignorado():
+def test_line_comment_is_ignored():
     q, v = prepare_query("SELECT 1 -- filtrar por :bairro depois\nFROM t", {})
     assert ":bairro" in q and v == []
 
 
-def test_comentario_de_bloco_e_ignorado():
+def test_block_comment_is_ignored():
     q, v = prepare_query("SELECT /* usar :bairro aqui */ 1 FROM t", {})
     assert v == []
 
 
-def test_identificador_entre_aspas_e_ignorado():
+def test_quoted_identifier_is_ignored():
     q, v = prepare_query('SELECT t."col:esquisita" FROM t WHERE a = :a', {"a": 1})
     assert '"col:esquisita"' in q
     assert v == [1]
 
 
-def test_dollar_quoting_e_ignorado():
+def test_dollar_quoting_is_ignored():
     q, v = prepare_query("SELECT $$texto com :nome dentro$$ FROM t", {})
     assert v == []
 
 
-def test_hora_dentro_de_literal_nao_confunde():
+def test_time_inside_literal_does_not_confuse():
     q, v = prepare_query("SELECT * FROM t WHERE h = '08:30' AND b = :b", {"b": 1})
     assert "'08:30'" in q
     assert v == [1]
@@ -101,14 +101,14 @@ def test_hora_dentro_de_literal_nao_confunde():
 from flow.utils.query_param_formatter import resolver_query_params
 
 
-def test_valor_da_aresta_vence_o_do_formulario():
+def test_edge_value_wins_over_the_form_value():
     assert resolver_query_params(
         {"queryParams": {"bairro": "Centro"}},
         {"queryParams": {"bairro": "Antigo"}},
     ) == {"bairro": "Centro"}
 
 
-def test_dicionario_vazio_da_aresta_e_uma_resposta_e_nao_ausencia():
+def test_empty_edge_dict_is_an_answer_not_absence():
     """The defect in one line: `{}` fell through to the static value because of the `or`."""
     assert resolver_query_params(
         {"queryParams": {}},
@@ -116,24 +116,24 @@ def test_dicionario_vazio_da_aresta_e_uma_resposta_e_nao_ausencia():
     ) == {}
 
 
-def test_sem_aresta_usa_o_formulario():
+def test_without_edge_uses_the_form():
     assert resolver_query_params(
         {"outraCoisa": 1},
         {"queryParams": {"bairro": "Centro"}},
     ) == {"bairro": "Centro"}
 
 
-def test_sem_aresta_e_sem_formulario_e_vazio():
+def test_without_edge_and_without_form_is_empty():
     assert resolver_query_params({}, {}) == {}
 
 
-def test_none_na_aresta_vira_vazio():
+def test_none_on_the_edge_becomes_empty():
     """Edge connected to an output that brought nothing — empty, not an error."""
     assert resolver_query_params({"queryParams": None}, {"queryParams": {"a": 1}}) == {}
 
 
 @pytest.mark.parametrize("valor", ["texto", 42, ["a"]])
-def test_tipo_errado_falha_dizendo_a_origem(valor):
+def test_wrong_type_fails_stating_the_source(valor):
     """The two sources call for opposite actions: change the edge or the form."""
     with pytest.raises(ValueError, match="recebido do nó anterior"):
         resolver_query_params({"queryParams": valor}, {})

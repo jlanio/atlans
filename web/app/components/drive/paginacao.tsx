@@ -2,7 +2,7 @@
 
 import { TbChevronLeft, TbChevronRight } from "react-icons/tb"
 import { Button } from "@/app/components/ui/button"
-import { formatarInteiro } from "@/lib/formatos"
+import { formatInteger } from "@/lib/formatos"
 
 interface Props {
   page: number
@@ -21,15 +21,15 @@ interface Props {
  * The structure (span "{page} / {totalPages}" flanked by the two buttons) is what
  * the workspace-switch test uses to navigate — kept on purpose.
  */
-export function RodapeDePaginacao({
+export function PaginationFooter({
   page, totalPages, total, mostrandoDe, mostrandoAte, refreshing, onPrev, onNext,
 }: Props) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-xs text-muted-foreground tabular-nums">
-        Mostrando <span className="font-medium text-foreground">{formatarInteiro(mostrandoDe)}</span>–
-        <span className="font-medium text-foreground">{formatarInteiro(mostrandoAte)}</span> de{" "}
-        <span className="font-medium text-foreground">{formatarInteiro(total)}</span>
+        Mostrando <span className="font-medium text-foreground">{formatInteger(mostrandoDe)}</span>–
+        <span className="font-medium text-foreground">{formatInteger(mostrandoAte)}</span> de{" "}
+        <span className="font-medium text-foreground">{formatInteger(total)}</span>
       </span>
       <div className="flex items-center gap-2">
         <Button

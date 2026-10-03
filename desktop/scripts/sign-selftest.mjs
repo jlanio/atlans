@@ -36,9 +36,9 @@ const falha = (msg) => log(` ERRO  ${msg}`)
  * present. `node.exe` is the fallback: larger, but equally outside any catalog.
  */
 /** The file electron-builder invokes — exercising another one would prove nothing. */
-const CAMINHO_HOOK = path.join(DESKTOP, 'build', 'sign.cjs').split(path.sep).join('/')
+const HOOK_PATH = path.join(DESKTOP, 'build', 'sign.cjs').split(path.sep).join('/')
 
-function binarioDeTeste() {
+function testBinary() {
   const esbuild = path.join(DESKTOP, 'node_modules', '@esbuild', 'win32-x64', 'esbuild.exe')
   return fs.existsSync(esbuild) ? esbuild : process.execPath
 }
@@ -62,7 +62,7 @@ function ps(script) {
 }
 
 /** Carrega o hook — interop CJS→ESM entrega `module.exports` em `.default`. */
-const hook = await import(`file://${CAMINHO_HOOK}`).then((m) => m.default ?? m)
+const hook = await import(`file://${HOOK_PATH}`).then((m) => m.default ?? m)
 
 // ── 0. Is there a signtool on this machine? ──────────────────────────────────
 // The GitHub runner ships the Windows SDK, but the electron-builder cache only
@@ -89,9 +89,9 @@ const hook = await import(`file://${CAMINHO_HOOK}`).then((m) => m.default ?? m)
  * Without this rule, the self-test protects something nobody uses and blocks
  * what everybody is waiting for.
  */
-function encerrar(houveFalha, motivo) {
+function encerrar(hadFailure, motivo) {
   const exigido = Boolean(process.env.ATLANS_SIGN_PROVIDER)
-  if (!houveFalha) {
+  if (!hadFailure) {
     ok('Autoteste de assinatura passou. Com um certificado real, basta trocar as variáveis.')
     process.exit(0)
   }
@@ -144,7 +144,7 @@ try {
   // also showed up as valid, which would make the test approve a broken hook.
   // The `esbuild.exe` from node_modules is a third-party PE, with no catalog
   // and no signature of its own.
-  fs.copyFileSync(binarioDeTeste(), alvo)
+  fs.copyFileSync(testBinary(), alvo)
 
   // ── 3. THE REAL HOOK ───────────────────────────────────────────────────────
   // No reimplementing the call here: what needs to be exercised is exactly the
@@ -197,14 +197,14 @@ try {
   // ── 5. The no-op is still a no-op ──────────────────────────────────────────
   step('Sem ATLANS_SIGN_PROVIDER o hook não deve fazer nada')
   delete process.env.ATLANS_SIGN_PROVIDER
-  const alvoLimpo = path.join(tmp, 'limpo.exe')
-  fs.copyFileSync(binarioDeTeste(), alvoLimpo)
-  await assinar({ path: alvoLimpo })
+  const cleanTarget = path.join(tmp, 'limpo.exe')
+  fs.copyFileSync(testBinary(), cleanTarget)
+  await assinar({ path: cleanTarget })
 
   // Checks by SIGNER, not by `NotSigned`: if some day the test binary comes
   // signed by its vendor, `NotSigned` would no longer hold and the test would
   // fail for a reason that is not its own.
-  const limpo = ps(`"subject=" + (Get-AuthenticodeSignature -FilePath '${alvoLimpo}').SignerCertificate.Subject`)
+  const limpo = ps(`"subject=" + (Get-AuthenticodeSignature -FilePath '${cleanTarget}').SignerCertificate.Subject`)
   if (/Atlans Autoteste/.test(limpo)) {
     falha('O hook assinou sem provedor configurado.')
     falhou = true

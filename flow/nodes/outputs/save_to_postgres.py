@@ -3,8 +3,8 @@ from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.logger import get_logger
-from flow.utils.sql_engine import make_engine_cache, get_engine, ensure_schema, truncate_table, lote_seguro
-from flow.utils.credencial import obter_conexao
+from flow.utils.sql_engine import make_engine_cache, get_engine, ensure_schema, truncate_table, safe_batch_size
+from flow.utils.credencial import get_connection
 
 logger = get_logger(__name__)
 
@@ -78,7 +78,7 @@ class SaveToPostgres(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         self.validate()
-        conn_str = obter_conexao(self.parameters)
+        conn_str = get_connection(self.parameters)
 
         df = self._get_first_df(inputs)
 
@@ -152,7 +152,7 @@ class SaveToPostgres(BaseNode):
         # any 10-column table with more than ~6,500 rows was rejected by the
         # driver. The batch size is now derived from the number of columns.
         colunas = len(df.columns) + (1 if index else 0)
-        lote = lote_seguro(colunas, chunksize)
+        lote = safe_batch_size(colunas, chunksize)
         if chunksize and lote < chunksize:
             logger.warning(
                 "Lote de %s linhas excede o limite do protocolo para %d colunas; "

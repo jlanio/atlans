@@ -14,13 +14,13 @@ import { createToast } from "@/utils/createToast"
 import { useConversas } from "@/app/hooks/home/useConversas"
 import { useHomeStore } from "@/app/stores/homeStore"
 import { LinhaDoMeu, GatilhoDeAcoes } from "../linha"
-import { useFormatos, useTextosDaCasca } from "../i18n/da-casca"
-import type { IConversaResumo } from "@/service/types"
-import { RenomearDialog } from "./renomear-dialog"
+import { useFormats, useShellTexts } from "../i18n/da-casca"
+import type { IConversationSummary } from "@/service/types"
+import { RenameDialog } from "./renomear-dialog"
 
 // The blocks that are not `SidebarMenuSub` (notices, footer) must be hidden by
 // hand in the 3rem rail: only the sublist comes with the hiding class built in.
-const SO_EXPANDIDO = "group-data-[collapsible=icon]:hidden"
+const EXPANDED_ONLY = "group-data-[collapsible=icon]:hidden"
 
 /**
  * "Recentes": the list of assistant conversations, inside the Meus → Chats group.
@@ -40,11 +40,11 @@ export function ChatsLista() {
   const selecionar = useHomeStore((s) => s.selecionarConversa)
   const abrirPainel = useHomeStore((s) => s.abrirPainel)
   const novaConversa = useHomeStore((s) => s.novaConversa)
-  const anuncio = useHomeStore((s) => s.anuncioDeConversa)
+  const announcement = useHomeStore((s) => s.anuncioDeConversa)
   const { isMobile, setOpenMobile } = useSidebar()
-  const textos = useTextosDaCasca()
+  const textos = useShellTexts()
   const t = textos.listas
-  const fmt = useFormatos()
+  const fmt = useFormats()
 
   // The assistant stream (in HomeView, this list's sibling in the shell) leaves in
   // the store the announcement "this conversation got activity", and the list
@@ -54,15 +54,15 @@ export function ChatsLista() {
   // waits for an in-flight load: its response REPLACES the list and would erase
   // the announcement applied in the meantime; after it, the upsert is a no-op if
   // the response already brought the conversation.
-  const visto = useRef(anuncio)
+  const visto = useRef(announcement)
   useEffect(() => {
-    if (!anuncio || anuncio === visto.current || carregando || atualizando) return
-    visto.current = anuncio
-    anunciar(anuncio)
-  }, [anuncio, carregando, atualizando, anunciar])
+    if (!announcement || announcement === visto.current || carregando || atualizando) return
+    visto.current = announcement
+    anunciar(announcement)
+  }, [announcement, carregando, atualizando, anunciar])
 
-  const [renomeando, setRenomeando] = useState<IConversaResumo | null>(null)
-  const [apagando, setApagando] = useState<IConversaResumo | null>(null)
+  const [renaming, setRenaming] = useState<IConversationSummary | null>(null)
+  const [apagando, setErasing] = useState<IConversationSummary | null>(null)
 
   // The panel would open BEHIND the drawer on the phone: close it too, as the
   // HomeSidebar's "Nova conversa" button already does.
@@ -93,7 +93,7 @@ export function ChatsLista() {
     // §3: the error block only takes over the list when no load was ever accepted.
     // With conversations on screen, the failure becomes the amber footer notice.
     corpo = (
-      <div role="alert" className={`flex flex-col items-start gap-1 px-2 py-1.5 ${SO_EXPANDIDO}`}>
+      <div role="alert" className={`flex flex-col items-start gap-1 px-2 py-1.5 ${EXPANDED_ONLY}`}>
         <p className="text-xs text-sidebar-foreground/70">{erro}</p>
         <button
           type="button"
@@ -151,11 +151,11 @@ export function ChatsLista() {
                       the light theme. The items get 40px on the phone: the
                       trigger was already big enough, the tap target was not. */}
                   <DropdownMenuContent align="end" className="home-portal min-w-32">
-                    <DropdownMenuItem onSelect={() => setRenomeando(c)} className="max-md:min-h-10">
+                    <DropdownMenuItem onSelect={() => setRenaming(c)} className="max-md:min-h-10">
                       {textos.comum.renomear}
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onSelect={() => setApagando(c)}
+                      onSelect={() => setErasing(c)}
                       className="text-destructive focus:text-destructive max-md:min-h-10"
                     >
                       {textos.comum.apagar}
@@ -177,7 +177,7 @@ export function ChatsLista() {
       {/* The footer lives OUTSIDE the branches: with the list EMPTY and a reload
           that failed, the amber notice had nowhere to show up. */}
       {((erro && jaCarregou) || faltam) && (
-        <div className={`flex flex-col gap-1 px-2 pb-1 ${SO_EXPANDIDO}`}>
+        <div className={`flex flex-col gap-1 px-2 pb-1 ${EXPANDED_ONLY}`}>
           {/* Redo what FAILED: after a "Ver mais" that dropped, it is the page —
               not the whole list, which on top of that went back to the 100 ceiling. */}
           {erro && jaCarregou && (
@@ -202,13 +202,13 @@ export function ChatsLista() {
         </div>
       )}
 
-      <RenomearDialog
-        conversa={renomeando}
-        onClose={() => setRenomeando(null)}
+      <RenameDialog
+        conversa={renaming}
+        onClose={() => setRenaming(null)}
         onRenomear={renomear}
       />
 
-      <Dialog open={!!apagando} onOpenChange={(v) => { if (!v) setApagando(null) }}>
+      <Dialog open={!!apagando} onOpenChange={(v) => { if (!v) setErasing(null) }}>
         {apagando && (
           <DeleteDialog
             className="home-portal"
@@ -228,7 +228,7 @@ export function ChatsLista() {
               // without this the panel stayed on the dead conversation and the
               // next message hit a 404. Read on the spot (`getState`), not via the closure.
               else if (useHomeStore.getState().conversaId === apagando.id) novaConversa()
-              setApagando(null)
+              setErasing(null)
             }}
           />
         )}

@@ -65,29 +65,29 @@ interface WorkflowSaveActions {
 
 /** How long the "Salvo" label (green) stays before turning into the resting state
  *  ("Salvo há N min", in a neutral tone). */
-const TEMPO_DO_ROTULO_SALVO_MS = 3000
+const SAVED_LABEL_DURATION_MS = 3000
 
 /** For how long, after the hydration snapshot, a difference can still be
  *  credited to ReactFlow's re-measuring instead of to the user. */
-const JANELA_DE_AUTOCORRECAO_MS = 1000
+const AUTOCORRECT_WINDOW_MS = 1000
 
 // The 'saved' → 'idle' timer lives here, and not in the component that saved,
 // because what needs to neutralize it is the change detector — which lives in
 // ANOTHER component. Before, an edit made within the 3s window marked "Não
 // salvo" and the old timer erased the warning right after.
-let timerDoRotuloSalvo: ReturnType<typeof setTimeout> | null = null
+let savedLabelTimer: ReturnType<typeof setTimeout> | null = null
 
 export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActions>((set, get) => {
 
-  function agendarVoltaAoRepouso() {
-    if (timerDoRotuloSalvo) clearTimeout(timerDoRotuloSalvo)
-    timerDoRotuloSalvo = setTimeout(() => {
-      timerDoRotuloSalvo = null
+  function scheduleReturnToIdle() {
+    if (savedLabelTimer) clearTimeout(savedLabelTimer)
+    savedLabelTimer = setTimeout(() => {
+      savedLabelTimer = null
       // Only clears the label if nobody touched the status in the meantime: if the
       // user edited the canvas in those 3s, the status is already 'unsaved' and
       // going back to 'idle' would hide the warning.
       if (get().saveStatus === 'saved') set({ saveStatus: 'idle' })
-    }, TEMPO_DO_ROTULO_SALVO_MS)
+    }, SAVED_LABEL_DURATION_MS)
   }
 
   return {
@@ -126,7 +126,7 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
         snapshotIniciadoEm: null,
         ...(viewport !== undefined ? { lastSavedViewport: viewport } : {}),
       })
-      agendarVoltaAoRepouso()
+      scheduleReturnToIdle()
     },
 
     failSave: (mensagem) => {
@@ -135,7 +135,7 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
 
     flashSaved: () => {
       set({ saveStatus: 'saved' })
-      agendarVoltaAoRepouso()
+      scheduleReturnToIdle()
     },
 
     setStatus: (status) => {
@@ -163,7 +163,7 @@ export const useWorkflowSaveStore = create<WorkflowSaveState & WorkflowSaveActio
       const { snapshotIniciadoEm, saveStatus } = get()
       if (saveStatus !== 'idle') return false
       if (snapshotIniciadoEm === null) return false
-      if (Date.now() - snapshotIniciadoEm >= JANELA_DE_AUTOCORRECAO_MS) return false
+      if (Date.now() - snapshotIniciadoEm >= AUTOCORRECT_WINDOW_MS) return false
       set({
         lastSavedSnapshot: JSON.stringify({ name, nodes, edges }),
         // Holds once per hydration: reopening the window here would stretch it

@@ -28,7 +28,7 @@ import { Label } from "@/app/components/ui/label"
 import { Input } from "@/app/components/ui/input"
 import { Button } from "@/app/components/ui/button"
 import { TbPlus, TbTrash, TbInfoCircle } from "react-icons/tb"
-import { AvisoPortasTravadas } from "./fields/ports-field"
+import { LockedPortsNotice } from "./fields/ports-field"
 
 
 interface Props {
@@ -81,7 +81,7 @@ function isValidKey(key: string): boolean {
  * whole set — no error, wrong data. The executor rejects the workflow; here the
  * operator sees the reason while typing, instead of finding out at run time.
  */
-export const PORTA_RESERVADA = "subWorkflowResult"
+export const RESERVED_PORT = "subWorkflowResult"
 
 
 /** Why this port is not valid — or `null` if it is. */
@@ -109,8 +109,8 @@ export function problemaNaPorta(
   }
   // Output side only: it is the return value that collides with the envelope.
   // On the input side the name never reaches the parent.
-  if (variant === "output" && porta === PORTA_RESERVADA) {
-    return `"${PORTA_RESERVADA}" é reservado: é o nome sob o qual o pai recebe o resultado inteiro do sub-fluxo.`
+  if (variant === "output" && porta === RESERVED_PORT) {
+    return `"${RESERVED_PORT}" é reservado: é o nome sob o qual o pai recebe o resultado inteiro do sub-fluxo.`
   }
   return null
 }
@@ -183,7 +183,7 @@ export default function SubWorkflowPortsHelper({
 
       <p className="text-[11px] text-muted-foreground">{helpText}</p>
 
-      {travado && <AvisoPortasTravadas conexoes={conexoesDeEntrada} />}
+      {travado && <LockedPortsNotice conexoes={conexoesDeEntrada} />}
 
       {ports.length === 0 ? (
         // The contract is opt-in: an empty list is a valid passthrough mode, not an

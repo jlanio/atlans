@@ -22,32 +22,32 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import { GisFlowService } from "@/service/GisFlowService"
-import type { IAssistenteEstado } from "@/service/types"
+import type { IAssistantState } from "@/service/types"
 import { API_URL } from "@/utils/env"
-import { turnoVazio, type TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
+import { emptyTurn, type AssistantTurn } from "@/app/components/home/assistente/quadros"
 import {
-  SEM_CONEXAO,
-  aplicarCota,
-  aplicarNoTurno,
+  NO_CONNECTION,
+  applyQuota,
+  applyToTurn,
   erroDaResposta,
   lerQuadrosSSE,
-  proximoIdDeTurno,
-  type ErrosDaRota,
+  nextTurnId,
+  type RouteErrors,
 } from "@/app/components/home/assistente/stream"
 
 /** The statuses that `/assistente/editor/conversa` refuses before the stream. It
  *  is not the Home's table on purpose — see `erroDaResposta`. */
-const ERROS_DA_ROTA: ErrosDaRota = {
+const ROUTE_ERRORS: RouteErrors = {
   409: { code: "conversa_em_andamento", message: "Já há uma conversa em andamento neste fluxo." },
   429: { code: "rate_limited", message: "Muitas mensagens em pouco tempo. Espere um instante." },
   503: { code: "desligado", message: "O assistente não está disponível nesta instalação." },
 }
 
 export interface Assistente {
-  estado: IAssistenteEstado | null
+  estado: IAssistantState | null
   /** Until `GET /estado` comes back, the panel should not decide anything. */
   consultando: boolean
-  turnos: TurnoDoAssistente[]
+  turnos: AssistantTurn[]
   correndo: boolean
   enviar: (mensagem: string) => Promise<void>
   parar: () => void
@@ -60,34 +60,34 @@ export interface Assistente {
  *                    key `novo`.
  */
 export function useAssistenteEditor(workflowId?: string): Assistente {
-  const [estado, setEstado] = useState<IAssistenteEstado | null>(null)
-  const [consultando, setConsultando] = useState(true)
-  const [turnos, setTurnos] = useState<TurnoDoAssistente[]>([])
-  const [correndo, setCorrendo] = useState(false)
+  const [estado, setAppState] = useState<IAssistantState | null>(null)
+  const [consultando, setQuerying] = useState(true)
+  const [turnos, setTurns] = useState<AssistantTurn[]>([])
+  const [correndo, setRunning] = useState(false)
 
-  const abortoRef = useRef<AbortController | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
 
   // Switching workflow means switching conversation: the previous workflow's
   // history has nothing to do with this one, and its stream must not keep
   // writing here.
   useEffect(() => {
-    setTurnos([])
-    setCorrendo(false)
+    setTurns([])
+    setRunning(false)
     return () => {
-      abortoRef.current?.abort()
-      abortoRef.current = null
+      abortRef.current?.abort()
+      abortRef.current = null
     }
   }, [workflowId])
 
   useEffect(() => {
     let vivo = true
-    setConsultando(true)
+    setQuerying(true)
     GisFlowService.estadoDoAssistente().then(({ data }) => {
       if (!vivo) return
       // A network error here is no reason to hide the panel forever; `null` lets
       // the caller treat "don't know" separately from "turned off".
-      setEstado(data ?? null)
-      setConsultando(false)
+      setAppState(data ?? null)
+      setQuerying(false)
     })
     return () => {
       vivo = false
@@ -95,26 +95,26 @@ export function useAssistenteEditor(workflowId?: string): Assistente {
   }, [])
 
   const parar = useCallback(() => {
-    abortoRef.current?.abort()
-    abortoRef.current = null
-    setCorrendo(false)
+    abortRef.current?.abort()
+    abortRef.current = null
+    setRunning(false)
   }, [])
 
   const enviar = useCallback(
     async (mensagem: string) => {
       const texto = mensagem.trim()
-      if (!texto || abortoRef.current) return
+      if (!texto || abortRef.current) return
 
       const controle = new AbortController()
-      abortoRef.current = controle
+      abortRef.current = controle
 
-      const idDoTurno = proximoIdDeTurno()
-      setTurnos(anteriores => [
+      const turnId = nextTurnId()
+      setTurns(anteriores => [
         ...anteriores,
-        { id: proximoIdDeTurno(), papel: "user", texto, blocos: [] },
-        turnoVazio(idDoTurno),
+        { id: nextTurnId(), papel: "user", texto, blocos: [] },
+        emptyTurn(turnId),
       ])
-      setCorrendo(true)
+      setRunning(true)
 
       try {
         const resposta = await fetch(`${API_URL}/assistente/editor/conversa`, {
@@ -125,35 +125,35 @@ export function useAssistenteEditor(workflowId?: string): Assistente {
         })
 
         if (!resposta.ok || !resposta.body) {
-          aplicarNoTurno(setTurnos, idDoTurno, {
+          applyToTurn(setTurns, turnId, {
             evento: "erro",
-            dados: await erroDaResposta(resposta, ERROS_DA_ROTA),
+            dados: await erroDaResposta(resposta, ROUTE_ERRORS),
           })
           return
         }
 
         // The `cota` frame updates the state and does not enter the conversation.
         await lerQuadrosSSE(resposta.body, (quadro) => {
-          if (!aplicarCota(setEstado, quadro)) aplicarNoTurno(setTurnos, idDoTurno, quadro)
+          if (!applyQuota(setAppState, quadro)) applyToTurn(setTurns, turnId, quadro)
         })
       } catch (erro) {
         // Stopping is the user's decision, not a failure: the turn stays as it is,
         // with whatever has already arrived.
         if (!(erro instanceof DOMException && erro.name === "AbortError")) {
-          aplicarNoTurno(setTurnos, idDoTurno, { evento: "erro", dados: SEM_CONEXAO })
+          applyToTurn(setTurns, turnId, { evento: "erro", dados: NO_CONNECTION })
         }
       } finally {
         // The end of the turn is the closing of the STREAM, not the arrival of the
         // `fim` frame. A closed tab, a dropped connection or a proxy that gave up
         // end the conversation with no frame at all, and the panel cannot keep
         // spinning.
-        if (abortoRef.current === controle) abortoRef.current = null
-        setCorrendo(false)
+        if (abortRef.current === controle) abortRef.current = null
+        setRunning(false)
         // The quota was charged during the turn. Without this re-read the panel
         // would forever show the spend as of mount, and the person would only
         // discover the ceiling by running into it.
         void GisFlowService.estadoDoAssistente().then(({ data }) => {
-          if (data) setEstado(data)
+          if (data) setAppState(data)
         })
       }
     },
@@ -162,7 +162,7 @@ export function useAssistenteEditor(workflowId?: string): Assistente {
 
   const esquecer = useCallback(async () => {
     parar()
-    setTurnos([])
+    setTurns([])
     await GisFlowService.esquecerConversaDoAssistente(workflowId)
   }, [parar, workflowId])
 

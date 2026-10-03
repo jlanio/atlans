@@ -17,15 +17,15 @@
  * enrollment, has the same 10. `limites.test.ts` checks that the executor
  * accepts the value.
  */
-export const INTERVALO_SYNC = 10
+export const SYNC_INTERVAL = 10
 
 /** Directions accepted by `EXECUTOR_SYNC_MODE`. */
-export const MODOS_SYNC = ['upload', 'download', 'bidirectional', 'catalog'] as const
-export type ModoSync = (typeof MODOS_SYNC)[number]
+export const SYNC_MODES = ['upload', 'download', 'bidirectional', 'catalog'] as const
+export type SyncMode = (typeof SYNC_MODES)[number]
 
 /** Valores aceitos por `EXECUTOR_SYNC_CONFLICT_STRATEGY`. */
 export const ESTRATEGIAS = ['local-wins', 'remote-wins', 'keep-both'] as const
-export type EstrategiaConflito = (typeof ESTRATEGIAS)[number]
+export type ConflictStrategy = (typeof ESTRATEGIAS)[number]
 
 /**
  * What the executor does when `EXECUTOR_SYNC_MODE` / `_CONFLICT_STRATEGY` are
@@ -38,7 +38,7 @@ export type EstrategiaConflito = (typeof ESTRATEGIAS)[number]
  * is also the safe default: nothing that happens in the Drive deletes or
  * overwrites a local file.
  */
-export const PADRAO_SYNC = {
+export const SYNC_DEFAULTS = {
   modo: 'upload',
   conflito: 'remote-wins',
-} as const satisfies { modo: ModoSync; conflito: EstrategiaConflito }
+} as const satisfies { modo: SyncMode; conflito: ConflictStrategy }

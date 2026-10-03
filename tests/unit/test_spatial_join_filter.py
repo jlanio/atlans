@@ -23,7 +23,7 @@ def _pts(coords, crs="EPSG:3857"):
 # ── SpatialJoin: dwithin ──────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_sjoin_dwithin_marca_matches_e_mantem_todos_a():
+async def test_sjoin_dwithin_marks_matches_and_keeps_all_a():
     # p0 5m from a point of B; p1 far away (100m).
     A = _pts([(0, 0), (100, 100)])
     B = _pts([(5, 0)])
@@ -34,7 +34,7 @@ async def test_sjoin_dwithin_marca_matches_e_mantem_todos_a():
 
 
 @pytest.mark.asyncio
-async def test_sjoin_dwithin_sem_distancia_da_erro():
+async def test_sjoin_dwithin_without_distance_errors():
     A = _pts([(0, 0)])
     B = _pts([(5, 0)])
     node = SpatialJoinNode("n", {"how": "left", "predicate": "dwithin", "distance": 0})
@@ -43,7 +43,7 @@ async def test_sjoin_dwithin_sem_distancia_da_erro():
 
 
 @pytest.mark.asyncio
-async def test_sjoin_intersects_regressao():
+async def test_sjoin_intersects_regression():
     A = gpd.GeoDataFrame({"id": [1]}, geometry=[box(0, 0, 2, 2)], crs="EPSG:3857")
     B = gpd.GeoDataFrame({"b": [9]}, geometry=[box(1, 1, 3, 3)], crs="EPSG:3857")
     node = SpatialJoinNode("n", {"how": "inner", "predicate": "intersects"})
@@ -54,7 +54,7 @@ async def test_sjoin_intersects_regressao():
 # ── SpatialFilter: mask + invert ──────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_filter_mask_mantem_intersectantes():
+async def test_filter_mask_keeps_intersecting():
     pts = _pts([(1, 1), (50, 50)])           # p0 inside the polygon, p1 outside
     mask = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:3857")
     node = SpatialFilterNode("n", {"filter_mode": "mask", "predicate": "intersects", "invert": False})
@@ -63,7 +63,7 @@ async def test_filter_mask_mantem_intersectantes():
 
 
 @pytest.mark.asyncio
-async def test_filter_mask_invert_pega_complemento():
+async def test_filter_mask_invert_takes_the_complement():
     pts = _pts([(1, 1), (50, 50)])
     mask = gpd.GeoDataFrame(geometry=[box(0, 0, 10, 10)], crs="EPSG:3857")
     node = SpatialFilterNode("n", {"filter_mode": "mask", "predicate": "intersects", "invert": True})
@@ -72,7 +72,7 @@ async def test_filter_mask_invert_pega_complemento():
 
 
 @pytest.mark.asyncio
-async def test_filter_mask_exige_entrada_mask():
+async def test_filter_mask_requires_mask_input():
     pts = _pts([(1, 1)])
     node = SpatialFilterNode("n", {"filter_mode": "mask", "predicate": "intersects"})
     with pytest.raises(ValueError, match="mask"):

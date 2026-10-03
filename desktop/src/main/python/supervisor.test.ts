@@ -5,9 +5,9 @@
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { PythonSupervisor, type EstadoSupervisor } from './supervisor.js'
+import { PythonSupervisor, type SupervisorState } from './supervisor.js'
 
-class ProcFalso extends EventEmitter {
+class FakeProc extends EventEmitter {
   stdout = new PassThrough()
   stderr = new PassThrough()
   stdin = new PassThrough()
@@ -33,13 +33,13 @@ class ProcFalso extends EventEmitter {
 }
 
 function criar() {
-  const procs: ProcFalso[] = []
+  const procs: FakeProc[] = []
   const spawnFn = vi.fn(() => {
-    const p = new ProcFalso()
+    const p = new FakeProc()
     procs.push(p)
     return p
   })
-  const estados: Array<[EstadoSupervisor, string | undefined]> = []
+  const estados: Array<[SupervisorState, string | undefined]> = []
   const sup = new PythonSupervisor({
     pythonExe: 'python',
     cwd: '.',

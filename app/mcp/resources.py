@@ -15,7 +15,7 @@ Three rules hold for every handler here:
    which is what calls `escopo_da_chamada` + `exigir_escopo`. A resource is not
    a back door: no scope, no read. What this module adds is the translation of
    the error and, in the handlers that read workspace data, the SAME timed
-   guard as `call_tool` (`guarda_da_chamada`) — without it, reading by URI
+   guard as `call_tool` (`call_guard`) — without it, reading by URI
    would be the only path in the server that leaves no audit line, and it is
    precisely the path the client repeats without thinking.
 
@@ -49,7 +49,7 @@ from mcp.server.mcpserver.exceptions import ResourceError, ResourceNotFoundError
 from app.mcp import guia
 from app.mcp.erros import codigo_do_erro, to_tool_error
 from app.mcp.escopo import escopo_da_chamada
-from app.mcp.tools.base import guarda_da_chamada
+from app.mcp.tools.base import call_guard
 from app.mcp.tools.catalogo import describe_node, get_authoring_guide, search_nodes
 from app.mcp.tools.execucao import get_run
 from app.mcp.tools.workflows import get_workflow, get_workflow_contract, list_workflows
@@ -58,7 +58,7 @@ from app.mcp.tools.workflows import get_workflow, get_workflow_contract, list_wo
 # exceeds 10 KB and the full sheet of the 63 nodes, 70 KB: delivering that as a
 # single blob in a `resources/read` spends the reader's context budget before
 # the conversation begins. The hint says how to get to what matters.
-DICA_CATALOGO = (
+CATALOG_HINT = (
     "Leia atlans://catalog/nodes?type=<tipo> para o índice de um grupo, ou "
     "atlans://catalog/nodes/<Nome> para a ficha completa de um nó."
 )
@@ -69,7 +69,7 @@ def _json(dados: Any) -> str:
     return json.dumps(dados, ensure_ascii=False, default=str)
 
 
-def _como_erro_de_resource(exc: Exception) -> ResourceError:
+def _as_resource_error(exc: Exception) -> ResourceError:
     """Translates an exception into the resource error, without losing the `code`.
 
     `to_tool_error` remains the MCP's only translation table (an
@@ -104,7 +104,7 @@ def registrar_resources(server) -> None:
         title="Guia de autoria de workflows",
         description=(
             "O guia de autoria, por tópico: "
-            + ", ".join(guia.TOPICOS)
+            + ", ".join(guia.TOPICS)
             + ". Mesmo texto da ferramenta get_authoring_guide."
         ),
         mime_type="text/markdown",
@@ -118,7 +118,7 @@ def registrar_resources(server) -> None:
         try:
             return (await get_authoring_guide(ctx, topic=topic))["markdown"]
         except Exception as exc:
-            raise _como_erro_de_resource(exc) from exc
+            raise _as_resource_error(exc) from exc
 
     @server.resource(
         "atlans://catalog/nodes{?type}",
@@ -145,7 +145,7 @@ def registrar_resources(server) -> None:
                 return _json({
                     "types": resultado["types"],
                     "total": resultado["total"],
-                    "hint": DICA_CATALOGO,
+                    "hint": CATALOG_HINT,
                 })
             return _json({
                 "type": type,
@@ -153,7 +153,7 @@ def registrar_resources(server) -> None:
                 "items": resultado["items"],
             })
         except Exception as exc:
-            raise _como_erro_de_resource(exc) from exc
+            raise _as_resource_error(exc) from exc
 
     @server.resource(
         "atlans://catalog/nodes/{name}",
@@ -172,7 +172,7 @@ def registrar_resources(server) -> None:
         try:
             return _json(await describe_node(ctx, name=name, brief=False))
         except Exception as exc:
-            raise _como_erro_de_resource(exc) from exc
+            raise _as_resource_error(exc) from exc
 
     @server.resource(
         "atlans://workspaces/{id}/workflows",
@@ -185,12 +185,12 @@ def registrar_resources(server) -> None:
         """Lightweight listing — no definition, no params_schema, no secret."""
         try:
             escopo = escopo_da_chamada(ctx)
-            async with guarda_da_chamada(
-                "list_workflows", escopo, cobrar_cota=False, origem="resource"
+            async with call_guard(
+                "list_workflows", escopo, charge_quota=False, origem="resource"
             ):
                 return _json(await list_workflows(ctx, workspace_id=id))
         except Exception as exc:
-            raise _como_erro_de_resource(exc) from exc
+            raise _as_resource_error(exc) from exc
 
     @server.resource(
         "atlans://workflows/{id}",
@@ -207,14 +207,14 @@ def registrar_resources(server) -> None:
         """
         try:
             escopo = escopo_da_chamada(ctx)
-            async with guarda_da_chamada(
-                "get_workflow", escopo, cobrar_cota=False, origem="resource"
+            async with call_guard(
+                "get_workflow", escopo, charge_quota=False, origem="resource"
             ):
                 return _json(
                     await get_workflow(ctx, workflow_id=id, include_definition=True)
                 )
         except Exception as exc:
-            raise _como_erro_de_resource(exc) from exc
+            raise _as_resource_error(exc) from exc
 
     @server.resource(
         "atlans://workflows/{id}/contract",
@@ -227,12 +227,12 @@ def registrar_resources(server) -> None:
         """What the workflow accepts and returns when called by another one."""
         try:
             escopo = escopo_da_chamada(ctx)
-            async with guarda_da_chamada(
-                "get_workflow_contract", escopo, cobrar_cota=False, origem="resource"
+            async with call_guard(
+                "get_workflow_contract", escopo, charge_quota=False, origem="resource"
             ):
                 return _json(await get_workflow_contract(ctx, workflow_id=id))
         except Exception as exc:
-            raise _como_erro_de_resource(exc) from exc
+            raise _as_resource_error(exc) from exc
 
     @server.resource(
         "atlans://runs/{id}",
@@ -253,14 +253,14 @@ def registrar_resources(server) -> None:
         offers the summary to whoever only wants the status.
 
         The run's error message and each node's go down sanitized into
-        `untrusted_data` (that is what `resumo_run` does): they are the fields
+        `untrusted_data` (that is what `run_summary` does): they are the fields
         most likely to carry a secret or a command sentence from a run.
         """
         try:
             escopo = escopo_da_chamada(ctx)
-            async with guarda_da_chamada(
-                "get_run", escopo, cobrar_cota=False, origem="resource"
+            async with call_guard(
+                "get_run", escopo, charge_quota=False, origem="resource"
             ):
                 return _json(await get_run(ctx, run_id=id, node_stats="full"))
         except Exception as exc:
-            raise _como_erro_de_resource(exc) from exc
+            raise _as_resource_error(exc) from exc

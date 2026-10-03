@@ -30,7 +30,7 @@ def _no(props: dict) -> dict:
 
 # ── A recusa ────────────────────────────────────────────────────────────────
 
-def test_connection_string_literal_e_recusada():
+def test_literal_connection_string_is_refused():
     with pytest.raises(HTTPException) as exc:
         WR._recusar_segredo(_no({"connectionString": SEGREDO}))
 
@@ -38,7 +38,7 @@ def test_connection_string_literal_e_recusada():
     assert "credential_id" in exc.value.detail
 
 
-def test_cabecalho_de_autorizacao_tambem_e_recusado():
+def test_authorization_header_is_also_refused():
     """Explicit decision by the owner: a free-form header is included in the refusal.
 
     Whoever needs to send a token in a header creates a credential. There is no exception
@@ -50,7 +50,7 @@ def test_cabecalho_de_autorizacao_tambem_e_recusado():
     assert exc.value.status_code == 422
 
 
-def test_a_recusa_cita_o_caminho_e_nunca_o_valor():
+def test_the_refusal_cites_the_path_and_never_the_value():
     """The refusal message must not be the leak it prevents."""
     with pytest.raises(HTTPException) as exc:
         WR._recusar_segredo(_no({"connectionString": SEGREDO}))
@@ -63,17 +63,17 @@ def test_a_recusa_cita_o_caminho_e_nunca_o_valor():
 
 # ── What must NOT be refused ────────────────────────────────────────────────
 
-def test_expressao_pura_passa():
+def test_pure_expression_passes():
     """`{{ ... }}` e referencia resolvida em runtime, nao segredo gravado."""
     WR._recusar_segredo(_no({"connectionString": "{{ inputs.dsn }}"}))
 
 
-def test_so_o_esquema_de_autenticacao_passa():
+def test_only_the_authentication_scheme_passes():
     """"Bearer {{ $Cred.token }}" nao grava nada — sobra so o esquema."""
     WR._recusar_segredo(_no({"headers": {"Authorization": "Bearer {{ $Cred.token }}"}}))
 
 
-def test_referencia_por_credential_id_passa():
+def test_reference_by_credential_id_passes():
     """O caminho pretendido: a definition guarda a referencia, nao o valor."""
     WR._recusar_segredo(_no({
         "credential_id": "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
@@ -81,14 +81,14 @@ def test_referencia_por_credential_id_passa():
     }))
 
 
-def test_definition_vazia_passa():
+def test_empty_definition_passes():
     WR._recusar_segredo({})
     WR._recusar_segredo(None)
 
 
 # ── The route wiring ────────────────────────────────────────────────────────
 
-async def test_update_sem_definition_nao_dispara_a_guarda(monkeypatch):
+async def test_update_without_definition_does_not_trigger_the_guard(monkeypatch):
     """The most likely regression: `WorkflowUpdate` is PARTIAL.
 
     A missing `definition` means "don't touch it". A careless guard, one that
@@ -131,20 +131,20 @@ async def test_update_sem_definition_nao_dispara_a_guarda(monkeypatch):
     assert gravado["nome"] == "nome novo"  # e a edicao passou
 
 
-def test_paridade_com_a_borda_do_mcp():
+def test_parity_with_the_mcp_edge():
     """The REST API must not be more permissive than the MCP server.
 
-    Both call `definition_contem_segredo`; this test breaks if someone
+    Both call `definition_contains_secret`; this test breaks if someone
     creates a second list of keys for one of the sides.
     """
-    from app.mcp.tools.construcao import _recusar_segredo as mcp_recusa
+    from app.mcp.tools.construcao import _recusar_segredo as mcp_refuse
 
     definicao = _no({"headers": {"Authorization": f"Bearer {TOKEN}"}})
 
     with pytest.raises(HTTPException):
         WR._recusar_segredo(definicao)
     with pytest.raises(Exception):           # o MCP levanta ToolError, nao HTTP
-        mcp_recusa(definicao)
+        mcp_refuse(definicao)
 
 
 # ── The guard is WIRED INTO the routes ──────────────────────────────────────
@@ -154,7 +154,7 @@ def test_paridade_com_a_borda_do_mcp():
 # exactly what a review measured — deleting the calls (there were three; the one in
 # /workflows/validate went away with the route) did not change a single name in the suite.
 
-class _Usuario:
+class _FakeUser:
     id_hash = "u-1"
 
 
@@ -164,7 +164,7 @@ class _Wf:
 
 
 @pytest.fixture
-def rota_liberada(monkeypatch):
+def open_route(monkeypatch):
     """Gets what is not the subject out of the way: limiter and role.
 
     On the `/{id_hash}` routes the role comes from the dependency (`workflow_com_papel`),
@@ -173,14 +173,14 @@ def rota_liberada(monkeypatch):
     """
     from app.core.authorization import workflow_access
 
-    async def _papel(db, ws_id, uid):
+    async def _role(db, ws_id, uid):
         return "editor"
 
     monkeypatch.setattr(WR.limiter, "enabled", False)
-    monkeypatch.setattr(workflow_access, "get_workspace_member_role", _papel)
+    monkeypatch.setattr(workflow_access, "get_workspace_member_role", _role)
 
 
-async def test_rota_de_criacao_recusa(rota_liberada):
+async def test_create_route_refuses(open_route):
     from app.schemas.workflow import WorkflowCreate
 
     payload = WorkflowCreate(
@@ -189,13 +189,13 @@ async def test_rota_de_criacao_recusa(rota_liberada):
 
     with pytest.raises(HTTPException) as exc:
         await WR.create_workflow(
-            request=None, payload=payload, service=None, current_user=_Usuario(), db=None,
+            request=None, payload=payload, service=None, current_user=_FakeUser(), db=None,
         )
     assert exc.value.status_code == 422
     assert SEGREDO not in str(exc.value.detail)
 
 
-async def test_rota_de_atualizacao_recusa(rota_liberada):
+async def test_update_route_refuses(open_route):
     from app.schemas.workflow import WorkflowUpdate
 
     with pytest.raises(HTTPException) as exc:
@@ -205,12 +205,12 @@ async def test_rota_de_atualizacao_recusa(rota_liberada):
             service=None,
             wf=_Wf(),
             db=None,
-            current_user=_Usuario(),
+            current_user=_FakeUser(),
         )
     assert exc.value.status_code == 422
 
 
-async def test_params_schema_tambem_e_guardado(rota_liberada):
+async def test_params_schema_is_also_guarded(open_route):
     """Sibling column, writable in the same body, and NOT encrypted in the database."""
     from app.schemas.workflow import WorkflowUpdate
 
@@ -221,7 +221,7 @@ async def test_params_schema_tambem_e_guardado(rota_liberada):
             service=None,
             wf=_Wf(),
             db=None,
-            current_user=_Usuario(),
+            current_user=_FakeUser(),
         )
     assert exc.value.status_code == 422
     assert TOKEN not in str(exc.value.detail)
@@ -239,7 +239,7 @@ async def test_params_schema_tambem_e_guardado(rota_liberada):
     ("token de paginacao num body JSON",
      {"body": {"pagina": 2, "token": "eyJhbGciOiJIUzI1NiJ9"}}),
 ])
-def test_recusas_deliberadas_em_mapas_de_dado_do_usuario(caso, props):
+def test_deliberate_refusals_in_user_data_maps(caso, props):
     """Four LEGITIMATE patterns the guard refuses — and that was decided.
 
     The rule matches by KEY NAME, and in these maps the key is user data:

@@ -69,7 +69,7 @@ developers of their own agents.
   `verify_workspace_access` returns 403 (not 404) with a NULL `workspace_id` (`:127-133`); runs
   authorize by the RUN's workspace, not the workflow's (`observability_service.py:142-168`).
   (After this spec, the REST role guards became two pieces: `workflow_com_papel(minimo)`
-  in `app/api/dependencies.py` — 404 before 403 — and `exigir_papel_no_workspace` in
+  in `app/api/dependencies.py` — 404 before 403 — and `require_workspace_role` in
   `app/core/authorization/workflow_access.py`; `_require_operator`, `_require_workspace_editor`
   and `get_accessible_workflow` were removed.)
 - **Global admin in observability — DONE (PR A of Phase 1)**: it used to be `_is_admin(user)` reading
@@ -93,14 +93,14 @@ developers of their own agents.
   `owner_id == user`** (today `assert_credentials_accessible`, `credential_loader.py`; fixed
   in PR 3 of Phase 0): a shared credential passed in the run and failed in validate. The
   `credential_scope()` (ContextVar) carried **only `owner_ids`** (since PR 3 it carries
-  `EscopoDeCredenciais(owner_ids, shared_workspace_id)`); `shared_workspace_id` is an explicit kwarg of
+  `CredentialScope(owner_ids, shared_workspace_id)`); `shared_workspace_id` is an explicit kwarg of
   `resolve_credentials_from_ids` (`:176-181`) that `DatabaseSpatialQuery.simulate` does not pass
   (`database_spatial_query.py:165-177`). `workspace_credential_owners` returns the owner + **all
   the members** (`:63-88`) — using it as the scope would hand over each member's private credential.
 - **`get_workflow_by_hash` decrypts `connectionString`** inside the definition
   (`workflow_service.py:541-543`, `encryption.py:45-54`; versions likewise,
   `workflow_version_service.py:83`); the field is still declared in 4 database nodes and legacy
-  definitions carry a DSN with a password. The existing redaction `_sem_segredos`/`_PROPRIEDADES_SECRETAS`
+  definitions carry a DSN with a password. The existing redaction `_without_secrets`/`_SECRET_PROPERTIES`
   (`flow/factory.py:13-32`) is a **flat** comprehension over the 1st-level keys of ONE properties
   dict, used only for **logging** — it does not walk `nodes[]`, does not descend into `headers`
   (`http_request.py:208`), `params`, `body`, `queryParams` (`database_query.py:67`), nor
@@ -108,9 +108,9 @@ developers of their own agents.
   (`node-config-form.tsx:231` discards the field), but `encrypt_workflow_connections` still
   writes it in legacy saves (`encryption.py:26-28`, `credential_resolver.py:80-81`).
   → **Covered in the core (PR A of Phase 1)**: `app/core/utils/redacao.py` provides
-  `redigir_definition` (recursive over `nodes[].properties`/`parameters`, including
-  `headers`, and scanning URLs with literal credentials), `compactar_definition` and
-  `definition_contem_segredo`; `_sem_segredos` stays where it is, only for logging. What is still missing
+  `redact_definition` (recursive over `nodes[].properties`/`parameters`, including
+  `headers`, and scanning URLs with literal credentials), `compact_definition` and
+  `definition_contains_secret`; `_without_secrets` stays where it is, only for logging. What is still missing
   is the MCP edge: applying the redaction to what goes out and rejecting `connectionString` on input.
 - **Run data goes out raw**: Redis events unfiltered (`observability_service.py:1440-1447`),
   including `kind:"stdout"|"debug"` (`log_workflows_router.py:56-57`); `error_message` and
@@ -137,12 +137,12 @@ developers of their own agents.
   drop`, `docker-compose.yml:207`, allowlist `:208-213`) and `_SCRUB_PATTERNS` already redacts
   `Bearer <token>` (`logger.py:24-25`); what remains exposed is `RequestPath`+query
   (`defaultmode=keep`, `:206`).
-- `_marcar_last_used` (`credential_loader.py:247-282`) is an **unconditional** `UPDATE` inside a
+- `_mark_last_used` (`credential_loader.py:247-282`) is an **unconditional** `UPDATE` inside a
   SAVEPOINT — best-effort, but **without throttling**.
 - `trigger_source` is a closed enum `manual|retry|webhook|schedule` (`observability_router.py:139`;
   `String(16)` column with no CHECK, `workflow_run.py:50`); `start_analysis` already accepts
   `trigger_source` (`workflow_service.py:552-564`). Web touch points: `TriggerSource`
-  (`web/service/types.ts:12`), `rotuloDaOrigem` (`observability/formatos.ts:95-97`),
+  (`web/service/types.ts:12`), `originLabel` (`observability/formatos.ts:95-97`),
   `docs/specs/metrics-history.md:35`.
 - Domain errors: `AtlasBaseError` mapped only by the HTTP handler (`error_handlers.py:14-29`);
   an inactive workflow on execute is **409 `workflow_inactive`** (`exceptions.py:38-40`), 403 only on retry.
@@ -168,8 +168,8 @@ developers of their own agents.
   `skills/atlans-workflows/` with
   `SKILL.md` (declares `ATLANS_API_URL`/`ATLANS_API_TOKEN`), `scripts/catalogo.py` (`GET /nodes`),
   `scripts/validar.py` (`POST /workflows/validate`, converts `properties`→`parameters`),
-  `reference/formato-e-semantica.md` (155 lines / 6.9 KB — edge semantics/pitfalls) and
-  `catalogo-resumido.md`. Written policy: *"don't create the workflow on your own — offer it"*;
+  `reference/formato-e-semantics.md` (155 lines / 6.9 KB — edge semantics/pitfalls) and
+  `catalogo-summarized.md`. Written policy: *"don't create the workflow on your own — offer it"*;
   *"the token defines the reach"*; *"a secret never goes in the definition"*. Bugs measured there (the first
   two fixed in PR 3 of Phase 0): a nonexistent node → **500** in validate; 8 nodes without
   `simulate()` vanish from the simulation;
@@ -247,7 +247,7 @@ developers of their own agents.
   (id=<id>).`), `duplicate_node_id`, `cycle`, `construction_error` and `invalid_credential_id`
   (fatal by contract: a client that only looks at the HTTP status still fails) → **422**
   `{"error":"invalid_definition","message":"Definição inválida: …","report":{…}}`
-  (`DefinicaoInvalidaError`; `report` = same shape as the `__report__`; before: 500 in the
+  (`InvalidDefinitionError`; `report` = same shape as the `__report__`; before: 500 in the
   constructor, `flow/core/graph.py`/`flow/factory.py`).
   201 response = `{node_id: {status:"ok", schema:[{fields:[{name, type}]}], schema_source:
   static|simulated|declared} | {status:"error", error}}` + `__edge_diagnostics__` (previous
@@ -390,7 +390,7 @@ developers of their own agents.
    operator in the run's workspace). MCP is the first consumer; the REST migrates **later, router by
    router, in PRs of their own**, with golden tests that pin down each divergence.
    Every tool declares its guard in a **tool → guard table** (minimum role, PAT scope).
-2. **`EscopoEfetivo`** = `{user, workspace_ids = get_user_workspace_ids ∩ token.workspace_ids,
+2. **`EffectiveScope`** = `{user, workspace_ids = get_user_workspace_ids ∩ token.workspace_ids,
    scopes, token_id}`. Rule: a resource with `workspace_id` → `∈ scope.workspace_ids` **before** the
    role; a resource **without** a workspace (`workspace_id` NULL — private credential) → `owner_id == user`.
    **Global admin does not pass through**: MCP never hands the raw admin `User` to the services — the
@@ -418,7 +418,7 @@ developers of their own agents.
 ### 2. Architecture and transport
 - **Where**: inside the API process, as the **exact route `/mcp`** (not `app.mount`), wrapped
   by the PAT middleware:
-  `app.add_route("/mcp", AutenticacaoPAT(server.streamable_http_app(streamable_http_path="/mcp",
+  `app.add_route("/mcp", PATAuthentication(server.streamable_http_app(streamable_http_path="/mcp",
   stateless_http=True, json_response=False, transport_security=TransportSecuritySettings(
   allowed_hosts=["<PUBLIC_HOST>", "<PUBLIC_HOST>:*", "localhost:*", "127.0.0.1:*"],
   allowed_origins=[]))), include_in_schema=False)`. The exact route receives the `path` intact and the SDK
@@ -430,7 +430,7 @@ developers of their own agents.
   (OAuth). `session_manager.run()` goes inside the existing `lifespan` (`app/main.py:95-143`);
   `create_mcp_server()` is a **factory** (one instance per process and per test), not a module
   singleton.
-- **Identity in the tools**: the middleware validates the PAT and writes `EscopoEfetivo` into
+- **Identity in the tools**: the middleware validates the PAT and writes `EffectiveScope` into
   `scope["state"]["escopo"]`; the tools read `ctx.request_context.request.state.escopo` via a
   `escopo_da_chamada(ctx)` helper. **Not** via `ctx.headers` (client input), **not** via
   `Resolve(...)` (Phase 1 does not use `Resolve`, so there is no `request_state` to seal across workers).
@@ -444,7 +444,7 @@ developers of their own agents.
   present → 403, `initialize` responds with the server name, identifiers importable. The
   `/mcp` without a PAT → 401 comes in with the middleware, in Phase 1. **Note for Phase 1**: the
   Host/Origin validation happens **inside** the transport, after any external middleware — with
-  `AutenticacaoPAT` in front, a request without a PAT gets 401 before any 421.
+  `PATAuthentication` in front, a request without a PAT gets 401 before any 421.
 - **Stateless — what the flag actually does**: modern clients (header `MCP-Protocol-Version`
   ≥ 2026-07-28) are sessionless by construction; `stateless_http=True` covers the legacy ones so that
   `uvicorn --workers 4` without affinity works. Cost in both: no server→client back-channel
@@ -485,8 +485,8 @@ developers of their own agents.
   done by overriding `MCPServer.list_tools()` (a public method) in a subclass that reads the scope from the
   request — not through the provisional middleware. No `admin`, ever.
 - **At the edge**: `Authorization: Bearer atl_pat_…` → SHA-256 → active/unexpired/unrevoked `ApiToken`
-  → `User` `status=="active"` → `EscopoEfetivo` in `scope["state"]`. Fit: an ASGI middleware
-  `AutenticacaoPAT` in front of the sub-app (401 with `WWW-Authenticate: Bearer`; the token is **never**
+  → `User` `status=="active"` → `EffectiveScope` in `scope["state"]`. Fit: an ASGI middleware
+  `PATAuthentication` in front of the sub-app (401 with `WWW-Authenticate: Bearer`; the token is **never**
   accepted in a query string). **It does not accept a session JWT.** `token_verifier`/`AuthSettings` are left
   for Phase 3 (OAuth resource server).
 - **Quotas** (Redis, **in Phase 1** — without them `validate` connects to a real database and `execute` dispatches
@@ -494,7 +494,7 @@ developers of their own agents.
   `validate_workflow` 20/min; **≤3 simultaneous waits (`wait`) per token and ≤40 on the platform**
   (each wait holds an uncapped pub/sub connection and an open SSE); `wait` default 120 s, max. 300 s.
 - `last_used_at` best-effort with a real throttle: `SET NX EX 60` on `pat:lu:{id}` in Redis before the
-  `UPDATE` (it inherits only the savepoint/best-effort of `_marcar_last_used`, which has no throttle).
+  `UPDATE` (it inherits only the savepoint/best-effort of `_mark_last_used`, which has no throttle).
 - Regex `atl_pat_[A-Za-z0-9_-]{43}` in `detect-secrets` (`.pre-commit-config.yaml`/baseline) and in
   `_SCRUB_PATTERNS` for **bare** occurrences (`Bearer …` is already covered by the existing pattern).
 
@@ -515,7 +515,7 @@ falls on is what the two conventions decide. Whoever needs the literal shape rea
 **Discovery and reading** — `workflows:read` (member)
 | Tool | Input → output |
 |---|---|
-| `list_workspaces` | → `[{id, name, my_role, is_default}]` (only those in the `EscopoEfetivo`) |
+| `list_workspaces` | → `[{id, name, my_role, is_default}]` (only those in the `EffectiveScope`) |
 | `list_workflows` | `(workspace_id?, search?, only_active?)` → lightweight items (`has_webhook_trigger`, `has_schedule_trigger`, `is_subworkflow`, `schedule`, `portal_access`) |
 | `get_workflow` | `(workflow_id, include_definition=false)` → summary (nodes `{id,name,alias,type}`, compact edges, **`params_schema`**, triggers, pins, number of versions, portal); with `include_definition=true` the **redacted** definition without `position/viewport` |
 | `get_workflow_contract` | → `{inputs, outputs, has_input_node, has_output_node, is_active}` (`inputsMapping` keys) |
@@ -540,8 +540,8 @@ falls on is what the two conventions decide. Whoever needs the literal shape rea
 **Execution** — `runs:execute` (operator)
 | Tool | Behavior |
 |---|---|
-| `run_workflow` | `(workflow_id, inputs?, debug_mode=false, wait=true, timeout_seconds=120 (máx 300), idempotency_key?)`. Validates `inputs` against **`params_schema` in the descriptor format** (`required`, `type`, coercion identical to the UI dialog's; absent/invalid = no contract, not an error) in addition to the webhook's `payload_schema`. **Namespaced** idempotency `{user_id}:{workflow_id}:{key}`. Triggers via `start_analysis(trigger_source="mcp", triggered_by=user)`. `wait`: consumes `app/services/run_events_service.py` (PR A of Phase 1) — `iter_run_events(run_id, timeout_s=…)` returns **batches** `{eventos, dropped, heartbeat, completo}` of raw JSON (the WS is just another client: it wraps each batch in the usual frame), and `esperar_run(run_id, timeout_s=…, total_nos=…, on_progress=…)` already combines these batches with the **poll of `WorkflowRun.status`** — the fallback for the endings that do not publish `__workflow_complete__` (cancel of a `pending` run, orphan dispatch, "all refused") — and calls back the progress, which becomes `ctx.report_progress(concluídos, total, "Buffer concluído (1,2 s)")`. Returns, at the top level, `{run_id, workflow_id, workspace_id, status, trigger_source, triggered_by, started_at, finished_at, duration_seconds, typical_seconds, error_category, retry_count, nodes, artifacts[], events_dropped}`. **`nodes` is the integer COUNT** of nodes with statistics, not a list: each node's snapshot comes out in `untrusted_data.node_stats` and in `summary` mode (`{node_id, name, status, duration_ms, error}` — **without `output_keys`/`output_columns`**); the full snapshot only comes via `get_run(node_stats="full")` and the `atlans://runs/{id}` resource. **There is no `error` key at the top level**: the message is `untrusted_data.error_message`. The error is not just passed through `scrub_text` — it stays in QUARANTINE in the data block (§1.6), together with `workflow_name`, each node's `error` and the inputs' `hints`, because it is the field most likely to carry a secret or a command phrase aimed at whoever reads the response. `artifacts[]` comes without links — whoever wants to download calls `get_run_artifacts`, and a list cut off at the cap of 100 sets `artifacts_truncated: true` —, and `events_dropped` says how many events the buffer discarded during the wait. Timeout exceeded → `{run_id, workflow_id, status:"running", hint}`; finished without a recorded outcome → the same shape with `status:"unknown"`. Inactive → `ToolError workflow_inactive` |
-| `cancel_run` · `retry_run` | **DONE** (Phase 2, PR 1). `cancel` only with `operator` in the run's workspace, and the admin does not pass through: the check lives in `workflow_execution_service.cancel_run`, next to the SELECT that loads the run, and the tool passes `user_id=escopo.user_id` with `como_admin` at its default. The response carries `outcome` (`requested`/`cancelled`/`already_finished`) and `status_before`, because `already_finished` also comes out when there is no associated executor — and in that case the run may stay in `running`. `retry` warns that it does not reuse the original inputs (`reused_inputs: false`): it triggers with the current definition and with the **`params_schema` defaults** (the same `validar_inputs` as `run_workflow`, which also rejects a required input with no default before spending an executor), marked as origin `mcp` and not `retry` |
+| `run_workflow` | `(workflow_id, inputs?, debug_mode=false, wait=true, timeout_seconds=120 (máx 300), idempotency_key?)`. Validates `inputs` against **`params_schema` in the descriptor format** (`required`, `type`, coercion identical to the UI dialog's; absent/invalid = no contract, not an error) in addition to the webhook's `payload_schema`. **Namespaced** idempotency `{user_id}:{workflow_id}:{key}`. Triggers via `start_analysis(trigger_source="mcp", triggered_by=user)`. `wait`: consumes `app/services/run_events_service.py` (PR A of Phase 1) — `iter_run_events(run_id, timeout_s=…)` returns **batches** `{eventos, dropped, heartbeat, completo}` of raw JSON (the WS is just another client: it wraps each batch in the usual frame), and `esperar_run(run_id, timeout_s=…, total_nodes=…, on_progress=…)` already combines these batches with the **poll of `WorkflowRun.status`** — the fallback for the endings that do not publish `__workflow_complete__` (cancel of a `pending` run, orphan dispatch, "all refused") — and calls back the progress, which becomes `ctx.report_progress(concluídos, total, "Buffer concluído (1,2 s)")`. Returns, at the top level, `{run_id, workflow_id, workspace_id, status, trigger_source, triggered_by, started_at, finished_at, duration_seconds, typical_seconds, error_category, retry_count, nodes, artifacts[], events_dropped}`. **`nodes` is the integer COUNT** of nodes with statistics, not a list: each node's snapshot comes out in `untrusted_data.node_stats` and in `summary` mode (`{node_id, name, status, duration_ms, error}` — **without `output_keys`/`output_columns`**); the full snapshot only comes via `get_run(node_stats="full")` and the `atlans://runs/{id}` resource. **There is no `error` key at the top level**: the message is `untrusted_data.error_message`. The error is not just passed through `scrub_text` — it stays in QUARANTINE in the data block (§1.6), together with `workflow_name`, each node's `error` and the inputs' `hints`, because it is the field most likely to carry a secret or a command phrase aimed at whoever reads the response. `artifacts[]` comes without links — whoever wants to download calls `get_run_artifacts`, and a list cut off at the cap of 100 sets `artifacts_truncated: true` —, and `events_dropped` says how many events the buffer discarded during the wait. Timeout exceeded → `{run_id, workflow_id, status:"running", hint}`; finished without a recorded outcome → the same shape with `status:"unknown"`. Inactive → `ToolError workflow_inactive` |
+| `cancel_run` · `retry_run` | **DONE** (Phase 2, PR 1). `cancel` only with `operator` in the run's workspace, and the admin does not pass through: the check lives in `workflow_execution_service.cancel_run`, next to the SELECT that loads the run, and the tool passes `user_id=escopo.user_id` with `como_admin` at its default. The response carries `outcome` (`requested`/`cancelled`/`already_finished`) and `status_before`, because `already_finished` also comes out when there is no associated executor — and in that case the run may stay in `running`. `retry` warns that it does not reuse the original inputs (`reused_inputs: false`): it triggers with the current definition and with the **`params_schema` defaults** (the same `validate_inputs` as `run_workflow`, which also rejects a required input with no default before spending an executor), marked as origin `mcp` and not `retry` |
 | `pin_node_output` · `unpin_node_output` · `list_pins` | pin on the next run: the tool **always** sends `outputs={}` (+ `ttl_hours`) — the router persists `body.outputs` unfiltered and the echo comes back in the GET; rejects a node whose `description()["type"] == "output"` (a pin on an output suppresses the write); `list_pins` reads `wf.pinned_outputs`/`pin_metadata` in-process (they are not in `WorkflowRead`) — Phase 2 |
 
 **Reading runs** — `workflows:read` (member of the **run's** workspace)
@@ -549,7 +549,7 @@ The owner's decision (2026-09-13): READING a run is `workflows:read` + member, a
 `runs:execute`. It is parity with the REST, where `/observability/runs` only requires
 belonging to the workspace; demanding the triggering scope just to follow along would force granting execution
 permission to someone who only reads. Always through the member scope, **with no admin bypass**
-(`como_admin=False`, `user=escopo.como_usuario()`, `workspace_ids=sorted(escopo.workspace_ids)`).
+(`como_admin=False`, `user=escopo.as_user()`, `workspace_ids=sorted(escopo.workspace_ids)`).
 | Tool | Behavior |
 |---|---|
 | `get_run` · `list_runs` | `get_run(run_id, node_stats="summary"\|"full")` (summary = status/duration/error per node, without `output_columns`) / the observability filters; `error_message` and `node_stats.*.error` go out through `scrub_text`, inside `untrusted_data` (summarized in the listing) |
@@ -572,7 +572,7 @@ permission to someone who only reads. Always through the member scope, **with no
 
 ### 5. Resources and prompts
 - **Resources** (`atlans://…`, JSON/markdown, cacheable): `atlans://guide/authoring/{topic}`
-  (the OpenClaw skill's `formato-e-semantica.md`, updated and **sliced by topic**: `to_key`
+  (the OpenClaw skill's `formato-e-semantics.md`, updated and **sliced by topic**: `to_key`
   required on multi-input, a nonexistent `from_key` does not fail, branches with `condition`+
   `source_handle`, credentials by id, `params_schema` × inputs by node_id, expressions, SQL with
   binding, pitfalls of pin/HTTP 4xx/binary/presigned URL, raster out) — the recipes
@@ -602,10 +602,10 @@ permission to someone who only reads. Always through the member scope, **with no
 1. **`app/core/authorization/workflow_access.py` module** extracted from the routers in an **additive** way
    (MCP consumes it; REST migrates later, router by router, with golden tests of the status divergences).
    Consumption by MCP is **DONE (Phase 1)** — `app/mcp/resolucao.py` loads every workflow via
-   `carregar_workflow_acessivel(..., decifrar=False)` and every tool applies `exigir_papel`; the
+   `load_accessible_workflow(..., decifrar=False)` and every tool applies `exigir_papel`; the
    REST migration continues in Phase 2.
 2. **`trigger_source="mcp"`**: the router regex (`observability_router.py:139-141`), the
-   `TriggerSource` union (`web/service/types.ts:12`), `rotuloDaOrigem` (`formatos.ts:95-97`),
+   `TriggerSource` union (`web/service/types.ts:12`), `originLabel` (`formatos.ts:95-97`),
    `docs/specs/metrics-history.md`. `start_analysis` already accepts the value.
 3. **Validate — DONE (PR 3)**: nonexistent name/cycle/duplicate id/construction error →
    **structured 422** `invalid_definition` (it was 500), lint before the executor and `__report__`
@@ -640,10 +640,10 @@ permission to someone who only reads. Always through the member scope, **with no
    not to touch `scope["client"]`. MCP quotas keyed by `token_id` — **DONE (Phase 1)**,
    in `app/mcp/cotas.py` (general bucket 120/min, `validate` and `run` 20/min, a cap of 3 waits per
    token and 40 on the platform; without Redis, they fail open with a warning).
-8. **Redaction — `redigir_definition`/`scrub_text` DONE (PR A of Phase 1)**, in
+8. **Redaction — `redact_definition`/`scrub_text` DONE (PR A of Phase 1)**, in
    `app/core/utils/redacao.py`; applying it at the MCP edge is also **DONE (Phase 1)** —
-   nothing goes out without `redigir_definition` and nothing comes in without `definition_contem_segredo`
-   (`secret_in_definition` with the paths, never the values): `redigir_definition(definition)`
+   nothing goes out without `redact_definition` and nothing comes in without `definition_contains_secret`
+   (`secret_in_definition` with the paths, never the values): `redact_definition(definition)`
    **recursive** over `nodes[].properties` and `nodes[].parameters`
    (fixed keys: `connectionString`, `password`, `senha`, `secret`, `token`, `api_key`, `apikey`,
    `authorization`, `private_key`, `http_auth`, and `authorization`/`x-api-key` inside `headers`)
@@ -655,7 +655,7 @@ permission to someone who only reads. Always through the member scope, **with no
 10. `atl_pat_` regex in `detect-secrets` and in the logger (bare occurrences).
 11. **slowapi with `storage_uri=REDIS_URL`** — the REST limits today apply per worker (×4).
 12. **Explicit scope in observability — DONE (PR A of Phase 1)**:
-    `_wf_filter/_run_filter/_resolver_escopo` receive an explicit `como_admin: bool` (default
+    `_wf_filter/_run_filter/_resolve_scope` receive an explicit `como_admin: bool` (default
     `False`) instead of `_is_admin(user)`; the one who flips the switch is the edge, via
     `e_admin_global(user)` (the `_is_admin` alias is already gone); `_serialize_run` defaults
     to `admin=False`; the metrics cache key hashes
@@ -667,14 +667,14 @@ permission to someone who only reads. Always through the member scope, **with no
 14. `MINIO_EXTERNAL_ENDPOINT=https://<S3_HOST>` as a precondition checked at boot —
     **DONE (PR A of Phase 1)**: `storage.endpoint_externo_e_local()` decides (empty host,
     `localhost`, `127.0.0.1`, `::1` or `minio` count as local) and the lifespan of `app/main.py`
-    logs a *warning* with `storage.endpoint_externo()`. It is a warning, never an error: in dev the local
+    logs a *warning* with `storage.external_endpoint()`. It is a warning, never an error: in dev the local
     endpoint is expected.
 
 ### 7. Phases
 | Phase | Deliverable | Effort |
 |---|---|---|
 | **0 — Foundation** — DONE | PAT (model, migration, endpoints, **`/settings/tokens` route + menu**); **additive** `workflow_access.py` (consumed only by MCP); `trigger_source="mcp"` (4 touch points); validate 422 + `credential_scope` with `shared_workspace_id` + optional `workspace_id` + disabled/sub-workflow/declared outputs; namespaced idempotency; real IP (§6.7); slowapi on Redis; secret regex; `mcp==2.2.0` + transitive deps; identifiers/421/403/401 test | ~2 weeks |
-| **1 — Server (MVP)** — DONE | exact `/mcp` route (factory + lifespan + `AutenticacaoPAT`), `EscopoEfetivo` in `request.state`, **per-token quotas + global cap**, recursive redactor + `scrub_text`, `to_tool_error`, explicit scope in observability (§6.12), reading tools (`list_workspaces`, `list_workflows`, `get_workflow`, `get_workflow_contract`, `search_nodes`/`describe_node`, `list_credentials`, `list_drive_files`/`get_drive_download_url`, `get_portal_info`, `get_authoring_guide`) + `validate_workflow`/`create_workflow`/`update_workflow`/`set_workflow_active`/`set_portal_access` + `run_workflow(wait)` (`iter_run_events` + fallback) + `get_run`/`list_runs`/`get_run_artifacts` (`MINIO_EXTERNAL_ENDPOINT` checked), resources + prompts (`criar_fluxo`, `diagnosticar_run`, `revisar_fluxo`, `explicar_fluxo`), Traefik, `docs/mcp.md` (single source) | ~2–3 weeks |
+| **1 — Server (MVP)** — DONE | exact `/mcp` route (factory + lifespan + `PATAuthentication`), `EffectiveScope` in `request.state`, **per-token quotas + global cap**, recursive redactor + `scrub_text`, `to_tool_error`, explicit scope in observability (§6.12), reading tools (`list_workspaces`, `list_workflows`, `get_workflow`, `get_workflow_contract`, `search_nodes`/`describe_node`, `list_credentials`, `list_drive_files`/`get_drive_download_url`, `get_portal_info`, `get_authoring_guide`) + `validate_workflow`/`create_workflow`/`update_workflow`/`set_workflow_active`/`set_portal_access` + `run_workflow(wait)` (`iter_run_events` + fallback) + `get_run`/`list_runs`/`get_run_artifacts` (`MINIO_EXTERNAL_ENDPOINT` checked), resources + prompts (`criar_fluxo`, `diagnosticar_run`, `revisar_fluxo`, `explicar_fluxo`), Traefik, `docs/mcp.md` (single source) | ~2–3 weeks |
 | **2 — Coverage** | versions/duplicate/restore, `get_run_events`, `cancel`/`retry`, pins, triggers (+ aligned timezone), drive writing, workspace artifacts, call auditing in the UI (History "by agent"), recipes validated in CI, **REST migration to `workflow_access.py`** (PRs per router, golden tests) | ~1.5 weeks |
 | **3 — Optional** | OAuth 2.1 (`token_verifier` + `AuthSettings`, `mcp.<PUBLIC_HOST>` + `/.well-known`; required for Claude.ai/Desktop *connectors* and ChatGPT), elicitation via `Resolve`+`Elicit` with `RequestStateSecurity(keys=[segredo compartilhado])`, browser clients (`allowed_origins`/CORS), `subscriptions/listen` on `atlans://runs/{id}`, a copilot inside Atlans | on demand |
 
@@ -715,7 +715,7 @@ permission to someone who only reads. Always through the member scope, **with no
 - **Copilot inside Atlans** (Phase 3): the web calls the model with the user's own MCP —
   "build it for me" in the editor, the canvas receiving the validated definition.
 - **The OpenClaw skill** becomes a thin MCP client (or coexists for stdio-only hosts) — the
-  knowledge in `formato-e-semantica.md` starts coming from the server and stops going stale.
+  knowledge in `formato-e-semantics.md` starts coming from the server and stops going stale.
 - **Workflow CI/CD**: a pipeline validates definitions versioned in git with `validate_workflow`
   before promoting them; Slack/Teams bots trigger runs and post artifacts.
 - **Headless automation**: scripts with the official client (`mcp.Client("https://<PUBLIC_HOST>/mcp")`).

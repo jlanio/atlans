@@ -5,12 +5,12 @@
 // leads to its section).
 
 import type { INodeAdminEntry, IStorageUsageAdmin, IWorkspacePolicyAdmin, IWorkspaceTrash } from "@/service/types"
-import { semOndeRodar } from "@/app/components/admin/isolation-floor-section"
+import { hasNowhereToRun } from "@/app/components/admin/isolation-floor-section"
 import { TbAlertTriangle, TbChevronRight, TbCircleCheck } from "react-icons/tb"
 import { cn } from "@/lib/utils"
 import { formatBytes } from "@/utils/formatters"
-import { formatarInteiro, plural } from "@/lib/formatos"
-import { SkeletonVisaoGeral } from "./estados"
+import { formatInteger, plural } from "@/lib/formatos"
+import { OverviewSkeleton } from "./estados"
 import type { SectionId } from "./nav"
 
 type Severity = "danger" | "warn" | "info"
@@ -42,7 +42,7 @@ export function buildAlerts(
 
   // A floor set on a workspace with no main executor: nothing runs in it, and the
   // owner has no way to loosen it — only the admin can fix it (or the owner adds one).
-  for (const ws of (policies ?? []).filter(semOndeRodar)) {
+  for (const ws of (policies ?? []).filter(hasNowhereToRun)) {
     alerts.push({
       section: "execucao", severity: "warn",
       title: `«${ws.name}» exige isolamento e não tem executor principal`,
@@ -159,7 +159,7 @@ export function OverviewSection({
   loading: boolean
   onNavigate: (s: SectionId) => void
 }) {
-  if (loading) return <SkeletonVisaoGeral />
+  if (loading) return <OverviewSkeleton />
 
   const enabled = nodes?.filter(n => n.enabled).length ?? 0
   const totalNodes = nodes?.length ?? 0
@@ -176,19 +176,19 @@ export function OverviewSection({
         />
         <Indicador
           rotulo="Workspaces com dados"
-          valor={formatarInteiro(storage?.by_workspace.length ?? 0)}
+          valor={formatInteger(storage?.by_workspace.length ?? 0)}
           apoio={orfaos > 0 ? plural(orfaos, "órfão", "órfãos") : "todos ativos"}
           onClick={() => onNavigate("armazenamento")}
         />
         <Indicador
           rotulo="Nodes ativos"
-          valor={totalNodes ? `${formatarInteiro(enabled)}/${formatarInteiro(totalNodes)}` : "—"}
+          valor={totalNodes ? `${formatInteger(enabled)}/${formatInteger(totalNodes)}` : "—"}
           apoio={totalNodes - enabled > 0 ? `${plural(totalNodes - enabled, "desabilitado")}` : "nenhum bloqueado"}
           onClick={() => onNavigate("nodes")}
         />
         <Indicador
           rotulo="Retenção"
-          valor={retentionDays != null ? `${formatarInteiro(retentionDays)} dias` : "∞"}
+          valor={retentionDays != null ? `${formatInteger(retentionDays)} dias` : "∞"}
           apoio={retentionDays != null ? "artefatos expiram" : "sem expiração"}
           onClick={() => onNavigate("seguranca")}
         />

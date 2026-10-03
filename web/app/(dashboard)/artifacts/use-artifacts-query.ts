@@ -17,7 +17,7 @@ interface Filtros { kind: ArtifactTab; search: string; fmt?: string; workspaceId
  * offset. Outside the hook so that the reload asks the client for the SAME
  * query — key, fetch and pagination — instead of a copy that could diverge.
  */
-function consultaDeArtefatos({ kind, search, fmt, workspaceId }: Filtros) {
+function artifactsQuery({ kind, search, fmt, workspaceId }: Filtros) {
   return infiniteQueryOptions({
     queryKey: ["artefatos", { kind, search, fmt, workspaceId }],
     queryFn: async ({ pageParam }) => {
@@ -72,7 +72,7 @@ export function useArtifactsQuery({ kind, search, fmt, workspaceId, enabled }: {
 }) {
   const cliente = useQueryClient()
   const consulta = useMemo(
-    () => consultaDeArtefatos({ kind, search, fmt, workspaceId }),
+    () => artifactsQuery({ kind, search, fmt, workspaceId }),
     [kind, search, fmt, workspaceId],
   )
   // The `enabled` gate avoids the request without workspace_id that would go
@@ -102,8 +102,8 @@ export function useArtifactsQuery({ kind, search, fmt, workspaceId, enabled }: {
   // resets with the new key: a filter that fails after an accepted load is an
   // amber notice, with the filter bar on screen so the person can get out of
   // it — not the card, which hides it.
-  const [atualizadoEm, setAtualizadoEm] = useState<number | null>(null)
-  if (dataUpdatedAt > (atualizadoEm ?? 0)) setAtualizadoEm(dataUpdatedAt)
+  const [atualizadoEm, setUpdatedAt] = useState<number | null>(null)
+  if (dataUpdatedAt > (atualizadoEm ?? 0)) setUpdatedAt(dataUpdatedAt)
 
   const loadMore = useCallback(() => { void fetchNextPage() }, [fetchNextPage])
 
@@ -142,7 +142,7 @@ export function useArtifactsQuery({ kind, search, fmt, workspaceId, enabled }: {
  * Deriving the targets from the visible list makes that path impossible, even
  * if some id escapes the selection reset.
  */
-export function idsSelecionadosVisiveis(
+export function visibleSelectedIds(
   items: IArtifactItem[],
   selecionados: Set<string>,
 ): string[] {

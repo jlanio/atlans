@@ -21,7 +21,7 @@ from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-class SobreposicaoBinaria(BaseNode):
+class BinaryOverlay(BaseNode):
     """Binary overlay that rejects differing CRSs and unsupported geometry."""
 
     HOW: str            # gpd.overlay's `how`
@@ -31,7 +31,7 @@ class SobreposicaoBinaria(BaseNode):
 
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, gpd.GeoDataFrame]:
         self.validate()
-        gdf1, gdf2 = self.get_pair(inputs, operacao=self.OPERACAO, tipos_suportados=True)
+        gdf1, gdf2 = self.get_pair(inputs, operacao=self.OPERACAO, supported_types=True)
 
         logger.info(f"Executando {self.DESCRICAO_LOG} entre {len(gdf1)} e {len(gdf2)} feições.")
 

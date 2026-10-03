@@ -10,7 +10,7 @@ import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
-from executor.sync.http import ClienteHTTP, TIMEOUT_CONTROLE
+from executor.sync.http import HTTPClient, CONTROL_TIMEOUT
 from executor.sync.paths import is_inside
 from executor.sync.pool import em_thread, em_thread_io
 from executor.sync.scanner import Dataset
@@ -46,7 +46,7 @@ class DriveUploader:
         self.workspace_id = workspace_id
         self.sync_dir = Path(sync_dir)
         self._httpx_kwargs = mtls_httpx_kwargs(self.base_url)
-        self._http = ClienteHTTP(self._httpx_kwargs)
+        self._http = HTTPClient(self._httpx_kwargs)
 
     async def aclose(self):
         """Closes the shared HTTP client (called on manager shutdown)."""
@@ -132,7 +132,7 @@ class DriveUploader:
         try:
             resp = await self._http().post(
                 f"{self.base_url}/drive/executor-register",
-                json=corpo, headers=self._headers(), timeout=TIMEOUT_CONTROLE,
+                json=corpo, headers=self._headers(), timeout=CONTROL_TIMEOUT,
             )
             if resp.status_code not in (200, 201):
                 logger.warning(
@@ -171,7 +171,7 @@ class DriveUploader:
         url = f"{self.base_url}/drive/executor-file/{remote_id_hash}"
         try:
             resp = await self._http().delete(url, headers=self._headers(),
-                                             timeout=TIMEOUT_CONTROLE)
+                                             timeout=CONTROL_TIMEOUT)
             if resp.status_code in (200, 204):
                 logger.info("Arquivo %s removido do Drive.", remote_id_hash)
                 return True
@@ -211,7 +211,7 @@ class DriveUploader:
             resp = await cliente.post(
                 f"{self.base_url}/drive/executor-upload-url",
                 json={"filename": filename, "size": file_size},
-                headers=self._headers(), timeout=TIMEOUT_CONTROLE,
+                headers=self._headers(), timeout=CONTROL_TIMEOUT,
             )
             if resp.status_code not in (200, 201):
                 logger.warning("Upload URL falhou: HTTP %d — %s", resp.status_code, resp.text[:200])
@@ -243,7 +243,7 @@ class DriveUploader:
             confirm_resp = await cliente.post(
                 f"{self.base_url}/drive/executor-confirm-upload/{id_hash}",
                 json={"spatial_metadata": spatial_metadata or {}},
-                headers=self._headers(), timeout=TIMEOUT_CONTROLE,
+                headers=self._headers(), timeout=CONTROL_TIMEOUT,
             )
             if confirm_resp.status_code not in (200, 201):
                 logger.warning("Confirm falhou: HTTP %d — %s", confirm_resp.status_code, confirm_resp.text[:200])

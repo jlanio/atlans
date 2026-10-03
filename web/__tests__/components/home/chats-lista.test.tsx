@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach } from "vitest"
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
-import type { IConversaResumo } from "@/service/types"
+import type { IConversationSummary } from "@/service/types"
 
 /**
  * The "Meu → Chats" panel (the "Recentes"): each conversation's row, the active one, the
@@ -11,7 +11,7 @@ import type { IConversaResumo } from "@/service/types"
 
 const H = vi.hoisted(() => ({
   hook: {
-    conversas: [] as IConversaResumo[],
+    conversas: [] as IConversationSummary[],
     carregando: false, atualizando: false, jaCarregou: true, erro: null as string | null,
     total: 0, carregandoMais: false,
     recarregar: vi.fn(), carregarMais: vi.fn(), tentarDeNovo: vi.fn(), anunciar: vi.fn(),
@@ -40,7 +40,7 @@ import { SidebarProvider } from "@/app/components/ui/sidebar"
 import { ChatsLista } from "@/app/components/home/chats/lista"
 import { useHomeStore } from "@/app/stores/homeStore"
 
-const conversa = (extra: Partial<IConversaResumo> = {}): IConversaResumo => ({
+const conversa = (extra: Partial<IConversationSummary> = {}): IConversationSummary => ({
   id: "c1", titulo: "Focos em Rondônia", workflow_id: null, tokens_total: 0,
   created_at: "2026-09-10T12:00:00Z", updated_at: "2026-09-10T12:00:00Z",
   ...extra,
@@ -75,7 +75,7 @@ function montar() {
   )
 }
 
-const gatilhoDe = (rotulo: string) => screen.getByRole("button", { name: `Ações de "${rotulo}"` })
+const triggerFor = (rotulo: string) => screen.getByRole("button", { name: `Ações de "${rotulo}"` })
 
 describe("ChatsLista — a linha", () => {
   it("lista as conversas; a sem título vira 'Sem título'", () => {
@@ -95,7 +95,7 @@ describe("ChatsLista — a linha", () => {
 
     // The menu mock wraps the trigger in a <div>; in the real DOM Radix adds no
     // wrapper. What matters: both live in the SAME flex row.
-    const gatilho = gatilhoDe("Focos em Rondônia")
+    const gatilho = triggerFor("Focos em Rondônia")
     const linha = botao.closest('[data-slot="linha-do-meu"]')!
     expect(gatilho.closest('[data-slot="linha-do-meu"]')).toBe(linha)
     expect(linha.className).toContain("flex")
@@ -200,19 +200,19 @@ describe("ChatsLista — renomear e apagar", () => {
 })
 
 describe("ChatsLista — o anúncio do stream chega à lista", () => {
-  const anuncio = { id: "c9", titulo: "Nova conversa", nova: true }
+  const announcement = { id: "c9", titulo: "Nova conversa", nova: true }
 
   it("um anúncio depois de montar vai ao hook — é assim que a conversa nova entra sem F5", () => {
     montar()
-    act(() => { useHomeStore.getState().anunciarConversa(anuncio) })
+    act(() => { useHomeStore.getState().anunciarConversa(announcement) })
     expect(H.hook.anunciar).toHaveBeenCalledTimes(1)
-    expect(H.hook.anunciar).toHaveBeenCalledWith(anuncio)
+    expect(H.hook.anunciar).toHaveBeenCalledWith(announcement)
   })
 
   it("o que já estava na store ao montar é passado — a carga de montagem traz a verdade", () => {
     // On the phone the list remounts every time the drawer opens; reapplying an
     // old announcement over the freshly loaded list would be double work.
-    useHomeStore.getState().anunciarConversa(anuncio)
+    useHomeStore.getState().anunciarConversa(announcement)
     montar()
     expect(H.hook.anunciar).not.toHaveBeenCalled()
   })
@@ -221,18 +221,18 @@ describe("ChatsLista — o anúncio do stream chega à lista", () => {
     // The load response REPLACES the list: applied in the middle, the announcement vanished.
     Object.assign(H.hook, { carregando: true, jaCarregou: false, conversas: [] })
     const { rerender } = montar()
-    act(() => { useHomeStore.getState().anunciarConversa(anuncio) })
+    act(() => { useHomeStore.getState().anunciarConversa(announcement) })
     expect(H.hook.anunciar).not.toHaveBeenCalled()
 
     Object.assign(H.hook, { carregando: false, jaCarregou: true, conversas: [conversa()] })
     rerender(<SidebarProvider><ChatsLista /></SidebarProvider>)
-    expect(H.hook.anunciar).toHaveBeenCalledWith(anuncio)
+    expect(H.hook.anunciar).toHaveBeenCalledWith(announcement)
   })
 })
 
 describe("ChatsLista — apagar a conversa ativa", () => {
   /** Deletes "c1" through the menu and waits for the dialog to close (the outcome has already been applied). */
-  async function apagarPrimeira() {
+  async function deleteFirst() {
     fireEvent.click(within(screen.getAllByTestId("menu")[0]).getByText("Apagar"))
     const dialogo = await screen.findByRole("dialog")
     fireEvent.click(within(dialogo).getByRole("button", { name: "Apagar" }))
@@ -246,7 +246,7 @@ describe("ChatsLista — apagar a conversa ativa", () => {
     H.hook.apagar.mockResolvedValue({ ok: true })
     useHomeStore.setState({ conversaId: "c1" })
     montar()
-    await apagarPrimeira()
+    await deleteFirst()
     expect(useHomeStore.getState().conversaId).toBeNull()
   })
 
@@ -254,7 +254,7 @@ describe("ChatsLista — apagar a conversa ativa", () => {
     H.hook.apagar.mockResolvedValue({ ok: true })
     useHomeStore.setState({ conversaId: "c2" })
     montar()
-    await apagarPrimeira()
+    await deleteFirst()
     expect(useHomeStore.getState().conversaId).toBe("c2")
   })
 
@@ -262,7 +262,7 @@ describe("ChatsLista — apagar a conversa ativa", () => {
     H.hook.apagar.mockResolvedValue({ ok: false, erro: "servidor fora" })
     useHomeStore.setState({ conversaId: "c1" })
     montar()
-    await apagarPrimeira()
+    await deleteFirst()
     expect(H.toastErro).toHaveBeenCalled()
     expect(useHomeStore.getState().conversaId).toBe("c1")
   })

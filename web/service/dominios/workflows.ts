@@ -1,6 +1,6 @@
 // service/dominios/workflows.ts — recorte de GisFlowService (F5/A12).
 
-import { qs, get, post, put, patch, delComRetorno, del } from "../http"
+import { qs, get, post, put, patch, delWithResponse, del } from "../http"
 import type {
   INodesAPI, IPinNodeMeta, IWorkflow, IWorkflowGroup, IWorkflowMoveResult, IWorkflowVersion,
 } from "../types"
@@ -116,7 +116,7 @@ export function pinNodeOutput(workflowId: string, nodeId: string, outputs: Recor
 }
 
 export function unpinNodeOutput(workflowId: string, nodeId: string) {
-  return delComRetorno<{ unpinned: string; total_pinned: number }>(
+  return delWithResponse<{ unpinned: string; total_pinned: number }>(
     `/workflows/${workflowId}/pin/${nodeId}`,
   )
 }

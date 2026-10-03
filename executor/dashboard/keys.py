@@ -24,16 +24,16 @@ from typing import Callable
 
 logger = logging.getLogger("executor.dashboard")
 
-_ESTADO_TERMINAL = None   # settings do termios a restaurar (POSIX)
+_TERMINAL_STATE = None   # settings do termios a restaurar (POSIX)
 _FD_TERMINAL = None
 
 
-def _restaurar_terminal() -> None:
-    """Devolve o terminal ao modo canonico. Idempotente e silenciosa."""
-    global _ESTADO_TERMINAL, _FD_TERMINAL
-    if _ESTADO_TERMINAL is None:
+def _restore_terminal() -> None:
+    """Devolve o terminal ao modo canonical. Idempotente e silenciosa."""
+    global _TERMINAL_STATE, _FD_TERMINAL
+    if _TERMINAL_STATE is None:
         return
-    estado, fd, _ESTADO_TERMINAL, _FD_TERMINAL = _ESTADO_TERMINAL, _FD_TERMINAL, None, None
+    estado, fd, _TERMINAL_STATE, _FD_TERMINAL = _TERMINAL_STATE, _FD_TERMINAL, None, None
     try:
         import termios
         termios.tcsetattr(fd, termios.TCSADRAIN, estado)
@@ -41,7 +41,7 @@ def _restaurar_terminal() -> None:
         pass
 
 
-atexit.register(_restaurar_terminal)
+atexit.register(_restore_terminal)
 
 
 def teclado_disponivel() -> bool:
@@ -70,18 +70,18 @@ def teclado_disponivel() -> bool:
         return False
 
 
-class LeitorDeTeclas:
+class KeyReader:
     """Delivers keys to the event loop through a callback.
 
     The callback runs ON THE LOOP (via call_soon_threadsafe), so it can touch the
     panel state without extra synchronization.
     """
 
-    def __init__(self, ao_receber: Callable[[str], None]):
-        self._ao_receber = ao_receber
+    def __init__(self, on_receive: Callable[[str], None]):
+        self._on_receive = on_receive
         self._loop: asyncio.AbstractEventLoop | None = None
         self._thread: threading.Thread | None = None
-        self._parar = threading.Event()
+        self._stop_event = threading.Event()
 
     def start(self) -> bool:
         """Starts the reader thread. Returns False if the keyboard is not
@@ -94,7 +94,7 @@ class LeitorDeTeclas:
         except Exception as exc:
             logger.debug("Teclado indisponivel (%s) — painel segue sem atalhos.", exc)
             return False
-        self._thread = threading.Thread(target=self._loop_leitura,
+        self._thread = threading.Thread(target=self._read_loop,
                                         name="dashboard-keys", daemon=True)
         self._thread.start()
         return True
@@ -103,23 +103,23 @@ class LeitorDeTeclas:
         """Stops delivering keys and returns the terminal to canonical mode.
 
         The thread is not awaited: it is blocked on a read that only returns
-        on the next key. Since it is a daemon and `_parar` makes it drop whatever
+        on the next key. Since it is a daemon and `_stop_event` makes it drop whatever
         arrives, leaving it hanging neither holds up shutdown nor delivers a key
         to a panel that has already died.
         """
-        self._parar.set()
-        _restaurar_terminal()
+        self._stop_event.set()
+        _restore_terminal()
 
     # ── Plataforma ───────────────────────────────────────────────────────────
 
     def _preparar_terminal(self) -> None:
-        global _ESTADO_TERMINAL, _FD_TERMINAL
+        global _TERMINAL_STATE, _FD_TERMINAL
         if os.name == "nt":
             return  # msvcrt.getwch() already reads without echo and without enter
         import termios
         import tty
         fd = sys.stdin.fileno()
-        _ESTADO_TERMINAL = termios.tcgetattr(fd)
+        _TERMINAL_STATE = termios.tcgetattr(fd)
         _FD_TERMINAL = fd
         # cbreak, and not raw: keeps Ctrl+C as SIGINT, which is still
         # the shutdown path everybody knows.
@@ -137,16 +137,16 @@ class LeitorDeTeclas:
             return ch
         return sys.stdin.read(1)
 
-    def _loop_leitura(self) -> None:
+    def _read_loop(self) -> None:
         try:
-            while not self._parar.is_set():
+            while not self._stop_event.is_set():
                 try:
                     tecla = self._ler_uma()
                 except Exception:
                     return  # stdin fechado (shutdown) — nada a relatar
-                if tecla is None or self._parar.is_set():
+                if tecla is None or self._stop_event.is_set():
                     continue
-                loop, cb = self._loop, self._ao_receber
+                loop, cb = self._loop, self._on_receive
                 if loop is None or loop.is_closed():
                     return
                 try:
@@ -154,4 +154,4 @@ class LeitorDeTeclas:
                 except RuntimeError:
                     return  # loop encerrando
         finally:
-            _restaurar_terminal()
+            _restore_terminal()

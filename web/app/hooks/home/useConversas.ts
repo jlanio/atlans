@@ -1,19 +1,19 @@
 "use client"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { GisFlowService } from "@/service/GisFlowService"
-import { useTextosDaCasca } from "@/app/components/home/i18n/da-casca"
-import type { IConversaResumo } from "@/service/types"
-import type { AnuncioDeConversa } from "@/app/stores/homeStore"
+import { useShellTexts } from "@/app/components/home/i18n/da-casca"
+import type { IConversationSummary } from "@/service/types"
+import type { ConversationAnnouncement } from "@/app/stores/homeStore"
 
 /** The result of an optimistic write. `erro` exists because a boolean only
  *  said "it didn't work" — and the rename dialog stayed open without explaining anything. */
-export interface ResultadoDaEscrita {
+export interface WriteResult {
   ok: boolean
   erro?: string
 }
 
-export interface UseConversas {
-  conversas: IConversaResumo[]
+export interface UseConversations {
+  conversas: IConversationSummary[]
   /** Only the FIRST load (the skeleton). */
   carregando: boolean
   /** Reload in flight over the list already on screen — `aria-busy`, not a skeleton. */
@@ -21,7 +21,7 @@ export interface UseConversas {
   /** An accepted load has already happened: the error block only takes over the list before that. */
   jaCarregou: boolean
   erro: string | null
-  /** Quantas conversas o servidor tem — a lista vem cortada em `LIMITE`. */
+  /** Quantas conversas o servidor tem — a lista vem cortada em `LIMIT`. */
   total: number
   /** One more page in flight (the "Ver mais" (see more)). */
   carregandoMais: boolean
@@ -32,19 +32,19 @@ export interface UseConversas {
   /** Redoes what failed last: the "Ver mais" page, or the reload. */
   tentarDeNovo: () => void
   /**
-   * Applies an announcement from the assistant stream (see `AnuncioDeConversa`):
+   * Applies an announcement from the assistant stream (see `ConversationAnnouncement`):
    * a new conversation goes in at the top with its title; an existing one moves up. No GET.
    */
-  anunciar: (anuncio: AnuncioDeConversa) => void
+  anunciar: (announcement: ConversationAnnouncement) => void
   /** Renomeia (otimista). */
-  renomear: (id: string, titulo: string) => Promise<ResultadoDaEscrita>
+  renomear: (id: string, titulo: string) => Promise<WriteResult>
   /** Apaga (soft, otimista). */
-  apagar: (id: string) => Promise<ResultadoDaEscrita>
+  apagar: (id: string) => Promise<WriteResult>
 }
 
 // The endpoint's ceiling (`limit = max(1, min(limit, 100))` in agente_router) — and
 // it is SILENT: asking for more returns 100 with no error. That is why the reload reads by pages.
-const LIMITE = 100
+const LIMIT = 100
 
 /**
  * The stored failure: our own microcopy as a KEY, so the sentence comes out in
@@ -64,21 +64,21 @@ type Falha = "carregar" | "carregarMais" | { detalhe: string }
  * Idempotent: applying the same announcement twice does not duplicate.
  */
 export function comAnuncio(
-  lista: IConversaResumo[],
-  anuncio: AnuncioDeConversa,
+  lista: IConversationSummary[],
+  announcement: ConversationAnnouncement,
   agora: string = new Date().toISOString(),
-): { lista: IConversaResumo[]; inseriu: boolean } {
-  const atual = lista.find((c) => c.id === anuncio.id)
-  const resto = lista.filter((c) => c.id !== anuncio.id)
+): { lista: IConversationSummary[]; inseriu: boolean } {
+  const atual = lista.find((c) => c.id === announcement.id)
+  const resto = lista.filter((c) => c.id !== announcement.id)
   if (atual) {
     return {
-      lista: [{ ...atual, titulo: anuncio.titulo ?? atual.titulo, updated_at: agora }, ...resto],
+      lista: [{ ...atual, titulo: announcement.titulo ?? atual.titulo, updated_at: agora }, ...resto],
       inseriu: false,
     }
   }
-  if (!anuncio.titulo) return { lista, inseriu: false }
-  const nova: IConversaResumo = {
-    id: anuncio.id, titulo: anuncio.titulo, workflow_id: null, tokens_total: 0,
+  if (!announcement.titulo) return { lista, inseriu: false }
+  const nova: IConversationSummary = {
+    id: announcement.id, titulo: announcement.titulo, workflow_id: null, tokens_total: 0,
     created_at: agora, updated_at: agora,
   }
   return { lista: [nova, ...resto], inseriu: true }
@@ -98,39 +98,39 @@ export function comAnuncio(
  * end of the turn.
  *
  * State precedence from §3: a reload that fails does NOT erase the conversations
- * already on screen — `setConversas` only happens with ALL pages good.
+ * already on screen — `setConversations` only happens with ALL pages good.
  */
-export function useConversas(): UseConversas {
-  const t = useTextosDaCasca().listas
-  const [conversas, setConversas] = useState<IConversaResumo[]>([])
-  const [carregando, setCarregando] = useState(true)
-  const [atualizando, setAtualizando] = useState(false)
-  const [jaCarregou, setJaCarregou] = useState(false)
-  const [falha, setFalha] = useState<Falha | null>(null)
+export function useConversas(): UseConversations {
+  const t = useShellTexts().listas
+  const [conversas, setConversations] = useState<IConversationSummary[]>([])
+  const [carregando, setLoading] = useState(true)
+  const [atualizando, setRefreshing] = useState(false)
+  const [jaCarregou, setAlreadyLoaded] = useState(false)
+  const [falha, setFailure] = useState<Falha | null>(null)
   const [total, setTotal] = useState(0)
-  const [carregandoMais, setCarregandoMais] = useState(false)
+  const [carregandoMais, setLoadingMore] = useState(false)
   // Discards responses from a load older than the most recent one (quick switch).
   const geracao = useRef(0)
-  const jaCarregouRef = useRef(false)
+  const alreadyLoadedRef = useRef(false)
   // The current list without entering the dependencies: "Ver mais" needs the size
   // and the announcement needs to know whether the conversation is already here
   // (the callbacks must be stable so as not to recreate handlers on every new row).
-  const listaRef = useRef<IConversaResumo[]>([])
-  listaRef.current = conversas
+  const listRef = useRef<IConversationSummary[]>([])
+  listRef.current = conversas
   // What failed last — it is what "Tentar de novo" redoes.
-  const ultimaFalha = useRef<"recarga" | "pagina">("recarga")
+  const lastFailure = useRef<"recarga" | "pagina">("recarga")
 
   const recarregar = useCallback(() => {
     const minha = ++geracao.current
-    if (jaCarregouRef.current) setAtualizando(true)
-    else setCarregando(true)
+    if (alreadyLoadedRef.current) setRefreshing(true)
+    else setLoading(true)
     // Rereads ALL pages on screen, not just the first: after "Ver mais" the
     // list had 200, 300 rows and a reload brought it back to 100.
     // The server ceiling is silent, so it goes by offset, in parallel and
     // all-or-nothing — one bad page and the list stays as it was (§3).
-    const paginas = Math.max(1, Math.ceil(listaRef.current.length / LIMITE))
+    const paginas = Math.max(1, Math.ceil(listRef.current.length / LIMIT))
     const pedidos = Array.from({ length: paginas }, (_, i) =>
-      i === 0 ? GisFlowService.listarConversas(LIMITE) : GisFlowService.listarConversas(LIMITE, i * LIMITE),
+      i === 0 ? GisFlowService.listarConversas(LIMIT) : GisFlowService.listarConversas(LIMIT, i * LIMIT),
     )
     Promise.all(pedidos).then((respostas) => {
       if (minha !== geracao.current) return
@@ -139,7 +139,7 @@ export function useConversas(): UseConversas {
         // A conversation that moved up between two pages may come repeated: the key
         // is the id, not the position (the same care as "Ver mais").
         const vistos = new Set<string>()
-        const itens: IConversaResumo[] = []
+        const itens: IConversationSummary[] = []
         for (const r of respostas) {
           for (const c of r.data!.itens) {
             if (vistos.has(c.id)) continue
@@ -147,20 +147,20 @@ export function useConversas(): UseConversas {
             itens.push(c)
           }
         }
-        setConversas(itens)
+        setConversations(itens)
         setTotal(respostas[0].data!.total)
-        setFalha(null)
-        jaCarregouRef.current = true
-        setJaCarregou(true)
+        setFailure(null)
+        alreadyLoadedRef.current = true
+        setAlreadyLoaded(true)
       } else {
-        ultimaFalha.current = "recarga"
+        lastFailure.current = "recarga"
         // Our own microcopy comes before the backend's raw `detail`: a 500
         // returned "Erro inesperado." (unexpected error) as if it were text written for the person.
         const detalhe = ruim.error?.message
-        setFalha(ruim.status >= 500 || !detalhe ? "carregar" : { detalhe })
+        setFailure(ruim.status >= 500 || !detalhe ? "carregar" : { detalhe })
       }
-      setCarregando(false)
-      setAtualizando(false)
+      setLoading(false)
+      setRefreshing(false)
     })
   }, [])
 
@@ -172,58 +172,58 @@ export function useConversas(): UseConversas {
     // The generation does NOT advance: this is another page of the SAME load, and a
     // parallel reload must be able to invalidate it.
     const minha = geracao.current
-    setCarregandoMais(true)
-    GisFlowService.listarConversas(LIMITE, listaRef.current.length).then((res) => {
-      if (minha !== geracao.current) { setCarregandoMais(false); return }
+    setLoadingMore(true)
+    GisFlowService.listarConversas(LIMIT, listRef.current.length).then((res) => {
+      if (minha !== geracao.current) { setLoadingMore(false); return }
       if (res.success && res.data) {
         const pagina = res.data.itens
-        setConversas((atual) => {
+        setConversations((atual) => {
           // Deleting is optimistic and shortens the list, so the offset may repeat a
           // conversation already on screen — the key is the id, not the position.
           const vistos = new Set(atual.map((c) => c.id))
           return [...atual, ...pagina.filter((c) => !vistos.has(c.id))]
         })
         setTotal(res.data.total)
-        setFalha(null)
+        setFailure(null)
       } else {
-        ultimaFalha.current = "pagina"
-        setFalha("carregarMais")
+        lastFailure.current = "pagina"
+        setFailure("carregarMais")
       }
-      setCarregandoMais(false)
+      setLoadingMore(false)
     })
   }, [])
 
   const tentarDeNovo = useCallback(() => {
-    if (ultimaFalha.current === "pagina") carregarMais()
+    if (lastFailure.current === "pagina") carregarMais()
     else recarregar()
   }, [carregarMais, recarregar])
 
-  const anunciar = useCallback((anuncio: AnuncioDeConversa) => {
+  const anunciar = useCallback((announcement: ConversationAnnouncement) => {
     const agora = new Date().toISOString()
-    setConversas((atual) => comAnuncio(atual, anuncio, agora).lista)
+    setConversations((atual) => comAnuncio(atual, announcement, agora).lista)
     // The total goes up only when the conversation was JUST born and was not here
     // yet (the mount load may have arrived after it). OUTSIDE the `setConversas`
     // updater: in StrictMode updaters run twice.
-    const jaEstava = listaRef.current.some((c) => c.id === anuncio.id)
-    if (anuncio.nova && anuncio.titulo && !jaEstava) setTotal((n) => n + 1)
+    const alreadyPresent = listRef.current.some((c) => c.id === announcement.id)
+    if (announcement.nova && announcement.titulo && !alreadyPresent) setTotal((n) => n + 1)
   }, [])
 
-  const renomear = useCallback(async (id: string, titulo: string): Promise<ResultadoDaEscrita> => {
+  const renomear = useCallback(async (id: string, titulo: string): Promise<WriteResult> => {
     const res = await GisFlowService.renomearConversa(id, titulo)
     if (res.success) {
       // The server stamps `updated_at` on PATCH: renaming counts as activity
       // and the conversation moves up. Mirroring it here avoids the order jump on F5.
       const agora = new Date().toISOString()
-      setConversas((atual) => comAnuncio(atual, { id, titulo, nova: false }, agora).lista)
+      setConversations((atual) => comAnuncio(atual, { id, titulo, nova: false }, agora).lista)
       return { ok: true }
     }
     return { ok: false, erro: res.error?.message ?? t.geral.tenteDeNovo }
   }, [t])
 
-  const apagar = useCallback(async (id: string): Promise<ResultadoDaEscrita> => {
+  const apagar = useCallback(async (id: string): Promise<WriteResult> => {
     const res = await GisFlowService.apagarConversa(id)
     if (res.success) {
-      setConversas((atual) => atual.filter((c) => c.id !== id))
+      setConversations((atual) => atual.filter((c) => c.id !== id))
       setTotal((n) => Math.max(0, n - 1))
       return { ok: true }
     }

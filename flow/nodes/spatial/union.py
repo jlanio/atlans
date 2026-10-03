@@ -34,7 +34,7 @@ class UnionNode(BaseNode):
     async def execute(self, inputs: Dict[str, Any]) -> Dict[str, gpd.GeoDataFrame]:
         self.validate()
         # Gets and validates the layers via the base class helper (rejects differing CRSs)
-        gdf1, gdf2 = self.get_pair(inputs, operacao="união", tipos_suportados=True)
+        gdf1, gdf2 = self.get_pair(inputs, operacao="união", supported_types=True)
 
         logger.info(f"Executando união entre {len(gdf1)} e {len(gdf2)} feições...")
 

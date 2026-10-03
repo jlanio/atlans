@@ -57,8 +57,8 @@ with attributes** (IBGE alone has 9,759, in WFS 1.0.0). The other folders are
 ArcGIS REST or "(Metadados em validação)" placeholders and are left out with the
 reason `sem_endpoint_wfs` — ready for a future phase.
 
-The parser is `app/services/fontes_vault.py` (pure, no database): `ler_pasta()`
-returns one `RegistroDoVault` per layer or one `Ignorada(pasta, motivo)` per
+The parser is `app/services/fontes_vault.py` (pure, no database): `read_folder()`
+returns one `RegistroDoVault` per layer or one `Skipped(pasta, motivo)` per
 folder that does not get in. The fixtures in `tests/fixtures/vault/` are real excerpts.
 
 ### Import at startup
@@ -103,7 +103,7 @@ Three changes, and the third is the one that prevents a repeat:
    (`type_name`, `url`) **cannot** be truncated: `type_name` goes literally into the
    WFS query and the `chave` derives from it, so a truncation would create a source that points to
    a nonexistent layer. These cause the record to be **skipped**, with the reason in the summary.
-   The limit comes from the COLUMN (`fontes_service._limite`), not from a copied constant.
+   The limit comes from the COLUMN (`fontes_service._column_limit`), not from a copied constant.
 3. **`tests/unit/test_catalogo_cabe_nas_colunas.py`**, and this is the test that was missing: the
    SQLite of the other tests **ignores the `VARCHAR` size**, so the overflow was
    invisible to the whole suite — it passed in CI and failed on PostgreSQL. The new test reads
@@ -162,7 +162,7 @@ It lives in five places, so that no surface forgets it:
 
 `fontes_service.buscar()`: the query is normalized (no accents, lowercase),
 the connectives are dropped ("de", "em", "do"…), each term is expanded by the synonyms
-(the default map `SINONIMOS_PADRAO` + the Vault's `_sinonimos.md`) and becomes
+(the default map `DEFAULT_SYNONYMS` + the Vault's `_sinonimos.md`) and becomes
 `(busca LIKE '%t%' OR busca LIKE '%sin1%' …)`; between terms, AND. The scope is
 `workspace_id IN (…) OR workspace_id IS NULL`, without the deleted ones. The order:
 `estado='ok'` first, then `prioridade`, `usos` descending and title.
@@ -202,7 +202,7 @@ turns it off.
 ## Per-endpoint verification
 
 25 thousand layers are not 25 thousand probes: **one GetCapabilities per distinct
-URL** marks all the layers of that URL (`fontes_service.verificar_endpoint`).
+URL** marks all the layers of that URL (`fontes_service.verify_endpoint`).
 Present in the capabilities → `ok`, with CRS and bbox in the schema (and title, abstract and
 keywords when they were missing); absent → `falhando` ("camada não consta no
 GetCapabilities", the layer is not listed in the GetCapabilities); endpoint down → all

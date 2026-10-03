@@ -3,13 +3,13 @@ import { headers, cookies } from 'next/headers';
 import "../globals.css";
 import { auth, SESSION_HEADER, decodeSessionHeader } from '@/auth';
 import Providers from '../components/providers';
-import { ProvedorDeConsultas } from '../components/provedor-de-consultas';
+import { QueryProvider } from '../components/provedor-de-consultas';
 import SidebarRoot from '../components/sidebar';
 import { ThemeProvider } from '@/context/ThemeContext';
 import { WorkspaceProvider } from '@/context/WorkspaceContext';
 import { ActiveRunsProvider } from '@/context/ActiveRunsContext';
-import { EscopoPelaRota, IdiomaProvider } from '@/context/IdiomaContext';
-import { COOKIE_DO_IDIOMA, resolverIdioma } from '@/lib/idioma';
+import { ScopeByRoute, LanguageProvider } from '@/context/IdiomaContext';
+import { LANGUAGE_COOKIE, resolverIdioma } from '@/lib/idioma';
 
 // Route protection done via proxy.ts (Auth.js)
 //
@@ -40,12 +40,12 @@ export default async function Layout(props: { children: React.ReactNode }) {
   // and never read — collapsing the bar did not survive F5. Default: open, except
   // when the cookie explicitly says "false".
   const cookieStore = await cookies();
-  const sidebarAberta = cookieStore.get("sidebar_state")?.value !== "false";
+  const sidebarOpen = cookieStore.get("sidebar_state")?.value !== "false";
   // The width chosen at the separator, for the same reason: read HERE, on the
   // server, the bar is born at the person's size. In a client effect it would
   // be born at 16rem and jump on the first frame. The value is sanitized in the
   // provider (`limitarLargura`), so a tampered cookie stretches nothing.
-  const larguraDaBarra = Number(cookieStore.get("sidebar_width")?.value);
+  const sidebarWidth = Number(cookieStore.get("sidebar_width")?.value);
 
   // The Home's language, resolved HERE for the same reason as the theme and the
   // width: the first paint already comes out in the right language. Explicit
@@ -53,7 +53,7 @@ export default async function Layout(props: { children: React.ReactNode }) {
   // lib/idioma.ts. Applies to the shell and the Home; the admin pages stay in
   // Portuguese.
   const idioma = resolverIdioma({
-    cookie: cookieStore.get(COOKIE_DO_IDIOMA)?.value,
+    cookie: cookieStore.get(LANGUAGE_COOKIE)?.value,
     acceptLanguage: requestHeaders.get("accept-language"),
     pais: requestHeaders.get("cf-ipcountry"),
   });
@@ -62,25 +62,25 @@ export default async function Layout(props: { children: React.ReactNode }) {
   // included: the contexts that still fetch by hand (notifications, active
   // runs, workspaces) can migrate without moving in the tree.
   return (
-    <ProvedorDeConsultas>
+    <QueryProvider>
       <Providers session={session}>
-        <IdiomaProvider inicial={idioma}>
-          <EscopoPelaRota>
+        <LanguageProvider inicial={idioma}>
+          <ScopeByRoute>
             <ThemeProvider>
               <WorkspaceProvider>
                 <ActiveRunsProvider>
                   <SidebarRoot
-                    defaultOpen={sidebarAberta}
-                    defaultWidth={Number.isFinite(larguraDaBarra) ? larguraDaBarra : undefined}
+                    defaultOpen={sidebarOpen}
+                    defaultWidth={Number.isFinite(sidebarWidth) ? sidebarWidth : undefined}
                   >
                     {props.children}
                   </SidebarRoot>
                 </ActiveRunsProvider>
               </WorkspaceProvider>
             </ThemeProvider>
-          </EscopoPelaRota>
-        </IdiomaProvider>
+          </ScopeByRoute>
+        </LanguageProvider>
       </Providers>
-    </ProvedorDeConsultas>
+    </QueryProvider>
   );
 }

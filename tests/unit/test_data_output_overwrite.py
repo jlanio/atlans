@@ -31,7 +31,7 @@ async def _run(params: dict) -> dict:
 
 
 @pytest.mark.asyncio
-async def test_overwrite_propagado_no_contexto_drive():
+async def test_overwrite_propagated_in_drive_context():
     captured = await _run({"label": "resultado", "context": "drive", "overwrite": True})
 
     assert captured["create_drive_entry"] is True
@@ -39,7 +39,7 @@ async def test_overwrite_propagado_no_contexto_drive():
 
 
 @pytest.mark.asyncio
-async def test_overwrite_desligado_por_padrao():
+async def test_overwrite_off_by_default():
     """Conservative default: whoever configures nothing keeps the old behavior."""
     captured = await _run({"label": "resultado", "context": "drive"})
 
@@ -47,7 +47,7 @@ async def test_overwrite_desligado_por_padrao():
 
 
 @pytest.mark.asyncio
-async def test_overwrite_ignorado_em_artefatos():
+async def test_overwrite_ignored_for_artifacts():
     """An artifact already has its own s3_key per run (includes task_id) — no collision."""
     captured = await _run({"label": "resultado", "context": "artifacts", "overwrite": True})
 
@@ -56,7 +56,7 @@ async def test_overwrite_ignorado_em_artefatos():
 
 
 @pytest.mark.asyncio
-async def test_overwrite_como_string_e_rejeitado_na_validacao():
+async def test_overwrite_as_string_is_rejected_in_validation():
     """type=boolean requires a real bool — a string does not pass validate().
 
     Documents why the node does not coerce "true"/"false": the parameter never

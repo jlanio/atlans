@@ -29,7 +29,7 @@ from app.core.utils.jwt_utils import (
 )
 from app.core.utils.logger import get_logger
 from app.core.rate_limiter import limiter
-from app.core.redis import contar_na_janela
+from app.core.redis import count_in_window
 from app.core import config
 from app.core.config import FRONTEND_URL, EMAIL_VERIFY_TOKEN_TTL, PASSWORD_RESET_TOKEN_TTL
 from app.services.email_service import send_email_background
@@ -73,7 +73,7 @@ async def _record_failed(username: str, redis: aioredis.Redis) -> int:
 
     # SLIDING window: each failure renews the deadline, and the counter only
     # resets after _ATTEMPTS_TTL without any failure.
-    attempts, _ = await contar_na_janela(attempts_key, _ATTEMPTS_TTL, deslizante=True, redis=redis)
+    attempts, _ = await count_in_window(attempts_key, _ATTEMPTS_TTL, sliding=True, redis=redis)
 
     if attempts >= _MAX_ATTEMPTS:
         await redis.setex(locked_key, _LOCKOUT_TTL, "1")
@@ -96,11 +96,11 @@ async def _clear_attempts(username: str, redis: aioredis.Redis) -> None:
 # already this (4 x 5); with them in Redis, 5/min would lock the group out.
 # Brute force against ONE account is held off by the per-account lockout
 # (_MAX_ATTEMPTS/_LOCKOUT_TTL).
-_LIMITE_DE_ENTRADA_POR_IP = "20/minute"
+_LOGIN_LIMIT_PER_IP = "20/minute"
 
 
 @router.post("/register", response_model=UserOut, status_code=201, summary="Criar nova conta")
-@limiter.limit(_LIMITE_DE_ENTRADA_POR_IP)
+@limiter.limit(_LOGIN_LIMIT_PER_IP)
 async def register(request: Request, payload: UserCreate, db: AsyncSession = Depends(get_db)):
     # Checks username and email uniqueness with a unified message (avoids user enumeration)
     result = await db.execute(select(User).where(User.username == payload.username))
@@ -155,7 +155,7 @@ async def register(request: Request, payload: UserCreate, db: AsyncSession = Dep
 
 
 @router.post("/login", response_model=Token, summary="Autenticar e obter tokens JWT")
-@limiter.limit(_LIMITE_DE_ENTRADA_POR_IP)
+@limiter.limit(_LOGIN_LIMIT_PER_IP)
 async def login(
     request: Request,
     payload: UserLogin,
@@ -184,10 +184,10 @@ async def login(
 
     # bcrypt off the event loop (see register): under a login burst, the hashes
     # run in parallel instead of serializing and stalling the worker.
-    senha_ok = bool(user) and await asyncio.to_thread(
+    password_ok = bool(user) and await asyncio.to_thread(
         verify_password, payload.password, user.hashed_password,
     )
-    if not senha_ok:
+    if not password_ok:
         remaining = await _record_failed(ident, redis)
         if remaining == 0:
             logger.warning("Conta '%s' bloqueada após %d tentativas falhas.", ident, _MAX_ATTEMPTS)
@@ -389,9 +389,9 @@ async def reset_password(
     # Cascade: whoever resets the password (possibly because the account was
     # compromised) does not want any agent staying authenticated with an old
     # token. Same transaction as the commit below.
-    from app.services.api_token_service import revogar_todos_do_usuario
+    from app.services.api_token_service import revoke_all_for_user
 
-    await revogar_todos_do_usuario(db, [user.id_hash], motivo="password_reset")
+    await revoke_all_for_user(db, [user.id_hash], motivo="password_reset")
     await db.commit()
     logger.info("Senha do usuário '%s' redefinida.", user.username)
     return MessageResponse(message="Senha redefinida com sucesso!")

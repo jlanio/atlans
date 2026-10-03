@@ -53,12 +53,12 @@ def ocultar_no_windows(caminho) -> None:
         FILE_ATTRIBUTE_HIDDEN = 0x02
         # GetFileAttributesW returns 0xFFFFFFFF on error; with ctypes' default
         # restype (c_int) that arrives as -1. We handle both forms.
-        INVALIDO = (-1, 0xFFFFFFFF)
+        INVALID = (-1, 0xFFFFFFFF)
 
         alvo = str(caminho)
         # ctypes converts `str` to wchar_t* automatically in the `...W` functions.
         atuais = ctypes.windll.kernel32.GetFileAttributesW(alvo)
-        if atuais in INVALIDO:
+        if atuais in INVALID:
             # Nonexistent file, no access, or a path beyond MAX_PATH without
             # long-path enabled. Stays best-effort; we only log at debug
             # because, without it, this failure mode is impossible to diagnose.

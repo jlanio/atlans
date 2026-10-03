@@ -84,7 +84,7 @@ const VersionHistory = () => {
   const [versions, setVersions] = useState<IWorkflowVersion[]>([])
   const [loading, setLoading] = useState(false)
   // The list didn't arrive: "nenhuma versão salva" would be a false statement.
-  const [falhou, setFalhou] = useState(false)
+  const [falhou, setFailed] = useState(false)
   const [restoring, setRestoring] = useState<number | null>(null)
   const [confirmVersion, setConfirmVersion] = useState<number | null>(null)
   const [overlayVisible, setOverlayVisible] = useState(false)
@@ -94,7 +94,7 @@ const VersionHistory = () => {
     setLoading(true)
     const versoes = dadoOuAviso(await GisFlowService.getWorkflowVersions(id), "Erro ao carregar versões")
     if (versoes) setVersions(versoes)
-    setFalhou(versoes === null)
+    setFailed(versoes === null)
     setLoading(false)
   }
 

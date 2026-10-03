@@ -3,7 +3,7 @@
  * continent > the usual Brazil. And the latitude kept in check (the hero does not open on a pole).
  */
 import { describe, it, expect } from "vitest"
-import { CENTRO_PADRAO_DO_GLOBO, centroDaRegiao } from "@/app/components/home/mapa/regiao"
+import { DEFAULT_GLOBE_CENTER, centroDaRegiao } from "@/app/components/home/mapa/regiao"
 import { FUSOS, PAISES } from "@/app/components/home/mapa/fusos.gerado"
 
 describe("centroDaRegiao", () => {
@@ -36,7 +36,7 @@ describe("centroDaRegiao", () => {
     expect(centroDaRegiao({ fuso: "Atlantic/Reykjavik", pais: "BR" })).toEqual(PAISES.BR)
     expect(centroDaRegiao({ fuso: "Iceland", pais: "JP" })).toEqual(PAISES.JP)
     // No country, the neutral center — not Iceland's North Atlantic.
-    expect(centroDaRegiao({ fuso: "Atlantic/Reykjavik" })).toEqual(CENTRO_PADRAO_DO_GLOBO)
+    expect(centroDaRegiao({ fuso: "Atlantic/Reykjavik" })).toEqual(DEFAULT_GLOBE_CENTER)
     // Someone REALLY in Iceland stays there (with the latitude kept in check).
     expect(centroDaRegiao({ fuso: "Atlantic/Reykjavik", pais: "is" })).toEqual([FUSOS["Atlantic/Reykjavik"][0], 50])
   })
@@ -48,10 +48,10 @@ describe("centroDaRegiao", () => {
   })
 
   it("sem sinal nenhum (ou só lixo), o centro neutro, sem país de preferência", () => {
-    expect(CENTRO_PADRAO_DO_GLOBO).toEqual([0, 20])
-    expect(centroDaRegiao({})).toEqual(CENTRO_PADRAO_DO_GLOBO)
-    expect(centroDaRegiao({ fuso: "UTC", pais: "XX" })).toEqual(CENTRO_PADRAO_DO_GLOBO)
-    expect(centroDaRegiao({ fuso: "Etc/GMT+3" })).toEqual(CENTRO_PADRAO_DO_GLOBO)
+    expect(DEFAULT_GLOBE_CENTER).toEqual([0, 20])
+    expect(centroDaRegiao({})).toEqual(DEFAULT_GLOBE_CENTER)
+    expect(centroDaRegiao({ fuso: "UTC", pais: "XX" })).toEqual(DEFAULT_GLOBE_CENTER)
+    expect(centroDaRegiao({ fuso: "Etc/GMT+3" })).toEqual(DEFAULT_GLOBE_CENTER)
   })
 
   it("a latitude fica numa faixa em que o hero não abre num polo", () => {

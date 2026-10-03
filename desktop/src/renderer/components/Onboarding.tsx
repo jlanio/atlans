@@ -8,9 +8,9 @@
 // them to run a command — in a terminal the installer does not assume exists.
 import { useEffect, useState } from 'react'
 import { TbCircleCheck, TbDeviceDesktop, TbKey, TbLoader2 } from 'react-icons/tb'
-import type { EstadoConfiguracao } from '../../main/state/config.js'
-import type { ResultadoEnroll } from '../../main/python/enroll.js'
-import type { PedidoDeepLink } from '../../main/deeplink.js'
+import type { ConfigState } from '../../main/state/config.js'
+import type { EnrollResult } from '../../main/python/enroll.js'
+import type { DeepLinkRequest } from '../../main/deeplink.js'
 import { Alerta } from './Alerta.js'
 import { Button } from './ui/button.js'
 import { Input } from './ui/input.js'
@@ -19,7 +19,7 @@ import { SERVIDOR } from '../../shared/servidor.js'
 import { cn } from '../lib/utils.js'
 
 /** Translates the Python `codigo` into something that says what to DO. */
-const REMEDIO: Record<string, string> = {
+const REMEDY: Record<string, string> = {
   otp_ausente: 'O OTP não chegou ao processo de enrollment. Tente novamente.',
   executor_id_ausente: 'Informe o ID do executor, copiado do painel web.',
   enroll_recusado: 'O servidor recusou o enrollment. Confira se o OTP não expirou (validade de 24 h, uso único) e se o ID do executor está correto.',
@@ -68,17 +68,17 @@ function Campo({
 export function Onboarding({
   config, aoConcluir,
 }: {
-  config: EstadoConfiguracao
+  config: ConfigState
   aoConcluir: () => void
 }) {
   const [executorId, setExecutorId] = useState(config.executorId ?? '')
   const [otp, setOtp] = useState('')
-  const [enviando, setEnviando] = useState(false)
-  const [resultado, setResultado] = useState<ResultadoEnroll | null>(null)
+  const [enviando, setSending] = useState(false)
+  const [resultado, setResult] = useState<EnrollResult | null>(null)
   // Request coming from `atlans://enroll?…`. It stays pending until the user
   // confirms: any web page can fire a deep link, so linking on its own would
   // hand this machine over to whoever wrote the page.
-  const [pedidoLink, setPedidoLink] = useState<PedidoDeepLink | null>(null)
+  const [linkRequest, setLinkRequest] = useState<DeepLinkRequest | null>(null)
 
   // The ID comes from the web dashboard and does not change; if it was already in
   // `.env` (partial enrollment, deleted certificate), the field starts filled in.
@@ -88,8 +88,8 @@ export function Onboarding({
 
   // Deep link: what arrived before mounting (invoke) and what arrives after (push).
   useEffect(() => {
-    void window.atlas.deepLinkPendente().then((p) => { if (p) setPedidoLink(p) })
-    return window.atlas.aoReceberDeepLink(setPedidoLink)
+    void window.atlas.deepLinkPendente().then((p) => { if (p) setLinkRequest(p) })
+    return window.atlas.aoReceberDeepLink(setLinkRequest)
   }, [])
 
   const podeEnviar = executorId.trim() && otp.trim() && !enviando
@@ -97,27 +97,27 @@ export function Onboarding({
   async function enviar(e: React.FormEvent) {
     e.preventDefault()
     if (!podeEnviar) return
-    setEnviando(true)
-    setResultado(null)
+    setSending(true)
+    setResult(null)
     try {
       const r = await window.atlas.enrolar({ executorId: executorId.trim(), otp: otp.trim() })
-      setResultado(r)
+      setResult(r)
       if (r.ok) {
         setOtp('')      // single use: keeping it on screen only risks a resubmission
         aoConcluir()
       }
     } finally {
-      setEnviando(false)
+      setSending(false)
     }
   }
 
-  const soFaltaCert = config.falta === 'enrollment'
+  const onlyCertMissing = config.falta === 'enrollment'
 
-  function aplicarPedido() {
-    if (!pedidoLink) return
-    setExecutorId(pedidoLink.executorId)
-    setOtp(pedidoLink.otp)
-    setPedidoLink(null)
+  function applyRequest() {
+    if (!linkRequest) return
+    setExecutorId(linkRequest.executorId)
+    setOtp(linkRequest.otp)
+    setLinkRequest(null)
   }
 
   return (
@@ -133,7 +133,7 @@ export function Onboarding({
             Vincular este computador
           </h1>
           <p className="text-sm text-muted-foreground">
-            {soFaltaCert
+            {onlyCertMissing
               ? 'O certificado deste executor não foi encontrado. Gere um OTP novo no painel web e refaça o enrollment.'
               : 'Para executar workflows nesta máquina, vincule-a a um executor cadastrado no Atlans Studio.'}
           </p>
@@ -149,7 +149,7 @@ export function Onboarding({
           </CardHeader>
         </Card>
 
-        {pedidoLink && (
+        {linkRequest && (
           <Card className="border-primary/50 bg-primary/5 py-4">
             <CardContent className="flex flex-col gap-3 px-6">
               <div className="flex flex-col gap-1.5">
@@ -164,11 +164,11 @@ export function Onboarding({
                 <span><span className="text-muted-foreground">servidor: </span>
                   <strong>{SERVIDOR}</strong></span>
                 <span><span className="text-muted-foreground">executor: </span>
-                  {pedidoLink.executorId}</span>
+                  {linkRequest.executorId}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Button size="sm" onClick={aplicarPedido}>Preencher o formulário</Button>
-                <Button size="sm" variant="ghost" onClick={() => setPedidoLink(null)}>
+                <Button size="sm" onClick={applyRequest}>Preencher o formulário</Button>
+                <Button size="sm" variant="ghost" onClick={() => setLinkRequest(null)}>
                   Ignorar
                 </Button>
               </div>
@@ -233,7 +233,7 @@ export function Onboarding({
           <Alerta
             tom="erro"
             titulo="Não foi possível vincular."
-            remedio={REMEDIO[resultado.codigo] ?? 'Falha no enrollment.'}
+            remedio={REMEDY[resultado.codigo] ?? 'Falha no enrollment.'}
             bruto={resultado.erro}
           />
         )}

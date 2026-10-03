@@ -15,7 +15,7 @@ from __future__ import annotations
 import pytest
 
 from flow.executor.core import WorkflowExecutor
-from flow.executor.declared_schema import schema_declarado, schema_do_catalogo
+from flow.executor.declared_schema import schema_declarado, catalog_schema
 from flow.nodes.base import BaseNode
 from flow.registry import NODE_REGISTRY
 
@@ -57,7 +57,7 @@ class NoDinamicoSemSchema(BaseNode):
 
 
 @pytest.fixture(autouse=True)
-def _registra_nos_de_teste():
+def _register_test_nodes():
     NODE_REGISTRY["NoDinamicoTeste"] = NoDinamicoTeste
     NODE_REGISTRY["NoDinamicoSemSchema"] = NoDinamicoSemSchema
     yield
@@ -69,7 +69,7 @@ def _executor(*nodes, edges=()) -> WorkflowExecutor:
     return WorkflowExecutor({"nodes": list(nodes), "edges": list(edges)})
 
 
-def _nomes(saida: dict) -> list:
+def _names(saida: dict) -> list:
     return [f["name"] for f in saida["schema"][0]["fields"]]
 
 
@@ -79,7 +79,7 @@ def _merge(nid: str = "m") -> dict:
 
 # ── Outputs declared in the definition ───────────────────────────────────────
 
-async def test_python_script_declara_as_saidas_por_output_vars():
+async def test_python_script_declares_outputs_via_output_vars():
     ex = _executor({"id": "ps", "name": "PythonScript", "type": "action",
                     "parameters": {"code": "a = 1\nb = 2", "output_vars": "a, b"}})
 
@@ -87,18 +87,18 @@ async def test_python_script_declara_as_saidas_por_output_vars():
 
     assert out["ps"]["status"] == "ok"
     assert out["ps"]["schema_source"] == "declared"
-    assert _nomes(out["ps"]) == ["a", "b"]
+    assert _names(out["ps"]) == ["a", "b"]
 
 
-async def test_python_script_sem_output_vars_usa_o_default_result():
+async def test_python_script_without_output_vars_uses_default_result():
     ex = _executor({"id": "ps", "name": "PythonScript", "type": "action", "parameters": {}})
 
     out = await ex.simulate_runner()
 
-    assert _nomes(out["ps"]) == ["result"]
+    assert _names(out["ps"]) == ["result"]
 
 
-async def test_output_vars_vazio_vira_erro_com_a_frase_do_run(caplog):
+async def test_empty_output_vars_becomes_error_with_the_run_message(caplog):
     """Before: schema `[{"fields": []}]` with `ok` — and with no known outputs the
     edge diagnostics switched off. The run rejects with this sentence."""
     ex = _executor({"id": "ps", "name": "PythonScript", "type": "action",
@@ -114,7 +114,7 @@ async def test_output_vars_vazio_vira_erro_com_a_frase_do_run(caplog):
     assert avisos and "output_vars" in avisos[0].message and "PythonScript" in avisos[0].message
 
 
-async def test_output_vars_que_nao_e_string_vira_erro():
+async def test_non_string_output_vars_becomes_error():
     ex = _executor({"id": "ps", "name": "PythonScript", "type": "action",
                     "parameters": {"code": "x = 1", "output_vars": ["a", "b"]}})
 
@@ -123,7 +123,7 @@ async def test_output_vars_que_nao_e_string_vira_erro():
     assert out["ps"] == {"status": "error", "error": "O parâmetro 'output_vars' deve ser uma string."}
 
 
-async def test_erro_na_saida_declarada_nao_cascateia_para_o_filho():
+async def test_error_in_declared_output_does_not_cascade_to_the_child():
     ex = _executor(
         {"id": "ps", "name": "PythonScript", "type": "action",
          "parameters": {"code": "x = 1", "output_vars": ""}},
@@ -138,7 +138,7 @@ async def test_erro_na_saida_declarada_nao_cascateia_para_o_filho():
     assert ex.validate_edges() == []  # origem em erro: nada a afirmar sobre a aresta
 
 
-async def test_switch_declara_fallback_e_saidas_das_regras():
+async def test_switch_declares_fallback_and_rule_outputs():
     """`rules` chega como JSON string (o editor grava via JSON.stringify)."""
     ex = _executor({"id": "sw", "name": "Switch", "type": "control", "parameters": {
         "rules": '[{"field": "x", "operator": "==", "value": 1, "output": "output_1"}]',
@@ -148,18 +148,18 @@ async def test_switch_declara_fallback_e_saidas_das_regras():
     out = await ex.simulate_runner()
 
     assert out["sw"]["schema_source"] == "declared"
-    assert _nomes(out["sw"]) == ["resto", "output_1"]
+    assert _names(out["sw"]) == ["resto", "output_1"]
 
 
-async def test_switch_sem_fallback_output_usa_output_0():
+async def test_switch_without_fallback_output_uses_output_0():
     ex = _executor({"id": "sw", "name": "Switch", "type": "control", "parameters": {"rules": []}})
 
     out = await ex.simulate_runner()
 
-    assert _nomes(out["sw"]) == ["output_0"]
+    assert _names(out["sw"]) == ["output_0"]
 
 
-async def test_switch_fallback_output_vazio_emite_a_porta_vazia():
+async def test_switch_empty_fallback_output_emits_the_empty_port():
     """Mirrors the run: `parameters.get("fallback_output", "output_0")` only falls
     back to the default when the key is ABSENT; present and empty, the emitted
     port is ''."""
@@ -169,20 +169,20 @@ async def test_switch_fallback_output_vazio_emite_a_porta_vazia():
     out = await ex.simulate_runner()
 
     assert out["sw"]["status"] == "ok"
-    assert _nomes(out["sw"]) == [""]
+    assert _names(out["sw"]) == [""]
 
 
-async def test_sub_workflow_input_declara_as_ports():
+async def test_sub_workflow_input_declares_the_ports():
     ex = _executor({"id": "in", "name": "SubWorkflowInput", "type": "trigger",
                     "parameters": {"ports": ["geometry"]}})
 
     out = await ex.simulate_runner()
 
     assert out["in"]["schema_source"] == "declared"
-    assert _nomes(out["in"]) == ["geometry"]
+    assert _names(out["in"]) == ["geometry"]
 
 
-async def test_sub_workflow_input_sem_ports_tem_schema_vazio():
+async def test_sub_workflow_input_without_ports_has_empty_schema():
     ex = _executor({"id": "in", "name": "SubWorkflowInput", "type": "trigger", "parameters": {}})
 
     out = await ex.simulate_runner()
@@ -190,17 +190,17 @@ async def test_sub_workflow_input_sem_ports_tem_schema_vazio():
     assert out["in"] == {"status": "ok", "schema": [{"fields": []}], "schema_source": "declared"}
 
 
-async def test_dinamico_sem_simulate_cai_nos_outputs_do_catalogo():
+async def test_dynamic_without_simulate_falls_back_to_catalog_outputs():
     ex = _executor({"id": "gj", "name": "ReadGeoJSON", "type": "datasource",
                     "parameters": {"driveFileId": "x"}})
 
     out = await ex.simulate_runner()
 
     assert out["gj"]["schema_source"] == "declared"
-    assert _nomes(out["gj"]) == ["output"]
+    assert _names(out["gj"]) == ["output"]
 
 
-async def test_dinamico_sem_simulate_e_sem_outputs_fica_como_unknown():
+async def test_dynamic_without_simulate_or_outputs_stays_unknown():
     """Nothing to assert is no reason to vanish: the node stays in the response
     and the source says the schema is unknown."""
     ex = _executor({"id": "n1", "name": "NoDinamicoSemSchema", "type": "datasource",
@@ -211,7 +211,7 @@ async def test_dinamico_sem_simulate_e_sem_outputs_fica_como_unknown():
     assert out["n1"] == {"status": "ok", "schema": [], "schema_source": "unknown"}
 
 
-async def test_origem_unknown_nao_gera_diagnostico_de_aresta():
+async def test_unknown_source_produces_no_edge_diagnostic():
     ex = _executor(
         {"id": "n1", "name": "NoDinamicoSemSchema", "type": "datasource", "parameters": {}},
         _merge(),
@@ -222,28 +222,28 @@ async def test_origem_unknown_nao_gera_diagnostico_de_aresta():
     assert ex.validate_edges() == []
 
 
-async def test_no_com_simulate_continua_simulado():
+async def test_node_with_simulate_stays_simulated():
     ex = _executor({"id": "n1", "name": "NoDinamicoTeste", "type": "datasource",
                     "parameters": {}})
 
     out = await ex.simulate_runner()
 
     assert out["n1"]["schema_source"] == "simulated"
-    assert _nomes(out["n1"]) == ["col"]
+    assert _names(out["n1"]) == ["col"]
 
 
-async def test_no_estatico_ganha_schema_source_static():
+async def test_static_node_gets_schema_source_static():
     ex = _executor(_merge())
 
     out = await ex.simulate_runner()
 
     assert out["m"]["schema_source"] == "static"
-    assert _nomes(out["m"]) == ["output"]
+    assert _names(out["m"]) == ["output"]
 
 
 # ── validate_edges sees the declared output ──────────────────────────────────
 
-async def test_from_key_fora_de_output_vars_e_erro_de_aresta():
+async def test_from_key_outside_output_vars_is_edge_error():
     ex = _executor(
         {"id": "ps", "name": "PythonScript", "type": "action",
          "parameters": {"code": "a = 1", "output_vars": "a"}},
@@ -259,7 +259,7 @@ async def test_from_key_fora_de_output_vars_e_erro_de_aresta():
     assert diag[0]["source"] == "ps" and diag[0]["target"] == "m"
 
 
-async def test_from_key_dentro_de_output_vars_passa():
+async def test_from_key_inside_output_vars_passes():
     ex = _executor(
         {"id": "ps", "name": "PythonScript", "type": "action",
          "parameters": {"code": "a = 1", "output_vars": "a"}},
@@ -273,7 +273,7 @@ async def test_from_key_dentro_de_output_vars_passa():
 
 # ── Catalog fields in the simulation ─────────────────────────────────────────
 
-async def test_campos_do_catalogo_entram_na_simulacao():
+async def test_catalog_fields_enter_the_simulation():
     """ChangeDetector declares its fields in `outputs` (and routes by `branches`):
     all fields appear in the simulated schema."""
     ex = _executor({"id": "cd", "name": "ChangeDetector", "type": "control", "parameters": {}})
@@ -281,10 +281,10 @@ async def test_campos_do_catalogo_entram_na_simulacao():
     out = await ex.simulate_runner()
 
     assert out["cd"]["schema_source"] == "static"
-    assert {"output", "branch", "previous_hash", "current_hash", "reason"} <= set(_nomes(out["cd"]))
+    assert {"output", "branch", "previous_hash", "current_hash", "reason"} <= set(_names(out["cd"]))
 
 
-async def test_chaves_internas_do_protocolo_nao_viram_saida():
+async def test_internal_protocol_keys_do_not_become_outputs():
     """Response only declares `__response__` in `outputs`; the executor removes it."""
     ex = _executor({"id": "r", "name": "Response", "type": "output", "parameters": {}})
 
@@ -293,38 +293,38 @@ async def test_chaves_internas_do_protocolo_nao_viram_saida():
     assert out["r"]["schema"] == [{"fields": []}]
 
 
-# ── schema_do_catalogo / schema_declarado (puros) ────────────────────────────
+# ── catalog_schema / schema_declarado (puros) ────────────────────────────
 
-def test_schema_do_catalogo_agrupa_os_campos_planos():
+def test_catalog_schema_groups_the_flat_fields():
     desc = {"outputs": [{"name": "output", "type": "object"}]}
 
-    assert schema_do_catalogo(desc) == [{"fields": [{"name": "output", "type": "object"}]}]
+    assert catalog_schema(desc) == [{"fields": [{"name": "output", "type": "object"}]}]
 
 
-def test_schema_do_catalogo_filtra_nomes_internos():
+def test_catalog_schema_filters_internal_names():
     desc = {"outputs": [{"name": "output", "type": "object"},
                         {"name": "__response__", "type": "object"}]}
 
-    assert schema_do_catalogo(desc) == [{"fields": [{"name": "output", "type": "object"}]}]
+    assert catalog_schema(desc) == [{"fields": [{"name": "output", "type": "object"}]}]
 
 
-def test_schema_do_catalogo_sem_outputs_fica_sem_campos():
-    assert schema_do_catalogo({}) == [{"fields": []}]
-    assert schema_do_catalogo({"outputs": None}) == [{"fields": []}]
+def test_catalog_schema_without_outputs_has_no_fields():
+    assert catalog_schema({}) == [{"fields": []}]
+    assert catalog_schema({"outputs": None}) == [{"fields": []}]
 
 
-def test_schema_declarado_sem_nada_a_afirmar_devolve_none():
+def test_declared_schema_with_nothing_to_assert_returns_none():
     assert schema_declarado({"parameters": {}}, {"properties": []}) is None
 
 
-def test_schema_declarado_output_vars_com_espacos_e_vazios():
+def test_declared_schema_output_vars_with_spaces_and_blanks():
     desc = {"properties": [{"name": "output_vars"}]}
 
     assert schema_declarado({"parameters": {"output_vars": " a , b ,, "}}, desc) == \
         [{"fields": [{"name": "a", "type": "any"}, {"name": "b", "type": "any"}]}]
 
 
-def test_schema_declarado_output_vars_invalido_levanta_a_frase_do_run():
+def test_declared_schema_invalid_output_vars_raises_the_run_message():
     desc = {"properties": [{"name": "output_vars"}]}
 
     with pytest.raises(ValueError, match="deve ser uma string"):
@@ -333,14 +333,14 @@ def test_schema_declarado_output_vars_invalido_levanta_a_frase_do_run():
         schema_declarado({"parameters": {"output_vars": ""}}, desc)
 
 
-def test_schema_declarado_rules_invalidas_deixam_so_o_fallback():
+def test_declared_schema_invalid_rules_leave_only_the_fallback():
     desc = {"properties": [{"name": "rules"}, {"name": "fallback_output"}]}
 
     assert schema_declarado({"properties": {"rules": "{nao e json"}}, desc) == \
         [{"fields": [{"name": "output_0", "type": "any"}]}]
 
 
-def test_schema_declarado_fallback_output_nao_string_levanta():
+def test_declared_schema_non_string_fallback_output_raises():
     desc = {"properties": [{"name": "rules"}, {"name": "fallback_output"}]}
 
     with pytest.raises(ValueError, match="fallback_output"):

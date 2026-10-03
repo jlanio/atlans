@@ -160,7 +160,7 @@ app/main.py
 │   (the slowapi rate limiter is applied per route via decorator + exception handler)
 ├── Exception handlers: HTTP, validation, rate limit, domain, generic
 ├── Background tasks (lifespan; the list is `_tarefas_de_fundo()`, and the periodic loops
-│   │   with a Redis lock use `laco_periodico` from app/core/tarefas_periodicas.py):
+│   │   with a Redis lock use `periodic_loop` from app/core/tarefas_periodicas.py):
 │   ├── RunResultConsumer (BRPOP run_results — the run_creates queue was removed)
 │   ├── AsyncScheduler (schedule loop)
 │   ├── ArtifactCleanup (periodic artifact cleanup)
@@ -515,13 +515,13 @@ Executors do **not** use an API key or a JWT token. Trust is established by an
    renewal: online, it is the "up since"; offline, the "last seen". The revocations
    (`DELETE /executores/{id}`, `DELETE /executores/admin/executores/{id}/cert`,
    `POST /admin/users/{id}/revoke-all-executores` and the suspension/deletion of the
-   operator's account) all end in `executor_service.concluir_revogacoes`, after the commit:
+   operator's account) all end in `executor_service.complete_revocations`, after the commit:
    cert blacklist, a notice to the owners whose primary tier was emptied, and the closing of the
    WebSocket on any worker, through the relay. Those of the whole executor (all but the cert one)
    first go through `revogar_executor`, which removes it from the policy's tiers. The notice can be
    lost (Redis restarting, the session's listener
    reconnecting); that is why each session also checks the database, every 60 s, whether it is still valid —
-   executor active and with a cert — and closes with 4403 if not (`_vigiar_revogacao`). Renewal
+   executor active and with a cert — and closes with 4403 if not (`_watch_revocation`). Renewal
    swaps the serial without clearing it, so it does not drop the session that did it.
 
 > The encryption of the jobs' **payload** is still X25519 + AES-256-GCM + an Ed25519 signature
@@ -608,7 +608,7 @@ one by one until one accepts. If none accepts, the run closes as `failed`
 (`no_executor`); nothing sits waiting for an executor to free up.
 
 Within each tier, the order comes from each executor's situation
-(`_situacoes`/`_chave_de_ordem`):
+(`_executor_states`/`_sort_key`):
 
 ```python
 carga  = runs pending/running do host no banco   # the declared one only if the count fails
@@ -1177,7 +1177,7 @@ must never contain the value.
 
 The write boundaries **refuse with 422** anyone who tries: `POST /workflows` and `PUT /workflows/{id}`
 in REST, plus the three build tools of the MCP server. All of them call the same function,
-`definition_contem_segredo`
+`definition_contains_secret`
 (`app/core/utils/redacao.py`), which scans the entire definition and returns the **paths** of the
 fields — the refusal message names the field and **never** the value.
 
@@ -1223,7 +1223,7 @@ the test breaks — and the message says that changing that is a product decisio
 
 #### Two fixes the same review prompted
 
-- `_residuo_literal` (`flow/utils/definition_lint.py`) joined the pieces of the string **with nothing**,
+- `_literal_residue` (`flow/utils/definition_lint.py`) joined the pieces of the string **with nothing**,
   gluing together lines of free text and fabricating a `host:usuario@dominio` that nobody wrote —
   the body of an email and comments in a `PythonScript` were flagged as storing a password. The
   asymmetry gave it away: the SAME URL with a path at the end passed. It now joins with a space.

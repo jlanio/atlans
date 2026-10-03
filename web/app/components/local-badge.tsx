@@ -22,14 +22,14 @@ export function isLocalDoExecutor(item: { content_location?: string | null }): b
 }
 
 /** The badge texts. Default: the Portuguese of Drive and Artifacts; the translated Home passes its own. */
-export interface TextosDoLocal {
+export interface LocalTexts {
   /** What the screen reader announces. */
   rotulo: string
   /** The `title`, with the executor (its first 8 characters) when known. */
   titulo: (executorId: string | null | undefined) => string
 }
 
-export const TEXTOS_DO_LOCAL_PT: TextosDoLocal = {
+export const TEXTOS_DO_LOCAL_PT: LocalTexts = {
   rotulo: "Conteúdo apenas no executor",
   titulo: (executorId) => {
     const onde = executorId ? `executor ${executorId.slice(0, 8)}…` : "executor de origem"
@@ -43,7 +43,7 @@ export const TEXTOS_DO_LOCAL_PT: TextosDoLocal = {
 
 export function LocalBadge({
   executorId, textos = TEXTOS_DO_LOCAL_PT,
-}: { executorId?: string | null; textos?: TextosDoLocal }) {
+}: { executorId?: string | null; textos?: LocalTexts }) {
   return (
     <span
       // `inline-flex`, not `inline`: aligns the icon to the file name's baseline

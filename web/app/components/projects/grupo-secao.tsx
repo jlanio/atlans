@@ -10,7 +10,7 @@ import type { IWorkflow, IWorkflowGroup } from "@/service/types"
 import { cn } from "@/lib/utils"
 import { plural } from "@/lib/formatos"
 
-export interface GrupoSecaoProps {
+export interface GroupSectionProps {
   grupo: IWorkflowGroup
   /** The rows to show — already filtered and sorted by the page composer. */
   workflows: IWorkflow[]
@@ -64,10 +64,10 @@ export function GrupoSecao({
   arrastandoEste, alvoDeReordenacao, recebendoWorkflow, nomeDoArrastado,
   onDragOver, onDragLeave, onDrop, onDragStartGrupo, onDragEndGrupo, onRenomear, onExcluir,
   renderLinha, children,
-}: GrupoSecaoProps) {
+}: GroupSectionProps) {
   const id = grupo.id_hash
   const tituloId = `grupo-${id}-titulo`
-  const corpoId = `grupo-${id}-corpo`
+  const bodyId = `grupo-${id}-corpo`
   // Fewer rows than the total only happens with an active search or chip: with
   // no filter the group's list is the whole group.
   const comFiltro = workflows.length < totalNoGrupo ? workflows.length : null
@@ -105,7 +105,7 @@ export function GrupoSecao({
         <button
           type="button"
           aria-expanded={!recolhido}
-          aria-controls={corpoId}
+          aria-controls={bodyId}
           onClick={() => onToggle(id)}
           className={cn(
             "flex min-w-0 items-center gap-2 rounded-sm text-sm font-semibold text-foreground outline-none transition-colors",
@@ -163,7 +163,7 @@ export function GrupoSecao({
           `aria-controls` must point to an element that is present. The rows,
           however, are only mounted when open — rendering dozens of invisible
           cards is not worth it. */}
-      <div id={corpoId} hidden={recolhido}>
+      <div id={bodyId} hidden={recolhido}>
         {!recolhido && (
           vazio ? (
             // When receiving a workflow the message above already says what to do;

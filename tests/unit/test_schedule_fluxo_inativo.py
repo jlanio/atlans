@@ -24,28 +24,28 @@ pytestmark = pytest.mark.asyncio
 
 WS = "ws-1"
 ATIVO = "wf-ativo"
-INATIVO = "wf-inativo"
+INACTIVE = "wf-inativo"
 
-TABELAS = [Workflow.__table__, Schedule.__table__]
+TABLES = [Workflow.__table__, Schedule.__table__]
 
 
 @pytest.fixture
 async def db():
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all, tables=TABELAS)
+        await conn.run_sync(Base.metadata.create_all, tables=TABLES)
     fabrica = async_sessionmaker(engine, expire_on_commit=False)
     async with fabrica() as sessao:
         sessao.add(Workflow(id_hash=ATIVO, name="Vivo", workspace_id=WS,
                             definition={"nodes": [], "edges": []}, flag_ative=True))
-        sessao.add(Workflow(id_hash=INATIVO, name="Parado", workspace_id=WS,
+        sessao.add(Workflow(id_hash=INACTIVE, name="Parado", workspace_id=WS,
                             definition={"nodes": [], "edges": []}, flag_ative=False))
         await sessao.commit()
         yield sessao
     await engine.dispose()
 
 
-async def test_criar_em_fluxo_inexistente_e_404_de_dominio(db):
+async def test_create_on_nonexistent_workflow_is_domain_404(db):
     """`WorkflowNotFoundError` (404), not `ValueError` — which would become a 500."""
     pedido = ScheduleCreate(strategy="interval", interval=10, unit="minutes",
                             workspace_id=WS, timezone="America/La_Paz")
@@ -53,7 +53,7 @@ async def test_criar_em_fluxo_inexistente_e_404_de_dominio(db):
         await ScheduleService(db).create_schedule("nao-existe", pedido)
 
 
-async def test_criar_em_fluxo_inativo_e_409_de_dominio(db):
+async def test_create_on_inactive_workflow_is_domain_409(db):
     """Writing STILL refuses — what changes is the code, not the rule.
 
     The scheduler ignores schedules of inactive workflows, so the stored row
@@ -63,10 +63,10 @@ async def test_criar_em_fluxo_inativo_e_409_de_dominio(db):
     pedido = ScheduleCreate(strategy="interval", interval=10, unit="minutes",
                             workspace_id=WS, timezone="America/La_Paz")
     with pytest.raises(WorkflowInactiveError):
-        await ScheduleService(db).create_schedule(INATIVO, pedido)
+        await ScheduleService(db).create_schedule(INACTIVE, pedido)
 
 
-async def test_a_recusa_de_escrita_tem_status_e_codigo(db):
+async def test_the_write_refusal_has_status_and_code(db):
     """Without this, swapping the exception for another `AtlasBaseError` would go unnoticed."""
     assert WorkflowInactiveError.status_code == 409
     assert WorkflowInactiveError.error_code == "workflow_inactive"

@@ -35,7 +35,7 @@ WS = "ws-1"
 
 
 @asynccontextmanager
-async def _banco():
+async def _from_db():
     engine = create_async_engine("sqlite+aiosqlite://")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all, tables=[Artifact.__table__, PortalLayer.__table__])
@@ -45,9 +45,9 @@ async def _banco():
         await engine.dispose()
 
 
-async def _publicado_local(Sessao, n: int = 1, *, vencido: bool = False):
+async def _published_local(SessionMaker, n: int = 1, *, vencido: bool = False):
     """A LOCAL artifact (bytes on the executor's disk) published to the portal."""
-    async with Sessao() as db:
+    async with SessionMaker() as db:
         db.add_all([
             Artifact(
                 id_hash=f"art-{n}", workspace_id=WS, workflow_hash="wf-1", run_id="run-1",
@@ -61,8 +61,8 @@ async def _publicado_local(Sessao, n: int = 1, *, vencido: bool = False):
         await db.commit()
 
 
-async def _sobrou(Sessao) -> tuple[list[str], list[str]]:
-    async with Sessao() as db:
+async def _leftover(SessionMaker) -> tuple[list[str], list[str]]:
+    async with SessionMaker() as db:
         artefatos = (await db.execute(select(Artifact.id_hash))).scalars().all()
         camadas = (await db.execute(select(PortalLayer.layer_key))).scalars().all()
     return sorted(artefatos), sorted(camadas)
@@ -72,77 +72,77 @@ async def _sobrou(Sessao) -> tuple[list[str], list[str]]:
 def entrega(monkeypatch):
     """The executor receives the removal order (or not, with `entrega([])`)."""
     def instalar(ids=None):
-        async def _ordem(por_executor):
-            todos = [i["_id"] for itens in por_executor.values() for i in itens]
+        async def _ids_in_order(by_executor):
+            todos = [i["_id"] for itens in by_executor.values() for i in itens]
             return todos if ids is None else [i for i in todos if i in ids]
-        monkeypatch.setattr(artifact_cleanup, "_ordenar_remocao_local", _ordem)
+        monkeypatch.setattr(artifact_cleanup, "_ordenar_remocao_local", _ids_in_order)
     instalar()
     return instalar
 
 
 @pytest.fixture
-def pode_editar(monkeypatch):
-    # Where `exigir_papel_no_workspace` looks up the role (the comparison stays real).
+def can_edit(monkeypatch):
+    # Where `require_workspace_role` looks up the role (the comparison stays real).
     monkeypatch.setattr(workflow_access, "get_workspace_member_role", AsyncMock(return_value="owner"))
 
 
-_QUEM = SimpleNamespace(id_hash="u-1")
+_WHO = SimpleNamespace(id_hash="u-1")
 
 
 # ── The portal layer goes along with the delivered local artifact ────────────
 
 @pytest.mark.asyncio
-async def test_delete_avulso_de_artefato_local_apaga_a_camada(entrega, pode_editar):
-    async with _banco() as Sessao:
-        await _publicado_local(Sessao)
-        async with Sessao() as db:
+async def test_single_delete_of_local_artifact_removes_the_layer(entrega, can_edit):
+    async with _from_db() as SessionMaker:
+        await _published_local(SessionMaker)
+        async with SessionMaker() as db:
             resposta = await artifacts_router.delete_artifact(
-                "art-1", db=db, current_user=_QUEM, workspace_ids=[WS],
+                "art-1", db=db, current_user=_WHO, workspace_ids=[WS],
             )
 
         assert resposta is None                        # 204, as before
-        assert await _sobrou(Sessao) == ([], [])
+        assert await _leftover(SessionMaker) == ([], [])
 
 
 @pytest.mark.asyncio
-async def test_delete_em_lote_de_artefato_local_apaga_a_camada(entrega, pode_editar):
-    async with _banco() as Sessao:
-        await _publicado_local(Sessao, 1)
-        await _publicado_local(Sessao, 2)
+async def test_batch_delete_of_local_artifact_removes_the_layer(entrega, can_edit):
+    async with _from_db() as SessionMaker:
+        await _published_local(SessionMaker, 1)
+        await _published_local(SessionMaker, 2)
         pedido = SimpleNamespace(json=AsyncMock(return_value={"id_hashes": ["art-1", "art-2"]}))
-        async with Sessao() as db:
+        async with SessionMaker() as db:
             resposta = await artifacts_router.batch_delete_artifacts(
-                pedido, db=db, current_user=_QUEM, workspace_ids=[WS],
+                pedido, db=db, current_user=_WHO, workspace_ids=[WS],
             )
 
         assert resposta == {"deleted": 2, "skipped": 0, "pendentes_no_executor": 0}
-        assert await _sobrou(Sessao) == ([], [])
+        assert await _leftover(SessionMaker) == ([], [])
 
 
 @pytest.mark.asyncio
-async def test_retencao_de_artefato_local_apaga_a_camada(entrega, monkeypatch):
-    async with _banco() as Sessao:
-        await _publicado_local(Sessao, vencido=True)
-        monkeypatch.setattr(artifact_cleanup, "AsyncSessionLocal", Sessao)
+async def test_local_artifact_retention_removes_the_layer(entrega, monkeypatch):
+    async with _from_db() as SessionMaker:
+        await _published_local(SessionMaker, vencido=True)
+        monkeypatch.setattr(artifact_cleanup, "AsyncSessionLocal", SessionMaker)
 
         assert await artifact_cleanup.purge_expired_artifacts() == 1
-        assert await _sobrou(Sessao) == ([], [])
+        assert await _leftover(SessionMaker) == ([], [])
 
 
 @pytest.mark.asyncio
-async def test_reenvio_ao_executor_que_reconecta_apaga_a_camada(entrega, monkeypatch):
-    async with _banco() as Sessao:
-        await _publicado_local(Sessao, vencido=True)
-        monkeypatch.setattr(artifact_cleanup, "AsyncSessionLocal", Sessao)
+async def test_resend_to_reconnecting_executor_removes_the_layer(entrega, monkeypatch):
+    async with _from_db() as SessionMaker:
+        await _published_local(SessionMaker, vencido=True)
+        monkeypatch.setattr(artifact_cleanup, "AsyncSessionLocal", SessionMaker)
 
         assert await artifact_cleanup.purgar_pendentes_do_executor("exec-1") == 1
-        assert await _sobrou(Sessao) == ([], [])
+        assert await _leftover(SessionMaker) == ([], [])
 
 
 # ── The responses of each path did not change ────────────────────────────────
 
-async def _publicado_no_minio(Sessao, n: int):
-    async with Sessao() as db:
+async def _published_in_minio(SessionMaker, n: int):
+    async with SessionMaker() as db:
         db.add_all([
             Artifact(
                 id_hash=f"art-{n}", workspace_id=WS, workflow_hash="wf-1", run_id="run-1",
@@ -156,59 +156,59 @@ async def _publicado_no_minio(Sessao, n: int):
 
 @pytest.fixture
 def minio(monkeypatch):
-    """MinIO fails for the keys in `quebradas`."""
-    quebradas: set[str] = set()
+    """MinIO fails for the keys in `broken`."""
+    broken: set[str] = set()
 
-    def _apagar(chave, allow_missing=True):
-        if chave in quebradas:
+    def _delete_object(chave, allow_missing=True):
+        if chave in broken:
             raise RuntimeError("MinIO fora")
 
-    monkeypatch.setattr("app.core.storage.delete_strict", _apagar)
-    return quebradas
+    monkeypatch.setattr("app.core.storage.delete_strict", _delete_object)
+    return broken
 
 
 @pytest.mark.asyncio
-async def test_delete_avulso_com_o_minio_fora_e_502_e_nada_sai(minio, pode_editar):
+async def test_single_delete_with_minio_down_is_502_and_nothing_is_removed(minio, can_edit):
     from fastapi import HTTPException
 
-    async with _banco() as Sessao:
-        await _publicado_no_minio(Sessao, 1)
+    async with _from_db() as SessionMaker:
+        await _published_in_minio(SessionMaker, 1)
         minio.add(f"artifacts/{WS}/run-1/camada_1.geojson")
-        async with Sessao() as db:
+        async with SessionMaker() as db:
             with pytest.raises(HTTPException) as erro:
-                await artifacts_router.delete_artifact("art-1", db=db, current_user=_QUEM, workspace_ids=[WS])
+                await artifacts_router.delete_artifact("art-1", db=db, current_user=_WHO, workspace_ids=[WS])
 
         assert erro.value.status_code == 502
-        assert await _sobrou(Sessao) == (["art-1"], ["camada_1"])
+        assert await _leftover(SessionMaker) == (["art-1"], ["camada_1"])
 
 
 @pytest.mark.asyncio
-async def test_lote_conta_a_falha_do_minio_como_skipped(minio, pode_editar):
-    async with _banco() as Sessao:
-        await _publicado_no_minio(Sessao, 1)
-        await _publicado_no_minio(Sessao, 2)
+async def test_batch_counts_the_minio_failure_as_skipped(minio, can_edit):
+    async with _from_db() as SessionMaker:
+        await _published_in_minio(SessionMaker, 1)
+        await _published_in_minio(SessionMaker, 2)
         minio.add(f"artifacts/{WS}/run-1/camada_2.geojson")
         pedido = SimpleNamespace(json=AsyncMock(return_value={"id_hashes": ["art-1", "art-2"]}))
-        async with Sessao() as db:
+        async with SessionMaker() as db:
             resposta = await artifacts_router.batch_delete_artifacts(
-                pedido, db=db, current_user=_QUEM, workspace_ids=[WS],
+                pedido, db=db, current_user=_WHO, workspace_ids=[WS],
             )
 
         assert resposta == {"deleted": 1, "skipped": 1, "pendentes_no_executor": 0}
         # The failure keeps the row AND the layer: the next attempt finds both.
-        assert await _sobrou(Sessao) == (["art-2"], ["camada_2"])
+        assert await _leftover(SessionMaker) == (["art-2"], ["camada_2"])
 
 
 @pytest.mark.asyncio
-async def test_ordem_nao_entregue_mantem_artefato_e_camada(entrega, pode_editar):
+async def test_undelivered_order_keeps_artifact_and_layer(entrega, can_edit):
     """The layer only goes with the row: an offline executor leaves both."""
     entrega([])
-    async with _banco() as Sessao:
-        await _publicado_local(Sessao)
-        async with Sessao() as db:
+    async with _from_db() as SessionMaker:
+        await _published_local(SessionMaker)
+        async with SessionMaker() as db:
             resposta = await artifacts_router.delete_artifact(
-                "art-1", db=db, current_user=_QUEM, workspace_ids=[WS],
+                "art-1", db=db, current_user=_WHO, workspace_ids=[WS],
             )
 
         assert resposta.status_code == 202
-        assert await _sobrou(Sessao) == (["art-1"], ["camada_1"])
+        assert await _leftover(SessionMaker) == (["art-1"], ["camada_1"])

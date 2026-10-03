@@ -71,10 +71,10 @@ export function SettingsNav({
 
 /** "atualizado há 20 s" (updated 20 s ago) with its own clock: only this span re-renders. */
 export function Frescor({ carimbo }: { carimbo: number }) {
-  const [agora, setAgora] = useState(() => Date.now())
+  const [agora, setNow] = useState(() => Date.now())
   useEffect(() => {
-    setAgora(Date.now())
-    const t = setInterval(() => setAgora(Date.now()), 5_000)
+    setNow(Date.now())
+    const t = setInterval(() => setNow(Date.now()), 5_000)
     return () => clearInterval(t)
   }, [carimbo])
   return (

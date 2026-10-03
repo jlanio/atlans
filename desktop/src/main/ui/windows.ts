@@ -4,7 +4,7 @@ import { ICONE_APP, IS_DEV, arquivoDoApp } from '../paths.js'
 import { ehExternoSeguro } from '../../shared/ui.js'
 
 let janela: BrowserWindow | null = null
-let janelaLog: BrowserWindow | null = null
+let logWindow: BrowserWindow | null = null
 
 /** URL of the Vite dev server, when `npm run dev` set it. */
 const DEV_SERVER = process.env.VITE_DEV_SERVER_URL
@@ -18,12 +18,12 @@ const DEV_SERVER = process.env.VITE_DEV_SERVER_URL
  */
 export const HASH_LOG = '#log'
 
-export function janelaPrincipal(): BrowserWindow | null {
+export function mainWindow(): BrowserWindow | null {
   return janela && !janela.isDestroyed() ? janela : null
 }
 
 /** Subset of `BrowserWindow` used by `trazerParaFrente`. */
-export interface JanelaVisivel {
+export interface VisibleWindow {
   isMinimized(): boolean
   isVisible(): boolean
   restore(): void
@@ -46,14 +46,14 @@ export interface JanelaVisivel {
  * `focus()` on a hidden window — and `focus()` does not make anything visible.
  * The menu looked dead.
  */
-export function trazerParaFrente(win: JanelaVisivel): void {
+export function trazerParaFrente(win: VisibleWindow): void {
   if (win.isMinimized()) win.restore()
   if (!win.isVisible()) win.show()
   win.focus()
 }
 
 /** Subset of `WebContents` used by `protegerNavegacao`. */
-export type ConteudoNavegavel = Pick<WebContents, 'setWindowOpenHandler' | 'on' | 'getURL'>
+export type NavigableContents = Pick<WebContents, 'setWindowOpenHandler' | 'on' | 'getURL'>
 
 /**
  * The same page the window already shows (scheme, host and path), with any
@@ -86,25 +86,25 @@ export function mesmaPagina(atual: string, destino: string): boolean {
  * same rule. `will-redirect` gets the same treatment: a 30x redirect in the
  * middle of a reload must not end up rendering another origin here.
  */
-export function protegerNavegacao(conteudo: ConteudoNavegavel): void {
-  const abrirFora = (destino: string): void => {
+export function protegerNavegacao(conteudo: NavigableContents): void {
+  const openExternally = (destino: string): void => {
     if (ehExternoSeguro(destino)) void shell.openExternal(destino)
   }
   conteudo.setWindowOpenHandler(({ url }) => {
-    abrirFora(url)
+    openExternally(url)
     return { action: 'deny' }
   })
-  const barrarSeSair = (evento: { preventDefault: () => void }, destino: string): void => {
+  const blockIfLeaving = (evento: { preventDefault: () => void }, destino: string): void => {
     if (mesmaPagina(conteudo.getURL(), destino)) return
     evento.preventDefault()
-    abrirFora(destino)
+    openExternally(destino)
   }
-  conteudo.on('will-navigate', barrarSeSair)
-  conteudo.on('will-redirect', barrarSeSair)
+  conteudo.on('will-navigate', blockIfLeaving)
+  conteudo.on('will-redirect', blockIfLeaving)
 }
 
 export function abrirJanela(): BrowserWindow {
-  const existente = janelaPrincipal()
+  const existente = mainWindow()
   if (existente) {
     trazerParaFrente(existente)
     return existente
@@ -158,7 +158,7 @@ export function abrirJanela(): BrowserWindow {
   // executor in the middle of a job — the opposite of what the user expects
   // from a background agent.
   janela.on('close', (evento) => {
-    if (!encerrandoDeVerdade) {
+    if (!reallyQuitting) {
       evento.preventDefault()
       janela?.hide()
     }
@@ -212,10 +212,10 @@ export function abrirJanela(): BrowserWindow {
  *  - wide, short proportions by default: log lines are long, and the nearly
  *    square shape of the main window would waste height on line wrapping.
  */
-export function abrirJanelaDeLog(): BrowserWindow {
-  if (janelaLog && !janelaLog.isDestroyed()) {
-    trazerParaFrente(janelaLog)
-    return janelaLog
+export function openLogWindow(): BrowserWindow {
+  if (logWindow && !logWindow.isDestroyed()) {
+    trazerParaFrente(logWindow)
+    return logWindow
   }
 
   const win = new BrowserWindow({
@@ -238,10 +238,10 @@ export function abrirJanelaDeLog(): BrowserWindow {
       sandbox: true,
     },
   })
-  janelaLog = win
+  logWindow = win
 
   win.once('ready-to-show', () => win.show())
-  win.on('closed', () => { janelaLog = null })
+  win.on('closed', () => { logWindow = null })
 
   protegerNavegacao(win.webContents)
   win.webContents.on('before-input-event', (_evento, input) => {
@@ -259,11 +259,11 @@ export function abrirJanelaDeLog(): BrowserWindow {
   return win
 }
 
-let encerrandoDeVerdade = false
+let reallyQuitting = false
 
 /** Releases `close` to actually close. Called on the app's exit path. */
-export function permitirEncerramento(): void {
-  encerrandoDeVerdade = true
+export function allowQuit(): void {
+  reallyQuitting = true
 }
 
 /**
@@ -274,7 +274,7 @@ export function permitirEncerramento(): void {
  * its own copy of the state and one of them would really close in the middle
  * of the drain.
  */
-export function estaEncerrando(): boolean {
-  return encerrandoDeVerdade
+export function isQuitting(): boolean {
+  return reallyQuitting
 }
 

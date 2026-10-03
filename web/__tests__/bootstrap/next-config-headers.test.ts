@@ -17,7 +17,7 @@ async function cabecalhos(config = nextConfig) {
   return { source, valor }
 }
 
-function diretivas(csp: string): Map<string, string[]> {
+function directives(csp: string): Map<string, string[]> {
   const mapa = new Map<string, string[]>()
   for (const parte of csp.split("; ")) {
     const [nome, ...fontes] = parte.split(" ")
@@ -41,7 +41,7 @@ describe("headers de segurança do next.config", () => {
     const { valor } = await cabecalhos()
     // Just one: with both, the report-only one would be duplicate noise in the log.
     expect(valor("Content-Security-Policy-Report-Only")).toBe("")
-    const csp = diretivas(valor("Content-Security-Policy"))
+    const csp = directives(valor("Content-Security-Policy"))
     expect(csp.get("report-uri")).toEqual(["/api/csp-report"])
     expect(csp.get("report-to")).toEqual(["csp"])
     expect(valor("Reporting-Endpoints")).toBe('csp="/api/csp-report"')
@@ -61,7 +61,7 @@ describe("headers de segurança do next.config", () => {
 
   it("script-src libera a origem e o beacon do Cloudflare — e nenhum CDN", async () => {
     const { valor } = await cabecalhos()
-    const csp = diretivas(valor("Content-Security-Policy"))
+    const csp = directives(valor("Content-Security-Policy"))
     // Only the beacon host: the real URL is `.../beacon.min.js/v<hash>`, and a
     // path without a trailing slash in the CSP matches exactly. Any other host here is a
     // third-party script someone allowed without going through this test — the
@@ -79,7 +79,7 @@ describe("headers de segurança do next.config", () => {
     vi.resetModules()
     const { default: configDev } = await import("@/next.config")
     const { valor } = await cabecalhos(configDev)
-    const csp = diretivas(valor("Content-Security-Policy"))
+    const csp = directives(valor("Content-Security-Policy"))
     expect(csp.get("script-src")).toContain("'unsafe-eval'")
     // utils/env.ts: with NEXT_PUBLIC_API_PORT the WebSocket goes to ws://host:8000.
     expect(csp.get("connect-src")).toEqual(["'self'", "https:", "wss:", "http:", "ws:"])

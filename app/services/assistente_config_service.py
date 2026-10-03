@@ -37,11 +37,11 @@ _TTL_S = 300
 # existence: what exists is said by the provider's catalog, queried in the
 # route. It serves to stop the obvious accident — a field pasted with a space,
 # a whole URL, an empty text — before it turns into an error in every conversation.
-TAMANHO_MAXIMO = 120
+MAX_LENGTH = 120
 
 
-def formato_valido(modelo: str) -> bool:
-    if not modelo or len(modelo) > TAMANHO_MAXIMO:
+def is_valid_format(modelo: str) -> bool:
+    if not modelo or len(modelo) > MAX_LENGTH:
         return False
     if any(c.isspace() for c in modelo) or "://" in modelo:
         return False
@@ -49,21 +49,21 @@ def formato_valido(modelo: str) -> bool:
     return all(modelo.split("/"))
 
 
-def _ler(valor: Any) -> str | None:
+def _read(valor: Any) -> str | None:
     """The model from the saved row, if it has the shape of an id — otherwise, nothing (the default)."""
     if isinstance(valor, dict):
         valor = valor.get("modelo")
-    if isinstance(valor, str) and formato_valido(valor):
+    if isinstance(valor, str) and is_valid_format(valor):
         return valor
     return None
 
 
 _CONFIG: ConfigEmCache[str] = ConfigEmCache(
     chave=CHAVE,
-    chave_cache=_CACHE,
+    cache_key=_CACHE,
     ttl_s=_TTL_S,
     campo="modelo",
-    ler=_ler,
+    ler=_read,
     padrao=lambda: ASSISTENTE_MODELO,
     rotulo="Assistente",
 )
@@ -76,26 +76,26 @@ async def modelo_em_uso(*, db: AsyncSession | None = None, redis=None) -> str:
     environment's default. Being left without a model would mean the whole
     assistant down because of a setting; the default is always better than nothing.
     """
-    return await _CONFIG.em_uso(db=db, redis=redis)
+    return await _CONFIG.in_use(db=db, redis=redis)
 
 
-async def definir_modelo(db: AsyncSession, modelo: str | None, *, por: str | None = None,
+async def set_model(db: AsyncSession, modelo: str | None, *, por: str | None = None,
                          redis=None) -> dict[str, Any]:
     """Saves the admin's choice. `None` goes back to the environment's default.
 
     Writes the who-and-when stamp together with the value and pins the new model
     in the cache right away (`ConfigEmCache.definir`).
     """
-    if modelo is not None and not formato_valido(modelo):
+    if modelo is not None and not is_valid_format(modelo):
         raise ValueError(
             "Id de modelo inválido: o nome no catálogo do provedor (ex.: `fornecedor/nome` "
             "no OpenRouter), sem espaços nem URL."
         )
     await _CONFIG.definir(db, modelo, por=por, redis=redis)
-    return await situacao(db=db)
+    return await get_status(db=db)
 
 
-async def situacao(*, db: AsyncSession) -> dict[str, Any]:
+async def get_status(*, db: AsyncSession) -> dict[str, Any]:
     """What the admin screen shows: the model, where it came from, and the stamp.
 
     `origem` is not decoration: "from the environment" and "set here" call for

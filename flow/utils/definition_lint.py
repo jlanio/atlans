@@ -14,13 +14,13 @@ the registry or the factory (the caller passes the names and the descriptors),
 so it runs without geopandas loaded and without a database session.
 
 The checks are CUMULATIVE: each step continues after an error, so the report
-comes out whole. `RelatorioLint.fatal` says whether it is worth trying to
+comes out whole. `LintReport.fatal` says whether it is worth trying to
 construct the executor afterwards (which would bring the constructor down).
 
 Everything here runs synchronously on the server's event loop, over text the
-client controls: every string scan is LINEAR (see `_partes_jinja`) and the
+client controls: every string scan is LINEAR (see `_jinja_parts`) and the
 reference heuristics (alias, `inputs.x`) ignore strings above
-`_TAMANHO_MAX_TEXTO` — the secret check never skips.
+`_MAX_TEXT_LENGTH` — the secret check never skips.
 """
 from __future__ import annotations
 
@@ -31,9 +31,9 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Collection, Iterable, Iterator, Mapping, Optional
 
-from flow.core.aliases import RESERVED_ALIASES, alias_declarado
+from flow.core.aliases import RESERVED_ALIASES, declared_alias
 from flow.core.graph import WorkflowGraph
-from flow.utils.parameter_validation import _CHAVES_DE_PLATAFORMA
+from flow.utils.parameter_validation import _PLATFORM_KEYS
 from flow.utils.workflow_contract import _parse_ports
 
 # Codes that would bring down the WorkflowExecutor constructor. `construction_error`
@@ -41,26 +41,26 @@ from flow.utils.workflow_contract import _parse_ports
 # lint, construction blew up — the vocabulary lives in one place. `unknown_node`
 # only brings down the constructor if the node is in the execution order (the
 # NodeManager only instantiates those); the graph step downgrades the rest (see
-# `Diagnostico.fatal`). `invalid_credential_id` is fatal by contract, not by
+# `Diagnostic.fatal`). `invalid_credential_id` is fatal by contract, not by
 # construction: an id that is not a UUID never reaches the database, and a client
 # that only looks at the HTTP status (the skill's `validar.py`) must keep failing
 # as it did with the 403.
-FATAIS = frozenset({
+FATAL_CODES = frozenset({
     "unknown_node", "duplicate_node_id", "cycle", "construction_error", "invalid_credential_id",
 })
 
-# Copy of `_PROPRIEDADES_SECRETAS` (flow/factory.py), in lowercase: the keys
+# Copy of `_SECRET_PROPERTIES` (flow/factory.py), in lowercase: the keys
 # that should only reach the node through server injection. The factory is not
 # imported because it pulls in the whole registry; tests/unit/test_definition_lint.py
 # ensures the two lists stay the same.
-CHAVES_SECRETAS = frozenset({
+SECRET_KEYS = frozenset({
     "http_auth", "s3_auth", "connectionstring", "token", "password", "senha",
     "secret", "api_key", "apikey", "authorization", "private_key",
     "awssecretaccesskey",
 })
 
 # HTTP headers that carry a credential when written by hand in `headers`.
-# Superset of `_CABECALHOS_DE_CREDENCIAL` (flow/nodes/action/http_request.py),
+# Superset of `_CREDENTIAL_HEADERS` (flow/nodes/action/http_request.py),
 # the list the node drops when following a 3xx to another origin — what the node
 # considers a credential in transit the lint considers a stored credential.
 # `cookie` and `proxy-authorization` carry a session and a proxy credential as
@@ -68,13 +68,13 @@ CHAVES_SECRETAS = frozenset({
 # text in the definition and in the redaction (which imports this list).
 # `x-api-key` only exists here: it is a stored key, not a header to drop on a
 # redirect. tests/unit/test_definition_lint.py watches over the inclusion.
-_CABECALHOS_SECRETOS = frozenset({
+_SECRET_HEADERS = frozenset({
     "authorization", "x-api-key", "cookie", "proxy-authorization",
 })
 
 # What remains of a value after removing the expressions and that is NOT a secret:
 # only the authentication scheme ("Bearer {{ $Cred.token }}" → "Bearer").
-_ESQUEMAS_DE_AUTENTICACAO = frozenset({"bearer", "basic", "token", "apikey", "api-key"})
+_AUTH_SCHEMES = frozenset({"bearer", "basic", "token", "apikey", "api-key"})
 
 # A `$Alias` or `$Alias.campo.sub` reference — the same pattern as
 # flow/utils/expression_service.py (`_ALIAS_PATTERN`), repeated here so as not
@@ -90,18 +90,18 @@ _INPUTS_EM_JINJA = re.compile(
 # Per-string ceiling for the reference heuristics (alias, inputs). A form
 # parameter does not come close; a hostile payload does, and the report
 # needs nothing that lies inside 16 thousand characters of text.
-_TAMANHO_MAX_TEXTO = 16_000
+_MAX_TEXT_LENGTH = 16_000
 
 # Ceiling on the descent through dict/list — a pathological structure does not become infinite recursion.
-_PROFUNDIDADE_MAX = 32
+_MAX_DEPTH = 32
 
 # Ceiling on the total text the alias reference index goes through (sum of
 # the definition's strings): ~1 s of CPU in the worst case, and it is only for a warning.
-_ORCAMENTO_INDICE = 2_000_000
+_INDEX_BUDGET = 2_000_000
 
 
 @dataclass
-class Diagnostico:
+class Diagnostic:
     code: str
     severity: str
     message: str
@@ -124,7 +124,7 @@ class Diagnostico:
 
 
 @dataclass
-class RelatorioLint:
+class LintReport:
     errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
     execution_order: list = field(default_factory=list)
@@ -136,21 +136,21 @@ class RelatorioLint:
         return any(d.fatal for d in self.errors)
 
     def erro(self, code: str, message: str, *, node_id: Optional[str] = None,
-             edge: Optional[dict] = None) -> Diagnostico:
-        d = Diagnostico(code, "error", message, node_id=node_id, edge=edge, fatal=code in FATAIS)
+             edge: Optional[dict] = None) -> Diagnostic:
+        d = Diagnostic(code, "error", message, node_id=node_id, edge=edge, fatal=code in FATAL_CODES)
         self.errors.append(d)
         return d
 
     def aviso(self, code: str, message: str, *, node_id: Optional[str] = None,
-              edge: Optional[dict] = None) -> Diagnostico:
-        d = Diagnostico(code, "warning", message, node_id=node_id, edge=edge)
+              edge: Optional[dict] = None) -> Diagnostic:
+        d = Diagnostic(code, "warning", message, node_id=node_id, edge=edge)
         self.warnings.append(d)
         return d
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-def _partes_jinja(texto: str) -> list:
+def _jinja_parts(texto: str) -> list:
     """Alternates plain text and Jinja block: [outside, inside, outside, ..., outside].
 
     LINEAR tokenizer with `str.find`: finds the next opening (`{{` or `{%`)
@@ -167,9 +167,9 @@ def _partes_jinja(texto: str) -> list:
     pos = 0
     proxima = {"{{": texto.find("{{"), "{%": texto.find("{%")}
     while True:
-        for abertura in ("{{", "{%"):
-            if -1 < proxima[abertura] < pos:
-                proxima[abertura] = texto.find(abertura, pos)
+        for opening in ("{{", "{%"):
+            if -1 < proxima[opening] < pos:
+                proxima[opening] = texto.find(opening, pos)
         candidatos = [i for i in proxima.values() if i != -1]
         if not candidatos:
             partes.append(texto[pos:])
@@ -185,21 +185,21 @@ def _partes_jinja(texto: str) -> list:
         pos = fim + 2
 
 
-def _blocos_jinja(texto: str) -> list:
-    partes = _partes_jinja(texto)
+def _jinja_blocks(texto: str) -> list:
+    partes = _jinja_parts(texto)
     return [partes[i] for i in range(1, len(partes), 2)]
 
 
-def _tem_template(texto: str) -> bool:
+def _has_template(texto: str) -> bool:
     """Does the string have any Jinja block or `$Alias` reference? Then the final
     value only exists at runtime, and the lint cannot judge the raw text."""
-    return len(_partes_jinja(texto)) > 1 or _ALIAS_REF.search(texto) is not None
+    return len(_jinja_parts(texto)) > 1 or _ALIAS_REF.search(texto) is not None
 
 
-def _residuo_literal(texto: str) -> str:
+def _literal_residue(texto: str) -> str:
     """What remains of a string without the Jinja blocks, the `$Alias` references
     and the whitespace: what was written LITERALLY in the definition."""
-    partes = _partes_jinja(texto)
+    partes = _jinja_parts(texto)
     fora = "".join(partes[i] for i in range(0, len(partes), 2))
     # Joins with a SPACE, not with nothing. Gluing the pieces together, two lines of
     # free text became a single string — the body of an e-mail ending in a
@@ -224,7 +224,7 @@ def _params_de(node: Mapping[str, Any]) -> dict:
 
 def _strings(valor: Any, profundidade: int = 0) -> Iterator[str]:
     """All the string values of a structure, descending through dict/list."""
-    if profundidade > _PROFUNDIDADE_MAX:
+    if profundidade > _MAX_DEPTH:
         return
     if isinstance(valor, str):
         yield valor
@@ -236,7 +236,7 @@ def _strings(valor: Any, profundidade: int = 0) -> Iterator[str]:
             yield from _strings(item, profundidade + 1)
 
 
-def _preenchido(valor: Any, profundidade: int = 0) -> bool:
+def _is_filled(valor: Any, profundidade: int = 0) -> bool:
     """Is there a LITERAL secret in here?
 
     String: strips Jinja blocks and `$Alias` references; what remains only counts
@@ -246,23 +246,23 @@ def _preenchido(valor: Any, profundidade: int = 0) -> bool:
     (it is a selector — `{"type": "http_bearer"}` is a form without a token, not
     a secret). No size ceiling: this is the check that is never skipped.
     """
-    if valor is None or profundidade > _PROFUNDIDADE_MAX:
+    if valor is None or profundidade > _MAX_DEPTH:
         return False
     if isinstance(valor, str):
-        residuo = _residuo_literal(valor)
-        return bool(residuo) and residuo.lower() not in _ESQUEMAS_DE_AUTENTICACAO
+        residue = _literal_residue(valor)
+        return bool(residue) and residue.lower() not in _AUTH_SCHEMES
     if isinstance(valor, Mapping):
         return any(
-            _preenchido(item, profundidade + 1)
+            _is_filled(item, profundidade + 1)
             for chave, item in valor.items()
             if str(chave).lower() != "type"
         )
     if isinstance(valor, (list, tuple)):
-        return any(_preenchido(item, profundidade + 1) for item in valor)
+        return any(_is_filled(item, profundidade + 1) for item in valor)
     return True
 
 
-def _como_dict(valor: Any) -> Optional[dict]:
+def _as_dict(valor: Any) -> Optional[dict]:
     """`headers` arrives as a dict or as JSON serialized by the editor."""
     if isinstance(valor, str):
         try:
@@ -272,7 +272,7 @@ def _como_dict(valor: Any) -> Optional[dict]:
     return valor if isinstance(valor, dict) else None
 
 
-class _IndiceDeReferencias:
+class _ReferenceIndex:
     """Names the definition uses as node aliases, collected ONCE.
 
     Outside a Jinja block only `$Alias` counts. Inside, besides `$Alias`,
@@ -286,24 +286,24 @@ class _IndiceDeReferencias:
     cost O(N²) tokenizations (100 nodes with 16 KB each = 24 s of synchronous
     CPU on the event loop). Here each string is tokenized once, the lookup by
     alias is a set lookup, and the total indexed text has a ceiling
-    (`_ORCAMENTO_INDICE`): it is a WARNING heuristic, and the lint runs
+    (`_INDEX_BUDGET`): it is a WARNING heuristic, and the lint runs
     synchronously in the handler — a body of tens of MB cannot cost tens of seconds.
     """
 
     def __init__(self, textos: Iterable[str]):
         self.nomes: set = set()
         self.truncado = False
-        orcamento = _ORCAMENTO_INDICE
+        budget = _INDEX_BUDGET
         for texto in textos:
-            orcamento -= len(texto)
-            if orcamento < 0:
+            budget -= len(texto)
+            if budget < 0:
                 self.truncado = True
                 break
-            for m in _REF_EM_QUALQUER_LUGAR.finditer(texto):
+            for m in _REF_ANYWHERE.finditer(texto):
                 self.nomes.add(m.group(1) or m.group(3))
             # One call per string, not per block: the line break between the
             # blocks is not `[\w.$]`, so the lookbehind still holds.
-            self.nomes.update(_NOME_EM_JINJA.findall("\n".join(_blocos_jinja(texto))))
+            self.nomes.update(_NAME_IN_JINJA.findall("\n".join(_jinja_blocks(texto))))
 
     def referencia(self, alias: str) -> bool:
         return alias in self.nomes
@@ -311,24 +311,24 @@ class _IndiceDeReferencias:
 
 # `$Alias`, `named.Alias` (group 1) and `named['Alias']` (group 3) — the same
 # `(?!\w)` as before: `$Ab` does not reference `A`.
-_REF_EM_QUALQUER_LUGAR = re.compile(
+_REF_ANYWHERE = re.compile(
     r"(?:\$|named\.)([^\W\d]\w*)(?!\w)"
     r"|named\[\s*(['\"])(.*?)\2\s*\]"
 )
 # Nome solto dentro de bloco Jinja (`{{ A }}`, `{{ A['x'] }}`, `{% for r in A %}`).
-_NOME_EM_JINJA = re.compile(r"(?<![\w.$])([^\W\d]\w*)(?!\w)")
+_NAME_IN_JINJA = re.compile(r"(?<![\w.$])([^\W\d]\w*)(?!\w)")
 
 
-def _inputs_referenciados(texto: str) -> list:
+def _referenced_inputs(texto: str) -> list:
     """Names of `inputs.<nome>` that a trigger parameter consumes.
 
     Only inside a Jinja block: a bare `$inputs.x` in the text is NOT rendered
-    by the executor (`rendering._tem_expressao` only triggers `$X` when X is a
+    by the executor (`rendering._has_expression` only triggers `$X` when X is a
     node alias), so suggesting a parameter from it would promise what the
     run does not deliver. `{{ $inputs.x }}` inside the block still counts.
     """
     nomes: list = []
-    for bloco in _blocos_jinja(texto):
+    for bloco in _jinja_blocks(texto):
         nomes.extend(m.group(1) or m.group(3) for m in _INPUTS_EM_JINJA.finditer(bloco))
     return nomes
 
@@ -342,7 +342,7 @@ def lint_definition(
     registry_names: Collection[str],
     reserved_aliases: Collection[str] = RESERVED_ALIASES,
     descriptors: Optional[Mapping[str, dict]] = None,
-) -> RelatorioLint:
+) -> LintReport:
     """Static diagnostics of `nodes` + `edges`.
 
     `registry_names`: valid node names (keys of NODE_REGISTRY).
@@ -350,7 +350,7 @@ def lint_definition(
     checks (undeclared / missing required / invalid JSON / empty fallback)
     do not run.
     """
-    rel = RelatorioLint()
+    rel = LintReport()
     nodes = [n for n in (nodes or []) if isinstance(n, Mapping)]
     # Only edges with both ends: the router's Pydantic already guarantees this, and
     # a malformed entry here is not a workflow diagnostic, it is payload garbage.
@@ -359,10 +359,10 @@ def lint_definition(
         if isinstance(e, Mapping) and "source" in e and "target" in e
     ]
 
-    def alias_efetivo(node: Mapping[str, Any], name: str) -> str:
+    def effective_alias(node: Mapping[str, Any], name: str) -> str:
         # `resolve_alias` honoring the received `reserved_aliases` (and tolerant of a
         # node without `name`, which `unknown_node` already reports).
-        custom = alias_declarado(node)
+        custom = declared_alias(node)
         if custom and custom.isidentifier() and custom not in reserved_aliases:
             return custom
         return name
@@ -388,8 +388,8 @@ def lint_definition(
         if name not in registry_names:
             # The prefix is the factory's message (flow/factory.py), verbatim: it is the
             # text the validation's consumer already looks for.
-            from flow.nodes.contrato import dica_de_no_desconhecido
-            dica = dica_de_no_desconhecido(name)
+            from flow.nodes.contrato import unknown_node_hint
+            dica = unknown_node_hint(name)
             rel.erro(
                 "unknown_node",
                 f"Node '{name}' não encontrado para instância (id={nid})."
@@ -397,7 +397,7 @@ def lint_definition(
                 node_id=nid,
             )
 
-        custom = alias_declarado(node)
+        custom = declared_alias(node)
         if custom and not custom.isidentifier():
             rel.erro(
                 "invalid_alias",
@@ -418,7 +418,7 @@ def lint_definition(
 
         # Secret stored in the definition. Never echo the value: the diagnostic goes
         # to logs and to the client, and the problem is precisely the leak.
-        def acusar_segredo(chave: str) -> None:
+        def flag_secret(chave: str) -> None:
             rel.erro(
                 "secret_in_definition",
                 f"propriedade '{chave}' preenchida em '{name}' (id={nid}): segredo "
@@ -428,13 +428,13 @@ def lint_definition(
             )
 
         for chave, valor in params.items():
-            if str(chave).lower() in CHAVES_SECRETAS and _preenchido(valor):
-                acusar_segredo(str(chave))
-        cabecalhos = _como_dict(params.get("headers"))
+            if str(chave).lower() in SECRET_KEYS and _is_filled(valor):
+                flag_secret(str(chave))
+        cabecalhos = _as_dict(params.get("headers"))
         if cabecalhos:
             for chave, valor in cabecalhos.items():
-                if str(chave).lower() in _CABECALHOS_SECRETOS and _preenchido(valor):
-                    acusar_segredo(f"headers.{chave}")
+                if str(chave).lower() in _SECRET_HEADERS and _is_filled(valor):
+                    flag_secret(f"headers.{chave}")
 
         cid = params.get("credential_id")
         if cid not in (None, ""):
@@ -458,14 +458,14 @@ def lint_definition(
             declaradas = {p["name"] for p in props}
             # Only the PRESENCE of the key is checked, never the value's type: a
             # parameter can be a Jinja expression that only becomes an integer in the run.
-            nao_declaradas = [
+            undeclared = [
                 k for k in params
-                if k not in declaradas and k not in _CHAVES_DE_PLATAFORMA
+                if k not in declaradas and k not in _PLATFORM_KEYS
             ]
-            if nao_declaradas:
+            if undeclared:
                 rel.aviso(
                     "undeclared_property",
-                    f"propriedade(s) {nao_declaradas} de '{name}' (id={nid}) não "
+                    f"propriedade(s) {undeclared} de '{name}' (id={nid}) não "
                     "existem no descriptor do nó e seriam descartadas em silêncio "
                     f"na execução. Declaradas: {sorted(declaradas)}.",
                     node_id=nid,
@@ -491,7 +491,7 @@ def lint_definition(
                 if prop.get("type") != "object":
                     continue
                 valor = params.get(prop["name"])
-                if not isinstance(valor, str) or not valor.strip() or _tem_template(valor):
+                if not isinstance(valor, str) or not valor.strip() or _has_template(valor):
                     continue
                 try:
                     decodificado = json.loads(valor)
@@ -527,13 +527,13 @@ def lint_definition(
     # expression actually references that name.
     grupos: dict = {}
     for nid, node in node_defs.items():
-        grupos.setdefault(alias_efetivo(node, str(node.get("name") or "")), []).append(node)
-    indice: Optional[_IndiceDeReferencias] = None
+        grupos.setdefault(effective_alias(node, str(node.get("name") or "")), []).append(node)
+    indice: Optional[_ReferenceIndex] = None
     for alias, membros in grupos.items():
         if len(membros) < 2 or not alias:
             continue
         ids = [str(m.get("id") or "") for m in membros]
-        explicito = any(alias_efetivo(m, "") == alias for m in membros)
+        explicito = any(effective_alias(m, "") == alias for m in membros)
         if explicito:
             rel.erro(
                 "duplicate_alias",
@@ -544,8 +544,8 @@ def lint_definition(
             )
             continue
         if indice is None:
-            indice = _IndiceDeReferencias(
-                s for node in nodes for s in _strings(node) if len(s) <= _TAMANHO_MAX_TEXTO
+            indice = _ReferenceIndex(
+                s for node in nodes for s in _strings(node) if len(s) <= _MAX_TEXT_LENGTH
             )
         if indice.referencia(alias):
             rel.aviso(
@@ -595,27 +595,27 @@ def lint_definition(
         # nonexistent name outside it (isolated, outside the trigger's cone) is still
         # an error, but does not bring down the constructor. With a cycle there is
         # no order — and `cycle` is already fatal.
-        na_ordem = set(order)
+        in_order = set(order)
         for d in rel.errors:
-            if d.code == "unknown_node" and d.node_id not in na_ordem:
+            if d.code == "unknown_node" and d.node_id not in in_order:
                 d.fatal = False
     rel.execution_order = list(order)
 
     # 5. Run parameters the workflow expects. `{{ inputs.X }}` is only a user
     # parameter in a trigger node (core.py: in the others, `inputs` are the
     # edges). The SubWorkflowInput's `ports` are the input contract.
-    sugeridos: dict = {}
+    suggested: dict = {}
     for node in nodes:
         params = _params_de(node)
         nomes: list = []
         if node.get("type") == "trigger":
             for texto in _strings(params):
-                if len(texto) <= _TAMANHO_MAX_TEXTO:
-                    nomes.extend(_inputs_referenciados(texto))
+                if len(texto) <= _MAX_TEXT_LENGTH:
+                    nomes.extend(_referenced_inputs(texto))
         if node.get("name") == "SubWorkflowInput":
             nomes.extend(_parse_ports(params.get("ports")))
         for nome in nomes:
-            sugeridos.setdefault(nome, {"type": "string", "required": True})
-    rel.suggested_params_schema = sugeridos
+            suggested.setdefault(nome, {"type": "string", "required": True})
+    rel.suggested_params_schema = suggested
 
     return rel

@@ -29,13 +29,13 @@ import type { NextConfig } from "next";
 // path without a trailing slash in the CSP matches exactly. Its POST
 // (`cloudflareinsights.com/cdn-cgi/rum`) already fits connect-src's `https:`.
 // Without Cloudflare in front (closed installation) the entry is harmless.
-const scriptsDaBorda = "https://static.cloudflareinsights.com";
+const edgeScripts = "https://static.cloudflareinsights.com";
 
 const emDev = process.env.NODE_ENV === "development";
 
 const csp = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${scriptsDaBorda}${emDev ? " 'unsafe-eval'" : ""}`,
+  `script-src 'self' 'unsafe-inline' ${edgeScripts}${emDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: https:${emDev ? " http:" : ""}`,
   "font-src 'self' data:",

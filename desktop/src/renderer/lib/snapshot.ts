@@ -14,9 +14,9 @@
 import { createContext, useContext } from 'react'
 import type { Snapshot } from '../../shared/events.js'
 
-export const ContextoSnapshot = createContext<Snapshot | null>(null)
+export const SnapshotContext = createContext<Snapshot | null>(null)
 
 /** Latest executor snapshot, or `null` when it is stopped. */
 export function useSnapshot(): Snapshot | null {
-  return useContext(ContextoSnapshot)
+  return useContext(SnapshotContext)
 }

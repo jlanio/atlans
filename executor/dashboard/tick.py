@@ -2,7 +2,7 @@
 """
 Collection of a `Snapshot` — the only place that gathers the tick's numbers.
 
-Extracted from `runtime.DashboardRuntime._pintar` when the JSON mode appeared.
+Extracted from `runtime.DashboardRuntime._paint` when the JSON mode appeared.
 Duplicating the call in both runtimes would guarantee divergence: it would take
 only someone adding an argument to `stats.snapshot()` and remembering one side,
 and the terminal dashboard and the GUI would start showing different numbers for
@@ -26,10 +26,10 @@ from executor import sysinfo
 logger = logging.getLogger("executor.dashboard")
 
 # Interval between outbox queries. See the module docstring.
-INTERVALO_OUTBOX_S = 5.0
+OUTBOX_INTERVAL_S = 5.0
 
 
-def contar_outbox() -> int:
+def count_outbox() -> int:
     """Pending items in the SQLite outbox. Never raises — 0 beats bringing down the tick."""
     try:
         from executor import result_store
@@ -39,26 +39,26 @@ def contar_outbox() -> int:
 
 
 class CacheOutbox:
-    """Keeps the last count and only re-queries every `INTERVALO_OUTBOX_S`.
+    """Keeps the last count and only re-queries every `OUTBOX_INTERVAL_S`.
 
     Takes the clock as a parameter (`loop.time`) instead of calling
     `asyncio.get_running_loop()` internally: that way it is testable without an
     event loop.
     """
 
-    def __init__(self, intervalo: float = INTERVALO_OUTBOX_S) -> None:
-        self._intervalo = intervalo
-        self._valor = 0
-        self._proximo = 0.0
+    def __init__(self, intervalo: float = OUTBOX_INTERVAL_S) -> None:
+        self._interval = intervalo
+        self._value = 0
+        self._next_at = 0.0
 
     def get(self, agora: float) -> int:
-        if agora >= self._proximo:
-            self._proximo = agora + self._intervalo
-            self._valor = contar_outbox()
-        return self._valor
+        if agora >= self._next_at:
+            self._next_at = agora + self._interval
+            self._value = count_outbox()
+        return self._value
 
 
-def coletar_snapshot(stats, *, capacity_source, result_queue, outbox_pending: int):
+def collect_snapshot(stats, *, capacity_source, result_queue, outbox_pending: int):
     """Builds the tick's `Snapshot`.
 
     `capacity_source` and `result_queue` are read "on the spot" on purpose — that

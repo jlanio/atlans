@@ -5,10 +5,10 @@ import type { IResponse } from "@/service/types"
 import { createToast } from "@/utils/createToast"
 
 /** The text of a toast: the sentence, or title + description. */
-export type TextoDeToast = string | readonly [titulo: string, descricao?: string]
+export type ToastText = string | readonly [titulo: string, descricao?: string]
 
 /** The service error, with the domain code when there is one (the policy 409). */
-export type ErroDaAcao = NonNullable<IResponse<unknown>["error"]>
+export type ActionError = NonNullable<IResponse<unknown>["error"]>
 
 /**
  * What the action returns: the service response (`data` on success, `error` on
@@ -16,22 +16,22 @@ export type ErroDaAcao = NonNullable<IResponse<unknown>["error"]>
  * validation stays OUTSIDE the action (in the button's `disabled` and in Enter):
  * an action that returns without an error is a success.
  */
-type RespostaDaAcao<R> = { data?: R; error?: ErroDaAcao | null } | void
+type ActionResponse<R> = { data?: R; error?: ActionError | null } | void
 
-export interface OpcoesDaAcao<R> {
+export interface ActionOptions<R> {
   /** Success toast: fixed text, or a function of what the server returned. `null`: no toast. */
-  sucesso: TextoDeToast | null | ((dados: R) => TextoDeToast | null)
+  sucesso: ToastText | null | ((dados: R) => ToastText | null)
   /**
    * Failure toast, built from the server message (`undefined` when none
    * came). `null`: the dialog shows the error on its own screen — the policy 409
    * becomes the "anyway" warning — and no toast goes out.
    */
-  erro: (mensagem: string | undefined, erro: ErroDaAcao) => TextoDeToast | null
+  erro: (mensagem: string | undefined, erro: ActionError) => ToastText | null
   /** After success, with the dialog already closed — typically reloading the list. */
   aoConcluir?: (dados: R) => void
 }
 
-export interface AcaoDeDialogo {
+export interface DialogAction {
   aberto: boolean
   /** Open/close. Closing in the middle of the action is ignored — the same lock as `bloqueado`. */
   setAberto: (aberto: boolean) => void
@@ -56,43 +56,43 @@ export interface AcaoDeDialogo {
  * applies to both.
  */
 export function useAcaoDeDialogo<R = unknown>(
-  fn: () => Promise<RespostaDaAcao<R>>,
-  opcoes: OpcoesDaAcao<R>,
-): AcaoDeDialogo {
-  const [aberto, setAbertoState] = useState(false)
-  const [executando, setExecutando] = useState(false)
+  fn: () => Promise<ActionResponse<R>>,
+  opcoes: ActionOptions<R>,
+): DialogAction {
+  const [aberto, setOpenState] = useState(false)
+  const [executando, setExecuting] = useState(false)
   // A ref and not just state: the second Enter can arrive before React draws
   // the "running" state — the guard has to hold already within the same tick.
-  const emVoo = useRef<Promise<void> | null>(null)
+  const inFlight = useRef<Promise<void> | null>(null)
 
   // Read from refs so `executar` has a constant identity; the value that counts
   // is the one from the render in which the action was CONFIRMED (see `executar`).
   const fnRef = useRef(fn)
-  const opcoesRef = useRef(opcoes)
+  const optionsRef = useRef(opcoes)
   fnRef.current = fn
-  opcoesRef.current = opcoes
+  optionsRef.current = opcoes
 
   const setAberto = useCallback((valor: boolean) => {
-    if (!valor && emVoo.current) return
-    setAbertoState(valor)
+    if (!valor && inFlight.current) return
+    setOpenState(valor)
   }, [])
 
   const executar = useCallback(() => {
-    if (emVoo.current) return emVoo.current
+    if (inFlight.current) return inFlight.current
     // The action and the texts from WHEN it was confirmed: touching the form
     // during the wait changes neither what was sent nor what the toast will say.
     const acao = fnRef.current
-    const { sucesso, erro, aoConcluir } = opcoesRef.current
-    setExecutando(true)
+    const { sucesso, erro, aoConcluir } = optionsRef.current
+    setExecuting(true)
 
     const rodada = (async () => {
-      let res: RespostaDaAcao<R>
+      let res: ActionResponse<R>
       try {
         res = await acao()
       } catch (e) {
         res = { error: { name: "Error", message: e instanceof Error ? e.message : undefined } }
       }
-      setExecutando(false)
+      setExecuting(false)
       if (res?.error) {
         const texto = erro(res.error.message, res.error)
         if (texto) mostrar(createToast.error, texto)
@@ -101,18 +101,18 @@ export function useAcaoDeDialogo<R = unknown>(
       const dados = res?.data as R
       const texto = typeof sucesso === "function" ? sucesso(dados) : sucesso
       if (texto) mostrar(createToast.success, texto)
-      setAbertoState(false)
+      setOpenState(false)
       aoConcluir?.(dados)
-    })().finally(() => { emVoo.current = null })
+    })().finally(() => { inFlight.current = null })
 
-    emVoo.current = rodada
+    inFlight.current = rodada
     return rodada
   }, [])
 
   return { aberto, setAberto, executando, executar }
 }
 
-function mostrar(toast: (titulo: string, descricao?: string) => unknown, texto: TextoDeToast) {
+function mostrar(toast: (titulo: string, descricao?: string) => unknown, texto: ToastText) {
   if (typeof texto === "string") toast(texto)
   else toast(texto[0], texto[1])
 }

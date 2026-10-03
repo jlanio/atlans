@@ -38,7 +38,7 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
   const [saving, setSaving] = useState(false)
   const [draft, setDraft] = useState<string[]>([])
 
-  const [novoHost, setNovoHost] = useState("")
+  const [newHost, setNewHost] = useState("")
   const [inputError, setInputError] = useState<string | null>(null)
 
   // Read when each response arrives: the load cannot depend on `draft`
@@ -79,10 +79,10 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
     [workflows, draft],
   )
 
-  const bloqueadosAgora = preview.filter(wf => !wf.allowed)
+  const blockedNow = preview.filter(wf => !wf.allowed)
   // The ones the pending edit would start blocking — the warning is only useful
   // if it separates "already blocked" from "you just blocked".
-  const novosBloqueios = dirty
+  const newBlocks = dirty
     ? preview.filter(wf => !wf.allowed && workflows.find(w => w.id_hash === wf.id_hash)?.allowed)
     : []
 
@@ -91,7 +91,7 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
   }, [workflows, loading, error, onAlertChange])
 
   function add() {
-    const valor = novoHost.trim().toLowerCase()
+    const valor = newHost.trim().toLowerCase()
     const problema = validateAllowlistPattern(valor)
     if (problema) {
       setInputError(problema)
@@ -102,7 +102,7 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
       return
     }
     setDraft(prev => [...prev, valor])
-    setNovoHost("")
+    setNewHost("")
     setInputError(null)
   }
 
@@ -165,11 +165,11 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
             <div className="flex gap-2">
               <Input
                 id={inputId}
-                value={novoHost}
+                value={newHost}
                 placeholder="exemplo.com ou *.exemplo.com"
                 disabled={saving}
                 aria-invalid={!!inputError}
-                onChange={e => { setNovoHost(e.target.value); setInputError(null) }}
+                onChange={e => { setNewHost(e.target.value); setInputError(null) }}
                 onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); add() } }}
               />
               <Button variant="outline" size="icon" onClick={add} disabled={saving} aria-label="Adicionar host">
@@ -227,7 +227,7 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
           )}
         </div>
 
-        {novosBloqueios.length > 0 && (
+        {newBlocks.length > 0 && (
           <div
             role="alert"
             className="space-y-1.5 rounded-md border border-amber-500/25 bg-amber-500/5 p-3 text-xs"
@@ -236,13 +236,13 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
               <TbAlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-700 dark:text-amber-400" aria-hidden="true" />
               <div className="space-y-1">
                 <p className="text-foreground">
-                  Ao salvar, {novosBloqueios.length === 1
+                  Ao salvar, {newBlocks.length === 1
                     ? "1 workflow deixa"
-                    : `${novosBloqueios.length} workflows deixam`}{" "}
+                    : `${newBlocks.length} workflows deixam`}{" "}
                   de enviar notificação:
                 </p>
                 <ul className="list-inside list-disc text-muted-foreground">
-                  {novosBloqueios.map(wf => (
+                  {newBlocks.map(wf => (
                     <li key={wf.id_hash}>
                       {wf.name} <span className="font-mono">({wf.host || "host inválido"})</span>
                     </li>
@@ -292,7 +292,7 @@ export function NotificationsSection({ workspaceId, canManage, onAlertChange }: 
               ))}
             </ul>
           )}
-          {bloqueadosAgora.length > 0 && !dirty && (
+          {blockedNow.length > 0 && !dirty && (
             <p className="text-xs text-muted-foreground">
               Notificações bloqueadas não geram erro na execução — elas simplesmente
               não são enviadas.

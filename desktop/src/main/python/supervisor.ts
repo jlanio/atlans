@@ -22,7 +22,7 @@ import { execFile } from 'node:child_process'
 import type { Command, ExecutorEvent } from '../../shared/events.js'
 import { LineSplitter, NdjsonParser } from './ndjson.js'
 
-export type EstadoSupervisor =
+export type SupervisorState =
   | 'stopped'      // stopped by the user's decision
   | 'starting'     // spawn feito, aguardando o `hello`
   | 'running'
@@ -31,8 +31,8 @@ export type EstadoSupervisor =
   | 'failed'       // gave up; requires user action
 
 /** Mesma politica de executor/main.py:_MAX_RESTARTS / _RESTART_WINDOW_SEC. */
-const MAX_TENTATIVAS = 5
-const JANELA_MS = 300_000
+const MAX_ATTEMPTS = 5
+const WINDOW_MS = 300_000
 const BACKOFF_BASE_MS = 2_000
 const BACKOFF_MAX_MS = 60_000
 
@@ -42,7 +42,7 @@ const BACKOFF_MAX_MS = 60_000
  */
 export const TIMEOUT_SHUTDOWN_MS = 150_000
 
-export interface OpcoesSupervisor {
+export interface SupervisorOptions {
   pythonExe: string
   cwd: string
   env: NodeJS.ProcessEnv
@@ -55,12 +55,12 @@ export interface SupervisorEvents {
   evento: (evt: ExecutorEvent) => void
   /** A stderr line (human log) or a stdout line that was not an event. */
   linha: (texto: string, origem: 'stderr' | 'stdout') => void
-  estado: (estado: EstadoSupervisor, detalhe?: string) => void
+  estado: (estado: SupervisorState, detalhe?: string) => void
 }
 
 export class PythonSupervisor extends EventEmitter {
   private proc: ChildProcessWithoutNullStreams | null = null
-  private _estado: EstadoSupervisor = 'stopped'
+  private _estado: SupervisorState = 'stopped'
   private tentativas: number[] = []
   private timerBackoff: NodeJS.Timeout | null = null
   private timerShutdown: NodeJS.Timeout | null = null
@@ -92,13 +92,13 @@ export class PythonSupervisor extends EventEmitter {
   private readonly agora: () => number
   private readonly spawnFn: typeof spawn
 
-  constructor(private readonly opcoes: OpcoesSupervisor) {
+  constructor(private readonly opcoes: SupervisorOptions) {
     super()
     this.agora = opcoes.agora ?? Date.now
     this.spawnFn = opcoes.spawnFn ?? spawn
   }
 
-  get estado(): EstadoSupervisor { return this._estado }
+  get estado(): SupervisorState { return this._estado }
   get pid(): number | undefined { return this.proc?.pid }
 
   // ── Start ────────────────────────────────────────────────────────────────
@@ -207,15 +207,15 @@ export class PythonSupervisor extends EventEmitter {
    * a new executor and main died without killing it — it stayed holding the
    * WebSocket with the same EXECUTOR_ID, with no supervisor.
    *
-   * `podeReligar` is the caller's guard (in main, "the app is not shutting
+   * `canRestart` is the caller's guard (in main, "the app is not shutting
    * down"), evaluated AFTER the drain, which is when it matters.
    */
-  async restart(podeReligar: () => boolean = () => true): Promise<void> {
+  async restart(canRestart: () => boolean = () => true): Promise<void> {
     const parada = this.stop()
     const geracao = this.geracaoParada
     await parada
     if (this.geracaoParada !== geracao) return   // another stop came in meanwhile
-    if (!podeReligar()) return
+    if (!canRestart()) return
     this.start()
   }
 
@@ -309,16 +309,16 @@ export class PythonSupervisor extends EventEmitter {
 
     const motivo = sinal ? `sinal ${sinal}` : `codigo ${codigo}`
     const t = this.agora()
-    this.tentativas = this.tentativas.filter((x) => t - x < JANELA_MS)
+    this.tentativas = this.tentativas.filter((x) => t - x < WINDOW_MS)
     this.tentativas.push(t)
 
-    if (this.tentativas.length > MAX_TENTATIVAS) {
+    if (this.tentativas.length > MAX_ATTEMPTS) {
       // Restarting in a loop would hide the cause and burn CPU. Stopping and
       // asking for action is more honest — it is the same policy as Python's
       // auto-restart.
       this.mudarEstado(
         'failed',
-        `o executor caiu ${this.tentativas.length} vezes em ${Math.round(JANELA_MS / 60000)} min (${motivo})`,
+        `o executor caiu ${this.tentativas.length} vezes em ${Math.round(WINDOW_MS / 60000)} min (${motivo})`,
       )
       return
     }
@@ -331,12 +331,12 @@ export class PythonSupervisor extends EventEmitter {
     return Math.round(base * (0.8 + Math.random() * 0.4))
   }
 
-  private agendarRestart(atrasoMs: number, motivo: string): void {
-    this.mudarEstado('restarting', `${motivo} — nova tentativa em ${Math.round(atrasoMs / 1000)}s`)
+  private agendarRestart(delayMs: number, motivo: string): void {
+    this.mudarEstado('restarting', `${motivo} — nova tentativa em ${Math.round(delayMs / 1000)}s`)
     this.timerBackoff = setTimeout(() => {
       this.timerBackoff = null
       this.start()
-    }, atrasoMs)
+    }, delayMs)
   }
 
   private cancelarBackoff(): void {
@@ -360,7 +360,7 @@ export class PythonSupervisor extends EventEmitter {
     this.paradaEmCurso = null
   }
 
-  private mudarEstado(estado: EstadoSupervisor, detalhe?: string): void {
+  private mudarEstado(estado: SupervisorState, detalhe?: string): void {
     if (this._estado === estado && !detalhe) return
     this._estado = estado
     this.emit('estado', estado, detalhe)

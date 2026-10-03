@@ -86,13 +86,13 @@ def evento():
         yield m
 
 
-async def _linha(db, id_hash="f-1"):
+async def _row(db, id_hash="f-1"):
     return (await db.execute(
         select(WorkspaceFile).where(WorkspaceFile.id_hash == id_hash)
     )).scalar_one_or_none()
 
 
-async def test_objeto_acima_do_teto_e_recusado_e_apagado(banco, apagar, evento):
+async def test_object_above_the_ceiling_is_rejected_and_deleted(banco, apagar, evento):
     """Declarou 1 KB, enviou 5 MB contra um teto de 1 MB."""
     with _head(5 * UM_MB):
         with pytest.raises(FileTooLargeError):
@@ -102,12 +102,12 @@ async def test_objeto_acima_do_teto_e_recusado_e_apagado(banco, apagar, evento):
     # just a slower way of accepting them.
     apagar.assert_awaited_once_with(CHAVE)
     # E a linha some — confirmada, o Drive listaria um arquivo sem objeto.
-    assert await _linha(banco) is None
+    assert await _row(banco) is None
     # Nobody is notified about a file that did not get in.
     evento.assert_not_awaited()
 
 
-async def test_objeto_dentro_do_teto_confirma_normalmente(banco, apagar, evento):
+async def test_object_within_the_ceiling_confirms_normally(banco, apagar, evento):
     """The counterpart of the test above: without it, a guard that rejects everything would pass."""
     with _head(512 * 1024):
         wf = await DriveService(banco).confirm_upload("f-1")
@@ -120,7 +120,7 @@ async def test_objeto_dentro_do_teto_confirma_normalmente(banco, apagar, evento)
     evento.assert_awaited_once()
 
 
-async def test_linha_ja_confirmada_e_recusada_sem_apagar_nada(banco, apagar):
+async def test_already_confirmed_row_is_rejected_without_deleting_anything(banco, apagar):
     """`confirm_upload` does not filter by status, and any editor can reach the route.
 
     If the rejection deleted here, re-confirming SOMEONE ELSE'S already accepted
@@ -133,7 +133,7 @@ async def test_linha_ja_confirmada_e_recusada_sem_apagar_nada(banco, apagar):
     An object above the ceiling that reconcile flags as a discrepancy is better
     than an unguarded deletion path.
     """
-    alvo = await _linha(banco)
+    alvo = await _row(banco)
     alvo.status = "confirmed"
     alvo.content_md5 = "md5-do-conteudo-antigo"
     await banco.commit()
@@ -143,12 +143,12 @@ async def test_linha_ja_confirmada_e_recusada_sem_apagar_nada(banco, apagar):
             await DriveService(banco).confirm_upload("f-1")
 
     apagar.assert_not_awaited()
-    sobrevivente = await _linha(banco)
-    assert sobrevivente is not None
-    assert sobrevivente.content_md5 == "md5-do-conteudo-antigo"  # intacta
+    survivor = await _row(banco)
+    assert survivor is not None
+    assert survivor.content_md5 == "md5-do-conteudo-antigo"  # intacta
 
 
-async def test_artefato_de_execucao_acima_do_teto_confirma_sem_recusar(banco, apagar, evento):
+async def test_run_artifact_above_the_ceiling_confirms_without_rejecting(banco, apagar, evento):
     """A run artifact never had a ceiling — applying it would mean data loss.
 
     `create_agent_upload_url(s3_key_override=...)` skips `validate_upload`
@@ -158,7 +158,7 @@ async def test_artefato_de_execucao_acima_do_teto_confirma_sem_recusar(banco, ap
     `raise_for_status` on the confirm) and, with `overwrite=True`, would delete
     the good file already in the Drive, without anyone having touched any setting.
     """
-    alvo = await _linha(banco)
+    alvo = await _row(banco)
     alvo.s3_key = "artifacts/ws-1/task-abc/resultado.geojson"
     await banco.commit()
 
@@ -168,17 +168,17 @@ async def test_artefato_de_execucao_acima_do_teto_confirma_sem_recusar(banco, ap
     apagar.assert_not_awaited()
     assert wf.status == "confirmed"
     assert wf.size == 7 * UM_MB          # o objeto grande entra, nao e recusado
-    assert await _linha(banco) is not None
+    assert await _row(banco) is not None
     evento.assert_awaited_once()
 
 
-async def test_chave_apontando_para_outro_workspace_nao_e_apagada(banco, apagar):
+async def test_key_pointing_to_another_workspace_is_not_deleted(banco, apagar):
     """`_validate_agent_s3_key` checks the key against ALL of the executor's
     workspaces, not against the row's — so an `s3_key_override` can point to
     another workspace's object. The rejection cannot become the trigger that
     destroys someone else's bytes.
     """
-    alvo = await _linha(banco)
+    alvo = await _row(banco)
     alvo.s3_key = "drive/ws-VITIMA/abc_alvo.gpkg"
     await banco.commit()
 
@@ -187,10 +187,10 @@ async def test_chave_apontando_para_outro_workspace_nao_e_apagada(banco, apagar)
             await DriveService(banco).confirm_upload("f-1")
 
     apagar.assert_not_awaited()
-    assert await _linha(banco) is not None
+    assert await _row(banco) is not None
 
 
-async def test_falha_ao_apagar_nao_transforma_recusa_em_aceite(banco, evento):
+async def test_delete_failure_does_not_turn_rejection_into_acceptance(banco, evento):
     """MinIO being down at deletion time must not let the file in.
 
     `storage.delete` is best-effort and NEVER raises: it returns False. That is
@@ -203,5 +203,5 @@ async def test_falha_ao_apagar_nao_transforma_recusa_em_aceite(banco, evento):
         with pytest.raises(FileTooLargeError):
             await DriveService(banco).confirm_upload("f-1")
 
-    assert await _linha(banco) is None
+    assert await _row(banco) is None
     evento.assert_not_awaited()

@@ -15,10 +15,10 @@ import { act, cleanup, render } from "@testing-library/react"
  */
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}))
 
-type Ouvinte = (e?: unknown) => void
+type Listener = (e?: unknown) => void
 
 const espiao = vi.hoisted(() => ({
-  mapa: null as ReturnType<typeof criarMapa> | null,
+  mapa: null as ReturnType<typeof createMap> | null,
   geo: null as null | {
     opcoes: Record<string, unknown>
     fire: (ev: string, e?: unknown) => void
@@ -34,32 +34,32 @@ const espiao = vi.hoisted(() => ({
 // A function declaration: it is hoisted, so the vi.mock factory (which is also hoisted)
 // can call it. A CLASS at the top would not be — hence the control double
 // lives INSIDE the factory.
-function criarMapa(opcoes: Record<string, unknown>) {
-  const ouvintes: Record<string, Ouvinte[]> = {}
+function createMap(opcoes: Record<string, unknown>) {
+  const ouvintes: Record<string, Listener[]> = {}
   const inicial = opcoes.center as [number, number]
   let centro = { lng: inicial[0], lat: inicial[1] }
   let zoom = opcoes.zoom as number
-  let movendo = false
+  let moving = false
   const aplicar = (o: { center?: [number, number]; zoom?: number }) => {
     if (o.center) centro = { lng: o.center[0], lat: o.center[1] }
     if (o.zoom != null) zoom = o.zoom
   }
   const mapa = {
     _opcoes: opcoes,
-    easeTo: vi.fn((o: { center?: [number, number]; zoom?: number }) => { movendo = true; aplicar(o) }),
-    jumpTo: vi.fn((o: { center?: [number, number]; zoom?: number }) => { movendo = false; aplicar(o) }),
-    stop: vi.fn(() => { movendo = false }),
-    isMoving: () => movendo,
+    easeTo: vi.fn((o: { center?: [number, number]; zoom?: number }) => { moving = true; aplicar(o) }),
+    jumpTo: vi.fn((o: { center?: [number, number]; zoom?: number }) => { moving = false; aplicar(o) }),
+    stop: vi.fn(() => { moving = false }),
+    isMoving: () => moving,
     getCenter: () => ({ ...centro }),
     getZoom: () => zoom,
-    _terminarMovimento: () => { movendo = false; mapa._disparar("moveend") },
+    _terminarMovimento: () => { moving = false; mapa._disparar("moveend") },
     _disparar: (evento: string, e?: unknown) => [...(ouvintes[evento] ?? [])].forEach((f) => f(e)),
-    on: (evento: string, f: Ouvinte) => { (ouvintes[evento] ??= []).push(f) },
-    once: (evento: string, f: Ouvinte) => {
+    on: (evento: string, f: Listener) => { (ouvintes[evento] ??= []).push(f) },
+    once: (evento: string, f: Listener) => {
       const so = (e?: unknown) => { ouvintes[evento] = (ouvintes[evento] ?? []).filter((g) => g !== so); f(e) }
       ;(ouvintes[evento] ??= []).push(so)
     },
-    off: (evento: string, f: Ouvinte) => { ouvintes[evento] = (ouvintes[evento] ?? []).filter((g) => g !== f) },
+    off: (evento: string, f: Listener) => { ouvintes[evento] = (ouvintes[evento] ?? []).filter((g) => g !== f) },
     addControl: vi.fn(),
     removeControl: () => {}, setProjection: () => {},
     setStyle: () => {}, getStyle: () => ({ layers: [], sources: {} }),
@@ -76,7 +76,7 @@ function criarMapa(opcoes: Record<string, unknown>) {
 vi.mock("maplibre-gl", () => {
   class GeolocateDuble {
     opcoes: Record<string, unknown>
-    _ouvintes: Record<string, Ouvinte[]> = {}
+    _ouvintes: Record<string, Listener[]> = {}
     /** The real code consults these maplibre internals; the test sets them up. */
     _watchState?: string
     _lastKnownPosition?: { coords: { latitude: number; longitude: number; accuracy: number } }
@@ -90,12 +90,12 @@ vi.mock("maplibre-gl", () => {
         duble: this,
       }
     }
-    on(ev: string, f: Ouvinte) { (this._ouvintes[ev] ??= []).push(f) }
+    on(ev: string, f: Listener) { (this._ouvintes[ev] ??= []).push(f) }
   }
   return {
     Map: class {
       constructor(opcoes: Record<string, unknown>) {
-        const m = criarMapa(opcoes)
+        const m = createMap(opcoes)
         espiao.mapa = m
         return m as unknown as object
       }
@@ -110,7 +110,7 @@ vi.mock("maplibre-gl", () => {
   }
 })
 
-import MapLibreMap, { PASSO_DO_GIRO_MS, TEXTOS_DO_MAPA_PT, type MapLibreMapHandle } from "@/app/components/share/MapLibreMap"
+import MapLibreMap, { SPIN_STEP_MS, TEXTOS_DO_MAPA_PT, type MapLibreMapHandle } from "@/app/components/share/MapLibreMap"
 import { textosDe } from "@/app/components/home/i18n"
 
 const BRASIL: [number, number] = [-52, -12]
@@ -173,7 +173,7 @@ describe("MapLibreMap — a localização no globo", () => {
     expect(mapa.stop).toHaveBeenCalled()          // corta o passo em voo
 
     // While following, the spin stays suspended: the resume interval moves nothing.
-    act(() => { vi.advanceTimersByTime(PASSO_DO_GIRO_MS + 1000) })
+    act(() => { vi.advanceTimersByTime(SPIN_STEP_MS + 1000) })
     expect(mapa.easeTo).toHaveBeenCalledTimes(1)
 
     // A pessoa solta o seguir (segundo toque) → o giro volta a andar.
@@ -240,14 +240,14 @@ describe("MapLibreMap — a localização no globo", () => {
   it("permissão negada solta o giro — o hero não fica congelado para sempre", () => {
     // PERMISSION_DENIED drops the control to OFF WITHOUT `trackuserlocationend`;
     // without the error handler, geolocalizandoRef stayed stuck at true.
-    const aoErro = vi.fn()
-    montar({ geolocalizar: true, giroLento: true, aoErroDeLocalizacao: aoErro })
+    const onError = vi.fn()
+    montar({ geolocalizar: true, giroLento: true, aoErroDeLocalizacao: onError })
     const mapa = espiao.mapa!
     expect(mapa.easeTo).toHaveBeenCalledTimes(1) // the mount step
 
     act(() => { espiao.geo!.fire("trackuserlocationstart") })
     act(() => { espiao.geo!.fire("error", { code: 1 }) })
-    expect(aoErro).toHaveBeenCalledWith(1)
+    expect(onError).toHaveBeenCalledWith(1)
 
     act(() => { vi.advanceTimersByTime(1000) })
     expect(mapa.easeTo).toHaveBeenCalledTimes(2) // o giro voltou a andar

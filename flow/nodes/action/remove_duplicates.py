@@ -2,7 +2,7 @@ from typing import Any, Dict, List
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
 from flow.utils.logger import get_logger
-from flow.utils.parameter_validation import colunas_pedidas
+from flow.utils.parameter_validation import requested_columns
 
 logger = get_logger(__name__)
 
@@ -72,7 +72,7 @@ class RemoveDuplicates(BaseNode):
 
         # Chips field: accepts a list, a JSON string (what the screen writes) and the
         # comma-separated text of old definitions.
-        fields: List[str] = colunas_pedidas(self.parameters.get("fields", []))
+        fields: List[str] = requested_columns(self.parameters.get("fields", []))
 
         # keep already validated against the options by self.validate().
         keep = self.parameters.get("keep", "first")

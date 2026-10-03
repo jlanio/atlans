@@ -48,8 +48,8 @@ vi.mock("@/app/components/credentials/dialog-content/create-credential", () => (
 import CredentialField from "@/app/components/workflow/nodes-configuration/fields/credential-field"
 
 const MINHA = { id: "cred-minha", name: "pg-homolog", type: "postgresql" }
-const OUTRO_TIPO = { id: "cred-token", name: "token-portal", type: "webhook_token" }
-const ID_ALHEIA = "cred-de-outro-usuario"
+const OTHER_TYPE = { id: "cred-token", name: "token-portal", type: "webhook_token" }
+const FOREIGN_ID = "cred-de-outro-usuario"
 
 function makeField(overrides: Partial<INodesPropertyAPI> = {}): INodesPropertyAPI {
   return {
@@ -84,30 +84,30 @@ function renderField(selectedId: string, field = makeField()) {
 }
 
 beforeEach(() => {
-  storeCredentials = [MINHA, OUTRO_TIPO]
+  storeCredentials = [MINHA, OTHER_TYPE]
   canEdit = true
 })
 afterEach(cleanup)
 
 describe("CredentialField — credencial que não está na lista do usuário", () => {
   it("credencial de outro usuário não cai no placeholder", async () => {
-    renderField(ID_ALHEIA)
+    renderField(FOREIGN_ID)
 
     expect(await screen.findByText("Credencial de outro usuário")).toBeDefined()
     expect(screen.queryByText("Escolha a credencial")).toBeNull()
   })
 
   it("avisa que escolher a própria substitui para todos", async () => {
-    renderField(ID_ALHEIA)
+    renderField(FOREIGN_ID)
 
     expect(await screen.findByText(/substitui para todos/i)).toBeDefined()
   })
 
   it("não expõe nome nem tipo da credencial alheia", async () => {
-    renderField(ID_ALHEIA)
+    renderField(FOREIGN_ID)
 
     await screen.findByText("Credencial de outro usuário")
-    expect(screen.queryByText(ID_ALHEIA)).toBeNull()
+    expect(screen.queryByText(FOREIGN_ID)).toBeNull()
   })
 })
 
@@ -122,7 +122,7 @@ describe("CredentialField — credencial do próprio usuário", () => {
   it("tipo incompatível mostra o nome e sinaliza o problema", async () => {
     // token-portal belongs to the user, but the node only accepts postgresql: it's
     // left out of `filtered` and before it also fell into the placeholder.
-    renderField(OUTRO_TIPO.id)
+    renderField(OTHER_TYPE.id)
 
     expect(await screen.findByText("token-portal")).toBeDefined()
     expect(await screen.findByText(/tipo aceito por este nó/i)).toBeDefined()
@@ -147,7 +147,7 @@ describe("CredentialField — viewer (somente leitura)", () => {
   beforeEach(() => { canEdit = false })
 
   it("indica que há credencial configurada, em vez de 'Edição Indisponível'", async () => {
-    renderField(ID_ALHEIA)
+    renderField(FOREIGN_ID)
 
     expect(await screen.findByText("Credencial de outro usuário")).toBeDefined()
     expect(screen.queryByText("Edição Indisponível")).toBeNull()

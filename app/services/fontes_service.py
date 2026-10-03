@@ -7,7 +7,7 @@ Four clients read from here, and none of them talks to the network or the table 
 its own: the MCP tools (`app/mcp/tools/fontes.py`), validation
 (`conferir_fontes_da_definicao`, no network), the results consumer
 (`aprender_de_execucao`) and the startup/verification loop
-(`importar_pasta`, `verificar_endpoint`).
+(`importar_pasta`, `verify_endpoint`).
 
 Decisions that apply to everything here:
 
@@ -27,7 +27,7 @@ Decisions that apply to everything here:
   row for that URL at once (77 requests for the whole seed). The
   per-layer DescribeFeatureType only happens on demand (probe/register).
 - **Writes do not commit**, except the two batches that manage their own
-  transaction (`importar_pasta`, `verificar_endpoint`). Whoever calls a tool
+  transaction (`importar_pasta`, `verify_endpoint`). Whoever calls a tool
   commits at the end, as with the other MCP tools.
 """
 from __future__ import annotations
@@ -47,29 +47,29 @@ import httpx
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import FonteInvalidaError
+from app.core.exceptions import InvalidSourceError
 from app.core.utils.busca import contem
 from app.core.utils.datetime_utils import utc_now_naive
 from app.core.utils.logger import get_logger
-from app.models.fonte_de_dados import FonteDeDados
+from app.models.fonte_de_dados import DataSource
 from app.services import fontes_vault
 from flow.utils import segredos_vivos
-from flow.utils.credencial_wfs import AutenticacaoWFS, formas_do_segredo
+from flow.utils.credencial_wfs import AutenticacaoWFS, secret_forms
 from flow.utils.geo_helpers import normalize_ows_endpoint_url, safe_httpx_request, validate_url_ssrf
 
 logger = get_logger("app.services.fontes")
 
-TIPO_WFS = "wfs"
+KIND_WFS = "wfs"
 NO_WFS = "WFS"
-VERSOES_WFS = ("1.0.0", "1.1.0", "2.0.0")
-VERSAO_PADRAO = "2.0.0"
+WFS_VERSIONS = ("1.0.0", "1.1.0", "2.0.0")
+DEFAULT_VERSION = "2.0.0"
 ORIGENS = ("vault", "aprendida", "manual")
 # `origem` is never downgraded: a Vault source that an execution uses remains
 # a Vault source. The order is the strength of each origin.
-_FORCA_DA_ORIGEM = {"aprendida": 0, "manual": 1, "vault": 2}
+_ORIGIN_STRENGTH = {"aprendida": 0, "manual": 1, "vault": 2}
 # The same for the schema: the live DescribeFeatureType beats the Vault table,
 # which beats what an execution saw (column names only), which beats nothing.
-_FORCA_DO_ESQUEMA = {None: 0, "run": 1, "vault": 2, "describe_feature_type": 3}
+_SCHEMA_STRENGTH = {None: 0, "run": 1, "vault": 2, "describe_feature_type": 3}
 
 URL_MAX = 2048
 # IBGE's GetCapabilities has 9,759 FeatureTypes — well above the interactive
@@ -78,19 +78,19 @@ TIMEOUT_CAPABILITIES_S = 30.0
 MAX_CAPABILITIES_BYTES = 32 * 1024 * 1024
 TIMEOUT_DESCRIBE_S = 15.0
 MAX_DESCRIBE_BYTES = 2 * 1024 * 1024
-LIMITE_DE_BUSCA = 20
-LOTE_DE_IMPORTACAO = 500
+SEARCH_LIMIT = 20
+IMPORT_BATCH = 500
 
 # The properties the WFS node declares TODAY. `version` stays in the catalog but
 # does not go into the snippet the model pastes while the node does not declare it —
 # pasting it would yield `undeclared_property` in validation. `cqlFilter` is left out
 # on purpose: it belongs to the QUESTION, not the source — learned from an execution,
 # its `uf = 'MT'` would stick to the snippet of every later one.
-PROPRIEDADES_DO_NO_WFS = ("url", "typeName", "maxFeatures", "bbox", "crs", "sortBy", "timeout", "retries")
+WFS_NODE_PROPERTIES = ("url", "typeName", "maxFeatures", "bbox", "crs", "sortBy", "timeout", "retries")
 
 # Synonyms that apply even without `_sinonimos.md` in the Vault: the themes the
 # product's phrases use. Keys and values are normalized on use.
-SINONIMOS_PADRAO: dict[str, set[str]] = {
+DEFAULT_SYNONYMS: dict[str, set[str]] = {
     "focos de calor": {"queimadas", "incendio", "fogo", "hotspot", "focos"},
     "queimadas": {"focos de calor", "incendio", "fogo"},
     "terras indigenas": {"terra indigena", "ti", "indigena", "aldeia"},
@@ -102,16 +102,16 @@ SINONIMOS_PADRAO: dict[str, set[str]] = {
     "desmatamento": {"prodes", "deter", "supressao"},
     "escolas": {"escola", "educacao"},
 }
-_sinonimos_extra: dict[str, set[str]] = {}
+_extra_synonyms: dict[str, set[str]] = {}
 
-_CREDENCIAL_NA_URL = re.compile(r"://[^/@\s]+:[^/@\s]+@")
-_SEPARADORES = re.compile(r"[\s,;/|]+")
+_CREDENTIAL_IN_URL = re.compile(r"://[^/@\s]+:[^/@\s]+@")
+_SEPARATORS = re.compile(r"[\s,;/|]+")
 
 
 # ── Erros ─────────────────────────────────────────────────────────────────────
 
 
-class SondagemError(Exception):
+class ProbeError(Exception):
     """A probe (GetCapabilities/DescribeFeatureType) that did not succeed.
 
     `codigo` is closed — `timeout | http_status | ssrf | tamanho | tls |
@@ -119,14 +119,14 @@ class SondagemError(Exception):
     HTTP status and the tool to a `reason`, without anyone reading the message.
     """
 
-    def __init__(self, codigo: str, mensagem: str, *, status: int | None = None, candidatas: list[str] | None = None):
+    def __init__(self, codigo: str, mensagem: str, *, status: int | None = None, candidates: list[str] | None = None):
         super().__init__(mensagem)
         self.codigo = codigo
         self.mensagem = mensagem
         self.status = status
-        self.candidatas = candidatas or []
+        self.candidates = candidates or []
 
-    def como_http(self) -> tuple[int, str]:
+    def as_http(self) -> tuple[int, str]:
         """(status, detail) in the shape `GET /nodes/wfs/layers` has always returned."""
         if self.codigo == "timeout":
             return 504, "Timeout ao conectar ao servidor WFS."
@@ -145,17 +145,17 @@ class SondagemError(Exception):
 # ── Texto ─────────────────────────────────────────────────────────────────────
 
 
-def normalizar_texto(texto: Any) -> str:
+def normalize_text(texto: Any) -> str:
     """Lowercase, no accents, collapsed spaces — the form of `busca` and of the query."""
     if texto is None:
         return ""
-    sem_acento = unicodedata.normalize("NFKD", str(texto))
-    plano = "".join(c for c in sem_acento if not unicodedata.combining(c)).casefold()
+    unaccented = unicodedata.normalize("NFKD", str(texto))
+    plano = "".join(c for c in unaccented if not unicodedata.combining(c)).casefold()
     return " ".join(plano.split())
 
 
-def normalizar_url(url: Any) -> str:
-    """The URL as the WFS node uses it — or `FonteInvalidaError`.
+def normalize_url(url: Any) -> str:
+    """The URL as the WFS node uses it — or `InvalidSourceError`.
 
     Pure on purpose (no DNS): the SSRF check happens at fetch time,
     in `safe_httpx_request`. Here we refuse what could never be a source:
@@ -166,28 +166,28 @@ def normalizar_url(url: Any) -> str:
     if texto.startswith("<") and texto.endswith(">"):
         texto = texto[1:-1].strip()
     if not texto:
-        raise FonteInvalidaError("Informe a URL do serviço.")
+        raise InvalidSourceError("Informe a URL do serviço.")
     if len(texto) > URL_MAX:
-        raise FonteInvalidaError(f"URL excede o limite de {URL_MAX} caracteres.")
+        raise InvalidSourceError(f"URL excede o limite de {URL_MAX} caracteres.")
     partes = urlparse(texto)
     if partes.scheme not in ("http", "https") or not partes.netloc:
-        raise FonteInvalidaError("URL inválida. Use http:// ou https://.")
-    if _CREDENCIAL_NA_URL.search(texto) or "@" in partes.netloc:
-        raise FonteInvalidaError("A URL não pode carregar usuário e senha.")
+        raise InvalidSourceError("URL inválida. Use http:// ou https://.")
+    if _CREDENTIAL_IN_URL.search(texto) or "@" in partes.netloc:
+        raise InvalidSourceError("A URL não pode carregar usuário e senha.")
     return normalize_ows_endpoint_url(texto)
 
 
-def normalizar_versao(versao: Any) -> str:
+def normalize_version(versao: Any) -> str:
     texto = str(versao or "").strip()
-    return texto if texto in VERSOES_WFS else VERSAO_PADRAO
+    return texto if texto in WFS_VERSIONS else DEFAULT_VERSION
 
 
-def chave_da_fonte(workspace_id: str | None, tipo: str, url: str, type_name: str | None) -> str:
+def source_key(workspace_id: str | None, tipo: str, url: str, type_name: str | None) -> str:
     bruto = "\n".join((workspace_id or "", tipo, url, type_name or ""))
     return hashlib.sha256(bruto.encode("utf-8")).hexdigest()
 
 
-def texto_de_busca(
+def search_text(
     *,
     instituicao: str | None,
     grupo: str | None,
@@ -212,34 +212,34 @@ def texto_de_busca(
             nome = coluna.get("name") if isinstance(coluna, Mapping) else coluna
             if nome:
                 partes.append(str(nome))
-    return normalizar_texto(" ".join(p for p in partes if p))
+    return normalize_text(" ".join(p for p in partes if p))
 
 
-def definir_sinonimos(mapa: Mapping[str, Iterable[str]] | None) -> None:
+def set_synonyms(mapa: Mapping[str, Iterable[str]] | None) -> None:
     """Replaces the synonyms coming from the Vault (`_sinonimos.md`); the defaults remain."""
-    global _sinonimos_extra
-    _sinonimos_extra = {
-        normalizar_texto(k): {normalizar_texto(v) for v in vs if normalizar_texto(v)}
+    global _extra_synonyms
+    _extra_synonyms = {
+        normalize_text(k): {normalize_text(v) for v in vs if normalize_text(v)}
         for k, vs in (mapa or {}).items()
-        if normalizar_texto(k)
+        if normalize_text(k)
     }
 
 
-def sinonimos_de(termo: str) -> set[str]:
-    chave = normalizar_texto(termo)
+def synonyms_of(termo: str) -> set[str]:
+    chave = normalize_text(termo)
     saida: set[str] = set()
-    for mapa in (SINONIMOS_PADRAO, _sinonimos_extra):
+    for mapa in (DEFAULT_SYNONYMS, _extra_synonyms):
         for k, vs in mapa.items():
-            kn = normalizar_texto(k)
+            kn = normalize_text(k)
             if kn == chave:
-                saida.update(normalizar_texto(v) for v in vs)
-            elif chave in {normalizar_texto(v) for v in vs}:
+                saida.update(normalize_text(v) for v in vs)
+            elif chave in {normalize_text(v) for v in vs}:
                 saida.add(kn)
     saida.discard(chave)
     return {s for s in saida if s}
 
 
-def termos_da_consulta(query: str | None) -> list[set[str]]:
+def query_terms(query: str | None) -> list[set[str]]:
     """Each query term with its variants (itself + synonyms).
 
     The whole query also counts as a term when it has more than one
@@ -247,26 +247,26 @@ def termos_da_consulta(query: str | None) -> list[set[str]]:
     "focos", "de" and "calor" separately. One-letter words and connectives
     are left out.
     """
-    texto = normalizar_texto(query)
+    texto = normalize_text(query)
     if not texto:
         return []
-    frase = {texto} | sinonimos_de(texto)
-    palavras = [p for p in _SEPARADORES.split(texto) if len(p) > 1 and p not in _CONECTIVOS]
+    frase = {texto} | synonyms_of(texto)
+    palavras = [p for p in _SEPARATORS.split(texto) if len(p) > 1 and p not in _CONNECTIVES]
     if len(palavras) <= 1:
-        return [frase | (sinonimos_de(palavras[0]) if palavras else set())]
+        return [frase | (synonyms_of(palavras[0]) if palavras else set())]
     # Phrase OR (each word with its synonyms): rows with the whole phrase
     # match right away; rows with only the words match via the AND below.
-    return [frase | {p} | sinonimos_de(p) for p in palavras]
+    return [frase | {p} | synonyms_of(p) for p in palavras]
 
 
-_CONECTIVOS = {"de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas", "e", "a", "o", "as", "os", "um", "uma", "por", "para", "com"}
+_CONNECTIVES = {"de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas", "e", "a", "o", "as", "os", "um", "uma", "por", "para", "com"}
 
 
 # ── Capabilities e DescribeFeatureType ────────────────────────────────────────
 
 
 @dataclass(frozen=True)
-class CamadaDoServico:
+class ServiceLayer:
     name: str
     title: str | None = None
     abstract: str | None = None
@@ -278,9 +278,9 @@ class CamadaDoServico:
 @dataclass(frozen=True)
 class Capabilities:
     version: str | None
-    layers: tuple[CamadaDoServico, ...]
+    layers: tuple[ServiceLayer, ...]
 
-    def por_nome(self) -> dict[str, CamadaDoServico]:
+    def by_name(self) -> dict[str, ServiceLayer]:
         return {c.name: c for c in self.layers}
 
 
@@ -288,14 +288,14 @@ def _local(tag: str) -> str:
     return tag.rsplit("}", 1)[-1] if "}" in tag else tag
 
 
-def _texto(no: ET.Element | None) -> str | None:
+def _as_text(no: ET.Element | None) -> str | None:
     if no is None or no.text is None:
         return None
     texto = " ".join(no.text.split())
     return texto or None
 
 
-def _filho(no: ET.Element, *nomes: str) -> ET.Element | None:
+def _child(no: ET.Element, *nomes: str) -> ET.Element | None:
     for filho in no:
         if _local(filho.tag) in nomes:
             return filho
@@ -311,14 +311,14 @@ def _parse_xml(texto: str | bytes) -> ET.Element:
     """
     cabeca = texto[:4096] if isinstance(texto, str) else texto[:4096].decode("utf-8", errors="replace")
     if "<!DOCTYPE" in cabeca or "<!ENTITY" in cabeca:
-        raise SondagemError("xml", "Resposta XML com DTD ou entidades — recusada por segurança.")
+        raise ProbeError("xml", "Resposta XML com DTD ou entidades — recusada por segurança.")
     try:
         return ET.fromstring(texto)
     except ET.ParseError as exc:
-        raise SondagemError("xml", f"Resposta não é um XML válido: {exc}") from exc
+        raise ProbeError("xml", f"Resposta não é um XML válido: {exc}") from exc
 
 
-def _crs_normalizado(valor: str | None) -> str | None:
+def _normalized_crs(valor: str | None) -> str | None:
     if not valor:
         return None
     achado = re.search(r"(?:EPSG|epsg)(?:::|:|/)(\d+)", valor)
@@ -332,7 +332,7 @@ def _bbox(no: ET.Element) -> tuple[float, float, float, float] | None:
     try:
         if _local(no.tag) == "LatLongBoundingBox":
             return tuple(float(no.attrib[k]) for k in ("minx", "miny", "maxx", "maxy"))  # type: ignore[return-value]
-        baixo, alto = _filho(no, "LowerCorner"), _filho(no, "UpperCorner")
+        baixo, alto = _child(no, "LowerCorner"), _child(no, "UpperCorner")
         if baixo is None or alto is None:
             return None
         x0, y0 = (float(v) for v in (baixo.text or "").split()[:2])
@@ -347,28 +347,28 @@ def parsear_capabilities(xml: str | bytes) -> Capabilities:
     raiz = _parse_xml(xml)
     if _local(raiz.tag) in ("ExceptionReport", "ServiceExceptionReport"):
         texto = " ".join(t.strip() for t in raiz.itertext() if t.strip())[:300]
-        raise SondagemError("http_status", f"O servidor respondeu com uma exceção WFS: {texto}", status=200)
-    camadas: list[CamadaDoServico] = []
+        raise ProbeError("http_status", f"O servidor respondeu com uma exceção WFS: {texto}", status=200)
+    camadas: list[ServiceLayer] = []
     for no in raiz.iter():
         if _local(no.tag) != "FeatureType":
             continue
-        nome = _texto(_filho(no, "Name"))
+        nome = _as_text(_child(no, "Name"))
         if not nome:
             continue
         palavras: list[str] = []
         for kw in no.iter():
-            if _local(kw.tag) == "Keyword" and _texto(kw):
-                palavras.append(_texto(kw))  # type: ignore[arg-type]
-            elif _local(kw.tag) == "Keywords" and _texto(kw) and not list(kw):
-                palavras.extend(p.strip() for p in (_texto(kw) or "").split(",") if p.strip())
-        crs_no = _filho(no, "DefaultCRS", "DefaultSRS", "SRS")
-        caixa = _filho(no, "WGS84BoundingBox", "LatLongBoundingBox")
-        camadas.append(CamadaDoServico(
+            if _local(kw.tag) == "Keyword" and _as_text(kw):
+                palavras.append(_as_text(kw))  # type: ignore[arg-type]
+            elif _local(kw.tag) == "Keywords" and _as_text(kw) and not list(kw):
+                palavras.extend(p.strip() for p in (_as_text(kw) or "").split(",") if p.strip())
+        crs_no = _child(no, "DefaultCRS", "DefaultSRS", "SRS")
+        caixa = _child(no, "WGS84BoundingBox", "LatLongBoundingBox")
+        camadas.append(ServiceLayer(
             name=nome,
-            title=_texto(_filho(no, "Title")),
-            abstract=_texto(_filho(no, "Abstract")),
+            title=_as_text(_child(no, "Title")),
+            abstract=_as_text(_child(no, "Abstract")),
             keywords=tuple(dict.fromkeys(palavras)),
-            crs=_crs_normalizado(_texto(crs_no)),
+            crs=_normalized_crs(_as_text(crs_no)),
             bbox=_bbox(caixa) if caixa is not None else None,
         ))
     return Capabilities(version=raiz.attrib.get("version"), layers=tuple(camadas))
@@ -383,40 +383,40 @@ def parsear_describe_feature_type(xml: str | bytes) -> dict:
     """
     raiz = _parse_xml(xml)
     colunas: list[dict] = []
-    geometria_col: str | None = None
-    geometria_tipo: str | None = None
+    geometry_col: str | None = None
+    geometry_type: str | None = None
     for seq in raiz.iter():
         if _local(seq.tag) != "sequence":
             continue
         for el in seq:
             if _local(el.tag) != "element":
                 continue
-            nome, tipo_xsd = el.attrib.get("name"), el.attrib.get("type")
-            if not nome or not tipo_xsd:
+            nome, xsd_type = el.attrib.get("name"), el.attrib.get("type")
+            if not nome or not xsd_type:
                 continue
-            local = tipo_xsd.split(":", 1)[1] if ":" in tipo_xsd else tipo_xsd
-            if tipo_xsd.startswith("gml:") or local.endswith("PropertyType"):
-                tipo = fontes_vault.GEOMETRIAS.get(local, "Geometry")
-                if geometria_col is None:
-                    geometria_col, geometria_tipo = nome, tipo
+            local = xsd_type.split(":", 1)[1] if ":" in xsd_type else xsd_type
+            if xsd_type.startswith("gml:") or local.endswith("PropertyType"):
+                tipo = fontes_vault.GEOMETRIES.get(local, "Geometry")
+                if geometry_col is None:
+                    geometry_col, geometry_type = nome, tipo
             else:
                 tipo = local
             colunas.append({
                 "name": nome,
                 "type": tipo,
-                "xsd": tipo_xsd,
+                "xsd": xsd_type,
                 "nullable": el.attrib.get("nillable", "true").lower() != "false",
             })
     return {
         "columns": colunas,
-        "geometry_column": geometria_col,
-        "geometry_type": geometria_tipo,
+        "geometry_column": geometry_col,
+        "geometry_type": geometry_type,
         "columns_source": "describe_feature_type",
     }
 
 
-async def _buscar(url: str, *, timeout: float, max_bytes: int, auth: AutenticacaoWFS | None = None) -> str:
-    """Safe GET; every failure becomes a `SondagemError` with a closed code.
+async def _fetch_text(url: str, *, timeout: float, max_bytes: int, auth: AutenticacaoWFS | None = None) -> str:
+    """Safe GET; every failure becomes a `ProbeError` with a closed code.
 
     With `auth`, the request goes out signed: the authkey key in the URL or in a
     header, or Basic. No message from here repeats the URL — only the host, the
@@ -425,7 +425,7 @@ async def _buscar(url: str, *, timeout: float, max_bytes: int, auth: Autenticaca
     try:
         await asyncio.to_thread(validate_url_ssrf, url)
     except ValueError as exc:
-        raise SondagemError("ssrf", str(exc)) from exc
+        raise ProbeError("ssrf", str(exc)) from exc
     endereco, cabecalhos = url, None
     if auth is not None:
         # Concatenated, and not via httpx's `params`: it REPLACES the URL's query
@@ -435,15 +435,15 @@ async def _buscar(url: str, *, timeout: float, max_bytes: int, auth: Autenticaca
         cabecalhos = auth.cabecalhos() or None
     try:
         # httpx logs the URL of every request (INFO): with the key in it, only `***`.
-        with segredos_vivos.em_uso(*formas_do_segredo(auth)):
+        with segredos_vivos.in_use(*secret_forms(auth)):
             resposta = await safe_httpx_request(
                 "GET", endereco, timeout=timeout, max_response_bytes=max_bytes, headers=cabecalhos,
             )
         resposta.raise_for_status()
     except httpx.TimeoutException as exc:
-        raise SondagemError("timeout", "Timeout ao conectar ao servidor WFS.") from exc
+        raise ProbeError("timeout", "Timeout ao conectar ao servidor WFS.") from exc
     except httpx.HTTPStatusError as exc:
-        raise SondagemError(
+        raise ProbeError(
             "http_status", f"Servidor WFS retornou HTTP {exc.response.status_code}.",
             status=exc.response.status_code,
         ) from exc
@@ -452,22 +452,22 @@ async def _buscar(url: str, *, timeout: float, max_bytes: int, auth: Autenticaca
         # but rebinding between the two resolutions lands here) and for a response
         # above the ceiling.
         codigo = "tamanho" if "excedeu" in str(exc).lower() else "ssrf"
-        raise SondagemError(codigo, str(exc)) from exc
+        raise ProbeError(codigo, str(exc)) from exc
     except RuntimeError as exc:
         # Invalid TLS chain, already turned into an actionable message by the helper.
-        raise SondagemError("tls", str(exc)) from exc
-    except SondagemError:
+        raise ProbeError("tls", str(exc)) from exc
+    except ProbeError:
         raise
     except Exception as exc:  # network, DNS, connection refused
-        raise SondagemError("rede", f"Erro ao conectar ao servidor WFS: {exc.__class__.__name__}") from exc
+        raise ProbeError("rede", f"Erro ao conectar ao servidor WFS: {exc.__class__.__name__}") from exc
     return resposta.text
 
 
 async def obter_capabilities(
-    url: str, version: str = VERSAO_PADRAO, *, auth: AutenticacaoWFS | None = None,
+    url: str, version: str = DEFAULT_VERSION, *, auth: AutenticacaoWFS | None = None,
 ) -> Capabilities:
-    versao = normalizar_versao(version)
-    xml = await _buscar(
+    versao = normalize_version(version)
+    xml = await _fetch_text(
         f"{url}?service=WFS&request=GetCapabilities&version={versao}",
         timeout=TIMEOUT_CAPABILITIES_S, max_bytes=MAX_CAPABILITIES_BYTES, auth=auth,
     )
@@ -475,7 +475,7 @@ async def obter_capabilities(
 
 
 async def listar_camadas_wfs(
-    url: str, version: str = VERSAO_PADRAO, *, auth: AutenticacaoWFS | None = None,
+    url: str, version: str = DEFAULT_VERSION, *, auth: AutenticacaoWFS | None = None,
 ) -> list[dict]:
     """`[{name, title}]` sorted by title — the body of `GET /nodes/wfs/layers`.
 
@@ -484,15 +484,15 @@ async def listar_camadas_wfs(
     """
     caps = await obter_capabilities(url, version, auth=auth)
     if not caps.layers:
-        raise SondagemError("sem_camadas", "Nenhuma camada encontrada no servidor WFS.")
+        raise ProbeError("sem_camadas", "Nenhuma camada encontrada no servidor WFS.")
     itens = [{"name": c.name, "title": c.title or c.name} for c in caps.layers]
     return sorted(itens, key=lambda item: item["title"])
 
 
-async def descrever_camada_wfs(url: str, type_name: str, version: str = VERSAO_PADRAO) -> dict:
-    versao = normalizar_versao(version)
+async def describe_wfs_layer(url: str, type_name: str, version: str = DEFAULT_VERSION) -> dict:
+    versao = normalize_version(version)
     parametro = "typeNames" if versao == "2.0.0" else "typeName"
-    xml = await _buscar(
+    xml = await _fetch_text(
         f"{url}?service=WFS&request=DescribeFeatureType&version={versao}&{parametro}={type_name}",
         timeout=TIMEOUT_DESCRIBE_S, max_bytes=MAX_DESCRIBE_BYTES,
     )
@@ -500,43 +500,43 @@ async def descrever_camada_wfs(url: str, type_name: str, version: str = VERSAO_P
 
 
 @dataclass
-class Sondagem:
+class Probe:
     url: str
     version: str
     capabilities: Capabilities
-    camada: CamadaDoServico | None = None
+    camada: ServiceLayer | None = None
     esquema: dict | None = None
 
 
-def _achar_camada(caps: Capabilities, type_name: str) -> CamadaDoServico | None:
-    por_nome = caps.por_nome()
-    if type_name in por_nome:
-        return por_nome[type_name]
+def _find_layer(caps: Capabilities, type_name: str) -> ServiceLayer | None:
+    by_name = caps.by_name()
+    if type_name in by_name:
+        return by_name[type_name]
     # Without the namespace prefix, when it is unique.
     local = type_name.split(":", 1)[-1]
-    candidatas = [c for c in caps.layers if c.name.split(":", 1)[-1] == local]
-    return candidatas[0] if len(candidatas) == 1 else None
+    candidates = [c for c in caps.layers if c.name.split(":", 1)[-1] == local]
+    return candidates[0] if len(candidates) == 1 else None
 
 
-async def sondar_wfs(url: str, type_name: str | None = None, version: str = VERSAO_PADRAO) -> Sondagem:
+async def sondar_wfs(url: str, type_name: str | None = None, version: str = DEFAULT_VERSION) -> Probe:
     """GetCapabilities and, with `type_name`, the layer and its DescribeFeatureType."""
     caps = await obter_capabilities(url, version)
     if not caps.layers:
-        raise SondagemError("sem_camadas", "Nenhuma camada encontrada no servidor WFS.")
-    sondagem = Sondagem(url=url, version=normalizar_versao(version), capabilities=caps)
+        raise ProbeError("sem_camadas", "Nenhuma camada encontrada no servidor WFS.")
+    sondagem = Probe(url=url, version=normalize_version(version), capabilities=caps)
     if not type_name:
         return sondagem
-    camada = _achar_camada(caps, type_name.strip())
+    camada = _find_layer(caps, type_name.strip())
     if camada is None:
         nomes = [c.name for c in caps.layers[:20]]
-        raise SondagemError(
+        raise ProbeError(
             "camada_inexistente",
             f"Camada '{type_name}' não encontrada no servidor WFS. Camadas disponíveis: "
             + ", ".join(nomes) + ("…" if len(caps.layers) > 20 else ""),
-            candidatas=nomes,
+            candidates=nomes,
         )
     sondagem.camada = camada
-    esquema = await descrever_camada_wfs(url, camada.name, version)
+    esquema = await describe_wfs_layer(url, camada.name, version)
     esquema["crs"] = camada.crs
     esquema["bbox"] = list(camada.bbox) if camada.bbox else None
     sondagem.esquema = esquema
@@ -546,7 +546,7 @@ async def sondar_wfs(url: str, type_name: str | None = None, version: str = VERS
 # ── Esquema ───────────────────────────────────────────────────────────────────
 
 
-def fundir_esquema(atual: Mapping[str, Any] | None, novo: Mapping[str, Any] | None) -> dict | None:
+def merge_schema(atual: Mapping[str, Any] | None, novo: Mapping[str, Any] | None) -> dict | None:
     """The most complete schema, without losing what only the other one had.
 
     The COLUMNS come from the strongest source (`describe_feature_type` > `vault` >
@@ -557,9 +557,9 @@ def fundir_esquema(atual: Mapping[str, Any] | None, novo: Mapping[str, Any] | No
         return None
     atual = dict(atual or {})
     novo = dict(novo or {})
-    forca_atual = _FORCA_DO_ESQUEMA.get(atual.get("columns_source") if atual.get("columns") else None, 0)
-    forca_nova = _FORCA_DO_ESQUEMA.get(novo.get("columns_source") if novo.get("columns") else None, 0)
-    base, extra = (novo, atual) if forca_nova >= forca_atual and novo.get("columns") else (atual, novo)
+    current_strength = _SCHEMA_STRENGTH.get(atual.get("columns_source") if atual.get("columns") else None, 0)
+    new_strength = _SCHEMA_STRENGTH.get(novo.get("columns_source") if novo.get("columns") else None, 0)
+    base, extra = (novo, atual) if new_strength >= current_strength and novo.get("columns") else (atual, novo)
     saida = dict(base)
     for chave in ("columns", "columns_source", "geometry_column", "geometry_type"):
         if not saida.get(chave) and extra.get(chave):
@@ -575,16 +575,16 @@ def fundir_esquema(atual: Mapping[str, Any] | None, novo: Mapping[str, Any] | No
 # ── Leitura ───────────────────────────────────────────────────────────────────
 
 
-def _no_escopo(workspace_ids: Iterable[str] | None):
+def _in_scope(workspace_ids: Iterable[str] | None):
     ids = [w for w in (workspace_ids or []) if w]
     if ids:
-        return or_(FonteDeDados.workspace_id.is_(None), FonteDeDados.workspace_id.in_(ids))
-    return FonteDeDados.workspace_id.is_(None)
+        return or_(DataSource.workspace_id.is_(None), DataSource.workspace_id.in_(ids))
+    return DataSource.workspace_id.is_(None)
 
 
 def _like(termo: str):
     # `busca` is already stored normalized (no accents, lowercase): plain LIKE.
-    return contem(FonteDeDados.busca, termo, ignorar_caixa=False)
+    return contem(DataSource.busca, termo, ignore_case=False)
 
 
 async def buscar(
@@ -595,31 +595,31 @@ async def buscar(
     kind: str | None = None,
     institution: str | None = None,
     state: str | None = None,
-    limit: int = LIMITE_DE_BUSCA,
+    limit: int = SEARCH_LIMIT,
     offset: int = 0,
-) -> tuple[list[FonteDeDados], int]:
+) -> tuple[list[DataSource], int]:
     """The sources within reach (platform + workspaces in scope) that match the query."""
-    filtros = [FonteDeDados.deleted_at.is_(None), _no_escopo(workspace_ids)]
+    filtros = [DataSource.deleted_at.is_(None), _in_scope(workspace_ids)]
     if kind:
-        filtros.append(FonteDeDados.tipo == str(kind).strip().lower())
+        filtros.append(DataSource.tipo == str(kind).strip().lower())
     if institution:
         # Exact (as in the catalog) OR normalized in the search text — whoever
         # types "ministerio da saude" finds "Ministério da Saúde".
-        filtros.append(or_(FonteDeDados.instituicao == str(institution).strip(), _like(normalizar_texto(institution))))
+        filtros.append(or_(DataSource.instituicao == str(institution).strip(), _like(normalize_text(institution))))
     if state:
-        filtros.append(FonteDeDados.estado == str(state).strip().lower())
-    for variantes in termos_da_consulta(query):
+        filtros.append(DataSource.estado == str(state).strip().lower())
+    for variantes in query_terms(query):
         filtros.append(or_(*[_like(v) for v in sorted(variantes)]))
     condicao = and_(*filtros)
-    total = (await db.execute(select(func.count()).select_from(FonteDeDados).where(condicao))).scalar_one()
+    total = (await db.execute(select(func.count()).select_from(DataSource).where(condicao))).scalar_one()
     linhas = await db.execute(
-        select(FonteDeDados)
+        select(DataSource)
         .where(condicao)
         .order_by(
-            case((FonteDeDados.estado == "ok", 0), else_=1),
-            FonteDeDados.prioridade,
-            FonteDeDados.usos.desc(),
-            FonteDeDados.titulo,
+            case((DataSource.estado == "ok", 0), else_=1),
+            DataSource.prioridade,
+            DataSource.usos.desc(),
+            DataSource.titulo,
         )
         .offset(max(0, int(offset)))
         .limit(max(1, min(int(limit), 100)))
@@ -627,28 +627,28 @@ async def buscar(
     return list(linhas.scalars().all()), int(total)
 
 
-async def obter(db: AsyncSession, source_id: str, workspace_ids: Iterable[str] | None) -> FonteDeDados | None:
+async def obter(db: AsyncSession, source_id: str, workspace_ids: Iterable[str] | None) -> DataSource | None:
     linha = await db.execute(
-        select(FonteDeDados).where(
-            FonteDeDados.id_hash == str(source_id).strip(),
-            FonteDeDados.deleted_at.is_(None),
-            _no_escopo(workspace_ids),
+        select(DataSource).where(
+            DataSource.id_hash == str(source_id).strip(),
+            DataSource.deleted_at.is_(None),
+            _in_scope(workspace_ids),
         )
     )
     return linha.scalar_one_or_none()
 
 
-async def obter_por_chave(db: AsyncSession, chave: str) -> FonteDeDados | None:
-    linha = await db.execute(select(FonteDeDados).where(FonteDeDados.chave == chave))
+async def get_by_key(db: AsyncSession, chave: str) -> DataSource | None:
+    linha = await db.execute(select(DataSource).where(DataSource.chave == chave))
     return linha.scalar_one_or_none()
 
 
-def trecho_do_no(fonte: FonteDeDados) -> dict:
+def node_snippet(fonte: DataSource) -> dict:
     """The node ready to paste into a definition — only the properties the node declares."""
     propriedades = {
         chave: valor
         for chave, valor in (fonte.propriedades or {}).items()
-        if chave in PROPRIEDADES_DO_NO_WFS and valor not in (None, "")
+        if chave in WFS_NODE_PROPERTIES and valor not in (None, "")
     }
     propriedades.setdefault("url", fonte.url)
     if fonte.type_name:
@@ -659,24 +659,24 @@ def trecho_do_no(fonte: FonteDeDados) -> dict:
 # ── Escrita ───────────────────────────────────────────────────────────────────
 
 
-def _recalcular_busca(fonte: FonteDeDados) -> None:
-    fonte.busca = texto_de_busca(
+def _recompute_search(fonte: DataSource) -> None:
+    fonte.busca = search_text(
         instituicao=fonte.instituicao, grupo=fonte.grupo, titulo=fonte.titulo,
         type_name=fonte.type_name, url=fonte.url, descricao=fonte.descricao,
         temas=fonte.temas or [], esquema=fonte.esquema,
     )
 
 
-def _temas_unidos(atuais: Sequence[str] | None, novos: Iterable[str] | None) -> list[str]:
+def _merged_themes(atuais: Sequence[str] | None, novos: Iterable[str] | None) -> list[str]:
     vistos: dict[str, str] = {}
     for tema in list(atuais or []) + list(novos or []):
         texto = str(tema).strip()
-        if texto and normalizar_texto(texto) not in vistos:
-            vistos[normalizar_texto(texto)] = texto
+        if texto and normalize_text(texto) not in vistos:
+            vistos[normalize_text(texto)] = texto
     return list(vistos.values())
 
 
-async def upsert_fonte(
+async def upsert_source(
     db: AsyncSession,
     *,
     workspace_id: str | None,
@@ -698,38 +698,38 @@ async def upsert_fonte(
     verificada_em: datetime | None = None,
     ultimo_erro: str | None = None,
     vault_hash: str | None = None,
-    contar_uso: bool = False,
+    count_usage: bool = False,
     no: str = NO_WFS,
-) -> tuple[FonteDeDados, str]:
+) -> tuple[DataSource, str]:
     """Creates or updates the source for `chave`; returns `(fonte, "created" | "updated")`.
 
     Merge rules — what a weaker origin does NOT do:
     - does not resurrect a deleted row (`deleted_at`) when it is `aprendida`;
     - does not downgrade `origem` (vault > manual > aprendida);
     - does not erase a `titulo`/`descricao`/`dicas` someone wrote: it only fills blanks;
-    - does not replace the schema with a weaker one (`fundir_esquema`).
+    - does not replace the schema with a weaker one (`merge_schema`).
     No commit: the caller decides the transaction.
     """
     assert origem in ORIGENS, origem
-    url = normalizar_url(url)
+    url = normalize_url(url)
     type_name = (type_name or "").strip() or None
-    chave = chave_da_fonte(workspace_id, tipo, url, type_name)
+    chave = source_key(workspace_id, tipo, url, type_name)
     agora = utc_now_naive()
-    fonte = await obter_por_chave(db, chave)
+    fonte = await get_by_key(db, chave)
     props = {k: v for k, v in dict(propriedades or {}).items() if v not in (None, "")}
     props["url"], props["typeName"] = url, type_name
 
     if fonte is None:
-        fonte = FonteDeDados(
+        fonte = DataSource(
             workspace_id=workspace_id, tipo=tipo, no=no, url=url, type_name=type_name, chave=chave,
             propriedades=props, instituicao=instituicao, grupo=grupo, titulo=titulo, descricao=descricao,
-            temas=_temas_unidos([], temas), esquema=dict(esquema) if esquema else None, dicas=dicas,
+            temas=_merged_themes([], temas), esquema=dict(esquema) if esquema else None, dicas=dicas,
             prioridade=prioridade or 2, origem=origem, estado=estado or "nao_verificada",
             verificada_em=verificada_em, ultimo_erro=ultimo_erro, vault_hash=vault_hash,
-            usos=1 if contar_uso else 0, usada_em=agora if contar_uso else None,
+            usos=1 if count_usage else 0, usada_em=agora if count_usage else None,
             created_by=created_by, created_at=agora, updated_at=agora,
         )
-        _recalcular_busca(fonte)
+        _recompute_search(fonte)
         db.add(fonte)
         await db.flush()
         return fonte, "created"
@@ -740,7 +740,7 @@ async def upsert_fonte(
             return fonte, "deleted"
         fonte.deleted_at = None
 
-    if _FORCA_DA_ORIGEM[origem] >= _FORCA_DA_ORIGEM.get(fonte.origem, 0):
+    if _ORIGIN_STRENGTH[origem] >= _ORIGIN_STRENGTH.get(fonte.origem, 0):
         fonte.origem = origem
     # Properties: the new ones on top, without erasing what only the catalog knew
     # (an execution does not bring `sortBy`; the Vault did).
@@ -758,8 +758,8 @@ async def upsert_fonte(
         fonte.grupo = grupo
     if prioridade:
         fonte.prioridade = prioridade
-    fonte.temas = _temas_unidos(fonte.temas, temas)
-    fonte.esquema = fundir_esquema(fonte.esquema, esquema)
+    fonte.temas = _merged_themes(fonte.temas, temas)
+    fonte.esquema = merge_schema(fonte.esquema, esquema)
     if estado:
         fonte.estado = estado
         fonte.ultimo_erro = ultimo_erro if estado != "ok" else None
@@ -767,11 +767,11 @@ async def upsert_fonte(
         fonte.verificada_em = verificada_em
     if vault_hash:
         fonte.vault_hash = vault_hash
-    if contar_uso:
+    if count_usage:
         fonte.usos = int(fonte.usos or 0) + 1
         fonte.usada_em = agora
     fonte.updated_at = agora
-    _recalcular_busca(fonte)
+    _recompute_search(fonte)
     await db.flush()
     return fonte, "updated"
 
@@ -779,7 +779,7 @@ async def upsert_fonte(
 # ── Validation (no network) ───────────────────────────────────────────────────
 
 
-def _propriedades_do_no(no: Mapping[str, Any]) -> Mapping[str, Any]:
+def _node_properties(no: Mapping[str, Any]) -> Mapping[str, Any]:
     for chave in ("parameters", "properties"):
         valor = no.get(chave)
         if isinstance(valor, Mapping):
@@ -790,10 +790,10 @@ def _propriedades_do_no(no: Mapping[str, Any]) -> Mapping[str, Any]:
     return {}
 
 
-def _alguma_credencial(no: Mapping[str, Any]) -> bool:
+def _has_any_credential(no: Mapping[str, Any]) -> bool:
     """`credential_id` in ANY of the places where a node stores properties.
 
-    `_propriedades_do_no` reads `parameters`/`properties` first; the resolver and the
+    `_node_properties` reads `parameters`/`properties` first; the resolver and the
     executor read `data.properties` first (`node_props`). With the credential in one and
     not the other, the execution went out authenticated and the layer went into the catalog.
     """
@@ -802,20 +802,20 @@ def _alguma_credencial(no: Mapping[str, Any]) -> bool:
     return any(isinstance(p, Mapping) and str(p.get("credential_id") or "").strip() for p in candidatos)
 
 
-def nos_de_fonte(nodes: Iterable[Mapping[str, Any]], descriptors: Mapping[str, Mapping[str, Any]] | None = None):
+def source_nodes(nodes: Iterable[Mapping[str, Any]], descriptors: Mapping[str, Mapping[str, Any]] | None = None):
     """The nodes that read an external source and the (url, typeName) of each."""
     for no in nodes:
         if not isinstance(no, Mapping):
             continue
         nome = str(no.get("name") or "")
         descriptor = (descriptors or {}).get(nome) or {}
-        kind = descriptor.get("source_kind") if descriptors is not None else (TIPO_WFS if nome == NO_WFS else None)
-        if kind != TIPO_WFS:
+        kind = descriptor.get("source_kind") if descriptors is not None else (KIND_WFS if nome == NO_WFS else None)
+        if kind != KIND_WFS:
             continue
-        props = _propriedades_do_no(no)
+        props = _node_properties(no)
         try:
-            url = normalizar_url(props.get("url"))
-        except FonteInvalidaError:
+            url = normalize_url(props.get("url"))
+        except InvalidSourceError:
             continue
         type_name = str(props.get("typeName") or "").strip()
         if not type_name:
@@ -835,24 +835,24 @@ async def conferir_fontes_da_definicao(
     cannot depend on the catalog to respond.
     """
     try:
-        alvos = list(nos_de_fonte(nodes, descriptors))
+        alvos = list(source_nodes(nodes, descriptors))
         if not alvos:
             return []
         chaves: dict[str, tuple[Mapping[str, Any], str, str]] = {}
         for no, url, type_name in alvos:
             for ws in (workspace_id, None):
-                chaves.setdefault(chave_da_fonte(ws, TIPO_WFS, url, type_name), (no, url, type_name))
+                chaves.setdefault(source_key(ws, KIND_WFS, url, type_name), (no, url, type_name))
         linhas = await db.execute(
-            select(FonteDeDados).where(FonteDeDados.chave.in_(list(chaves)), FonteDeDados.deleted_at.is_(None))
+            select(DataSource).where(DataSource.chave.in_(list(chaves)), DataSource.deleted_at.is_(None))
         )
-        por_chave = {f.chave: f for f in linhas.scalars().all()}
+        by_key = {f.chave: f for f in linhas.scalars().all()}
         avisos: list[dict] = []
         for no, url, type_name in alvos:
-            achada = por_chave.get(chave_da_fonte(workspace_id, TIPO_WFS, url, type_name)) or por_chave.get(
-                chave_da_fonte(None, TIPO_WFS, url, type_name)
+            found = by_key.get(source_key(workspace_id, KIND_WFS, url, type_name)) or by_key.get(
+                source_key(None, KIND_WFS, url, type_name)
             )
             node_id = no.get("id")
-            if achada is None:
+            if found is None:
                 avisos.append({
                     "code": "unknown_source", "severity": "warning", "node_id": node_id, "edge": None,
                     "message": (
@@ -861,13 +861,13 @@ async def conferir_fontes_da_definicao(
                         "probe_source / register_source para sondar e registrar esta antes de executar."
                     ),
                 })
-            elif achada.estado == "falhando":
-                quando = achada.verificada_em.isoformat() if achada.verificada_em else "sem data"
-                motivo = (achada.ultimo_erro or "sem detalhe")[:160]
+            elif found.estado == "falhando":
+                quando = found.verificada_em.isoformat() if found.verificada_em else "sem data"
+                motivo = (found.ultimo_erro or "sem detalhe")[:160]
                 avisos.append({
                     "code": "failing_source", "severity": "warning", "node_id": node_id, "edge": None,
                     "message": (
-                        f"nó 'WFS' (id={node_id}) usa a fonte {achada.id_hash} que falhou na última "
+                        f"nó 'WFS' (id={node_id}) usa a fonte {found.id_hash} que falhou na última "
                         f"verificação ({quando}): {motivo}. Confira com probe_source antes de executar."
                     ),
                 })
@@ -880,10 +880,10 @@ async def conferir_fontes_da_definicao(
 # ── Aprendizado (consumer) ────────────────────────────────────────────────────
 
 
-def _esquema_da_execucao(nid: str, stats: Mapping[str, Any], *, recortada: bool = False) -> dict | None:
+def _run_schema(nid: str, stats: Mapping[str, Any], *, sliced: bool = False) -> dict | None:
     """What the execution saw of the layer.
 
-    `recortada` (the node had a CQL or bbox filter): the extent and the count are
+    `sliced` (the node had a CQL or bbox filter): the extent and the count are
     those of the SLICE, not of the layer — they are not learned. The columns and the CRS
     still apply.
     """
@@ -891,34 +891,34 @@ def _esquema_da_execucao(nid: str, stats: Mapping[str, Any], *, recortada: bool 
     metricas = ((stats.get("__metrics__") or {}).get("nodes") or {}).get(nid) or {}
     espacial = metricas.get("spatial") if isinstance(metricas, Mapping) else None
     espacial = espacial if isinstance(espacial, Mapping) else {}
-    colunas_por_saida = no_stats.get("output_columns") if isinstance(no_stats.get("output_columns"), Mapping) else {}
-    nomes = colunas_por_saida.get("output") if isinstance(colunas_por_saida, Mapping) else None
+    columns_by_output = no_stats.get("output_columns") if isinstance(no_stats.get("output_columns"), Mapping) else {}
+    nomes = columns_by_output.get("output") if isinstance(columns_by_output, Mapping) else None
     esquema: dict = {}
     if isinstance(nomes, list) and nomes:
         esquema["columns"] = [{"name": str(n), "type": None, "xsd": None, "nullable": True} for n in nomes]
         esquema["columns_source"] = "run"
-    for chave in ("crs",) if recortada else ("crs", "bbox", "feature_count"):
+    for chave in ("crs",) if sliced else ("crs", "bbox", "feature_count"):
         if espacial.get(chave) is not None:
             esquema[chave] = espacial[chave]
-    if not recortada and esquema.get("feature_count") is None and no_stats.get("output_features") is not None:
+    if not sliced and esquema.get("feature_count") is None and no_stats.get("output_features") is not None:
         esquema["feature_count"] = no_stats.get("output_features")
     return esquema or None
 
 
-def _produz_bbox_string(nome_do_no: str) -> bool:
+def _produces_bbox_string(node_name: str) -> bool:
     """Does the node declare `bbox_string` among its outputs (ComputeBoundingBox, another
     WFS)? On an edge without keys everything it produces goes into the next node."""
     try:
         from flow.registry import NODE_REGISTRY
 
-        cls = NODE_REGISTRY.get(nome_do_no)
+        cls = NODE_REGISTRY.get(node_name)
         saidas = cls.description().get("outputs") or [] if cls is not None else []
     except Exception:  # registry unavailable or broken descriptor
         saidas = []
     return any(isinstance(s, Mapping) and s.get("name") == "bbox_string" for s in saidas)
 
 
-def _bbox_por_aresta(nid: str, definition: Mapping[str, Any]) -> bool:
+def _bbox_from_edge(nid: str, definition: Mapping[str, Any]) -> bool:
     """Does the node receive the bbox from ANOTHER node? The WFS node reads
     `inputs["bbox_string"]` when the `bbox` field is empty (the ComputeBoundingBox → WFS
     case), and then the execution is also a slice: the extent and the count are not the layer's.
@@ -936,7 +936,7 @@ def _bbox_por_aresta(nid: str, definition: Mapping[str, Any]) -> bool:
         de, para = aresta.get("from_key") or None, aresta.get("to_key") or None
         if (para or de) == "bbox_string":
             return True
-        if de is None and para is None and _produz_bbox_string(nomes.get(str(aresta.get("source")), "")):
+        if de is None and para is None and _produces_bbox_string(nomes.get(str(aresta.get("source")), "")):
             return True
     return False
 
@@ -950,79 +950,79 @@ async def aprender_de_execucao(
     quando = getattr(run, "end_time", None) or utc_now_naive()
     if getattr(quando, "tzinfo", None) is not None:
         quando = quando.replace(tzinfo=None)
-    aprendidas = 0
-    for no, url, type_name in nos_de_fonte(definition.get("nodes") or [], None):
+    learned = 0
+    for no, url, type_name in source_nodes(definition.get("nodes") or [], None):
         nid = str(no.get("id") or "")
         no_stats = stats.get(nid)
         if not isinstance(no_stats, Mapping) or no_stats.get("status") != "completed":
             continue
-        props = _propriedades_do_no(no)
+        props = _node_properties(no)
         # A layer read WITH a credential is protected: it does not go into the catalog — the
         # daily verification would probe it without the key and mark it as failing,
         # and the ready snippet would offer it to people without access.
-        if _alguma_credencial(no):
+        if _has_any_credential(no):
             continue
-        recortada = (
+        sliced = (
             any(str(props.get(k) or "").strip() for k in ("cqlFilter", "bbox"))
-            or _bbox_por_aresta(nid, definition)
+            or _bbox_from_edge(nid, definition)
         )
-        _, desfecho = await upsert_fonte(
+        _, desfecho = await upsert_source(
             db,
             workspace_id=getattr(run, "workspace_id", None),
-            tipo=TIPO_WFS, url=url, type_name=type_name,
-            propriedades={k: props.get(k) for k in PROPRIEDADES_DO_NO_WFS if props.get(k) not in (None, "")},
-            origem="aprendida", estado="ok", esquema=_esquema_da_execucao(nid, stats, recortada=recortada),
-            titulo=None, verificada_em=quando, contar_uso=first_close,
+            tipo=KIND_WFS, url=url, type_name=type_name,
+            propriedades={k: props.get(k) for k in WFS_NODE_PROPERTIES if props.get(k) not in (None, "")},
+            origem="aprendida", estado="ok", esquema=_run_schema(nid, stats, sliced=sliced),
+            titulo=None, verificada_em=quando, count_usage=first_close,
         )
         if desfecho != "deleted":
-            aprendidas += 1
-    return aprendidas
+            learned += 1
+    return learned
 
 
 # ── Verification ──────────────────────────────────────────────────────────────
 
 
 @dataclass
-class ResumoDaVerificacao:
+class CheckSummary:
     url: str
     ok: int = 0
     falhando: int = 0
     erro: str | None = None
 
 
-async def endpoints_para_verificar(
-    db: AsyncSession, *, desatualizados_ha: int | None = None
+async def endpoints_to_verify(
+    db: AsyncSession, *, stale_for: int | None = None
 ) -> list[tuple[str, str]]:
     """The catalog's distinct URLs (with each one's WFS version).
 
-    `desatualizados_ha` (seconds): only URLs with some layer never
+    `stale_for` (seconds): only URLs with some layer never
     verified or verified longer ago than that — the mode of the initial
     verification at startup, which does not redo what the previous round already did.
     """
-    consulta = select(FonteDeDados.url, FonteDeDados.propriedades).where(
-        FonteDeDados.deleted_at.is_(None), FonteDeDados.tipo == TIPO_WFS
+    consulta = select(DataSource.url, DataSource.propriedades).where(
+        DataSource.deleted_at.is_(None), DataSource.tipo == KIND_WFS
     )
-    if desatualizados_ha is not None:
-        limite = utc_now_naive() - timedelta(seconds=max(0, desatualizados_ha))
+    if stale_for is not None:
+        limite = utc_now_naive() - timedelta(seconds=max(0, stale_for))
         consulta = consulta.where(
-            or_(FonteDeDados.verificada_em.is_(None), FonteDeDados.verificada_em < limite)
+            or_(DataSource.verificada_em.is_(None), DataSource.verificada_em < limite)
         )
     linhas = await db.execute(consulta)
     vistos: dict[str, str] = {}
     for url, props in linhas.all():
-        versao = normalizar_versao((props or {}).get("version"))
+        versao = normalize_version((props or {}).get("version"))
         vistos.setdefault(url, versao)
     return sorted(vistos.items())
 
 
-async def verificar_endpoint(db: AsyncSession, url: str, version: str = VERSAO_PADRAO) -> ResumoDaVerificacao:
+async def verify_endpoint(db: AsyncSession, url: str, version: str = DEFAULT_VERSION) -> CheckSummary:
     """ONE GetCapabilities marks every row for that URL: `ok` (with crs/bbox
     from the capabilities) or `falhando`. Endpoint down: all `falhando`.
     Commits at the end — it is a batch."""
-    resumo = ResumoDaVerificacao(url=url)
+    resumo = CheckSummary(url=url)
     linhas = await db.execute(
-        select(FonteDeDados).where(
-            FonteDeDados.url == url, FonteDeDados.tipo == TIPO_WFS, FonteDeDados.deleted_at.is_(None)
+        select(DataSource).where(
+            DataSource.url == url, DataSource.tipo == KIND_WFS, DataSource.deleted_at.is_(None)
         )
     )
     fontes = list(linhas.scalars().all())
@@ -1031,7 +1031,7 @@ async def verificar_endpoint(db: AsyncSession, url: str, version: str = VERSAO_P
     agora = utc_now_naive()
     try:
         caps = await obter_capabilities(url, version)
-    except SondagemError as exc:
+    except ProbeError as exc:
         resumo.erro = exc.mensagem
         for fonte in fontes:
             fonte.estado, fonte.ultimo_erro, fonte.verificada_em, fonte.updated_at = "falhando", exc.mensagem[:500], agora, agora
@@ -1040,14 +1040,14 @@ async def verificar_endpoint(db: AsyncSession, url: str, version: str = VERSAO_P
         return resumo
 
     for fonte in fontes:
-        camada = _achar_camada(caps, fonte.type_name or "")
+        camada = _find_layer(caps, fonte.type_name or "")
         if camada is None:
             fonte.estado = "falhando"
             fonte.ultimo_erro = "camada não consta no GetCapabilities"
             resumo.falhando += 1
         else:
             fonte.estado, fonte.ultimo_erro = "ok", None
-            fonte.esquema = fundir_esquema(
+            fonte.esquema = merge_schema(
                 fonte.esquema,
                 {"crs": camada.crs, "bbox": list(camada.bbox) if camada.bbox else None},
             )
@@ -1056,8 +1056,8 @@ async def verificar_endpoint(db: AsyncSession, url: str, version: str = VERSAO_P
             if camada.abstract and not fonte.descricao:
                 fonte.descricao = camada.abstract[:2000]
             if camada.keywords:
-                fonte.temas = _temas_unidos(fonte.temas, camada.keywords)
-            _recalcular_busca(fonte)
+                fonte.temas = _merged_themes(fonte.temas, camada.keywords)
+            _recompute_search(fonte)
             resumo.ok += 1
         fonte.verificada_em, fonte.updated_at = agora, agora
     await db.commit()
@@ -1076,7 +1076,7 @@ class ResumoDaImportacao:
     ignoradas: dict[str, int] = field(default_factory=dict)
     erros: list[str] = field(default_factory=list)
 
-    def como_texto(self) -> str:
+    def as_text(self) -> str:
         ign = ", ".join(f"{n} {m}" for m, n in sorted(self.ignoradas.items())) or "nenhuma"
         return (
             f"{self.criadas} criadas, {self.atualizadas} atualizadas, {self.iguais} iguais, "
@@ -1097,29 +1097,29 @@ class ResumoDaImportacao:
 # `titulo` is not here because it became TEXT (scripts/init_schema.sql; the
 # historical migration a3c81d7e2f46 made the change): it is
 # written by people and any fixed limit would overflow again in the next catalog.
-_FUNCIONAIS = ("type_name", "url")
+_FUNCTIONAL_COLUMNS = ("type_name", "url")
 
 
-def _limite(coluna: str) -> int | None:
+def _column_limit(coluna: str) -> int | None:
     """The COLUMN's limit, read from the model.
 
     Read, not copied: a constant repeated here would diverge the day the
     column changed, and the divergence would show up as the same overflow this
     guard exists to prevent.
     """
-    return getattr(FonteDeDados.__table__.c[coluna].type, "length", None)
+    return getattr(DataSource.__table__.c[coluna].type, "length", None)
 
 
-def _cortar(valor: str | None, limite: int | None) -> str | None:
+def _truncate(valor: str | None, limite: int | None) -> str | None:
     if valor is None or limite is None or len(valor) <= limite:
         return valor
     return valor[: max(1, limite - 1)] + "…"
 
 
-def _campo_funcional_longo(registro: fontes_vault.RegistroDoVault) -> str | None:
+def _long_functional_field(registro: fontes_vault.RegistroDoVault) -> str | None:
     """The error message when a field that can NOT be cut does not fit."""
-    for coluna in _FUNCIONAIS:
-        limite = _limite(coluna)
+    for coluna in _FUNCTIONAL_COLUMNS:
+        limite = _column_limit(coluna)
         valor = getattr(registro, coluna, None)
         if limite is not None and valor is not None and len(str(valor)) > limite:
             return (
@@ -1130,7 +1130,7 @@ def _campo_funcional_longo(registro: fontes_vault.RegistroDoVault) -> str | None
     return None
 
 
-def _aplicar_registro(fonte: FonteDeDados, registro: fontes_vault.RegistroDoVault, agora: datetime) -> None:
+def _apply_record(fonte: DataSource, registro: fontes_vault.RegistroDoVault, agora: datetime) -> None:
     """The fields the Vault dictates on a `vault` row. Preserves what the catalog
     learned on its own (state, verification, uses) and what a future UI edits
     on top of blanks."""
@@ -1138,17 +1138,17 @@ def _aplicar_registro(fonte: FonteDeDados, registro: fontes_vault.RegistroDoVaul
     # Cut at the COLUMN's limit: they are labels, and a label without its tail still
     # works. Without this, one of them over the limit brought down the whole batch — and
     # with it all the rest of the catalog.
-    fonte.instituicao = _cortar(registro.instituicao, _limite("instituicao"))
-    fonte.grupo = _cortar(registro.grupo, _limite("grupo"))
+    fonte.instituicao = _truncate(registro.instituicao, _column_limit("instituicao"))
+    fonte.grupo = _truncate(registro.grupo, _column_limit("grupo"))
     fonte.titulo = registro.titulo
     fonte.descricao = registro.descricao
-    fonte.temas = _temas_unidos(registro.temas, [])
+    fonte.temas = _merged_themes(registro.temas, [])
     fonte.dicas = registro.dicas
     fonte.prioridade = registro.prioridade
-    fonte.esquema = fundir_esquema(fonte.esquema, registro.esquema)
+    fonte.esquema = merge_schema(fonte.esquema, registro.esquema)
     fonte.vault_hash = registro.vault_hash
     fonte.updated_at = agora
-    _recalcular_busca(fonte)
+    _recompute_search(fonte)
 
 
 async def importar_pasta(db: AsyncSession, caminho: str | Path, *, workspace_id: str | None = None) -> ResumoDaImportacao:
@@ -1160,13 +1160,13 @@ async def importar_pasta(db: AsyncSession, caminho: str | Path, *, workspace_id:
     if not raiz.is_dir():
         resumo.erros.append(f"pasta não encontrada: {raiz}")
         return resumo
-    definir_sinonimos(await asyncio.to_thread(fontes_vault.sinonimos_de, raiz))
-    itens = await asyncio.to_thread(lambda: list(fontes_vault.ler_pasta(raiz)))
+    set_synonyms(await asyncio.to_thread(fontes_vault.synonyms_of, raiz))
+    itens = await asyncio.to_thread(lambda: list(fontes_vault.read_folder(raiz)))
 
     linhas = await db.execute(
-        select(FonteDeDados.id, FonteDeDados.chave, FonteDeDados.vault_hash).where(
-            FonteDeDados.origem == "vault",
-            FonteDeDados.workspace_id.is_(None) if workspace_id is None else FonteDeDados.workspace_id == workspace_id,
+        select(DataSource.id, DataSource.chave, DataSource.vault_hash).where(
+            DataSource.origem == "vault",
+            DataSource.workspace_id.is_(None) if workspace_id is None else DataSource.workspace_id == workspace_id,
         )
     )
     existentes: dict[str, tuple[int, str | None]] = {chave: (id_, h) for id_, chave, h in linhas.all()}
@@ -1175,12 +1175,12 @@ async def importar_pasta(db: AsyncSession, caminho: str | Path, *, workspace_id:
     pendentes = 0
 
     for item in itens:
-        if isinstance(item, fontes_vault.Ignorada):
+        if isinstance(item, fontes_vault.Skipped):
             resumo.ignoradas[item.motivo] = resumo.ignoradas.get(item.motivo, 0) + 1
             continue
         try:
-            url = normalizar_url(item.url)
-        except FonteInvalidaError as exc:
+            url = normalize_url(item.url)
+        except InvalidSourceError as exc:
             resumo.erros.append(f"{item.instituicao}/{item.type_name}: {exc.detail}")
             continue
         # BEFORE any computation with the record: the `chave` derives from the
@@ -1188,11 +1188,11 @@ async def importar_pasta(db: AsyncSession, caminho: str | Path, *, workspace_id:
         # `db.add`. The commit is per BATCH, so a row that overflows takes along
         # its 499 neighbors and aborts the rest of the import — that is how 75% of the
         # catalog vanished in production with nothing but an ERROR in the log.
-        longo = _campo_funcional_longo(item)
+        longo = _long_functional_field(item)
         if longo:
             resumo.erros.append(f"{item.instituicao}/{item.type_name}: {longo}")
             continue
-        chave = chave_da_fonte(workspace_id, TIPO_WFS, url, item.type_name)
+        chave = source_key(workspace_id, KIND_WFS, url, item.type_name)
         if chave in vistas:
             continue  # a mesma camada listada duas vezes na nota
         vistas.add(chave)
@@ -1201,31 +1201,31 @@ async def importar_pasta(db: AsyncSession, caminho: str | Path, *, workspace_id:
             resumo.iguais += 1
             continue
         if existente:
-            fonte = await db.get(FonteDeDados, existente[0])
+            fonte = await db.get(DataSource, existente[0])
             if fonte is None:
                 continue
             fonte.deleted_at = None
-            _aplicar_registro(fonte, item, agora)
+            _apply_record(fonte, item, agora)
             resumo.atualizadas += 1
         else:
-            fonte = FonteDeDados(
-                workspace_id=workspace_id, tipo=TIPO_WFS, no=NO_WFS, url=url, type_name=item.type_name,
+            fonte = DataSource(
+                workspace_id=workspace_id, tipo=KIND_WFS, no=NO_WFS, url=url, type_name=item.type_name,
                 chave=chave, propriedades={}, origem="vault", estado="nao_verificada",
                 created_at=agora, updated_at=agora,
             )
-            _aplicar_registro(fonte, item, agora)
+            _apply_record(fonte, item, agora)
             db.add(fonte)
             resumo.criadas += 1
         pendentes += 1
-        if pendentes >= LOTE_DE_IMPORTACAO:
+        if pendentes >= IMPORT_BATCH:
             await db.commit()
             pendentes = 0
 
     # The Vault is the source of truth for the `vault` origin: what vanished from the folder
     # leaves the catalog (soft delete — the row and the history stay).
-    sumidas = [id_ for chave, (id_, _) in existentes.items() if chave not in vistas]
-    for id_ in sumidas:
-        fonte = await db.get(FonteDeDados, id_)
+    vanished = [id_ for chave, (id_, _) in existentes.items() if chave not in vistas]
+    for id_ in vanished:
+        fonte = await db.get(DataSource, id_)
         if fonte is not None and fonte.deleted_at is None:
             fonte.deleted_at, fonte.updated_at = agora, agora
             resumo.removidas += 1

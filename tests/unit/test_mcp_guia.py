@@ -22,48 +22,48 @@ import pytest
 import flow.nodes  # noqa: F401  (popula o NODE_REGISTRY)
 from app.mcp import guia
 from flow.registry import NODE_REGISTRY
-from flow.utils.definition_lint import CHAVES_SECRETAS, lint_definition
+from flow.utils.definition_lint import SECRET_KEYS, lint_definition
 
 # ```json ... ``` blocks of a markdown document.
-_BLOCO_JSON = re.compile(r"```json\n(.*?)\n```", re.S)
+_JSON_BLOCK = re.compile(r"```json\n(.*?)\n```", re.S)
 
 # Sentences the server has disproven and that must not survive in a topic:
 # a nonexistent node name became a structured 422 (with `unknown_node` in the
 # report), and the skill's scripts were replaced by the tools.
-PROIBIDOS = ("HTTP 500", "validar.py", "catalogo.py")
+FORBIDDEN = ("HTTP 500", "validar.py", "catalogo.py")
 
 # Ceiling per topic. It is not aesthetics: the guide is read per call, and a
 # topic that doesn't fit in one read stops being consulted.
-LIMITE_BYTES = 8 * 1024
+BYTE_LIMIT = 8 * 1024
 
 
-def _descritores() -> dict:
+def _descriptors() -> dict:
     return {nome: cls.description() for nome, cls in NODE_REGISTRY.items()}
 
 
-def _blocos_json(texto: str) -> list[dict]:
-    return [json.loads(bloco) for bloco in _BLOCO_JSON.findall(texto)]
+def _json_blocks(texto: str) -> list[dict]:
+    return [json.loads(bloco) for bloco in _JSON_BLOCK.findall(texto)]
 
 
-def _valores_de_chave(valor, chave_alvo: str) -> list:
-    """All values stored under `chave_alvo`, at any depth."""
+def _values_for_key(valor, target_key: str) -> list:
+    """All values stored under `target_key`, at any depth."""
     achados: list = []
     if isinstance(valor, dict):
         for chave, sub in valor.items():
-            if str(chave).lower() == chave_alvo.lower():
+            if str(chave).lower() == target_key.lower():
                 achados.append(sub)
-            achados.extend(_valores_de_chave(sub, chave_alvo))
+            achados.extend(_values_for_key(sub, target_key))
     elif isinstance(valor, list):
         for item in valor:
-            achados.extend(_valores_de_chave(item, chave_alvo))
+            achados.extend(_values_for_key(item, target_key))
     return achados
 
 
 # ── The nine topics ───────────────────────────────────────────────────────────
 
 
-def test_sao_nove_topicos_na_ordem_de_leitura():
-    assert guia.TOPICOS == (
+def test_there_are_nine_topics_in_reading_order():
+    assert guia.TOPICS == (
         "overview",
         "edges",
         "credentials",
@@ -76,17 +76,17 @@ def test_sao_nove_topicos_na_ordem_de_leitura():
     )
 
 
-@pytest.mark.parametrize("topico", guia.TOPICOS)
-def test_topico_tem_texto_e_cabe_numa_leitura(topico):
+@pytest.mark.parametrize("topico", guia.TOPICS)
+def test_topic_has_text_and_fits_in_one_read(topico):
     texto = guia.ler_topico(topico)
     assert texto.strip(), f"{topico} está vazio"
     # A topic must stand on its own: a title and more than one paragraph.
     assert texto.lstrip().startswith("#"), f"{topico} não começa por um título"
     assert len(texto) > 400, f"{topico} é curto demais para valer sozinho"
-    assert len(texto.encode("utf-8")) <= LIMITE_BYTES, f"{topico} passou de {LIMITE_BYTES} bytes"
+    assert len(texto.encode("utf-8")) <= BYTE_LIMIT, f"{topico} passou de {BYTE_LIMIT} bytes"
 
 
-def test_topico_desconhecido_e_recusado_sem_tocar_no_disco():
+def test_unknown_topic_is_refused_without_touching_the_disk():
     # The name comes from the client: building a `Path` with it would be directory traversal.
     for entrada in ("inexistente", "../__init__", "/etc/passwd", ""):
         with pytest.raises(ValueError) as exc:
@@ -94,26 +94,26 @@ def test_topico_desconhecido_e_recusado_sem_tocar_no_disco():
         assert "Tópico desconhecido" in str(exc.value)
 
 
-@pytest.mark.parametrize("topico", guia.TOPICOS)
-def test_topico_nao_repete_afirmacao_desmentida(topico):
+@pytest.mark.parametrize("topico", guia.TOPICS)
+def test_topic_does_not_repeat_a_refuted_claim(topico):
     texto = guia.ler_topico(topico)
-    for proibido in PROIBIDOS:
+    for proibido in FORBIDDEN:
         assert proibido not in texto, f"{topico} ainda menciona {proibido!r}"
 
 
-@pytest.mark.parametrize("topico", guia.TOPICOS)
-def test_topico_nao_carrega_segredo(topico):
+@pytest.mark.parametrize("topico", guia.TOPICS)
+def test_topic_carries_no_secret(topico):
     texto = guia.ler_topico(topico)
     # A personal token's secret: not even as an example.
     assert "atl_pat_" not in texto, f"{topico} carrega o prefixo de um token pessoal"
     # And no secret property filled in inside the JSON examples.
-    for definicao in _blocos_json(texto):
-        for chave in CHAVES_SECRETAS:
-            preenchidos = [v for v in _valores_de_chave(definicao, chave) if v not in (None, "", {}, [])]
+    for definicao in _json_blocks(texto):
+        for chave in SECRET_KEYS:
+            preenchidos = [v for v in _values_for_key(definicao, chave) if v not in (None, "", {}, [])]
             assert not preenchidos, f"{topico} preenche '{chave}' num exemplo"
 
 
-def test_overview_ensina_o_relatorio_estruturado():
+def test_overview_teaches_the_structured_report():
     """What replaced the old claim about a nonexistent node name."""
     texto = guia.ler_topico("overview")
     for codigo in ("unknown_node", "duplicate_node_id", "cycle", "invalid_credential_id"):
@@ -123,7 +123,7 @@ def test_overview_ensina_o_relatorio_estruturado():
     assert "`parameters`" in texto and "`properties`" in texto
 
 
-def test_inputs_cobre_os_tres_caminhos_de_entrada():
+def test_inputs_covers_the_three_input_paths():
     texto = guia.ler_topico("inputs")
     assert "params_schema" in texto
     assert "{{ inputs." in texto
@@ -135,13 +135,13 @@ def test_inputs_cobre_os_tres_caminhos_de_entrada():
 # ── The recipes ───────────────────────────────────────────────────────────────
 
 
-def test_sao_cinco_receitas():
+def test_there_are_five_recipes():
     texto = guia.ler_topico("recipes")
     titulos = re.findall(r"^## \d+\.", texto, re.M)
     assert len(titulos) == 5, f"esperava 5 receitas, achei {len(titulos)}"
 
 
-def test_receitas_sao_json_valido_e_passam_no_lint():
+def test_recipes_are_valid_json_and_pass_the_lint():
     """The lock that keeps the guide from teaching a broken workflow.
 
     `lint_definition` is the same lint as `/validate`. A FATAL error here is a
@@ -149,13 +149,13 @@ def test_receitas_sao_json_valido_e_passam_no_lint():
     the guide as an example to copy.
     """
     texto = guia.ler_topico("recipes")
-    definicoes = _blocos_json(texto)
+    definitions = _json_blocks(texto)
     # Four recipes, and the sub-workflow one carries both ends (child and parent).
-    assert len(definicoes) >= 4
+    assert len(definitions) >= 4
 
     nomes = set(NODE_REGISTRY)
-    descritores = _descritores()
-    for indice, definicao in enumerate(definicoes, start=1):
+    descritores = _descriptors()
+    for indice, definicao in enumerate(definitions, start=1):
         assert definicao.get("nodes"), f"receita {indice} sem nós"
         relatorio = lint_definition(
             definicao["nodes"],
@@ -171,22 +171,22 @@ def test_receitas_sao_json_valido_e_passam_no_lint():
         )
 
 
-def test_receitas_so_referenciam_nos_do_catalogo():
+def test_recipes_only_reference_catalog_nodes():
     texto = guia.ler_topico("recipes")
     nomes = set(NODE_REGISTRY)
-    for definicao in _blocos_json(texto):
+    for definicao in _json_blocks(texto):
         for no in definicao["nodes"]:
             assert no["name"] in nomes, f"nó '{no['name']}' não existe no catálogo"
 
 
-def test_receitas_usam_credential_id_como_uuid():
+def test_recipes_use_credential_id_as_uuid():
     """A credential goes in by id; an id that is not a UUID is fatal in the lint."""
     import uuid
 
     texto = guia.ler_topico("recipes")
     encontrados = 0
-    for definicao in _blocos_json(texto):
-        for valor in _valores_de_chave(definicao, "credential_id"):
+    for definicao in _json_blocks(texto):
+        for valor in _values_for_key(definicao, "credential_id"):
             if valor in (None, ""):
                 continue
             uuid.UUID(str(valor))  # raises if it is not a UUID

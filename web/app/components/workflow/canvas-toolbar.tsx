@@ -9,12 +9,12 @@ import { INodeContext } from "@/context/useFlowContext"
 import { useRunDockHeight } from "@/app/stores/runPanelStore"
 import { useCanvasViewStore } from "@/app/stores/canvasViewStore"
 import { computeAutoLayout } from "./utils/auto-layout"
-import { CAMADA_SOBRE_O_CANVAS } from "./canvas-layers"
+import { LAYER_ABOVE_CANVAS } from "./canvas-layers"
 import { useCanvasReadOnly } from "./canvas-interaction"
 
 // 44px is the recommended minimum touch target (iOS HIG and Material). On desktop
 // it stays 32px: with a fine pointer the bigger button only steals canvas area.
-const BOTAO = "h-11 w-11 sm:h-8 sm:w-8"
+const BUTTON = "h-11 w-11 sm:h-8 sm:w-8"
 
 interface CanvasToolbarProps {
   onUndo?: () => void
@@ -30,7 +30,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
   // pointermove of a drag, and also recreated `handleAutoLayout` per frame.
   const { zoomIn, zoomOut, fitView, setNodes, getNodes, getEdges } = useReactFlow<INodeContext, Edge>()
   const [minimapOpen, setMinimapOpen] = useState(false)
-  const somenteLeitura = useCanvasReadOnly()
+  const readOnly = useCanvasReadOnly()
   const focusEnabled = useCanvasViewStore(s => s.focusEnabled)
   const toggleFocusEnabled = useCanvasViewStore(s => s.toggleFocusEnabled)
   // Rises together with the run panel dock — anchored at a fixed `bottom-4`,
@@ -80,10 +80,10 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
           goes because it's triggered by hover, which doesn't exist on touch. */}
       <div
         data-canvas-chrome=""
-        className={`${CAMADA_SOBRE_O_CANVAS} right-2 sm:right-4 pr-safe flex flex-col gap-1.5 transition-[bottom] duration-150`}
+        className={`${LAYER_ABOVE_CANVAS} right-2 sm:right-4 pr-safe flex flex-col gap-1.5 transition-[bottom] duration-150`}
         style={{ bottom: dockHeight + 16 }}
       >
-        {!somenteLeitura && (
+        {!readOnly && (
           <>
             <Button
               variant="outline"
@@ -91,7 +91,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
               onClick={onUndo}
               disabled={!canUndo}
               title="Desfazer (Ctrl+Z)"
-              className={BOTAO}
+              className={BUTTON}
             >
               <TbArrowBackUp size={15} />
             </Button>
@@ -102,7 +102,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
               onClick={onRedo}
               disabled={!canRedo}
               title="Refazer (Ctrl+Y)"
-              className={BOTAO}
+              className={BUTTON}
             >
               <TbArrowForwardUp size={15} />
             </Button>
@@ -114,7 +114,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
               size="icon"
               onClick={handleAutoLayout}
               title="Organizar nós automaticamente"
-              className={BOTAO}
+              className={BUTTON}
             >
               <TbLayoutDistributeVertical size={15} />
             </Button>
@@ -124,7 +124,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
               size="icon"
               onClick={toggleFocusEnabled}
               title={focusEnabled ? "Desativar realce de caminho (F)" : "Realçar caminho ao passar o mouse (F)"}
-              className={cn(BOTAO, focusEnabled && "border-primary text-primary")}
+              className={cn(BUTTON, focusEnabled && "border-primary text-primary")}
             >
               <TbRoute size={15} />
             </Button>
@@ -136,7 +136,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
           size="icon"
           onClick={() => setMinimapOpen(v => !v)}
           title={minimapOpen ? "Fechar minimapa" : "Abrir minimapa"}
-          className={cn(BOTAO, minimapOpen && "border-primary text-primary")}
+          className={cn(BUTTON, minimapOpen && "border-primary text-primary")}
         >
           <TbMap size={17} />
         </Button>
@@ -148,7 +148,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
           size="icon"
           onClick={() => fitView({ padding: 0.1, duration: 400 })}
           title="Ajustar à tela"
-          className={BOTAO}
+          className={BUTTON}
         >
           <TbFocus2 size={17} />
         </Button>
@@ -158,7 +158,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
           size="icon"
           onClick={() => zoomIn({ duration: 200 })}
           title="Zoom in"
-          className={BOTAO}
+          className={BUTTON}
         >
           <TbZoomIn size={17} />
         </Button>
@@ -168,7 +168,7 @@ const CanvasToolbar = ({ onUndo, onRedo, canUndo, canRedo, onSaveSnapshot }: Can
           size="icon"
           onClick={() => zoomOut({ duration: 200 })}
           title="Zoom out"
-          className={BOTAO}
+          className={BUTTON}
         >
           <TbZoomOut size={17} />
         </Button>

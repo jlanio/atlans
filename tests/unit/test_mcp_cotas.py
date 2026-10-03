@@ -11,7 +11,7 @@ What each test protects:
   would stay full forever);
 - overflowing returns `retry_after_seconds` from the real TTL, so the client waits
   instead of retrying;
-- the boundary is where the real ceiling is: call number LIMITE passes and
+- the boundary is where the real ceiling is: call number LIMIT passes and
   the next one is refused (a `<` in place of a `<=` would otherwise go
   unnoticed);
 - a key left without a deadline (the `EXPIRE` got lost back when it was sent
@@ -31,37 +31,37 @@ import pytest
 from mcp.server.mcpserver.exceptions import ToolError
 
 from app.mcp import cotas
-from tests.unit._mcp_harness import RedisFalso
+from tests.unit._mcp_harness import FakeRedis
 
 
 @pytest.fixture(autouse=True)
-def _zera_estado_do_processo():
+def _reset_process_state():
     """The warning and the local semaphore are module globals; each test starts clean."""
-    cotas._ultimo_aviso = 0.0
-    cotas._esperas_locais.clear()
-    cotas._esperas_locais_total = 0
+    cotas._last_warning = 0.0
+    cotas._local_waits.clear()
+    cotas._local_waits_total = 0
     yield
-    cotas._ultimo_aviso = 0.0
-    cotas._esperas_locais.clear()
-    cotas._esperas_locais_total = 0
+    cotas._last_warning = 0.0
+    cotas._local_waits.clear()
+    cotas._local_waits_total = 0
 
 
-def _corpo(exc: ToolError) -> dict:
+def _response_body(exc: ToolError) -> dict:
     return json.loads(str(exc))
 
 
 # ── verificar() ───────────────────────────────────────────────────────────────
 
 
-async def test_primeira_chamada_cria_a_janela_de_um_minuto():
-    redis = RedisFalso()
+async def test_first_call_creates_the_one_minute_window():
+    redis = FakeRedis()
     await cotas.verificar(redis, "tok-1", None)
     assert redis.dados["ratelimit:mcp:tok-1:geral"] == 1
     assert redis.ttls["ratelimit:mcp:tok-1:geral"] == 60
 
 
-async def test_chamadas_seguintes_nao_empurram_o_prazo_para_a_janela_poder_fechar():
-    redis = RedisFalso()
+async def test_later_calls_do_not_push_the_expiry_so_the_window_can_close():
+    redis = FakeRedis()
     chave = "ratelimit:mcp:tok-1:geral"
     await cotas.verificar(redis, "tok-1", None)
     redis.ttls[chave] = 25  # 35 s of the window have passed
@@ -71,40 +71,40 @@ async def test_chamadas_seguintes_nao_empurram_o_prazo_para_a_janela_poder_fecha
     assert redis.ttls[chave] == 25
 
 
-async def test_baldes_sao_por_token():
-    redis = RedisFalso()
+async def test_buckets_are_per_token():
+    redis = FakeRedis()
     await cotas.verificar(redis, "tok-1", None)
     await cotas.verificar(redis, "tok-2", None)
     assert redis.dados["ratelimit:mcp:tok-1:geral"] == 1
     assert redis.dados["ratelimit:mcp:tok-2:geral"] == 1
 
 
-async def test_estourar_o_geral_levanta_rate_limited_com_o_ttl():
-    redis = RedisFalso()
-    redis.dados["ratelimit:mcp:tok-1:geral"] = cotas.LIMITE_GERAL
+async def test_exceeding_the_general_raises_rate_limited_with_the_ttl():
+    redis = FakeRedis()
+    redis.dados["ratelimit:mcp:tok-1:geral"] = cotas.OVERALL_LIMIT
     redis.ttls["ratelimit:mcp:tok-1:geral"] = 17
     with pytest.raises(ToolError) as exc:
         await cotas.verificar(redis, "tok-1", None)
-    corpo = _corpo(exc.value)
+    corpo = _response_body(exc.value)
     assert corpo["code"] == "rate_limited"
     assert corpo["retry_after_seconds"] == 17
 
 
-async def test_a_fronteira_exata_do_balde_geral():
-    """Call number LIMITE_GERAL passes; the next one is refused."""
-    redis = RedisFalso()
-    redis.dados["ratelimit:mcp:tok-1:geral"] = cotas.LIMITE_GERAL - 1
+async def test_the_exact_boundary_of_the_general_bucket():
+    """Call number OVERALL_LIMIT passes; the next one is refused."""
+    redis = FakeRedis()
+    redis.dados["ratelimit:mcp:tok-1:geral"] = cotas.OVERALL_LIMIT - 1
     redis.ttls["ratelimit:mcp:tok-1:geral"] = 30
 
-    await cotas.verificar(redis, "tok-1", None)  # call number LIMITE_GERAL
-    assert redis.dados["ratelimit:mcp:tok-1:geral"] == cotas.LIMITE_GERAL
+    await cotas.verificar(redis, "tok-1", None)  # call number OVERALL_LIMIT
+    assert redis.dados["ratelimit:mcp:tok-1:geral"] == cotas.OVERALL_LIMIT
 
-    with pytest.raises(ToolError) as exc:  # a LIMITE_GERAL + 1
+    with pytest.raises(ToolError) as exc:  # a OVERALL_LIMIT + 1
         await cotas.verificar(redis, "tok-1", None)
-    assert _corpo(exc.value)["code"] == "rate_limited"
+    assert _response_body(exc.value)["code"] == "rate_limited"
 
 
-async def test_chave_estourada_sem_prazo_ganha_o_prazo_na_contagem():
+async def test_exceeded_key_without_expiry_gets_the_expiry_on_count():
     """Without the deadline back, the token would be locked forever.
 
     When `INCR` and `EXPIRE` were two commands, losing the second (Redis
@@ -113,47 +113,47 @@ async def test_chave_estourada_sem_prazo_ganha_o_prazo_na_contagem():
     deleted the key by hand. The count arms the deadline of a key without one, in the
     same transaction as the `INCR`, overflowed or not.
     """
-    redis = RedisFalso()
+    redis = FakeRedis()
     chave = "ratelimit:mcp:tok-1:geral"
-    redis.dados[chave] = cotas.LIMITE_GERAL + 5  # estourado
+    redis.dados[chave] = cotas.OVERALL_LIMIT + 5  # estourado
     redis.ttls.pop(chave, None)  # and with no deadline at all (the EXPIRE got lost)
 
     with pytest.raises(ToolError) as exc:
         await cotas.verificar(redis, "tok-1", None)
 
-    assert _corpo(exc.value)["retry_after_seconds"] == cotas.JANELA_SEGUNDOS
-    assert ("expire", chave, cotas.JANELA_SEGUNDOS) in redis.chamadas
-    assert redis.ttls[chave] == cotas.JANELA_SEGUNDOS
+    assert _response_body(exc.value)["retry_after_seconds"] == cotas.WINDOW_SECONDS
+    assert ("expire", chave, cotas.WINDOW_SECONDS) in redis.chamadas
+    assert redis.ttls[chave] == cotas.WINDOW_SECONDS
 
 
-async def test_cota_de_run_tem_teto_proprio_menor_que_o_geral():
-    redis = RedisFalso()
-    assert cotas.LIMITES_POR_COTA["run"] < cotas.LIMITE_GERAL
-    redis.dados["ratelimit:mcp:tok-1:run"] = cotas.LIMITES_POR_COTA["run"]
+async def test_run_quota_has_its_own_ceiling_lower_than_the_general():
+    redis = FakeRedis()
+    assert cotas.LIMITS_PER_QUOTA["run"] < cotas.OVERALL_LIMIT
+    redis.dados["ratelimit:mcp:tok-1:run"] = cotas.LIMITS_PER_QUOTA["run"]
     with pytest.raises(ToolError) as exc:
         await cotas.verificar(redis, "tok-1", "run")
-    assert _corpo(exc.value)["code"] == "rate_limited"
+    assert _response_body(exc.value)["code"] == "rate_limited"
     # The general bucket was already consumed before the specific one refused: it is one
     # call, counted once in each bucket.
     assert redis.dados["ratelimit:mcp:tok-1:geral"] == 1
 
 
-async def test_cota_de_validate_nao_afeta_o_balde_de_run():
-    redis = RedisFalso()
+async def test_validate_quota_does_not_affect_the_run_bucket():
+    redis = FakeRedis()
     await cotas.verificar(redis, "tok-1", "validate")
     assert redis.dados["ratelimit:mcp:tok-1:validate"] == 1
     assert "ratelimit:mcp:tok-1:run" not in redis.dados
 
 
-async def test_ttl_ausente_cai_na_janela_cheia_em_vez_de_um_numero_negativo():
-    redis = RedisFalso()
-    redis.dados["ratelimit:mcp:tok-1:geral"] = cotas.LIMITE_GERAL + 5
+async def test_missing_ttl_falls_back_to_full_window_instead_of_a_negative_number():
+    redis = FakeRedis()
+    redis.dados["ratelimit:mcp:tok-1:geral"] = cotas.OVERALL_LIMIT + 5
     with pytest.raises(ToolError) as exc:
         await cotas.verificar(redis, "tok-1", None)
-    assert _corpo(exc.value)["retry_after_seconds"] == cotas.JANELA_SEGUNDOS
+    assert _response_body(exc.value)["retry_after_seconds"] == cotas.WINDOW_SECONDS
 
 
-async def test_sem_redis_degrada_aberto_e_avisa_uma_vez_por_minuto(caplog):
+async def test_without_redis_degrades_open_and_warns_once_per_minute(caplog):
     with caplog.at_level("WARNING", logger="app.mcp.cotas"):
         for _ in range(5):
             await cotas.verificar(None, "tok-1", "run")
@@ -161,19 +161,19 @@ async def test_sem_redis_degrada_aberto_e_avisa_uma_vez_por_minuto(caplog):
     assert len(avisos) == 1
 
 
-async def test_falha_do_redis_nao_derruba_a_chamada():
-    class RedisQuebrado(RedisFalso):
+async def test_redis_failure_does_not_break_the_call():
+    class BrokenRedis(FakeRedis):
         async def incrby(self, chave, quanto):
             raise ConnectionError("sem rede")
 
-    await cotas.verificar(RedisQuebrado(), "tok-1", None)  # does not raise
+    await cotas.verificar(BrokenRedis(), "tok-1", None)  # does not raise
 
 
 # ── espera() ──────────────────────────────────────────────────────────────────
 
 
-async def test_espera_reserva_nos_dois_contadores_e_devolve_no_fim():
-    redis = RedisFalso()
+async def test_wait_reserves_in_both_counters_and_releases_at_the_end():
+    redis = FakeRedis()
     async with cotas.espera(redis, "tok-1", ttl_s=120):
         assert redis.dados["mcp:wait:token:tok-1"] == 1
         assert redis.dados["mcp:wait:global"] == 1
@@ -181,119 +181,119 @@ async def test_espera_reserva_nos_dois_contadores_e_devolve_no_fim():
     assert redis.dados["mcp:wait:global"] == 0
 
 
-async def test_ttl_da_reserva_cobre_o_prazo_maximo_mais_folga():
-    redis = RedisFalso()
+async def test_reservation_ttl_covers_the_max_deadline_plus_slack():
+    redis = FakeRedis()
     async with cotas.espera(redis, "tok-1", ttl_s=120):
         pass
     assert redis.ttls["mcp:wait:token:tok-1"] == 180
 
 
-async def test_espera_devolve_a_reserva_mesmo_com_erro_no_corpo():
-    redis = RedisFalso()
+async def test_wait_releases_the_reservation_even_with_error_in_the_body():
+    redis = FakeRedis()
     with pytest.raises(RuntimeError):
         async with cotas.espera(redis, "tok-1", ttl_s=60):
             raise RuntimeError("a execução falhou")
     assert redis.dados["mcp:wait:token:tok-1"] == 0
 
 
-async def test_quarta_espera_do_mesmo_token_e_recusada_sem_deixar_contador_pendurado():
-    redis = RedisFalso()
-    redis.dados["mcp:wait:token:tok-1"] = cotas.MAX_ESPERAS_POR_TOKEN
+async def test_fourth_wait_of_the_same_token_is_refused_without_leaving_a_dangling_counter():
+    redis = FakeRedis()
+    redis.dados["mcp:wait:token:tok-1"] = cotas.MAX_WAITS_PER_TOKEN
     redis.dados["mcp:wait:global"] = 1
     with pytest.raises(ToolError) as exc:
         async with cotas.espera(redis, "tok-1", ttl_s=60):
             pass
-    corpo = _corpo(exc.value)
+    corpo = _response_body(exc.value)
     assert corpo["code"] == "wait_limit"
     assert "wait=false" in corpo["hint"]
-    assert redis.dados["mcp:wait:token:tok-1"] == cotas.MAX_ESPERAS_POR_TOKEN
+    assert redis.dados["mcp:wait:token:tok-1"] == cotas.MAX_WAITS_PER_TOKEN
     assert redis.dados["mcp:wait:global"] == 1
 
 
-async def test_teto_global_recusa_mesmo_token_dentro_do_proprio_limite():
-    redis = RedisFalso()
-    redis.dados["mcp:wait:global"] = cotas.MAX_ESPERAS_GLOBAL
+async def test_global_ceiling_refuses_even_a_token_within_its_own_limit():
+    redis = FakeRedis()
+    redis.dados["mcp:wait:global"] = cotas.MAX_GLOBAL_WAITS
     with pytest.raises(ToolError) as exc:
         async with cotas.espera(redis, "tok-novo", ttl_s=60):
             pass
-    assert _corpo(exc.value)["code"] == "wait_limit"
+    assert _response_body(exc.value)["code"] == "wait_limit"
     assert redis.dados["mcp:wait:token:tok-novo"] == 0
 
 
-async def test_falha_entre_os_dois_incr_nao_deixa_reserva_pendurada():
+async def test_failure_between_the_two_incr_leaves_no_dangling_reservation():
     """The first bucket has already been incremented when the second one fails.
 
     Without returning what was counted, each attempt during a Redis outage
     would eat one of the token's slots, and the ceiling would lock as soon as the network came back.
     """
 
-    class RedisQueCaiNoGlobal(RedisFalso):
+    class RedisFailingOnGlobal(FakeRedis):
         async def incr(self, chave):
             if chave == "mcp:wait:global":
                 raise ConnectionError("caiu no meio da reserva")
             return await super().incr(chave)
 
-    redis = RedisQueCaiNoGlobal()
+    redis = RedisFailingOnGlobal()
     async with cotas.espera(redis, "tok-1", ttl_s=60):
         # It degraded to the local semaphore, as the no-Redis policy dictates.
-        assert cotas._esperas_locais["tok-1"] == 1
+        assert cotas._local_waits["tok-1"] == 1
     assert redis.dados["mcp:wait:token:tok-1"] == 0
 
 
-async def test_sem_redis_a_espera_usa_semaforo_local_ao_processo():
+async def test_without_redis_the_wait_uses_a_process_local_semaphore():
     import contextlib
 
     async with contextlib.AsyncExitStack() as pilha:
-        for _ in range(cotas.MAX_ESPERAS_POR_TOKEN):
+        for _ in range(cotas.MAX_WAITS_PER_TOKEN):
             await pilha.enter_async_context(cotas.espera(None, "tok-1", ttl_s=60))
         with pytest.raises(ToolError) as exc:
             async with cotas.espera(None, "tok-1", ttl_s=60):
                 pass
-    assert _corpo(exc.value)["code"] == "wait_limit"
+    assert _response_body(exc.value)["code"] == "wait_limit"
     # Popped off the stack: the semaphore is back at zero and the next request passes.
     async with cotas.espera(None, "tok-1", ttl_s=60):
         pass
 
 
-async def test_semaforo_local_tem_teto_global_e_volta_ao_zero():
+async def test_local_semaphore_has_global_ceiling_and_returns_to_zero():
     """Without Redis the global ceiling also applies — and the counter unwinds down to zero."""
     import contextlib
 
-    cotas._esperas_locais_total = cotas.MAX_ESPERAS_GLOBAL
+    cotas._local_waits_total = cotas.MAX_GLOBAL_WAITS
     with pytest.raises(ToolError) as exc:
         async with cotas.espera(None, "tok-novo", ttl_s=60):
             pass
-    assert _corpo(exc.value)["code"] == "wait_limit"
+    assert _response_body(exc.value)["code"] == "wait_limit"
     # The refusal does not consume a slot: the total stays where it was.
-    assert cotas._esperas_locais_total == cotas.MAX_ESPERAS_GLOBAL
-    assert "tok-novo" not in cotas._esperas_locais
+    assert cotas._local_waits_total == cotas.MAX_GLOBAL_WAITS
+    assert "tok-novo" not in cotas._local_waits
 
-    cotas._esperas_locais_total = 0
+    cotas._local_waits_total = 0
     async with contextlib.AsyncExitStack() as pilha:
-        for numero in range(cotas.MAX_ESPERAS_POR_TOKEN):
+        for numero in range(cotas.MAX_WAITS_PER_TOKEN):
             await pilha.enter_async_context(cotas.espera(None, f"tok-{numero}", ttl_s=60))
-        assert cotas._esperas_locais_total == cotas.MAX_ESPERAS_POR_TOKEN
-    assert cotas._esperas_locais_total == 0
-    assert cotas._esperas_locais == {}
+        assert cotas._local_waits_total == cotas.MAX_WAITS_PER_TOKEN
+    assert cotas._local_waits_total == 0
+    assert cotas._local_waits == {}
 
 
 # ── verificar_tokens_do_assistente() ────────────────────────────────────────────
 
 
-async def test_o_teto_de_tokens_e_do_CHAMADOR_e_o_default_e_o_da_instalacao():
+async def test_the_token_ceiling_is_the_CALLERS_and_the_default_is_the_installations():
     """The ceiling now depends on the plan, and the one who resolves it is the caller.
 
     This module is Redis only: if it went fetching the subscription, the assistant loop
     (which runs inside an SSE generator, without a request session) would drag the database
     into a check that exists to be cheap.
     """
-    redis = RedisFalso()
+    redis = FakeRedis()
     redis.dados["assistente:tokens:usr-1"] = cotas.TETO_DE_TOKENS_DO_ASSISTENTE_POR_DIA
 
     # Without `teto`, the behavior from before plans: the installation's ceiling.
     with pytest.raises(ToolError) as exc:
         await cotas.verificar_tokens_do_assistente(redis, "usr-1")
-    assert _corpo(exc.value)["code"] == "rate_limited"
+    assert _response_body(exc.value)["code"] == "rate_limited"
 
     # With a higher ceiling (a plan's, when there is an extension), the SAME spending passes.
     await cotas.verificar_tokens_do_assistente(
@@ -301,10 +301,10 @@ async def test_o_teto_de_tokens_e_do_CHAMADOR_e_o_default_e_o_da_instalacao():
     )
 
 
-async def test_a_fronteira_do_teto_injetado_e_o_proprio_teto():
+async def test_the_injected_ceiling_boundary_is_the_ceiling_itself():
     """A `<=` in place of the `<` would give a free turn to every plan — and the
     boundary is precisely where nobody looks."""
-    redis = RedisFalso()
+    redis = FakeRedis()
     teto = 22_500_000
 
     redis.dados["assistente:tokens:usr-1"] = teto - 1
@@ -313,7 +313,7 @@ async def test_a_fronteira_do_teto_injetado_e_o_proprio_teto():
     redis.dados["assistente:tokens:usr-1"] = teto
     with pytest.raises(ToolError) as exc:
         await cotas.verificar_tokens_do_assistente(redis, "usr-1", teto=teto)
-    assert _corpo(exc.value)["code"] == "rate_limited"
+    assert _response_body(exc.value)["code"] == "rate_limited"
 
 
 # ── The assistant quota key must not become immortal (PR 5, #3) ─────────────────
@@ -322,44 +322,44 @@ async def test_a_fronteira_do_teto_injetado_e_o_proprio_teto():
 # commands —, losing the second (Redis restarted, connection dropped, SSE cancelled
 # midway) left the key without a deadline: on crossing the ceiling, the user lost
 # the assistant FOREVER. Today the deadline goes out in the same transaction as the
-# INCRBY (`contar_na_janela`); whatever remains of an old key without a deadline is
-# armed on the next charge, on the refusal or on reading `/estado` (`gasto_e_prazo`).
+# INCRBY (`count_in_window`); whatever remains of an old key without a deadline is
+# armed on the next charge, on the refusal or on reading `/estado` (`spent_and_reset`).
 
 
-async def test_abaixo_do_teto_a_cobranca_arma_o_prazo_de_uma_chave_que_ficou_sem():
+async def test_below_the_ceiling_the_charge_sets_the_expiry_of_a_key_left_without_one():
     """Below the ceiling the turn goes on, and its charge sets the missing deadline —
     otherwise the immortal key would only be noticed too late, already locked."""
-    redis = RedisFalso()
-    chave = cotas.chave_de_tokens("usr-1")
+    redis = FakeRedis()
+    chave = cotas.tokens_key("usr-1")
     redis.dados[chave] = 10  # below the ceiling, but WITHOUT a deadline (the EXPIRE got lost)
 
     await cotas.verificar_tokens_do_assistente(redis, "usr-1", teto=1000)  # does not refuse
     assert await cotas.cobrar_tokens_do_assistente(redis, "usr-1", 5) == 15
 
-    assert redis.ttls[chave] == cotas.JANELA_DO_ASSISTENTE_SEGUNDOS
-    assert await cotas.gasto_e_prazo(redis, "usr-1") == (15, cotas.JANELA_DO_ASSISTENTE_SEGUNDOS)
+    assert redis.ttls[chave] == cotas.ASSISTANT_WINDOW_SECONDS
+    assert await cotas.spent_and_reset(redis, "usr-1") == (15, cotas.ASSISTANT_WINDOW_SECONDS)
 
 
-async def test_a_recusa_arma_o_prazo_de_uma_chave_estourada_que_ficou_sem():
+async def test_the_refusal_sets_the_expiry_of_an_exceeded_key_left_without_one():
     """Once overflowed, the turn is refused BEFORE the charge — which is what arms the
     deadline. If the refusal did not arm it, whoever crossed the ceiling with such a key
     would never have the assistant again; and it also says when the window reopens."""
-    redis = RedisFalso()
-    chave = cotas.chave_de_tokens("usr-1")
+    redis = FakeRedis()
+    chave = cotas.tokens_key("usr-1")
     redis.dados[chave] = 1000  # at the ceiling, and WITHOUT a deadline
 
     with pytest.raises(ToolError) as exc:
         await cotas.verificar_tokens_do_assistente(redis, "usr-1", teto=1000)
 
-    assert _corpo(exc.value)["retry_after_seconds"] == cotas.JANELA_DO_ASSISTENTE_SEGUNDOS
-    assert redis.ttls[chave] == cotas.JANELA_DO_ASSISTENTE_SEGUNDOS
+    assert _response_body(exc.value)["retry_after_seconds"] == cotas.ASSISTANT_WINDOW_SECONDS
+    assert redis.ttls[chave] == cotas.ASSISTANT_WINDOW_SECONDS
 
 
-async def test_cobrar_e_recusar_nao_reabrem_uma_janela_com_prazo_vivo():
+async def test_charge_and_refuse_do_not_reopen_a_window_with_live_expiry():
     """Only the key WITHOUT a deadline gets one; a live window is NOT reopened — reopening
     would extend the ceiling for free on every turn."""
-    redis = RedisFalso()
-    chave = cotas.chave_de_tokens("usr-1")
+    redis = FakeRedis()
+    chave = cotas.tokens_key("usr-1")
     redis.dados[chave] = 10
     redis.ttls[chave] = 3600  # prazo vivo
 
@@ -368,39 +368,39 @@ async def test_cobrar_e_recusar_nao_reabrem_uma_janela_com_prazo_vivo():
 
     with pytest.raises(ToolError) as exc:
         await cotas.verificar_tokens_do_assistente(redis, "usr-1", teto=15)
-    assert _corpo(exc.value)["retry_after_seconds"] == 3600
+    assert _response_body(exc.value)["retry_after_seconds"] == 3600
     assert redis.ttls[chave] == 3600
 
 
-async def test_o_estado_arma_o_prazo_de_uma_chave_estourada_que_ficou_sem():
+async def test_the_state_sets_the_expiry_of_an_exceeded_key_left_without_one():
     """With the quota full, the interface reads `/estado` (which comes from here) and locks
     sending: the refusal, which would also arm the deadline, never runs. Without the cure
     here, the old key without a deadline would never expire, and the person would lose the
     assistant forever, with the meter saying "sem prazo" (no deadline)."""
-    redis = RedisFalso()
-    chave = cotas.chave_de_tokens("usr-1")
+    redis = FakeRedis()
+    chave = cotas.tokens_key("usr-1")
     redis.dados[chave] = 1_600_000  # above the ceiling, and WITHOUT a deadline
 
-    assert await cotas.gasto_e_prazo(redis, "usr-1") == (1_600_000, cotas.JANELA_DO_ASSISTENTE_SEGUNDOS)
-    assert redis.ttls[chave] == cotas.JANELA_DO_ASSISTENTE_SEGUNDOS
+    assert await cotas.spent_and_reset(redis, "usr-1") == (1_600_000, cotas.ASSISTANT_WINDOW_SECONDS)
+    assert redis.ttls[chave] == cotas.ASSISTANT_WINDOW_SECONDS
 
 
-async def test_o_estado_nao_reabre_uma_janela_com_prazo_vivo():
+async def test_the_state_does_not_reopen_a_window_with_live_expiry():
     """Reading the meter does not extend the ceiling: a live window stays as it is."""
-    redis = RedisFalso()
-    chave = cotas.chave_de_tokens("usr-1")
+    redis = FakeRedis()
+    chave = cotas.tokens_key("usr-1")
     redis.dados[chave] = 10
     redis.ttls[chave] = 3600
 
-    assert await cotas.gasto_e_prazo(redis, "usr-1") == (10, 3600)
+    assert await cotas.spent_and_reset(redis, "usr-1") == (10, 3600)
     assert redis.ttls[chave] == 3600
 
 
-async def test_gasto_e_prazo_de_chave_ausente_nao_inventa_prazo():
+async def test_usage_and_expiry_of_missing_key_does_not_invent_expiry():
     """Without a key (nothing spent), there is no deadline to show, and the read does not
     create the key."""
-    redis = RedisFalso()
-    gasto, prazo = await cotas.gasto_e_prazo(redis, "usr-1")
+    redis = FakeRedis()
+    gasto, prazo = await cotas.spent_and_reset(redis, "usr-1")
 
     assert gasto == 0
     assert prazo is None

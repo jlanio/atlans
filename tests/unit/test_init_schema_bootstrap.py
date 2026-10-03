@@ -34,22 +34,22 @@ for _mod in pkgutil.iter_modules(app.models.__path__):
     importlib.import_module(f"app.models.{_mod.name}")
 
 RAIZ = Path(__file__).resolve().parents[2]
-SQL_DO_NUCLEO = (RAIZ / "scripts" / "init_schema.sql").read_text(encoding="utf-8")
-SQL_DAS_EXTENSOES = [p.read_text(encoding="utf-8") for p in esquemas()]
-SQL = "\n".join([SQL_DO_NUCLEO, *SQL_DAS_EXTENSOES])
+CORE_SQL = (RAIZ / "scripts" / "init_schema.sql").read_text(encoding="utf-8")
+EXTENSIONS_SQL = [p.read_text(encoding="utf-8") for p in esquemas()]
+SQL = "\n".join([CORE_SQL, *EXTENSIONS_SQL])
 
 # `alembic_version` is created by the script but is not a model.
 _SO_DO_SCRIPT = {"alembic_version"}
 
-_CRIADAS = set(re.findall(r"CREATE TABLE (?:IF NOT EXISTS )?(\w+)", SQL))
+_CREATED = set(re.findall(r"CREATE TABLE (?:IF NOT EXISTS )?(\w+)", SQL))
 _DROPADAS = set(re.findall(r"DROP TABLE IF EXISTS (\w+) CASCADE", SQL))
-_TABELAS_DOS_MODELS = set(Base.metadata.tables)
+_MODEL_TABLES = set(Base.metadata.tables)
 
 # Words that open a constraint, not a column, inside the CREATE TABLE.
-_NAO_E_COLUNA = {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT", "EXCLUDE", "LIKE"}
+_NOT_A_COLUMN = {"PRIMARY", "FOREIGN", "UNIQUE", "CHECK", "CONSTRAINT", "EXCLUDE", "LIKE"}
 
 
-def _colunas_do_script() -> dict:
+def _script_columns() -> dict:
     """Columns declared in each `CREATE TABLE` of the script.
 
     Comparing only TABLE NAMES lets through the most common case of divergence
@@ -67,63 +67,63 @@ def _colunas_do_script() -> dict:
             if not linha:
                 continue
             token = linha.split()[0].strip('",').strip('"')
-            if not re.fullmatch(r"\w+", token or "") or token.upper() in _NAO_E_COLUNA:
+            if not re.fullmatch(r"\w+", token or "") or token.upper() in _NOT_A_COLUMN:
                 continue
             colunas.add(token.lower())
         fora[nome] = colunas
     return fora
 
 
-_COLUNAS_DO_SCRIPT = _colunas_do_script()
+_SCRIPT_COLUMNS = _script_columns()
 
 
-def test_todo_model_tem_create_no_script():
-    assert not (_TABELAS_DOS_MODELS - _CRIADAS)
+def test_every_model_has_create_in_script():
+    assert not (_MODEL_TABLES - _CREATED)
 
 
-def test_toda_tabela_criada_tem_o_drop_correspondente():
-    assert not (_CRIADAS - _DROPADAS)
+def test_every_created_table_has_matching_drop():
+    assert not (_CREATED - _DROPADAS)
 
 
-def test_o_script_nao_cria_tabela_que_nao_e_de_nenhum_model():
-    assert not (_CRIADAS - _TABELAS_DOS_MODELS - _SO_DO_SCRIPT)
+def test_script_does_not_create_table_without_a_model():
+    assert not (_CREATED - _MODEL_TABLES - _SO_DO_SCRIPT)
 
 
-def _criadas(sql: str) -> set[str]:
+def _created_tables(sql: str) -> set[str]:
     return set(re.findall(r"CREATE TABLE (?:IF NOT EXISTS )?(\w+)", sql))
 
 
 # The tables of the models that live in an extension.
-_TABELAS_DE_EXTENSAO = {
+_EXTENSION_TABLES = {
     m.local_table.name for m in Base.registry.mappers
     if m.class_.__module__.startswith("app.extensoes.")
 }
 
 
-def test_tabela_de_extensao_nao_mora_no_script_do_nucleo():
+def test_extension_table_does_not_live_in_core_script():
     """Without the extension (the free distribution), one of its tables in the core
     script would be a table with no model, created on every installation. It lives
     in the extension's `schema.sql`, with the DROP alongside."""
-    assert not (_criadas(SQL_DO_NUCLEO) & _TABELAS_DE_EXTENSAO)
-    das_extensoes = set().union(set(), *(_criadas(sql) for sql in SQL_DAS_EXTENSOES))
-    assert _TABELAS_DE_EXTENSAO <= das_extensoes
+    assert not (_created_tables(CORE_SQL) & _EXTENSION_TABLES)
+    from_extensions = set().union(set(), *(_created_tables(sql) for sql in EXTENSIONS_SQL))
+    assert _EXTENSION_TABLES <= from_extensions
 
 
 @pytest.mark.parametrize(
     "tabela",
     ["user_executor_assignments", "audit_events", "executor_enrollment_otp"],
 )
-def test_tabelas_que_ja_faltaram(tabela):
+def test_tables_that_were_missing_before(tabela):
     """Named regressions: the three that have already broken a bootstrap."""
-    assert tabela in _CRIADAS and tabela in _DROPADAS
+    assert tabela in _CREATED and tabela in _DROPADAS
 
 
-def test_toda_coluna_de_model_existe_no_script():
+def test_every_model_column_exists_in_script():
     """The hole the TABLE NAME test could not see: a new column in the model and
     in the migration, but forgotten in the script — a new database is born without it, forever."""
     faltando = {}
     for tabela, obj in Base.metadata.tables.items():
-        no_script = _COLUNAS_DO_SCRIPT.get(tabela)
+        no_script = _SCRIPT_COLUMNS.get(tabela)
         if no_script is None:
             continue  # absence of the TABLE is already covered by another test
         ausentes = {c.name.lower() for c in obj.columns} - no_script
@@ -136,16 +136,16 @@ def test_toda_coluna_de_model_existe_no_script():
     ("tabela", "coluna"),
     [("workflows", "origem"), ("users", "agent_quota"), ("workflow_runs", "trigger_source")],
 )
-def test_colunas_que_o_teste_por_nome_deixava_passar(tabela, coluna):
+def test_columns_the_name_based_test_let_through(tabela, coluna):
     """Named COLUMN regressions — the analogue of the table test above."""
-    assert coluna in _COLUNAS_DO_SCRIPT[tabela]
+    assert coluna in _SCRIPT_COLUMNS[tabela]
 
 
-def test_nenhum_indice_aponta_para_tabela_inexistente():
+def test_no_index_points_to_missing_table():
     """`ix_otp_unused` was created on `agent_enrollment_otp`, the name before the
     20260716_0001 rename — the whole script blew up in section 2."""
     alvos = set(re.findall(r"CREATE (?:UNIQUE )?INDEX \w+ ON (\w+)", SQL))
-    assert not (alvos - _CRIADAS)
+    assert not (alvos - _CREATED)
 
 
 def test_carimbo_do_alembic_e_a_head_real():
@@ -155,7 +155,7 @@ def test_carimbo_do_alembic_e_a_head_real():
     assert carimbo
 
     versoes = RAIZ / "alembic" / "versions"
-    revisoes, down = set(), set()
+    revisions, down = set(), set()
     for arquivo in versoes.glob("*.py"):
         texto = arquivo.read_text(encoding="utf-8")
         # The type annotation varies between migrations (`: str`, `: Union[str, None]`,
@@ -163,11 +163,11 @@ def test_carimbo_do_alembic_e_a_head_real():
         # and "heads" became the set of ALL revisions — any old stamp
         # passed.
         for m in re.finditer(r'^revision(?::[^=\n]+)?\s*=\s*"(\w+)"', texto, re.M):
-            revisoes.add(m.group(1))
+            revisions.add(m.group(1))
         for m in re.finditer(r'^down_revision(?::[^=\n]+)?\s*=\s*"(\w+)"', texto, re.M):
             down.add(m.group(1))
 
-    heads = revisoes - down
+    heads = revisions - down
     assert len(heads) == 1, f"a cadeia de migracoes tem mais de uma head: {sorted(heads)}"
     assert carimbo.group(1) in heads
 

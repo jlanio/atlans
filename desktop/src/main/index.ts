@@ -13,29 +13,29 @@ import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 import fs from 'node:fs'
 import {
   ARTIFACTS_DIR_PADRAO, CERT_DIR, ENV_FILE, IS_DEV, LOG_DIR, PYTHON_EXE,
-  RESOURCES, ambienteDoSpawn, envDoExecutor, garantirDiretorios, migrarDadosAntigos,
+  RESOURCES, ambienteDoSpawn, envDoExecutor, ensureDirectories, migrateLegacyData,
 } from './paths.js'
 import { PythonSupervisor } from './python/supervisor.js'
-import { enrolar, type PedidoEnroll } from './python/enroll.js'
+import { enrolar, type EnrollRequest } from './python/enroll.js'
 import {
   artifactsDirEfetivo, descartarEnrollment, gravarExecucao, gravarGeoSync,
-  lerConfiguracao, lerExecucao, lerGeoSync, validarPasta,
-  type ConfigExecucao, type ConfigGeoSync, type EstadoConfiguracao,
+  lerConfiguracao, lerExecucao, lerGeoSync, validateFolder,
+  type RunConfig, type ConfigGeoSync, type ConfigState,
 } from './state/config.js'
-import { ESTRATEGIAS, MODOS_SYNC, PADRAO_SYNC } from '../shared/geosync.js'
+import { ESTRATEGIAS, SYNC_MODES, SYNC_DEFAULTS } from '../shared/geosync.js'
 import { consultarStatusCacheado, invalidarStatus } from './python/status.js'
-import { interpretar, registrarProtocolo, urlDosArgumentos } from './deeplink.js'
-import { iniciarUpdater, instalarAgora, pararUpdater } from './updater.js'
+import { interpretar, registerProtocol, urlDosArgumentos } from './deeplink.js'
+import { startUpdater, installNow, stopUpdater } from './updater.js'
 import { AppStore } from './state/store.js'
-import { atualizarTray, criarTray, destruirTray } from './ui/tray.js'
+import { updateTray, createTray, destroyTray } from './ui/tray.js'
 import {
-  abrirJanela, abrirJanelaDeLog, janelaPrincipal, permitirEncerramento,
+  abrirJanela, openLogWindow, mainWindow, allowQuit,
 } from './ui/windows.js'
-import { abrirJanelaWeb, definirTratadorDeepLink, janelaWebPrincipal } from './ui/janela-web.js'
-import { CANAIS_WEB, assinaturaStatus, derivarStatus } from '../shared/executor-status.js'
-import { definirAutostart, iniciadoOculto, lerAutostart } from './ui/autostart.js'
+import { abrirJanelaWeb, setDeepLinkHandler, mainWebWindow } from './ui/janela-web.js'
+import { WEB_CHANNELS, assinaturaStatus, derivarStatus } from '../shared/executor-status.js'
+import { definirAutostart, startedHidden, lerAutostart } from './ui/autostart.js'
 import { notificarSeMudou } from './ui/notificacoes.js'
-import { ACOES_JANELA, CANAIS, type AcaoJanela, type InfoApp } from '../shared/ipc.js'
+import { WINDOW_ACTIONS, CHANNELS, type WindowAction, type InfoApp } from '../shared/ipc.js'
 import { COMMANDS, type CommandName, type ExecutorEvent } from '../shared/events.js'
 
 if (!app.requestSingleInstanceLock()) {
@@ -64,7 +64,7 @@ let supervisor: PythonSupervisor | null = null
 let encerrando = false
 // Signature of the last status sent to the web window — push dedupe. See the
 // `store.assinar` callback below and shared/executor-status.ts.
-let ultimaAssinaturaStatusWeb = ''
+let lastWebStatusSignature = ''
 
 // Cached configuration for the status HOT PATH. `lerConfiguracao` does
 // synchronous I/O (readFileSync of the .env + existsSync of the PEMs) and the
@@ -73,16 +73,16 @@ let ultimaAssinaturaStatusWeb = ''
 // defect (see the cache in autostart.ts). Only enrollment changes
 // `configurado`/`executorId`, so we invalidate only at those points; the
 // on-demand `CANAIS.configuracao` handler keeps reading fresh.
-let cfgCache: EstadoConfiguracao | null = null
-function configAtual(): EstadoConfiguracao {
+let cfgCache: ConfigState | null = null
+function currentConfig(): ConfigState {
   if (!cfgCache) cfgCache = lerConfiguracao()
   return cfgCache
 }
-function invalidarConfig(): void { cfgCache = null }
+function invalidateConfig(): void { cfgCache = null }
 
 // ── Supervisor ───────────────────────────────────────────────────────────────
 
-function criarSupervisor(): PythonSupervisor {
+function createSupervisor(): PythonSupervisor {
   const sup = new PythonSupervisor({
     pythonExe: PYTHON_EXE,
     cwd: RESOURCES,
@@ -113,13 +113,13 @@ function criarSupervisor(): PythonSupervisor {
   return sup
 }
 
-function difundir(canal: string, dado: unknown): void {
+function broadcast(canal: string, dado: unknown): void {
   // The web window hosts REMOTE content (the web UI) and is deliberately
   // skipped: the panel's channels carry state, log and the deep link's OTP, and
   // none of that may go to the remote origin. Today its preload neither listens
   // to those channels nor exposes `ipcRenderer` — but not delivering is the
   // guarantee, not luck. Its redacted status goes over its own channel (CANAIS_WEB).
-  const web = janelaWebPrincipal()
+  const web = mainWebWindow()
   for (const win of BrowserWindow.getAllWindows()) {
     if (win.isDestroyed()) continue
     if (web && win.id === web.id) continue
@@ -130,29 +130,29 @@ function difundir(canal: string, dado: unknown): void {
 /**
  * Nothing may spawn the executor once shutdown has started.
  *
- * `encerrarApp()` sets `encerrando` and only then AWAITS the drain (up to
+ * `quitApp()` sets `encerrando` and only then AWAITS the drain (up to
  * 150 s); during that wait the tray and the window are still up, and an
  * "Iniciar" (start) there would launch a Python that nobody kills anymore —
  * main exits right after and the process is orphaned, holding the WebSocket
  * with the same EXECUTOR_ID.
  */
-function iniciarExecutor(): void {
+function startExecutor(): void {
   if (encerrando) return
   supervisor?.start()
 }
 
-const acoesTray = {
-  iniciar: iniciarExecutor,
+const trayActions = {
+  iniciar: startExecutor,
   parar: () => { void supervisor?.stop() },
-  sair: () => { void encerrarApp() },
+  sair: () => { void quitApp() },
 }
 
 // The log goes over its own INCREMENTAL channel — see the header of store.ts.
-store.assinarLog((lote) => difundir(CANAIS.aoReceberLog, lote))
+store.assinarLog((lote) => broadcast(CHANNELS.aoReceberLog, lote))
 
 store.assinar((estado) => {
-  difundir(CANAIS.aoAtualizarEstado, estado)
-  atualizarTray(estado, acoesTray)
+  broadcast(CHANNELS.aoAtualizarEstado, estado)
+  updateTray(estado, trayActions)
   // Guarded by comparison with the previous condition — see notificacoes.ts.
   // This callback runs once per second with the executor running.
   notificarSeMudou(estado, () => abrirJanela())
@@ -161,28 +161,28 @@ store.assinar((estado) => {
   // `lerConfiguracao`, which is I/O, does not even run without an open window)
   // and only when the signature changes (state is re-evaluated on every tick;
   // status, rarely).
-  const janelaWeb = janelaWebPrincipal()
-  if (janelaWeb) {
-    const status = derivarStatus(estado, configAtual())
+  const webWindow = mainWebWindow()
+  if (webWindow) {
+    const status = derivarStatus(estado, currentConfig())
     const assinatura = assinaturaStatus(status)
-    if (assinatura !== ultimaAssinaturaStatusWeb) {
-      ultimaAssinaturaStatusWeb = assinatura
-      janelaWeb.webContents.send(CANAIS_WEB.statusMudou, status)
+    if (assinatura !== lastWebStatusSignature) {
+      lastWebStatusSignature = assinatura
+      webWindow.webContents.send(WEB_CHANNELS.statusMudou, status)
     }
   }
 })
 
 // ── IPC ──────────────────────────────────────────────────────────────────────
 
-function registrarIpc(): void {
-  ipcMain.handle(CANAIS.estado, () => store.instantaneo())
-  ipcMain.handle(CANAIS.log, () => store.logCompleto())
+function registerIpc(): void {
+  ipcMain.handle(CHANNELS.estado, () => store.instantaneo())
+  ipcMain.handle(CHANNELS.log, () => store.logCompleto())
 
   // Read-only bridge of the web window (preload/web.ts): the executor's redacted
   // status for the first render. Pushes of changes come from the `store.assinar` callback.
-  ipcMain.handle(CANAIS_WEB.status, () => derivarStatus(store.instantaneo(), configAtual()))
+  ipcMain.handle(WEB_CHANNELS.status, () => derivarStatus(store.instantaneo(), currentConfig()))
 
-  ipcMain.handle(CANAIS.info, (): InfoApp => ({
+  ipcMain.handle(CHANNELS.info, (): InfoApp => ({
     versao: app.getVersion(),
     versaoElectron: process.versions.electron,
     envFile: ENV_FILE,
@@ -192,17 +192,17 @@ function registrarIpc(): void {
     dev: IS_DEV,
   }))
 
-  ipcMain.handle(CANAIS.configuracao, () => lerConfiguracao())
+  ipcMain.handle(CHANNELS.configuracao, () => lerConfiguracao())
 
   // The renderer asks on mount; the push covers the case of the app already being open.
-  ipcMain.handle(CANAIS.deepLinkPendente, () => {
+  ipcMain.handle(CHANNELS.deepLinkPendente, () => {
     const p = deepLinkPendente
     deepLinkPendente = null   // consumed only once
     return p
   })
 
-  ipcMain.handle(CANAIS.enrolar, async (_e, pedido: unknown) => {
-    const p = pedido as Partial<PedidoEnroll>
+  ipcMain.handle(CHANNELS.enrolar, async (_e, pedido: unknown) => {
+    const p = pedido as Partial<EnrollRequest>
     if (!p?.executorId?.trim() || !p.otp?.trim()) {
       return { ok: false, codigo: 'executor_id_ausente', erro: 'Preencha todos os campos.' }
     }
@@ -214,19 +214,19 @@ function registrarIpc(): void {
     if (r.ok) {
       // New binding, new certificate: the reachable workspaces are different ones.
       invalidarStatus()
-      invalidarConfig()   // executorId/certificado mudaram — releia no proximo status
-      iniciarExecutor()
+      invalidateConfig()   // executorId/certificado mudaram — releia no proximo status
+      startExecutor()
     }
     return r
   })
 
-  ipcMain.handle(CANAIS.refazerEnrollment, async () => {
+  ipcMain.handle(CHANNELS.refazerEnrollment, async () => {
     // Stops FIRST: with the executor alive, the PEMs may be open, and an executor
     // running without a cert has nowhere to go. The `await` here is legitimate
     // (10 s ceiling) and the order is what matters.
     await supervisor?.stop(10_000)
     invalidarStatus()
-    invalidarConfig()   // certificado descartado — o status volta a "sem-vinculo"
+    invalidateConfig()   // certificado descartado — o status volta a "sem-vinculo"
     const { removidos } = descartarEnrollment()
     store.aplicarEstadoSupervisor(
       'stopped',
@@ -237,14 +237,14 @@ function registrarIpc(): void {
     return lerConfiguracao()
   })
 
-  ipcMain.handle(CANAIS.iniciar, () => { iniciarExecutor() })
+  ipcMain.handle(CHANNELS.iniciar, () => { startExecutor() })
 
   // Fire and return. `stop()` only resolves on Python's `exit`, that is, after
   // the whole drain (up to 150 s): waiting for it here kept the renderer
   // "busy" the whole time and disabled precisely the "Forcar" (force) buttons,
   // which are the way out of the wait. The `state: draining` and the snapshots
   // tell the rest through the state subscription.
-  ipcMain.handle(CANAIS.parar, () => { void supervisor?.stop() })
+  ipcMain.handle(CHANNELS.parar, () => { void supervisor?.stop() })
 
   // STOP -> START sequence on this side. Done in the renderer with two
   // invokes, it would break now that `parar` returns immediately: `start()`
@@ -255,21 +255,21 @@ function registrarIpc(): void {
   // take 150 s, and in that interval the user may have asked to "Sair" (quit)
   // from the tray (hence the `!encerrando` guard) or another stop. Restarting
   // anyway would leave an orphaned Python — see the header of `restart()`.
-  ipcMain.handle(CANAIS.reiniciar, async () => {
+  ipcMain.handle(CHANNELS.reiniciar, async () => {
     await supervisor?.restart(() => !encerrando)
   })
 
-  ipcMain.handle(CANAIS.forcar, () => { supervisor?.forcar() })
+  ipcMain.handle(CHANNELS.forcar, () => { supervisor?.forcar() })
 
-  ipcMain.handle(CANAIS.comando, (_e, cmd: unknown) => {
+  ipcMain.handle(CHANNELS.comando, (_e, cmd: unknown) => {
     // Validates against the closed list. The renderer cannot inject an arbitrary
     // command into the Python process's stdin.
     if (typeof cmd !== 'string' || !COMMANDS.includes(cmd as CommandName)) return false
     return supervisor?.enviar({ cmd: cmd as CommandName }) ?? false
   })
 
-  ipcMain.handle(CANAIS.escolherPasta, async (_e, atual?: string) => {
-    const win = janelaPrincipal()
+  ipcMain.handle(CHANNELS.escolherPasta, async (_e, atual?: string) => {
+    const win = mainWindow()
     const r = await dialog.showOpenDialog(win ?? undefined as never, {
       properties: ['openDirectory', 'createDirectory'],
       defaultPath: typeof atual === 'string' && atual ? atual : ARTIFACTS_DIR_PADRAO,
@@ -277,7 +277,7 @@ function registrarIpc(): void {
     return r.canceled || !r.filePaths[0] ? null : r.filePaths[0]
   })
 
-  ipcMain.handle(CANAIS.abrirCaminho, async (_e, caminho: unknown) => {
+  ipcMain.handle(CHANNELS.abrirCaminho, async (_e, caminho: unknown) => {
     // Only paths the app itself knows. Opening an arbitrary path coming from
     // the renderer would give any displayed content (a workflow log, for
     // example) the power to launch an executable.
@@ -291,14 +291,14 @@ function registrarIpc(): void {
     await shell.openPath(caminho)
   })
 
-  ipcMain.handle(CANAIS.geosync, () => lerGeoSync())
+  ipcMain.handle(CHANNELS.geosync, () => lerGeoSync())
 
-  ipcMain.handle(CANAIS.salvarGeosync, (_e, cfg: unknown) => {
+  ipcMain.handle(CHANNELS.salvarGeosync, (_e, cfg: unknown) => {
     const c = cfg as ConfigGeoSync
     if (!c) return { salvo: false, invalidas: [] }
 
     const pasta = typeof c.pasta === 'string' && c.pasta.trim() ? c.pasta.trim() : null
-    const invalida = validarPasta(pasta)
+    const invalida = validateFolder(pasta)
 
     gravarGeoSync({
       // An invalid folder is not saved, but the rest of the settings are: refusing
@@ -306,30 +306,30 @@ function registrarIpc(): void {
       // the mode and the workspace. The reason goes back to the renderer in
       // `invalidas`.
       pasta: invalida ? null : pasta,
-      modo: MODOS_SYNC.includes(c.modo) ? c.modo : PADRAO_SYNC.modo,
-      conflito: ESTRATEGIAS.includes(c.conflito) ? c.conflito : PADRAO_SYNC.conflito,
+      modo: SYNC_MODES.includes(c.modo) ? c.modo : SYNC_DEFAULTS.modo,
+      conflito: ESTRATEGIAS.includes(c.conflito) ? c.conflito : SYNC_DEFAULTS.conflito,
       workspaceId: typeof c.workspaceId === 'string' && c.workspaceId.trim() ? c.workspaceId.trim() : null,
     })
     return { salvo: true, invalidas: invalida ? [invalida] : [] }
   })
 
-  ipcMain.handle(CANAIS.workspaces, (_e, atualizar?: unknown) => (
+  ipcMain.handle(CHANNELS.workspaces, (_e, atualizar?: unknown) => (
     consultarStatusCacheado(atualizar === true)
   ))
 
-  ipcMain.handle(CANAIS.execucao, () => lerExecucao(ARTIFACTS_DIR_PADRAO))
+  ipcMain.handle(CHANNELS.execucao, () => lerExecucao(ARTIFACTS_DIR_PADRAO))
 
-  ipcMain.handle(CANAIS.salvarExecucao, (_e, cfg: unknown) => {
+  ipcMain.handle(CHANNELS.salvarExecucao, (_e, cfg: unknown) => {
     // `gravarExecucao` reapplies the ranges from executor/config.py — the
     // renderer validates to give immediate feedback, but this side is the one
     // that guarantees it.
-    gravarExecucao(cfg as ConfigExecucao)
+    gravarExecucao(cfg as RunConfig)
     return lerExecucao(ARTIFACTS_DIR_PADRAO)
   })
 
-  ipcMain.handle(CANAIS.exportarLog, async (_e, texto: unknown) => {
+  ipcMain.handle(CHANNELS.exportarLog, async (_e, texto: unknown) => {
     if (typeof texto !== 'string') return null
-    const win = janelaPrincipal()
+    const win = mainWindow()
     const r = await dialog.showSaveDialog(win ?? undefined as never, {
       title: 'Exportar log',
       defaultPath: `atlans-executor-${new Date().toISOString().slice(0, 10)}.log`,
@@ -340,13 +340,13 @@ function registrarIpc(): void {
     return r.filePath
   })
 
-  ipcMain.handle(CANAIS.janela, (e, acao: unknown) => {
-    // The SENDER's window, not `janelaPrincipal()`: with the log window open,
+  ipcMain.handle(CHANNELS.janela, (e, acao: unknown) => {
+    // The SENDER's window, not `mainWindow()`: with the log window open,
     // both renderers draw the same title bar, and always resolving to the main
     // one would make the log's close button hide the panel.
     const win = BrowserWindow.fromWebContents(e.sender)
-    if (!win || typeof acao !== 'string' || !ACOES_JANELA.includes(acao as AcaoJanela)) return false
-    switch (acao as AcaoJanela) {
+    if (!win || typeof acao !== 'string' || !WINDOW_ACTIONS.includes(acao as WindowAction)) return false
+    switch (acao as WindowAction) {
       case 'minimizar': win.minimize(); return false
       case 'alternar-maximizar':
         if (win.isMaximized()) win.unmaximize()
@@ -363,9 +363,9 @@ function registrarIpc(): void {
     }
   })
 
-  ipcMain.handle(CANAIS.abrirJanelaLog, () => { abrirJanelaDeLog() })
+  ipcMain.handle(CHANNELS.abrirJanelaLog, () => { openLogWindow() })
 
-  ipcMain.handle(CANAIS.autostart, (_e, ativar?: unknown) => {
+  ipcMain.handle(CHANNELS.autostart, (_e, ativar?: unknown) => {
     if (typeof ativar === 'boolean') return definirAutostart(ativar)
     return lerAutostart()
   })
@@ -375,13 +375,13 @@ function registrarIpc(): void {
 
 app.on('second-instance', (_evento, argv) => {
   const url = urlDosArgumentos(argv)
-  // A deep link is enrollment: `tratarDeepLink` already brings the PANEL to the
+  // A deep link is enrollment: `handleDeepLink` already brings the PANEL to the
   // front. An ordinary second launch wants the app — the WEB window.
-  if (url) { tratarDeepLink(url); return }
+  if (url) { handleDeepLink(url); return }
   abrirJanelaWeb()
 })
 
-function tratarDeepLink(bruta: string): void {
+function handleDeepLink(bruta: string): void {
   const pedido = interpretar(bruta)
   if (!pedido) {
     // Silent refusal for the user, loud in the log: a malformed deep link is
@@ -391,36 +391,36 @@ function tratarDeepLink(bruta: string): void {
     return
   }
   deepLinkPendente = pedido
-  difundir(CANAIS.aoReceberDeepLink, pedido)
+  broadcast(CHANNELS.aoReceberDeepLink, pedido)
   abrirJanela()
 }
 
 app.whenReady().then(() => {
-  // Before garantirDiretorios: the migration only happens while the new folder
+  // Before ensureDirectories: the migration only happens while the new folder
   // does not exist yet.
-  const migrado = migrarDadosAntigos()
-  garantirDiretorios()
+  const migrado = migrateLegacyData()
+  ensureDirectories()
   if (migrado) {
     store.registrarLinhaBruta(
       `[app] Dados migrados de "${migrado}" para "AtlansExecutor" — certificado e configuração preservados.`,
       'stderr',
     )
   }
-  registrarProtocolo()
-  registrarIpc()
+  registerProtocol()
+  registerIpc()
   // "Abrir no app" (open in the app) in the embedded web UI fires an
   // `atlans://`. Clicked inside the web window it is in-app navigation: the
   // window forwards it here, to the SAME handler as the deep link coming from
   // the browser — the app behaves the same in both cases.
-  definirTratadorDeepLink(tratarDeepLink)
-  supervisor = criarSupervisor()
-  criarTray(acoesTray)
+  setDeepLinkHandler(handleDeepLink)
+  supervisor = createSupervisor()
+  createTray(trayActions)
 
-  // Auto-update. Installation only happens in `encerrarApp`, after the
+  // Auto-update. Installation only happens in `quitApp`, after the
   // executor's orderly shutdown: replacing the `resources/` tree with a
   // workflow running would kill the job without confirming the result to the
   // server, which would mark it as orphaned.
-  void iniciarUpdater((e) => {
+  void startUpdater((e) => {
     if (e.baixado) {
       store.registrarLinhaBruta(
         `[app] Atualização ${e.versao} pronta para instalar. Ela é aplicada ao sair do app.`,
@@ -430,9 +430,9 @@ app.whenReady().then(() => {
   })
 
   // A deep link that OPENED the app arrives in the process's own argv.
-  const urlInicial = urlDosArgumentos(process.argv)
-  if (urlInicial) {
-    const pedido = interpretar(urlInicial)
+  const initialUrl = urlDosArgumentos(process.argv)
+  if (initialUrl) {
+    const pedido = interpretar(initialUrl)
     if (pedido) deepLinkPendente = pedido
   }
 
@@ -463,7 +463,7 @@ app.whenReady().then(() => {
   // would leave the person with no clue what to do, so that case still opens
   // the web window.
   if (deepLinkPendente) abrirJanela()
-  else if (!(cfg.configurado && iniciadoOculto())) abrirJanelaWeb()
+  else if (!(cfg.configurado && startedHidden())) abrirJanelaWeb()
 })
 
 // Without this the app would quit when closing the last window, killing the
@@ -473,10 +473,10 @@ app.on('window-all-closed', () => { /* intencionalmente vazio */ })
 app.on('before-quit', (evento) => {
   if (encerrando) return
   evento.preventDefault()
-  void encerrarApp()
+  void quitApp()
 })
 
-async function encerrarApp(): Promise<void> {
+async function quitApp(): Promise<void> {
   if (encerrando) return
   encerrando = true
   try {
@@ -489,13 +489,13 @@ async function encerrarApp(): Promise<void> {
   // `state: failed` or the last log line of the shutdown would sit in an 80ms
   // timer that never fires, and the window would show the second-to-last state.
   store.descarregar()
-  pararUpdater()
-  destruirTray()
-  permitirEncerramento()
+  stopUpdater()
+  destroyTray()
+  allowQuit()
 
   // If there is a downloaded update, shutdown is the window of opportunity: the
   // executor has already stopped in an orderly way above, so replacing the
   // resources/ tree now interrupts no work at all.
-  if (instalarAgora()) return
+  if (installNow()) return
   app.quit()
 }

@@ -27,7 +27,7 @@ class _Wf:
     id_hash = "wf-1"
 
 
-def _requisicao() -> Request:
+def _request() -> Request:
     """Minimal Request: the route has a rate limit, and slowapi rejects anything
     that is not a real Request (same pattern as
     tests/integration/test_grupos_ordem.py)."""
@@ -52,12 +52,12 @@ def _service():
 
 
 @pytest.mark.asyncio
-async def test_run_inexistente_recebe_404_em_vez_de_disparar():
+async def test_missing_run_gets_404_instead_of_triggering():
     """The central regression: an unknown id must not trigger an execution."""
     svc = _service()
     with pytest.raises(HTTPException) as exc:
         await mod.retry_run(
-            request=_requisicao(), run_id="nao-existe", db=_db(False),
+            request=_request(), run_id="nao-existe", db=_db(False),
             service=svc, wf=_Wf(),
         )
     assert exc.value.status_code == 404
@@ -65,13 +65,13 @@ async def test_run_inexistente_recebe_404_em_vez_de_disparar():
 
 
 @pytest.mark.asyncio
-async def test_run_de_outro_workflow_nao_dispara():
+async def test_run_of_another_workflow_does_not_trigger():
     """A consulta filtra por workflow_hash — o `db` fake devolve None p/ o par."""
     svc = _service()
     db = _db(False)
     with pytest.raises(HTTPException) as exc:
         await mod.retry_run(
-            request=_requisicao(), run_id="run-de-outro", db=db,
+            request=_request(), run_id="run-de-outro", db=db,
             service=svc, wf=_Wf(),
         )
     assert exc.value.status_code == 404
@@ -82,10 +82,10 @@ async def test_run_de_outro_workflow_nao_dispara():
 
 
 @pytest.mark.asyncio
-async def test_run_valido_dispara_a_execucao():
+async def test_valid_run_triggers_the_execution():
     svc = _service()
     resp = await mod.retry_run(
-        request=_requisicao(), run_id="run-1", db=_db(True),
+        request=_request(), run_id="run-1", db=_db(True),
         service=svc, wf=_Wf(),
         current_user=MagicMock(id_hash="user-x"),
     )
@@ -96,7 +96,7 @@ async def test_run_valido_dispara_a_execucao():
 
 
 @pytest.mark.asyncio
-async def test_papel_insuficiente_e_barrado_antes_da_consulta(client):
+async def test_insufficient_role_is_blocked_before_the_query(client):
     """403 still comes before any I/O.
 
     Through the app, not by calling the function: the role now belongs to the
@@ -111,11 +111,11 @@ async def test_papel_insuficiente_e_barrado_antes_da_consulta(client):
     async def _viewer(id_hash: str):
         return _Wf(), "viewer"
 
-    async def _sessao():
+    async def _session():
         yield db
 
     app.dependency_overrides[get_accessible_workflow_with_role] = _viewer
-    app.dependency_overrides[get_db] = _sessao
+    app.dependency_overrides[get_db] = _session
 
     resposta = await client.post("/workflows/wf-1/runs/run-1/retry")
 

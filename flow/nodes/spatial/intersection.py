@@ -137,7 +137,7 @@ class IntersectionNode(BaseNode):
             return {"output": gpd.GeoDataFrame(columns=['geometry'], geometry='geometry', crs=srcA.crs)}
 
         # Supported geometry types — checked AFTER hygiene, on what actually
-        # goes to the overlay (that is why it is not get_pair's `tipos_suportados`).
+        # goes to the overlay (that is why it is not get_pair's `supported_types`).
         reject_unsupported_geom_types(srcA, srcB, operation="operação de interseção")
 
         logger.info(f"Camada A: {len(srcA)} feições, Camada B: {len(srcB)} feições")

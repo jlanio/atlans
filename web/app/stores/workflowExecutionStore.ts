@@ -152,10 +152,10 @@ export function toRunEvent(data: RawEvent): RunEvent {
  * from `useEdges()` and only changes when the topology changes, so the WeakMap
  * hits on practically every call and frees the entry by itself when the array dies.
  */
-const adjacenciaPorArestas = new WeakMap<Edge[], Map<string, Edge[]>>()
+const adjacencyByEdges = new WeakMap<Edge[], Map<string, Edge[]>>()
 
-function adjacencia(allEdges: Edge[]): Map<string, Edge[]> {
-  let index = adjacenciaPorArestas.get(allEdges)
+function adjacency(allEdges: Edge[]): Map<string, Edge[]> {
+  let index = adjacencyByEdges.get(allEdges)
   if (index) return index
   index = new Map<string, Edge[]>()
   for (const edge of allEdges) {
@@ -163,14 +163,14 @@ function adjacencia(allEdges: Edge[]): Map<string, Edge[]> {
     if (lista) lista.push(edge)
     else index.set(edge.source, [edge])
   }
-  adjacenciaPorArestas.set(allEdges, index)
+  adjacencyByEdges.set(allEdges, index)
   return index
 }
 
 function computeLosingBranches(statusNodes: INodeStatusWorkFlow[], allEdges: Edge[]) {
   const losingNodeIds = new Set<string>()
   const losingEdgeIds = new Set<string>()
-  const porOrigem = adjacencia(allEdges)
+  const bySource = adjacency(allEdges)
 
   for (const node of statusNodes) {
     if (node.branch_result === undefined) continue
@@ -179,7 +179,7 @@ function computeLosingBranches(statusNodes: INodeStatusWorkFlow[], allEdges: Edg
     // made the BFS quadratic on long branches.
     const queue: string[] = []
     let head = 0
-    for (const edge of porOrigem.get(node.id) ?? []) {
+    for (const edge of bySource.get(node.id) ?? []) {
       if (edge.sourceHandle === losingHandle) {
         losingEdgeIds.add(edge.id)
         queue.push(edge.target)
@@ -191,7 +191,7 @@ function computeLosingBranches(statusNodes: INodeStatusWorkFlow[], allEdges: Edg
       if (visited.has(nodeId)) continue
       visited.add(nodeId)
       losingNodeIds.add(nodeId)
-      for (const edge of porOrigem.get(nodeId) ?? []) {
+      for (const edge of bySource.get(nodeId) ?? []) {
         losingEdgeIds.add(edge.id)
         if (!visited.has(edge.target)) queue.push(edge.target)
       }
@@ -201,7 +201,7 @@ function computeLosingBranches(statusNodes: INodeStatusWorkFlow[], allEdges: Edg
 }
 
 /** Signature of the already resolved branches — changes only when a Conditional decides. */
-function assinaturaDeRamos(statusNodes: INodeStatusWorkFlow[]): string {
+function branchesSignature(statusNodes: INodeStatusWorkFlow[]): string {
   let assinatura = ""
   for (const node of statusNodes) {
     if (node.branch_result === undefined) continue
@@ -216,17 +216,17 @@ function assinaturaDeRamos(statusNodes: INodeStatusWorkFlow[]): string {
  * re-renders every node and every edge subscribed to them, even when no
  * Conditional decided anything. Preserving identity is half the gain.
  */
-let ultimaAssinatura: string | null = null
-let ultimasArestas: Edge[] | null = null
-let ultimosRamos = { losingNodeIds: new Set<string>(), losingEdgeIds: new Set<string>() }
+let lastSignature: string | null = null
+let lastEdges: Edge[] | null = null
+let lastBranches = { losingNodeIds: new Set<string>(), losingEdgeIds: new Set<string>() }
 
-function ramosPerdedores(statusNodes: INodeStatusWorkFlow[], allEdges: Edge[]) {
-  const assinatura = assinaturaDeRamos(statusNodes)
-  if (assinatura === ultimaAssinatura && allEdges === ultimasArestas) return ultimosRamos
-  ultimaAssinatura = assinatura
-  ultimasArestas = allEdges
-  ultimosRamos = computeLosingBranches(statusNodes, allEdges)
-  return ultimosRamos
+function losingBranches(statusNodes: INodeStatusWorkFlow[], allEdges: Edge[]) {
+  const assinatura = branchesSignature(statusNodes)
+  if (assinatura === lastSignature && allEdges === lastEdges) return lastBranches
+  lastSignature = assinatura
+  lastEdges = allEdges
+  lastBranches = computeLosingBranches(statusNodes, allEdges)
+  return lastBranches
 }
 
 /** `id → state` index of the canvas.
@@ -235,7 +235,7 @@ function ramosPerdedores(statusNodes: INodeStatusWorkFlow[], allEdges: Edge[]) {
  * message — the O(1) cost promised by the comment multiplied by N+E.
  * Here it is built once, and the components subscribe only to their own entry.
  */
-function indexarPorId(nodes: INodeStatusWorkFlow[]): Map<string, INodeStatusWorkFlow> {
+function indexById(nodes: INodeStatusWorkFlow[]): Map<string, INodeStatusWorkFlow> {
   const index = new Map<string, INodeStatusWorkFlow>()
   for (const node of nodes) index.set(node.id, node)
   return index
@@ -252,9 +252,9 @@ function indexarPorId(nodes: INodeStatusWorkFlow[]): Map<string, INodeStatusWork
  *  spinning again, and now there is no socket, no `isExecuting`, nothing to
  *  settle it again. That is why the outcome has to be final in here, and not only
  *  at the instant it is decided. */
-export const RUN_ENCERRADO: ReadonlySet<string> = new Set(['completed', 'failed', 'cancelled'])
+export const RUN_TERMINAL: ReadonlySet<string> = new Set(['completed', 'failed', 'cancelled'])
 
-const SEM_STATUS: Map<string, INodeStatusWorkFlow> = new Map()
+const NO_STATUS: Map<string, INodeStatusWorkFlow> = new Map()
 
 /** Applies the event ceiling by discarding the OLDEST `stdout` events.
  *
@@ -347,7 +347,7 @@ export interface RunOutcome {
  *  not depend on a component. */
 const WF_COMPLETE = "__workflow_complete__"
 
-function desfechoDoEvento(event: RunEvent): RunOutcome | null {
+function eventOutcome(event: RunEvent): RunOutcome | null {
   if (event.node !== WF_COMPLETE) return null
   return {
     status: event.status === "failed" ? "failed" : event.status === "cancelled" ? "cancelled" : "completed",
@@ -387,7 +387,7 @@ interface WorkflowExecutionActions {
 
 export const useWorkflowExecutionStore = create<WorkflowExecutionState & WorkflowExecutionActions>((set) => ({
   statusWorkflow: null,
-  statusById: SEM_STATUS,
+  statusById: NO_STATUS,
   losingNodeIds: undefined,
   losingEdgeIds: undefined,
   debugMode: false,
@@ -403,15 +403,15 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
   runOutcome: null,
 
   startExecution: (nodes) => {
-    const iniciais = nodes.map(n => ({ ...n, status: 'idle' as const }))
+    const initialNodes = nodes.map(n => ({ ...n, status: 'idle' as const }))
     set({
       isExecuting: true,
       wsState: 'connecting',
       statusWorkflow: {
         status: 'queued',
-        nodes: iniciais,
+        nodes: initialNodes,
       },
-      statusById: indexarPorId(iniciais),
+      statusById: indexById(initialNodes),
       losingNodeIds: undefined,
       losingEdgeIds: undefined,
       // Clears the previous execution's events — the panel must start clean.
@@ -439,20 +439,20 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
 
   updateNodeStatuses: (nodes, allEdges) => {
     set(state => {
-      // A closed run does not go back. See `RUN_ENCERRADO`: without this guard,
+      // A closed run does not go back. See `RUN_TERMINAL`: without this guard,
       // a late batch returned the node to `started` AND the workflow to `running`,
       // leaving the blue ring spinning forever on an already finished run.
-      if (state.statusWorkflow && RUN_ENCERRADO.has(state.statusWorkflow.status)) {
+      if (state.statusWorkflow && RUN_TERMINAL.has(state.statusWorkflow.status)) {
         return {}
       }
-      const { losingNodeIds, losingEdgeIds } = ramosPerdedores(nodes, allEdges)
+      const { losingNodeIds, losingEdgeIds } = losingBranches(nodes, allEdges)
       return {
         statusWorkflow: state.statusWorkflow ? {
           ...state.statusWorkflow,
           status: 'running' as const,
           nodes,
         } : null,
-        statusById: indexarPorId(nodes),
+        statusById: indexById(nodes),
         losingNodeIds,
         losingEdgeIds,
       }
@@ -472,11 +472,11 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
     //               becomes `unknown`, which the UI shows as "resultado não
     //               recebido" (result not received). Painting it green would be
     //               inventing a result.
-    const paradoComo: StatusNodeStatusWorkFlow = status === 'cancelled' ? 'idle' : 'unknown'
+    const stoppedAs: StatusNodeStatusWorkFlow = status === 'cancelled' ? 'idle' : 'unknown'
     const settled = nodes.some(n => n.status === 'started')
-      ? nodes.map(n => (n.status === 'started' ? { ...n, status: paradoComo } : n))
+      ? nodes.map(n => (n.status === 'started' ? { ...n, status: stoppedAs } : n))
       : nodes
-    const { losingNodeIds, losingEdgeIds } = ramosPerdedores(settled, allEdges)
+    const { losingNodeIds, losingEdgeIds } = losingBranches(settled, allEdges)
     set(state => ({
       statusWorkflow: {
         status,
@@ -485,7 +485,7 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
         task_id: state.statusWorkflow?.task_id,
         nodes: settled,
       },
-      statusById: indexarPorId(settled),
+      statusById: indexById(settled),
       losingNodeIds,
       losingEdgeIds,
       isExecuting: false,
@@ -509,7 +509,7 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
           status: 'failed' as const,
           nodes: settled,
         } : null,
-        statusById: state.statusWorkflow ? indexarPorId(settled) : state.statusById,
+        statusById: state.statusWorkflow ? indexById(settled) : state.statusById,
         isExecuting: false,
         wsState: 'closed',
         losingNodeIds: undefined,
@@ -521,7 +521,7 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
   resetExecution: () => {
     set({
       statusWorkflow: null,
-      statusById: SEM_STATUS,
+      statusById: NO_STATUS,
       losingNodeIds: undefined,
       losingEdgeIds: undefined,
       // `debugMode` is NOT included here: it is a user preference, not run state.
@@ -571,7 +571,7 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
           if (subflowRoots === state.subflowRoots) subflowRoots = new Set(state.subflowRoots)
           subflowRoots.add(pai)
         }
-        runOutcome = desfechoDoEvento(event) ?? runOutcome
+        runOutcome = eventOutcome(event) ?? runOutcome
       }
 
       // One copy per batch — not one per event.
@@ -601,7 +601,7 @@ export const useWorkflowExecutionStore = create<WorkflowExecutionState & Workflo
     let runOutcome: RunOutcome | null = null
     for (const event of events) {
       if (event.subworkflow_parent) subflowRoots.add(event.subworkflow_parent)
-      runOutcome = desfechoDoEvento(event) ?? runOutcome
+      runOutcome = eventOutcome(event) ?? runOutcome
     }
     // The same ceiling as the live path: the endpoint returns up to 5000 events and
     // rendering them all at once locked up the tab for seconds — the historical

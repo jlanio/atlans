@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook, waitFor } from "@testing-library/react"
-import { ESTADO_PADRAO, type EstadoDoHistorico } from "@/app/components/observability/historico-url"
+import { DEFAULT_STATE, type HistoryState } from "@/app/components/observability/historico-url"
 
 // Only the service is doubled: the hook is tested for real (cache, sequence, poll).
 vi.mock("@/service/GisFlowService", () => ({
@@ -13,7 +13,7 @@ vi.mock("@/service/GisFlowService", () => ({
 }))
 
 import { GisFlowService } from "@/service/GisFlowService"
-import { chavesDeCache, useHistoricoDados } from "@/app/components/observability/use-historico-dados"
+import { cacheKeys, useHistoricoDados } from "@/app/components/observability/use-historico-dados"
 
 const svc = GisFlowService as unknown as {
   getObservabilityMetrics: ReturnType<typeof vi.fn>
@@ -29,15 +29,15 @@ function metricas(total: number) {
   return { total_runs: total, period_days: 30 } as unknown as Parameters<typeof ok>[0]
 }
 
-function respostasBoas(total = 10) {
+function goodResponses(total = 10) {
   svc.getObservabilityMetrics.mockResolvedValue(ok(metricas(total)))
   svc.getRunsByDay.mockResolvedValue(ok({ days: [{ day: "2026-09-06", total, success: total, failed: 0, running: 0 }] }))
   svc.getExecutorMetrics.mockResolvedValue(ok({ executores: [{ agent_host: "h1" }] }))
   svc.getWorkflowMetricsList.mockResolvedValue(ok({ period_days: 30, workflows: [{ workflow_hash: "wf" }] }))
 }
 
-function estado(extra: Partial<EstadoDoHistorico> = {}): EstadoDoHistorico {
-  return { ...ESTADO_PADRAO, ...extra }
+function estado(extra: Partial<HistoryState> = {}): HistoryState {
+  return { ...DEFAULT_STATE, ...extra }
 }
 
 beforeEach(() => {
@@ -49,7 +49,7 @@ afterEach(() => {
 
 describe("useHistoricoDados", () => {
   it("quatro chamadas em paralelo, recortadas por período e filtros, com o fuso no runs-by-day", async () => {
-    respostasBoas()
+    goodResponses()
     const { result } = renderHook(() => useHistoricoDados(estado({ periodo: 7, workspace: "ws1", workflow: "wf1" }), { habilitado: true, intervaloDoAgoraMs: 0 }))
     expect(result.current.carregando).toBe(true)
     await waitFor(() => expect(result.current.carregando).toBe(false))
@@ -70,7 +70,7 @@ describe("useHistoricoDados", () => {
   })
 
   it("não busca enquanto desabilitado (sessão ainda não resolvida)", async () => {
-    respostasBoas()
+    goodResponses()
     const { result, rerender } = renderHook(
       ({ habilitado }) => useHistoricoDados(estado(), { habilitado, intervaloDoAgoraMs: 0 }),
       { initialProps: { habilitado: false } },
@@ -82,7 +82,7 @@ describe("useHistoricoDados", () => {
   })
 
   it("voltar a um período dentro de 60 s vem do cache, sem rede; recarregar fura o cache e manda force", async () => {
-    respostasBoas()
+    goodResponses()
     const { result, rerender } = renderHook(
       ({ periodo }: { periodo: 7 | 30 | 90 }) => useHistoricoDados(estado({ periodo }), { habilitado: true, intervaloDoAgoraMs: 0 }),
       { initialProps: { periodo: 30 as 7 | 30 | 90 } },
@@ -107,7 +107,7 @@ describe("useHistoricoDados", () => {
   })
 
   it("trocar só o workflow reaproveita executores e workflows do cache", async () => {
-    respostasBoas()
+    goodResponses()
     const { result, rerender } = renderHook(
       ({ workflow }: { workflow: string | null }) => useHistoricoDados(estado({ workspace: "ws1", workflow }), { habilitado: true, intervaloDoAgoraMs: 0 }),
       { initialProps: { workflow: null as string | null } },
@@ -123,9 +123,9 @@ describe("useHistoricoDados", () => {
 
   it("resposta velha não sobrescreve a nova (carimbo de sequência)", async () => {
     // Period 30 answers AFTER 7: the screen has to stay with 7.
-    let soltar30: (v: unknown) => void = () => {}
+    let release30: (v: unknown) => void = () => {}
     svc.getObservabilityMetrics.mockImplementation((days: number) =>
-      days === 30 ? new Promise(r => { soltar30 = r }) : Promise.resolve(ok(metricas(7))),
+      days === 30 ? new Promise(r => { release30 = r }) : Promise.resolve(ok(metricas(7))),
     )
     svc.getRunsByDay.mockResolvedValue(ok({ days: [] }))
     svc.getExecutorMetrics.mockResolvedValue(ok({ executores: [] }))
@@ -137,14 +137,14 @@ describe("useHistoricoDados", () => {
     )
     rerender({ periodo: 7 })
     await waitFor(() => expect(result.current.metrics?.total_runs).toBe(7))
-    await act(async () => { soltar30(ok(metricas(30))) })
+    await act(async () => { release30(ok(metricas(30))) })
     expect(result.current.metrics?.total_runs).toBe(7)
     expect(result.current.periodoDosDados).toBe(7)
     expect(result.current.carregando).toBe(false)
   })
 
   it("falha parcial vira aviso na parte afetada e mantém o que já havia", async () => {
-    respostasBoas(10)
+    goodResponses(10)
     const { result, rerender } = renderHook(
       ({ periodo }: { periodo: 7 | 30 | 90 }) => useHistoricoDados(estado({ periodo }), { habilitado: true, intervaloDoAgoraMs: 0 }),
       { initialProps: { periodo: 30 as 7 | 30 | 90 } },
@@ -181,7 +181,7 @@ describe("useHistoricoDados", () => {
 
   it("poll da faixa Agora: só as métricas, sem ligar carregando, e só com a aba visível", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
-    respostasBoas(1)
+    goodResponses(1)
     const { result } = renderHook(() => useHistoricoDados(estado(), { habilitado: true, intervaloDoAgoraMs: 1_000 }))
     await waitFor(() => expect(result.current.carregando).toBe(false))
     expect(svc.getObservabilityMetrics).toHaveBeenCalledTimes(1)
@@ -202,7 +202,7 @@ describe("useHistoricoDados", () => {
   })
 
   it("chaves de cache: métricas e dias por (período, workspace, workflow); frota e workflows só por workspace", () => {
-    const c = chavesDeCache({ periodo: 7, workspace: "ws", workflow: "wf" }, "America/Sao_Paulo")
+    const c = cacheKeys({ periodo: 7, workspace: "ws", workflow: "wf" }, "America/Sao_Paulo")
     expect(c.metrics).toBe("metrics|7|ws|wf")
     expect(c.dias).toBe("dias|7|ws|wf|America/Sao_Paulo")
     expect(c.executores).toBe("executores|7|ws")

@@ -21,13 +21,13 @@ from app.api.routers.workspace_router import _normalize_allowlist, _notification
 
 # ── Normalizacao ─────────────────────────────────────────────────────────────
 
-def test_normaliza_caixa_espacos_e_duplicatas():
+def test_normalizes_case_spaces_and_duplicates():
     assert _normalize_allowlist(
         ["  Exemplo.COM ", "exemplo.com", "", "   ", "*.Interno.Corp"],
     ) == ["exemplo.com", "*.interno.corp"]
 
 
-def test_lista_vazia_vira_lista_vazia():
+def test_empty_list_becomes_empty_list():
     """O handler grava NULL a partir disto — `None` e `[]` sao o mesmo estado."""
     assert _normalize_allowlist([]) == []
     assert _normalize_allowlist(["", "  "]) == []
@@ -39,7 +39,7 @@ def test_lista_vazia_vira_lista_vazia():
     "exemplo.com:8443",
     "user@exemplo.com",
 ])
-def test_rejeita_o_que_nao_e_hostname(entrada):
+def test_rejects_what_is_not_a_hostname(entrada):
     with pytest.raises(HTTPException) as exc:
         _normalize_allowlist([entrada])
     assert exc.value.status_code == 400
@@ -51,13 +51,13 @@ def test_rejeita_o_que_nao_e_hostname(entrada):
     "*.com",         # wildcard with no domain
     "localhost",     # no dot: would never match as written
 ])
-def test_rejeita_curinga_que_o_matcher_ignoraria(entrada):
+def test_rejects_wildcard_the_matcher_would_ignore(entrada):
     with pytest.raises(HTTPException) as exc:
         _normalize_allowlist([entrada])
     assert exc.value.status_code == 400
 
 
-def test_aceita_as_duas_formas_suportadas():
+def test_accepts_both_supported_forms():
     assert _normalize_allowlist(
         ["exemplo.com", "*.exemplo.com"],
     ) == ["exemplo.com", "*.exemplo.com"]
@@ -68,7 +68,7 @@ def test_aceita_as_duas_formas_suportadas():
 # The preview's `allowed` uses `hostname_matches_allowlist`, the same function the
 # consumer calls when firing. These tests pin the contract the screen promises.
 
-def _db_com_workflows(linhas):
+def _db_with_workflows(linhas):
     db = MagicMock()
     resultado = MagicMock()
     resultado.all.return_value = linhas
@@ -76,14 +76,14 @@ def _db_com_workflows(linhas):
     return db
 
 
-async def test_allowlist_vazia_permite_todos_os_workflows():
+async def test_empty_allowlist_allows_all_workflows():
     """Inverted semantics of the column: with no list, there is no additional policy.
 
     The matcher alone would return False for everything (nothing matches an empty list);
     what decides that "empty = allowed" is the handler, mirroring the consumer's
     `if allowlist:`. Changing that would block every webhook on the platform.
     """
-    db = _db_com_workflows([("wf-1", "Diário", "https://qualquer.host/hook")])
+    db = _db_with_workflows([("wf-1", "Diário", "https://qualquer.host/hook")])
 
     alvos = await _notification_targets(db, "ws-1", [])
 
@@ -91,8 +91,8 @@ async def test_allowlist_vazia_permite_todos_os_workflows():
     assert alvos[0].host == "qualquer.host"
 
 
-async def test_preview_marca_bloqueado_o_host_fora_da_lista():
-    db = _db_com_workflows([
+async def test_preview_marks_the_host_outside_the_list_as_blocked():
+    db = _db_with_workflows([
         ("wf-1", "Permitido", "https://api.exemplo.com/hook"),
         ("wf-2", "Bloqueado", "https://evil.com/hook"),
     ])
@@ -102,8 +102,8 @@ async def test_preview_marca_bloqueado_o_host_fora_da_lista():
     assert {a.name: a.allowed for a in alvos} == {"Permitido": True, "Bloqueado": False}
 
 
-async def test_url_sem_host_nao_explode():
-    db = _db_com_workflows([("wf-1", "Quebrado", "nao-e-url")])
+async def test_url_without_host_does_not_blow_up():
+    db = _db_with_workflows([("wf-1", "Quebrado", "nao-e-url")])
 
     alvos = await _notification_targets(db, "ws-1", ["exemplo.com"])
 
@@ -111,7 +111,7 @@ async def test_url_sem_host_nao_explode():
     assert alvos[0].allowed is False
 
 
-def test_curinga_nao_cobre_o_dominio_nu():
+def test_wildcard_does_not_cover_the_bare_domain():
     """A rule that is easy to lose when porting to another language."""
     from app.core.utils.allowlist import hostname_matches_allowlist
 
@@ -120,7 +120,7 @@ def test_curinga_nao_cobre_o_dominio_nu():
     assert hostname_matches_allowlist("exemplo.com", ["*.exemplo.com"]) is False
 
 
-def test_host_fora_da_lista_e_bloqueado():
+def test_host_outside_the_list_is_blocked():
     from app.core.utils.allowlist import hostname_matches_allowlist
 
     assert hostname_matches_allowlist("evil.com", ["exemplo.com"]) is False

@@ -56,7 +56,7 @@ describe("serializeEdge", () => {
 })
 
 /**
- * The counterpart of the SINGLE-port fix (`handleDeEntrada`): with ONE port the
+ * The counterpart of the SINGLE-port fix (`inputHandle`): with ONE port the
  * node renders an ANONYMOUS input handle, so `buildEdges` resolves `targetHandle`
  * as undefined — but the executor routes by `to_key`. `serializeEdge` MUST write
  * `to_key` even without `targetHandle` (it falls back to `data.to_key`),
@@ -101,7 +101,7 @@ describe("round-trip canvas → banco → canvas", () => {
     // stayed "output". On load, resolveSourceHandle follows the old sourceHandle.
     expect(roundTrip(edge({ sourceHandle: "output", data: { from_key: "metadata" } }), DATA_INPUT))
       .toBe("output")
-    // escolherChave now writes sourceHandle=from_key when the key is a declared
+    // chooseKey now writes sourceHandle=from_key when the key is a declared
     // port — the sourceHandle==from_key invariant that this round-trip requires.
     expect(roundTrip(edge({ sourceHandle: "metadata", data: { from_key: "metadata" } }), DATA_INPUT))
       .toBe("metadata")
@@ -168,22 +168,22 @@ describe("resolveSourceHandle — handle fantasma (campo sem porta gravado)", ()
   const STATIC_ONLY: INodePortAPI[] = []
 
   it("saída anônima: campo sem porta gravado como handle volta a anônimo", () => {
-    const corrompida = { source: "a", target: "b", source_handle: "previous_hash", from_key: "previous_hash" }
+    const corrupted = { source: "a", target: "b", source_handle: "previous_hash", from_key: "previous_hash" }
 
-    expect(resolveSourceHandle(corrompida, new Map([["a", STATIC_ONLY]]))).toBeUndefined()
+    expect(resolveSourceHandle(corrupted, new Map([["a", STATIC_ONLY]]))).toBeUndefined()
   })
 
   it("nó multi-saída: handle fantasma cai na recuperação por from_key", () => {
     // Invalid source_handle, but from_key points to a real port → re-anchors on it.
-    const corrompida = { source: "a", target: "b", source_handle: "inexistente", from_key: "metadata" }
+    const corrupted = { source: "a", target: "b", source_handle: "inexistente", from_key: "metadata" }
 
-    expect(resolveSourceHandle(corrompida, new Map([["a", DATA_INPUT]]))).toBe("metadata")
+    expect(resolveSourceHandle(corrupted, new Map([["a", DATA_INPUT]]))).toBe("metadata")
   })
 
   it("saída única: handle fantasma volta a anônimo", () => {
-    const corrompida = { source: "a", target: "b", source_handle: "crs", from_key: "crs" }
+    const corrupted = { source: "a", target: "b", source_handle: "crs", from_key: "crs" }
 
-    expect(resolveSourceHandle(corrompida, new Map([["a", SINGLE]]))).toBeUndefined()
+    expect(resolveSourceHandle(corrupted, new Map([["a", SINGLE]]))).toBeUndefined()
   })
 
   it("não afeta um handle nomeado LEGÍTIMO nem um ramo de roteamento", () => {

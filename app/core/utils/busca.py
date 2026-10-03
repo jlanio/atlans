@@ -15,19 +15,19 @@ from __future__ import annotations
 _ESCAPE = "\\"
 
 
-def escapar_like(termo: str) -> str:
+def escape_like(termo: str) -> str:
     """`termo` with `\\`, `%` and `_` escaped — literals inside a LIKE."""
     return termo.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
-def contem(coluna, termo: str, *, ignorar_caixa: bool = True):
+def contem(coluna, termo: str, *, ignore_case: bool = True):
     """Condition "`coluna` contains `termo`", with the term treated as text.
 
-    `ILIKE` by default, like the screens' searches. `ignorar_caixa=False` gives
+    `ILIKE` by default, like the screens' searches. `ignore_case=False` gives
     plain `LIKE`, for a column that is already stored normalized (no accents,
     lowercase) — there the case difference was already resolved on write.
     """
-    padrao = f"%{escapar_like(termo)}%"
-    if ignorar_caixa:
+    padrao = f"%{escape_like(termo)}%"
+    if ignore_case:
         return coluna.ilike(padrao, escape=_ESCAPE)
     return coluna.like(padrao, escape=_ESCAPE)

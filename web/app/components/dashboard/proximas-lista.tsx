@@ -4,14 +4,14 @@ import type { IconType } from "react-icons"
 import { TbBolt, TbChevronRight, TbClock, TbFile, TbMapPin, TbSubtask } from "react-icons/tb"
 import { cn } from "@/lib/utils"
 import type { IWorkflow } from "@/service/types"
-import { derivarGatilho, resumirAgendamento, type TipoDeGatilho } from "../projects/gatilho"
+import { derivarGatilho, resumirAgendamento, type TriggerKind } from "../projects/gatilho"
 import { SeloAssistente } from "../shared/selo-assistente"
-import type { EstadoDoEscopo } from "./dashboard-url"
+import type { ScopeState } from "./dashboard-url"
 
 interface Props {
   /** Already filtered and trimmed by `proximas()`; the list only draws. */
   workflows: IWorkflow[]
-  escopo: EstadoDoEscopo
+  escopo: ScopeState
   /** Workspace name of the item, only used in the "todos" scope; `null` hides it. */
   nomeDoWorkspace?: (workspaceId: string | null | undefined) => string | null
   onAbrir: (id: string) => void
@@ -22,7 +22,7 @@ interface Props {
 // Icon per trigger type, the same choices as `linha-workflow.tsx`. Only the
 // scheduled one tends to appear here (it is the one with `next_run_at`), but the
 // others exist so webhook/file with a secondary schedule don't end up faceless.
-const ICONE: Record<TipoDeGatilho, IconType> = {
+const ICON: Record<TriggerKind, IconType> = {
   agendado: TbClock,
   webhook: TbBolt,
   arquivo: TbFile,
@@ -72,13 +72,13 @@ export function ProximasLista({ workflows, escopo, nomeDoWorkspace, onAbrir, onP
 
 function Item({ workflow, escopo, nomeDoWorkspace, onAbrir, onPrefetch }: {
   workflow: IWorkflow
-  escopo: EstadoDoEscopo
+  escopo: ScopeState
   nomeDoWorkspace?: (id: string | null | undefined) => string | null
   onAbrir: (id: string) => void
   onPrefetch?: (id: string) => void
 }) {
   const gatilho = derivarGatilho(workflow)
-  const Icone = ICONE[gatilho.tipo]
+  const Icone = ICON[gatilho.tipo]
   const resumo = resumirAgendamento(workflow.schedule, workflow.flag_ative)
   // Only in "todos" does the label matter; in a single-workspace scope it is redundant.
   const workspace = escopo === "todos" ? nomeDoWorkspace?.(workflow.workspace_id) : null

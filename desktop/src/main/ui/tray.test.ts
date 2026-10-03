@@ -9,7 +9,7 @@
 // does NOT show (uptime, CPU, memory, counters) and change exactly when what
 // it shows changes.
 import { describe, expect, it, vi } from 'vitest'
-import type { EstadoApp } from '../state/store.js'
+import type { AppState } from '../state/store.js'
 import type { Snapshot } from '../../shared/events.js'
 
 vi.mock('electron', () => ({
@@ -32,13 +32,13 @@ function snap(over: Partial<Snapshot> = {}): Snapshot {
   } as unknown as Snapshot & typeof over as Snapshot
 }
 
-function estado(over: Partial<EstadoApp> = {}): EstadoApp {
+function estado(over: Partial<AppState> = {}): AppState {
   return {
     supervisor: 'running', detalheSupervisor: null, fase: 'running',
     passoFase: null, detalheFase: null, hello: null,
     snapshot: snap(), jobs: [], log: [],
     ...over,
-  } as EstadoApp
+  } as AppState
 }
 
 // ── Icon ─────────────────────────────────────────────────────────────────────

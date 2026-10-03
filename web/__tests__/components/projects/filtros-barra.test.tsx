@@ -1,18 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react"
 import { BarraDeFiltros } from "@/app/components/projects/filtros-barra"
-import { ESTADO_PADRAO, FILTROS, type EstadoDeProjetos, type Filtro } from "@/app/components/projects/projetos-url"
+import { DEFAULT_STATE, FILTERS, type ProjectsState, type Filtro } from "@/app/components/projects/projetos-url"
 
 afterEach(() => {
   cleanup()
   vi.useRealTimers()
 })
 
-function estado(extra: Partial<EstadoDeProjetos> = {}): EstadoDeProjetos {
-  return { ...ESTADO_PADRAO, ...extra }
+function estado(extra: Partial<ProjectsState> = {}): ProjectsState {
+  return { ...DEFAULT_STATE, ...extra }
 }
 
-const contagens = Object.fromEntries(FILTROS.map(f => [f, 0])) as Record<Filtro, number>
+const contagens = Object.fromEntries(FILTERS.map(f => [f, 0])) as Record<Filtro, number>
 Object.assign(contagens, { todos: 10, ativos: 8, inativos: 2, executando: 1, falha: 2, agendados: 4, webhook: 1, subfluxos: 1, portal: 2, assistente: 3, pausado: 1, nunca: 3 })
 
 const base = {
@@ -97,17 +97,17 @@ describe("BarraDeFiltros", () => {
   })
 
   it("Recolher/Expandir todos só com grupos, e o rótulo segue o estado", () => {
-    const onRecolher = vi.fn()
-    const onExpandir = vi.fn()
+    const onCollapse = vi.fn()
+    const onExpand = vi.fn()
     const { rerender } = render(<BarraDeFiltros {...base} estado={estado()} temGrupos={false} />)
     expect(screen.queryByRole("button", { name: /todos$/ })).toBeNull()
 
-    rerender(<BarraDeFiltros {...base} estado={estado()} onRecolherTodos={onRecolher} onExpandirTodos={onExpandir} />)
+    rerender(<BarraDeFiltros {...base} estado={estado()} onRecolherTodos={onCollapse} onExpandirTodos={onExpand} />)
     fireEvent.click(screen.getByRole("button", { name: "Recolher todos" }))
-    expect(onRecolher).toHaveBeenCalledTimes(1)
+    expect(onCollapse).toHaveBeenCalledTimes(1)
 
-    rerender(<BarraDeFiltros {...base} estado={estado()} todosRecolhidos onRecolherTodos={onRecolher} onExpandirTodos={onExpandir} />)
+    rerender(<BarraDeFiltros {...base} estado={estado()} todosRecolhidos onRecolherTodos={onCollapse} onExpandirTodos={onExpand} />)
     fireEvent.click(screen.getByRole("button", { name: "Expandir todos" }))
-    expect(onExpandir).toHaveBeenCalledTimes(1)
+    expect(onExpand).toHaveBeenCalledTimes(1)
   })
 })

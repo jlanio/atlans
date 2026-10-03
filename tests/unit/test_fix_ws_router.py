@@ -25,10 +25,10 @@ from app.api.routers.executor_ws import resultados as RES
 from app.core.executor_connections import executor_registry
 from app.core import executor_connections as C
 from flow.utils.publisher.reducao import (
-    CHAVES_PESADAS_DO_EXTRA,
-    TETO_DO_ERRO,
-    TETO_NODE_EVENT_BYTES,
-    reduzir_node_event,
+    HEAVY_EXTRA_KEYS,
+    ERROR_CEILING,
+    NODE_EVENT_BYTES_CEILING,
+    shrink_node_event,
 )
 
 
@@ -51,7 +51,7 @@ def fake_conn(monkeypatch):
 
 # ── S3: capacity ──────────────────────────────────────────────────────────────
 
-def test_capacity_dict_em_contador_e_rejeitada(fake_conn):
+def test_capacity_dict_in_counter_is_rejected(fake_conn):
     """The payload that brought down POST /execute for the entire platform."""
     cap, errors = P._sanitize_capacity("ex-1", {
         "queued": {"n": 0}, "running": 0, "max_concurrent": 4, "max_queue": 50,
@@ -60,7 +60,7 @@ def test_capacity_dict_em_contador_e_rejeitada(fake_conn):
     assert any("queued" in e for e in errors)
 
 
-def test_capacity_negativa_e_rejeitada(fake_conn):
+def test_negative_capacity_is_rejected(fake_conn):
     cap, errors = P._sanitize_capacity("ex-1", {
         "queued": -1, "running": 0, "max_concurrent": 4, "max_queue": 50,
     })
@@ -68,7 +68,7 @@ def test_capacity_negativa_e_rejeitada(fake_conn):
     assert any("negativo" in e for e in errors)
 
 
-def test_capacity_booleano_nao_vira_inteiro(fake_conn):
+def test_boolean_capacity_does_not_become_integer(fake_conn):
     cap, errors = P._sanitize_capacity("ex-1", {
         "queued": True, "running": 0, "max_concurrent": 4, "max_queue": 50,
     })
@@ -76,7 +76,7 @@ def test_capacity_booleano_nao_vira_inteiro(fake_conn):
     assert errors
 
 
-def test_capacity_string_numerica_e_coagida(fake_conn):
+def test_numeric_string_capacity_is_coerced(fake_conn):
     cap, errors = P._sanitize_capacity("ex-1", {
         "queued": "2", "running": "1", "max_concurrent": "4", "max_queue": "50",
     })
@@ -85,7 +85,7 @@ def test_capacity_string_numerica_e_coagida(fake_conn):
     assert all(isinstance(cap[k], int) for k in ("queued", "running", "max_concurrent", "max_queue"))
 
 
-def test_capacity_e_clampada_pelos_limites_do_banco(fake_conn):
+def test_capacity_is_clamped_by_db_limits(fake_conn):
     """Declaring max_queue=10**9 must not attract every job in the pool."""
     cap, errors = P._sanitize_capacity("ex-1", {
         "queued": 0, "running": 0, "max_concurrent": 10 ** 9, "max_queue": 10 ** 9,
@@ -95,7 +95,7 @@ def test_capacity_e_clampada_pelos_limites_do_banco(fake_conn):
     assert cap["max_queue"] == fake_conn.max_queue_limit
 
 
-def test_capacity_metricas_invalidas_viram_none(fake_conn):
+def test_capacity_invalid_metrics_become_none(fake_conn):
     cap, _ = P._sanitize_capacity("ex-1", {
         "queued": 0, "running": 0, "max_concurrent": 1, "max_queue": 1,
         "disk_free_gb": "muito", "ram_available_gb": -5,
@@ -114,12 +114,12 @@ def test_capacity_sanitizada_e_somavel():
 
 # ── S5: system_info ───────────────────────────────────────────────────────────
 
-def test_system_info_string_e_descartada():
+def test_string_system_info_is_dropped():
     """'pwn' persistido na coluna JSONB gerava 500 permanente em GET /executores."""
     assert P._sanitize_system_info("ex-1", "pwn") is None
 
 
-def test_system_info_aplica_allowlist():
+def test_system_info_applies_allowlist():
     clean = P._sanitize_system_info("ex-1", {
         "hostname": "host-a", "os_name": "Linux", "cpu_cores": 8,
         "container": True, "__proto__": {"x": 1}, "secret": "abc",
@@ -129,12 +129,12 @@ def test_system_info_aplica_allowlist():
     }
 
 
-def test_system_info_trunca_strings_longas():
+def test_system_info_truncates_long_strings():
     clean = P._sanitize_system_info("ex-1", {"hostname": "h" * 5000})
     assert len(clean["hostname"]) == P._SYSTEM_INFO_STR_MAX
 
 
-def test_system_info_volumoso_nao_e_persistido():
+def test_bulky_system_info_is_not_persisted():
     """15 MB per reconnection: nothing outside the allowlist survives."""
     payload = {f"campo_{i}": "x" * 1000 for i in range(5000)}
     assert P._sanitize_system_info("ex-1", payload) is None
@@ -143,7 +143,7 @@ def test_system_info_volumoso_nao_e_persistido():
 
 # ── S10: node_event ───────────────────────────────────────────────────────────
 
-def test_node_event_de_log_e_limitado_na_faixa_baixa(monkeypatch):
+def test_log_node_event_is_limited_in_low_band(monkeypatch):
     monkeypatch.setattr(P, "_rate_state", {})
     log_msg = {"kind": "debug", "run_id": "r", "node": "n"}
     allowed = sum(
@@ -156,7 +156,7 @@ def test_node_event_de_log_e_limitado_na_faixa_baixa(monkeypatch):
     assert P._node_event_allowed("ex-1", log_msg) is True
 
 
-def test_lifecycle_nao_e_descartado_pela_cota_de_log(monkeypatch):
+def test_lifecycle_is_not_dropped_by_log_quota(monkeypatch):
     """The bug: 300 nodes = 600 lifecycle events in a burst blew past the 200/s and the
     canvas was left with half the graph spinning forever."""
     monkeypatch.setattr(P, "_rate_state", {})
@@ -169,7 +169,7 @@ def test_lifecycle_nao_e_descartado_pela_cota_de_log(monkeypatch):
         }) is True
 
 
-def test_lifecycle_ainda_tem_teto_duro(monkeypatch):
+def test_lifecycle_still_has_hard_ceiling(monkeypatch):
     monkeypatch.setattr(P, "_rate_state", {})
     msg = {"kind": "lifecycle", "status": "started"}
     allowed = sum(
@@ -179,14 +179,14 @@ def test_lifecycle_ainda_tem_teto_duro(monkeypatch):
     assert allowed == P._NODE_EVENT_LIFECYCLE_RATE_LIMIT
 
 
-def test_kind_ausente_conta_como_lifecycle(monkeypatch):
+def test_missing_kind_counts_as_lifecycle(monkeypatch):
     """Default do produtor (publish_event) e KIND_LIFECYCLE."""
     monkeypatch.setattr(P, "_rate_state", {})
     for _ in range(P._NODE_EVENT_RATE_LIMIT + 50):
         assert P._node_event_allowed("ex-1", {"run_id": "r", "node": "n"}) is True
 
 
-def test_buckets_nao_compartilham_cota(monkeypatch):
+def test_buckets_do_not_share_quota(monkeypatch):
     monkeypatch.setattr(P, "_rate_state", {})
     for _ in range(P._JOB_RESULT_RATE_LIMIT):
         assert P._rate_allowed("ex-1", "job_result", P._JOB_RESULT_RATE_LIMIT) is True
@@ -195,7 +195,7 @@ def test_buckets_nao_compartilham_cota(monkeypatch):
     assert P._node_event_allowed("ex-1", {"kind": "lifecycle"}) is True
 
 
-def test_drop_rate_state_limpa_todos_os_buckets(monkeypatch):
+def test_drop_rate_state_clears_all_buckets(monkeypatch):
     monkeypatch.setattr(P, "_rate_state", {})
     P._rate_allowed("ex-1", "job_result", 10)
     P._node_event_allowed("ex-1", {"kind": "lifecycle"})
@@ -205,21 +205,21 @@ def test_drop_rate_state_limpa_todos_os_buckets(monkeypatch):
     assert ("ex-2", "node_event:lifecycle") in P._rate_state
 
 
-def test_truncagem_preserva_campos_de_controle():
+def test_truncation_preserves_control_fields():
     event = {
         "run_id": "run-1", "node": "n1", "status": "running", "kind": "log",
         "level": "info", "timestamp": 123.0, "payload": "x" * 100_000,
     }
     payload = json.dumps(event)
-    out = json.loads(reduzir_node_event(event, payload))
+    out = json.loads(shrink_node_event(event, payload))
     assert out["run_id"] == "run-1" and out["node"] == "n1" and out["status"] == "running"
     assert out["__truncated__"] is True
     assert out["__original_size__"] == len(payload)
     assert "payload" not in out
-    assert len(reduzir_node_event(event, payload)) <= TETO_NODE_EVENT_BYTES
+    assert len(shrink_node_event(event, payload)) <= NODE_EVENT_BYTES_CEILING
 
 
-def test_estouro_por_extra_pesado_preserva_output_columns():
+def test_overflow_from_heavy_extra_preserves_output_columns():
     """Per-key degradation: the heavy stuff (traceback/debug/stdout/drift) goes first.
 
     Before, an overflow cut straight down to the control fields and the whole `extra`
@@ -240,21 +240,21 @@ def test_estouro_por_extra_pesado_preserva_output_columns():
         },
     }
     payload = json.dumps(event)
-    assert len(payload) > TETO_NODE_EVENT_BYTES
+    assert len(payload) > NODE_EVENT_BYTES_CEILING
 
-    raw = reduzir_node_event(event, payload)
-    assert len(raw) <= TETO_NODE_EVENT_BYTES
+    raw = shrink_node_event(event, payload)
+    assert len(raw) <= NODE_EVENT_BYTES_CEILING
     out = json.loads(raw)
     assert out["extra"]["output_columns"] == colunas, "a sugestão de coluna tinha que sobreviver"
     assert out["extra"]["node_name"] == "Join" and out["extra"]["cache_hit"] is False
-    for pesada in CHAVES_PESADAS_DO_EXTRA:
-        assert pesada not in out["extra"]
+    for heavy_key in HEAVY_EXTRA_KEYS:
+        assert heavy_key not in out["extra"]
     assert out["duration_ms"] == 5.0
     assert out["__truncated__"] is True
     assert out["__original_size__"] == len(payload)
 
 
-def test_error_gigante_do_evento_e_truncado_preservando_o_extra():
+def test_huge_event_error_is_truncated_preserving_the_extra():
     """`error` is also a heavy field: truncating it avoids throwing away the light extra."""
     event = {
         "run_id": "run-1", "node": "n1", "status": "failed", "kind": "lifecycle",
@@ -262,17 +262,17 @@ def test_error_gigante_do_evento_e_truncado_preservando_o_extra():
         "extra": {"error_category": "runtime", "retryable": False},
     }
     payload = json.dumps(event)
-    assert len(payload) > TETO_NODE_EVENT_BYTES
+    assert len(payload) > NODE_EVENT_BYTES_CEILING
 
-    out = json.loads(reduzir_node_event(event, payload))
+    out = json.loads(shrink_node_event(event, payload))
     assert out["error"].endswith("…[truncado]")
-    assert out["error"].startswith("e" * TETO_DO_ERRO)
-    assert len(out["error"]) < TETO_DO_ERRO + 20
+    assert out["error"].startswith("e" * ERROR_CEILING)
+    assert len(out["error"]) < ERROR_CEILING + 20
     assert out["extra"] == {"error_category": "runtime", "retryable": False}
     assert out["__truncated__"] is True
 
 
-def test_estouro_extremo_ainda_cai_para_campos_de_controle():
+def test_extreme_overflow_still_falls_back_to_control_fields():
     """If not even the degraded event fits, the ceiling is still a guarantee: control only."""
     event = {
         "run_id": "run-1", "node": "n1", "status": "completed", "kind": "lifecycle",
@@ -286,15 +286,15 @@ def test_estouro_extremo_ainda_cai_para_campos_de_controle():
     }
     payload = json.dumps(event)
 
-    raw = reduzir_node_event(event, payload)
-    assert len(raw) <= TETO_NODE_EVENT_BYTES
+    raw = shrink_node_event(event, payload)
+    assert len(raw) <= NODE_EVENT_BYTES_CEILING
     out = json.loads(raw)
     assert "extra" not in out
     assert out["run_id"] == "run-1" and out["node"] == "n1" and out["status"] == "completed"
     assert out["__truncated__"] is True
 
 
-async def test_node_event_gigante_e_truncado_antes_do_redis(monkeypatch, fake_conn):
+async def test_huge_node_event_is_truncated_before_redis(monkeypatch, fake_conn):
     published: list[str] = []
 
     class _Pipe:
@@ -333,7 +333,7 @@ async def test_node_event_gigante_e_truncado_antes_do_redis(monkeypatch, fake_co
 
     assert published, "evento deveria ter sido publicado (truncado)"
     for payload in published:
-        assert len(payload) <= TETO_NODE_EVENT_BYTES
+        assert len(payload) <= NODE_EVENT_BYTES_CEILING
         assert json.loads(payload)["__truncated__"] is True
 
 
@@ -347,7 +347,7 @@ async def _async_false(*_a, **_kw):
 
 # ── S10 (part 2): job_result also has a byte ceiling and rate limit ──────────
 
-def test_error_gigante_do_job_result_e_truncado():
+def test_huge_job_result_error_is_truncated():
     """15 MB went raw into WorkflowRun.error_message (Text, no limit)."""
     capped, _ = P._cap_job_result("ex-1", {
         "job_id": "j1", "status": "error", "error": "A" * 15_000_000,
@@ -356,7 +356,7 @@ def test_error_gigante_do_job_result_e_truncado():
     assert capped["error"].startswith("AAA")
 
 
-def test_error_nao_string_nao_passa_inteiro():
+def test_non_string_error_does_not_pass_whole():
     capped, _ = P._cap_job_result("ex-1", {
         "job_id": "j1", "status": "error", "error": {"blob": "B" * 5_000_000},
     })
@@ -364,7 +364,7 @@ def test_error_nao_string_nao_passa_inteiro():
     assert len(capped["error"]) <= P._MAX_JOB_ERROR_CHARS + 40
 
 
-def test_stats_gigante_preserva_chaves_de_controle():
+def test_huge_stats_preserves_control_keys():
     stats = {
         "__response__": {"status": 200, "body": "ok"},
         **{f"node-{i}": {"rows": "x" * 2000} for i in range(4000)},
@@ -377,7 +377,7 @@ def test_stats_gigante_preserva_chaves_de_controle():
     assert len(json.dumps(out)) <= P._MAX_JOB_STATS_BYTES
 
 
-def test_stats_com_chave_de_controle_gigante_marca_control_dropped():
+def test_stats_with_huge_control_key_marks_control_dropped():
     """Without __control_dropped__ the webhook_router's BRPOP would sit until the timeout."""
     stats = {"__response__": {"body": "z" * (P._MAX_JOB_STATS_BYTES + 1000)}}
     capped, _ = P._cap_job_result("ex-1", {"job_id": "j1", "status": "ok", "stats": stats})
@@ -385,25 +385,25 @@ def test_stats_com_chave_de_controle_gigante_marca_control_dropped():
     assert len(json.dumps(capped["stats"])) <= P._MAX_JOB_STATS_BYTES
 
 
-def test_stats_nao_serializavel_nao_derruba_o_consumer():
+def test_non_serializable_stats_does_not_crash_the_consumer():
     ciclo: dict = {}
     ciclo["self"] = ciclo
     capped, _ = P._cap_job_result("ex-1", {"job_id": "j1", "status": "ok", "stats": ciclo})
     assert capped["stats"]["__control_dropped__"] is True
 
 
-def test_stats_de_tipo_errado_e_descartado():
+def test_stats_of_wrong_type_is_dropped():
     capped, _ = P._cap_job_result("ex-1", {"job_id": "j1", "status": "ok", "stats": "pwn"})
     assert capped["stats"] == {}
 
 
-def test_job_result_pequeno_passa_intacto():
+def test_small_job_result_passes_intact():
     msg = {"job_id": "j1", "status": "ok", "stats": {"n1": {"rows": 3}}, "error": None}
     capped, _ = P._cap_job_result("ex-1", msg)
     assert capped == msg
 
 
-def test_stats_serializado_uma_vez_e_reaproveitado():
+def test_stats_serialized_once_and_reused():
     """The returned JSON must be the SAME one that goes to the run_results queue —
     without that the caller redid a dumps of up to 4 MB, synchronously, on the event loop."""
     stats = {"n1": {"rows": 3}, "__response__": {"status": 200}}
@@ -413,7 +413,7 @@ def test_stats_serializado_uma_vez_e_reaproveitado():
     assert json.loads(stats_json) == capped["stats"]
 
 
-def test_stats_ausente_devolve_objeto_vazio():
+def test_missing_stats_returns_empty_object():
     _capped, stats_json = P._cap_job_result("ex-1", {"job_id": "j1", "status": "ok"})
     assert json.loads(stats_json) == {}
 
@@ -465,18 +465,18 @@ class _FakeRedis:
 
 
 @pytest.fixture
-def sem_banco(monkeypatch):
+def without_db(monkeypatch):
     """The duration calculation opens a real session; in the tests it fails fast and
     the handler continues (the block is already tolerant of DB errors)."""
 
-    class _SemDB:
+    class _NoDB:
         async def __aenter__(self):
             raise RuntimeError("sem banco no teste")
 
         async def __aexit__(self, *_a):
             return False
 
-    monkeypatch.setattr(RES, "get_session_async", lambda: _SemDB())
+    monkeypatch.setattr(RES, "get_session_async", lambda: _NoDB())
 
 
 def _snapshot_de(executor_id="ex-1", status="running", start_time=None):
@@ -488,7 +488,7 @@ def _snapshot_de(executor_id="ex-1", status="running", start_time=None):
     return _query
 
 
-async def test_job_result_gigante_nao_chega_cru_ao_redis(monkeypatch, fake_conn):
+async def test_huge_job_result_does_not_reach_redis_raw(monkeypatch, fake_conn):
     """All durable destinations (results, run_results, history, publish)
     must receive the already-contained payload."""
     rc = _FakeRedis()
@@ -510,8 +510,8 @@ async def test_job_result_gigante_nao_chega_cru_ao_redis(monkeypatch, fake_conn)
     assert "A" * (P._MAX_JOB_ERROR_CHARS + 100) not in juntos
 
 
-async def test_job_result_le_o_run_uma_unica_vez(monkeypatch, fake_conn):
-    """Posse, idempotencia e duracao saem da MESMA linha: eram 3 sessoes."""
+async def test_job_result_reads_the_run_only_once(monkeypatch, fake_conn):
+    """Posse, idempotencia e duracao saem da MESMA linha: eram 3 sessions."""
     leituras = []
 
     async def _query(run_id):
@@ -528,7 +528,7 @@ async def test_job_result_le_o_run_uma_unica_vez(monkeypatch, fake_conn):
     assert leituras == ["run-1"]
 
 
-async def test_job_result_de_run_alheio_e_rejeitado(monkeypatch, fake_conn):
+async def test_job_result_of_foreign_run_is_rejected(monkeypatch, fake_conn):
     """Cross-tenant fail-closed: another executor's host must not be overwritten."""
     rc = _FakeRedis()
     monkeypatch.setattr(P, "_rate_state", {})
@@ -543,22 +543,22 @@ async def test_job_result_de_run_alheio_e_rejeitado(monkeypatch, fake_conn):
     assert fake_conn.run_auth_cache["run-1"][0] is False
 
 
-async def test_job_result_sem_host_e_rejeitado(monkeypatch, fake_conn):
+async def test_job_result_without_host_is_rejected(monkeypatch, fake_conn):
     """NULL host (nonexistent run or not yet dispatched) stays fail-closed."""
     rc = _FakeRedis()
 
-    async def _sem_linha(_run_id):
+    async def _no_row(_run_id):
         return None
 
     monkeypatch.setattr(P, "_rate_state", {})
-    monkeypatch.setattr(RES, "_query_run_snapshot", _sem_linha)
+    monkeypatch.setattr(RES, "_query_run_snapshot", _no_row)
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
 
     await RES._handle_job_result("ex-1", {"job_id": "run-1", "status": "ok"})
     assert rc.writes == []
 
 
-async def test_job_result_de_run_terminal_e_ignorado(monkeypatch, fake_conn):
+async def test_job_result_of_terminal_run_is_ignored(monkeypatch, fake_conn):
     """An outbox replay must not turn a 'failed' into a 'success'."""
     rc = _FakeRedis()
     monkeypatch.setattr(P, "_rate_state", {})
@@ -571,7 +571,7 @@ async def test_job_result_de_run_terminal_e_ignorado(monkeypatch, fake_conn):
     assert rc.writes == []
 
 
-async def test_job_result_de_run_cancelado_e_ignorado(monkeypatch, fake_conn):
+async def test_job_result_of_cancelled_run_is_ignored(monkeypatch, fake_conn):
     """A run cancelled by the user is already terminal: a later job_result
     (redelivery or compromised executor) must not resurrect it as success."""
     rc = _FakeRedis()
@@ -585,7 +585,7 @@ async def test_job_result_de_run_cancelado_e_ignorado(monkeypatch, fake_conn):
     assert rc.writes == []
 
 
-async def test_job_result_com_banco_fora_abre_cooldown(monkeypatch, fake_conn):
+async def test_job_result_with_db_down_opens_cooldown(monkeypatch, fake_conn):
     """A Postgres blip must not turn into one checkout attempt per event."""
     rc = _FakeRedis()
 
@@ -601,7 +601,7 @@ async def test_job_result_com_banco_fora_abre_cooldown(monkeypatch, fake_conn):
     assert fake_conn.db_auth_cooldown_until > time.monotonic()
 
 
-async def test_job_result_tem_rate_limit(monkeypatch, fake_conn):
+async def test_job_result_has_rate_limit(monkeypatch, fake_conn):
     monkeypatch.setattr(P, "_rate_state", {})
     vistos = []
 
@@ -623,7 +623,7 @@ async def test_job_result_tem_rate_limit(monkeypatch, fake_conn):
 
 # ── P1: memo de autorizacao run -> executor ──────────────────────────────────
 
-async def test_run_auth_consulta_o_banco_uma_vez_por_run(monkeypatch, fake_conn):
+async def test_run_auth_queries_the_db_once_per_run(monkeypatch, fake_conn):
     calls = []
 
     async def _fake_query(executor_id, run_id):
@@ -637,7 +637,7 @@ async def test_run_auth_consulta_o_banco_uma_vez_por_run(monkeypatch, fake_conn)
     assert len(calls) == 1
 
 
-async def test_run_auth_memoriza_negativa(monkeypatch, fake_conn):
+async def test_run_auth_memoizes_denial(monkeypatch, fake_conn):
     calls = []
 
     async def _fake_query(executor_id, run_id):
@@ -651,7 +651,7 @@ async def test_run_auth_memoriza_negativa(monkeypatch, fake_conn):
     assert len(calls) == 1
 
 
-async def test_erro_de_banco_nega_sem_repetir_a_consulta(monkeypatch, fake_conn):
+async def test_db_error_denies_without_repeating_the_query(monkeypatch, fake_conn):
     """A DB error still DENIES and does NOT become a memo (the verdict is transient),
     but during the cooldown no new session is opened per event — that is how a
     1-minute hiccup in Postgres turned into a mass disconnection of executors."""
@@ -674,22 +674,22 @@ async def test_erro_de_banco_nega_sem_repetir_a_consulta(monkeypatch, fake_conn)
     assert len(calls) == 2
 
 
-async def test_consulta_de_autorizacao_tem_timeout(monkeypatch, fake_conn):
+async def test_authorization_query_has_timeout(monkeypatch, fake_conn):
     """Waiting POOL_TIMEOUT (30s) on the WS hot path leaves the heartbeat unread
     and the server drops a healthy executor."""
     monkeypatch.setattr(RES, "_RUN_AUTH_QUERY_TIMEOUT", 0.01)
 
-    async def _travada(executor_id, run_id):
+    async def _stuck(executor_id, run_id):
         await asyncio.sleep(5)
         return True
 
-    monkeypatch.setattr(RES, "_query_run_belongs_to_agent", _travada)
+    monkeypatch.setattr(RES, "_query_run_belongs_to_agent", _stuck)
 
     assert await RES._run_belongs_to_agent("ex-1", "run-1") is False
     assert fake_conn.db_auth_cooldown_until > time.monotonic()
 
 
-async def test_run_auth_nao_cruza_executores(monkeypatch):
+async def test_run_auth_does_not_cross_executors(monkeypatch):
     """The memo lives on the connection: an executor never inherits another's verdict."""
     conns = {"ex-1": _FakeConn(), "ex-2": _FakeConn()}
     monkeypatch.setattr(executor_registry, "get", conns.get)
@@ -707,14 +707,14 @@ async def test_run_auth_nao_cruza_executores(monkeypatch):
     assert asked == ["ex-1", "ex-2"]
 
 
-def test_run_auth_cache_tem_teto(fake_conn):
+def test_run_auth_cache_has_ceiling(fake_conn):
     now = time.monotonic()
     for i in range(RES._RUN_AUTH_CACHE_MAX + 100):
         RES._store_run_auth(fake_conn.run_auth_cache, f"run-{i}", False, now)
     assert len(fake_conn.run_auth_cache) <= RES._RUN_AUTH_CACHE_MAX
 
 
-def test_forget_run_auth_limpa_o_memo(fake_conn):
+def test_forget_run_auth_clears_the_memo(fake_conn):
     fake_conn.run_auth_cache["run-1"] = (True, time.monotonic() + 999)
     RES._forget_run_auth("ex-1", "run-1")
     assert "run-1" not in fake_conn.run_auth_cache
@@ -723,14 +723,14 @@ def test_forget_run_auth_limpa_o_memo(fake_conn):
 # ── B1: orphans only fail if the executor really went away ───────────────────
 
 @pytest.fixture
-def sem_espera(monkeypatch):
+def no_wait(monkeypatch):
     async def _no_sleep(_s):
         return None
 
     monkeypatch.setattr(ORF.asyncio, "sleep", _no_sleep)
 
 
-async def test_blip_de_rede_nao_falha_runs_em_voo(monkeypatch, sem_espera):
+async def test_network_blip_does_not_fail_in_flight_runs(monkeypatch, no_wait):
     """Reconnection on the SAME worker: in-flight runs must survive."""
     chamou = []
     monkeypatch.setattr(ORF, "_fail_orphan_runs", lambda aid: chamou.append(aid))
@@ -740,24 +740,24 @@ async def test_blip_de_rede_nao_falha_runs_em_voo(monkeypatch, sem_espera):
     assert chamou == []
 
 
-async def test_reconexao_em_outro_worker_nao_falha_runs(monkeypatch, sem_espera):
+async def test_reconnection_on_another_worker_does_not_fail_runs(monkeypatch, no_wait):
     chamou = []
 
     async def _fail(aid):
         chamou.append(aid)
 
-    async def _presente(_aid):
+    async def _present(_aid):
         return True
 
     monkeypatch.setattr(ORF, "_fail_orphan_runs", _fail)
     monkeypatch.setattr(executor_registry, "get", lambda _aid: None)
-    monkeypatch.setattr(C, "_redis_presence_or_unknown", _presente)
+    monkeypatch.setattr(C, "_redis_presence_or_unknown", _present)
 
     await ORF._fail_orphan_runs_if_gone("ex-1")
     assert chamou == []
 
 
-async def test_redis_indisponivel_na_checagem_nao_destroi_runs(monkeypatch, sem_espera):
+async def test_redis_unavailable_during_check_does_not_destroy_runs(monkeypatch, no_wait):
     """'I don't know' != 'gone'. A pool blip at the moment of the check destroyed
     precisely the runs the grace period exists to save."""
     chamou = []
@@ -765,18 +765,18 @@ async def test_redis_indisponivel_na_checagem_nao_destroi_runs(monkeypatch, sem_
     async def _fail(aid):
         chamou.append(aid)
 
-    async def _nao_sei(_aid):
+    async def _unknown(_aid):
         return None
 
     monkeypatch.setattr(ORF, "_fail_orphan_runs", _fail)
     monkeypatch.setattr(executor_registry, "get", lambda _aid: None)
-    monkeypatch.setattr(C, "_redis_presence_or_unknown", _nao_sei)
+    monkeypatch.setattr(C, "_redis_presence_or_unknown", _unknown)
 
     await ORF._fail_orphan_runs_if_gone("ex-1")
     assert chamou == []
 
 
-async def test_presence_tri_estado_devolve_none_em_erro_de_redis(monkeypatch):
+async def test_tri_state_presence_returns_none_on_redis_error(monkeypatch):
     async def _boom():
         raise RuntimeError("pool saturado")
 
@@ -790,18 +790,18 @@ async def test_presence_tri_estado_devolve_none_em_erro_de_redis(monkeypatch):
     assert await C._redis_check_presence("ex-1") is False
 
 
-async def test_executor_sumido_de_fato_falha_os_runs(monkeypatch, sem_espera):
+async def test_truly_gone_executor_fails_the_runs(monkeypatch, no_wait):
     chamou = []
 
     async def _fail(aid):
         chamou.append(aid)
 
-    async def _ausente(_aid):
+    async def _absent(_aid):
         return False
 
     monkeypatch.setattr(ORF, "_fail_orphan_runs", _fail)
     monkeypatch.setattr(executor_registry, "get", lambda _aid: None)
-    monkeypatch.setattr(C, "_redis_presence_or_unknown", _ausente)
+    monkeypatch.setattr(C, "_redis_presence_or_unknown", _absent)
 
     await ORF._fail_orphan_runs_if_gone("ex-1")
     assert chamou == ["ex-1"]
@@ -809,7 +809,7 @@ async def test_executor_sumido_de_fato_falha_os_runs(monkeypatch, sem_espera):
 
 # ── S6: relay envelope ───────────────────────────────────────────────────────
 
-def test_envelope_de_relay_abre_no_canal_certo():
+def test_relay_envelope_opens_on_the_right_channel():
     env = C.build_relay_envelope('{"type":"job"}', executor_id="ex-1")
     out = C.open_signed_envelope(
         env, channel_label="Relay", executor_id="ex-1", audience=C._AUDIENCE_RELAY,
@@ -817,7 +817,7 @@ def test_envelope_de_relay_abre_no_canal_certo():
     assert out == '{"type":"job"}'
 
 
-def test_envelope_nao_pode_ser_replicado_em_outro_executor():
+def test_envelope_cannot_be_replayed_on_another_executor():
     """Republishing a control/revoked on every executor's channel took down the fleet."""
     env = C.build_relay_envelope('{"type":"control","action":"revoked"}', executor_id="ex-1")
     assert C.open_signed_envelope(
@@ -825,14 +825,14 @@ def test_envelope_nao_pode_ser_replicado_em_outro_executor():
     ) is None
 
 
-def test_envelope_de_drive_nao_serve_no_canal_de_relay():
+def test_drive_envelope_is_not_valid_on_relay_channel():
     env = C.build_signed_envelope('{"type":"drive_event"}')
     assert C.open_signed_envelope(
         env, channel_label="Relay", executor_id="ex-1", audience=C._AUDIENCE_RELAY,
     ) is None
 
 
-def test_envelope_de_drive_aceita_fan_out():
+def test_drive_envelope_accepts_fan_out():
     env = C.build_signed_envelope('{"type":"drive_event"}')
     for aid in ("ex-1", "ex-2"):
         assert C.open_signed_envelope(
@@ -840,7 +840,7 @@ def test_envelope_de_drive_aceita_fan_out():
         ) == '{"type":"drive_event"}'
 
 
-def test_envelope_nao_pode_ser_reapresentado():
+def test_envelope_cannot_be_presented_again():
     env = C.build_relay_envelope('{"type":"job"}', executor_id="ex-1")
     assert C.open_signed_envelope(
         env, channel_label="Relay", executor_id="ex-1", audience=C._AUDIENCE_RELAY,
@@ -850,7 +850,7 @@ def test_envelope_nao_pode_ser_reapresentado():
     ) is None
 
 
-def test_envelope_velho_e_recusado():
+def test_stale_envelope_is_refused():
     """An envelope captured yesterday must not stay valid (legitimate signature)."""
     payload = '{"type":"control","action":"revoked"}'
     ts = f"{time.time() - (C._RELAY_FRESHNESS_WINDOW + 10):.3f}"
@@ -868,7 +868,7 @@ def test_envelope_velho_e_recusado():
     ) is None
 
 
-def test_envelope_adulterado_e_recusado():
+def test_tampered_envelope_is_refused():
     env = json.loads(C.build_relay_envelope('{"type":"job"}', executor_id="ex-1"))
     env["payload"] = '{"type":"control","action":"shutdown"}'
     assert C.open_signed_envelope(
@@ -876,7 +876,7 @@ def test_envelope_adulterado_e_recusado():
     ) is None
 
 
-def test_nonces_expirados_saem_sem_evictar_validos(monkeypatch):
+def test_expired_nonces_leave_without_evicting_valid_ones(monkeypatch):
     """Prefix purge: with a fixed TTL, the expired entries are always the start of the dict."""
     monkeypatch.setattr(C, "_seen_relay_nonces", {})
     agora = time.monotonic()
@@ -887,7 +887,7 @@ def test_nonces_expirados_saem_sem_evictar_validos(monkeypatch):
     assert "novo|ex-1" in C._seen_relay_nonces
 
 
-def test_evicao_de_nonce_valido_grita(monkeypatch, caplog):
+def test_eviction_of_valid_nonce_screams(monkeypatch, caplog):
     """The executor's sibling cache logs; this one discarded in absolute silence and
     the operator had no way of knowing that anti-replay was off."""
     monkeypatch.setattr(C, "_RELAY_NONCE_MAX", 8)
@@ -907,7 +907,7 @@ def test_evicao_de_nonce_valido_grita(monkeypatch, caplog):
     assert any("anti-replay do relay cheio" in r.getMessage() for r in caplog.records)
 
 
-def test_envelope_sem_assinatura_e_recusado():
+def test_unsigned_envelope_is_refused():
     raw = json.dumps({"payload": '{"type":"job"}'})
     assert C.open_signed_envelope(
         raw, channel_label="Relay", executor_id="ex-1", audience=C._AUDIENCE_RELAY,
@@ -916,7 +916,7 @@ def test_envelope_sem_assinatura_e_recusado():
 
 # ── B14: presence via CAS ────────────────────────────────────────────────────
 
-async def test_release_presence_respeita_o_dono_atual(monkeypatch):
+async def test_release_presence_respects_the_current_owner(monkeypatch):
     """A losing worker must not delete the presence of another worker's live session."""
     store = {
         C._presence_key("ex-1"): "1",
@@ -944,7 +944,7 @@ async def test_release_presence_respeita_o_dono_atual(monkeypatch):
     assert C._presence_key("ex-1") not in store
 
 
-async def test_renew_presence_indica_perda_de_posse(monkeypatch):
+async def test_renew_presence_signals_ownership_loss(monkeypatch):
     class _RC:
         async def eval(self, *_a):
             return 0
@@ -956,7 +956,7 @@ async def test_renew_presence_indica_perda_de_posse(monkeypatch):
     assert await C._redis_renew_presence("ex-1", "token-antigo") is False
 
 
-async def test_renew_presence_e_fail_open_em_erro_de_redis(monkeypatch):
+async def test_renew_presence_is_fail_open_on_redis_error(monkeypatch):
     async def _boom():
         raise RuntimeError("redis fora")
 
@@ -971,28 +971,28 @@ async def test_renew_presence_e_fail_open_em_erro_de_redis(monkeypatch):
     assert await C._redis_renew_presence("ex-1", "tok") is None
 
 
-def test_conexao_nasce_com_memo_e_token_proprios():
+def test_connection_starts_with_its_own_memo_and_token():
     a = C.ExecutorConnection(executor_id="ex-1", websocket=None)
     b = C.ExecutorConnection(executor_id="ex-1", websocket=None)
     assert a.owner_token != b.owner_token
     assert a.run_auth_cache is not b.run_auth_cache
 
 
-def test_capacidade_inicial_respeita_o_default():
+def test_initial_capacity_respects_the_default():
     conn = C.ExecutorConnection(executor_id="ex-1", websocket=None)
     assert conn.capacity["running"] + conn.capacity["queued"] == 0
     assert conn.is_full() is False
 
 
 # Sanity: the handler should no longer depend on a real asyncio.sleep in the tests.
-def test_grace_period_configurado():
+def test_configured_grace_period():
     assert ORF._DISCONNECT_GRACE_SECONDS > 0
     assert isinstance(asyncio.Queue, type)
 
 
 # ── P0: per-connection queue, coalescing and flush on teardown ───────────────
 
-class _PipeGravador:
+class _RecordingPipe:
     """Pipeline that records the enqueued commands and how many times it executed."""
 
     def __init__(self, log: list, execucoes: list):
@@ -1028,19 +1028,19 @@ class _PipeGravador:
         return []
 
 
-class _RedisGravador:
+class _RecordingRedis:
     def __init__(self):
         self.log: list = []
         self.execucoes: list = []
 
     def pipeline(self, transaction=False):
-        return _PipeGravador(self.log, self.execucoes)
+        return _RecordingPipe(self.log, self.execucoes)
 
 
-async def test_lote_de_node_events_vira_um_unico_pipeline(monkeypatch, fake_conn):
+async def test_node_events_batch_becomes_a_single_pipeline(monkeypatch, fake_conn):
     """64 events cost 64 serialized Redis round-trips in the receive
     loop — that is what held the final job_result behind the telemetry."""
-    rc = _RedisGravador()
+    rc = _RecordingRedis()
     monkeypatch.setattr(RES, "_run_belongs_to_agent", _async_true)
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
 
@@ -1059,8 +1059,8 @@ async def test_lote_de_node_events_vira_um_unico_pipeline(monkeypatch, fake_conn
     assert [json.loads(p[2])["node"] for p in publishes] == [f"n{i}" for i in range(64)]
 
 
-async def test_lote_agrupa_por_run_sem_misturar(monkeypatch, fake_conn):
-    rc = _RedisGravador()
+async def test_batch_groups_by_run_without_mixing(monkeypatch, fake_conn):
+    rc = _RecordingRedis()
     monkeypatch.setattr(RES, "_run_belongs_to_agent", _async_true)
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
 
@@ -1073,9 +1073,9 @@ async def test_lote_agrupa_por_run_sem_misturar(monkeypatch, fake_conn):
     assert len(rpushes["workflow:b:history"]) == 1
 
 
-async def test_lote_nao_publica_run_alheio(monkeypatch, fake_conn):
+async def test_batch_does_not_publish_foreign_run(monkeypatch, fake_conn):
     """Authorization is per run, once per batch — grouping must not loosen it."""
-    rc = _RedisGravador()
+    rc = _RecordingRedis()
 
     async def _belongs(_aid, run_id):
         return run_id == "meu"
@@ -1090,18 +1090,18 @@ async def test_lote_nao_publica_run_alheio(monkeypatch, fake_conn):
     assert any(c[1] == "workflow:meu:history" for c in rc.log if c[0] == "rpush")
 
 
-async def test_drenadora_preserva_a_ordem_entre_node_event_e_job_result(monkeypatch, fake_conn):
+async def test_drainer_preserves_order_between_node_event_and_job_result(monkeypatch, fake_conn):
     """If both paths drained in parallel, __workflow_complete__ could
     overtake the last node events."""
     ordem: list[str] = []
 
-    async def _publica(_aid, msgs):
+    async def _publish(_aid, msgs):
         ordem.extend(f"evento:{m['node']}" for m in msgs)
 
     async def _resultado(_aid, _msg, _bytes, **_kw):
         ordem.append("job_result")
 
-    monkeypatch.setattr(IB, "_publish_node_events", _publica)
+    monkeypatch.setattr(IB, "_publish_node_events", _publish)
     monkeypatch.setattr(IB, "_handle_job_result", _resultado)
 
     inbox: asyncio.Queue = asyncio.Queue(maxsize=100)
@@ -1110,38 +1110,38 @@ async def test_drenadora_preserva_a_ordem_entre_node_event_e_job_result(monkeypa
     inbox.put_nowait(("node_event", {"run_id": "r", "node": "n2"}, 10))
     inbox.put_nowait(IB._INBOX_STOP)
 
-    await IB._drenar_inbox("ex-1", inbox)
+    await IB._drain_inbox("ex-1", inbox)
     assert ordem == ["evento:n1", "job_result", "evento:n2"]
 
 
-async def test_drenadora_faz_flush_antes_de_encerrar(monkeypatch, fake_conn):
+async def test_drainer_flushes_before_exiting(monkeypatch, fake_conn):
     """Without the flush on WS teardown, the run's last events are lost and the
     user's panel spins forever on a run that has already finished."""
     publicados: list[dict] = []
 
-    async def _publica(_aid, msgs):
+    async def _publish(_aid, msgs):
         publicados.extend(msgs)
 
-    monkeypatch.setattr(IB, "_publish_node_events", _publica)
+    monkeypatch.setattr(IB, "_publish_node_events", _publish)
 
     inbox: asyncio.Queue = asyncio.Queue(maxsize=100)
-    task = asyncio.create_task(IB._drenar_inbox("ex-1", inbox))
+    task = asyncio.create_task(IB._drain_inbox("ex-1", inbox))
     inbox.put_nowait(("node_event", {"run_id": "r", "node": "n1"}, 10))
     await IB._encerrar_drenagem(inbox, task)
     assert [m["node"] for m in publicados] == ["n1"]
 
 
-async def test_drenadora_sobrevive_a_erro_de_um_handler(monkeypatch, fake_conn):
+async def test_drainer_survives_a_handler_error(monkeypatch, fake_conn):
     """A problematic job_result must not kill the draining of the rest of the connection."""
     publicados: list[dict] = []
 
-    async def _publica(_aid, msgs):
+    async def _publish(_aid, msgs):
         publicados.extend(msgs)
 
     async def _explode(*_a, **_kw):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(IB, "_publish_node_events", _publica)
+    monkeypatch.setattr(IB, "_publish_node_events", _publish)
     monkeypatch.setattr(IB, "_handle_job_result", _explode)
 
     inbox: asyncio.Queue = asyncio.Queue(maxsize=100)
@@ -1149,13 +1149,13 @@ async def test_drenadora_sobrevive_a_erro_de_um_handler(monkeypatch, fake_conn):
     inbox.put_nowait(("node_event", {"run_id": "r", "node": "n1"}, 10))
     inbox.put_nowait(IB._INBOX_STOP)
 
-    await IB._drenar_inbox("ex-1", inbox)
+    await IB._drain_inbox("ex-1", inbox)
     assert [m["node"] for m in publicados] == ["n1"]
 
 
 # ── S: sync_event ganha rate limit e teto de bytes ───────────────────────────
 
-def test_sync_event_tem_rate_limit(monkeypatch):
+def test_sync_event_has_rate_limit(monkeypatch):
     monkeypatch.setattr(P, "_rate_state", {})
     permitidos = sum(
         P._sync_event_allowed("ex-1", {"event": "file_uploaded"})
@@ -1164,7 +1164,7 @@ def test_sync_event_tem_rate_limit(monkeypatch):
     assert permitidos == P._SYNC_EVENT_RATE_LIMIT
 
 
-def test_sync_event_terminal_nao_e_descartado(monkeypatch):
+def test_terminal_sync_event_is_not_dropped(monkeypatch):
     """Losing sync_complete leaves the progress bar stuck forever."""
     monkeypatch.setattr(P, "_rate_state", {})
     for _ in range(P._SYNC_EVENT_RATE_LIMIT + 50):
@@ -1172,7 +1172,7 @@ def test_sync_event_terminal_nao_e_descartado(monkeypatch):
     assert P._sync_event_allowed("ex-1", {"event": "sync_complete"}) is True
 
 
-def test_sync_error_nao_e_isento_do_rate_limit(monkeypatch):
+def test_sync_error_is_not_exempt_from_rate_limit(monkeypatch):
     """`sync_error`/`conflict_detected` are emitted PER FILE.
 
     Exempting them brought back in full the flood the ceiling exists to contain:
@@ -1189,7 +1189,7 @@ def test_sync_error_nao_e_isento_do_rate_limit(monkeypatch):
     assert P._SYNC_TERMINAL_EVENTS == frozenset({"sync_complete"})
 
 
-def test_balde_de_problema_nao_consome_a_cota_do_progresso(monkeypatch):
+def test_problem_bucket_does_not_consume_progress_quota(monkeypatch):
     """A burst of errors must not stop the progress bar, nor the other way around."""
     monkeypatch.setattr(P, "_rate_state", {})
     for i in range(P._SYNC_PROBLEM_RATE_LIMIT + 200):
@@ -1197,8 +1197,8 @@ def test_balde_de_problema_nao_consome_a_cota_do_progresso(monkeypatch):
     assert P._sync_event_allowed("ex-1", {"event": "file_uploaded"}) is True
 
 
-async def test_sync_event_gigante_e_reduzido_e_sai_num_pipeline(monkeypatch):
-    rc = _RedisGravador()
+async def test_huge_sync_event_is_reduced_and_goes_out_in_a_pipeline(monkeypatch):
+    rc = _RecordingRedis()
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
 
     await RES._handle_sync_event("ex-1", {
@@ -1231,7 +1231,7 @@ class _RedisEval:
         return [1, self.valor]
 
 
-def _rc_fixo(monkeypatch, rc):
+def _fixed_rc(monkeypatch, rc):
     async def _get_rc():
         return rc
 
@@ -1240,27 +1240,27 @@ def _rc_fixo(monkeypatch, rc):
     return C.ExecutorConnectionRegistry()
 
 
-async def test_ack_limpa_em_um_round_trip(monkeypatch):
+async def test_ack_cleans_up_in_one_round_trip(monkeypatch):
     rc = _RedisEval("ex-1|123.4")
-    reg = _rc_fixo(monkeypatch, rc)
+    reg = _fixed_rc(monkeypatch, rc)
     assert await reg.clear_pending_ack(
         "j1", expected_executor_id="ex-1",
     ) == "ex-1"
     assert rc.chamadas == 1
 
 
-async def test_ack_de_impostor_continua_recusado(monkeypatch):
+async def test_impostor_ack_is_still_refused(monkeypatch):
     """SEC: the ACK only clears jobs dispatched to THIS executor."""
     rc = _RedisEval("ex-2|123.4")
-    reg = _rc_fixo(monkeypatch, rc)
+    reg = _fixed_rc(monkeypatch, rc)
     assert await reg.clear_pending_ack(
         "j1", expected_executor_id="ex-1",
     ) is None
 
 
-async def test_ack_de_job_desconhecido_devolve_none(monkeypatch):
+async def test_ack_of_unknown_job_returns_none(monkeypatch):
     rc = _RedisEval(None)
-    reg = _rc_fixo(monkeypatch, rc)
+    reg = _fixed_rc(monkeypatch, rc)
     assert await reg.clear_pending_ack(
         "j1", expected_executor_id="ex-1",
     ) is None
@@ -1268,12 +1268,12 @@ async def test_ack_de_job_desconhecido_devolve_none(monkeypatch):
 
 # ── P: throttled presence renewal ────────────────────────────────────────────
 
-async def test_presenca_nao_renova_a_cada_mensagem(monkeypatch):
+async def test_presence_does_not_renew_on_every_message(monkeypatch):
     """There were 2 EVALs per capacity (every 10s) for a 120s TTL."""
-    renovacoes = []
+    renewals = []
 
     async def _renew(executor_id, token):
-        renovacoes.append(executor_id)
+        renewals.append(executor_id)
         return True
 
     monkeypatch.setattr(C, "_redis_renew_presence", _renew)
@@ -1283,14 +1283,14 @@ async def test_presenca_nao_renova_a_cada_mensagem(monkeypatch):
 
     for _ in range(12):  # ~2 minutes of capacity every 10s
         await reg.update_capacity("ex-1", dict(C._DEFAULT_CAPACITY))
-    assert renovacoes == []
+    assert renewals == []
 
     conn.last_presence_renew -= C._PRESENCE_RENEW_INTERVAL + 1
     await reg.update_capacity("ex-1", dict(C._DEFAULT_CAPACITY))
-    assert renovacoes == ["ex-1"]
+    assert renewals == ["ex-1"]
 
 
-async def test_falha_de_redis_nao_conta_como_renovacao(monkeypatch):
+async def test_redis_failure_does_not_count_as_renewal(monkeypatch):
     """A12: a Redis blip turned into 'renewed' for an entire interval.
 
     Combined with the fail-open of `_redis_renew_presence`, the presence key
@@ -1319,7 +1319,7 @@ async def test_falha_de_redis_nao_conta_como_renovacao(monkeypatch):
     assert tentativas == ["ex-1", "ex-1"]
 
 
-async def test_renovacao_confirmada_carimba_o_throttle(monkeypatch):
+async def test_confirmed_renewal_stamps_the_throttle(monkeypatch):
     """The throttle still applies when the renewal actually happened."""
     tentativas = []
 
@@ -1339,7 +1339,7 @@ async def test_renovacao_confirmada_carimba_o_throttle(monkeypatch):
     assert tentativas == ["ex-1"]
 
 
-async def test_perda_de_posse_ainda_derruba_o_ws_duplicado(monkeypatch):
+async def test_ownership_loss_still_drops_the_duplicate_ws(monkeypatch):
     """False (another worker is the owner) still closes this session."""
     async def _renew(_executor_id, _token):
         return False
@@ -1362,7 +1362,7 @@ async def test_perda_de_posse_ainda_derruba_o_ws_duplicado(monkeypatch):
     C.encerrar_saida(ws)
 
 
-def test_folga_de_renovacao_cobre_mais_de_uma_falha():
+def test_renewal_slack_covers_more_than_one_failure():
     """With TTL/3 a single missed renewal already brushed up against expiry."""
     assert C._PRESENCE_TTL / C._PRESENCE_RENEW_INTERVAL >= 4
 
@@ -1379,20 +1379,20 @@ def _stdout_event(i):
     return ("node_event", {"run_id": "run-1", "node": f"n{i}", "kind": "stdout"}, 10)
 
 
-async def test_job_result_nao_e_descartado_com_a_fila_cheia(monkeypatch):
+async def test_job_result_is_not_dropped_with_full_queue(monkeypatch):
     """job_result is NEVER discarded: with the queue full it goes INLINE right away. Before,
     it tried to open a slot by sacrificing telemetry; now it goes straight inline —
     simpler and equally lossless. Losing it would leave the run hanging in 'running'."""
     inbox = IB._InboxQueue(maxsize=4)
     for i in range(4):
         inbox.put_nowait(_stdout_event(i))
-    processados = []
+    processed = []
 
     async def _fake_handle(executor_id, msg, frame_bytes=0, **_kw):
-        processados.append(msg["job_id"])
+        processed.append(msg["job_id"])
 
     monkeypatch.setattr(IB, "_handle_job_result", _fake_handle)
-    descartes = IB._novo_contador_de_descartes()
+    descartes = IB._new_drop_counter()
 
     await IB._enfileirar_mensagem(
         "ex-1", inbox, descartes, "job_result", {"job_id": "j1"}, 10,
@@ -1400,12 +1400,12 @@ async def test_job_result_nao_e_descartado_com_a_fila_cheia(monkeypatch):
 
     # Processed inline; not enqueued, and the queue's telemetry stays intact
     # (we do not sacrifice telemetry to open a slot — inline already solves it).
-    assert processados == ["j1"]
+    assert processed == ["j1"]
     assert inbox.qsize() == 4
     assert descartes["total"] == 0
 
 
-async def test_telemetria_continua_sendo_descartada_com_a_fila_cheia():
+async def test_telemetry_is_still_dropped_with_full_queue():
     """The optimization is not undone: STDOUT on a full queue is still dropped.
 
     Before, this test sent a node_event WITHOUT `kind` and required it to be
@@ -1416,7 +1416,7 @@ async def test_telemetria_continua_sendo_descartada_com_a_fila_cheia():
     inbox = IB._InboxQueue(maxsize=2)
     for i in range(2):
         inbox.put_nowait(_stdout_event(i))
-    descartes = IB._novo_contador_de_descartes()
+    descartes = IB._new_drop_counter()
 
     await IB._enfileirar_mensagem(
         "ex-1", inbox, descartes, "node_event",
@@ -1426,61 +1426,61 @@ async def test_telemetria_continua_sendo_descartada_com_a_fila_cheia():
     assert [m[1]["node"] for m in inbox._queue] == ["n0", "n1"]
 
 
-async def test_job_result_sem_telemetria_para_descartar_vai_inline(monkeypatch):
+async def test_job_result_without_telemetry_to_drop_goes_inline(monkeypatch):
     """The contract's last resort: blocking the loop costs less than losing the run."""
     inbox = IB._InboxQueue(maxsize=2)
     inbox.put_nowait(("job_result", {"job_id": "a"}, 10))
     inbox.put_nowait(("job_result", {"job_id": "b"}, 10))
-    processados = []
+    processed = []
 
     async def _fake_handle(executor_id, msg, frame_bytes=0, **_kw):
-        processados.append(msg["job_id"])
+        processed.append(msg["job_id"])
 
     monkeypatch.setattr(IB, "_handle_job_result", _fake_handle)
     await IB._enfileirar_mensagem(
-        "ex-1", inbox, IB._novo_contador_de_descartes(), "job_result", {"job_id": "c"}, 10,
+        "ex-1", inbox, IB._new_drop_counter(), "job_result", {"job_id": "c"}, 10,
     )
-    assert processados == ["c"]
+    assert processed == ["c"]
     assert inbox.qsize() == 2  # the two previous ones are still in the queue
 
 
 # -- A38: cancelling the drainer must not cut a split commit ------------------
 
-async def test_cancelar_a_drenadora_nao_corta_o_job_result_no_meio(monkeypatch):
+async def test_cancelling_the_drainer_does_not_cut_job_result_midway(monkeypatch):
     """A38: a cancel between the lpush to `run_results` and the publish of
     `__workflow_complete__` left the run terminal in the database and the canvas spinning
     forever."""
-    fases = []
+    phases = []
     entrou = asyncio.Event()
     libera = asyncio.Event()
 
     async def _handle(executor_id, msg, frame_bytes=0, **_kw):
-        fases.append("inicio")
+        phases.append("inicio")
         entrou.set()
         await libera.wait()
-        fases.append("fim")
+        phases.append("fim")
 
     monkeypatch.setattr(IB, "_handle_job_result", _handle)
     inbox = IB._InboxQueue(maxsize=10)
     inbox.put_nowait(("job_result", {"job_id": "j1"}, 10))
     inflight: set = set()
-    task = asyncio.create_task(IB._drenar_inbox("ex-1", inbox, inflight))
+    task = asyncio.create_task(IB._drain_inbox("ex-1", inbox, inflight))
 
     await entrou.wait()
     task.cancel()          # teardown desistindo de esperar a drenagem
     await asyncio.sleep(0)
-    assert fases == ["inicio"]
+    assert phases == ["inicio"]
 
     # The write stays alive and shielded: the teardown waits for it.
     assert inflight
     libera.set()
     await asyncio.wait(set(inflight), timeout=1)
-    assert fases == ["inicio", "fim"]
+    assert phases == ["inicio", "fim"]
 
 
 # -- A39: a database cooldown must not eat job_result -------------------------
 
-async def test_cooldown_de_banco_nao_descarta_job_result(monkeypatch, fake_conn):
+async def test_db_cooldown_does_not_drop_job_result(monkeypatch, fake_conn):
     """A39: a transient DB error armed a 2s cooldown and ALL the
     job_results in that window vanished — each one leaving a run hanging."""
     rc = _FakeRedis()
@@ -1495,12 +1495,12 @@ async def test_cooldown_de_banco_nao_descarta_job_result(monkeypatch, fake_conn)
     assert rc.writes, "job_result foi descartado por um cooldown de telemetria"
 
 
-async def test_leitura_do_run_retenta_falha_transitoria(monkeypatch, fake_conn):
+async def test_run_read_retries_transient_failure(monkeypatch, fake_conn):
     """A pgbouncer restart (~200ms) must not cost the run's result."""
     rc = _FakeRedis()
     tentativas = []
 
-    async def _instavel(run_id):
+    async def _flaky(run_id):
         tentativas.append(run_id)
         if len(tentativas) == 1:
             raise RuntimeError("connection reset")
@@ -1508,7 +1508,7 @@ async def test_leitura_do_run_retenta_falha_transitoria(monkeypatch, fake_conn):
 
     monkeypatch.setattr(P, "_rate_state", {})
     monkeypatch.setattr(RES, "_JOB_RESULT_DB_RETRY_DELAY", 0.0)
-    monkeypatch.setattr(RES, "_query_run_snapshot", _instavel)
+    monkeypatch.setattr(RES, "_query_run_snapshot", _flaky)
     monkeypatch.setattr("app.core.redis.get_redis_pool", lambda: rc)
 
     await RES._handle_job_result("ex-1", {
@@ -1518,7 +1518,7 @@ async def test_leitura_do_run_retenta_falha_transitoria(monkeypatch, fake_conn):
     assert rc.writes
 
 
-async def test_job_result_perdido_fecha_o_run_em_vez_de_pendura_lo(monkeypatch, fake_conn):
+async def test_lost_job_result_closes_the_run_instead_of_hanging_it(monkeypatch, fake_conn):
     """Contract: if the result is actually lost, the run becomes failed — it never
     stays in 'running' forever."""
     rc = _FakeRedis()
@@ -1541,7 +1541,7 @@ async def test_job_result_perdido_fecha_o_run_em_vez_de_pendura_lo(monkeypatch, 
     assert any(p.get("node") == "__workflow_complete__" for p in juntos)
 
 
-async def test_run_alheio_nao_e_fechado_com_o_banco_fora(monkeypatch, fake_conn):
+async def test_foreign_run_is_not_closed_with_db_down(monkeypatch, fake_conn):
     """SEC: without proven ownership, a database outage stays fail-closed — a compromised
     executor must not fail another tenant's runs during the incident."""
     rc = _FakeRedis()
@@ -1558,23 +1558,23 @@ async def test_run_alheio_nao_e_fechado_com_o_banco_fora(monkeypatch, fake_conn)
     assert rc.writes == []
 
 
-async def test_teardown_resgata_job_result_que_ficou_na_fila(monkeypatch):
+async def test_teardown_rescues_job_result_left_in_queue(monkeypatch):
     """The cancelled drainer leaves the queue full: telemetry may vanish, the
     result may not — it is the run's last message."""
     inbox = IB._InboxQueue(maxsize=10)
     inbox.put_nowait(("node_event", {"run_id": "run-1", "node": "n1"}, 10))
     inbox.put_nowait(("job_result", {"job_id": "run-1", "run_id": "run-1"}, 10))
-    processados = []
+    processed = []
 
     async def _fake_handle(executor_id, msg, frame_bytes=0, **_kw):
-        processados.append(msg["job_id"])
+        processed.append(msg["job_id"])
 
     monkeypatch.setattr(IB, "_handle_job_result", _fake_handle)
     await IB._resgatar_job_results_pendentes("ex-1", inbox)
-    assert processados == ["run-1"]
+    assert processed == ["run-1"]
 
 
-async def test_resgate_que_falha_fecha_o_run(monkeypatch, fake_conn):
+async def test_failing_rescue_closes_the_run(monkeypatch, fake_conn):
     """If not even the rescue works, the run becomes failed — it never stays in 'running'."""
     rc = _FakeRedis()
     inbox = IB._InboxQueue(maxsize=10)
@@ -1604,11 +1604,11 @@ def _ev(node: str, *, kind: str = "lifecycle", status: str = "completed") -> tup
     return ("node_event", {"run_id": "r", "node": node, "kind": kind, "status": status}, 10)
 
 
-def _nos_na_fila(inbox) -> list:
+def _queued_nodes(inbox) -> list:
     return [m.get("node") for _t, m, _b in list(inbox._queue)]
 
 
-async def test_lifecycle_e_descartado_com_a_fila_cheia():
+async def test_lifecycle_is_dropped_with_full_queue():
     """NEW contract: under a full queue, lifecycle is discardable just like
     telemetry. Losing a `completed` degrades honestly — the node becomes 'unknown'
     at the end of the run (completeExecution) and the client's watchdog recovers the channel.
@@ -1617,7 +1617,7 @@ async def test_lifecycle_e_descartado_com_a_fila_cheia():
     inbox = IB._InboxQueue(maxsize=2)
     inbox.put_nowait(_ev("n1", kind="stdout", status="log"))
     inbox.put_nowait(_ev("n2", kind="stdout", status="log"))
-    descartes = IB._novo_contador_de_descartes()
+    descartes = IB._new_drop_counter()
 
     await IB._enfileirar_mensagem(
         "ex-1", inbox, descartes, "node_event",
@@ -1625,32 +1625,32 @@ async def test_lifecycle_e_descartado_com_a_fila_cheia():
     )
 
     # Discarded: did not jump the queue or wait for a slot.
-    assert _nos_na_fila(inbox) == ["n1", "n2"]
+    assert _queued_nodes(inbox) == ["n1", "n2"]
     assert descartes["total"] == 1
 
 
-async def test_stdout_continua_descartavel_com_a_fila_cheia():
+async def test_stdout_stays_droppable_with_full_queue():
     """The queue exists to absorb telemetry — it is still what gets dropped."""
     inbox = IB._InboxQueue(maxsize=2)
     inbox.put_nowait(_ev("n1"))
     inbox.put_nowait(_ev("n2"))
-    descartes = IB._novo_contador_de_descartes()
+    descartes = IB._new_drop_counter()
 
     await IB._enfileirar_mensagem(
         "ex-1", inbox, descartes, "node_event",
         {"run_id": "r", "node": "n3", "kind": "stdout", "status": "log"}, 10,
     )
 
-    assert _nos_na_fila(inbox) == ["n1", "n2"]
+    assert _queued_nodes(inbox) == ["n1", "n2"]
     assert descartes["total"] == 1
 
 
 # ── sync_complete: the only one that still pays back-pressure ───────────────
 
-async def test_sync_complete_espera_vaga_em_vez_de_ser_descartado():
+async def test_sync_complete_waits_for_slot_instead_of_being_dropped():
     inbox = IB._InboxQueue(maxsize=1)
     inbox.put_nowait(_ev("n1"))
-    descartes = IB._novo_contador_de_descartes()
+    descartes = IB._new_drop_counter()
 
     tarefa = asyncio.create_task(IB._enfileirar_mensagem(
         "ex-1", inbox, descartes, "sync_event", {"event": "sync_complete"}, 10,

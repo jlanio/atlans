@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
-import { GrupoSecao, textoDaContagemDoGrupo, type GrupoSecaoProps } from "@/app/components/projects/grupo-secao"
+import { GrupoSecao, textoDaContagemDoGrupo, type GroupSectionProps } from "@/app/components/projects/grupo-secao"
 import type { IWorkflow, IWorkflowGroup } from "@/service/types"
 
 afterEach(cleanup)
@@ -18,7 +18,7 @@ const grupo: IWorkflowGroup = {
 }
 const lista = [wf({ id_hash: "a", name: "Outorgas" }), wf({ id_hash: "b", name: "Cheias" }), wf({ id_hash: "c", name: "Nascentes" })]
 
-function props(extra: Partial<GrupoSecaoProps> = {}): GrupoSecaoProps {
+function props(extra: Partial<GroupSectionProps> = {}): GroupSectionProps {
   return {
     grupo, workflows: lista, totalNoGrupo: 3, ativosNoGrupo: 2, recolhido: false, onToggle: vi.fn(),
     canEdit: true, podeArrastar: true, arrastandoEste: false, alvoDeReordenacao: false, recebendoWorkflow: false,
@@ -64,9 +64,9 @@ describe("GrupoSecao", () => {
     expect(screen.getByRole("button", { name: /^Hidrologia/ })).toHaveAttribute("aria-expanded", "false")
     // The body stays in the DOM (the button references it via aria-controls), just
     // hidden; the rows are not mounted when collapsed.
-    const corpoRecolhido = document.getElementById("grupo-g1-corpo")
-    expect(corpoRecolhido).not.toBeNull()
-    expect(corpoRecolhido).toHaveAttribute("hidden")
+    const collapsedBody = document.getElementById("grupo-g1-corpo")
+    expect(collapsedBody).not.toBeNull()
+    expect(collapsedBody).toHaveAttribute("hidden")
     expect(screen.queryByText("Outorgas")).toBeNull()
   })
 

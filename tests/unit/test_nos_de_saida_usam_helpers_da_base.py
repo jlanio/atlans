@@ -25,21 +25,21 @@ from pathlib import Path
 import pytest
 
 RAIZ = Path(__file__).resolve().parents[2]
-SAIDAS = RAIZ / "flow" / "nodes" / "outputs"
+OUTPUTS_DIR = RAIZ / "flow" / "nodes" / "outputs"
 
 # Nodes that resolve workspace_id/task_id (the ones that save an artifact).
-COM_CONTEXTO = ["save_to_shapefile", "save_to_geoparquet", "save_to_s3", "data_output", "carta_imagem"]
+WITH_CONTEXT = ["save_to_shapefile", "save_to_geoparquet", "save_to_s3", "data_output", "carta_imagem"]
 
 
-def _fonte(modulo: str) -> str:
-    return (SAIDAS / f"{modulo}.py").read_text(encoding="utf-8")
+def _source(modulo: str) -> str:
+    return (OUTPUTS_DIR / f"{modulo}.py").read_text(encoding="utf-8")
 
 
 # ── require_execution_context ────────────────────────────────────────────────
 
-@pytest.mark.parametrize("modulo", COM_CONTEXTO)
-def test_contexto_de_execucao_vem_do_helper(modulo):
-    fonte = _fonte(modulo)
+@pytest.mark.parametrize("modulo", WITH_CONTEXT)
+def test_execution_context_comes_from_the_helper(modulo):
+    fonte = _source(modulo)
     assert "require_execution_context()" in fonte, (
         f"{modulo} deixou de usar o helper da BaseNode"
     )
@@ -51,7 +51,7 @@ def test_contexto_de_execucao_vem_do_helper(modulo):
     )
 
 
-def test_o_helper_continua_devolvendo_os_dois_valores():
+def test_the_helper_still_returns_both_values():
     """Anchors the contract: the nodes unpack `(workspace_id, task_id)`."""
     from flow.nodes.base import BaseNode
 
@@ -62,15 +62,15 @@ def test_o_helper_continua_devolvendo_os_dois_valores():
 # ── derive_label ─────────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("modulo", ["save_to_shapefile", "save_to_geoparquet"])
-def test_label_vem_do_helper(modulo):
-    fonte = _fonte(modulo)
+def test_label_comes_from_the_helper(modulo):
+    fonte = _source(modulo)
     assert "self.derive_label(" in fonte, f"{modulo} deixou de usar derive_label"
     assert "os.path.splitext(os.path.basename(output_path))" not in fonte, (
         f"{modulo} voltou a derivar o label na mao"
     )
 
 
-def test_save_to_s3_NAO_usa_derive_label_e_isso_e_proposital():
+def test_save_to_s3_does_NOT_use_derive_label_on_purpose():
     """The difference that prevents unification.
 
     `save_to_s3` derives the label from the S3 KEY, not from an outputPath, and
@@ -79,7 +79,7 @@ def test_save_to_s3_NAO_usa_derive_label_e_isso_e_proposital():
     ValueError. If someone "unifies" this node, a key without a basename starts
     bringing down the execution instead of saving the artifact.
     """
-    fonte = _fonte("save_to_s3")
+    fonte = _source("save_to_s3")
     assert "'s3_export'" in fonte, (
         "o fallback de save_to_s3 sumiu — derive_label levantaria ValueError "
         "onde antes havia um nome padrao"
@@ -89,8 +89,8 @@ def test_save_to_s3_NAO_usa_derive_label_e_isso_e_proposital():
 # ── The no-op branch ─────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("modulo", ["save_to_shapefile", "save_to_geoparquet"])
-def test_o_ramo_de_10mb_nao_voltou(modulo):
-    fonte = _fonte(modulo)
+def test_the_10mb_branch_did_not_come_back(modulo):
+    fonte = _source(modulo)
     assert "10 * 1024 * 1024" not in fonte, (
         f"{modulo}: o ramo `if tamanho > 10MB` voltou — ele e no-op, "
         "persistir_artefato le o fileobj inteiro nos dois caminhos"
@@ -98,7 +98,7 @@ def test_o_ramo_de_10mb_nao_voltou(modulo):
 
 
 @pytest.mark.parametrize("modulo", ["save_to_shapefile", "save_to_geoparquet"])
-def test_persistir_artefato_e_chamado_UMA_vez(modulo):
+def test_persist_artifact_is_called_ONCE(modulo):
     """Two calls with the same arguments and the duplicated branch back.
 
     Persistence now runs in `asyncio.to_thread(persistir_artefato, ...)`
@@ -108,7 +108,7 @@ def test_persistir_artefato_e_chamado_UMA_vez(modulo):
     `ast.Name`), which still proves there is exactly one persistence — not the
     two of the size-based branch.
     """
-    arvore = ast.parse(_fonte(modulo))
+    arvore = ast.parse(_source(modulo))
     usos = [
         n for n in ast.walk(arvore)
         if isinstance(n, ast.Name) and n.id == "persistir_artefato"
@@ -119,15 +119,15 @@ def test_persistir_artefato_e_chamado_UMA_vez(modulo):
     )
 
 
-def test_persistir_artefato_le_o_fileobj_nos_dois_caminhos():
+def test_persist_artifact_reads_the_fileobj_on_both_paths():
     """The premise that makes the removed branch a no-op.
 
     If one of the paths starts doing real streaming upload, the branch makes
     sense again — and this test warns that the premise changed.
     """
     fonte = (RAIZ / "flow" / "utils" / "artifact_helpers.py").read_text(encoding="utf-8")
-    ocorrencias = fonte.count("content = fileobj.read()")
-    assert ocorrencias >= 2, (
+    occurrences = fonte.count("content = fileobj.read()")
+    assert occurrences >= 2, (
         "artifact_helpers deixou de ler o fileobj inteiro em algum caminho — "
         "reavalie se o ramo por tamanho volta a ser necessario"
     )

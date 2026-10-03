@@ -2,7 +2,7 @@ import asyncio
 from typing import Any, Dict
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
-from flow.utils.geo_helpers import para_crs_metrico, require_crs
+from flow.utils.geo_helpers import to_metric_crs, require_crs
 from flow.utils.logger import get_logger
 logger = get_logger(__name__)
 
@@ -66,7 +66,7 @@ class ComputeArea(BaseNode):
         if gdf.crs.is_geographic:
             logger.info("Reprojetando GeoDataFrame geográfico para UTM antes de calcular área.")
             try:
-                (gdf,) = await asyncio.to_thread(para_crs_metrico, gdf)
+                (gdf,) = await asyncio.to_thread(to_metric_crs, gdf)
             except Exception as e:
                 logger.error(f"Falha ao reprojetar para UTM: {e}")
                 raise RuntimeError(f"Erro ao reprojetar para UTM: {e}")

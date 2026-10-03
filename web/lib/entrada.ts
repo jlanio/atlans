@@ -15,7 +15,7 @@
  * token, activates the account — these were the /forgot-password,
  * /reset-password and /verify-email pages of the old full-page model.
  */
-export type ModoDeEntrada = "entrar" | "cadastro" | "recuperar" | "redefinir" | "verificar"
+export type EntryMode = "entrar" | "cadastro" | "recuperar" | "redefinir" | "verificar"
 
 /**
  * The panels that come from an E-MAIL LINK, not from the login gate. Two
@@ -30,7 +30,7 @@ export type ModoDeEntrada = "entrar" | "cadastro" | "recuperar" | "redefinir" | 
  *    The link's token is SINGLE-USE: closing the panel out from under someone
  *    using it would burn it without anything having been done.
  */
-export function ehPainelDeEmail(modo: ModoDeEntrada | null | undefined): boolean {
+export function ehPainelDeEmail(modo: EntryMode | null | undefined): boolean {
   return modo === "recuperar" || modo === "redefinir" || modo === "verificar"
 }
 
@@ -55,7 +55,7 @@ export function caminhoInterno(valor: unknown): string | undefined {
  * internal and is not the Home itself — returning to `/` is what already
  * happens without it.
  */
-export function destinoDaEntrada(modo: ModoDeEntrada, callbackUrl?: string): string {
+export function destinoDaEntrada(modo: EntryMode, callbackUrl?: string): string {
   const params = new URLSearchParams()
   params.set(modo, "1")
   const volta = caminhoInterno(callbackUrl)

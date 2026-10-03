@@ -11,7 +11,7 @@
 /** Execution tone — the same vocabulary as the card (globals.css, `.exec-card`). */
 export type ExecTone = "idle" | "running" | "success" | "error" | "unknown"
 
-const TOM_POR_STATUS: Record<string, ExecTone> = {
+const TONE_BY_STATUS: Record<string, ExecTone> = {
   started: "running",
   completed: "success",
   failed: "error",
@@ -25,7 +25,7 @@ const TOM_POR_STATUS: Record<string, ExecTone> = {
   // Cancellation returns nodes to `idle` (see `completeExecution` in workflowExecutionStore).
 }
 
-const TOM_POR_HANDLE: Record<string, ExecTone> = {
+const TONE_BY_HANDLE: Record<string, ExecTone> = {
   true: "success",
   false: "error",
 }
@@ -37,7 +37,7 @@ const TOM_POR_HANDLE: Record<string, ExecTone> = {
  *  returned the `Object` function instead of `undefined`, and the color
  *  became `var(--exec-function Object() { [native code] })` — an invalid
  *  `var()`, property dropped, port invisible on the canvas. */
-function buscarTom(mapa: Record<string, ExecTone>, chave: string): ExecTone | undefined {
+function findTone(mapa: Record<string, ExecTone>, chave: string): ExecTone | undefined {
   // `hasOwnProperty.call` and not `Object.hasOwn`: this is the only color module
   // on the render path of EVERY edge, and `Object.hasOwn` is ES2022 — the project
   // declares no browserslist and Next's polyfill bundle does not cover it. It
@@ -52,7 +52,7 @@ function buscarTom(mapa: Record<string, ExecTone>, chave: string): ExecTone | un
  *  Without this the handle would have to repeat the `true → verde` map, and the
  *  two ends of the same connection could diverge without anyone noticing. */
 export function tomDoHandle(handle: string | null | undefined): ExecTone | undefined {
-  return handle ? buscarTom(TOM_POR_HANDLE, handle) : undefined
+  return handle ? findTone(TONE_BY_HANDLE, handle) : undefined
 }
 
 /** Edge tone from the source's status and the output handle. */
@@ -62,8 +62,8 @@ export function tomDaAresta(
   perdedora: boolean,
 ): ExecTone {
   if (perdedora) return "idle"
-  return (status ? buscarTom(TOM_POR_STATUS, status) : undefined)
-    ?? buscarTom(TOM_POR_HANDLE, handle)
+  return (status ? findTone(TONE_BY_STATUS, status) : undefined)
+    ?? findTone(TONE_BY_HANDLE, handle)
     ?? "idle"
 }
 

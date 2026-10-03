@@ -51,7 +51,7 @@ QUARENTENA_DIAS = 14
 
 PYPI = "https://pypi.org/pypi"
 
-_PINO = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?==([^\s\\;#]+)")
+_PIN = re.compile(r"^([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?==([^\s\\;#]+)")
 _HASH = re.compile(r"--hash=sha256:([0-9a-f]{64})")
 
 
@@ -64,7 +64,7 @@ def travados(caminho: Path) -> dict[tuple[str, str], set[str]]:
     blocos: dict[tuple[str, str], set[str]] = {}
     atual = None
     for linha in caminho.read_text(encoding="utf-8").splitlines():
-        m = _PINO.match(linha)
+        m = _PIN.match(linha)
         if m:
             atual = (normalizar(m.group(1)), m.group(2))
             blocos.setdefault(atual, set())
@@ -111,8 +111,8 @@ def consultar(nome: str, versao: str, hashes: set[str] | None = None, tentativas
     publicado = max(
         dt.datetime.fromisoformat(a["upload_time_iso_8601"].replace("Z", "+00:00")) for a in arquivos
     )
-    retirados = [a for a in arquivos if a.get("yanked")]
-    retirada = (retirados[0].get("yanked_reason") or "") if retirados else None
+    yanked_files = [a for a in arquivos if a.get("yanked")]
+    retirada = (yanked_files[0].get("yanked_reason") or "") if yanked_files else None
     return Consulta(publicado, retirada)
 
 
@@ -131,7 +131,7 @@ def consultar_varios(
         return dict(zip(pedidos, pool.map(uma, pedidos)))
 
 
-def _dias(delta: dt.timedelta) -> str:
+def _days(delta: dt.timedelta) -> str:
     return f"{delta.total_seconds() / 86400:.1f}"
 
 
@@ -159,7 +159,7 @@ def main() -> int:
         key=lambda cr: cr[1].publicado,
         reverse=True,
     )
-    retiradas = sorted((c, r) for c, r in respostas.items() if isinstance(r, Consulta) and r.retirada is not None)
+    yanked_releases = sorted((c, r) for c, r in respostas.items() if isinstance(r, Consulta) and r.retirada is not None)
     erros = sorted((c, r) for c, r in respostas.items() if isinstance(r, Exception))
 
     no_actions = os.environ.get("GITHUB_ACTIONS") == "true"
@@ -171,7 +171,7 @@ def main() -> int:
         resumo += ["| Pacote | Publicado (UTC) | Dias | Locks |", "|---|---|---|---|"]
         for (nome, versao), r in recentes:
             locks = ", ".join(onde[(nome, versao)])
-            dias = _dias(agora - r.publicado)
+            dias = _days(agora - r.publicado)
             print(f"  {nome}=={versao}  {r.publicado:%Y-%m-%d %H:%M}  ({dias} dias)  {locks}")
             resumo.append(f"| `{nome}=={versao}` | {r.publicado:%Y-%m-%d %H:%M} | {dias} | {locks} |")
             if no_actions:
@@ -183,7 +183,7 @@ def main() -> int:
         print(f"\nNenhuma versão com menos de {QUARENTENA_DIAS} dias.")
         resumo.append(f"Nenhuma versão com menos de {QUARENTENA_DIAS} dias.")
 
-    for (nome, versao), r in retiradas:
+    for (nome, versao), r in yanked_releases:
         motivo = r.retirada or "sem motivo informado"
         print(f"  RETIRADA do PyPI (yanked): {nome}=={versao} — {motivo}")
         resumo.append(f"\n**Retirada do PyPI (yanked):** `{nome}=={versao}` — {motivo}")
@@ -203,7 +203,7 @@ def main() -> int:
     if args.estrito:
         if erros:
             return 2
-        if recentes or retiradas:
+        if recentes or yanked_releases:
             return 1
     return 0
 

@@ -12,44 +12,44 @@
  * Defaults don't go into the URL, so it stays clean when nothing was touched.
  */
 
-import { PERIODOS, type Periodo } from "../observability/historico-url"
+import { PERIODS, type Period } from "../observability/historico-url"
 
-export { PERIODOS }
-export type { Periodo }
+export { PERIODS }
+export type { Period }
 
-export type EstadoDoEscopo = "ativo" | "todos"
+export type ScopeState = "ativo" | "todos"
 
-export const ESCOPO_PADRAO: EstadoDoEscopo = "ativo"
+export const DEFAULT_SCOPE: ScopeState = "ativo"
 /** The same default window as History (spec §3.1). */
-export const PERIODO_PADRAO: Periodo = 30
+export const DEFAULT_PERIOD: Period = 30
 
-export interface EstadoDoDashboard {
-  escopo: EstadoDoEscopo
-  periodo: Periodo
+export interface DashboardState {
+  escopo: ScopeState
+  periodo: Period
 }
 
 type Leitor = { get(nome: string): string | null }
 
 /** Only `escopo=todos` becomes "todos"; any other value (or absence) → "ativo". */
-export function lerEscopo(sp: Leitor): EstadoDoEscopo {
-  return sp.get("escopo") === "todos" ? "todos" : ESCOPO_PADRAO
+export function lerEscopo(sp: Leitor): ScopeState {
+  return sp.get("escopo") === "todos" ? "todos" : DEFAULT_SCOPE
 }
 
 /** `periodo` is only valid as 7/30/90 (History's set); anything else (or absence) → 30. */
-export function lerPeriodo(sp: Leitor): Periodo {
+export function readPeriod(sp: Leitor): Period {
   const bruto = Number(sp.get("periodo"))
-  return (PERIODOS as number[]).includes(bruto) ? (bruto as Periodo) : PERIODO_PADRAO
+  return (PERIODS as number[]).includes(bruto) ? (bruto as Period) : DEFAULT_PERIOD
 }
 
 /** Reads both slices from the query string; an invalid value falls back to each one's default. */
-export function lerEstado(sp: Leitor): EstadoDoDashboard {
-  return { escopo: lerEscopo(sp), periodo: lerPeriodo(sp) }
+export function lerEstado(sp: Leitor): DashboardState {
+  return { escopo: lerEscopo(sp), periodo: readPeriod(sp) }
 }
 
 /** Query string (without "?") of both slices; omits each default so the URL stays clean. */
-export function escreverEstado(estado: EstadoDoDashboard): string {
+export function escreverEstado(estado: DashboardState): string {
   const sp = new URLSearchParams()
-  if (estado.escopo !== ESCOPO_PADRAO) sp.set("escopo", estado.escopo)
-  if (estado.periodo !== PERIODO_PADRAO) sp.set("periodo", String(estado.periodo))
+  if (estado.escopo !== DEFAULT_SCOPE) sp.set("escopo", estado.escopo)
+  if (estado.periodo !== DEFAULT_PERIOD) sp.set("periodo", String(estado.periodo))
   return sp.toString()
 }

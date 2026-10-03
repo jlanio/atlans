@@ -18,7 +18,7 @@ export function chaveDosColapsados(workspaceId: string | null | undefined): stri
   return `${PREFIXO}:${workspaceId ?? "sem-workspace"}`
 }
 
-export function lerColapsados(chave: string): Set<string> {
+export function readCollapsed(chave: string): Set<string> {
   try {
     const cru = window.localStorage.getItem(chave)
     if (!cru) return new Set()
@@ -32,7 +32,7 @@ export function lerColapsados(chave: string): Set<string> {
   }
 }
 
-export function gravarColapsados(chave: string, recolhidos: Set<string>): void {
+export function saveCollapsed(chave: string, recolhidos: Set<string>): void {
   try {
     window.localStorage.setItem(chave, JSON.stringify([...recolhidos]))
   } catch {

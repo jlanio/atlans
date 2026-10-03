@@ -16,7 +16,7 @@ from pathlib import Path
 # nodes, how to reference credentials, how to write expressions, how to receive
 # inputs, where external sources come from (the catalog), SQL, known pitfalls
 # and, finally, ready-made recipes.
-TOPICOS: tuple[str, ...] = (
+TOPICS: tuple[str, ...] = (
     "overview",
     "edges",
     "credentials",
@@ -36,8 +36,8 @@ def ler_topico(topic: str) -> str:
     comes from the client, and building a `Path` from arbitrary text would be
     directory traversal.
     """
-    if topic not in TOPICOS:
+    if topic not in TOPICS:
         raise ValueError(
-            f"Tópico desconhecido: {topic!r}. Disponíveis: {', '.join(TOPICOS)}."
+            f"Tópico desconhecido: {topic!r}. Disponíveis: {', '.join(TOPICS)}."
         )
     return (Path(__file__).parent / f"{topic}.md").read_text(encoding="utf-8")

@@ -31,7 +31,7 @@ an accidental `print()` from a workflow node landing on the same stdout.
 ## Commands (stdin)
 
 One JSON line per command, mirroring the keys of the `rich` panel
-(`runtime.py::_tecla`) — the GUI gets exactly the control surface the
+(`runtime.py::_on_key`) — the GUI gets exactly the control surface the
 terminal operator has, no more, no less.
 """
 from __future__ import annotations
@@ -52,7 +52,7 @@ logger = logging.getLogger("executor.dashboard")
 # Format version, the `v` of the framing. Bumping it here requires updating the PROTOCOLO
 # in desktop/src/shared/events.ts.
 PROTOCOLO = 1
-_PREFIXO = '{"v":%d,' % PROTOCOLO
+_PREFIX = '{"v":%d,' % PROTOCOLO
 
 # Events held back while the consumer is not reading. When full, the OLDEST is dropped
 # (deque with maxlen). It is the right choice for snapshots, which supersede each other: the
@@ -61,7 +61,7 @@ _BUFFER_MAX = 256
 
 # Ceiling on a serialized line. No event may become a multi-megabyte line
 # that hangs the parser on the other side.
-_LINHA_MAX = 512 * 1024
+_LINE_MAX = 512 * 1024
 
 # `Snapshot` fields that exist for the `rich` panel to draw and that this
 # runtime does NOT emit. `log_tail` is up to 200 log lines resent in full
@@ -76,12 +76,12 @@ _LINHA_MAX = 512 * 1024
 #
 # If some screen ever needs `system`, its place is `hello`, which goes out
 # once, and not a periodic event.
-_SO_DO_PAINEL = ("log_tail", "system")
+_DASHBOARD_ONLY = ("log_tail", "system")
 
 # Mirror the rich panel's keys 1:1. `toggle_debug` is named that way, and not
-# `set_debug`, because `logging_setup.alternar_debug()` toggles — promising an
+# `set_debug`, because `logging_setup.toggle_debug()` toggles — promising an
 # idempotent setter on top of a toggle would give a retry the opposite semantics.
-COMANDOS = ("shutdown", "reconnect", "reset_stats", "toggle_debug", "ping", "sync_now")
+COMMANDS = ("shutdown", "reconnect", "reset_stats", "toggle_debug", "ping", "sync_now")
 
 
 class JsonRuntime:
@@ -94,19 +94,19 @@ class JsonRuntime:
 
     def __init__(self, stats, *, capacity_source, result_queue, intervalo: float,
                  tail_handler: logging.Handler | None = None,
-                 ao_sair=None, ao_reconectar=None, ao_sincronizar=None):
+                 on_exit=None, ao_reconectar=None, on_sync=None):
         self._stats = stats
         self._capacity_source = capacity_source
         self._result_queue = result_queue
-        self._intervalo = intervalo
+        self._interval = intervalo
         self._tail_handler = tail_handler
-        self._ao_sair = ao_sair
+        self._on_exit = on_exit
         self._ao_reconectar = ao_reconectar
-        self._ao_sincronizar = ao_sincronizar
+        self._on_sync = on_sync
 
         self._loop: asyncio.AbstractEventLoop | None = None
         self._task: asyncio.Task | None = None
-        self._parar = asyncio.Event()
+        self._stop_event = asyncio.Event()
         self._cache_outbox = tick.CacheOutbox()
 
         # Buffer + writer thread. Writing must NOT happen on the event loop:
@@ -114,13 +114,13 @@ class JsonRuntime:
         # heartbeat, jobs, connection — would freeze because the supervisor stopped reading.
         self._buffer: deque[str] = deque(maxlen=_BUFFER_MAX)
         self._cond = threading.Condition()
-        self._descartados = 0
-        self._encerrando = False
-        self._escritora: threading.Thread | None = None
-        self._leitora: threading.Thread | None = None
+        self._dropped = 0
+        self._closing = False
+        self._writer_thread: threading.Thread | None = None
+        self._reader_thread: threading.Thread | None = None
 
     def vincular_fontes(
-        self, *, capacity_source=None, result_queue=None, ao_sincronizar=None,
+        self, *, capacity_source=None, result_queue=None, on_sync=None,
     ) -> None:
         """Hooks up the sources that only exist after boot.
 
@@ -130,7 +130,7 @@ class JsonRuntime:
         is born in phase 3 and the connection in phase 4, so until then the capacity
         fields go out zeroed, which is the truth: there is no queue yet.
 
-        `ao_sincronizar` comes in for the same reason, and through the same door: GeoSync
+        `on_sync` comes in for the same reason, and through the same door: GeoSync
         is only set up in phase 6. It could not be passed in the constructor, and since
         ONLY the rich panel received it there, the `sync_now` command — which comes from the
         desktop app, which runs in JSON mode — always answered
@@ -141,16 +141,16 @@ class JsonRuntime:
             self._capacity_source = capacity_source
         if result_queue is not None:
             self._result_queue = result_queue
-        if ao_sincronizar is not None:
-            self._ao_sincronizar = ao_sincronizar
+        if on_sync is not None:
+            self._on_sync = on_sync
 
     # ── Lifecycle ────────────────────────────────────────────────────────────
 
     async def start(self) -> None:
         self._loop = asyncio.get_running_loop()
-        self._escritora = threading.Thread(
-            target=self._loop_escrita, name="ipc-stdout", daemon=True)
-        self._escritora.start()
+        self._writer_thread = threading.Thread(
+            target=self._write_loop, name="ipc-stdout", daemon=True)
+        self._writer_thread.start()
 
         # `hello` is queued BEFORE the reader starts. With the order reversed,
         # a command already in the pipe was processed first and its
@@ -160,19 +160,19 @@ class JsonRuntime:
             "pid": os.getpid(),
             "executor_id": self._stats.executor_id,
             "python": sys.version.split()[0],
-            "comandos": list(COMANDOS),
+            "comandos": list(COMMANDS),
         })
 
-        self._leitora = threading.Thread(
-            target=self._loop_leitura, name="ipc-stdin", daemon=True)
-        self._leitora.start()
+        self._reader_thread = threading.Thread(
+            target=self._read_loop, name="ipc-stdin", daemon=True)
+        self._reader_thread.start()
         self._task = asyncio.create_task(self._loop_tick(), name="ipc-snapshot")
 
     async def stop(self) -> None:
         """Idempotent. Drains what is still in the buffer before leaving — the
         last `state` (`stopped`) is precisely what the supervisor needs to
         tell an orderly shutdown from a crash."""
-        self._parar.set()
+        self._stop_event.set()
         if self._task is not None:
             self._task.cancel()
             try:
@@ -194,16 +194,16 @@ class JsonRuntime:
             pass
 
         with self._cond:
-            if self._encerrando:
+            if self._closing:
                 return
-            self._encerrando = True
+            self._closing = True
             self._cond.notify_all()
-        t = self._escritora
+        t = self._writer_thread
         if t is not None and t.is_alive():
             # Short on purpose: the goal is to deliver what is already in the buffer,
             # not to wait for a consumer that may have died.
             t.join(timeout=2.0)
-        self._escritora = None
+        self._writer_thread = None
 
         if self._tail_handler is not None:
             try:
@@ -231,7 +231,7 @@ class JsonRuntime:
             if dados is not None:
                 msg["data"] = dados
             linha = json.dumps(msg, ensure_ascii=False, separators=(",", ":"))
-            if len(linha) > _LINHA_MAX:
+            if len(linha) > _LINE_MAX:
                 linha = json.dumps({
                     "v": PROTOCOLO, "t": "warn", "ts": round(time.time(), 3),
                     "data": {"motivo": "linha descartada por tamanho",
@@ -243,20 +243,20 @@ class JsonRuntime:
             return
 
         with self._cond:
-            if self._encerrando:
+            if self._closing:
                 return
             if len(self._buffer) == _BUFFER_MAX:
-                self._descartados += 1
+                self._dropped += 1
             self._buffer.append(linha)
             self._cond.notify()
 
-    def _loop_escrita(self) -> None:
+    def _write_loop(self) -> None:
         """Thread: drains the buffer to stdout. The only place that writes there."""
         while True:
             with self._cond:
-                while not self._buffer and not self._encerrando:
+                while not self._buffer and not self._closing:
                     self._cond.wait()
-                if not self._buffer and self._encerrando:
+                if not self._buffer and self._closing:
                     return
                 lote = list(self._buffer)
                 self._buffer.clear()
@@ -271,9 +271,9 @@ class JsonRuntime:
     # ── Tick ─────────────────────────────────────────────────────────────────
 
     async def _loop_tick(self) -> None:
-        while not self._parar.is_set():
+        while not self._stop_event.is_set():
             try:
-                self._emitir_snapshot()
+                self._emit_snapshot()
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
@@ -282,15 +282,15 @@ class JsonRuntime:
                 # again on the next tick.
                 logger.debug("Falha ao emitir snapshot: %s", exc)
             try:
-                await asyncio.wait_for(self._parar.wait(), timeout=self._intervalo)
+                await asyncio.wait_for(self._stop_event.wait(), timeout=self._interval)
             except asyncio.TimeoutError:
                 pass
 
-    def _emitir_snapshot(self) -> None:
+    def _emit_snapshot(self) -> None:
         from executor.stats import snapshot_to_dict
 
         loop = asyncio.get_running_loop()
-        snap = tick.coletar_snapshot(
+        snap = tick.collect_snapshot(
             self._stats,
             capacity_source=self._capacity_source,
             result_queue=self._result_queue,
@@ -300,16 +300,16 @@ class JsonRuntime:
             return
 
         dados = snapshot_to_dict(snap)
-        for campo in _SO_DO_PAINEL:
+        for campo in _DASHBOARD_ONLY:
             dados.pop(campo, None)
 
         with self._cond:
-            descartados, self._descartados = self._descartados, 0
+            descartados, self._dropped = self._dropped, 0
         self.emitir("snapshot", dados, descartados=descartados)
 
     # ── Comandos ─────────────────────────────────────────────────────────────
 
-    def _loop_leitura(self) -> None:
+    def _read_loop(self) -> None:
         """Thread: reads commands from stdin line by line.
 
         Blocking thread + `call_soon_threadsafe`, and not `loop.connect_read_pipe`:
@@ -336,11 +336,11 @@ class JsonRuntime:
             if loop is None or loop.is_closed():
                 return
             try:
-                loop.call_soon_threadsafe(self._executar_comando, cmd)
+                loop.call_soon_threadsafe(self._run_command, cmd)
             except RuntimeError:
                 return          # loop encerrando
 
-    def _executar_comando(self, cmd: dict) -> None:
+    def _run_command(self, cmd: dict) -> None:
         """Runs ON the event loop. No command may raise."""
         nome = (cmd.get("cmd") or "").strip() if isinstance(cmd, dict) else ""
         ident = cmd.get("id") if isinstance(cmd, dict) else None
@@ -351,10 +351,10 @@ class JsonRuntime:
                 # no shortcut. Draining jobs and confirming results matters more than
                 # exiting fast — on Windows this holds even more, because there is
                 # no signal at all for the supervisor to send.
-                if self._ao_sair is None:
+                if self._on_exit is None:
                     ok, detalhe = False, "sem handler de shutdown"
                 else:
-                    self._ao_sair()
+                    self._on_exit()
             elif nome == "reconnect":
                 if self._ao_reconectar is None:
                     ok, detalhe = False, "sem handler de reconexao"
@@ -365,21 +365,21 @@ class JsonRuntime:
                 # Wakes the GeoSync cycle without waiting for the interval. Whoever asks
                 # knows something the executor has not seen yet — they just copied
                 # a file into the folder, or published something to the Drive.
-                if self._ao_sincronizar is None:
+                if self._on_sync is None:
                     ok, detalhe = False, "sem handler de sincronizacao"
                 else:
                     # `ok` says the command was valid and was executed, not that
                     # something changed — same convention as `reconnect`, which answers
                     # ok even when there was no backoff to interrupt. With no
                     # folder configured there is no failure at all: there is nothing to do.
-                    n = self._ao_sincronizar()
+                    n = self._on_sync()
                     detalhe = (f"{n} pasta(s) acordada(s)" if n
                                else "nenhuma pasta do GeoSync configurada")
             elif nome == "reset_stats":
                 self._stats.reset()
             elif nome == "toggle_debug":
                 from executor import logging_setup
-                ligado = logging_setup.alternar_debug()
+                ligado = logging_setup.toggle_debug()
                 detalhe = "DEBUG" if ligado else "LOG_LEVEL"
             elif nome == "ping":
                 pass

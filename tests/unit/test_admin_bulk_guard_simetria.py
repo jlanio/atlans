@@ -34,7 +34,7 @@ from unittest.mock import AsyncMock as _AsyncMock_seg16
 
 
 @_pytest_seg16.fixture(autouse=True)
-def _patch_revoga_executores(monkeypatch):
+def _patch_revoke_executors(monkeypatch):
     """SEG-16: isolates these tests from executor revocation (its own queries)."""
     monkeypatch.setattr(
         "app.services.executor_service.revogar_executores_do_usuario",
@@ -43,10 +43,10 @@ def _patch_revoga_executores(monkeypatch):
 
 
 RAIZ = Path(__file__).resolve().parents[2]
-ROTAS_BULK = ("bulk_suspend", "bulk_reactivate", "bulk_delete")
+BULK_ROUTES = ("bulk_suspend", "bulk_reactivate", "bulk_delete")
 
 
-class _Usuario:
+class _FakeUser:
     def __init__(self, id_hash="admin-1", status="active"):
         self.id_hash = id_hash
         self.status = status
@@ -63,8 +63,8 @@ def _svc(users):
 
 # ── Simetria estrutural ──────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("rota", ROTAS_BULK)
-def test_toda_rota_bulk_passa_pela_triagem_unica(rota):
+@pytest.mark.parametrize("rota", BULK_ROUTES)
+def test_every_bulk_route_goes_through_the_single_triage(rota):
     fonte = inspect.getsource(getattr(mod, rota))
     assert "_triar(" in fonte, (
         f"{rota} deixou de usar _triar — a triagem voltou a ser copiada, e com "
@@ -72,14 +72,14 @@ def test_toda_rota_bulk_passa_pela_triagem_unica(rota):
     )
 
 
-def test_a_triagem_chama_o_guard_de_jurisdicao():
+def test_triage_calls_the_jurisdiction_guard():
     fonte = inspect.getsource(mod._triar)
     assert "_ensure_admin_can_modify_target" in fonte, (
         "_triar deixou de chamar o guard que as rotas single chamam"
     )
 
 
-def test_nenhuma_rota_bulk_reimplementa_o_laco():
+def test_no_bulk_route_reimplements_the_loop():
     """Uma quarta rota bulk copiando o laco reabriria a assimetria."""
     arvore = ast.parse((RAIZ / "app/api/routers/admin_users_router.py").read_text("utf-8"))
     problemas = []
@@ -100,10 +100,10 @@ def test_nenhuma_rota_bulk_reimplementa_o_laco():
 # ── Behavior preserved per route ─────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_suspend_recusa_auto_acao_e_status_errado():
-    admin = _Usuario("admin-1")
-    ativo = _Usuario("u-ativo", "active")
-    suspenso = _Usuario("u-suspenso", "suspended")
+async def test_suspend_refuses_self_action_and_wrong_status():
+    admin = _FakeUser("admin-1")
+    ativo = _FakeUser("u-ativo", "active")
+    suspenso = _FakeUser("u-suspenso", "suspended")
 
     with _svc([admin, ativo, suspenso]), \
             patch.object(mod.svc, "bulk_suspend", new=AsyncMock()) as acao:
@@ -121,9 +121,9 @@ async def test_suspend_recusa_auto_acao_e_status_errado():
 
 
 @pytest.mark.asyncio
-async def test_reactivate_permite_auto_acao():
+async def test_reactivate_allows_self_action():
     """The only one of the three without a self-action guard — the difference is intentional."""
-    admin = _Usuario("admin-1", "suspended")
+    admin = _FakeUser("admin-1", "suspended")
 
     with _svc([admin]), patch.object(mod.svc, "bulk_reactivate", new=AsyncMock()):
         resp = await mod.bulk_reactivate(
@@ -134,9 +134,9 @@ async def test_reactivate_permite_auto_acao():
 
 
 @pytest.mark.asyncio
-async def test_delete_recusa_quem_ja_esta_excluido():
-    admin = _Usuario("admin-1")
-    ja = _Usuario("u-ja", "deleted")
+async def test_delete_refuses_already_deleted():
+    admin = _FakeUser("admin-1")
+    ja = _FakeUser("u-ja", "deleted")
 
     with _svc([admin, ja]), patch.object(mod.svc, "bulk_soft_delete", new=AsyncMock()):
         resp = await mod.bulk_delete(
@@ -150,7 +150,7 @@ async def test_delete_recusa_quem_ja_esta_excluido():
 # ── Batch semantics preserved ────────────────────────────────────────────────
 
 @pytest.mark.asyncio
-async def test_recusa_do_guard_vira_erro_do_usuario_e_nao_derruba_o_lote():
+async def test_guard_refusal_becomes_user_error_and_does_not_break_the_batch():
     """The difference between single and bulk that the consolidation had to respect.
 
     In the single route, the guard raises and the request dies — correct, it
@@ -159,9 +159,9 @@ async def test_recusa_do_guard_vira_erro_do_usuario_e_nao_derruba_o_lote():
     test anticipates V04: today the guard is a no-op, so without simulation
     there is nothing to check.
     """
-    admin = _Usuario("admin-1")
-    permitido = _Usuario("u-ok", "active")
-    negado = _Usuario("u-fora", "active")
+    admin = _FakeUser("admin-1")
+    permitido = _FakeUser("u-ok", "active")
+    negado = _FakeUser("u-fora", "active")
 
     async def _guard(_db, _admin, uid):
         if uid == "u-fora":
@@ -189,9 +189,9 @@ async def test_recusa_do_guard_vira_erro_do_usuario_e_nao_derruba_o_lote():
 # the text vanished without a trace.
 
 @pytest.mark.asyncio
-async def test_bulk_suspend_repassa_o_motivo_e_o_autor():
-    admin = _Usuario("admin-1")
-    alvo = _Usuario("u-ativo", "active")
+async def test_bulk_suspend_passes_reason_and_author():
+    admin = _FakeUser("admin-1")
+    alvo = _FakeUser("u-ativo", "active")
 
     with _svc([alvo]), patch.object(mod.svc, "bulk_suspend", new=AsyncMock()) as acao:
         await mod.bulk_suspend(
@@ -204,10 +204,10 @@ async def test_bulk_suspend_repassa_o_motivo_e_o_autor():
 
 
 @pytest.mark.asyncio
-async def test_suspend_sem_motivo_continua_funcionando():
+async def test_suspend_without_reason_still_works():
     """The field is optional in the UI — its absence must not break the suspension."""
-    admin = _Usuario("admin-1")
-    alvo = _Usuario("u-ativo", "active")
+    admin = _FakeUser("admin-1")
+    alvo = _FakeUser("u-ativo", "active")
 
     with _svc([alvo]), patch.object(mod.svc, "bulk_suspend", new=AsyncMock()) as acao:
         await mod.bulk_suspend(
@@ -219,7 +219,7 @@ async def test_suspend_sem_motivo_continua_funcionando():
 
 
 @pytest.mark.asyncio
-async def test_o_servico_registra_motivo_e_autor_no_log(caplog):
+async def test_service_logs_reason_and_author(caplog):
     """The destination is the structured log, not `audit_events`, and that is deliberate.
 
     The `audit_events` table exists, is indexed and has documented retention —

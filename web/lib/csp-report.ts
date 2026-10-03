@@ -4,7 +4,7 @@
  *   - `report-to`:  a list `[{ type: "csp-violation", body: {...} }]` (camelCase).
  * Only what decides the policy comes out of here — the rest of the report is log noise.
  */
-export interface ViolacaoCsp {
+export interface CspViolation {
   documento: string;
   diretiva: string;
   bloqueado: string;
@@ -14,14 +14,14 @@ export interface ViolacaoCsp {
 }
 
 // Public endpoint: a forged POST must not turn into a giant log.
-const TETO_POR_POST = 20;
-const TETO_DO_CAMPO = 512;
+const PER_POST_CEILING = 20;
+const FIELD_CEILING = 512;
 
 function texto(v: unknown): string | null {
-  return typeof v === "string" && v.length > 0 ? v.slice(0, TETO_DO_CAMPO) : null;
+  return typeof v === "string" && v.length > 0 ? v.slice(0, FIELD_CEILING) : null;
 }
 
-function deRelato(r: Record<string, unknown>): ViolacaoCsp | null {
+function fromReport(r: Record<string, unknown>): CspViolation | null {
   const diretiva = texto(
     r["effective-directive"] ?? r.effectiveDirective ?? r["violated-directive"] ?? r.violatedDirective,
   );
@@ -39,16 +39,16 @@ function deRelato(r: Record<string, unknown>): ViolacaoCsp | null {
   };
 }
 
-export function extrairViolacoes(corpo: unknown): ViolacaoCsp[] {
+export function extrairViolacoes(corpo: unknown): CspViolation[] {
   const itens: unknown[] = Array.isArray(corpo) ? corpo : [corpo];
-  const saida: ViolacaoCsp[] = [];
+  const saida: CspViolation[] = [];
   for (const item of itens) {
-    if (saida.length >= TETO_POR_POST) break;
+    if (saida.length >= PER_POST_CEILING) break;
     if (!item || typeof item !== "object") continue;
     const o = item as Record<string, unknown>;
     const relato = o["csp-report"] ?? (o.type === "csp-violation" ? o.body : null);
     if (!relato || typeof relato !== "object") continue;
-    const v = deRelato(relato as Record<string, unknown>);
+    const v = fromReport(relato as Record<string, unknown>);
     if (v) saida.push(v);
   }
   return saida;

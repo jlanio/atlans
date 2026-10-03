@@ -14,7 +14,7 @@ import pytest
 import app.core.executor_connections as ec
 
 
-def _registry_sem_conexao_local():
+def _registry_without_local_connection():
     reg = ec.ExecutorConnectionRegistry()
     reg.record_pending_ack = AsyncMock()
     return reg
@@ -25,8 +25,8 @@ def _job():
 
 
 @pytest.mark.asyncio
-async def test_relay_recusa_executor_cheio():
-    reg = _registry_sem_conexao_local()
+async def test_relay_refuses_full_executor():
+    reg = _registry_without_local_connection()
     rc = MagicMock(); rc.publish = AsyncMock(return_value=1)
     with patch.object(ec, "_redis_check_presence", AsyncMock(return_value=True)), \
          patch.object(ec, "_redis_read_capacity", AsyncMock(return_value={
@@ -37,8 +37,8 @@ async def test_relay_recusa_executor_cheio():
 
 
 @pytest.mark.asyncio
-async def test_relay_publica_quando_ha_folga():
-    reg = _registry_sem_conexao_local()
+async def test_relay_publishes_when_there_is_room():
+    reg = _registry_without_local_connection()
     rc = MagicMock(); rc.publish = AsyncMock(return_value=1)
     with patch.object(ec, "_redis_check_presence", AsyncMock(return_value=True)), \
          patch.object(ec, "_redis_read_capacity", AsyncMock(return_value={
@@ -50,9 +50,9 @@ async def test_relay_publica_quando_ha_folga():
 
 
 @pytest.mark.asyncio
-async def test_capacidade_desconhecida_nao_e_fail_closed():
+async def test_unknown_capacity_is_not_fail_closed():
     """Missing key = don't know = try. Refusing here would recreate the spurious 503."""
-    reg = _registry_sem_conexao_local()
+    reg = _registry_without_local_connection()
     rc = MagicMock(); rc.publish = AsyncMock(return_value=1)
     with patch.object(ec, "_redis_check_presence", AsyncMock(return_value=True)), \
          patch.object(ec, "_redis_read_capacity", AsyncMock(return_value=None)), \
@@ -61,7 +61,7 @@ async def test_capacidade_desconhecida_nao_e_fail_closed():
         assert await reg.send_job("ex-1", _job()) is True
 
 
-def test_mesma_conta_de_cheio_nos_dois_caminhos():
+def test_same_full_calculation_on_both_paths():
     cap = {"queued": 50, "running": 4, "max_concurrent": 4, "max_queue": 50}
     conn = ec.ExecutorConnection(executor_id="ex-1", websocket=MagicMock(), capacity=cap)
     assert conn.is_full() is True

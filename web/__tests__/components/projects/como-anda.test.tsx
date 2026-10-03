@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest"
 import { cleanup, render, screen } from "@testing-library/react"
 import { ComoAndaCelula, textoDaContagem, textoDaExecucao } from "@/app/components/projects/como-anda-celula"
-import type { ComoAnda } from "@/app/components/projects/como-anda"
+import type { HowItsGoing } from "@/app/components/projects/como-anda"
 
 afterEach(cleanup)
 
-const concluida: ComoAnda = { tipo: "concluida", quando: "há 3 h", instante: 1, erro: null, total: 61, falhas: 3, mediana: 180 }
-const falhou: ComoAnda = { tipo: "falhou", quando: "há 40 min", instante: 1, erro: "Timeout ao consultar o WFS do SICAR (30 s)", total: 10, falhas: 1, mediana: null }
-const cancelada: ComoAnda = { tipo: "cancelada", quando: "ontem, 06:00", instante: 1, erro: null, total: 5, falhas: 0, mediana: null }
-const executando: ComoAnda = { tipo: "executando", desde: "há 4 min", instante: 1, origem: "agendado", executor: "geo-01", tipica: 420 }
+const concluida: HowItsGoing = { tipo: "concluida", quando: "há 3 h", instante: 1, erro: null, total: 61, falhas: 3, mediana: 180 }
+const falhou: HowItsGoing = { tipo: "falhou", quando: "há 40 min", instante: 1, erro: "Timeout ao consultar o WFS do SICAR (30 s)", total: 10, falhas: 1, mediana: null }
+const cancelada: HowItsGoing = { tipo: "cancelada", quando: "ontem, 06:00", instante: 1, erro: null, total: 5, falhas: 0, mediana: null }
+const executando: HowItsGoing = { tipo: "executando", desde: "há 4 min", instante: 1, origem: "agendado", executor: "geo-01", tipica: 420 }
 
 describe("ComoAndaCelula", () => {
   it("concluída: verde, quando, e a contagem da janela na segunda linha", () => {

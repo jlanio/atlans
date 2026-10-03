@@ -27,19 +27,19 @@ import { Button } from "@/app/components/ui/button"
 import { INodeContext } from "@/context/useFlowContext"
 import { useWorkflowCatalogStore } from "@/app/stores/workflowCatalogStore"
 import { plural } from "@/lib/formatos"
-import { aplicarProposta, type ResultadoDaProposta } from "../utils/aplicar-proposta"
-import type { PropostaDeFluxo } from "@/app/components/home/assistente/quadros"
+import { aplicarProposta, type ProposalResult } from "../utils/aplicar-proposta"
+import type { WorkflowProposal } from "@/app/components/home/assistente/quadros"
 
 interface Props {
-  proposta: PropostaDeFluxo
-  onAplicar: (resultado: ResultadoDaProposta) => void
+  proposta: WorkflowProposal
+  onAplicar: (resultado: ProposalResult) => void
   /** The conversation may now draw by itself on a canvas that had work. */
   liberado: boolean
   /** Called on the first accepted drawing, so the following ones don't ask. */
   onLiberar: () => void
 }
 
-export default function CartaoProposta({ proposta, onAplicar, liberado, onLiberar }: Props) {
+export default function ProposalCard({ proposta, onAplicar, liberado, onLiberar }: Props) {
   const nodesAPI = useWorkflowCatalogStore(s => s.nodesAPI)
   // Subscribes to the canvas HERE, not in the drawer: only this card needs to react
   // to what is drawn, and subscribing up there would re-render the whole
@@ -55,38 +55,38 @@ export default function CartaoProposta({ proposta, onAplicar, liberado, onLibera
 
   // Empty canvas: nothing to lose, always draws. Canvas with work: only after
   // the conversation's first acceptance.
-  const canvasVazio = nos.length === 0
-  const desenhaSozinho = proposta.desenhar === true
+  const canvasEmpty = nos.length === 0
+  const drawsAutomatically = proposta.desenhar === true
     && resultado.catalogoPronto
-    && (canvasVazio || liberado)
+    && (canvasEmpty || liberado)
 
   // Once per card. Without the lock, any canvas re-render (a drag,
   // a zoom) would reapply the same proposal and undo what the person just
   // changed — and `resultado` changes identity on every render, so the
   // dependency list alone doesn't hold it.
-  const jaDesenhou = useRef(false)
+  const alreadyDrew = useRef(false)
   useEffect(() => {
-    if (!desenhaSozinho || jaDesenhou.current) return
-    jaDesenhou.current = true
+    if (!drawsAutomatically || alreadyDrew.current) return
+    alreadyDrew.current = true
     onAplicar(resultado)
-  }, [desenhaSozinho, onAplicar, resultado])
+  }, [drawsAutomatically, onAplicar, resultado])
   // `ok: null` is "don't know" — the validation report couldn't be read. Treating
   // it as "passed" would mean offering to apply a workflow nobody confirmed.
-  const validou = proposta.ok === true && (proposta.erros ?? 0) === 0
+  const validated = proposta.ok === true && (proposta.erros ?? 0) === 0
 
   return (
     <div className="mt-2 rounded-lg border bg-card p-3 shadow-xs" data-testid="cartao-proposta">
       <div className="flex items-start gap-2">
         <span className="mt-0.5 shrink-0" aria-hidden="true">
-          {proposta.desenhar || validou
+          {proposta.desenhar || validated
             ? <TbCheck size={16} className="text-green-600 dark:text-green-400" />
             : <TbAlertTriangle size={16} className="text-amber-600 dark:text-amber-400" />}
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-foreground">
             {proposta.desenhar
-              ? (desenhaSozinho ? "Desenhado no canvas" : "Pronto para desenhar")
-              : (validou ? "Validação limpa" : "Validação com pendências")}
+              ? (drawsAutomatically ? "Desenhado no canvas" : "Pronto para desenhar")
+              : (validated ? "Validação limpa" : "Validação com pendências")}
           </p>
           {proposta.nota && (
             <p className="break-words text-xs text-muted-foreground">{proposta.nota}</p>
@@ -98,7 +98,7 @@ export default function CartaoProposta({ proposta, onAplicar, liberado, onLibera
         </div>
       </div>
 
-      {!proposta.desenhar && !validou && (
+      {!proposta.desenhar && !validated && (
         <p role="status" className="mt-2 rounded-md border border-amber-500/30 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
           {proposta.erros != null && proposta.erros > 0
             ? `A validação apontou ${plural(proposta.erros, "erro")}. Peça o ajuste antes de aplicar.`
@@ -133,17 +133,17 @@ export default function CartaoProposta({ proposta, onAplicar, liberado, onLibera
           first drawing on a canvas that already had work. After it, the
           conversation draws by itself and the footer disappears — interrupting at
           every node would be the opposite of watching the workflow grow. */}
-      {proposta.desenhar && !desenhaSozinho && (
+      {proposta.desenhar && !drawsAutomatically && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <Button
             size="sm"
             className="max-md:h-10"
             disabled={!resultado.catalogoPronto}
             onClick={() => {
-              // The lock BEFORE releasing: releasing makes `desenhaSozinho`
+              // The lock BEFORE releasing: releasing makes `drawsAutomatically`
               // true, the effect fires, and without this the same drawing
               // would land on the canvas twice.
-              jaDesenhou.current = true
+              alreadyDrew.current = true
               onLiberar()
               onAplicar(resultado)
             }}
@@ -157,7 +157,7 @@ export default function CartaoProposta({ proposta, onAplicar, liberado, onLibera
         </div>
       )}
 
-      {proposta.desenhar && desenhaSozinho && (
+      {proposta.desenhar && drawsAutomatically && (
         <p className="mt-2 text-[11px] text-muted-foreground">
           Desenhar não salva — o Salvar continua seu.
         </p>

@@ -13,8 +13,8 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { UserPreferencesDialog } from "./user-preferences-dialog";
 import { EXTENSOES, LimiteDaExtensao } from "@/extensoes";
-import { useTextosDaCasca } from "../home/i18n/da-casca";
-import { useCodigoFonte } from "../share/codigo-fonte";
+import { useShellTexts } from "../home/i18n/da-casca";
+import { useSourceCode } from "../share/codigo-fonte";
 
 /**
  * `portalClassName`: the menu and the Preferences dialog are Radix portals — they
@@ -32,11 +32,11 @@ const UserSidebar = ({ portalClassName }: { portalClassName?: string } = {}) => 
   const { data: session } = useSession()
   const [changedThemeState, setChangedThemeState] = useState("")
   const [prefsOpen, setPrefsOpen] = useState(false)
-  const textosDaCasca = useTextosDaCasca()
-  const t = textosDaCasca.casca.conta
+  const shellTexts = useShellTexts()
+  const t = shellTexts.casca.conta
   // AGPL §13: this installation's source code (CODIGO_FONTE_URL), when it
   // declares it. Opens outside: it isn't a route of this application.
-  const codigoFonte = useCodigoFonte()
+  const codigoFonte = useSourceCode()
 
   const username = session?.user?.username ?? t.usuario
   const email = session?.user?.email ?? ""
@@ -139,7 +139,7 @@ const UserSidebar = ({ portalClassName }: { portalClassName?: string } = {}) => 
             <DropdownMenuItem asChild>
               <a href={codigoFonte} target="_blank" rel="noopener noreferrer">
                 <TbSourceCode />
-                {textosDaCasca.comum.codigoFonte}
+                {shellTexts.comum.codigoFonte}
               </a>
             </DropdownMenuItem>
           )}

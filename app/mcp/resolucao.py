@@ -37,12 +37,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.authorization.workflow_access import (
-    carregar_workflow_acessivel,
+    load_accessible_workflow,
     get_workspace_member_role,
 )
 from app.core.utils.logger import scrub_text
 from app.mcp.erros import erro, to_tool_error
-from app.mcp.escopo import EscopoEfetivo
+from app.mcp.escopo import EffectiveScope
 from app.models.workflow import Workflow
 from app.models.workspace import Workspace
 from app.services.workflow_service import WorkflowService
@@ -69,20 +69,20 @@ def e_uuid(valor) -> bool:
 # whoever varied the id and read the sentence would learn which ones exist on
 # the other side of the wall. The message also does not echo the reference
 # received, for the same reason.
-MSG_WORKFLOW_NAO_ENCONTRADO = "Nenhum workflow com esta referência está ao alcance do token."
-HINT_WORKFLOW_NAO_ENCONTRADO = "use list_workflows para ver o que este token alcança"
+MSG_WORKFLOW_NOT_FOUND = "Nenhum workflow com esta referência está ao alcance do token."
+HINT_WORKFLOW_NOT_FOUND = "use list_workflows para ver o que este token alcança"
 
 
-def _workflow_nao_encontrado():
-    return erro("not_found", MSG_WORKFLOW_NAO_ENCONTRADO, HINT_WORKFLOW_NAO_ENCONTRADO)
+def _workflow_not_found():
+    return erro("not_found", MSG_WORKFLOW_NOT_FOUND, HINT_WORKFLOW_NOT_FOUND)
 
 
-def _candidatos(linhas) -> list:
+def _candidates(linhas) -> list:
     """Candidates for an `ambiguous` error: id at the top level, sanitized name."""
     return [{"id": id_hash, "name": scrub_text(str(nome or ""))} for id_hash, nome in linhas]
 
 
-async def resolver_workspace(db: AsyncSession, escopo: EscopoEfetivo, ref: str | None) -> str:
+async def resolve_workspace(db: AsyncSession, escopo: EffectiveScope, ref: str | None) -> str:
     """The `id_hash` of the workspace the call indicated — id, name or omission.
 
     Omitting it is legitimate when the token reaches a single workspace: asking
@@ -100,14 +100,14 @@ async def resolver_workspace(db: AsyncSession, escopo: EscopoEfetivo, ref: str |
         )
 
     if ref is None:
-        unico = escopo.workspace_unico()
+        unico = escopo.single_workspace()
         if unico:
             return unico
         raise erro(
             "ambiguous",
             "Este token alcança mais de um workspace: informe workspace_id.",
             "escolha um dos candidates e repita a chamada",
-            candidates=_candidatos(await _workspaces_do_escopo(db, alcance)),
+            candidates=_candidates(await _scope_workspaces(db, alcance)),
         )
 
     referencia = str(ref).strip()
@@ -129,7 +129,7 @@ async def resolver_workspace(db: AsyncSession, escopo: EscopoEfetivo, ref: str |
             "ambiguous",
             "Mais de um workspace atende por este nome.",
             "use o id do workspace desejado",
-            candidates=_candidatos(achados),
+            candidates=_candidates(achados),
         )
 
     # Nothing within reach. An id is refused as "forbidden" without querying
@@ -149,7 +149,7 @@ async def resolver_workspace(db: AsyncSession, escopo: EscopoEfetivo, ref: str |
     )
 
 
-async def _workspaces_do_escopo(db: AsyncSession, alcance) -> list:
+async def _scope_workspaces(db: AsyncSession, alcance) -> list:
     resultado = await db.execute(
         select(Workspace.id_hash, Workspace.name)
         .where(Workspace.id_hash.in_(list(alcance)), Workspace.deleted_at.is_(None))
@@ -159,7 +159,7 @@ async def _workspaces_do_escopo(db: AsyncSession, alcance) -> list:
 
 
 async def carregar_workflow(
-    db: AsyncSession, escopo: EscopoEfetivo, ref: str, *, decifrar: bool = False
+    db: AsyncSession, escopo: EffectiveScope, ref: str, *, decifrar: bool = False
 ) -> Tuple[object, str]:
     """`(workflow, papel)` (workflow, role) from an id or a name.
 
@@ -176,7 +176,7 @@ async def carregar_workflow(
 
     if e_uuid(referencia):
         try:
-            wf, papel = await carregar_workflow_acessivel(
+            wf, papel = await load_accessible_workflow(
                 servico, db, referencia, escopo.user_id, decifrar=decifrar
             )
         except HTTPException as exc:
@@ -190,9 +190,9 @@ async def carregar_workflow(
             # the SAME `not_found` as the name lookup, text included: an
             # identical code with a different sentence would still tell.
             if exc.status_code in (403, 404):
-                raise _workflow_nao_encontrado() from exc
+                raise _workflow_not_found() from exc
             raise to_tool_error(exc) from exc
-        _exigir_workspace_no_escopo(wf.workspace_id, escopo)
+        _require_workspace_in_scope(wf.workspace_id, escopo)
         return wf, papel
 
     resultado = await db.execute(
@@ -206,7 +206,7 @@ async def carregar_workflow(
     if not achados:
         # Includes the "exists, but out of reach" case: the scope filter goes
         # into the query, so the answer does not tell one from the other.
-        raise _workflow_nao_encontrado()
+        raise _workflow_not_found()
     if len(achados) > 1:
         raise erro(
             "ambiguous",
@@ -223,14 +223,14 @@ async def carregar_workflow(
         )
 
     wf = achados[0]
-    _exigir_workspace_no_escopo(wf.workspace_id, escopo)
+    _require_workspace_in_scope(wf.workspace_id, escopo)
     papel = await get_workspace_member_role(db, wf.workspace_id, escopo.user_id)
     if papel is None:
         raise erro("forbidden", "Acesso negado a este workflow.")
     return wf, papel
 
 
-def _exigir_workspace_no_escopo(workspace_id: str | None, escopo: EscopoEfetivo) -> None:
+def _require_workspace_in_scope(workspace_id: str | None, escopo: EffectiveScope) -> None:
     """The TOKEN's reach, checked before any role lookup."""
     if workspace_id in escopo.workspace_ids:
         return

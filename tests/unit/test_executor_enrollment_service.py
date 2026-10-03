@@ -58,7 +58,7 @@ def mock_db():
 class TestCreateEnrollmentOTP:
 
     @pytest.mark.asyncio
-    async def test_gera_otp_urlsafe_de_alta_entropia(self, mock_db):
+    async def test_generates_high_entropy_urlsafe_otp(self, mock_db):
         from app.services.executor_enrollment_service import create_enrollment_otp
 
         with patch("app.services.executor_enrollment_service.OTP_PEPPER", "pepper-de-teste-256-bits-base64xxxx"):
@@ -74,7 +74,7 @@ class TestCreateEnrollmentOTP:
         mock_db.commit.assert_awaited()
 
     @pytest.mark.asyncio
-    async def test_sem_pepper_lanca_runtime_error(self, mock_db):
+    async def test_without_pepper_raises_runtime_error(self, mock_db):
         from app.services.executor_enrollment_service import create_enrollment_otp
 
         with patch("app.services.executor_enrollment_service.OTP_PEPPER", ""):
@@ -88,7 +88,7 @@ class TestCreateEnrollmentOTP:
 class TestConsumeOTP:
 
     @pytest.mark.asyncio
-    async def test_invalido_ou_expirado_lanca_value_error(self, mock_db):
+    async def test_invalid_or_expired_raises_value_error(self, mock_db):
         from app.services.executor_enrollment_service import consume_otp
 
         result = MagicMock()
@@ -100,7 +100,7 @@ class TestConsumeOTP:
                 await consume_otp(mock_db, "otp-fake-xyz", from_ip="127.0.0.1")
 
     @pytest.mark.asyncio
-    async def test_sucesso_retorna_agent_id(self, mock_db):
+    async def test_success_returns_agent_id(self, mock_db):
         from app.services.executor_enrollment_service import consume_otp
 
         result = MagicMock()
@@ -119,28 +119,28 @@ class TestConsumeOTP:
 
 class TestParseAndValidateCSR:
 
-    def test_aceita_csr_ed25519_com_cn_valido(self):
+    def test_accepts_ed25519_csr_with_valid_cn(self):
         from app.services.executor_enrollment_service import parse_and_validate_csr
 
         csr_pem = _csr_pem(cn="executor-abc")
         result = parse_and_validate_csr(csr_pem)
         assert isinstance(result, x509.CertificateSigningRequest)
 
-    def test_rejeita_csr_rsa(self):
+    def test_rejects_rsa_csr(self):
         from app.services.executor_enrollment_service import parse_and_validate_csr
 
         csr_pem = _csr_pem(cn="executor-abc", use_ed25519=False)
         with pytest.raises(ValueError, match="Ed25519"):
             parse_and_validate_csr(csr_pem)
 
-    def test_rejeita_csr_com_cn_invalido(self):
+    def test_rejects_csr_with_invalid_cn(self):
         from app.services.executor_enrollment_service import parse_and_validate_csr
 
         csr_pem = _csr_pem(cn="random-cn-without-prefix")
         with pytest.raises(ValueError, match="CommonName"):
             parse_and_validate_csr(csr_pem)
 
-    def test_rejeita_csr_mal_formado(self):
+    def test_rejects_malformed_csr(self):
         from app.services.executor_enrollment_service import parse_and_validate_csr
 
         with pytest.raises(ValueError, match="CSR"):
@@ -153,7 +153,7 @@ class TestParseAndValidateCSR:
 class TestRevokeCert:
 
     @pytest.mark.asyncio
-    async def test_marca_serial_no_redis(self):
+    async def test_marks_serial_in_redis(self):
         from app.services.executor_enrollment_service import revoke_cert
 
         fake_redis = AsyncMock()
@@ -168,7 +168,7 @@ class TestRevokeCert:
         assert "serial-abc" in str(call_args)
 
     @pytest.mark.asyncio
-    async def test_is_cert_revoked_true_quando_marcado(self):
+    async def test_is_cert_revoked_true_when_marked(self):
         from app.services.executor_enrollment_service import is_cert_revoked
 
         fake_redis = AsyncMock()
@@ -180,7 +180,7 @@ class TestRevokeCert:
         assert revoked is True
 
     @pytest.mark.asyncio
-    async def test_is_cert_revoked_false_quando_ausente(self):
+    async def test_is_cert_revoked_false_when_absent(self):
         from app.services.executor_enrollment_service import is_cert_revoked
 
         fake_redis = AsyncMock()

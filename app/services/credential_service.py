@@ -13,15 +13,15 @@ from app.schemas.credential import CredentialCreate, CredentialUpdate
 from app.core.credentials.connection_builder import build_connection_data, validate_required_fields
 from app.core.credentials.schemas import CREDENTIAL_TYPE_SCHEMAS
 from app.core.utils.encryption import decrypt_credential_data
-from flow.utils.credencial_wfs import autenticacao_wfs
+from flow.utils.credencial_wfs import wfs_authentication
 
 # The types the WFS node reads: saving and "Testar" (Test) apply ITS rules.
-_TIPOS_DO_WFS = ("geoserver_authkey", "wfs")
+_WFS_TYPES = ("geoserver_authkey", "wfs")
 # The types whose `connectionString` is DERIVED from the fields (see connection_builder).
-_TIPOS_DE_BANCO = ("postgresql", "mysql")
+_DATABASE_TYPES = ("postgresql", "mysql")
 
 
-def erro_de_validacao(cred_type: str, data: dict) -> str | None:
+def validation_error(cred_type: str, data: dict) -> str | None:
     """Why the credential cannot be saved — or None.
 
     Required fields of a KNOWN type and, for the WFS ones, what the node would
@@ -34,9 +34,9 @@ def erro_de_validacao(cred_type: str, data: dict) -> str | None:
     erro = validate_required_fields(cred_type, data)
     if erro:
         return erro
-    if cred_type in _TIPOS_DO_WFS:
+    if cred_type in _WFS_TYPES:
         try:
-            autenticacao_wfs(None, {**data, "type": cred_type})
+            wfs_authentication(None, {**data, "type": cred_type})
         except ValueError as exc:
             return str(exc)
     return None
@@ -50,7 +50,7 @@ def _validate_or_raise(cred_type: str, data: dict) -> None:
     producing `postgresql://:@localhost:5432/` — a plausible credential that only
     failed when the workflow executed.
     """
-    erro = erro_de_validacao(cred_type, data)
+    erro = validation_error(cred_type, data)
     if erro:
         raise CredentialValidationError(erro)
 
@@ -113,7 +113,7 @@ async def update_credential(cred_id: UUID, update_data: CredentialUpdate, db: As
     # name/type/data) would wipe the description/tags/workspace_id already saved.
     # With it, omitting preserves and sending null clears — on purpose.
     enviados = update_data.model_fields_set
-    tipo_anterior = cred.type
+    previous_type = cred.type
     cred.name = update_data.name
     cred.type = update_data.type
     if "description" in enviados:
@@ -140,8 +140,8 @@ async def update_credential(cred_id: UUID, update_data: CredentialUpdate, db: As
     # the `token` from when it was Bearer) do not stay encrypted in the blob of a
     # credential of another type — and the new type must have its required
     # fields, otherwise the change would save a credential no node can use.
-    mudou_de_tipo = update_data.type != tipo_anterior
-    if update_data.data or mudou_de_tipo:
+    type_changed = update_data.type != previous_type
+    if update_data.data or type_changed:
         atuais = decrypt_credential_data(cred.data or {})
         # For database types the connectionString is DERIVED (recomputed from
         # host/user/... by build_connection_data further on), so the old one does
@@ -149,11 +149,11 @@ async def update_credential(cred_id: UUID, update_data: CredentialUpdate, db: As
         # where the DSN with the old password would keep being injected into a
         # database node. For a free-form type that was always free-form,
         # "connectionString" may be a legitimate user field: then it is NOT touched.
-        if update_data.type in _TIPOS_DE_BANCO or tipo_anterior in _TIPOS_DE_BANCO:
+        if update_data.type in _DATABASE_TYPES or previous_type in _DATABASE_TYPES:
             atuais.pop("connectionString", None)
         mesclado = {**atuais, **(update_data.data or {})}
         esquema = CREDENTIAL_TYPE_SCHEMAS.get(update_data.type)
-        if mudou_de_tipo and esquema is not None:
+        if type_changed and esquema is not None:
             permitidas = {f.key for f in esquema.fields} | {"expires_at"}
             mesclado = {k: v for k, v in mesclado.items() if k in permitidas}
         _validate_or_raise(update_data.type, mesclado)

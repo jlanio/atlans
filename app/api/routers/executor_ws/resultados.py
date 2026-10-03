@@ -19,14 +19,14 @@ from app.core.db import get_session_async
 # the `__workflow_complete__` JSON. Through the module, as in `fechamento_de_run`.
 from app.services import run_events_service
 from flow.utils.protocolo_ws import (
-    STATS_CONTROLE_DESCARTADO,
-    STATS_TAMANHO_ORIGINAL,
-    STATS_TRUNCADO,
+    STATS_CONTROL_DROPPED,
+    STATS_ORIGINAL_SIZE,
+    STATS_TRUNCATED,
 )
 from flow.utils.publisher.reducao import (
-    TETO_NODE_EVENT_BYTES,
-    TETO_POR_CAMPO,
-    reduzir_node_event,
+    NODE_EVENT_BYTES_CEILING,
+    PER_FIELD_CEILING,
+    shrink_node_event,
 )
 
 logger = get_logger(__name__)
@@ -40,7 +40,7 @@ from .protocolo import (
     _rate_allowed,
 )
 
-def _desfecho(job_status: str, is_cancelled: bool, *, ok: str) -> str:
+def _outcome(job_status: str, is_cancelled: bool, *, ok: str) -> str:
     """Translates a job's outcome into the reader's vocabulary.
 
     The fall-through (`cancelled` before `failed`) is the same in both consumers
@@ -212,7 +212,7 @@ async def _record_job_ack(executor_id: str, job_id: str | None, status: str) -> 
     if not _rate_allowed(executor_id, "ack", _JOB_RESULT_RATE_LIMIT):
         return
     try:
-        await _promover_para_running(executor_id, job_id)
+        await _promote_to_running(executor_id, job_id)
     except Exception as exc:
         # Best-effort: a live dispatch promotes on its own, and the undelivered
         # sweep closes whatever is left behind.
@@ -222,7 +222,7 @@ async def _record_job_ack(executor_id: str, job_id: str | None, status: str) -> 
         )
 
 
-async def _promover_para_running(executor_id: str, job_ids) -> int:
+async def _promote_to_running(executor_id: str, job_ids) -> int:
     """'pending' → 'running' for jobs THIS executor confirmed it has. Returns
     how many runs changed.
 
@@ -395,7 +395,7 @@ async def _query_run_snapshot(run_id: str):
         )
         return result.first()
 
-def _posse_ja_provada(executor_id: str, run_id: str) -> bool:
+def _ownership_already_proven(executor_id: str, run_id: str) -> bool:
     """True when this connection's memo has already proven the run is this executor's.
 
     Serves the paths in which the job_result could not be processed and we need
@@ -409,7 +409,7 @@ def _posse_ja_provada(executor_id: str, run_id: str) -> bool:
     memo = conn.run_auth_cache.get(run_id)
     return memo is not None and memo[0] and memo[1] > time.monotonic()
 
-async def _fechar_run_inconclusivo(executor_id: str, run_id: str, motivo: str) -> None:
+async def _close_inconclusive_run(executor_id: str, run_id: str, motivo: str) -> None:
     """Closes as FAILED a run whose job_result could not be processed.
 
     WHY: the executor deletes the outbox row as soon as `send_text` returns, so
@@ -421,7 +421,7 @@ async def _fechar_run_inconclusivo(executor_id: str, run_id: str, motivo: str) -
     'running' is worse.
 
     SEC: only call it with ownership of the run by THIS executor already proven
-    (`_posse_ja_provada` or a snapshot read).
+    (`_ownership_already_proven` or a snapshot read).
     """
     from datetime import datetime as _dt, timezone as _tz
 
@@ -454,7 +454,7 @@ async def _fechar_run_inconclusivo(executor_id: str, run_id: str, motivo: str) -
         # database closes the run but the UI never receives the completion event.
         async with rc.pipeline(transaction=False) as pipe:
             pipe.lpush("run_results", resultado)
-            run_events_service.anexar_eventos(pipe, run_id, [evento])
+            run_events_service.append_events(pipe, run_id, [evento])
             # Unblocks the synchronous webhook, which otherwise waits for the whole timeout.
             pipe.lpush(webhook_key, json.dumps({
                 "job_status": "error", "error": mensagem, "response": None,
@@ -471,7 +471,7 @@ async def _fechar_run_inconclusivo(executor_id: str, run_id: str, motivo: str) -
             run_id, motivo, exc,
         )
 
-async def _ler_snapshot_com_retentativa(run_id: str):
+async def _read_snapshot_with_retry(run_id: str):
     """Reads the run's snapshot, insisting a little before giving up.
 
     The job_result path has no second chance: losing the result to a 200ms
@@ -490,7 +490,7 @@ async def _ler_snapshot_com_retentativa(run_id: str):
                 await asyncio.sleep(_JOB_RESULT_DB_RETRY_DELAY)
     raise ultimo_erro  # type: ignore[misc]
 
-async def _descartar_por_rate_limit(executor_id: str, job_id, msg: dict) -> None:
+async def _drop_for_rate_limit(executor_id: str, job_id, msg: dict) -> None:
     """Drops the job_result that went over the ceiling — without leaving the run hanging.
 
     ERROR and not WARNING because dropping a legitimate job_result leaves the run
@@ -503,13 +503,13 @@ async def _descartar_por_rate_limit(executor_id: str, job_id, msg: dict) -> None
     )
     # Dropped is dropped, but the run cannot stay in 'running' forever
     # because of it — closes it as failed when ownership is already proven.
-    run_descartado = msg.get("run_id") or job_id
-    if _posse_ja_provada(executor_id, run_descartado):
-        await _fechar_run_inconclusivo(
-            executor_id, run_descartado, "rate limit de job_result",
+    dropped_run = msg.get("run_id") or job_id
+    if _ownership_already_proven(executor_id, dropped_run):
+        await _close_inconclusive_run(
+            executor_id, dropped_run, "rate limit de job_result",
         )
 
-async def _ler_veredito(executor_id: str, job_id, run_id):
+async def _read_verdict(executor_id: str, job_id, run_id):
     """Ownership and idempotency of the job_result, in a SINGLE read of the WorkflowRun.
 
     The three verdicts — does it belong to this executor? is it already
@@ -542,7 +542,7 @@ async def _ler_veredito(executor_id: str, job_id, run_id):
     # job_result per job, capped at _JOB_RESULT_RATE_LIMIT/s, is a negligible
     # cost in SELECTs.
     try:
-        linha = await _ler_snapshot_com_retentativa(run_id)
+        linha = await _read_snapshot_with_retry(run_id)
     except Exception as exc:
         # Fail-closed on WRITING the result: without proving ownership of the run
         # there is no way to accept it. The cooldown is still armed to contain
@@ -555,8 +555,8 @@ async def _ler_veredito(executor_id: str, job_id, run_id):
             conn.db_auth_cooldown_until = time.monotonic() + _RUN_AUTH_DB_COOLDOWN
         # If ownership was already proven by previous events of this same run,
         # we close it as failed: the executor does not resend job_result.
-        if _posse_ja_provada(executor_id, run_id):
-            await _fechar_run_inconclusivo(
+        if _ownership_already_proven(executor_id, run_id):
+            await _close_inconclusive_run(
                 executor_id, run_id, f"banco indisponível ({exc})",
             )
         return None
@@ -594,7 +594,7 @@ async def _ler_veredito(executor_id: str, job_id, run_id):
     return linha
 
 @dataclass(frozen=True)
-class _ResultadoDoJob:
+class _JobResult:
     """The outcome the executor reported, already in the server's taxonomy.
 
     Read ONCE from the contained job_result and used by all destinations — the
@@ -610,7 +610,7 @@ class _ResultadoDoJob:
     retryable: bool
     erro: object          # the executor's `error` when the job did not finish "ok"
 
-def _ler_resultado(executor_id: str, job_id, msg: dict) -> _ResultadoDoJob:
+def _read_result(executor_id: str, job_id, msg: dict) -> _JobResult:
     """Classifies the job's outcome and logs the receipt."""
     job_status = msg.get("status", "unknown")
     # Cancellation is not failure: the user asked to stop. It has its own status
@@ -618,7 +618,7 @@ def _ler_resultado(executor_id: str, job_id, msg: dict) -> _ResultadoDoJob:
     cancelado = job_status == "cancelled"
     # Error taxonomy (flow.utils.error_taxonomy): stable category + retryable.
     falhou = job_status != "ok" and not cancelado
-    resultado = _ResultadoDoJob(
+    resultado = _JobResult(
         job_status=job_status,
         cancelado=cancelado,
         falhou=falhou,
@@ -635,8 +635,8 @@ def _ler_resultado(executor_id: str, job_id, msg: dict) -> _ResultadoDoJob:
         )
     return resultado
 
-async def _persistir_resultado(
-    executor_id: str, job_id, msg: dict, resultado: _ResultadoDoJob,
+async def _persist_result(
+    executor_id: str, job_id, msg: dict, resultado: _JobResult,
 ) -> None:
     """Ephemeral key `executor:{id}:results:{job}` (TTL 300 s) with the summary.
 
@@ -662,7 +662,7 @@ async def _persistir_resultado(
     except Exception as exc:
         logger.error("Erro ao persistir resultado do job '%s' no Redis: %s", job_id, exc)
 
-def _medir_duracao(inicio) -> tuple[float | None, float | None]:
+def _measure_duration(inicio) -> tuple[float | None, float | None]:
     """`(duration_seconds, duration_ms)` since the run's `start_time`, or `(None, None)`.
 
     The `start_time` already came in the verdict read; naive is read as UTC.
@@ -676,8 +676,8 @@ def _medir_duracao(inicio) -> tuple[float | None, float | None]:
     decorrido = (_dt.now(_tz.utc) - inicio).total_seconds()
     return round(decorrido, 3), round(decorrido * 1000, 2)
 
-async def _notificar_consumer(
-    executor_id: str, run_id, resultado: _ResultadoDoJob, duration_seconds,
+async def _notify_consumer(
+    executor_id: str, run_id, resultado: _JobResult, duration_seconds,
     stats_json: str, executor_ip: str | None,
 ) -> None:
     """Enqueues the result in `run_results`, from where the consumer closes the run in the database."""
@@ -693,7 +693,7 @@ async def _notificar_consumer(
         # the containers) and converted to UTC, writing the end 4h in the
         # future — every execution showed ~4h of duration when the UI
         # subtracted end_time - start_time. duration_seconds was always
-        # right, since it compares two aware datetimes (`_medir_duracao`).
+        # right, since it compares two aware datetimes (`_measure_duration`).
         end_ts = _dt.now(_tz.utc).isoformat()
         # `stats` was already serialized a single time in `_cap_job_result` (up
         # to 4 MB): repeating the dumps here was the second of the three
@@ -710,7 +710,7 @@ async def _notificar_consumer(
         # carries it); the registry only comes in for callers without it.
         _head = json.dumps({
             "task_id":          run_id,
-            "status":           _desfecho(resultado.job_status, resultado.cancelado, ok="success"),
+            "status":           _outcome(resultado.job_status, resultado.cancelado, ok="success"),
             "error_message":    resultado.erro,
             "error_category":   resultado.error_category,
             "retryable":        resultado.retryable,
@@ -724,8 +724,8 @@ async def _notificar_consumer(
     except Exception as exc:
         logger.error("Erro ao publicar run_results para run '%s': %s", run_id, exc)
 
-async def _notificar_webhook(
-    run_id, stats: dict, resposta, resultado: _ResultadoDoJob, *, offload: bool,
+async def _notify_webhook(
+    run_id, stats: dict, resposta, resultado: _JobResult, *, offload: bool,
 ) -> None:
     """Unblocks the synchronous webhook (ResponseNode or failure).
 
@@ -737,15 +737,15 @@ async def _notificar_webhook(
 
     # Markers of the `stats` truncation — the protocol's, which the executor
     # applies before sending and `_cap_job_result` reapplies on entry.
-    truncado = stats.get(STATS_TRUNCADO) is True
-    controle_descartado = stats.get(STATS_CONTROLE_DESCARTADO) is True
+    truncado = stats.get(STATS_TRUNCATED) is True
+    control_dropped = stats.get(STATS_CONTROL_DROPPED) is True
     # If the payload was truncated and even the control keys are gone, the webhook
     # has no way to receive the response — we publish an explicit error to
     # unblock the BRPOP instead of leaving the caller to time out.
-    if truncado and resposta is None and controle_descartado:
+    if truncado and resposta is None and control_dropped:
         job_status = "error"
         erro = (
-            f"Resposta do workflow excedeu o limite de {stats.get(STATS_TAMANHO_ORIGINAL, '?')} bytes "
+            f"Resposta do workflow excedeu o limite de {stats.get(STATS_ORIGINAL_SIZE, '?')} bytes "
             "no transporte executor→servidor. Reduza o tamanho do body (ex: compactar geometria, "
             "paginar resultados) ou consuma via runner assíncrono."
         )
@@ -787,7 +787,7 @@ async def _registrar_body(run_id, executor_id: str, resposta) -> None:
         except Exception as exc:
             logger.error("Falha ao registrar Artifact de webhook response (run=%s): %s", run_id, exc)
 
-async def _publicar_conclusao(run_id, resultado: _ResultadoDoJob, duration_ms) -> None:
+async def _publish_completion(run_id, resultado: _JobResult, duration_ms) -> None:
     """Publishes the job's `__workflow_complete__` to the run's history and channel.
 
     It is the end the panel sees. The runs the SERVER closes, without a
@@ -801,7 +801,7 @@ async def _publicar_conclusao(run_id, resultado: _ResultadoDoJob, duration_ms) -
         # The level comes from the status: "failed" ⇔ failure (`resultado.falhou`).
         evento = run_events_service.evento_de_conclusao(
             run_id,
-            _desfecho(resultado.job_status, resultado.cancelado, ok="completed"),
+            _outcome(resultado.job_status, resultado.cancelado, ok="completed"),
             erro=resultado.erro,
             # Taxonomy of the whole job — the panel uses it to say whether it is
             # worth repeating the execution or the user needs to fix the input.
@@ -813,7 +813,7 @@ async def _publicar_conclusao(run_id, resultado: _ResultadoDoJob, duration_ms) -
         )
         rc = get_redis_pool()
         async with rc.pipeline(transaction=False) as pipe:
-            run_events_service.anexar_eventos(pipe, run_id, [evento])
+            run_events_service.append_events(pipe, run_id, [evento])
             await pipe.execute()
     except Exception as exc:
         logger.error("Erro ao publicar __workflow_complete__ para run '%s': %s", run_id, exc)
@@ -833,11 +833,11 @@ async def _handle_job_result(
     TTL), the run's history and Postgres — and the loop cost only 3 SELECTs per
     iteration.
 
-    ORDER of the effects, which is a contract: run read (`_ler_veredito`) →
-    the result's ephemeral key (`_persistir_resultado`) → `run_results` queue
-    (`_notificar_consumer`) → `webhook_response` (`_notificar_webhook`) →
+    ORDER of the effects, which is a contract: run read (`_read_verdict`) →
+    the result's ephemeral key (`_persist_result`) → `run_results` queue
+    (`_notify_consumer`) → `webhook_response` (`_notify_webhook`) →
     the body's Artifact (`_registrar_body`) → `__workflow_complete__`
-    (`_publicar_conclusao`). Each destination has its own try: one failing does
+    (`_publish_completion`). Each destination has its own try: one failing does
     not prevent the following ones.
 
     `frame_bytes` is the size of the frame that brought this message. It only
@@ -851,7 +851,7 @@ async def _handle_job_result(
 
     # Before the authorization on purpose: it is the cost in SELECTs that the flood exploits.
     if not _rate_allowed(executor_id, "job_result", _JOB_RESULT_RATE_LIMIT):
-        await _descartar_por_rate_limit(executor_id, job_id, msg)
+        await _drop_for_rate_limit(executor_id, job_id, msg)
         return
 
     # `stats` can be megabytes: above the threshold, measuring the ceiling (which
@@ -868,22 +868,22 @@ async def _handle_job_result(
     # enough to locate the WorkflowRun.
     run_id = msg.get("run_id") or job_id
 
-    linha = await _ler_veredito(executor_id, job_id, run_id)
+    linha = await _read_verdict(executor_id, job_id, run_id)
     if linha is None:
         return
 
-    resultado = _ler_resultado(executor_id, job_id, msg)
-    await _persistir_resultado(executor_id, job_id, msg, resultado)
-    duration_seconds, duration_ms = _medir_duracao(linha[2])
-    await _notificar_consumer(
+    resultado = _read_result(executor_id, job_id, msg)
+    await _persist_result(executor_id, job_id, msg, resultado)
+    duration_seconds, duration_ms = _measure_duration(linha[2])
+    await _notify_consumer(
         executor_id, run_id, resultado, duration_seconds, stats_json, executor_ip,
     )
     # The ResponseNode returns the synchronous webhook's body inside `stats`.
     stats = msg.get("stats") or {}
     resposta = stats.get("__response__")
-    await _notificar_webhook(run_id, stats, resposta, resultado, offload=offload)
+    await _notify_webhook(run_id, stats, resposta, resultado, offload=offload)
     await _registrar_body(run_id, executor_id, resposta)
-    await _publicar_conclusao(run_id, resultado, duration_ms)
+    await _publish_completion(run_id, resultado, duration_ms)
 
 def _serialize_node_event(executor_id: str, msg: dict) -> str:
     """Serializes the node_event already contained by the byte ceiling.
@@ -901,12 +901,12 @@ def _serialize_node_event(executor_id: str, msg: dict) -> str:
     payload = json.dumps(event)
 
     # `json.dumps` usa ensure_ascii, logo len(str) == tamanho em bytes.
-    if len(payload) > TETO_NODE_EVENT_BYTES:
+    if len(payload) > NODE_EVENT_BYTES_CEILING:
         logger.warning(
             "Executor '%s': node_event de %d bytes (run=%s node=%s) excede o teto de %d — truncado.",
-            executor_id, len(payload), msg.get("run_id"), msg.get("node"), TETO_NODE_EVENT_BYTES,
+            executor_id, len(payload), msg.get("run_id"), msg.get("node"), NODE_EVENT_BYTES_CEILING,
         )
-        payload = reduzir_node_event(event, payload)
+        payload = shrink_node_event(event, payload)
     return payload
 
 async def _publish_node_events(executor_id: str, msgs: list[dict]) -> None:
@@ -929,13 +929,13 @@ async def _publish_node_events(executor_id: str, msgs: list[dict]) -> None:
     """
     from app.core.redis import get_redis_pool
 
-    por_run: dict[str, list[str]] = {}
+    by_run: dict[str, list[str]] = {}
     negados: set[str] = set()
     for msg in msgs:
         run_id = msg.get("run_id")
         if not run_id or run_id in negados:
             continue
-        if run_id not in por_run:
+        if run_id not in by_run:
             if not await _run_belongs_to_agent(executor_id, run_id):
                 logger.warning(
                     "Executor '%s' tentou publicar node_event em run '%s' que não lhe "
@@ -943,22 +943,22 @@ async def _publish_node_events(executor_id: str, msgs: list[dict]) -> None:
                 )
                 negados.add(run_id)
                 continue
-            por_run[run_id] = []
-        por_run[run_id].append(_serialize_node_event(executor_id, msg))
+            by_run[run_id] = []
+        by_run[run_id].append(_serialize_node_event(executor_id, msg))
 
-    if not por_run:
+    if not by_run:
         return
 
     try:
         rc = get_redis_pool()
         async with rc.pipeline(transaction=False) as pipe:
-            for run_id, payloads in por_run.items():
-                run_events_service.anexar_eventos(pipe, run_id, payloads)
+            for run_id, payloads in by_run.items():
+                run_events_service.append_events(pipe, run_id, payloads)
             await pipe.execute()
     except Exception as exc:
         logger.warning(
             "Erro ao publicar %d node_event(s) no Redis (runs=%s): %s",
-            sum(len(p) for p in por_run.values()), list(por_run), exc,
+            sum(len(p) for p in by_run.values()), list(by_run), exc,
         )
 
 async def _handle_sync_event(executor_id: str, msg: dict):
@@ -988,8 +988,8 @@ async def _handle_sync_event(executor_id: str, msg: dict):
         )
         payload = json.dumps({
             "executor_id":   executor_id,
-            "event":         str(msg.get("event", ""))[:TETO_POR_CAMPO],
-            "dataset":       str(msg.get("dataset", ""))[:TETO_POR_CAMPO],
+            "event":         str(msg.get("event", ""))[:PER_FIELD_CEILING],
+            "dataset":       str(msg.get("dataset", ""))[:PER_FIELD_CEILING],
             "progress":      _coerce_gauge(msg.get("progress")) or 0,
             "timestamp":     _coerce_gauge(msg.get("timestamp")),
             "__truncated__": True,
@@ -1004,8 +1004,8 @@ async def _handle_sync_event(executor_id: str, msg: dict):
             pipe.publish(channel, payload)
             # Saves the current state for lookup
             pipe.hset(status_key, mapping={
-                "last_event": str(msg.get("event", ""))[:TETO_POR_CAMPO],
-                "dataset": str(msg.get("dataset", ""))[:TETO_POR_CAMPO],
+                "last_event": str(msg.get("event", ""))[:PER_FIELD_CEILING],
+                "dataset": str(msg.get("dataset", ""))[:PER_FIELD_CEILING],
                 "progress": str(msg.get("progress", 0))[:64],
                 "timestamp": str(msg.get("timestamp", ""))[:64],
             })

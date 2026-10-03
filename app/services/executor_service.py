@@ -2,7 +2,7 @@
 """
 Business operations for Executors:
   - Creation (admin) — only records metadata; the credential comes via enrollment OTP + mTLS cert.
-  - Basic CRUD + revocation (`revogar_executor` + `concluir_revogacoes`, the
+  - Basic CRUD + revocation (`revogar_executor` + `complete_revocations`, the
     single version for every path that revokes).
 
 Executor authentication is now done entirely via mTLS — the static API key
@@ -218,9 +218,9 @@ async def delete_agent(db: AsyncSession, executor_id: str) -> Executor:
 
 
 @dataclass
-class Revogacao:
+class Revocation:
     """An executor revoked in the caller's session, with what can only leave the
-    database after the commit — see `concluir_revogacoes`."""
+    database after the commit — see `complete_revocations`."""
 
     executor_id: str
     nome: str
@@ -244,7 +244,7 @@ async def revogar_executor(
     aviso: str,
     fechamento: str,
     desanexar: bool = True,
-) -> Revogacao:
+) -> Revocation:
     """Revokes `ag` in the caller's transaction — does NOT commit.
 
     1. With `desanexar` (the executor DELETE and the operator's "revoke all"),
@@ -256,14 +256,14 @@ async def revogar_executor(
     2. Status `revoked` and cert voided — if it comes back, only with a new enrollment.
 
     Blacklist, owner notification and the WebSocket close are not database work and
-    only apply after the commit: the caller runs `concluir_revogacoes` with what this
+    only apply after the commit: the caller runs `complete_revocations` with what this
     function returns. Notifying earlier would act on a revocation that a rollback
     can still undo — and the 4403 close is terminal for the executor.
     """
     afetados = await politica.detach_executor(
         db, ag.id_hash, force=force, actor_id=actor_id, reason=motivo,
     ) if desanexar else []
-    revogacao = Revogacao(
+    revogacao = Revocation(
         executor_id=ag.id_hash, nome=ag.name, serial=ag.cert_serial,
         serial_expira_em=ag.cert_expires_at, aviso=aviso, fechamento=fechamento,
         afetados=afetados,
@@ -276,7 +276,7 @@ async def revogar_executor(
 async def revogar_executores_do_usuario(
     db: AsyncSession, usuario, *, motivo: str, desanexar: bool,
     actor_id: str | None = None,
-) -> list[Revogacao]:
+) -> list[Revocation]:
     """Revokes every executor created by `usuario` that is not yet
     revoked — the operator's "revoke all" and account suspension/deletion
     (audit SEG-16: without this the executor of a suspended account stayed
@@ -318,21 +318,21 @@ async def revogar_executores_do_usuario(
     ]
 
 
-def avisar_donos_de_niveis_esvaziados(afetados: Sequence[dict], *, executor_name: str) -> None:
+def notify_owners_of_emptied_tiers(afetados: Sequence[dict], *, executor_name: str) -> None:
     """A removal that emptied someone's primary tier: email to the owner
     (best-effort, in the background, with its own session — the request's closes
     along with the response). Without this the workspace would find out from the 503."""
     from app.services.execution_alert_service import notify_primary_emptied_background
 
-    esvaziados = [d for d in afetados if d.get("would_empty_primary")]
-    notify_primary_emptied_background(esvaziados, executor_name=executor_name)
+    emptied = [d for d in afetados if d.get("would_empty_primary")]
+    notify_primary_emptied_background(emptied, executor_name=executor_name)
 
 
-async def concluir_revogacoes(revogacoes: Iterable[Revogacao]) -> None:
+async def complete_revocations(revocations: Iterable[Revocation]) -> None:
     """What revocation does outside the database, AFTER the caller's commit.
 
     All best-effort and isolated per executor — the revocation already holds in the
-    database, and the session watcher (`_vigiar_revogacao`) drops the WebSocket even
+    database, and the session watcher (`_watch_revocation`) drops the WebSocket even
     if the close from here gets lost:
 
     - cert blacklist in Redis (defense in depth beyond the CRL);
@@ -344,7 +344,7 @@ async def concluir_revogacoes(revogacoes: Iterable[Revogacao]) -> None:
     """
     from app.services import executor_enrollment_service
 
-    for r in revogacoes:
+    for r in revocations:
         if r.serial:
             try:
                 await executor_enrollment_service.revoke_cert(r.serial, cert_expires_at=r.serial_expira_em)
@@ -353,7 +353,7 @@ async def concluir_revogacoes(revogacoes: Iterable[Revogacao]) -> None:
                     "Falha ao marcar cert '%s' (executor %s) como revogado no Redis: %s",
                     r.serial, r.executor_id, exc,
                 )
-        avisar_donos_de_niveis_esvaziados(r.afetados, executor_name=r.nome)
+        notify_owners_of_emptied_tiers(r.afetados, executor_name=r.nome)
         try:
             await executor_registry.send_json(r.executor_id, {
                 "type": "control", "action": "revoked", "reason": r.aviso,
@@ -392,10 +392,10 @@ async def motivo_da_revogacao(db: AsyncSession, executor_id: str) -> str | None:
     return None
 
 
-async def registrar_fim_da_sessao(db: AsyncSession, executor_id: str, visto_em) -> None:
+async def registrar_fim_da_sessao(db: AsyncSession, executor_id: str, seen_at) -> None:
     """End of a WebSocket session: `last_seen_at` becomes its last contact —
     if later than what is in the database. The end of a replaced session
     arrives after the new one's handshake (seconds, up to ~100 s when the
     takeover notice gets lost) and, written unconditionally, erased the start of
     the new one: the "no ar desde" (online since) that the other workers read from here."""
-    await ExecutorCRUD(db).touch_last_seen_if_later(executor_id, visto_em)
+    await ExecutorCRUD(db).touch_last_seen_if_later(executor_id, seen_at)

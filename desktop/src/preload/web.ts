@@ -24,17 +24,17 @@
 // web/app/globals.css.
 
 import { contextBridge, ipcRenderer } from 'electron'
-import { CANAIS_WEB, type StatusExecutorLocal } from '../shared/executor-status.js'
+import { WEB_CHANNELS, type StatusExecutorLocal } from '../shared/executor-status.js'
 
 /** Marks the <html> so CSS turns on header dragging only inside the desktop app. */
-function marcarDesktop(): void {
+function markDesktop(): void {
   document.documentElement?.setAttribute('data-atlans-desktop', '1')
 }
 // `documentElement` already exists when the preload runs; the listener covers
 // the rare case where it does not exist yet. `setAttribute` is idempotent, so
 // repeating it costs nothing.
-marcarDesktop()
-document.addEventListener('DOMContentLoaded', marcarDesktop, { once: true })
+markDesktop()
+document.addEventListener('DOMContentLoaded', markDesktop, { once: true })
 
 // ── Read-only bridge ───────────────────────────────────────────────────────
 //
@@ -42,12 +42,12 @@ document.addEventListener('DOMContentLoaded', marcarDesktop, { once: true })
 // feature-detects: in a regular browser this object does not exist.
 contextBridge.exposeInMainWorld('atlansDesktop', {
   versao: 1,
-  obterStatus: (): Promise<StatusExecutorLocal> => ipcRenderer.invoke(CANAIS_WEB.status),
+  obterStatus: (): Promise<StatusExecutorLocal> => ipcRenderer.invoke(WEB_CHANNELS.status),
   aoMudarStatus: (fn: (s: StatusExecutorLocal) => void): (() => void) => {
-    const ouvinte = (_e: unknown, s: StatusExecutorLocal): void => fn(s)
-    ipcRenderer.on(CANAIS_WEB.statusMudou, ouvinte)
+    const listener = (_e: unknown, s: StatusExecutorLocal): void => fn(s)
+    ipcRenderer.on(WEB_CHANNELS.statusMudou, listener)
     // Returns the unsubscribe: without it, each React remount would accumulate a
     // listener (the same reason as `assinar` in preload/index.ts).
-    return () => ipcRenderer.removeListener(CANAIS_WEB.statusMudou, ouvinte)
+    return () => ipcRenderer.removeListener(WEB_CHANNELS.statusMudou, listener)
   },
 })

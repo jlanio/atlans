@@ -3,8 +3,8 @@
 import { TbPlus, TbSitemap } from "react-icons/tb"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import * as Estado from "@/app/components/shared/estados"
-import { formatarInteiro } from "@/lib/formatos"
-import { ESTADO_PADRAO, type Filtro } from "./projetos-url"
+import { formatInteger } from "@/lib/formatos"
+import { DEFAULT_STATE, type Filtro } from "./projetos-url"
 
 /**
  * States of the Projects screen (docs/specs/projects.md §3.10): loading,
@@ -27,16 +27,16 @@ export function SkeletonDeProjetos() {
           <Skeleton className="h-4 w-40" />
           <Skeleton className="h-3 w-24" />
         </div>
-        {[0, 1, 2].map(i => <LinhaFantasma key={i} />)}
+        {[0, 1, 2].map(i => <GhostRow key={i} />)}
       </div>
       <div className="flex flex-col gap-1.5">
-        {[0, 1].map(i => <LinhaFantasma key={i} />)}
+        {[0, 1].map(i => <GhostRow key={i} />)}
       </div>
     </div>
   )
 }
 
-function LinhaFantasma() {
+function GhostRow() {
   return (
     <div className="flex h-14 items-center gap-3 rounded-lg border bg-card px-3 shadow-xs">
       <Skeleton className="size-[34px] shrink-0 rounded-lg" />
@@ -50,7 +50,7 @@ function LinhaFantasma() {
   )
 }
 
-const PASSOS: { titulo: string; detalhe: string }[] = [
+const STEPS: { titulo: string; detalhe: string }[] = [
   { titulo: "Desenhe", detalhe: "Ligue os nós de leitura, processamento e saída no editor." },
   { titulo: "Execute uma vez", detalhe: "Rode pela lista e confira o resultado." },
   { titulo: "Agende ou exponha", detalhe: "Um horário, um webhook, um arquivo que chega — ou um portal." },
@@ -68,7 +68,7 @@ export function VazioPrimeiroUso({ canEdit, onCriar }: { canEdit: boolean; onCri
           num horário, ou quando um webhook ou um arquivo chega.
         </>
       }
-      passos={PASSOS}
+      passos={STEPS}
       cta={{ rotulo: "Criar o primeiro workflow", icone: TbPlus, onClick: onCriar }}
       podeCriar={canEdit}
       pedirA="criar o primeiro workflow"
@@ -78,7 +78,7 @@ export function VazioPrimeiroUso({ canEdit, onCriar }: { canEdit: boolean; onCri
 
 /** "Nenhum workflow com «q»" / "…com este filtro" / "…com «q» e este filtro". */
 export function textoDeSemResultado(q: string, filtro: Filtro): string {
-  return Estado.textoDeSemResultado({ nada: "Nenhum workflow", termo: q, comFiltro: filtro !== ESTADO_PADRAO.filtro })
+  return Estado.textoDeSemResultado({ nada: "Nenhum workflow", termo: q, comFiltro: filtro !== DEFAULT_STATE.filtro })
 }
 
 /**
@@ -97,7 +97,7 @@ export function SemResultado({ q, filtro, semFiltro, onLimpar }: {
     <Estado.SemResultado
       texto={textoDeSemResultado(q, filtro)}
       dica={semFiltro != null && semFiltro > 0 && termo
-        ? `Há ${formatarInteiro(semFiltro)} com «${termo}» sem o filtro.`
+        ? `Há ${formatInteger(semFiltro)} com «${termo}» sem o filtro.`
         : undefined}
       onLimpar={onLimpar}
     />

@@ -22,7 +22,7 @@ module:
 
 Reading runs (`get_run`, `list_runs`, `get_run_artifacts`) requires
 `workflows:read` and membership in the RUN's workspace, the same requirement as
-the application — and always with `escopo.como_usuario()`, never with an
+the application — and always with `escopo.as_user()`, never with an
 administrator view: a personal token does not extend the reach of whoever
 created it.
 """
@@ -45,10 +45,10 @@ from app.core.utils.datetime_utils import utc_now_naive
 from app.core.utils.logger import get_logger, scrub_text
 from app.mcp import cotas, infra
 from app.mcp.erros import erro
-from app.mcp.escopo import EscopoEfetivo, escopo_da_chamada, exigir_escopo
-from app.mcp.parametros import validar_inputs
-from app.mcp.resolucao import carregar_workflow, resolver_workspace
-from app.mcp.saida import envelope, higienizar, iso, resumo_run
+from app.mcp.escopo import EffectiveScope, escopo_da_chamada, exigir_escopo
+from app.mcp.parametros import validate_inputs
+from app.mcp.resolucao import carregar_workflow, resolve_workspace
+from app.mcp.saida import envelope, sanitize, iso, run_summary
 from app.mcp.tools.base import anotacoes, ferramenta
 from app.models.artifact import Artifact
 from app.services.observability_service import ObservabilityService
@@ -61,18 +61,18 @@ logger = get_logger("app.mcp.tools.execucao")
 # real workflow finishes and the wait would only serve to spend a slot; the
 # ceiling is the limit of what an HTTP transport keeps open without proxies
 # along the way dropping the connection.
-TIMEOUT_MINIMO_S = 5
-TIMEOUT_MAXIMO_S = 300
-TIMEOUT_PADRAO_S = 120
+MIN_TIMEOUT_S = 5
+MAX_TIMEOUT_S = 300
+DEFAULT_TIMEOUT_S = 120
 
 # Slack of the wait reservation's TTL over the requested deadline: if the
 # process dies midway, the counter fixes itself one minute later.
-FOLGA_DA_RESERVA_S = 60
+RESERVATION_MARGIN_S = 60
 
 # Validity of an artifact's signed URL — the same minute-by-minute as the Drive:
 # the link is a bearer link and travels through a conversation that may be
 # recorded.
-VALIDADE_DO_LINK_S = 300
+LINK_VALIDITY_S = 300
 
 # Ceiling of artifacts per response. A run that generates hundreds of outputs
 # is a looping workflow case, and returning all of them would cost more context
@@ -81,59 +81,59 @@ MAX_ARTEFATOS = 100
 
 # Ceiling of the run listing — the reader's context budget, as in the server's
 # other listings.
-LIMITE_MAXIMO = 100
+MAX_LIMIT = 100
 
 # How much of `error_message` is left in the LISTING. The full text remains in
 # `get_run`: here it is only enough to choose which run to investigate, and a
 # whole traceback per row would make the list unreadable.
-MAX_ERRO_NA_LISTAGEM = 300
+MAX_ERROR_IN_LISTING = 300
 
 # Statuses in which a run has really ended. Any other is "non-terminal".
-STATUS_TERMINAIS = ("success", "failed", "cancelled")
+TERMINAL_STATUSES = ("success", "failed", "cancelled")
 
 # How long events survive in Redis. Past that deadline they do not exist
 # anywhere — what remains of the run is the `node_stats`, which is in the
 # database and does not expire.
 #
 # IMPORTED, not copied: it is the same constant that the consumer re-emits on
-# every batch in the run's history (`run_events_service.anexar_eventos`, the
+# every batch in the run's history (`run_events_service.append_events`, the
 # only one that writes to it). With the value duplicated, changing the TTL in
 # the core made this tool lie in `availability` and `retention_seconds` without
 # anything breaking — the worst kind of divergence, the one with no symptom.
-RETENCAO_DOS_EVENTOS_S = REDIS_TTL_1H
+EVENTS_RETENTION_S = REDIS_TTL_1H
 
 # Ceiling of events per response. A looping workflow with debug on emits
 # thousands; returning all of them would cost more context than the whole log
 # is worth.
-MAX_EVENTOS = 200
+MAX_EVENTS = 200
 
-_MENSAGEM_PAPEL_EXECUCAO = "Requer papel 'operator' ou superior neste workspace."
-_MENSAGEM_PAPEL_LEITURA = "Requer papel 'viewer' ou superior neste workspace."
+_RUN_ROLE_MESSAGE = "Requer papel 'operator' ou superior neste workspace."
+_READ_ROLE_MESSAGE = "Requer papel 'viewer' ou superior neste workspace."
 
 # The "run not found" refusal is a SINGLE one, in code and in text, for the id
 # that does not exist and for the id that exists in another account's
 # workspace — the core already answers 404 to both cases, and the message must
 # not reopen through the body the oracle the query closed. That is why it also
 # does not echo the identifier received.
-MSG_RUN_NAO_ENCONTRADO = "Nenhuma execução com esta referência está ao alcance do token."
-HINT_RUN_NAO_ENCONTRADO = "use list_runs para ver as execuções que este token alcança"
+MSG_RUN_NOT_FOUND = "Nenhuma execução com esta referência está ao alcance do token."
+HINT_RUN_NOT_FOUND = "use list_runs para ver as execuções que este token alcança"
 
 # And the disabled-workflow refusal, for the same reason: `run_workflow` and
 # `retry_run` stop on the same condition, and two copies of the text become two
 # texts the first time someone edits one of them.
-MSG_WORKFLOW_INATIVO = "Este workflow está inativo e não pode ser executado."
-HINT_WORKFLOW_INATIVO = "ative com set_workflow_active(active=true) antes de executar"
+MSG_WORKFLOW_INACTIVE = "Este workflow está inativo e não pode ser executado."
+HINT_WORKFLOW_INACTIVE = "ative com set_workflow_active(active=true) antes de executar"
 
 
-def _workflow_inativo():
-    return erro("workflow_inactive", MSG_WORKFLOW_INATIVO, HINT_WORKFLOW_INATIVO)
+def _workflow_inactive():
+    return erro("workflow_inactive", MSG_WORKFLOW_INACTIVE, HINT_WORKFLOW_INACTIVE)
 
 
-def _run_nao_encontrado():
-    return erro("not_found", MSG_RUN_NAO_ENCONTRADO, HINT_RUN_NAO_ENCONTRADO)
+def _run_not_found():
+    return erro("not_found", MSG_RUN_NOT_FOUND, HINT_RUN_NOT_FOUND)
 
 
-async def _detalhe_do_run(db, run_id: str, escopo: EscopoEfetivo) -> dict:
+async def _run_detail(db, run_id: str, escopo: EffectiveScope) -> dict:
     """The run detail from a MEMBER's view — never an administrator's.
 
     `como_admin` stays at its default (`False`) on purpose and is not a
@@ -145,14 +145,14 @@ async def _detalhe_do_run(db, run_id: str, escopo: EscopoEfetivo) -> dict:
         return await ObservabilityService.get_run_detail(
             db,
             str(run_id),
-            escopo.como_usuario(),
+            escopo.as_user(),
             sorted(escopo.workspace_ids),
         )
     except RunNotFoundError as exc:
-        raise _run_nao_encontrado() from exc
+        raise _run_not_found() from exc
 
 
-def _nomes_dos_nos(definition: Any) -> dict[str, str]:
+def _node_names(definition: Any) -> dict[str, str]:
     """`{node id: name}` — the dictionary that translates progress for the reader."""
     nos = definition.get("nodes") if isinstance(definition, Mapping) else None
     if not isinstance(nos, list):
@@ -168,7 +168,7 @@ def _nomes_dos_nos(definition: Any) -> dict[str, str]:
     return nomes
 
 
-def _mensagem_de_progresso(mensagem: str, nomes: Mapping[str, str]) -> str:
+def _progress_message(mensagem: str, nomes: Mapping[str, str]) -> str:
     """The progress line with the node's NAME in place of the identifier.
 
     `esperar_run` builds the message as `"<id do nó>: <status> (<duração>)"`,
@@ -188,17 +188,17 @@ def _mensagem_de_progresso(mensagem: str, nomes: Mapping[str, str]) -> str:
     return scrub_text(mensagem)
 
 
-def _relator_de_progresso(ctx: Context, nomes: Mapping[str, str]):
+def _progress_reporter(ctx: Context, nomes: Mapping[str, str]):
     """The callback that `esperar_run` calls for each completed node."""
 
-    async def _relatar(concluidos: int, total: int, mensagem: str) -> None:
-        await ctx.report_progress(concluidos, total, _mensagem_de_progresso(mensagem, nomes))
+    async def _report_progress(concluidos: int, total: int, mensagem: str) -> None:
+        await ctx.report_progress(concluidos, total, _progress_message(mensagem, nomes))
 
-    return _relatar
+    return _report_progress
 
 
-async def _despachar(
-    escopo: EscopoEfetivo,
+async def _dispatch(
+    escopo: EffectiveScope,
     id_hash: str,
     *,
     inputs: dict,
@@ -233,7 +233,7 @@ async def _despachar(
     return resultado.id
 
 
-def _resposta_em_andamento(run_id: str, workflow_id: str, *, status: str, hint: str, hints: list) -> dict:
+def _in_progress_response(run_id: str, workflow_id: str, *, status: str, hint: str, hints: list) -> dict:
     """The response for whoever did not see the outcome — with what to do next."""
     return envelope(
         {
@@ -256,7 +256,7 @@ async def run_workflow(
     inputs: dict | None = None,
     debug_mode: bool = False,
     wait: bool = True,
-    timeout_seconds: int = TIMEOUT_PADRAO_S,
+    timeout_seconds: int = DEFAULT_TIMEOUT_S,
     idempotency_key: str | None = None,
 ) -> dict:
     """Runs a workflow and, by default, waits for the outcome.
@@ -285,32 +285,32 @@ async def run_workflow(
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "runs:execute")
-    prazo = max(TIMEOUT_MINIMO_S, min(int(timeout_seconds), TIMEOUT_MAXIMO_S))
+    prazo = max(MIN_TIMEOUT_S, min(int(timeout_seconds), MAX_TIMEOUT_S))
 
     async with infra.sessao() as db:
         wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-        exigir_papel(papel, ROLE_OPERATOR, _MENSAGEM_PAPEL_EXECUCAO)
+        exigir_papel(papel, ROLE_OPERATOR, _RUN_ROLE_MESSAGE)
         if not wf.flag_ative:
             # Before any quota: an inactive workflow dispatches nothing, and
             # charging a wait slot for an immediate refusal would punish
             # whoever received the server's cheapest error.
-            raise _workflow_inativo()
-        inputs_validos, hints = validar_inputs(wf.params_schema, inputs)
+            raise _workflow_inactive()
+        valid_inputs, hints = validate_inputs(wf.params_schema, inputs)
         definicao = wf.definition or {}
         nos = definicao.get("nodes") if isinstance(definicao, Mapping) else None
-        total_nos = len(nos) if isinstance(nos, list) else 0
-        nomes = _nomes_dos_nos(definicao)
+        total_nodes = len(nos) if isinstance(nos, list) else 0
+        nomes = _node_names(definicao)
         id_hash = wf.id_hash
 
     despacho = {
-        "inputs": inputs_validos,
+        "inputs": valid_inputs,
         "debug_mode": bool(debug_mode),
         "idempotency_key": idempotency_key,
     }
 
     if not wait:
-        run_id = await _despachar(escopo, id_hash, **despacho)
-        return _resposta_em_andamento(
+        run_id = await _dispatch(escopo, id_hash, **despacho)
+        return _in_progress_response(
             run_id,
             id_hash,
             status="running",
@@ -321,14 +321,14 @@ async def run_workflow(
     # Dispatch INSIDE the reservation: the ceiling of simultaneous waits has
     # to refuse before the run exists. Otherwise, a client at the ceiling would
     # leave workflows running with nobody to receive the result.
-    async with cotas.espera(infra.redis_ou_none(), escopo.token_id, ttl_s=prazo + FOLGA_DA_RESERVA_S):
-        run_id = await _despachar(escopo, id_hash, **despacho)
+    async with cotas.espera(infra.redis_ou_none(), escopo.token_id, ttl_s=prazo + RESERVATION_MARGIN_S):
+        run_id = await _dispatch(escopo, id_hash, **despacho)
         try:
             espera = await esperar_run(
                 run_id,
                 timeout_s=prazo,
-                total_nos=total_nos,
-                on_progress=_relator_de_progresso(ctx, nomes),
+                total_nodes=total_nodes,
+                on_progress=_progress_reporter(ctx, nomes),
             )
         except (ToolError, asyncio.CancelledError):
             # An already-formatted refusal and the client giving up are not
@@ -347,7 +347,7 @@ async def run_workflow(
             logger.exception(
                 "Acompanhamento da execução %s falhou; a execução segue no servidor.", run_id
             )
-            return _resposta_em_andamento(
+            return _in_progress_response(
                 run_id,
                 id_hash,
                 status="running",
@@ -365,10 +365,10 @@ async def run_workflow(
     # `timed_out=True` and the row not yet written (or not even existing). In
     # that combination there is only ONE right answer: "finished, outcome still
     # unknown". Testing the timeout first answered `running` — the reading that
-    # the `ResultadoEspera` contract forbids, and the one that convinces the
+    # the `WaitResult` contract forbids, and the one that convinces the
     # client to fire again.
-    if espera.viu_complete and espera.status not in STATUS_TERMINAIS:
-        return _resposta_em_andamento(
+    if espera.viu_complete and espera.status not in TERMINAL_STATUSES:
+        return _in_progress_response(
             run_id,
             id_hash,
             status="unknown",
@@ -384,7 +384,7 @@ async def run_workflow(
         # (`run is None`) the server does not know LESS than on timeout: in
         # both cases the run was dispatched and the outcome has not arrived
         # yet. All that changes is the reason told to the reader.
-        return _resposta_em_andamento(
+        return _in_progress_response(
             run_id,
             id_hash,
             status="running",
@@ -398,10 +398,10 @@ async def run_workflow(
             hints=hints,
         )
 
-    if espera.status not in STATUS_TERMINAIS:
+    if espera.status not in TERMINAL_STATUSES:
         # Non-terminal status and no complete seen: this is the only case in
         # which "still running" is the truth.
-        return _resposta_em_andamento(
+        return _in_progress_response(
             run_id,
             id_hash,
             status="running",
@@ -410,11 +410,11 @@ async def run_workflow(
         )
 
     async with infra.sessao() as db:
-        detalhe = await _detalhe_do_run(db, run_id, escopo)
+        detalhe = await _run_detail(db, run_id, escopo)
         brutos, truncado = await _artefatos_do_run(db, run_id, escopo)
 
-    resposta = resumo_run(detalhe, node_stats="summary")
-    resposta["artifacts"] = [_artefato_sem_link(bruto) for bruto in brutos]
+    resposta = run_summary(detalhe, node_stats="summary")
+    resposta["artifacts"] = [_artifact_without_link(bruto) for bruto in brutos]
     if truncado:
         resposta["artifacts_truncated"] = True
     # How many events the buffer discarded during the wait: progress may
@@ -428,7 +428,7 @@ async def run_workflow(
         # written by people, so it goes down into the data block ALREADY
         # sanitized.
         bloco = resposta.setdefault("untrusted_data", {})
-        bloco["hints"] = higienizar(hints)
+        bloco["hints"] = sanitize(hints)
     return resposta
 
 
@@ -457,9 +457,9 @@ async def get_run(ctx: Context, run_id: str, node_stats: str = "summary") -> dic
         )
 
     async with infra.sessao() as db:
-        detalhe = await _detalhe_do_run(db, str(run_id), escopo)
+        detalhe = await _run_detail(db, str(run_id), escopo)
 
-    return resumo_run(detalhe, node_stats=node_stats)
+    return run_summary(detalhe, node_stats=node_stats)
 
 
 @ferramenta
@@ -488,28 +488,28 @@ async def list_runs(
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
-    teto = max(1, min(int(limit), LIMITE_MAXIMO))
+    teto = max(1, min(int(limit), MAX_LIMIT))
     deslocamento = max(0, int(offset))
 
     async with infra.sessao() as db:
-        alvo_workspace = (
-            await resolver_workspace(db, escopo, workspace_id) if workspace_id is not None else None
+        target_workspace = (
+            await resolve_workspace(db, escopo, workspace_id) if workspace_id is not None else None
         )
-        alvo_workflow = None
+        target_workflow = None
         if workflow_id is not None:
             # Resolved here (and not passed raw to the core) so that the tool
             # accepts the workflow's NAME like all the others — and so that an
             # id out of reach answers with the usual "not found".
             wf, papel = await carregar_workflow(db, escopo, workflow_id, decifrar=False)
-            exigir_papel(papel, ROLE_VIEWER, _MENSAGEM_PAPEL_LEITURA)
-            alvo_workflow = wf.id_hash
+            exigir_papel(papel, ROLE_VIEWER, _READ_ROLE_MESSAGE)
+            target_workflow = wf.id_hash
 
         pagina = await ObservabilityService.list_runs(
             db,
-            escopo.como_usuario(),
+            escopo.as_user(),
             sorted(escopo.workspace_ids),
-            workflow_id=alvo_workflow,
-            workspace_id=alvo_workspace,
+            workflow_id=target_workflow,
+            workspace_id=target_workspace,
             status=status,
             trigger_source=trigger_source,
             date_from=date_from,
@@ -522,13 +522,13 @@ async def list_runs(
             # by character, the password the redaction erased (`...:a` 0
             # items, `...:b` 0, `...:S` 1 item, and so on). The REST path,
             # which delivers the whole message, still searches it.
-            q_inclui_erro=False,
+            q_includes_error=False,
             limit=teto,
             offset=deslocamento,
         )
 
     return {
-        "items": [_item_da_listagem(linha) for linha in pagina.get("runs") or []],
+        "items": [_listing_item(linha) for linha in pagina.get("runs") or []],
         "has_more": bool(pagina.get("has_more")),
         "limit": teto,
         "offset": deslocamento,
@@ -555,7 +555,7 @@ async def get_run_artifacts(ctx: Context, run_id: str) -> dict:
     async with infra.sessao() as db:
         # Authorizes through the same door as the detail: a run outside the
         # token's reach answers "not found", and never gets to list artifacts.
-        await _detalhe_do_run(db, str(run_id), escopo)
+        await _run_detail(db, str(run_id), escopo)
         brutos, truncado = await _artefatos_do_run(db, str(run_id), escopo)
 
     itens = []
@@ -566,16 +566,16 @@ async def get_run_artifacts(ctx: Context, run_id: str) -> dict:
         # content exists in the storage) — what is missing is the right to
         # download it from here.
         if not bruto["available"] or bruto["protected"]:
-            itens.append(_artefato_sem_link(bruto))
+            itens.append(_artifact_without_link(bruto))
             continue
         url = await presigned_get_async(
-            bruto["s3_key"], expires=VALIDADE_DO_LINK_S, filename=bruto["filename"]
+            bruto["s3_key"], expires=LINK_VALIDITY_S, filename=bruto["filename"]
         )
         itens.append(
             _artefato(
                 bruto,
                 download_url=url,
-                expires_at=iso(utc_now_naive() + timedelta(seconds=VALIDADE_DO_LINK_S)),
+                expires_at=iso(utc_now_naive() + timedelta(seconds=LINK_VALIDITY_S)),
             )
         )
 
@@ -583,7 +583,7 @@ async def get_run_artifacts(ctx: Context, run_id: str) -> dict:
         "items": itens,
         "run_id": str(run_id),
         "total": len(itens),
-        "expires_in_seconds": VALIDADE_DO_LINK_S,
+        "expires_in_seconds": LINK_VALIDITY_S,
     }
     if truncado:
         # The run produced more files than fit in a response. Saying so is the
@@ -601,7 +601,7 @@ async def get_run_artifacts(ctx: Context, run_id: str) -> dict:
 
 
 async def _artefatos_do_run(
-    db, run_id: str, escopo: EscopoEfetivo
+    db, run_id: str, escopo: EffectiveScope
 ) -> tuple[list[dict], bool]:
     """The run's artifacts and whether the list was CUT at the ceiling.
 
@@ -671,7 +671,7 @@ def _artefato(bruto: Mapping[str, Any], **extras: Any) -> dict:
     return envelope(dados, filename=bruto["filename"], output_key=bruto["output_key"])
 
 
-def _artefato_sem_link(bruto: Mapping[str, Any]) -> dict:
+def _artifact_without_link(bruto: Mapping[str, Any]) -> dict:
     """The artifact without a signed URL, with the reason when it cannot be downloaded.
 
     `run_workflow` uses this shape for ALL artifacts: signing a URL per output
@@ -692,7 +692,7 @@ def _artefato_sem_link(bruto: Mapping[str, Any]) -> dict:
     return item
 
 
-def _resumir_erro(texto: Any) -> str | None:
+def _summarize_error(texto: Any) -> str | None:
     """The listing's error message: REDACTED and only then truncated.
 
     The ORDER is the fix, not a detail of writing style — whoever "simplifies"
@@ -707,13 +707,13 @@ def _resumir_erro(texto: Any) -> str | None:
     """
     if not isinstance(texto, str) or not texto:
         return None
-    redigido = scrub_text(texto)
-    if len(redigido) <= MAX_ERRO_NA_LISTAGEM:
-        return redigido
-    return redigido[:MAX_ERRO_NA_LISTAGEM] + "…"
+    redacted = scrub_text(texto)
+    if len(redacted) <= MAX_ERROR_IN_LISTING:
+        return redacted
+    return redacted[:MAX_ERROR_IN_LISTING] + "…"
 
 
-def _item_da_listagem(linha: Mapping[str, Any]) -> dict:
+def _listing_item(linha: Mapping[str, Any]) -> dict:
     """A run in the list: enough to choose which one to investigate."""
     return envelope(
         {
@@ -729,11 +729,11 @@ def _item_da_listagem(linha: Mapping[str, Any]) -> dict:
             "error_category": linha.get("error_category"),
         },
         workflow_name=linha.get("workflow_name"),
-        error_message=_resumir_erro(linha.get("error_message")),
+        error_message=_summarize_error(linha.get("error_message")),
     )
 
 
-def _instante_naive(valor: Any) -> datetime | None:
+def _naive_instant(valor: Any) -> datetime | None:
     """A time from the detail as naive UTC, ready to subtract — or `None`.
 
     It serves both `finished_at` and `started_at`: both come out of the same
@@ -768,7 +768,7 @@ def _instante_naive(valor: Any) -> datetime | None:
     return valor
 
 
-def _disponibilidade_dos_eventos(eventos: list, detalhe: Mapping[str, Any]) -> tuple[str, str]:
+def _events_availability(eventos: list, detalhe: Mapping[str, Any]) -> tuple[str, str]:
     """Resolves the ambiguity of the core's `expired`.
 
     The service returns `expired=True` in three situations that are NOT the
@@ -794,13 +794,13 @@ def _disponibilidade_dos_eventos(eventos: list, detalhe: Mapping[str, Any]) -> t
         return "disponivel", "o log está no Redis e veio inteiro nesta resposta"
 
     status = detalhe.get("status")
-    if status not in STATUS_TERMINAIS:
-        inicio = _instante_naive(detalhe.get("started_at"))
-        if inicio is not None and (utc_now_naive() - inicio).total_seconds() > RETENCAO_DOS_EVENTOS_S:
+    if status not in TERMINAL_STATUSES:
+        inicio = _naive_instant(detalhe.get("started_at"))
+        if inicio is not None and (utc_now_naive() - inicio).total_seconds() > EVENTS_RETENTION_S:
             return (
                 "expirada",
                 f"a execução consta como '{status}' há mais de "
-                f"{RETENCAO_DOS_EVENTOS_S // 3600}h e o log saiu do Redis. Uma execução parada "
+                f"{EVENTS_RETENTION_S // 3600}h e o log saiu do Redis. Uma execução parada "
                 "nesse estado costuma ser executor que caiu sem fechar o run; o que sobrou "
                 "dela está em get_run(node_stats='full')",
             )
@@ -810,7 +810,7 @@ def _disponibilidade_dos_eventos(eventos: list, detalhe: Mapping[str, Any]) -> t
             "instantes (se o Redis estiver fora, a lista vem vazia por aqui também)",
         )
 
-    fim = _instante_naive(detalhe.get("finished_at"))
+    fim = _naive_instant(detalhe.get("finished_at"))
     if fim is None:
         return (
             "indeterminada",
@@ -818,11 +818,11 @@ def _disponibilidade_dos_eventos(eventos: list, detalhe: Mapping[str, Any]) -> t
             "dizer se o log expirou ou nunca existiu",
         )
 
-    idade = (utc_now_naive() - fim).total_seconds()
-    if idade > RETENCAO_DOS_EVENTOS_S:
+    age = (utc_now_naive() - fim).total_seconds()
+    if age > EVENTS_RETENTION_S:
         return (
             "expirada",
-            f"a execução terminou há mais de {RETENCAO_DOS_EVENTOS_S // 3600}h e o log saiu do "
+            f"a execução terminou há mais de {EVENTS_RETENTION_S // 3600}h e o log saiu do "
             "Redis; o que sobrou dela está em get_run(node_stats='full')",
         )
     return (
@@ -833,7 +833,7 @@ def _disponibilidade_dos_eventos(eventos: list, detalhe: Mapping[str, Any]) -> t
 
 
 @ferramenta
-async def get_run_events(ctx: Context, run_id: str, limit: int = MAX_EVENTOS) -> dict:
+async def get_run_events(ctx: Context, run_id: str, limit: int = MAX_EVENTS) -> dict:
     """The raw log of a run, in the order it was published.
 
     **Events last one hour.** They live only in Redis; past that deadline they
@@ -854,7 +854,7 @@ async def get_run_events(ctx: Context, run_id: str, limit: int = MAX_EVENTOS) ->
     """
     escopo = escopo_da_chamada(ctx)
     exigir_escopo(escopo, "workflows:read")
-    teto = max(1, min(int(limit), MAX_EVENTOS))
+    teto = max(1, min(int(limit), MAX_EVENTS))
 
     async with infra.sessao() as db:
         # A single call, and it returns both things: the events and the detail
@@ -872,17 +872,17 @@ async def get_run_events(ctx: Context, run_id: str, limit: int = MAX_EVENTOS) ->
         # which is where REST also goes through. The fix that lived only here
         # now applies to both paths.
         try:
-            bruto, detalhe = await ObservabilityService.get_run_events_com_detalhe(
+            bruto, detalhe = await ObservabilityService.get_run_events_with_detail(
                 db,
                 str(run_id),
-                escopo.como_usuario(),
+                escopo.as_user(),
                 sorted(escopo.workspace_ids),
             )
         except RunNotFoundError as exc:
-            raise _run_nao_encontrado() from exc
+            raise _run_not_found() from exc
 
     eventos = [e for e in (bruto.get("events") or []) if isinstance(e, Mapping)]
-    disponibilidade, explicacao = _disponibilidade_dos_eventos(eventos, detalhe)
+    availability, explanation = _events_availability(eventos, detalhe)
 
     # Drop the OLDEST: whoever investigates a failure wants the end of the log,
     # which is where the error shows up.
@@ -894,9 +894,9 @@ async def get_run_events(ctx: Context, run_id: str, limit: int = MAX_EVENTOS) ->
             "run_id": detalhe.get("run_id"),
             "workflow_id": detalhe.get("workflow_hash"),
             "status": detalhe.get("status"),
-            "availability": disponibilidade,
-            "reason": explicacao,
-            "retention_seconds": RETENCAO_DOS_EVENTOS_S,
+            "availability": availability,
+            "reason": explanation,
+            "retention_seconds": EVENTS_RETENTION_S,
             # The EFFECTIVE `limit`, not the requested one: whoever sends 10000 gets
             # 200 and needs to know it, so as not to conclude the log had 200
             # events. It is what `list_runs` already does with its own.
@@ -946,7 +946,7 @@ async def cancel_run(ctx: Context, run_id: str) -> dict:
     # double would be bypassed, with nothing flagging it: the tests would stay
     # green exercising the real service. Moving this to the top breaks three
     # tests.
-    from app.services.workflow_execution_service import cancel_run as _cancelar
+    from app.services.workflow_execution_service import cancel_run as _cancel_run
 
     async with infra.sessao() as db:
         # The detail first, and not for convenience: the service resolves the run
@@ -954,14 +954,14 @@ async def cancel_run(ctx: Context, run_id: str) -> dict:
         # account's run answers 403 — which confirms it exists. Loading through
         # the scope path, everything the token cannot reach falls into the same
         # `not_found`, with no oracle.
-        detalhe = await _detalhe_do_run(db, str(run_id), escopo)
+        detalhe = await _run_detail(db, str(run_id), escopo)
         alvo = str(detalhe.get("run_id") or run_id)
 
         # `como_admin` stays at its default (False): the global-administrator
         # shortcut belongs to the REST route, where the caller is a person's
         # session. A personal token does not extend whoever issued it, even if
         # that person is an admin.
-        desfecho = await _cancelar(db, alvo, user_id=escopo.user_id)
+        desfecho = await _cancel_run(db, alvo, user_id=escopo.user_id)
 
     status_before = detalhe.get("status")
     dados = {
@@ -976,7 +976,7 @@ async def cancel_run(ctx: Context, run_id: str) -> dict:
     # had already finished.
     if desfecho == "requested":
         dados["hint"] = "o executor ainda pode levar alguns segundos; confirme com get_run(run_id)"
-    elif desfecho == "already_finished" and status_before not in STATUS_TERMINAIS:
+    elif desfecho == "already_finished" and status_before not in TERMINAL_STATUSES:
         # The core's label is the same for "already over" and for "no executor to
         # ask", and in the second case the run may still be `running`. Passing
         # on just the label would make the agent say something finished that
@@ -1014,24 +1014,24 @@ async def retry_run(ctx: Context, run_id: str) -> dict:
     exigir_escopo(escopo, "runs:execute")
 
     async with infra.sessao() as db:
-        detalhe = await _detalhe_do_run(db, str(run_id), escopo)
-        alvo_workflow = detalhe.get("workflow_hash")
-        if not alvo_workflow:
-            raise _run_nao_encontrado()
+        detalhe = await _run_detail(db, str(run_id), escopo)
+        target_workflow = detalhe.get("workflow_hash")
+        if not target_workflow:
+            raise _run_not_found()
 
         # The role comes from the workflow that will be TRIGGERED, not from the
         # run's workspace: whoever executes needs permission where the new run
         # will happen. It is also what prevents re-running a workflow that left
         # the token's reach since the original run.
-        wf, papel = await carregar_workflow(db, escopo, str(alvo_workflow), decifrar=False)
-        exigir_papel(papel, ROLE_OPERATOR, _MENSAGEM_PAPEL_EXECUCAO)
+        wf, papel = await carregar_workflow(db, escopo, str(target_workflow), decifrar=False)
+        exigir_papel(papel, ROLE_OPERATOR, _RUN_ROLE_MESSAGE)
         ativo = bool(wf.flag_ative)
         id_hash = wf.id_hash
         nome = wf.name
         esquema = wf.params_schema
 
     if not ativo:
-        raise _workflow_inativo()
+        raise _workflow_inactive()
 
     # The SAME check as `run_workflow`, not a raw `inputs={}`. Two reasons,
     # and the second is the one that matters:
@@ -1039,19 +1039,19 @@ async def retry_run(ctx: Context, run_id: str) -> dict:
     # - a required parameter without a default makes `run_workflow` refuse
     #   without spending an executor; dispatching here would pay for a run
     #   doomed to fail;
-    # - `validar_inputs` FILLS IN the defaults declared in the `params_schema`.
+    # - `validate_inputs` FILLS IN the defaults declared in the `params_schema`.
     #   Sending `{}` would produce a run with inputs that no ordinary trigger
     #   of the same workflow produces — and the response would still say
     #   "without the previous run's inputs", as if the contract's defaults had
     #   not vanished too.
-    inputs_validos, hints = validar_inputs(esquema, None)
+    valid_inputs, hints = validate_inputs(esquema, None)
 
     # `trigger_source="mcp"`, not "retry": what this call does is
     # indistinguishable from a `run_workflow` without inputs, and labeling it
     # "retry" would count in History a re-run that does not exist. Who
     # triggered it is recorded in `triggered_by`.
-    novo = await _despachar(
-        escopo, id_hash, inputs=inputs_validos, debug_mode=False, idempotency_key=None,
+    novo = await _dispatch(
+        escopo, id_hash, inputs=valid_inputs, debug_mode=False, idempotency_key=None,
     )
 
     return envelope(
@@ -1061,7 +1061,7 @@ async def retry_run(ctx: Context, run_id: str) -> dict:
             "retried_from": str(detalhe.get("run_id") or run_id),
             "status": "running",
             "reused_inputs": False,
-            "inputs_sent": sorted(inputs_validos),
+            "inputs_sent": sorted(valid_inputs),
             "hints": hints,
             "hint": "execução nova, com a definição atual e com os padrões do params_schema; "
                     "os inputs da execução anterior não são guardados pelo Atlans. "

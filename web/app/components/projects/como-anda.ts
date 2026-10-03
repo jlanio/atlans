@@ -2,7 +2,7 @@ import type { IWorkflow } from "@/service/types"
 import type { IWorkflowMetricsRow } from "@/service/types"
 import type { RunningRun } from "@/context/ActiveRunsContext"
 import { fromBackend, dayjs } from "@/lib/dayjs"
-import { formatarDecorridoGrosso, formatarQuando, rotuloDaOrigem } from "@/lib/formatos"
+import { formatarDecorridoGrosso, formatarQuando, originLabel } from "@/lib/formatos"
 
 /**
  * "Como anda" (how it is going): a workflow's last run (docs/specs/projects.md
@@ -13,9 +13,9 @@ import { formatarDecorridoGrosso, formatarQuando, rotuloDaOrigem } from "@/lib/f
  */
 
 /** Window of the listing metrics (`days=30`), the same one that separates "nunca" (never) from "sem execuções" (no runs). */
-export const JANELA_EM_DIAS = 30
+export const WINDOW_IN_DAYS = 30
 
-export type ComoAnda =
+export type HowItsGoing =
   | {
       tipo: "executando"
       /** "há 4 min"; empty when the run has no `started_at` yet. */
@@ -52,7 +52,7 @@ export function derivarComoAnda(
   emExecucao: RunningRun | undefined,
   metricasIndisponiveis: boolean,
   agora: Date = new Date(),
-): ComoAnda {
+): HowItsGoing {
   // The live run beats everything, including missing metrics: it comes from
   // another endpoint, at a 10 s cadence, and it is what the person is waiting to see.
   if (emExecucao) {
@@ -61,7 +61,7 @@ export function derivarComoAnda(
       tipo: "executando",
       desde: inicio ? formatarDecorridoGrosso(Math.max(0, dayjs(agora).diff(inicio, "second"))) : "",
       instante: inicio ? inicio.valueOf() : agora.getTime(),
-      origem: rotuloDaOrigem(emExecucao.triggerSource),
+      origem: originLabel(emExecucao.triggerSource),
       executor: emExecucao.executorName,
       tipica: metrica?.p50_seconds ?? null,
     }
@@ -70,7 +70,7 @@ export function derivarComoAnda(
   if (metricasIndisponiveis) return { tipo: "indisponivel" }
 
   const ultima = fromBackend(metrica?.last_run_at)
-  if (!metrica || !ultima || !metrica.last_status) return nuncaOuSemExecucoes(wf, metrica, agora)
+  if (!metrica || !ultima || !metrica.last_status) return neverOrNoRuns(wf, metrica, agora)
 
   // Metrics say "running" but the context does not have the run: either the
   // context has not done its first poll yet, or the run ended less than 45 s
@@ -108,17 +108,17 @@ export function derivarComoAnda(
   }
 }
 
-function nuncaOuSemExecucoes(
+function neverOrNoRuns(
   wf: Pick<IWorkflow, "created_at">,
   metrica: IWorkflowMetricsRow | undefined,
   agora: Date,
-): ComoAnda {
+): HowItsGoing {
   // "Nunca" (never) is the invitation for the new workflow ("execute uma vez
   // para validar"); past the window, there is no way to know whether it ran
   // before it — and the text becomes the neutral "sem execuções em 30 dias".
   // Without `created_at` there is no way to claim it is new.
   const criado = fromBackend(wf.created_at)
-  const semRuns = (metrica?.total_runs ?? 0) === 0
-  const recente = criado != null && dayjs(agora).diff(criado, "day") < JANELA_EM_DIAS
-  return semRuns && recente ? { tipo: "nunca" } : { tipo: "sem-execucoes" }
+  const noRuns = (metrica?.total_runs ?? 0) === 0
+  const recente = criado != null && dayjs(agora).diff(criado, "day") < WINDOW_IN_DAYS
+  return noRuns && recente ? { tipo: "nunca" } : { tipo: "sem-execucoes" }
 }

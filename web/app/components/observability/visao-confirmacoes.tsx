@@ -5,19 +5,19 @@ import { TbAlertTriangle, TbArrowRight, TbCircleCheck, TbInbox } from "react-ico
 import { Skeleton } from "@/app/components/ui/skeleton"
 import { GisFlowService } from "@/service/GisFlowService"
 import { cn } from "@/lib/utils"
-import { formatarDuracao, formatarInteiro, plural } from "@/lib/formatos"
+import { formatarDuracao, formatInteger, plural } from "@/lib/formatos"
 
 // Runs sent to an executor and still without a receipt acknowledgment.
 // The late ones (past the threshold) deserve highlighting: they may have been
 // lost between the server and the executor (connection dropped, executor
 // restarted before enqueuing).
-export type ConfirmacaoPendente = { job_id: string; executor_id: string; elapsed_seconds: number }
+export type PendingConfirmation = { job_id: string; executor_id: string; elapsed_seconds: number }
 
-export interface ConfirmacoesPendentes {
-  itens: ConfirmacaoPendente[]
+export interface PendingAcks {
+  itens: PendingConfirmation[]
   limiarSegundos: number
   carregando: boolean
-  atrasadas: ConfirmacaoPendente[]
+  atrasadas: PendingConfirmation[]
   falhou: boolean
 }
 
@@ -30,53 +30,53 @@ export interface ConfirmacoesPendentes {
  * `enabled` is the admin gate: `/pending-acks` is admin-only, and for everyone
  * else this was a 403 every 10 s with an error nobody could fix.
  */
-export function usePendingAcks({ enabled }: { enabled: boolean }): ConfirmacoesPendentes {
-  const [itens, setItens] = useState<ConfirmacaoPendente[]>([])
-  const [limiarSegundos, setLimiar] = useState(15)
-  const [carregando, setCarregando] = useState(true)
-  const [falhou, setFalhou] = useState(false)
+export function usePendingAcks({ enabled }: { enabled: boolean }): PendingAcks {
+  const [itens, setItems] = useState<PendingConfirmation[]>([])
+  const [limiarSegundos, setThreshold] = useState(15)
+  const [carregando, setLoading] = useState(true)
+  const [falhou, setFailed] = useState(false)
   // Signature of the last accepted queue: without it every tick changed the
   // array's identity and re-rendered the whole page just to keep a counter.
   const assinatura = useRef("")
 
   useEffect(() => {
     if (!enabled) {
-      setCarregando(false)
+      setLoading(false)
       return
     }
     let vivo = true
     async function buscar() {
       const res = await GisFlowService.getPendingAcks()
       if (!vivo) return
-      setCarregando(false)
+      setLoading(false)
       // An empty list due to failure is not an empty queue — without this the card
       // claimed "tudo confirmado" (all acknowledged) with no basis at all.
       if (res.error || !res.data) {
-        setFalhou(true)
+        setFailed(true)
         return
       }
-      setFalhou(false)
-      const proximos = res.data.items ?? []
+      setFailed(false)
+      const nextItems = res.data.items ?? []
       // `elapsed_seconds` is included on purpose: it is the list's time column.
-      const sig = proximos.map(i => `${i.job_id}:${i.elapsed_seconds}`).join("|")
+      const sig = nextItems.map(i => `${i.job_id}:${i.elapsed_seconds}`).join("|")
       if (sig !== assinatura.current) {
         assinatura.current = sig
-        setItens(proximos)
+        setItems(nextItems)
       }
-      setLimiar(res.data.threshold_overdue_seconds ?? 15)
+      setThreshold(res.data.threshold_overdue_seconds ?? 15)
     }
     buscar()
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") buscar()
     }, 10_000)
-    const aoMudarVisibilidade = () => {
+    const onVisibilityChange = () => {
       if (document.visibilityState === "visible") buscar()
     }
-    document.addEventListener("visibilitychange", aoMudarVisibilidade)
+    document.addEventListener("visibilitychange", onVisibilityChange)
     return () => {
       vivo = false
       clearInterval(timer)
-      document.removeEventListener("visibilitychange", aoMudarVisibilidade)
+      document.removeEventListener("visibilitychange", onVisibilityChange)
     }
   }, [enabled])
 
@@ -88,7 +88,7 @@ export function usePendingAcks({ enabled }: { enabled: boolean }): ConfirmacoesP
 }
 
 interface Props {
-  acks: ConfirmacoesPendentes
+  acks: PendingAcks
   onAbrirExecucao: (runId: string) => void
   /** executor_id → friendly name (from /metrics/executores); without it, the short id. */
   nomes?: Record<string, string>
@@ -103,23 +103,23 @@ export function VisaoConfirmacoes({ acks, onAbrirExecucao, nomes }: Props) {
     () => [...itens].sort((a, b) => b.elapsed_seconds - a.elapsed_seconds).slice(0, 10),
     [itens],
   )
-  const haAtraso = atrasadas.length > 0
+  const hasDelay = atrasadas.length > 0
 
   return (
     <section aria-labelledby="confirmacoes-titulo" className="flex flex-col rounded-lg border bg-card shadow-xs">
       <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-4 pb-2">
         <h2 id="confirmacoes-titulo" className="flex items-center gap-2 text-sm font-semibold">
-          <TbInbox size={16} className={haAtraso ? "text-red-500" : "text-muted-foreground"} aria-hidden="true" />
+          <TbInbox size={16} className={hasDelay ? "text-red-500" : "text-muted-foreground"} aria-hidden="true" />
           Confirmações pendentes
         </h2>
         <div className="flex items-center gap-2 text-xs">
           <span className={cn(
             "rounded-full px-2 py-0.5 font-medium",
-            haAtraso ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" : "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400",
+            hasDelay ? "bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-400" : "bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-400",
           )}>
             {plural(atrasadas.length, "atrasada")}
           </span>
-          <span className="text-muted-foreground">{formatarInteiro(itens.length)} em espera</span>
+          <span className="text-muted-foreground">{formatInteger(itens.length)} em espera</span>
         </div>
       </div>
       <div className="px-4 pb-4">
@@ -139,7 +139,7 @@ export function VisaoConfirmacoes({ acks, onAbrirExecucao, nomes }: Props) {
                 {itens.length > 0 && " Os itens abaixo são da última leitura que deu certo."}
               </p>
             </div>
-            {itens.length > 0 && <ListaDeConfirmacoes itens={topo} limiar={limiarSegundos} onAbrir={onAbrirExecucao} nomes={nomes} />}
+            {itens.length > 0 && <ConfirmationList itens={topo} limiar={limiarSegundos} onAbrir={onAbrirExecucao} nomes={nomes} />}
           </div>
         ) : itens.length === 0 ? (
           <div className="flex items-center gap-3 py-2">
@@ -153,14 +153,14 @@ export function VisaoConfirmacoes({ acks, onAbrirExecucao, nomes }: Props) {
         ) : (
           <>
             <p className="mb-3 text-sm text-muted-foreground">
-              {haAtraso
+              {hasDelay
                 ? `${plural(atrasadas.length, "execução enviada", "execuções enviadas")} há mais de ${formatarDuracao(limiarSegundos)} sem confirmação do executor. Pode ter se perdido no caminho, ou o executor reiniciou antes de enfileirar.`
                 : `${plural(itens.length, "execução enviada", "execuções enviadas")} há pouco — conta como atrasada depois de ${formatarDuracao(limiarSegundos)}.`}
             </p>
-            <ListaDeConfirmacoes itens={topo} limiar={limiarSegundos} onAbrir={onAbrirExecucao} nomes={nomes} />
+            <ConfirmationList itens={topo} limiar={limiarSegundos} onAbrir={onAbrirExecucao} nomes={nomes} />
             {itens.length > topo.length && (
               <p className="mt-2 text-xs text-muted-foreground">
-                Mostrando as {topo.length} mais antigas de {formatarInteiro(itens.length)}.
+                Mostrando as {topo.length} mais antigas de {formatInteger(itens.length)}.
               </p>
             )}
           </>
@@ -170,9 +170,9 @@ export function VisaoConfirmacoes({ acks, onAbrirExecucao, nomes }: Props) {
   )
 }
 
-function ListaDeConfirmacoes({ itens, limiar, onAbrir, nomes }: {
+function ConfirmationList({ itens, limiar, onAbrir, nomes }: {
   nomes?: Record<string, string>
-  itens: ConfirmacaoPendente[]
+  itens: PendingConfirmation[]
   limiar: number
   onAbrir: (runId: string) => void
 }) {

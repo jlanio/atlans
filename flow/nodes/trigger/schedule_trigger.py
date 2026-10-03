@@ -1,7 +1,7 @@
 # flow/nodes/trigger/schedule_trigger.py
 from flow.registry import register_node
 from flow.nodes.base import BaseNode
-from flow.utils.fuso import fuso_padrao_do_agendamento
+from flow.utils.fuso import default_schedule_timezone
 
 @register_node
 class ScheduleTrigger(BaseNode):
@@ -67,7 +67,7 @@ class ScheduleTrigger(BaseNode):
                     # default would be UTC — that is why the server fills in
                     # `timezone` at dispatch (app/services/fuso_do_agendamento.py),
                     # and here it only applies to whoever builds the node on the server itself.
-                    "default": fuso_padrao_do_agendamento(),
+                    "default": default_schedule_timezone(),
                     "description": "Fuso horário de referência para execução"
                 },
                 {

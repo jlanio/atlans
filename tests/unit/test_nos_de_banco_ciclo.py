@@ -18,19 +18,19 @@ from flow.nodes.outputs.save_to_postgis import SaveToPostGIS
 TODOS = [DatabaseQuery, DatabaseSpatialQuery, SaveToPostgres, SaveToPostGIS]
 
 
-def _nomes(cls):
+def _names(cls):
     return [p["name"] for p in cls.description()["properties"]]
 
 
 @pytest.mark.parametrize("cls", TODOS, ids=lambda c: c.__name__)
-def test_connectionstring_e_declarada(cls):
+def test_connectionstring_is_declared(cls):
     """Direct guard on the cause: without the declaration, `validate()` discards it."""
-    assert "connectionString" in _nomes(cls)
+    assert "connectionString" in _names(cls)
 
 
 @pytest.mark.parametrize("cls", [DatabaseQuery, DatabaseSpatialQuery],
                          ids=lambda c: c.__name__)
-def test_conexao_sobrevive_ao_validate(cls):
+def test_connection_survives_validate(cls):
     no = cls(node_id="n1", parameters={
         "query": "SELECT 1",
         "connectionString": "postgresql://u:p@h/db",  # pragma: allowlist secret
@@ -40,13 +40,13 @@ def test_conexao_sobrevive_ao_validate(cls):
 
 
 @pytest.mark.parametrize("cls", TODOS, ids=lambda c: c.__name__)
-def test_execute_chama_validate(cls):
+def test_execute_calls_validate(cls):
     """BaseNode's contract. The read nodes were the two that didn't comply."""
     import inspect
     assert "self.validate()" in inspect.getsource(cls.execute)
 
 
-def test_timeout_do_espacial_e_declarado():
+def test_spatial_timeout_is_declared():
     """`execute` always read `timeout`, but it wasn't in the property list:
     the UI drew no field, and the only way to change it was editing the
     workflow's JSON by hand."""
@@ -62,7 +62,7 @@ def test_timeout_do_espacial_e_declarado():
     assert no.parameters["timeout"] == 600
 
 
-def test_defaults_declarados_sao_aplicados_no_espacial():
+def test_declared_defaults_are_applied_in_the_spatial_one():
     no = DatabaseSpatialQuery(node_id="n1", parameters={
         "query": "SELECT 1", "connectionString": "x",
     })
@@ -72,7 +72,7 @@ def test_defaults_declarados_sao_aplicados_no_espacial():
     assert no.parameters["queryParams"] == {}
 
 
-def test_queryparams_como_texto_json_e_aceito():
+def test_queryparams_as_json_text_is_accepted():
     """The canvas only saves primitives, so structures arrive serialized."""
     no = DatabaseQuery(node_id="n1", parameters={
         "query": "SELECT 1", "connectionString": "x",
@@ -86,7 +86,7 @@ def test_queryparams_como_texto_json_e_aceito():
 
 @pytest.mark.parametrize("cls", [DatabaseQuery, DatabaseSpatialQuery],
                          ids=lambda c: c.__name__)
-def test_o_no_respeita_o_queryparams_vazio_da_aresta(cls):
+def test_the_node_respects_the_empty_queryparams_from_the_edge(cls):
     """Integration guard: the `or` that caused this lived in `execute()`."""
     import inspect
     fonte = inspect.getsource(cls.execute)
@@ -96,7 +96,7 @@ def test_o_no_respeita_o_queryparams_vazio_da_aresta(cls):
 
 @pytest.mark.parametrize("cls", [DatabaseQuery, DatabaseSpatialQuery],
                          ids=lambda c: c.__name__)
-def test_placeholder_sem_valor_da_erro_acionavel(cls):
+def test_placeholder_without_value_gives_actionable_error(cls):
     """With empty params, `if query_params:` skipped `prepare_query` and sent the
     literal `:bairro` to Postgres, which answered with a syntax error pointing
     at a character. Now the message says which parameter is missing."""

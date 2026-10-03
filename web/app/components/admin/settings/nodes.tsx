@@ -14,7 +14,7 @@ import { Switch } from "@/app/components/ui/switch"
 import { Textarea } from "@/app/components/ui/textarea"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/app/components/ui/dialog"
 import { createToast } from "@/utils/createToast"
-import { formatarInteiro } from "@/lib/formatos"
+import { formatInteger } from "@/lib/formatos"
 
 // ── Admin: habilita/desabilita nodes ────────────────────────────────────────
 
@@ -141,8 +141,8 @@ export function NodesAdminSection({
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground tabular-nums">{formatarInteiro(totals.enabled)}</span> habilitados,{" "}
-          <span className="font-semibold text-foreground tabular-nums">{formatarInteiro(totals.disabled)}</span> desabilitados (de {formatarInteiro(totals.total)}).
+          <span className="font-semibold text-foreground tabular-nums">{formatInteger(totals.enabled)}</span> habilitados,{" "}
+          <span className="font-semibold text-foreground tabular-nums">{formatInteger(totals.disabled)}</span> desabilitados (de {formatInteger(totals.total)}).
         </div>
         <Input
           value={search}

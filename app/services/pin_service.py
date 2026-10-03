@@ -49,16 +49,16 @@ logger = get_logger(__name__)
 # TTL ceiling: one year. The value itself is arbitrary; what is not arbitrary is
 # that a ceiling exists — without it, `timedelta(hours=…)` with a large integer raises
 # `OverflowError` and the route returns 500 for an input the schema accepted.
-TTL_MAXIMO_HORAS = 8760
+MAX_TTL_HOURS = 8760
 
-# Node types whose output cannot be pinned. See `e_no_de_saida`.
-TIPO_DE_SAIDA = "output"
+# Node types whose output cannot be pinned. See `is_output_node`.
+OUTPUT_TYPE = "output"
 
 
 # ── Leitura ──────────────────────────────────────────────────────────────────
 
 
-def _instante(valor: Any) -> Optional[datetime]:
+def _instant(valor: Any) -> Optional[datetime]:
     """Reads an instant stored in `pin_metadata`, tolerating whatever shows up.
 
     Today's writer stores `utc_now_naive().isoformat()` — naive, with no
@@ -73,7 +73,7 @@ def _instante(valor: Any) -> Optional[datetime]:
     - non-string value (a number, a `null` that became `0`) → `TypeError`;
     - the entry itself not being a dict → `AttributeError` on `.get`.
 
-    The recipe is the one from `artifacts_router._recusar_se_token_expirado`, which
+    The recipe is the one from `artifacts_router._reject_if_token_expired`, which
     does this same computation correctly: it accepts `Z`, normalizes the timezone and,
     here, returns `None` for whatever does not parse — because in a LISTING "I cannot
     read this date" is no reason to bring down the whole response.
@@ -95,14 +95,14 @@ def listar_pins(
     pin_metadata: Any,
     pinned_outputs: Any,
     *,
-    node_ids_existentes: Optional[set[str]] = None,
+    existing_node_ids: Optional[set[str]] = None,
 ) -> list[dict]:
     """A workflow's pins, with intent and materialization side by side.
 
     Pure function: it does not touch the database. The caller passes the two columns
     and, optionally, the set of nodes the definition still has.
 
-    `node_ids_existentes=None` means "do not filter" — that is what REST does today.
+    `existing_node_ids=None` means "do not filter" — that is what REST does today.
     Passing the set, pins of deleted nodes disappear, which is the criterion the
     MCP's `get_workflow` already uses (`app/mcp/saida.py`).
 
@@ -131,14 +131,14 @@ def listar_pins(
     pins: list[dict] = []
     for node_id in todos:
         nid = str(node_id)
-        if node_ids_existentes is not None and nid not in node_ids_existentes:
+        if existing_node_ids is not None and nid not in existing_node_ids:
             continue
 
         # The entry may not be a dict: `.get` on a loose value is AttributeError.
         bruto = metadata.get(node_id)
         meta = bruto if isinstance(bruto, dict) else {}
         expires_at = meta.get("expires_at")
-        instante = _instante(expires_at)
+        instante = _instant(expires_at)
 
         if not expires_at:
             expirado: Optional[bool] = False
@@ -165,7 +165,7 @@ def listar_pins(
 # ── The output-node gate ─────────────────────────────────────────────────────
 
 
-def e_no_de_saida(nome_do_no: Any) -> bool:
+def is_output_node(node_name: Any) -> bool:
     """The node writes a file, and therefore cannot have its output pinned.
 
     Pinning the output of an output node creates a phantom artifact: the executor
@@ -180,22 +180,22 @@ def e_no_de_saida(nome_do_no: Any) -> bool:
     Unknown name → `False`. Refusing what is not recognized would turn
     every new node, or one from an earlier version of the registry, into a non-pinnable node.
     """
-    if not isinstance(nome_do_no, str) or not nome_do_no:
+    if not isinstance(node_name, str) or not node_name:
         return False
     from flow.registry import NODE_REGISTRY
 
-    classe = NODE_REGISTRY.get(nome_do_no)
+    classe = NODE_REGISTRY.get(node_name)
     if classe is None:
         return False
     try:
         descricao = classe.description() or {}
     except Exception:  # noqa: BLE001 — a broken descriptor does not close the gate
-        logger.warning("description() do nó '%s' levantou; portão de pin aberto.", nome_do_no)
+        logger.warning("description() do nó '%s' levantou; portão de pin aberto.", node_name)
         return False
-    return descricao.get("type") == TIPO_DE_SAIDA
+    return descricao.get("type") == OUTPUT_TYPE
 
 
-def nome_do_no_na_definition(definition: Any, node_id: str) -> Optional[str]:
+def node_name_in_definition(definition: Any, node_id: str) -> Optional[str]:
     """The node's `name` (the registry key), read from the definition. `None` if absent."""
     if not isinstance(definition, dict):
         return None
@@ -212,15 +212,15 @@ def nome_do_no_na_definition(definition: Any, node_id: str) -> Optional[str]:
 # ── Escrita ──────────────────────────────────────────────────────────────────
 
 
-class PinEmNoDeSaidaError(ValueError):
+class PinOnOutputNodeError(ValueError):
     """Pin request on a node whose output is a written file."""
 
 
-class NoInexistenteError(ValueError):
+class NodeNotFoundError(ValueError):
     """Pin request on a `node_id` the definition does not have."""
 
 
-def _validar_ttl(ttl_hours: Optional[int]) -> Optional[int]:
+def _validate_ttl(ttl_hours: Optional[int]) -> Optional[int]:
     """`None` = no expiration. Otherwise, an integer within the range.
 
     `0` is refused on purpose rather than accepted: in the previous code it fell
@@ -231,9 +231,9 @@ def _validar_ttl(ttl_hours: Optional[int]) -> Optional[int]:
         return None
     if not isinstance(ttl_hours, int) or isinstance(ttl_hours, bool):
         raise ValueError("ttl_hours deve ser um número inteiro de horas ou nulo.")
-    if ttl_hours < 1 or ttl_hours > TTL_MAXIMO_HORAS:
+    if ttl_hours < 1 or ttl_hours > MAX_TTL_HOURS:
         raise ValueError(
-            f"ttl_hours deve estar entre 1 e {TTL_MAXIMO_HORAS} horas "
+            f"ttl_hours deve estar entre 1 e {MAX_TTL_HOURS} horas "
             f"(um ano), ou nulo para não expirar."
         )
     return ttl_hours
@@ -262,13 +262,13 @@ async def fixar_saida(
     turning that into an error is a contract change on a route the screen uses.
     The MCP asks for the check; the route does not.
     """
-    ttl = _validar_ttl(ttl_hours)
+    ttl = _validate_ttl(ttl_hours)
 
-    nome = nome_do_no_na_definition(getattr(wf, "definition", None), node_id)
+    nome = node_name_in_definition(getattr(wf, "definition", None), node_id)
     if nome is None and exigir_no_existente:
-        raise NoInexistenteError(f"O fluxo não tem nó com id '{node_id}'.")
-    if e_no_de_saida(nome):
-        raise PinEmNoDeSaidaError(
+        raise NodeNotFoundError(f"O fluxo não tem nó com id '{node_id}'.")
+    if is_output_node(nome):
+        raise PinOnOutputNodeError(
             f"O nó '{node_id}' ({nome}) grava um arquivo. Fixar a saída dele faria o "
             f"executor reaproveitar o valor congelado e PULAR a gravação — o fluxo "
             f"terminaria com sucesso e sem produzir o arquivo."
@@ -336,7 +336,7 @@ async def _artefato_de_pin(db: AsyncSession, workflow_hash: str, node_id: str):
     return resultado.scalar_one_or_none()
 
 
-async def desfixar_saida(db: AsyncSession, wf, node_id: str) -> dict:
+async def unpin_output(db: AsyncSession, wf, node_id: str) -> dict:
     """Unpins the node and deletes the cache object — in that order, on purpose.
 
     The order is this module's central decision, and it diverges from its sibling
@@ -363,7 +363,7 @@ async def desfixar_saida(db: AsyncSession, wf, node_id: str) -> dict:
     flag_modified(wf, "pinned_outputs")
 
     meta = dict(wf.pin_metadata or {})
-    tinha_meta = meta.pop(node_id, None) is not None
+    had_meta = meta.pop(node_id, None) is not None
     wf.pin_metadata = meta or None
     flag_modified(wf, "pin_metadata")
 
@@ -411,7 +411,7 @@ async def desfixar_saida(db: AsyncSession, wf, node_id: str) -> dict:
 
     return {
         "unpinned": node_id,
-        "outcome": "unpinned" if (estava or tinha_meta) else "not_pinned",
+        "outcome": "unpinned" if (estava or had_meta) else "not_pinned",
         "total_pinned": len(pinned),
         **({"storage_warning": aviso} if aviso else {}),
     }

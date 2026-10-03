@@ -109,7 +109,7 @@ describe("useAssistente — estado", () => {
 
 describe("useAssistente — o desfecho de uma confirmação", () => {
   /** A hook with a conversation already loaded — `confirmar` needs the id in the ref. */
-  async function comConversa(onConversa?: (info: { id: string; titulo?: string; nova: boolean }) => void) {
+  async function withConversation(onConversa?: (info: { id: string; titulo?: string; nova: boolean }) => void) {
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     servico.lerConversa.mockResolvedValue({ success: true, data: { quadros: [] } })
     const { result } = renderHook(() => useAssistente({ conversaId: "c1", onConversa }))
@@ -137,7 +137,7 @@ describe("useAssistente — o desfecho de uma confirmação", () => {
       }),
     )
 
-    const result = await comConversa()
+    const result = await withConversation()
     let decisao!: Promise<string>
     act(() => { decisao = result.current.confirmar("tu1", "TOK", "confirmar") })
     await waitFor(() => expect(result.current.correndo).toBe(true))
@@ -151,7 +151,7 @@ describe("useAssistente — o desfecho de uma confirmação", () => {
       ok: false, status: 409, json: async () => ({ message: "A confirmação expirou ou já foi decidida." }),
     })
     const onConversa = vi.fn()
-    const result = await comConversa(onConversa)
+    const result = await withConversation(onConversa)
 
     let desfecho: string | undefined
     await act(async () => { desfecho = await result.current.confirmar("tu1", "TOK", "confirmar") })
@@ -168,7 +168,7 @@ describe("useAssistente — o desfecho de uma confirmação", () => {
       body: { getReader: () => ({ read: async () => ({ done: true, value: undefined }), cancel: async () => {} }) },
     })
     const onConversa = vi.fn()
-    const result = await comConversa(onConversa)
+    const result = await withConversation(onConversa)
 
     await act(async () => { await result.current.confirmar("tu1", "TOK", "confirmar") })
     expect(onConversa).toHaveBeenCalledWith({ id: "c1", nova: false })
@@ -176,7 +176,7 @@ describe("useAssistente — o desfecho de uma confirmação", () => {
 
   it("queda de rede vira 'falhou' — aí sim a ação precisa de outra chance", async () => {
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(new TypeError("Failed to fetch"))
-    const result = await comConversa()
+    const result = await withConversation()
 
     let desfecho: string | undefined
     await act(async () => { desfecho = await result.current.confirmar("tu1", "TOK", "confirmar") })
@@ -188,14 +188,14 @@ describe("useAssistente — a cota durante o turno", () => {
   it("o quadro `cota` sobe o gasto DURANTE o turno; o fim do stream relê o estado", async () => {
     servico.estadoDoAgente.mockResolvedValue({ success: true, data: ATIVO })
     let soltar!: () => void
-    const ultimaLeitura = new Promise<{ done: true; value?: undefined }>((r) => { soltar = () => r({ done: true }) })
+    const lastRead = new Promise<{ done: true; value?: undefined }>((r) => { soltar = () => r({ done: true }) })
     const bytes = new TextEncoder().encode('event: cota\ndata: {"gasto":40,"teto":100}\n\n')
     let lidas = 0
     ;(globalThis.fetch as unknown as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       body: {
         getReader: () => ({
-          read: () => (lidas++ === 0 ? Promise.resolve({ done: false, value: bytes }) : ultimaLeitura),
+          read: () => (lidas++ === 0 ? Promise.resolve({ done: false, value: bytes }) : lastRead),
           cancel: async () => {},
         }),
       },

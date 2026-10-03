@@ -2,8 +2,8 @@
 import { TbAlertTriangle, TbMap2 } from "react-icons/tb"
 import { derivarCamadas } from "@/app/components/home/camadas"
 import { useHomeStore } from "@/app/stores/homeStore"
-import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
-import { useTextos } from "../i18n"
+import type { AssistantTurn } from "@/app/components/home/assistente/quadros"
+import { useTexts } from "../i18n"
 
 /**
  * The artifacts THIS conversation produced, in a strip fixed at the top of the
@@ -26,9 +26,9 @@ import { useTextos } from "../i18n"
  * - `PainelCamadas`, in the globe's corner: what is on the globe NOW, with eye,
  *   remove and frame.
  */
-export default function BadgeArtefatos({ turnos }: { turnos: TurnoDoAssistente[] }) {
+export default function BadgeArtefatos({ turnos }: { turnos: AssistantTurn[] }) {
   const pedirCamada = useHomeStore((s) => s.pedirCamada)
-  const t = useTextos().assistente.camada
+  const t = useTexts().assistente.camada
   const camadas = derivarCamadas(turnos)
   if (camadas.length === 0) return null
 

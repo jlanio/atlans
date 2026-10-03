@@ -44,7 +44,7 @@ export function FormatBadge({ format }: { format: string | null }) {
 }
 
 /** Portal serving this layer now: success (sanctioned green pair + dark). */
-export function PortalAtivoBadge() {
+export function ActivePortalBadge() {
   return (
     <span className="flex items-center gap-0.5 rounded-full border border-green-500/20 bg-green-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-green-700 dark:bg-green-500/15 dark:text-green-400">
       <TbCloudUp size={9} aria-hidden="true" /> Ativo
@@ -78,7 +78,7 @@ export function CachePinBadge() {
  * Home, which speaks three languages, passes those of its language (the Artifacts
  * table passes nothing and stays the same).
  */
-export interface TextosDaRetencao {
+export interface RetentionTexts {
   expirado: string
   expiraHoje: string
   /** `dias` ≥ 1: "expira em 3 dias". */
@@ -87,7 +87,7 @@ export interface TextosDaRetencao {
   removidoEm: (expiresAt: string | null) => string
 }
 
-export const RETENCAO_EM_PORTUGUES: TextosDaRetencao = {
+export const RETENCAO_EM_PORTUGUES: RetentionTexts = {
   expirado: "expirado",
   expiraHoje: "expira hoje",
   // `plural` covers the pt-BR "1 dia"/"2 dias" with the same thousands formatter
@@ -100,9 +100,9 @@ export const RETENCAO_EM_PORTUGUES: TextosDaRetencao = {
 // (`artifact_cleanup` purges by `expires_at`). `null` = no expiration — renders
 // nothing, the absence already says "permanent". Brings the red/amber closer as
 // expiry approaches so the user is not caught off guard by an artifact that vanishes.
-function infoRetencao(
+function retentionInfo(
   expiresAt: string | null,
-  textos: TextosDaRetencao,
+  textos: RetentionTexts,
 ): { texto: string; classe: string } | null {
   const exp = fromBackend(expiresAt)
   if (!exp) return null
@@ -122,9 +122,9 @@ export function RetencaoHint({
   textos = RETENCAO_EM_PORTUGUES,
 }: {
   expiresAt: string | null
-  textos?: TextosDaRetencao
+  textos?: RetentionTexts
 }) {
-  const r = infoRetencao(expiresAt, textos)
+  const r = retentionInfo(expiresAt, textos)
   if (!r) return null
   return (
     <span

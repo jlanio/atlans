@@ -29,19 +29,19 @@ from executor import sysinfo
 GB = 1024 ** 3
 
 
-class _UsoDeDisco:
-    def __init__(self, livre_gb: float, total_gb: float) -> None:
-        self.free = int(livre_gb * GB)
+class _DiskUsage:
+    def __init__(self, free_gb: float, total_gb: float) -> None:
+        self.free = int(free_gb * GB)
         self.total = int(total_gb * GB)
         self.used = self.total - self.free
 
 
-class PsutilFalso:
+class FakePsutil:
     """Only what `_coletar_disco` uses. `bloqueio` simulates the hung mount."""
 
-    def __init__(self, livre_gb: float = 100.0, total_gb: float = 500.0,
+    def __init__(self, free_gb: float = 100.0, total_gb: float = 500.0,
                  bloqueio: threading.Event | None = None) -> None:
-        self.livre_gb = livre_gb
+        self.free_gb = free_gb
         self.total_gb = total_gb
         self.bloqueio = bloqueio
         self.chamadas = 0
@@ -52,21 +52,21 @@ class PsutilFalso:
             # An NFS `hard` mount that stopped responding does not return an error: it
             # simply never comes back.
             self.bloqueio.wait()
-        return _UsoDeDisco(self.livre_gb, self.total_gb)
+        return _DiskUsage(self.free_gb, self.total_gb)
 
 
 def _threads_de_disco() -> list[threading.Thread]:
     return [t for t in threading.enumerate() if t.name == "sysinfo-disco"]
 
 
-def _esperar_coleta(timeout: float = 5.0) -> None:
+def _wait_for_collection(timeout: float = 5.0) -> None:
     """Espera as threads `sysinfo-disco` pousarem."""
     for t in _threads_de_disco():
         t.join(timeout)
 
 
 @pytest.fixture(autouse=True)
-def _caches_limpos():
+def _clean_caches():
     """Isolates the module's globals between tests — see `_resetar_caches`."""
     sysinfo._resetar_caches()
     yield
@@ -80,204 +80,204 @@ def _caches_limpos():
 # ── Async collection and first reading ───────────────────────────────────────
 
 
-def test_primeira_leitura_nao_bloqueia_e_o_valor_pousa_depois():
-    fake = PsutilFalso(livre_gb=100.0)
+def test_first_read_does_not_block_and_the_value_lands_later():
+    fake = FakePsutil(free_gb=100.0)
 
     # The first call must not do disk I/O on the event loop: it returns
     # unknown and delegates to the thread.
-    assert sysinfo._metricas_de_disco(fake) == {}
-    _esperar_coleta()
+    assert sysinfo._disk_metrics(fake) == {}
+    _wait_for_collection()
 
-    metricas = sysinfo._metricas_de_disco(fake)
+    metricas = sysinfo._disk_metrics(fake)
     assert metricas["disk_free_gb"] == 100.0
     assert metricas["artifacts_disk_free_gb"] == 100.0
 
 
-def test_leituras_seguintes_saem_do_cache_sem_novas_syscalls():
-    fake = PsutilFalso(livre_gb=100.0)
-    sysinfo._metricas_de_disco(fake)
-    _esperar_coleta()
+def test_subsequent_reads_come_from_cache_without_new_syscalls():
+    fake = FakePsutil(free_gb=100.0)
+    sysinfo._disk_metrics(fake)
+    _wait_for_collection()
     chamadas = fake.chamadas
 
     for _ in range(20):
-        assert sysinfo._metricas_de_disco(fake)["disk_free_gb"] == 100.0
+        assert sysinfo._disk_metrics(fake)["disk_free_gb"] == 100.0
     assert fake.chamadas == chamadas, "o TTL deixou de segurar as syscalls"
 
 
 # ── A23: age ceiling ─────────────────────────────────────────────────────────
 
 
-def test_valor_velho_vira_desconhecido_em_vez_de_passar_por_leitura_corrente(caplog):
-    fake = PsutilFalso(livre_gb=100.0)
-    sysinfo._metricas_de_disco(fake)
-    _esperar_coleta()
-    assert sysinfo._metricas_de_disco(fake)["artifacts_disk_free_gb"] == 100.0
+def test_old_value_becomes_unknown_instead_of_passing_as_current_reading(caplog):
+    fake = FakePsutil(free_gb=100.0)
+    sysinfo._disk_metrics(fake)
+    _wait_for_collection()
+    assert sysinfo._disk_metrics(fake)["artifacts_disk_free_gb"] == 100.0
 
     # The share hung right after: the in-flight collection does not come back,
     # and the last good value ages beyond the ceiling.
     agora = time.monotonic()
-    sysinfo._disco_coletado_em = agora - (sysinfo.IDADE_MAXIMA_DISCO_S + 1)
-    sysinfo._disco_expira = 0.0
-    sysinfo._disco_em_voo = 1
-    sysinfo._disco_iniciou_em = agora  # still within the deadline: nothing to fire
+    sysinfo._disk_collected_at = agora - (sysinfo.DISK_MAX_AGE_S + 1)
+    sysinfo._disk_expires = 0.0
+    sysinfo._disk_in_flight = 1
+    sysinfo._disk_started_at = agora  # still within the deadline: nothing to fire
 
     with caplog.at_level("WARNING", logger="executor.sysinfo"):
-        assert sysinfo._metricas_de_disco(fake) == {}
+        assert sysinfo._disk_metrics(fake) == {}
     assert any("obsoletas" in r.message for r in caplog.records), \
         "o painel passou a mentir sem nem registrar no log"
 
-    sysinfo._disco_em_voo = 0  # teardown: there was no real thread
+    sysinfo._disk_in_flight = 0  # teardown: there was no real thread
 
 
-def test_valor_abaixo_do_teto_de_idade_continua_servindo():
-    fake = PsutilFalso(livre_gb=100.0)
-    sysinfo._metricas_de_disco(fake)
-    _esperar_coleta()
+def test_value_below_the_age_ceiling_keeps_serving():
+    fake = FakePsutil(free_gb=100.0)
+    sysinfo._disk_metrics(fake)
+    _wait_for_collection()
 
     # Serving stale data is acceptable; what is not is serving it forever.
-    sysinfo._disco_coletado_em = time.monotonic() - (sysinfo.IDADE_MAXIMA_DISCO_S - 5)
-    assert sysinfo._metricas_de_disco(fake)["disk_free_gb"] == 100.0
+    sysinfo._disk_collected_at = time.monotonic() - (sysinfo.DISK_MAX_AGE_S - 5)
+    assert sysinfo._disk_metrics(fake)["disk_free_gb"] == 100.0
 
 
-def test_aviso_de_obsoleto_nao_se_repete_a_cada_tick(caplog):
-    fake = PsutilFalso(livre_gb=100.0)
-    sysinfo._metricas_de_disco(fake)
-    _esperar_coleta()
-    sysinfo._disco_coletado_em = time.monotonic() - (sysinfo.IDADE_MAXIMA_DISCO_S + 1)
-    sysinfo._disco_em_voo = 1
-    sysinfo._disco_iniciou_em = time.monotonic()
+def test_stale_warning_does_not_repeat_every_tick(caplog):
+    fake = FakePsutil(free_gb=100.0)
+    sysinfo._disk_metrics(fake)
+    _wait_for_collection()
+    sysinfo._disk_collected_at = time.monotonic() - (sysinfo.DISK_MAX_AGE_S + 1)
+    sysinfo._disk_in_flight = 1
+    sysinfo._disk_started_at = time.monotonic()
 
     with caplog.at_level("WARNING", logger="executor.sysinfo"):
         for _ in range(10):
-            sysinfo._metricas_de_disco(fake)
-    obsoletos = [r for r in caplog.records if "obsoletas" in r.message]
-    assert len(obsoletos) == 1, "o aviso é avaliado a 1 Hz; não pode inundar o log"
+            sysinfo._disk_metrics(fake)
+    stale_records = [r for r in caplog.records if "obsoletas" in r.message]
+    assert len(stale_records) == 1, "o aviso é avaliado a 1 Hz; não pode inundar o log"
 
-    sysinfo._disco_em_voo = 0
+    sysinfo._disk_in_flight = 0
 
 
 # ── A23: coleta pendurada ────────────────────────────────────────────────────
 
 
-def test_coleta_pendurada_nao_bloqueia_o_chamador():
+def test_hung_collection_does_not_block_the_caller():
     bloqueio = threading.Event()
-    fake = PsutilFalso(livre_gb=100.0, bloqueio=bloqueio)
+    fake = FakePsutil(free_gb=100.0, bloqueio=bloqueio)
     try:
         t0 = time.monotonic()
-        assert sysinfo._metricas_de_disco(fake) == {}
+        assert sysinfo._disk_metrics(fake) == {}
         assert time.monotonic() - t0 < 1.0, "o event loop esperou pelo mount pendurado"
-        assert sysinfo._disco_em_voo == 1
+        assert sysinfo._disk_in_flight == 1
     finally:
         bloqueio.set()
-        _esperar_coleta()
+        _wait_for_collection()
 
 
-def test_coleta_pendurada_nao_trava_as_tentativas_futuras_para_sempre():
+def test_hung_collection_does_not_lock_future_attempts_forever():
     bloqueio = threading.Event()
-    fake = PsutilFalso(livre_gb=100.0, bloqueio=bloqueio)
+    fake = FakePsutil(free_gb=100.0, bloqueio=bloqueio)
     try:
-        sysinfo._metricas_de_disco(fake)
-        assert sysinfo._disco_em_voo == 1
+        sysinfo._disk_metrics(fake)
+        assert sysinfo._disk_in_flight == 1
 
         # Within the deadline: no new thread, even with the TTL expired.
-        sysinfo._disco_expira = 0.0
-        sysinfo._metricas_de_disco(fake)
-        assert sysinfo._disco_em_voo == 1
+        sysinfo._disk_expires = 0.0
+        sysinfo._disk_metrics(fake)
+        assert sysinfo._disk_in_flight == 1
 
         # Past the deadline, the collection is considered hung and a new one is
-        # allowed — without this, `_disco_em_voo` would be a permanent lock and
+        # allowed — without this, `_disk_in_flight` would be a permanent lock and
         # the frozen value would never be replaced again.
-        sysinfo._disco_iniciou_em = time.monotonic() - sysinfo.TIMEOUT_COLETA_DISCO_S - 1
-        sysinfo._disco_expira = 0.0
-        sysinfo._metricas_de_disco(fake)
-        assert sysinfo._disco_em_voo == 2
+        sysinfo._disk_started_at = time.monotonic() - sysinfo.DISK_COLLECTION_TIMEOUT_S - 1
+        sysinfo._disk_expires = 0.0
+        sysinfo._disk_metrics(fake)
+        assert sysinfo._disk_in_flight == 2
     finally:
         bloqueio.set()
-        _esperar_coleta()
+        _wait_for_collection()
 
 
-def test_mount_pendurado_nao_vaza_uma_thread_por_tick():
+def test_hung_mount_does_not_leak_a_thread_per_tick():
     bloqueio = threading.Event()
-    fake = PsutilFalso(livre_gb=100.0, bloqueio=bloqueio)
+    fake = FakePsutil(free_gb=100.0, bloqueio=bloqueio)
     try:
         for _ in range(30):
             # The most hostile scenario possible: deadline always blown and TTL always
             # expired. Only the ceiling can hold it.
-            sysinfo._disco_iniciou_em = time.monotonic() - sysinfo.TIMEOUT_COLETA_DISCO_S - 1
-            sysinfo._disco_expira = 0.0
-            assert sysinfo._metricas_de_disco(fake) == {}
-        assert sysinfo._disco_em_voo == sysinfo.MAX_COLETAS_DISCO_EM_VOO
-        assert len(_threads_de_disco()) <= sysinfo.MAX_COLETAS_DISCO_EM_VOO
+            sysinfo._disk_started_at = time.monotonic() - sysinfo.DISK_COLLECTION_TIMEOUT_S - 1
+            sysinfo._disk_expires = 0.0
+            assert sysinfo._disk_metrics(fake) == {}
+        assert sysinfo._disk_in_flight == sysinfo.MAX_DISK_COLLECTIONS_IN_FLIGHT
+        assert len(_threads_de_disco()) <= sysinfo.MAX_DISK_COLLECTIONS_IN_FLIGHT
     finally:
         bloqueio.set()
-        _esperar_coleta()
+        _wait_for_collection()
 
 
-def test_disparo_empurra_o_vencimento_para_nao_abrir_thread_por_tick():
+def test_trigger_pushes_the_expiry_to_avoid_a_thread_per_tick():
     bloqueio = threading.Event()
-    fake = PsutilFalso(livre_gb=100.0, bloqueio=bloqueio)
+    fake = FakePsutil(free_gb=100.0, bloqueio=bloqueio)
     try:
-        sysinfo._metricas_de_disco(fake)
+        sysinfo._disk_metrics(fake)
         # If the expiration were only pushed at the end of the collection, a
-        # collection that never finishes would leave `_disco_expira` in the past forever.
-        assert sysinfo._disco_expira >= time.monotonic() + sysinfo.TIMEOUT_COLETA_DISCO_S - 1
+        # collection that never finishes would leave `_disk_expires` in the past forever.
+        assert sysinfo._disk_expires >= time.monotonic() + sysinfo.DISK_COLLECTION_TIMEOUT_S - 1
     finally:
         bloqueio.set()
-        _esperar_coleta()
+        _wait_for_collection()
 
 
-def test_falha_na_coleta_sai_no_log_e_mantem_o_valor_anterior(caplog, monkeypatch):
-    fake = PsutilFalso(livre_gb=100.0)
-    sysinfo._metricas_de_disco(fake)
-    _esperar_coleta()
+def test_collection_failure_is_logged_and_keeps_the_previous_value(caplog, monkeypatch):
+    fake = FakePsutil(free_gb=100.0)
+    sysinfo._disk_metrics(fake)
+    _wait_for_collection()
 
     def explode(_mod):
         raise OSError("unidade de rede sumiu")
 
     monkeypatch.setattr(sysinfo, "_coletar_disco", explode)
     with caplog.at_level("WARNING", logger="executor.sysinfo"):
-        sysinfo._refrescar_disco(fake)
+        sysinfo._refresh_disk(fake)
 
     # An inaccessible artifacts folder was completely silent (logger.debug).
     assert any("Falha ao coletar metricas de disco" in r.message for r in caplog.records)
-    assert sysinfo._metricas_de_disco(fake)["disk_free_gb"] == 100.0
-    assert sysinfo._disco_em_voo == 0, "a vaga precisa voltar mesmo na falha"
+    assert sysinfo._disk_metrics(fake)["disk_free_gb"] == 100.0
+    assert sysinfo._disk_in_flight == 0, "a vaga precisa voltar mesmo na falha"
 
 
 # ── A48: adaptive TTL near the end of the disk ───────────────────────────────
 
 
-def test_ttl_longo_quando_ha_folga():
-    assert sysinfo._ttl_do_valor({}) == sysinfo.TTL_DISCO_S
-    assert sysinfo._ttl_do_valor(
+def test_long_ttl_when_there_is_headroom():
+    assert sysinfo._value_ttl({}) == sysinfo.TTL_DISCO_S
+    assert sysinfo._value_ttl(
         {"disk_free_gb": 200.0, "artifacts_disk_free_gb": 80.0}
     ) == sysinfo.TTL_DISCO_S
 
 
-def test_ttl_curto_quando_o_disco_dos_artefatos_esta_apertado():
+def test_short_ttl_when_the_artifacts_disk_is_tight():
     # 3 GB free: a GIS node writing a raster consumes that in seconds, and the
     # "Disco quase cheio" (disk almost full) toast must arrive BEFORE the write fails.
-    assert sysinfo._ttl_do_valor(
+    assert sysinfo._value_ttl(
         {"disk_free_gb": 200.0, "artifacts_disk_free_gb": 3.0}
-    ) == sysinfo.TTL_DISCO_APERTADO_S
+    ) == sysinfo.DISK_LOW_TTL_S
 
 
-def test_disco_apertado_encurta_o_vencimento_de_verdade():
-    fake = PsutilFalso(livre_gb=3.0, total_gb=500.0)
-    sysinfo._metricas_de_disco(fake)
-    _esperar_coleta()
+def test_tight_disk_really_shortens_the_expiry():
+    fake = FakePsutil(free_gb=3.0, total_gb=500.0)
+    sysinfo._disk_metrics(fake)
+    _wait_for_collection()
 
-    restante = sysinfo._disco_expira - time.monotonic()
-    assert restante <= sysinfo.TTL_DISCO_APERTADO_S + 0.5
+    restante = sysinfo._disk_expires - time.monotonic()
+    assert restante <= sysinfo.DISK_LOW_TTL_S + 0.5
     assert restante < sysinfo.TTL_DISCO_S
 
 
-def test_folga_mantem_o_ttl_longo_de_verdade():
-    fake = PsutilFalso(livre_gb=200.0, total_gb=500.0)
-    sysinfo._metricas_de_disco(fake)
-    _esperar_coleta()
+def test_headroom_really_keeps_the_long_ttl():
+    fake = FakePsutil(free_gb=200.0, total_gb=500.0)
+    sysinfo._disk_metrics(fake)
+    _wait_for_collection()
 
-    restante = sysinfo._disco_expira - time.monotonic()
+    restante = sysinfo._disk_expires - time.monotonic()
     assert restante > sysinfo.TTL_DISCO_S - 5, \
         "o TTL longo é o que tira o I/O de disco do caminho de 1 Hz"
 
@@ -285,7 +285,7 @@ def test_folga_mantem_o_ttl_longo_de_verdade():
 # ── A58: limites de cgroup mudam em voo ──────────────────────────────────────
 
 
-def test_limite_de_ram_do_container_e_relido_apos_o_ttl(monkeypatch):
+def test_container_ram_limit_is_reread_after_the_ttl(monkeypatch):
     monkeypatch.setattr(sysinfo, "_EH_LINUX", True)
     arquivos = {"/sys/fs/cgroup/memory.max": 4 * GB}
     monkeypatch.setattr(sysinfo, "_read_cgroup_value", lambda p: arquivos.get(p))
@@ -301,7 +301,7 @@ def test_limite_de_ram_do_container_e_relido_apos_o_ttl(monkeypatch):
         "o memo permanente prendia ram_available_gb em 0.0 para sempre"
 
 
-def test_ram_disponivel_acompanha_o_limite_reduzido(monkeypatch):
+def test_available_ram_follows_the_reduced_limit(monkeypatch):
     monkeypatch.setattr(sysinfo, "_EH_LINUX", True)
     arquivos = {"/sys/fs/cgroup/memory.max": 4 * GB,
                 "/sys/fs/cgroup/memory.current": 1 * GB}
@@ -316,7 +316,7 @@ def test_ram_disponivel_acompanha_o_limite_reduzido(monkeypatch):
     assert sysinfo._get_cgroup_ram_available() == 1 * GB
 
 
-def test_cota_de_cpu_do_container_e_relida_apos_o_ttl(monkeypatch):
+def test_container_cpu_quota_is_reread_after_the_ttl(monkeypatch):
     monkeypatch.setattr(sysinfo, "_EH_LINUX", True)
     cota = {"valor": 2.0}
     monkeypatch.setattr(sysinfo, "_ler_cgroup_cpu_cores", lambda: cota["valor"])
@@ -325,12 +325,12 @@ def test_cota_de_cpu_do_container_e_relida_apos_o_ttl(monkeypatch):
     cota["valor"] = 8.0  # docker update --cpus=8
     assert sysinfo._get_cgroup_cpu_cores() == 2.0
 
-    sysinfo._cache_cpu_cores_em -= sysinfo.TTL_CGROUP_S + 1
+    sysinfo._cached_cpu_cores_at -= sysinfo.TTL_CGROUP_S + 1
     assert sysinfo._get_cgroup_cpu_cores() == 8.0, \
         "cpu_pct_norm ficaria normalizado pela cota antiga para sempre"
 
 
-def test_o_memo_de_cgroup_evita_reler_a_cada_tick(monkeypatch):
+def test_cgroup_memo_avoids_rereading_every_tick(monkeypatch):
     monkeypatch.setattr(sysinfo, "_EH_LINUX", True)
     leituras = []
     monkeypatch.setattr(sysinfo, "_read_cgroup_value",
@@ -341,15 +341,15 @@ def test_o_memo_de_cgroup_evita_reler_a_cada_tick(monkeypatch):
     assert len(leituras) == 1, "o objetivo da otimização (cortar open() por tick) se perdeu"
 
 
-def test_fora_do_linux_nao_toca_no_sysfs(monkeypatch):
+def test_outside_linux_does_not_touch_sysfs(monkeypatch):
     """This case IS immutable, and it is what generated FileNotFoundError every second."""
     monkeypatch.setattr(sysinfo, "_EH_LINUX", False)
 
-    def nao_deveria(*_a, **_k):
+    def should_not_happen(*_a, **_k):
         raise AssertionError("leu /sys/fs/cgroup fora do Linux")
 
-    monkeypatch.setattr(sysinfo, "_read_cgroup_value", nao_deveria)
-    monkeypatch.setattr(sysinfo, "_ler_cgroup_cpu_cores", nao_deveria)
+    monkeypatch.setattr(sysinfo, "_read_cgroup_value", should_not_happen)
+    monkeypatch.setattr(sysinfo, "_ler_cgroup_cpu_cores", should_not_happen)
 
     assert sysinfo._get_cgroup_ram_total() is None
     assert sysinfo._get_cgroup_cpu_cores() is None
@@ -359,19 +359,19 @@ def test_fora_do_linux_nao_toca_no_sysfs(monkeypatch):
 # ── Reset hook ───────────────────────────────────────────────────────────────
 
 
-def test_resetar_caches_zera_todo_o_estado(monkeypatch):
+def test_reset_caches_clears_all_state(monkeypatch):
     monkeypatch.setattr(sysinfo, "_EH_LINUX", True)
     monkeypatch.setattr(sysinfo, "_read_cgroup_value", lambda p: 4 * GB)
     sysinfo._get_cgroup_ram_total()
-    fake = PsutilFalso(livre_gb=100.0)
-    sysinfo._metricas_de_disco(fake)
-    _esperar_coleta()
+    fake = FakePsutil(free_gb=100.0)
+    sysinfo._disk_metrics(fake)
+    _wait_for_collection()
 
     sysinfo._resetar_caches()
 
-    assert sysinfo._disco_valor == {}
-    assert sysinfo._disco_em_voo == 0
-    assert sysinfo._disco_expira == 0.0
+    assert sysinfo._disk_value == {}
+    assert sysinfo._disk_in_flight == 0
+    assert sysinfo._disk_expires == 0.0
     assert sysinfo._cache_ram_total is None
-    assert sysinfo._cache_ram_total_em == sysinfo._SEM_LEITURA
-    assert sysinfo._cache_cpu_cores_em == sysinfo._SEM_LEITURA
+    assert sysinfo._cache_ram_total_em == sysinfo._NEVER_READ
+    assert sysinfo._cached_cpu_cores_at == sysinfo._NEVER_READ

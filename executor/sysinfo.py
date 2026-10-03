@@ -58,11 +58,11 @@ _EH_LINUX = sys.platform.startswith("linux")
 # for the optimization) and self-corrects shortly after a limit change.
 TTL_CGROUP_S = 30.0
 
-_SEM_LEITURA = float("-inf")  # never read; do not use 0.0 (monotonic may be < TTL)
+_NEVER_READ = float("-inf")  # never read; do not use 0.0 (monotonic may be < TTL)
 _cache_ram_total: int | None = None
-_cache_ram_total_em = _SEM_LEITURA
-_cache_cpu_cores: float | None = None
-_cache_cpu_cores_em = _SEM_LEITURA
+_cache_ram_total_em = _NEVER_READ
+_cached_cpu_cores: float | None = None
+_cached_cpu_cores_at = _NEVER_READ
 
 
 def _get_cgroup_ram_total() -> int | None:
@@ -107,15 +107,15 @@ def _get_cgroup_cpu_cores() -> float | None:
     old quota (CPU bar flattened, or overflowing 100 and getting clamped)
     forever.
     """
-    global _cache_cpu_cores, _cache_cpu_cores_em
+    global _cached_cpu_cores, _cached_cpu_cores_at
     if not _EH_LINUX:
         return None
     agora = time.monotonic()
-    if agora - _cache_cpu_cores_em < TTL_CGROUP_S:
-        return _cache_cpu_cores
-    _cache_cpu_cores = _ler_cgroup_cpu_cores()
-    _cache_cpu_cores_em = agora
-    return _cache_cpu_cores
+    if agora - _cached_cpu_cores_at < TTL_CGROUP_S:
+        return _cached_cpu_cores
+    _cached_cpu_cores = _ler_cgroup_cpu_cores()
+    _cached_cpu_cores_at = agora
+    return _cached_cpu_cores
 
 
 def _ler_cgroup_cpu_cores() -> float | None:
@@ -206,7 +206,7 @@ def _collect_system_info() -> dict | None:
         return None
 
 
-def _disco_dos_artefatos(psutil_mod) -> object | None:
+def _artifacts_disk(psutil_mod) -> object | None:
     """Usage of the disk WHERE THE ARTIFACTS ARE WRITTEN.
 
     Not the same as `_safe_disk_usage`, which measures the CWD drive — in the
@@ -253,16 +253,16 @@ def _disco_dos_artefatos(psutil_mod) -> object | None:
 #
 # Three limits apply to this cache, and each one exists because of a symptom:
 #
-# 1. Adaptive TTL (`_ttl_do_valor`). Far from the disk filling up, 60 s: that is
+# 1. Adaptive TTL (`_value_ttl`). Far from the disk filling up, 60 s: that is
 #    what takes the collection off the hot path. Close to full, 5 s — see the
-#    `_ttl_do_valor` docstring.
-# 2. Age ceiling (`IDADE_MAXIMA_DISCO_S`). Past it the value becomes
+#    `_value_ttl` docstring.
+# 2. Age ceiling (`DISK_MAX_AGE_S`). Past it the value becomes
 #    UNKNOWN (missing keys -> None -> "—" in the panel and in the desktop) instead
 #    of continuing to be served as if it were a current reading. Serving stale
 #    data is acceptable; serving stale data indistinguishable from fresh data is
 #    not, in a gauge whose only job is to warn before the artifact is lost.
-# 3. Deadline for the in-flight collection (`TIMEOUT_COLETA_DISCO_S`) with a
-#    thread ceiling (`MAX_COLETAS_DISCO_EM_VOO`). `psutil.disk_usage` on an NFS
+# 3. Deadline for the in-flight collection (`DISK_COLLECTION_TIMEOUT_S`) with a
+#    thread ceiling (`MAX_DISK_COLLECTIONS_IN_FLIGHT`). `psutil.disk_usage` on an NFS
 #    `hard` mount or a hung FUSE NEVER returns: the thread stays hung without ever
 #    releasing the counter. Without a deadline, it would be a permanent lock
 #    against any future attempt; with only a deadline, the executor would leak a
@@ -270,29 +270,29 @@ def _disco_dos_artefatos(psutil_mod) -> object | None:
 #    recovery attempts and then the number simply becomes unknown, which is the
 #    honest answer.
 TTL_DISCO_S = 60.0
-TTL_DISCO_APERTADO_S = 5.0
+DISK_LOW_TTL_S = 5.0
 
 # Mirrors DISCO_BAIXO_GB from desktop/src/shared/disco.ts — the threshold at
 # which the desktop starts warning. If the two diverged, the executor would stop
 # refreshing precisely in the range where the alert is decided.
-DISCO_APERTADO_GB = 5.0
+DISK_LOW_GB = 5.0
 
 # ~3x the long TTL: absorbs one slow collection and one isolated failure (the
 # retry only comes when the next TTL expires) without wiping the number.
-IDADE_MAXIMA_DISCO_S = 180.0
-TIMEOUT_COLETA_DISCO_S = 30.0
-MAX_COLETAS_DISCO_EM_VOO = 3
+DISK_MAX_AGE_S = 180.0
+DISK_COLLECTION_TIMEOUT_S = 30.0
+MAX_DISK_COLLECTIONS_IN_FLIGHT = 3
 
 _disco_lock = threading.Lock()
-_disco_valor: dict = {}
-_disco_expira = 0.0
-_disco_em_voo = 0                   # collection threads that have not come back yet
-_disco_coletado_em = _SEM_LEITURA   # monotonic of the last SUCCESSFUL collection
-_disco_iniciou_em = _SEM_LEITURA    # monotonic of the last collection trigger
-_disco_obsoleto_logado = False      # the staleness warning is evaluated at 1 Hz; log it once
+_disk_value: dict = {}
+_disk_expires = 0.0
+_disk_in_flight = 0                   # collection threads that have not come back yet
+_disk_collected_at = _NEVER_READ   # monotonic of the last SUCCESSFUL collection
+_disk_started_at = _NEVER_READ    # monotonic of the last collection trigger
+_disk_stale_logged = False      # the staleness warning is evaluated at 1 Hz; log it once
 
 
-def _ttl_do_valor(valor: dict) -> float:
+def _value_ttl(valor: dict) -> float:
     """Adaptive TTL: short when the disk is tight.
 
     The old premise ("no decision this number supports would change with the
@@ -308,8 +308,8 @@ def _ttl_do_valor(valor: dict) -> float:
     """
     livres = [v for k, v in valor.items()
               if k.endswith("_free_gb") and isinstance(v, (int, float))]
-    if livres and min(livres) < DISCO_APERTADO_GB:
-        return TTL_DISCO_APERTADO_S
+    if livres and min(livres) < DISK_LOW_GB:
+        return DISK_LOW_TTL_S
     return TTL_DISCO_S
 
 
@@ -323,11 +323,11 @@ def _coletar_disco(psutil_mod) -> dict:
     # Artifacts disk, reported separately: it may be another drive, and it is
     # the one that decides whether a workflow can write its result.
     #
-    # In its OWN try: `_disco_dos_artefatos` imports `executor.config`, and an
+    # In its OWN try: `_artifacts_disk` imports `executor.config`, and an
     # ImportError there would bring down the whole collection. The effect would
     # be to also lose the system disk because of this one, silently.
     try:
-        art = _disco_dos_artefatos(psutil_mod)
+        art = _artifacts_disk(psutil_mod)
         if art is not None:
             metrics["artifacts_disk_free_gb"] = round(art.free / (1024**3), 1)
             metrics["artifacts_disk_total_gb"] = round(art.total / (1024**3), 1)
@@ -336,9 +336,9 @@ def _coletar_disco(psutil_mod) -> dict:
     return metrics
 
 
-def _refrescar_disco(psutil_mod) -> None:
-    global _disco_valor, _disco_expira, _disco_em_voo
-    global _disco_coletado_em, _disco_obsoleto_logado
+def _refresh_disk(psutil_mod) -> None:
+    global _disk_value, _disk_expires, _disk_in_flight
+    global _disk_collected_at, _disk_stale_logged
     try:
         novo = _coletar_disco(psutil_mod)
     except Exception as exc:
@@ -350,71 +350,71 @@ def _refrescar_disco(psutil_mod) -> None:
     agora = time.monotonic()
     with _disco_lock:
         if novo is not None:
-            _disco_valor = novo
-            _disco_coletado_em = agora
-            _disco_obsoleto_logado = False
+            _disk_value = novo
+            _disk_collected_at = agora
+            _disk_stale_logged = False
         # The TTL renews even on failure: the old value keeps being served (up to the
         # age ceiling) and the next attempt comes at the following expiry, without
         # hammering a drive that disappeared on every tick.
-        _disco_expira = agora + _ttl_do_valor(_disco_valor)
-        _disco_em_voo = max(_disco_em_voo - 1, 0)
+        _disk_expires = agora + _value_ttl(_disk_value)
+        _disk_in_flight = max(_disk_in_flight - 1, 0)
 
 
-def _metricas_de_disco(psutil_mod) -> dict:
+def _disk_metrics(psutil_mod) -> dict:
     """Memoized disk space. See the note above.
 
     Returns `{}` (missing keys -> `None` in the consumers) until the
     first collection lands and whenever the last good value is older than
-    `IDADE_MAXIMA_DISCO_S`.
+    `DISK_MAX_AGE_S`.
     """
-    global _disco_em_voo, _disco_expira, _disco_iniciou_em, _disco_obsoleto_logado
+    global _disk_in_flight, _disk_expires, _disk_started_at, _disk_stale_logged
     agora = time.monotonic()
     with _disco_lock:
-        vencido = agora >= _disco_expira
-        atual = _disco_valor
+        vencido = agora >= _disk_expires
+        atual = _disk_value
         # While a collection is in flight no other is triggered: on a hung network
         # drive, each tick would open a new thread. But with a deadline — a
-        # collection that went past TIMEOUT_COLETA_DISCO_S is hung and may never
+        # collection that went past DISK_COLLECTION_TIMEOUT_S is hung and may never
         # come back, and without this way out it would block every future attempt.
-        pendurada = _disco_em_voo > 0 and (agora - _disco_iniciou_em) >= TIMEOUT_COLETA_DISCO_S
+        pendurada = _disk_in_flight > 0 and (agora - _disk_started_at) >= DISK_COLLECTION_TIMEOUT_S
         disparar = (
             vencido
-            and (_disco_em_voo == 0 or pendurada)
-            and _disco_em_voo < MAX_COLETAS_DISCO_EM_VOO
+            and (_disk_in_flight == 0 or pendurada)
+            and _disk_in_flight < MAX_DISK_COLLECTIONS_IN_FLIGHT
         )
         if disparar:
-            _disco_em_voo += 1
-            _disco_iniciou_em = agora
+            _disk_in_flight += 1
+            _disk_started_at = agora
             # Push the expiry forward ALREADY at trigger time: if the collection hangs
-            # and never reaches `_refrescar_disco`, this is what prevents a new
+            # and never reaches `_refresh_disk`, this is what prevents a new
             # thread per tick. The normal path overwrites this when it finishes, so
             # the short TTL of a tight disk is not lost.
-            _disco_expira = agora + max(_ttl_do_valor(atual), TIMEOUT_COLETA_DISCO_S)
-        idade = agora - _disco_coletado_em
-        obsoleto = bool(atual) and idade >= IDADE_MAXIMA_DISCO_S
-        logar_obsoleto = obsoleto and not _disco_obsoleto_logado
-        if logar_obsoleto:
-            _disco_obsoleto_logado = True
+            _disk_expires = agora + max(_value_ttl(atual), DISK_COLLECTION_TIMEOUT_S)
+        age = agora - _disk_collected_at
+        obsoleto = bool(atual) and age >= DISK_MAX_AGE_S
+        log_stale = obsoleto and not _disk_stale_logged
+        if log_stale:
+            _disk_stale_logged = True
 
     if disparar:
         try:
-            threading.Thread(target=_refrescar_disco, args=(psutil_mod,),
+            threading.Thread(target=_refresh_disk, args=(psutil_mod,),
                              name="sysinfo-disco", daemon=True).start()
         except Exception as exc:
             # Without returning the slot here, a single "can't start new thread"
             # would freeze the disk metrics for the rest of the process's life.
             with _disco_lock:
-                _disco_em_voo = max(_disco_em_voo - 1, 0)
-                _disco_expira = 0.0
+                _disk_in_flight = max(_disk_in_flight - 1, 0)
+                _disk_expires = 0.0
             logger.warning("Nao foi possivel iniciar a coleta de disco: %s", exc)
 
     if obsoleto:
-        if logar_obsoleto:
+        if log_stale:
             logger.warning(
                 "Metricas de disco obsoletas (ultima coleta ha %.0fs, teto %.0fs): "
                 "reportando desconhecido em vez do valor antigo. A pasta de artefatos "
                 "pode estar numa unidade de rede que parou de responder.",
-                idade, IDADE_MAXIMA_DISCO_S,
+                age, DISK_MAX_AGE_S,
             )
         return {}
     return atual
@@ -429,23 +429,23 @@ def _resetar_caches() -> None:
     those that have nothing to do with sysinfo, because `_get_dynamic_metrics` is
     called from several places. Nothing in production calls this.
     """
-    global _cache_ram_total, _cache_ram_total_em, _cache_cpu_cores, _cache_cpu_cores_em
-    global _disco_valor, _disco_expira, _disco_em_voo
-    global _disco_coletado_em, _disco_iniciou_em, _disco_obsoleto_logado
-    global _PROC, _PROC_FALHOU
+    global _cache_ram_total, _cache_ram_total_em, _cached_cpu_cores, _cached_cpu_cores_at
+    global _disk_value, _disk_expires, _disk_in_flight
+    global _disk_collected_at, _disk_started_at, _disk_stale_logged
+    global _PROC, _PROC_FAILED
     _cache_ram_total = None
-    _cache_ram_total_em = _SEM_LEITURA
-    _cache_cpu_cores = None
-    _cache_cpu_cores_em = _SEM_LEITURA
+    _cache_ram_total_em = _NEVER_READ
+    _cached_cpu_cores = None
+    _cached_cpu_cores_at = _NEVER_READ
     with _disco_lock:
-        _disco_valor = {}
-        _disco_expira = 0.0
-        _disco_em_voo = 0
-        _disco_coletado_em = _SEM_LEITURA
-        _disco_iniciou_em = _SEM_LEITURA
-        _disco_obsoleto_logado = False
+        _disk_value = {}
+        _disk_expires = 0.0
+        _disk_in_flight = 0
+        _disk_collected_at = _NEVER_READ
+        _disk_started_at = _NEVER_READ
+        _disk_stale_logged = False
     _PROC = None
-    _PROC_FALHOU = False
+    _PROC_FAILED = False
 
 
 def _get_dynamic_metrics() -> dict:
@@ -453,7 +453,7 @@ def _get_dynamic_metrics() -> dict:
 
     Prefers cgroup limits inside containers.
 
-    The disk comes from the cache (`_metricas_de_disco`); RAM is read on the spot,
+    The disk comes from the cache (`_disk_metrics`); RAM is read on the spot,
     because it is a cheap read — `GlobalMemoryStatusEx`, /proc/meminfo or a local
     cgroup file, nothing that can get stuck on a network drive — and it is precisely
     the metric the operator expects to see move in the panel while a heavy job runs.
@@ -463,7 +463,7 @@ def _get_dynamic_metrics() -> dict:
     except ImportError:
         return {}
 
-    metrics = dict(_metricas_de_disco(psutil))
+    metrics = dict(_disk_metrics(psutil))
     try:
         cgroup_avail = _get_cgroup_ram_available()
         if cgroup_avail is not None:
@@ -480,12 +480,12 @@ def _get_dynamic_metrics() -> dict:
 # PREVIOUS call on the same object — that is why the Process is created once and
 # kept. Recreating it on every tick would make every reading return 0.0.
 _PROC = None
-_PROC_FALHOU = False
+_PROC_FAILED = False
 
 
 def _process() -> object | None:
-    global _PROC, _PROC_FALHOU
-    if _PROC_FALHOU:
+    global _PROC, _PROC_FAILED
+    if _PROC_FAILED:
         return None
     if _PROC is None:
         try:
@@ -493,7 +493,7 @@ def _process() -> object | None:
             _PROC = psutil.Process()
             _PROC.cpu_percent(interval=None)  # aquece o baseline
         except Exception as exc:
-            _PROC_FALHOU = True
+            _PROC_FAILED = True
             logger.debug("psutil.Process indisponivel — metricas do processo desligadas: %s", exc)
             return None
     return _PROC

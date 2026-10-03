@@ -83,8 +83,8 @@ export function useResizablePanel({
 
   // Depends on the viewport, so it only exists on the client.
   const resolveDefault = useCallback(() => {
-    const porFracao = defaultRatio ? window.innerWidth * defaultRatio : 0
-    return Math.max(defaultWidth, porFracao)
+    const byRatio = defaultRatio ? window.innerWidth * defaultRatio : 0
+    return Math.max(defaultWidth, byRatio)
   }, [defaultWidth, defaultRatio])
 
   // Opening width, on mount (not on render: `window` does not exist on the

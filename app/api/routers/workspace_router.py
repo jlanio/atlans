@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import (
     get_db, get_current_user,
-    get_workspace_member_role, exigir_papel_no_workspace,
+    get_workspace_member_role, require_workspace_role,
 )
 from app.models.user import User
 from app.models.workspace import Workspace
@@ -102,7 +102,7 @@ async def _get_admin_managed_workspace(id_hash: str, db: AsyncSession, current_u
     ws = result.scalar_one_or_none()
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace não encontrado.")
-    await exigir_papel_no_workspace(
+    await require_workspace_role(
         db, id_hash, current_user.id_hash, ROLE_ADMIN,
         "Requer role 'admin' ou superior neste workspace.",
     )
@@ -308,7 +308,7 @@ async def list_members(
     return _build_member_list(ws.owner_id, owner_user, ws.created_at, rows)
 
 
-def _conferir_email_do_convidado(user: User, workspace_id: str) -> None:
+def _check_invitee_email(user: User, workspace_id: str) -> None:
     """The invitation is by e-mail: it is only valid if the e-mail belongs to the account holder.
 
     With EXIGIR_EMAIL_VERIFICADO (the default), an account without a verified e-mail does
@@ -359,7 +359,7 @@ async def invite_member(
     # ("Você já é o dono deste workspace") on top of that accused the wrong person.
     if ws.owner_id and user.id_hash == ws.owner_id:
         raise HTTPException(status_code=400, detail="Este usuário já é o dono do workspace.")
-    _conferir_email_do_convidado(user, id_hash)
+    _check_invitee_email(user, id_hash)
 
     # Check whether already a member
     existing = await db.execute(
@@ -488,7 +488,7 @@ async def remove_member(
 
     # The user can leave on their own; admin+ can remove other members
     if user_id != current_user.id_hash:
-        await exigir_papel_no_workspace(
+        await require_workspace_role(
             db, id_hash, current_user.id_hash, ROLE_ADMIN,
             "Requer role 'admin' ou superior para remover membros.",
         )
@@ -669,7 +669,7 @@ async def _policy_out(db: AsyncSession, ws: Workspace) -> WorkspacePolicyOut:
 
     policy = await politica.load_policy(db, ws)
 
-    async def _membro(ag, tier: int) -> PolicyMemberOut:
+    async def _member(ag, tier: int) -> PolicyMemberOut:
         online = await executor_registry.presence_or_unknown(ag.id_hash)
         capacity = await executor_registry.read_capacity(ag.id_hash) if online else None
         return PolicyMemberOut(
@@ -677,8 +677,8 @@ async def _policy_out(db: AsyncSession, ws: Workspace) -> WorkspacePolicyOut:
             status=ag.status, tier=tier, online=online, capacity=capacity,
         )
 
-    primary = list(await asyncio.gather(*[_membro(a, 1) for a in policy.primary]))
-    fallback = list(await asyncio.gather(*[_membro(a, 2) for a in policy.fallback]))
+    primary = list(await asyncio.gather(*[_member(a, 1) for a in policy.primary]))
+    fallback = list(await asyncio.gather(*[_member(a, 2) for a in policy.fallback]))
 
     pool = None
     if policy.allows_pool:
@@ -796,13 +796,13 @@ class WorkspaceNotificationsOut(BaseModel):
 def _normalize_allowlist(raw: List[str]) -> List[str]:
     """Normalizes and validates hostname patterns. Raises 400 on what the matcher would ignore.
 
-    The rule lives in `app.core.utils.allowlist.validar_allowlist`, shared
+    The rule lives in `app.core.utils.allowlist.validate_allowlist`, shared
     with the admin's global webhook whitelist.
     """
-    from app.core.utils.allowlist import validar_allowlist
+    from app.core.utils.allowlist import validate_allowlist
 
     try:
-        return validar_allowlist(raw)
+        return validate_allowlist(raw)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

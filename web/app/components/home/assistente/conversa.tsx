@@ -22,11 +22,11 @@ import { TbAlertTriangle, TbChevronRight, TbSparkles } from "react-icons/tb"
 
 import { cn } from "@/lib/utils"
 import ExecActivity from "@/app/components/shared/exec-activity"
-import type { BlocoDoAssistente, TurnoDoAssistente, PropostaDeFluxo } from "@/app/components/home/assistente/quadros"
-import Passo from "./passo"
-import type { ErroDoAssistente } from "@/app/components/home/assistente/quadros"
+import type { AssistantBlock, AssistantTurn, WorkflowProposal } from "@/app/components/home/assistente/quadros"
+import Step from "./passo"
+import type { AssistantError } from "@/app/components/home/assistente/quadros"
 import type { Idioma } from "@/lib/idioma"
-import { textosDe, useIdiomaDaTela, useTextos } from "../i18n"
+import { textosDe, useScreenLanguage, useTexts } from "../i18n"
 
 /**
  * The on-screen text of an error. In Portuguese it is the server message AS IT
@@ -34,7 +34,7 @@ import { textosDe, useIdiomaDaTela, useTextos } from "../i18n"
  * sentence — the server message is in Portuguese; a new code still shows up as
  * it came, which is better than nothing.
  */
-export function textoDoErro(erro: ErroDoAssistente, idioma: Idioma): { message: string; hint?: string } {
+export function textoDoErro(erro: AssistantError, idioma: Idioma): { message: string; hint?: string } {
   if (idioma === "pt-BR") return { message: erro.message, hint: erro.hint }
   const erros = textosDe(idioma).assistente.erros
   if (!Object.hasOwn(erros, erro.code)) return { message: erro.message, hint: erro.hint }
@@ -43,21 +43,21 @@ export function textoDoErro(erro: ErroDoAssistente, idioma: Idioma): { message: 
 }
 
 /** What the `Conversa` knows about a block beyond the block itself, for whoever renders the `extras`. */
-export interface ContextoDoBloco {
+export interface BlockContext {
   /** The block is in the LAST turn of the list — the only one where an offer still holds. */
   ultimoTurno: boolean
 }
 
 /** The activity indicator of the pending item: an SVG that accepts `size` (the `ExecActivity`; the Home's logo). */
-export type IndicadorDeAtividade = React.ComponentType<{ size?: number; className?: string }>
+export type ActivityIndicator = React.ComponentType<{ size?: number; className?: string }>
 
 interface Props {
-  turnos: TurnoDoAssistente[]
+  turnos: AssistantTurn[]
   correndo: boolean
   // Optional: only the editor drawer knows how to draw a proposal on the canvas —
   // it injects the card through here. The Home does not pass it (the HOME surface
   // does not emit `proposta`) and uses `extras` for the blocks only it has.
-  proposta?: (proposta: PropostaDeFluxo) => React.ReactNode
+  proposta?: (proposta: WorkflowProposal) => React.ReactNode
   /**
    * Renders the blocks this Conversa does not know (`fluxo`/`camada`/
    * `confirmacao`/`respostas_rapidas` from the Home assistant). Without it, an
@@ -65,7 +65,7 @@ interface Props {
    * types. The `contexto` says whether the block is in the LAST turn: that is what
    * makes the quick replies valid only for that one time.
    */
-  extras?: (bloco: BlocoDoAssistente, contexto: ContextoDoBloco) => React.ReactNode
+  extras?: (bloco: AssistantBlock, contexto: BlockContext) => React.ReactNode
   /**
    * What the surface is called in the screen reader announcement. The editor is
    * the "assistente"; on the Home the same conversation is the "assistente", and
@@ -93,7 +93,7 @@ interface Props {
    * a single "busy" vocabulary, the same as the running node. The Home passes the
    * animated logo (`assistente/marca-animada.tsx`): there, the one thinking is the site.
    */
-  indicador?: IndicadorDeAtividade
+  indicador?: ActivityIndicator
   /**
    * A blinking cursor at the end of the paragraph being written (the last group
    * of the turn in progress), like the one in the Home's typed suggestion. Opt-in
@@ -107,19 +107,19 @@ export default function Conversa({
   nome = "assistente", vazio, compacta = false,
   indicador: Indicador = ExecActivity, cursorAoEscrever = false,
 }: Props) {
-  const t = useTextos().assistente.conversa
-  const fimRef = useRef<HTMLDivElement>(null)
-  const grudadoRef = useRef(true)
+  const t = useTexts().assistente.conversa
+  const endRef = useRef<HTMLDivElement>(null)
+  const stuckRef = useRef(true)
 
   // Scrolls only when already at the bottom. Someone who scrolled up to reread an
   // explanation must not be dragged back on every text delta.
   useEffect(() => {
-    if (grudadoRef.current) fimRef.current?.scrollIntoView({ block: "end" })
+    if (stuckRef.current) endRef.current?.scrollIntoView({ block: "end" })
   }, [turnos])
 
-  function aoRolar(e: React.UIEvent<HTMLDivElement>) {
+  function handleScroll(e: React.UIEvent<HTMLDivElement>) {
     const el = e.currentTarget
-    grudadoRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
+    stuckRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48
   }
 
   // Opening a `<details>` increases `scrollHeight` WITHOUT firing a `scroll`
@@ -128,9 +128,9 @@ export default function Conversa({
   // bottom: the click of someone who only wanted to read the reasoning is undone
   // on its own. Whoever opens an OLD block unsticks; whoever opens the one being
   // written keeps following, which is what is wanted in both cases.
-  const desgrudar = useCallback(() => { grudadoRef.current = false }, [])
+  const unstick = useCallback(() => { stuckRef.current = false }, [])
 
-  const idDoUltimo = turnos[turnos.length - 1]?.id
+  const lastId = turnos[turnos.length - 1]?.id
 
   return (
     // `min-h-0` is NOT a detail: without it the layout breaks as the conversation
@@ -150,7 +150,7 @@ export default function Conversa({
     <div
       // The caption has no padding of its own: the strip (`.home-pilha`) provides it.
       className={cn("nowheel min-h-0 min-w-0 flex-1 overflow-y-auto", !compacta && "px-3 py-3")}
-      onScroll={aoRolar}
+      onScroll={handleScroll}
       aria-busy={correndo}
     >
       {/* The screen reader announcement is COARSE, and the list is NOT `aria-live`.
@@ -166,7 +166,7 @@ export default function Conversa({
           <ol className={cn("flex min-w-0 flex-col", compacta ? "gap-1.5" : "gap-4")}>
             {turnos.map(turno => (
               <li key={turno.id}>
-                {turno.papel === "user" ? <Pergunta texto={turno.texto ?? ""} compacta={compacta} /> : (
+                {turno.papel === "user" ? <Question texto={turno.texto ?? ""} compacta={compacta} /> : (
                   <Resposta
                     turno={turno}
                     proposta={proposta}
@@ -174,25 +174,25 @@ export default function Conversa({
                     compacta={compacta}
                     // The model turn that is running is, by construction, the
                     // LAST one in the list. There is no new state here.
-                    pensando={correndo && turno.id === idDoUltimo}
-                    ultimoTurno={turno.id === idDoUltimo}
+                    pensando={correndo && turno.id === lastId}
+                    ultimoTurno={turno.id === lastId}
                     Indicador={Indicador}
                     cursorAoEscrever={cursorAoEscrever}
-                    onDesgrudar={desgrudar}
+                    onDesgrudar={unstick}
                   />
                 )}
               </li>
             ))}
           </ol>
-          <div ref={fimRef} />
+          <div ref={endRef} />
         </>
       )}
     </div>
   )
 }
 
-function Pergunta({ texto, compacta }: { texto: string; compacta: boolean }) {
-  const t = useTextos().assistente.conversa
+function Question({ texto, compacta }: { texto: string; compacta: boolean }) {
+  const t = useTexts().assistente.conversa
   if (compacta) {
     // One line: "Você · pergunta", truncated, with the full text in `title`.
     // The question sits in its own `<span>`, not loose next to "Você": it is
@@ -221,15 +221,15 @@ function Resposta({
   cursorAoEscrever,
   onDesgrudar,
 }: {
-  turno: TurnoDoAssistente
-  proposta?: (proposta: PropostaDeFluxo) => React.ReactNode
-  extras?: (bloco: BlocoDoAssistente, contexto: ContextoDoBloco) => React.ReactNode
+  turno: AssistantTurn
+  proposta?: (proposta: WorkflowProposal) => React.ReactNode
+  extras?: (bloco: AssistantBlock, contexto: BlockContext) => React.ReactNode
   /** This turn is the one being written right now. */
   pensando: boolean
   compacta: boolean
   /** This turn is the last in the list (the `extras` know: an offer only holds there). */
   ultimoTurno: boolean
-  Indicador: IndicadorDeAtividade
+  Indicador: ActivityIndicator
   cursorAoEscrever: boolean
   onDesgrudar: () => void
 }) {
@@ -237,7 +237,7 @@ function Resposta({
 
   // Consecutive steps become a single list: five `<ul>` of one item each
   // drew five loose blocks where there is a sequence.
-  const grupos: BlocoDoAssistente[][] = []
+  const grupos: AssistantBlock[][] = []
   for (const bloco of turno.blocos) {
     const ultimo = grupos[grupos.length - 1]
     if (bloco.tipo === "ferramenta" && ultimo?.[0]?.tipo === "ferramenta") ultimo.push(bloco)
@@ -250,14 +250,14 @@ function Resposta({
   // and the texts before the last one, are left for the panel. The stored index
   // is the ORIGINAL one (the `key` and `pensandoAgora` depend on it): the filter
   // must not shift ownership.
-  const ultimoTexto = grupos.map((g) => g[0].tipo).lastIndexOf("texto")
+  const lastTextIndex = grupos.map((g) => g[0].tipo).lastIndexOf("texto")
   const vivo = grupos.length - 1
   const visiveis = grupos
     .map((grupo, i) => ({ grupo, i }))
     .filter(({ grupo, i }) => {
       if (!compacta) return true
       const tipo = grupo[0].tipo
-      if (tipo === "texto") return i === ultimoTexto
+      if (tipo === "texto") return i === lastTextIndex
       if (tipo === "pensando" || tipo === "ferramenta") return pensando && i === vivo
       return true // `erro` and the Home's cards; `proposta` never reaches the Home
     })
@@ -270,7 +270,7 @@ function Resposta({
           grupo={grupo}
           proposta={proposta}
           extras={extras}
-          // The `key={i}` is safe because the indices are APPEND-ONLY: `acumular`
+          // The `key={i}` is safe because the indices are APPEND-ONLY: `accumulate`
           // replaces the last block or appends, `mapearFerramenta` replaces in
           // place, and everything else appends. No group shifts in the middle, so
           // an open <details> does not jump owners during the stream. If some new
@@ -298,19 +298,19 @@ function Grupo({
   cursorAoEscrever,
   onDesgrudar,
 }: {
-  grupo: BlocoDoAssistente[]
-  proposta?: (proposta: PropostaDeFluxo) => React.ReactNode
-  extras?: (bloco: BlocoDoAssistente, contexto: ContextoDoBloco) => React.ReactNode
+  grupo: AssistantBlock[]
+  proposta?: (proposta: WorkflowProposal) => React.ReactNode
+  extras?: (bloco: AssistantBlock, contexto: BlockContext) => React.ReactNode
   /** This is the last group of a turn in progress — that is, the live one. */
   pensandoAgora: boolean
   compacta: boolean
   ultimoTurno: boolean
-  Indicador: IndicadorDeAtividade
+  Indicador: ActivityIndicator
   cursorAoEscrever: boolean
   onDesgrudar: () => void
 }) {
   const primeiro = grupo[0]
-  const idioma = useIdiomaDaTela()
+  const idioma = useScreenLanguage()
   const t = textosDe(idioma).assistente.conversa
 
   if (primeiro.tipo === "ferramenta") {
@@ -319,7 +319,7 @@ function Grupo({
     return (
       <ul className="rounded-md border border-dashed bg-muted/30 px-2.5 py-1">
         {passos.map((b, i) => (
-          b.tipo === "ferramenta" ? <Passo key={`${b.id}-${i}`} bloco={b} /> : null
+          b.tipo === "ferramenta" ? <Step key={`${b.id}-${i}`} bloco={b} /> : null
         ))}
       </ul>
     )
@@ -442,8 +442,8 @@ function Grupo({
  * from here would not fit, and neither would its `role="status"` — one per
  * reasoning block would be the live region the comment on the `<ol>` above rejects.
  */
-function Pensando({ Indicador }: { Indicador: IndicadorDeAtividade }) {
-  const t = useTextos().assistente.barra
+function Pensando({ Indicador }: { Indicador: ActivityIndicator }) {
+  const t = useTexts().assistente.barra
   return (
     <p className="flex items-center gap-1.5 text-xs text-muted-foreground" role="status">
       <Indicador size={13} />

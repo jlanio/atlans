@@ -109,11 +109,11 @@ def strip_sql_literals(sql: str) -> str:
 
         # 'string' — a doubled quote ('') escapes; with the E'' prefix the backslash does too
         elif c == "'":
-            escapa_barra = i > 0 and sql[i - 1] in "eE" and (i < 2 or not sql[i - 2].isalnum())
+            escapes_backslash = i > 0 and sql[i - 1] in "eE" and (i < 2 or not sql[i - 2].isalnum())
             i += 1
             fechou = False
             while i < n:
-                if escapa_barra and sql[i] == "\\":
+                if escapes_backslash and sql[i] == "\\":
                     i += 2
                     continue
                 if sql[i] == "'":

@@ -30,11 +30,11 @@ import { BrowserWindow, shell } from 'electron'
 import { ICONE_APP, arquivoDoApp } from '../paths.js'
 import { UI_URL, ehExternoSeguro, ehOrigemInterna, hostsInternos } from '../../shared/ui.js'
 import { ehDeepLink } from '../deeplink.js'
-import { estaEncerrando, trazerParaFrente } from './windows.js'
+import { isQuitting, trazerParaFrente } from './windows.js'
 
 let janela: BrowserWindow | null = null
 
-export function janelaWebPrincipal(): BrowserWindow | null {
+export function mainWebWindow(): BrowserWindow | null {
   return janela && !janela.isDestroyed() ? janela : null
 }
 
@@ -43,7 +43,7 @@ export function janelaWebPrincipal(): BrowserWindow | null {
 // bringing the panel to the front — lives there. Without this, a click on
 // "Abrir no app" (open in app) in the embedded web UI would have nowhere to go
 // and would die in `will-navigate`.
-let encaminharDeepLink: ((url: string) => void) | null = null
+let forwardDeepLink: ((url: string) => void) | null = null
 
 /**
  * Registers the handler for a deep link clicked in the web window. Called once
@@ -51,8 +51,8 @@ let encaminharDeepLink: ((url: string) => void) | null = null
  * from outside, so that "Abrir no app" behaves the same inside and outside the
  * app.
  */
-export function definirTratadorDeepLink(fn: (url: string) => void): void {
-  encaminharDeepLink = fn
+export function setDeepLinkHandler(fn: (url: string) => void): void {
+  forwardDeepLink = fn
 }
 
 /**
@@ -73,7 +73,7 @@ function urlDaUI(): string {
 }
 
 /** Local HTML shown when the UI does not load (network down, server down). */
-function paginaOffline(url: string): string {
+function offlinePage(url: string): string {
   // INLINE page, without depending on a packaged file: works the same in dev
   // (no `vite build`) and in the packaged app. "Tentar de novo" (try again) is
   // a link to the UI itself — `will-navigate` recognizes the origin and lets
@@ -112,7 +112,7 @@ function paginaOffline(url: string): string {
 }
 
 export function abrirJanelaWeb(): BrowserWindow {
-  const existente = janelaWebPrincipal()
+  const existente = mainWebWindow()
   if (existente) {
     trazerParaFrente(existente)
     return existente
@@ -156,10 +156,10 @@ export function abrirJanelaWeb(): BrowserWindow {
   // (sandbox, no nodeIntegration) guarantees. We deny everything by default;
   // the only exception is clipboard WRITE, which the UI's "Copiar" (copy)
   // buttons use (clipboard read and the rest stay out).
-  const PERMISSOES_WEB = new Set(['clipboard-sanitized-write'])
-  const sessaoWeb = janela.webContents.session
-  sessaoWeb.setPermissionRequestHandler((_wc, permissao, cb) => cb(PERMISSOES_WEB.has(permissao)))
-  sessaoWeb.setPermissionCheckHandler((_wc, permissao) => PERMISSOES_WEB.has(permissao))
+  const WEB_PERMISSIONS = new Set(['clipboard-sanitized-write'])
+  const webSession = janela.webContents.session
+  webSession.setPermissionRequestHandler((_wc, permissao, cb) => cb(WEB_PERMISSIONS.has(permissao)))
+  webSession.setPermissionCheckHandler((_wc, permissao) => WEB_PERMISSIONS.has(permissao))
 
   janela.once('ready-to-show', () => janela?.show())
 
@@ -167,7 +167,7 @@ export function abrirJanelaWeb(): BrowserWindow {
   // keeps running — the same contract as the panel window. Only an explicit
   // quit closes it.
   janela.on('close', (evento) => {
-    if (!estaEncerrando()) {
+    if (!isQuitting()) {
       evento.preventDefault()
       janela?.hide()
     }
@@ -190,8 +190,8 @@ export function abrirJanelaWeb(): BrowserWindow {
   // `atlans://` itself does NOT go this way, it is diverted earlier.
   // `interpretar` (in main) revalidates the link and never enrolls on its own:
   // it requires human confirmation.
-  const tratarExterno = (destino: string): void => {
-    if (ehDeepLink(destino)) { encaminharDeepLink?.(destino); return }
+  const handleExternal = (destino: string): void => {
+    if (ehDeepLink(destino)) { forwardDeepLink?.(destino); return }
     if (ehExternoSeguro(destino)) void shell.openExternal(destino)
   }
 
@@ -201,7 +201,7 @@ export function abrirJanelaWeb(): BrowserWindow {
   // needs to see the destination.
   janela.webContents.setWindowOpenHandler(({ url: destino }) => {
     if (interno(destino)) void janela?.loadURL(destino)
-    else tratarExterno(destino)
+    else handleExternal(destino)
     return { action: 'deny' }
   })
 
@@ -213,12 +213,12 @@ export function abrirJanelaWeb(): BrowserWindow {
   janela.webContents.on('will-navigate', (evento, destino) => {
     if (interno(destino)) return
     evento.preventDefault()
-    tratarExterno(destino)
+    handleExternal(destino)
   })
   janela.webContents.on('will-redirect', (evento, destino) => {
     if (interno(destino)) return
     evento.preventDefault()
-    tratarExterno(destino)
+    handleExternal(destino)
   })
 
   // Without an address bar, DevTools via shortcut is the only way to inspect
@@ -232,14 +232,14 @@ export function abrirJanelaWeb(): BrowserWindow {
 
   // Network/server down: the main frame fails and the window would stay blank.
   // Swap in the local page with "Tentar de novo" (try again).
-  janela.webContents.on('did-fail-load', (_e, codigo, _desc, urlQueFalhou, ehFramePrincipal) => {
+  janela.webContents.on('did-fail-load', (_e, codigo, _desc, failedUrl, ehFramePrincipal) => {
     // Only the top frame, and only while loading the remote UI. `-3` = ABORTED,
     // a navigation replaced by another — swapping there would flicker for
     // nothing; and the offline page itself (data:) never matches `^https?:`,
     // so there is no loop.
     if (!ehFramePrincipal || codigo === -3) return
-    if (!/^https?:/i.test(urlQueFalhou)) return
-    const html = paginaOffline(url)
+    if (!/^https?:/i.test(failedUrl)) return
+    const html = offlinePage(url)
     void janela?.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`)
   })
 

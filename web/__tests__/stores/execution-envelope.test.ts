@@ -20,16 +20,16 @@ const RUN_B = "run-b"
 
 // --- Minimal environment around the hook ------------------------------------
 
-let workflowAtual = "wf-a"
-const runsPorWorkflow: Record<string, { run_id: string; status: string }[]> = {}
+let currentWorkflow = "wf-a"
+const runsByWorkflow: Record<string, { run_id: string; status: string }[]> = {}
 
-const nosDoCanvas = [
+const canvasNodes = [
   { id: "n1", position: { x: 0, y: 0 }, data: {} },
   { id: "n2", position: { x: 0, y: 0 }, data: {} },
 ]
 
 vi.mock("next/navigation", () => ({
-  useParams: () => ({ id: workflowAtual }),
+  useParams: () => ({ id: currentWorkflow }),
 }))
 
 vi.mock("next-auth/react", () => ({
@@ -43,7 +43,7 @@ vi.mock("@/app/hooks/workflow/useSaveWorkflow", () => ({
 vi.mock("@/service/GisFlowService", () => ({
   GisFlowService: {
     getObservabilityRuns: vi.fn(async ({ workflow_id }: { workflow_id: string }) => ({
-      data: { runs: runsPorWorkflow[workflow_id] ?? [] },
+      data: { runs: runsByWorkflow[workflow_id] ?? [] },
     })),
     executeWorkflow: vi.fn(),
   },
@@ -57,14 +57,14 @@ vi.mock("@/utils/env", () => ({ getWsUrl: () => "ws://teste" }))
 
 vi.mock("@xyflow/react", async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useNodes: () => nosDoCanvas,
+  useNodes: () => canvasNodes,
   useEdges: () => [],
-  useReactFlow: () => ({ getNodes: () => nosDoCanvas }),
+  useReactFlow: () => ({ getNodes: () => canvasNodes }),
 }))
 
 /** Fake socket: keeps the handlers so the test can push frames. */
-class SocketFalso {
-  static abertos: SocketFalso[] = []
+class FakeSocket {
+  static abertos: FakeSocket[] = []
   onopen: (() => void) | null = null
   onmessage: ((ev: { data: string }) => void) | null = null
   onerror: ((err: unknown) => void) | null = null
@@ -72,7 +72,7 @@ class SocketFalso {
   fechadoCom: number | null = null
 
   constructor(public url: string) {
-    SocketFalso.abertos.push(this)
+    FakeSocket.abertos.push(this)
   }
   send() {}
   close(code = 1000) {
@@ -87,52 +87,52 @@ class SocketFalso {
 /** rAF queue under the test's control — with no callback running, it is the
  *  hidden tab; running the queue by hand, it is the visible tab. */
 const quadros = new Map<number, FrameRequestCallback>()
-let proximoQuadro = 1
+let nextFrame = 1
 
-function rodarQuadros() {
+function runFrames() {
   const pendentes = [...quadros.entries()]
   quadros.clear()
   for (const [, cb] of pendentes) cb(performance.now())
 }
 
-async function importarHook() {
+async function importHook() {
   const mod = await import("@/app/hooks/workflow/useExecuteWorkflow")
   return mod.useExecuteWorkflow
 }
 
-function frameDeEventos(events: object[], dropped = 0) {
+function eventsFrame(events: object[], dropped = 0) {
   return dropped > 0 ? { type: "events", events, dropped } : { type: "events", events }
 }
 
-function eventoDeNo(node: string, status: string, over: object = {}) {
+function nodeEvent(node: string, status: string, over: object = {}) {
   return { node, status, kind: "lifecycle", level: "info", timestamp: 1_700_000_000, ...over }
 }
 
-function eventoDeFim(status = "completed") {
+function endEvent(status = "completed") {
   return { node: "__workflow_complete__", status, kind: "lifecycle", level: "info", duration_ms: 1200, timestamp: 1_700_000_001 }
 }
 
 /** Mounts the hook already attached to a live run (the re-attach path). */
 async function anexar(runId: string) {
-  const useExecuteWorkflow = await importarHook()
+  const useExecuteWorkflow = await importHook()
   const view = renderHook(() => useExecuteWorkflow())
-  await waitFor(() => expect(SocketFalso.abertos.length).toBeGreaterThan(0))
-  const ws = SocketFalso.abertos.find(s => s.url.endsWith(runId))!
+  await waitFor(() => expect(FakeSocket.abertos.length).toBeGreaterThan(0))
+  const ws = FakeSocket.abertos.find(s => s.url.endsWith(runId))!
   expect(ws).toBeDefined()
   return { view, ws }
 }
 
 describe("useExecuteWorkflow — envelope único de eventos", () => {
   beforeEach(() => {
-    workflowAtual = "wf-a"
-    runsPorWorkflow["wf-a"] = [{ run_id: RUN_A, status: "running" }]
-    runsPorWorkflow["wf-b"] = []
-    SocketFalso.abertos = []
+    currentWorkflow = "wf-a"
+    runsByWorkflow["wf-a"] = [{ run_id: RUN_A, status: "running" }]
+    runsByWorkflow["wf-b"] = []
+    FakeSocket.abertos = []
     quadros.clear()
-    proximoQuadro = 1
-    vi.stubGlobal("WebSocket", SocketFalso)
+    nextFrame = 1
+    vi.stubGlobal("WebSocket", FakeSocket)
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      const id = proximoQuadro++
+      const id = nextFrame++
       quadros.set(id, cb)
       return id
     })
@@ -148,10 +148,10 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
     const { view, ws } = await anexar(RUN_A)
 
     act(() => {
-      ws.entregar(frameDeEventos([
-        eventoDeNo("n1", "started"),
-        eventoDeNo("n1", "completed", { duration_ms: 10 }),
-        eventoDeFim(),
+      ws.entregar(eventsFrame([
+        nodeEvent("n1", "started"),
+        nodeEvent("n1", "completed", { duration_ms: 10 }),
+        endEvent(),
       ]))
     })
 
@@ -169,15 +169,15 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
     const { view, ws } = await anexar(RUN_A)
 
     act(() => {
-      ws.entregar(frameDeEventos([eventoDeNo("n1", "started")]))
-      ws.entregar(frameDeEventos([eventoDeNo("n2", "started")]))
+      ws.entregar(eventsFrame([nodeEvent("n1", "started")]))
+      ws.entregar(eventsFrame([nodeEvent("n2", "started")]))
     })
     // Nothing in the store yet: per-frame grouping is what avoids a render
     // cycle of the whole canvas per message.
     expect(useWorkflowExecutionStore.getState().events).toHaveLength(0)
     expect(quadros.size).toBe(1)
 
-    act(() => { rodarQuadros() })
+    act(() => { runFrames() })
     expect(useWorkflowExecutionStore.getState().events).toHaveLength(2)
 
     view.unmount()
@@ -187,8 +187,8 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
     const { view, ws } = await anexar(RUN_A)
 
     act(() => {
-      ws.entregar(frameDeEventos([eventoDeNo("n1", "started")], 7))
-      ws.entregar(frameDeEventos([eventoDeNo("n1", "completed")], 5))
+      ws.entregar(eventsFrame([nodeEvent("n1", "started")], 7))
+      ws.entregar(eventsFrame([nodeEvent("n1", "completed")], 5))
     })
 
     // The server-side drop is what the user has no way to notice alone:
@@ -203,7 +203,7 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
 
     act(() => {
       for (let i = 0; i < MAX_RUN_EVENTS + 10; i++) {
-        ws.entregar(frameDeEventos([{ node: "n1", status: "log", kind: "stdout", level: "info", extra: { lines: [`linha ${i}`] } }]))
+        ws.entregar(eventsFrame([{ node: "n1", status: "log", kind: "stdout", level: "info", extra: { lines: [`linha ${i}`] } }]))
       }
     })
 
@@ -218,7 +218,7 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
   it("esconder a aba drena o lote pendente", async () => {
     const { view, ws } = await anexar(RUN_A)
 
-    act(() => { ws.entregar(frameDeEventos([eventoDeNo("n1", "started")])) })
+    act(() => { ws.entregar(eventsFrame([nodeEvent("n1", "started")])) })
     expect(useWorkflowExecutionStore.getState().events).toHaveLength(0)
 
     act(() => {
@@ -237,15 +237,15 @@ describe("useExecuteWorkflow — envelope único de eventos", () => {
 
 describe("useExecuteWorkflow — isolamento entre runs", () => {
   beforeEach(() => {
-    workflowAtual = "wf-a"
-    runsPorWorkflow["wf-a"] = [{ run_id: RUN_A, status: "running" }]
-    runsPorWorkflow["wf-b"] = []
-    SocketFalso.abertos = []
+    currentWorkflow = "wf-a"
+    runsByWorkflow["wf-a"] = [{ run_id: RUN_A, status: "running" }]
+    runsByWorkflow["wf-b"] = []
+    FakeSocket.abertos = []
     quadros.clear()
-    proximoQuadro = 1
-    vi.stubGlobal("WebSocket", SocketFalso)
+    nextFrame = 1
+    vi.stubGlobal("WebSocket", FakeSocket)
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
-      const id = proximoQuadro++
+      const id = nextFrame++
       quadros.set(id, cb)
       return id
     })
@@ -258,13 +258,13 @@ describe("useExecuteWorkflow — isolamento entre runs", () => {
   })
 
   it("mensagem atrasada do workflow A não cai na store do workflow B", async () => {
-    const useExecuteWorkflow = await importarHook()
+    const useExecuteWorkflow = await importHook()
     const view = renderHook(() => useExecuteWorkflow())
-    await waitFor(() => expect(SocketFalso.abertos.length).toBe(1))
-    const wsA = SocketFalso.abertos[0]
+    await waitFor(() => expect(FakeSocket.abertos.length).toBe(1))
+    const wsA = FakeSocket.abertos[0]
 
     // Workflow switch: /workflow/A → /workflow/B does NOT remount the component.
-    workflowAtual = "wf-b"
+    currentWorkflow = "wf-b"
     await act(async () => {
       view.rerender()
       await Promise.resolve()
@@ -275,8 +275,8 @@ describe("useExecuteWorkflow — isolamento entre runs", () => {
     // close(1000) — including the end of A's run, which closed B's panel
     // with "Concluído · 0 nós" for a workflow that never ran.
     act(() => {
-      wsA.entregar(frameDeEventos([eventoDeNo("n1", "completed"), eventoDeFim()]))
-      rodarQuadros()
+      wsA.entregar(eventsFrame([nodeEvent("n1", "completed"), endEvent()]))
+      runFrames()
     })
 
     const estado = useWorkflowExecutionStore.getState()
@@ -288,15 +288,15 @@ describe("useExecuteWorkflow — isolamento entre runs", () => {
   })
 
   it("desmontar descarta o lote pendente", async () => {
-    const useExecuteWorkflow = await importarHook()
+    const useExecuteWorkflow = await importHook()
     const view = renderHook(() => useExecuteWorkflow())
-    await waitFor(() => expect(SocketFalso.abertos.length).toBe(1))
-    const wsA = SocketFalso.abertos[0]
+    await waitFor(() => expect(FakeSocket.abertos.length).toBe(1))
+    const wsA = FakeSocket.abertos[0]
 
-    act(() => { wsA.entregar(frameDeEventos([eventoDeNo("n1", "started")])) })
+    act(() => { wsA.entregar(eventsFrame([nodeEvent("n1", "started")])) })
     view.unmount()
 
-    act(() => { rodarQuadros() })
+    act(() => { runFrames() })
     expect(useWorkflowExecutionStore.getState().events).toHaveLength(0)
   })
 })

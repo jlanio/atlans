@@ -20,15 +20,15 @@ def _job(job_id, **envelope):
     return {"envelope": {"job_id": job_id, **envelope}}
 
 
-async def _ordem_de_execucao(mensagens):
+async def _execution_order(mensagens):
     """Enqueues everything BEFORE starting the single worker — the output order is
     the queue's, with no race between enqueue and consumption."""
     ordem: list[str] = []
 
-    async def _executar(msg):
+    async def _execute(msg):
         ordem.append(msg["envelope"]["job_id"])
 
-    fila = ExecutorJobQueue(on_execute=_executar, max_concurrent=1, max_queue_size=100)
+    fila = ExecutorJobQueue(on_execute=_execute, max_concurrent=1, max_queue_size=100)
     for m in mensagens:
         assert await fila.enqueue(m)
     await fila.start(n_workers=1)
@@ -43,14 +43,14 @@ async def _ordem_de_execucao(mensagens):
 
 
 @pytest.mark.asyncio
-async def test_prioridade_igual_roda_na_ordem_de_chegada():
+async def test_equal_priority_runs_in_arrival_order():
     ids = [f"job{i}" for i in range(1, 21)]
-    assert await _ordem_de_execucao([_job(i) for i in ids]) == ids
+    assert await _execution_order([_job(i) for i in ids]) == ids
 
 
 @pytest.mark.asyncio
-async def test_prioridade_explicita_continua_passando_na_frente():
+async def test_explicit_priority_still_jumps_ahead():
     mensagens = [
         _job("a"), _job("b"), _job("urgente", priority=1), _job("c"), _job("depois", priority=9),
     ]
-    assert await _ordem_de_execucao(mensagens) == ["urgente", "a", "b", "c", "depois"]
+    assert await _execution_order(mensagens) == ["urgente", "a", "b", "c", "depois"]

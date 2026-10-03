@@ -17,12 +17,12 @@ from flow.core.graph import WorkflowGraph
 # name still exists here: tests/unit/test_alias_expressions.py imports
 # `_resolve_alias` from flow.executor.core.
 from flow.core.aliases import resolve_alias as _resolve_alias
-from flow.executor.declared_schema import schema_declarado, schema_do_catalogo
+from flow.executor.declared_schema import schema_declarado, catalog_schema
 from flow.utils.parameter_validation import validate_node_parameters
 from flow.utils.safe_env import safe_env
 
 from flow.executor.node_manager import NodeManager
-from flow.executor.utils import _count_gdf_features, _colunas_das_saidas, _build_debug_summary
+from flow.executor.utils import _count_gdf_features, _output_columns, _build_debug_summary
 from flow.executor.spill import _spill_to_disk, _load_from_disk, _cleanup_spill, _delete_spill_files
 from flow.executor.rendering import expr_svc, render_node_parameters
 from flow.executor.edge_resolver import Edge, resolve_edge_inputs, resolve_edge_schema_inputs
@@ -231,16 +231,16 @@ class WorkflowExecutor:
                 pinned = await asyncio.to_thread(self._download_pin_artifact, pinned)
             except Exception as exc:
                 self.logger.warning("[%s] Erro ao baixar pin: %s — executando normalmente.", node_id, exc)
-                self._marcar_pin_para_regravar(node_id)
+                self._mark_pin_for_rewrite(node_id)
                 return None
             if not pinned:
                 self.logger.warning("[%s] Falha ao baixar pin do MinIO — executando normalmente.", node_id)
-                self._marcar_pin_para_regravar(node_id)
+                self._mark_pin_for_rewrite(node_id)
                 return None
 
         return pinned
 
-    def _marcar_pin_para_regravar(self, node_id: str) -> None:
+    def _mark_pin_for_rewrite(self, node_id: str) -> None:
         """Self-healing of a broken pin: clears the ref so auto-pin rewrites it in this very run.
 
         Without this, a ref whose object vanished from MinIO (purge, bucket wiped,
@@ -286,14 +286,14 @@ class WorkflowExecutor:
                 "error": None,
                 "started_at": utc_now_naive().isoformat(),
                 "output_keys": list(pinned.keys()),
-                "output_columns": _colunas_das_saidas(pinned),
+                "output_columns": _output_columns(pinned),
             }
             self.all_node_outputs[node_id] = {
                 "outputs": pinned,
                 "meta": {"timestamp": utc_now_naive().isoformat(), "duration_ms": 0.0},
             }
             self._publish_completed(node_id, "completed", 0.0, cache_hit=True, output_keys=list(pinned.keys()) if isinstance(pinned, dict) else [],
-                                        output_columns=_colunas_das_saidas(pinned))
+                                        output_columns=_output_columns(pinned))
             if self.debug_mode and self.publisher:
                 self._publish_debug(node_id, inputs, pinned)
             return node_id, pinned, 0.0
@@ -366,7 +366,7 @@ class WorkflowExecutor:
                 # Which columns each output had. This is what lets the editor
                 # suggest column names instead of requiring the person to run
                 # the workflow just to find out what reaches the next node.
-                "output_columns": _colunas_das_saidas(outputs) if isinstance(outputs, dict) else None,
+                "output_columns": _output_columns(outputs) if isinstance(outputs, dict) else None,
             }
             self.all_node_outputs[node_id] = {
                 "outputs": outputs,
@@ -415,7 +415,7 @@ class WorkflowExecutor:
 
             self._publish_completed(node_id, status, duration_ms, str(error) if error else None,
                                     output_keys=list(outputs.keys()) if isinstance(outputs, dict) else [],
-                                    output_columns=_colunas_das_saidas(outputs) if isinstance(outputs, dict) else None,
+                                    output_columns=_output_columns(outputs) if isinstance(outputs, dict) else None,
                                     branch_result=_branch_result,
                                     traceback_str=error_traceback,
                                     schema_drift=_schema_drift,
@@ -826,7 +826,7 @@ class WorkflowExecutor:
             if not desc.get("dynamic_output") and not desc.get("outputs_from_ports"):
                 self.simulated_outputs[node_id] = {
                     "status": "ok",
-                    "schema": schema_do_catalogo(desc),
+                    "schema": catalog_schema(desc),
                     "schema_source": "static",
                 }
                 continue

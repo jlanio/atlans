@@ -22,7 +22,7 @@ from app.core.utils.workflow_triggers import has_webhook_trigger
 # ── Tests of the utility function ─────────────────────────────────────────────
 
 class TestHasWebhookTrigger:
-    def test_definition_com_webhook_trigger_retorna_true(self):
+    def test_definition_with_webhook_trigger_returns_true(self):
         definition = {
             "nodes": [
                 {"id": "n1", "type": "trigger", "name": "WebhookTrigger", "properties": {}},
@@ -31,7 +31,7 @@ class TestHasWebhookTrigger:
         }
         assert has_webhook_trigger(definition) is True
 
-    def test_definition_apenas_com_schedule_trigger_retorna_false(self):
+    def test_definition_with_only_schedule_trigger_returns_false(self):
         definition = {
             "nodes": [
                 {"id": "n1", "type": "trigger", "name": "ScheduleTrigger", "properties": {}},
@@ -40,7 +40,7 @@ class TestHasWebhookTrigger:
         }
         assert has_webhook_trigger(definition) is False
 
-    def test_definition_apenas_com_file_trigger_retorna_false(self):
+    def test_definition_with_only_file_trigger_returns_false(self):
         definition = {
             "nodes": [
                 {"id": "n1", "type": "trigger", "name": "FileTrigger", "properties": {}},
@@ -48,7 +48,7 @@ class TestHasWebhookTrigger:
         }
         assert has_webhook_trigger(definition) is False
 
-    def test_definition_sem_triggers_retorna_false(self):
+    def test_definition_without_triggers_returns_false(self):
         definition = {
             "nodes": [
                 {"id": "n1", "type": "action", "name": "HttpRequest", "properties": {}},
@@ -57,13 +57,13 @@ class TestHasWebhookTrigger:
         }
         assert has_webhook_trigger(definition) is False
 
-    def test_definition_sem_nodes_retorna_false(self):
+    def test_definition_without_nodes_returns_false(self):
         assert has_webhook_trigger({"nodes": []}) is False
 
-    def test_definition_vazia_retorna_false(self):
+    def test_empty_definition_returns_false(self):
         assert has_webhook_trigger({}) is False
 
-    def test_definition_com_multiplos_triggers_incluindo_webhook(self):
+    def test_definition_with_multiple_triggers_including_webhook(self):
         """Hybrid workflows (schedule + webhook) should pass validation."""
         definition = {
             "nodes": [
@@ -73,7 +73,7 @@ class TestHasWebhookTrigger:
         }
         assert has_webhook_trigger(definition) is True
 
-    def test_node_com_name_webhook_mas_type_errado_retorna_false(self):
+    def test_node_with_webhook_name_but_wrong_type_returns_false(self):
         """Anti-spoofing defense: a node of type action named 'WebhookTrigger'
         must not pass validation — the type must be 'trigger'.
         """
@@ -115,7 +115,7 @@ def client(app):
     return TestClient(app)
 
 
-def test_router_retorna_403_quando_workflow_nao_tem_webhook_trigger(client, mock_service):
+def test_router_returns_403_when_workflow_has_no_webhook_trigger(client, mock_service):
     """POST /webhook/execute/{id_hash} on a workflow with only a ScheduleTrigger → 403."""
     wf = MagicMock()
     wf.flag_ative = True
@@ -134,7 +134,7 @@ def test_router_retorna_403_quando_workflow_nao_tem_webhook_trigger(client, mock
     mock_service.start_analysis.assert_not_called()
 
 
-def test_router_retorna_403_quando_workflow_desativado(client, mock_service):
+def test_router_returns_403_when_workflow_disabled(client, mock_service):
     """Workflow desativado retorna 403 mesmo se tiver WebhookTrigger."""
     wf = MagicMock()
     wf.flag_ative = False
@@ -152,7 +152,7 @@ def test_router_retorna_403_quando_workflow_desativado(client, mock_service):
     mock_service.start_analysis.assert_not_called()
 
 
-def test_router_retorna_404_quando_workflow_nao_existe(client, mock_service):
+def test_router_returns_404_when_workflow_does_not_exist(client, mock_service):
     """Workflow inexistente retorna 404."""
     from app.services.workflow_service import WorkflowNotFoundError
 
@@ -164,7 +164,7 @@ def test_router_retorna_404_quando_workflow_nao_existe(client, mock_service):
     mock_service.start_analysis.assert_not_called()
 
 
-def test_router_dispara_workflow_com_webhook_trigger_valido(client, mock_service):
+def test_router_triggers_workflow_with_valid_webhook_trigger(client, mock_service):
     """Workflow ativo com WebhookTrigger → chama start_analysis e retorna 202."""
     wf = MagicMock()
     wf.flag_ative = True

@@ -1,13 +1,13 @@
 "use client"
 import { TbCheck, TbX } from "react-icons/tb"
 import { Button } from "@/app/components/ui/button"
-import { rotuloDaFerramenta } from "@/app/components/home/assistente/rotulos"
-import { IDIOMA_PADRAO, type Idioma } from "@/lib/idioma"
-import { textosDe, useIdiomaDaTela } from "../i18n"
-import type { ConfirmacaoDoAssistente } from "@/app/components/home/assistente/quadros"
+import { toolLabel } from "@/app/components/home/assistente/rotulos"
+import { DEFAULT_LANGUAGE, type Idioma } from "@/lib/idioma"
+import { textosDe, useScreenLanguage } from "../i18n"
+import type { AssistantConfirmation } from "@/app/components/home/assistente/quadros"
 
 interface Props {
-  confirmacao: ConfirmacaoDoAssistente
+  confirmacao: AssistantConfirmation
   /** Already clicked in this session — the buttons lock. */
   decidido: boolean
   /**
@@ -29,7 +29,7 @@ interface Props {
  * content into the card by accident. The order is reading order — the name before
  * the id, because the name is what tells what the action touches.
  */
-const CAMPOS: readonly string[] = [
+const FIELDS: readonly string[] = [
   "name",
   "workflow_name",
   "file_name",
@@ -46,18 +46,18 @@ const CAMPOS: readonly string[] = [
   "run_id",
 ]
 
-const MAX_LINHAS = 4
+const MAX_LINES = 4
 
 /** The readable pairs of the argument summary: `[rótulo, valor]`. */
 export function descreverAlvo(
   argumentos: Record<string, unknown>,
-  idioma: Idioma = IDIOMA_PADRAO,
+  idioma: Idioma = DEFAULT_LANGUAGE,
 ): Array<[string, string]> {
   const t = textosDe(idioma).assistente.confirmacao
   const linhas: Array<[string, string]> = []
-  for (const chave of CAMPOS) {
+  for (const chave of FIELDS) {
     const rotulo = t.campos[chave]
-    if (linhas.length >= MAX_LINHAS) break
+    if (linhas.length >= MAX_LINES) break
     const bruto = argumentos[chave]
     if (bruto == null) continue
     if (typeof bruto === "object") continue // already collapsed by the server
@@ -76,16 +76,16 @@ export function descreverAlvo(
  * The arguments are SHOWN (not sent): the gate is the only barrier against
  * destructive actions, and "Apagar arquivo do Drive · a3f9c2e1…" asks for a blind click.
  */
-export default function CartaoConfirmacao({ confirmacao, decidido, expirado = false, ocupado, onDecidir }: Props) {
+export default function ConfirmationCard({ confirmacao, decidido, expirado = false, ocupado, onDecidir }: Props) {
   const { tool_use_id, token, acao } = confirmacao
-  const semToken = !token
-  const travado = decidido || ocupado || semToken
+  const noToken = !token
+  const travado = decidido || ocupado || noToken
   // Two doors into the same dead end: the key vanished on replay, or the server
   // rejected the one that was sent. The sentence is the same because the way out is the same.
-  const semSaida = expirado || (semToken && !decidido)
-  const idioma = useIdiomaDaTela()
+  const semSaida = expirado || (noToken && !decidido)
+  const idioma = useScreenLanguage()
   const t = textosDe(idioma).assistente.confirmacao
-  const rotulo = rotuloDaFerramenta(acao.tool, idioma)
+  const rotulo = toolLabel(acao.tool, idioma)
   const linhas = descreverAlvo(acao.argumentos, idioma)
   const tituloId = `confirmacao-${tool_use_id}`
 
@@ -97,7 +97,7 @@ export default function CartaoConfirmacao({ confirmacao, decidido, expirado = fa
     >
       {/* The screen reader goes SILENT when the assistant stops to wait for a
           click: the "respondendo" announcement disappears and nothing takes its place. */}
-      {!decidido && !semToken && (
+      {!decidido && !noToken && (
         <p role="status" className="sr-only">{t.pendente(rotulo)}</p>
       )}
       <p id={tituloId} className="text-xs font-semibold text-amber-400">{t.titulo(rotulo)}</p>
@@ -141,7 +141,7 @@ export default function CartaoConfirmacao({ confirmacao, decidido, expirado = fa
       )}
       {/* The deadline exists on the server (15 min) and existed nowhere on the
           screen: someone coming back from lunch clicked and got an error. */}
-      {!decidido && !semToken && (
+      {!decidido && !noToken && (
         <p className="mt-1.5 text-[11px] text-amber-400/70">{t.prazo}</p>
       )}
     </div>

@@ -28,7 +28,7 @@ def _reraise_from(e: BaseException) -> RuntimeError:
     (KeyError("missing"), "user"),
     (RuntimeError("algo inesperado"), "internal"),
 ])
-def test_classifica_direto(exc, expected):
+def test_classifies_directly(exc, expected):
     assert classify_error(exc) == expected
 
 
@@ -37,13 +37,13 @@ def test_classifica_direto(exc, expected):
     (ValueError("coluna ausente"), "user"),
     (ConnectionError(), "transient"),
 ])
-def test_classifica_pela_cadeia_quando_envolvido_em_runtimeerror(cause, expected):
+def test_classifies_by_chain_when_wrapped_in_runtimeerror(cause, expected):
     wrapped = _reraise_from(cause)
     assert isinstance(wrapped, RuntimeError)
     assert classify_error(wrapped) == expected
 
 
-def test_retryable_derivado_da_categoria():
+def test_retryable_derived_from_category():
     assert is_retryable("timeout") is True
     assert is_retryable("transient") is True
     assert is_retryable("user") is False

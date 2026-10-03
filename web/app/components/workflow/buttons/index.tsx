@@ -7,7 +7,7 @@ import PortalShare from "./portal-share"
 import { IWorkflow } from "@/service/types"
 import { useWorkspace } from "@/context/WorkspaceContext"
 import { useRunDockHeight } from "@/app/stores/runPanelStore"
-import { CAMADA_SOBRE_O_CANVAS } from "../canvas-layers"
+import { LAYER_ABOVE_CANVAS } from "../canvas-layers"
 
 interface ActionsButtonProps {
   workflow?: IWorkflow
@@ -30,7 +30,7 @@ const ActionsButton = ({ workflow }: ActionsButtonProps) => {
     // canvas-layers.
     <div
       data-canvas-chrome=""
-      className={`${CAMADA_SOBRE_O_CANVAS} left-2 sm:left-4 pl-safe flex flex-col gap-2 transition-[bottom] duration-150`}
+      className={`${LAYER_ABOVE_CANVAS} left-2 sm:left-4 pl-safe flex flex-col gap-2 transition-[bottom] duration-150`}
       style={{ bottom: dockHeight + 16 }}
     >
       {id ?

@@ -18,17 +18,17 @@ import { cleanup, render, screen, fireEvent } from "@testing-library/react"
  */
 vi.mock("maplibre-gl/dist/maplibre-gl.css", () => ({}))
 
-const fundosDeTeste = vi.hoisted(() => ({
+const testBasemaps = vi.hoisted(() => ({
   ruas: { url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png", credito: "© OpenStreetMap contributors" },
   satelite: { url: "https://satelite.example.org/{z}/{x}/{y}.jpg", credito: "© Satélite de Teste" },
   hibrido: { url: "https://hibrido.example.org/{z}/{x}/{y}.jpg", credito: "© Híbrido de Teste" },
 }))
-vi.mock("@/app/components/share/fundos-do-mapa", () => ({ useFundosDoMapa: () => fundosDeTeste }))
+vi.mock("@/app/components/share/fundos-do-mapa", () => ({ useFundosDoMapa: () => testBasemaps }))
 
-type Ouvinte = (e?: unknown) => void
+type Listener = (e?: unknown) => void
 
 const espiao = vi.hoisted(() => ({
-  mapa: null as ReturnType<typeof criarMapa> | null,
+  mapa: null as ReturnType<typeof createMap> | null,
   /** Every `new AttributionControl(...)` made by the component. Must stay EMPTY. */
   atribuicoes: [] as Array<Record<string, unknown> | undefined>,
   /** The last HTML the Popup received — to check the current theme's colors. */
@@ -37,10 +37,10 @@ const espiao = vi.hoisted(() => ({
   feature: undefined as unknown,
 }))
 
-function criarMapa(opcoes: Record<string, unknown>) {
-  const ouvintes: Record<string, Ouvinte[]> = {}
+function createMap(opcoes: Record<string, unknown>) {
+  const ouvintes: Record<string, Listener[]> = {}
   /** `off(evento, f)` arrives with the ORIGINAL function; we keep the `once` wrapper. */
-  const registrados = new Map<Ouvinte, Ouvinte>()
+  const registrados = new Map<Listener, Listener>()
   const estilo = {
     layers: [] as Array<Record<string, unknown>>,
     sources: (opcoes.style as { sources?: Record<string, unknown> })?.sources ?? {},
@@ -60,12 +60,12 @@ function criarMapa(opcoes: Record<string, unknown>) {
     _estilo: estilo,
     // Copy: a `once` unregisters itself during the loop itself.
     _disparar: (evento: string, e?: unknown) => [...(ouvintes[evento] ?? [])].forEach((f) => f(e)),
-    on: (evento: string, f: Ouvinte) => { (ouvintes[evento] ??= []).push(f) },
+    on: (evento: string, f: Listener) => { (ouvintes[evento] ??= []).push(f) },
     // `once` UNREGISTERS after firing, like the real one. It is not a detail:
     // the `[layers]` effect also listens to `style.load` once, and a `once`
     // left hanging would re-sync the layers forever — masking
     // exactly the defect the component's `style.load` fixes.
-    once: (evento: string, f: Ouvinte) => {
+    once: (evento: string, f: Listener) => {
       const so = (e?: unknown) => {
         ouvintes[evento] = (ouvintes[evento] ?? []).filter((g) => g !== so)
         f(e)
@@ -73,7 +73,7 @@ function criarMapa(opcoes: Record<string, unknown>) {
       ;(ouvintes[evento] ??= []).push(so)
       registrados.set(f, so)
     },
-    off: (evento: string, f: Ouvinte) => {
+    off: (evento: string, f: Listener) => {
       const alvo = registrados.get(f) ?? f
       ouvintes[evento] = (ouvintes[evento] ?? []).filter((g) => g !== alvo)
     },
@@ -115,7 +115,7 @@ function criarMapa(opcoes: Record<string, unknown>) {
 vi.mock("maplibre-gl", () => ({
   Map: class {
     constructor(opcoes: Record<string, unknown>) {
-      const m = criarMapa(opcoes)
+      const m = createMap(opcoes)
       espiao.mapa = m
       return m as unknown as object
     }
@@ -166,7 +166,7 @@ describe("alternador de basemap — rótulos e acessibilidade", () => {
 })
 
 describe("`basemapInicial` — o basemap com que o mapa nasce", () => {
-  type EstiloRaster = {
+  type RasterStyle = {
     version: number
     sources: { basemap: { type: string; tiles: string[]; attribution: string } }
     layers: Array<{ id: string; type: string }>
@@ -174,7 +174,7 @@ describe("`basemapInicial` — o basemap com que o mapa nasce", () => {
 
   it("padrão streets: o construtor recebe as tiles do OSM (o portal, intacto)", () => {
     render(<MapLibreMap layers={[]} />)
-    const estilo = espiao.mapa!._opcoes.style as EstiloRaster
+    const estilo = espiao.mapa!._opcoes.style as RasterStyle
     expect(estilo.sources.basemap.tiles[0]).toContain("openstreetmap")
     expect(estilo.sources.basemap.attribution).toContain("OpenStreetMap")
   })
@@ -182,7 +182,7 @@ describe("`basemapInicial` — o basemap com que o mapa nasce", () => {
   it("hybrid (a Home): o construtor recebe o híbrido da instalação, e não há setStyle na montagem", () => {
     render(<MapLibreMap layers={[]} basemapInicial="hybrid" basemapToggle={false} />)
     const mapa = espiao.mapa!
-    const estilo = mapa._opcoes.style as EstiloRaster
+    const estilo = mapa._opcoes.style as RasterStyle
     expect(estilo.version).toBe(8)
     expect(estilo.sources.basemap.type).toBe("raster")
     // The hybrid (imagery + roads and labels), and not plain satellite: the sphere

@@ -21,13 +21,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.core.exceptions import ConteudoNoExecutorError
+from app.core.exceptions import ContentOnExecutorError
 from app.services import drive_service
 
 
 # ── Drive: registro catalogado e recusado ────────────────────────────────────
 
-def _arquivo(**kw):
+def _file_record(**kw):
     base = dict(id_hash="h1", s3_key=None, content_location="executor",
                 original_name="cadastro.gpkg", extension="gpkg", size=10,
                 workspace_id="ws1")
@@ -35,9 +35,9 @@ def _arquivo(**kw):
     return SimpleNamespace(**base)
 
 
-def test_catalogado_e_recusado_com_saida_explicada():
-    with pytest.raises(ConteudoNoExecutorError) as e:
-        drive_service._recusar_se_catalogado(_arquivo())
+def test_cataloged_is_rejected_with_explained_way_out():
+    with pytest.raises(ContentOnExecutorError) as e:
+        drive_service._refuse_if_cataloged(_file_record())
 
     # The message has to say WHAT TO DO. "Nao permitido" (not allowed) alone leaves
     # the person with no action in the only place they are looking.
@@ -45,27 +45,27 @@ def test_catalogado_e_recusado_com_saida_explicada():
     assert "pasta sincronizada" in msg or "geosync" in msg
 
 
-def test_recusa_e_409_e_nao_400():
+def test_rejection_is_409_not_400():
     """Nothing is wrong with the request — the problem is the resource's STATE."""
-    assert ConteudoNoExecutorError.status_code == 409
+    assert ContentOnExecutorError.status_code == 409
 
 
-def test_arquivo_normal_passa():
-    drive_service._recusar_se_catalogado(
-        _arquivo(content_location="minio", s3_key="drive/ws1/x.gpkg")
+def test_normal_file_passes():
+    drive_service._refuse_if_cataloged(
+        _file_record(content_location="minio", s3_key="drive/ws1/x.gpkg")
     )
 
 
-def test_ausencia_do_campo_nao_bloqueia():
+def test_missing_field_does_not_block():
     """An old object without `content_location` must not become a rejection."""
-    drive_service._recusar_se_catalogado(SimpleNamespace(id_hash="h", s3_key="k"))
+    drive_service._refuse_if_cataloged(SimpleNamespace(id_hash="h", s3_key="k"))
 
 
 # ── Artifact: the row only goes away once the order was delivered ────────────
 #
-# The rule lives in `remocao_de_artefatos.remover_artefatos`, the same one used
+# The rule lives in `remocao_de_artefatos.remove_artifacts`, the same one used
 # by the five deleting paths; the deletion routes call it with
-# `agendar_pendentes`.
+# `schedule_pending`.
 
 def _artefato(id_=1, **kw):
     base = dict(id=id_, id_hash=f"a{id_}", workspace_id="ws1", content_location="executor",
@@ -79,35 +79,35 @@ def _artefato(id_=1, **kw):
 @pytest.fixture
 def entrega(monkeypatch):
     """Controla o que `_ordenar_remocao_local` considera entregue."""
-    def instalar(ids_entregues):
-        async def _fake(por_executor):
-            return list(ids_entregues)
+    def instalar(delivered_ids):
+        async def _fake(by_executor):
+            return list(delivered_ids)
         import app.core.artifact_cleanup as ac
         monkeypatch.setattr(ac, "_ordenar_remocao_local", _fake)
     return instalar
 
 
-async def _remover(itens):
-    from app.services.remocao_de_artefatos import remover_artefatos
+async def _remove(itens):
+    from app.services.remocao_de_artefatos import remove_artifacts
 
-    return await remover_artefatos(MagicMock(execute=AsyncMock()), itens, agendar_pendentes=True)
+    return await remove_artifacts(MagicMock(execute=AsyncMock()), itens, schedule_pending=True)
 
 
 @pytest.mark.asyncio
-async def test_entregue_libera_a_linha(entrega):
+async def test_delivered_frees_the_row(entrega):
     entrega([1])
-    remocao = await _remover([_artefato(1)])
+    remocao = await _remove([_artefato(1)])
 
     assert [x.id for x in remocao.apagados] == [1]
     assert remocao.pendentes_local == []
 
 
 @pytest.mark.asyncio
-async def test_executor_OFFLINE_marca_para_purga_em_vez_de_apagar(entrega):
+async def test_OFFLINE_executor_marks_for_purge_instead_of_deleting(entrega):
     # The bug's case: with no delivery, the row stayed and the file vanished from the system.
     entrega([])
     a = _artefato(1)
-    remocao = await _remover([a])
+    remocao = await _remove([a])
 
     assert remocao.apagados == []
     assert [x.id for x in remocao.pendentes_local] == [1]
@@ -115,24 +115,24 @@ async def test_executor_OFFLINE_marca_para_purga_em_vez_de_apagar(entrega):
 
 
 @pytest.mark.asyncio
-async def test_artefato_FIXADO_perde_o_pin_ao_ser_agendado(entrega):
+async def test_PINNED_artifact_loses_the_pin_when_scheduled(entrega):
     """`purge_expired_artifacts` ignores `is_pinned` — without clearing it, the
     artifact would be marked as expired and never purged: it disappears from the
     UI as "removing" and stays on disk forever."""
     entrega([])
     a = _artefato(1, is_pinned=True)
-    await _remover([a])
+    await _remove([a])
 
     assert a.is_pinned is False
 
 
 @pytest.mark.asyncio
-async def test_sem_executor_id_a_linha_e_PRESERVADA(entrega):
+async def test_without_executor_id_the_row_is_PRESERVED(entrega):
     """Without a destination there is no one to send to. Deleting the row would
     leave the file orphaned and invisible — same decision as retention and purge."""
     entrega([])
     a = _artefato(1, executor_id=None)
-    remocao = await _remover([a])
+    remocao = await _remove([a])
 
     assert remocao.apagados == []
     assert [x.id for x in remocao.sem_rastro] == [1]
@@ -140,9 +140,9 @@ async def test_sem_executor_id_a_linha_e_PRESERVADA(entrega):
 
 
 @pytest.mark.asyncio
-async def test_lote_parcial_separa_entregues_de_pendentes(entrega):
+async def test_partial_batch_separates_delivered_from_pending(entrega):
     entrega([1, 3])
-    remocao = await _remover([_artefato(1), _artefato(2), _artefato(3)])
+    remocao = await _remove([_artefato(1), _artefato(2), _artefato(3)])
 
     assert sorted(x.id for x in remocao.apagados) == [1, 3]
     assert [x.id for x in remocao.pendentes_local] == [2]
@@ -150,11 +150,11 @@ async def test_lote_parcial_separa_entregues_de_pendentes(entrega):
 
 # ── The batch: commit even with nothing deleted, pending is not failure ──────
 
-async def _excluir_em_lote(monkeypatch, itens):
+async def _batch_delete(monkeypatch, itens):
     from app.api.routers import artifacts_router as R
     from app.core.authorization import workflow_access
 
-    # Where `exigir_papel_no_workspace` looks up the role (the comparison stays real).
+    # Where `require_workspace_role` looks up the role (the comparison stays real).
     monkeypatch.setattr(workflow_access, "get_workspace_member_role", AsyncMock(return_value="owner"))
     selecionados = MagicMock()
     selecionados.scalars.return_value.all.return_value = list(itens)
@@ -167,7 +167,7 @@ async def _excluir_em_lote(monkeypatch, itens):
 
 
 @pytest.mark.asyncio
-async def test_commit_do_batch_NAO_depende_de_ter_apagado_algo(entrega, monkeypatch):
+async def test_batch_commit_does_NOT_depend_on_having_deleted_anything(entrega, monkeypatch):
     """Regression: the commit was conditioned on what was deleted.
 
     With ALL artifacts local and the executor offline — the common case of this
@@ -178,17 +178,17 @@ async def test_commit_do_batch_NAO_depende_de_ter_apagado_algo(entrega, monkeypa
     """
     entrega([])
     a = _artefato(1)
-    _, db = await _excluir_em_lote(monkeypatch, [a])
+    _, db = await _batch_delete(monkeypatch, [a])
 
     db.commit.assert_awaited_once()
     assert a.expires_at is not None
 
 
 @pytest.mark.asyncio
-async def test_pendente_nao_e_contado_como_falha(entrega, monkeypatch):
+async def test_pending_is_not_counted_as_failure(entrega, monkeypatch):
     """`skipped` means "failed, try again"; pending will happen on its own.
     Counting it in both would make the UI add up the same artifact twice."""
     entrega([])
-    resposta, _ = await _excluir_em_lote(monkeypatch, [_artefato(1), _artefato(2, executor_id=None)])
+    resposta, _ = await _batch_delete(monkeypatch, [_artefato(1), _artefato(2, executor_id=None)])
 
     assert resposta == {"deleted": 0, "skipped": 0, "pendentes_no_executor": 2}

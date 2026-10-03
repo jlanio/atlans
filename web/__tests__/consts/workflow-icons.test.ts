@@ -8,7 +8,7 @@ import { OUTPUT_ICONS, NODE_ICONS } from "@/consts/WorkflowIcons"
  * the map diverge from each other — not when the backend gains a node and nobody
  * remembers the icon. This test fails and points out which one was left out.
  */
-const SAIDAS_DO_BACKEND = [
+const BACKEND_OUTPUTS = [
   "SaveToPostGIS",
   "SaveToPostgres",
   "SaveGeoJSON",
@@ -25,12 +25,12 @@ const SAIDAS_DO_BACKEND = [
 ]
 
 describe("OUTPUT_ICONS", () => {
-  it.each(SAIDAS_DO_BACKEND)("tem ícone para o nó de saída '%s'", nome => {
+  it.each(BACKEND_OUTPUTS)("tem ícone para o nó de saída '%s'", nome => {
     expect(OUTPUT_ICONS[nome as keyof typeof OUTPUT_ICONS]).toBeTypeOf("function")
   })
 
   it("não tem entrada sobrando que o backend não conheça", () => {
-    expect(Object.keys(OUTPUT_ICONS).sort()).toEqual([...SAIDAS_DO_BACKEND].sort())
+    expect(Object.keys(OUTPUT_ICONS).sort()).toEqual([...BACKEND_OUTPUTS].sort())
   })
 
   it("o mapa unificado do drawer enxerga a Carta imagem", () => {

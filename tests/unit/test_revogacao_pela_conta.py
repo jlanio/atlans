@@ -40,9 +40,9 @@ from app.services import executor_service
 
 
 @asynccontextmanager
-async def _banco():
+async def _from_db():
     """SQLite with what the revocation touches. `executors` uses JSONB, which SQLite
-    does not compile: a copy of the table with JSON is used (see `banco_de_executores`)."""
+    does not compile: a copy of the table with JSON is used (see `executors_db`)."""
     executores = Executor.__table__.to_metadata(MetaData())
     for coluna in executores.columns:
         if isinstance(coluna.type, JSONB):
@@ -60,10 +60,10 @@ async def _banco():
         await engine.dispose()
 
 
-async def _semear(Sessao):
+async def _seed(SessionMaker):
     """Ana's account has her machine, which is the ONLY executor in the primary
     tier of ws-1 (Bia's) and shares the one of ws-2 with another executor."""
-    async with Sessao() as db:
+    async with SessionMaker() as db:
         db.add_all([
             User(id_hash="u-ana", username="ana", email="ana@x.test", hashed_password="x"),
             User(id_hash="u-bia", username="bia", email="bia@x.test", hashed_password="x"),
@@ -81,7 +81,7 @@ async def _semear(Sessao):
 
 
 @pytest.fixture
-def efeitos(monkeypatch):
+def effects(monkeypatch):
     """What leaves the database: blacklist, e-mail to the owners and the WebSocket."""
     registro = MagicMock()
     registro.send_json = AsyncMock(return_value=True)
@@ -94,44 +94,44 @@ def efeitos(monkeypatch):
     return {"registro": registro, "blacklist": blacklist, "aviso": aviso}
 
 
-async def _suspender(db, ana):
+async def _suspend(db, ana):
     await admin_user_service.suspend_user(db, ana, motivo="teste", por="adm")
 
 
-async def _excluir(db, ana):
+async def _delete_account(db, ana):
     await admin_user_service.soft_delete_user(db, ana)
 
 
-async def _suspender_em_lote(db, ana):
+async def _suspend_in_batch(db, ana):
     await admin_user_service.bulk_suspend(db, [ana], motivo="teste", por="adm")
 
 
-async def _excluir_em_lote(db, ana):
+async def _batch_delete(db, ana):
     await admin_user_service.bulk_soft_delete(db, [ana])
 
 
-ACOES = [
-    pytest.param(_suspender, "user_suspended", id="suspender"),
-    pytest.param(_excluir, "user_deleted", id="excluir"),
-    pytest.param(_suspender_em_lote, "user_suspended", id="suspender-em-lote"),
-    pytest.param(_excluir_em_lote, "user_deleted", id="excluir-em-lote"),
+ACTIONS = [
+    pytest.param(_suspend, "user_suspended", id="suspender"),
+    pytest.param(_delete_account, "user_deleted", id="excluir"),
+    pytest.param(_suspend_in_batch, "user_suspended", id="suspender-em-lote"),
+    pytest.param(_batch_delete, "user_deleted", id="excluir-em-lote"),
 ]
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("acao, motivo", ACOES)
-async def test_a_conta_revogada_derruba_o_executor_e_mantem_os_niveis(efeitos, acao, motivo):
-    async with _banco() as Sessao:
-        await _semear(Sessao)
-        async with Sessao() as db:
+@pytest.mark.parametrize("acao, motivo", ACTIONS)
+async def test_revoked_account_drops_the_executor_and_keeps_the_tiers(effects, acao, motivo):
+    async with _from_db() as SessionMaker:
+        await _seed(SessionMaker)
+        async with SessionMaker() as db:
             ana = (await db.execute(select(User).where(User.id_hash == "u-ana"))).scalar_one()
             await acao(db, ana)
 
-        async with Sessao() as db:
+        async with SessionMaker() as db:
             status, serial = (await db.execute(
                 select(Executor.status, Executor.cert_serial).where(Executor.id_hash == "ex-ana")
             )).one()
-            niveis = (await db.execute(
+            tiers = (await db.execute(
                 select(WorkspaceExecutor.workspace_id).where(WorkspaceExecutor.executor_id == "ex-ana")
             )).scalars().all()
             auditoria = (await db.execute(
@@ -142,52 +142,52 @@ async def test_a_conta_revogada_derruba_o_executor_e_mantem_os_niveis(efeitos, a
     assert (status, serial) == ("revoked", None)
     # The tiers of ws-1 and ws-2 (Bia's) stay: dispatch skips the revoked executor
     # and follows the chain; no detach and no emptied-tier notice.
-    assert sorted(niveis) == ["ws-1", "ws-2"]
+    assert sorted(tiers) == ["ws-1", "ws-2"]
     assert auditoria == []
-    assert all(c.args[0] == [] for c in efeitos["aviso"].call_args_list)
+    assert all(c.args[0] == [] for c in effects["aviso"].call_args_list)
 
     # The open session drops right away, as in the executor DELETE.
-    registro = efeitos["registro"]
+    registro = effects["registro"]
     registro.send_json.assert_awaited_once()
     destino, mensagem = registro.send_json.await_args.args
     assert destino == "ex-ana"
     assert (mensagem["type"], mensagem["action"]) == ("control", "revoked")
     registro.disconnect_executor.assert_awaited_once_with("ex-ana", code=4403, reason="Operador revogado.")
-    efeitos["blacklist"].assert_awaited_once()
-    assert efeitos["blacklist"].await_args.args == ("S1",)
+    effects["blacklist"].assert_awaited_once()
+    assert effects["blacklist"].await_args.args == ("S1",)
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("acao, motivo", ACOES)
-async def test_suspender_a_conta_nao_rebaixa_o_workspace_isolado_de_outro_dono(efeitos, acao, motivo):
+@pytest.mark.parametrize("acao, motivo", ACTIONS)
+async def test_suspending_the_account_does_not_downgrade_another_owners_isolated_workspace(effects, acao, motivo):
     """ws-1 (Bia's) is Isolated: primary [ex-ana], fallback [ex-outro], terminal
     `fail`. With the account's forced detach, the primary was emptied, the fallback
     and the terminal were deleted and the workspace started sending jobs to the
     shared pool."""
     from app.services import workspace_executor_service as politica
 
-    async with _banco() as Sessao:
-        await _semear(Sessao)
-        async with Sessao() as db:
+    async with _from_db() as SessionMaker:
+        await _seed(SessionMaker)
+        async with SessionMaker() as db:
             db.add(WorkspaceExecutor(workspace_id="ws-1", executor_id="ex-outro", tier=2))
             await db.commit()
-        async with Sessao() as db:
+        async with SessionMaker() as db:
             ana = (await db.execute(select(User).where(User.id_hash == "u-ana"))).scalar_one()
             await acao(db, ana)
 
-        async with Sessao() as db:
-            niveis = sorted((await db.execute(
+        async with SessionMaker() as db:
+            tiers = sorted((await db.execute(
                 select(WorkspaceExecutor.executor_id, WorkspaceExecutor.tier)
                 .where(WorkspaceExecutor.workspace_id == "ws-1")
             )).all())
-            politica_ws1 = await politica.load_policy_by_id(db, "ws-1")
+            policy_ws1 = await politica.load_policy_by_id(db, "ws-1")
 
-    assert niveis == [("ex-ana", 1), ("ex-outro", 2)]
-    assert politica_ws1.mode == politica.MODE_ISOLATED
+    assert tiers == [("ex-ana", 1), ("ex-outro", 2)]
+    assert policy_ws1.mode == politica.MODE_ISOLATED
 
 
 @pytest.mark.asyncio
-async def test_revogar_todos_do_operador_tira_dos_niveis_e_avisa_os_donos(efeitos, monkeypatch):
+async def test_revoke_all_of_operator_removes_from_tiers_and_notifies_the_owners(effects, monkeypatch):
     """The "revoke all" is an explicit action on the executors: like the forced
     DELETE, it leaves the tiers and the owner of the emptied primary tier is notified."""
     from types import SimpleNamespace
@@ -197,103 +197,103 @@ async def test_revogar_todos_do_operador_tira_dos_niveis_e_avisa_os_donos(efeito
 
     monkeypatch.setattr(limiter, "enabled", False)
     admin = SimpleNamespace(role="admin", id_hash="u-adm", username="adm")
-    async with _banco() as Sessao:
-        await _semear(Sessao)
-        async with Sessao() as db:
+    async with _from_db() as SessionMaker:
+        await _seed(SessionMaker)
+        async with SessionMaker() as db:
             await R.revoke_all_user_agents(request=None, id_hash="u-ana", db=db, current_user=admin)
 
-        async with Sessao() as db:
-            niveis = (await db.execute(
+        async with SessionMaker() as db:
+            tiers = (await db.execute(
                 select(WorkspaceExecutor.workspace_id).where(WorkspaceExecutor.executor_id == "ex-ana")
             )).scalars().all()
 
-    assert niveis == []
-    [chamada] = efeitos["aviso"].call_args_list
+    assert tiers == []
+    [chamada] = effects["aviso"].call_args_list
     assert [d["workspace_id"] for d in chamada.args[0] if d["would_empty_primary"]] == ["ws-1"]
-    efeitos["registro"].disconnect_executor.assert_awaited_once_with("ex-ana", code=4403, reason="Operador revogado.")
+    effects["registro"].disconnect_executor.assert_awaited_once_with("ex-ana", code=4403, reason="Operador revogado.")
 
 
 @pytest.mark.asyncio
-async def test_nada_sai_do_banco_se_o_commit_falha(efeitos):
+async def test_nothing_leaves_the_db_if_the_commit_fails(effects):
     """Blacklist, e-mail and close 4403 (terminal for the executor) only after the
     commit: a rollback must not leave the executor dropped yet active in the database."""
-    async with _banco() as Sessao:
-        await _semear(Sessao)
-        async with Sessao() as db:
+    async with _from_db() as SessionMaker:
+        await _seed(SessionMaker)
+        async with SessionMaker() as db:
             ana = (await db.execute(select(User).where(User.id_hash == "u-ana"))).scalar_one()
             db.commit = AsyncMock(side_effect=RuntimeError("banco fora"))
             with pytest.raises(RuntimeError):
-                await _suspender(db, ana)
+                await _suspend(db, ana)
 
-    efeitos["registro"].send_json.assert_not_awaited()
-    efeitos["registro"].disconnect_executor.assert_not_awaited()
-    efeitos["blacklist"].assert_not_awaited()
-    efeitos["aviso"].assert_not_called()
+    effects["registro"].send_json.assert_not_awaited()
+    effects["registro"].disconnect_executor.assert_not_awaited()
+    effects["blacklist"].assert_not_awaited()
+    effects["aviso"].assert_not_called()
 
 
 # ── The executor DELETE goes through the same revocation ─────────────────────
 
-async def _revogar_pela_rota(Sessao, *, force):
+async def _revoke_via_route(SessionMaker, *, force):
     from types import SimpleNamespace
 
     from app.api.routers import executores_router as R
 
     admin = SimpleNamespace(role="admin", id_hash="u-adm", username="adm")
-    async with Sessao() as db:
+    async with SessionMaker() as db:
         ag = (await db.execute(select(Executor).where(Executor.id_hash == "ex-ana"))).scalar_one()
         await R.revoke_executor("ex-ana", force=force, db=db, current_user=admin, ag=ag)
 
 
 @pytest.mark.asyncio
-async def test_delete_do_executor_revoga_como_a_conta(efeitos):
-    async with _banco() as Sessao:
-        await _semear(Sessao)
-        await _revogar_pela_rota(Sessao, force=True)
+async def test_executor_delete_revokes_like_the_account(effects):
+    async with _from_db() as SessionMaker:
+        await _seed(SessionMaker)
+        await _revoke_via_route(SessionMaker, force=True)
 
-        async with Sessao() as db:
+        async with SessionMaker() as db:
             status, serial = (await db.execute(
                 select(Executor.status, Executor.cert_serial).where(Executor.id_hash == "ex-ana")
             )).one()
-            niveis = (await db.execute(
+            tiers = (await db.execute(
                 select(WorkspaceExecutor.workspace_id).where(WorkspaceExecutor.executor_id == "ex-ana")
             )).scalars().all()
 
-    assert (status, serial, niveis) == ("revoked", None, [])
-    [chamada] = efeitos["aviso"].call_args_list
+    assert (status, serial, tiers) == ("revoked", None, [])
+    [chamada] = effects["aviso"].call_args_list
     assert chamada.kwargs["executor_name"] == "maquina-da-ana"
-    efeitos["registro"].disconnect_executor.assert_awaited_once_with(
+    effects["registro"].disconnect_executor.assert_awaited_once_with(
         "ex-ana", code=4403, reason="Executor revogado.",
     )
-    assert efeitos["registro"].send_json.await_args.args[1]["reason"] == "Executor revogado pelo administrador."
+    assert effects["registro"].send_json.await_args.args[1]["reason"] == "Executor revogado pelo administrador."
 
 
 @pytest.mark.asyncio
-async def test_delete_sem_force_nao_esvazia_o_nivel_principal(efeitos):
+async def test_delete_without_force_does_not_empty_the_main_tier(effects):
     from app.core.exceptions import WorkspacePolicyConflictError
 
-    async with _banco() as Sessao:
-        await _semear(Sessao)
+    async with _from_db() as SessionMaker:
+        await _seed(SessionMaker)
         with pytest.raises(WorkspacePolicyConflictError):
-            await _revogar_pela_rota(Sessao, force=False)
+            await _revoke_via_route(SessionMaker, force=False)
 
-        async with Sessao() as db:
+        async with SessionMaker() as db:
             status = (await db.execute(
                 select(Executor.status).where(Executor.id_hash == "ex-ana")
             )).scalar_one()
 
     assert status == "active"
-    efeitos["registro"].disconnect_executor.assert_not_awaited()
+    effects["registro"].disconnect_executor.assert_not_awaited()
 
 
 @pytest.mark.asyncio
-async def test_executor_de_outra_conta_nao_e_tocado(efeitos):
-    async with _banco() as Sessao:
-        await _semear(Sessao)
-        async with Sessao() as db:
+async def test_executor_of_another_account_is_not_touched(effects):
+    async with _from_db() as SessionMaker:
+        await _seed(SessionMaker)
+        async with SessionMaker() as db:
             ana = (await db.execute(select(User).where(User.id_hash == "u-ana"))).scalar_one()
-            await _suspender(db, ana)
+            await _suspend(db, ana)
 
-        async with Sessao() as db:
+        async with SessionMaker() as db:
             outro = (await db.execute(select(Executor).where(Executor.id_hash == "ex-outro"))).scalar_one()
             nivel = (await db.execute(
                 select(WorkspaceExecutor.tier).where(WorkspaceExecutor.executor_id == "ex-outro")
@@ -301,4 +301,4 @@ async def test_executor_de_outra_conta_nao_e_tocado(efeitos):
 
     assert (outro.status, outro.cert_serial) == ("active", "S9")
     assert nivel == [1]
-    assert [c.args[0] for c in efeitos["registro"].disconnect_executor.await_args_list] == ["ex-ana"]
+    assert [c.args[0] for c in effects["registro"].disconnect_executor.await_args_list] == ["ex-ana"]

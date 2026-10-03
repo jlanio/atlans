@@ -5,13 +5,13 @@
 
 import { createContext, useContext, type ReactNode } from "react"
 
-const CodigoFonteContexto = createContext<string | null>(null)
+const SourceCodeContext = createContext<string | null>(null)
 
-export function CodigoFonteProvider({ url, children }: { url: string | null; children: ReactNode }) {
-  return <CodigoFonteContexto.Provider value={url}>{children}</CodigoFonteContexto.Provider>
+export function SourceCodeProvider({ url, children }: { url: string | null; children: ReactNode }) {
+  return <SourceCodeContext.Provider value={url}>{children}</SourceCodeContext.Provider>
 }
 
 /** The URL of this installation's source code, or null when it doesn't declare one. */
-export function useCodigoFonte(): string | null {
-  return useContext(CodigoFonteContexto)
+export function useSourceCode(): string | null {
+  return useContext(SourceCodeContext)
 }

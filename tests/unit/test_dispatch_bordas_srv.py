@@ -34,13 +34,13 @@ TOKEN = "token-do-webhook"
 # A14 — precedence: authenticate before talking about the fleet
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _requisicao(authorization: str | None) -> MagicMock:
+def _request(authorization: str | None) -> MagicMock:
     req = MagicMock()
     req.headers = {"Authorization": authorization} if authorization else {}
     return req
 
 
-def _definicao_com_gatilho_protegido() -> dict:
+def _definition_with_protected_trigger() -> dict:
     return {
         "nodes": [
             {"id": "t", "type": "trigger", "name": "WebhookTrigger",
@@ -50,14 +50,14 @@ def _definicao_com_gatilho_protegido() -> dict:
     }
 
 
-def _servico_sem_executor():
+def _service_without_executor():
     """WorkflowService whose executor pool is empty (503 guaranteed)."""
     from app.services.workflow_service import WorkflowService
 
     wf = MagicMock()
     wf.id_hash, wf.workspace_id, wf.flag_ative = "wf-1", "ws-1", True
     wf.pinned_outputs = wf.pin_metadata = None
-    wf.definition = _definicao_com_gatilho_protegido()
+    wf.definition = _definition_with_protected_trigger()
 
     db = MagicMock()
     service = WorkflowService(db)
@@ -73,7 +73,7 @@ def _servico_sem_executor():
     return service
 
 
-async def _disparar_sem_executor(service, resolver_credenciais, **kwargs):
+async def _trigger_without_executor(service, resolve_credentials, **kwargs):
     with (
         patch("app.services.disabled_nodes_service.disabled_names",
               new=AsyncMock(return_value=set())),
@@ -81,51 +81,51 @@ async def _disparar_sem_executor(service, resolver_credenciais, **kwargs):
         patch("flow.utils.workflow_contract.collect_subworkflow_definitions_recursive",
               new=AsyncMock(return_value={})),
         patch("app.services.workflow_service.resolve_credentials_from_ids",
-              new=resolver_credenciais),
+              new=resolve_credentials),
     ):
         return await service.start_analysis("wf-1", inputs={}, **kwargs)
 
 
-class TestOrdemAutenticacaoAntesDoFailFast:
+class TestAuthenticationBeforeFailFastOrder:
 
     @pytest.mark.asyncio
-    async def test_anonimo_recebe_401_e_nao_sonda_a_frota(self):
+    async def test_anonymous_gets_401_and_does_not_probe_the_fleet(self):
         """No header at all: 401 from the token, and `_resolve_candidates` does not even run.
 
         Before, the same caller got a 503 with the literal message about the
         executor pool — an oracle on the tenant's infrastructure.
         """
-        service = _servico_sem_executor()
+        service = _service_without_executor()
         resolver = AsyncMock(return_value={"cred-1": {"type": "webhook_token", "token": TOKEN}})
 
         with pytest.raises(HTTPException) as exc:
-            await _disparar_sem_executor(service, resolver, request=_requisicao(None))
+            await _trigger_without_executor(service, resolver, request=_request(None))
 
         assert exc.value.status_code == 401
         assert service._resolve_candidates.await_count == 0
 
     @pytest.mark.asyncio
-    async def test_token_errado_recebe_403_e_nao_sonda_a_frota(self):
-        service = _servico_sem_executor()
+    async def test_wrong_token_gets_403_and_does_not_probe_the_fleet(self):
+        service = _service_without_executor()
         resolver = AsyncMock(return_value={"cred-1": {"type": "webhook_token", "token": TOKEN}})
 
         with pytest.raises(HTTPException) as exc:
-            await _disparar_sem_executor(
-                service, resolver, request=_requisicao("Bearer token-errado"),
+            await _trigger_without_executor(
+                service, resolver, request=_request("Bearer token-errado"),
             )
 
         assert exc.value.status_code == 403
         assert service._resolve_candidates.await_count == 0
 
     @pytest.mark.asyncio
-    async def test_token_certo_continua_recebendo_o_fail_fast(self):
+    async def test_correct_token_still_gets_the_fail_fast(self):
         """The fail-fast was not removed — only moved after the token."""
-        service = _servico_sem_executor()
+        service = _service_without_executor()
         resolver = AsyncMock(return_value={"cred-1": {"type": "webhook_token", "token": TOKEN}})
 
         with pytest.raises(NoExecutorAvailableError):
-            await _disparar_sem_executor(
-                service, resolver, request=_requisicao(f"Bearer {TOKEN}"),
+            await _trigger_without_executor(
+                service, resolver, request=_request(f"Bearer {TOKEN}"),
             )
 
         assert service._resolve_candidates.await_count == 1
@@ -133,17 +133,17 @@ class TestOrdemAutenticacaoAntesDoFailFast:
         assert service._dispatch_job.await_count == 0
 
     @pytest.mark.asyncio
-    async def test_disparo_ja_autenticado_aborta_antes_de_resolver_credenciais(self):
+    async def test_authenticated_trigger_aborts_before_resolving_credentials(self):
         """The latency gain preserved: whoever has already authenticated (Executar
         button, retry, cron) gets the 503 without the server collecting
         sub-workflows or decrypting any credential."""
-        service = _servico_sem_executor()
+        service = _service_without_executor()
         resolver = AsyncMock(return_value={})
 
         with pytest.raises(NoExecutorAvailableError):
-            await _disparar_sem_executor(
+            await _trigger_without_executor(
                 service, resolver,
-                request=_requisicao("Bearer jwt.de.sessao"),
+                request=_request("Bearer jwt.de.sessao"),
                 autenticar_entrada=False,
             )
 
@@ -164,7 +164,7 @@ def _run(status="pending", host="executor:ag-1"):
     )
 
 
-def _db_para_cancelamento(run, rowcount=1):
+def _db_for_cancellation(run, rowcount=1):
     """db.execute: 1o SELECT devolve o run; 2o UPDATE devolve o rowcount."""
     selecionado = MagicMock()
     selecionado.scalar_one_or_none = MagicMock(return_value=run)
@@ -178,17 +178,17 @@ def _db_para_cancelamento(run, rowcount=1):
     return db
 
 
-class TestCancelarRunPendente:
+class TestCancelPendingRun:
 
     @pytest.mark.asyncio
-    async def test_pendente_com_host_avisa_o_executor(self):
+    async def test_pending_with_host_notifies_the_executor(self):
         """The scenario of the worker dying between `send_job` and the commit: the
         executor ALREADY has the job, the run stayed 'pending' forever. Without
         this notice the API answers "cancelado" and the workflow runs to the end."""
         from app.services import workflow_execution_service as svc
 
         run = _run()
-        db = _db_para_cancelamento(run)
+        db = _db_for_cancellation(run)
         registry = MagicMock()
         registry.send_json = AsyncMock(return_value=True)
 
@@ -210,11 +210,11 @@ class TestCancelarRunPendente:
         assert run.status == "cancelled"
 
     @pytest.mark.asyncio
-    async def test_pendente_sem_host_nao_tenta_falar_com_ninguem(self):
+    async def test_pending_without_host_does_not_try_to_contact_anyone(self):
         from app.services import workflow_execution_service as svc
 
         run = _run(host=None)
-        db = _db_para_cancelamento(run)
+        db = _db_for_cancellation(run)
         registry = MagicMock()
         registry.send_json = AsyncMock(return_value=True)
 
@@ -228,13 +228,13 @@ class TestCancelarRunPendente:
         registry.send_json.assert_not_awaited()
 
     @pytest.mark.asyncio
-    async def test_executor_offline_nao_desfaz_o_cancelamento_local(self):
+    async def test_offline_executor_does_not_undo_the_local_cancellation(self):
         """The notice is best-effort: the run was already closed in the database and
         the user needs the confirmation even with the executor offline."""
         from app.services import workflow_execution_service as svc
 
         run = _run()
-        db = _db_para_cancelamento(run)
+        db = _db_for_cancellation(run)
         registry = MagicMock()
         registry.send_json = AsyncMock(side_effect=RuntimeError("socket fechado"))
 
@@ -248,13 +248,13 @@ class TestCancelarRunPendente:
         assert run.status == "cancelled"
 
     @pytest.mark.asyncio
-    async def test_dispatch_venceu_a_corrida_segue_pelo_caminho_normal(self):
+    async def test_dispatch_won_the_race_follows_the_normal_path(self):
         """rowcount 0: the run became 'running' in the meantime. The request to the
         executor applies, which answers "requested"."""
         from app.services import workflow_execution_service as svc
 
         run = _run()
-        db = _db_para_cancelamento(run, rowcount=0)
+        db = _db_for_cancellation(run, rowcount=0)
 
         async def _refresh(_obj):
             run.status = "running"
@@ -282,21 +282,21 @@ class TestCancelarRunPendente:
 class _RedisFake:
     """Only the GET/INCR pair of the epoch key."""
 
-    def __init__(self, epoca: str | None = None):
-        self.epoca = epoca
+    def __init__(self, epoch: str | None = None):
+        self.epoch = epoch
         self.incrs = 0
 
     async def get(self, _key):
-        return self.epoca
+        return self.epoch
 
     async def incr(self, _key):
         self.incrs += 1
-        self.epoca = str(int(self.epoca or "0") + 1)
-        return int(self.epoca)
+        self.epoch = str(int(self.epoch or "0") + 1)
+        return int(self.epoch)
 
 
 @pytest.fixture(autouse=True)
-def _cache_limpo():
+def _clean_cache():
     from app.services import disabled_nodes_service as svc
 
     svc.invalidate_cache()
@@ -304,10 +304,10 @@ def _cache_limpo():
     svc.invalidate_cache()
 
 
-class TestInvalidacaoEntreWorkers:
+class TestInvalidationAcrossWorkers:
 
     @pytest.mark.asyncio
-    async def test_epoca_estavel_nao_volta_ao_banco(self):
+    async def test_stable_epoch_does_not_go_back_to_the_db(self):
         """The gain that motivated the cache: nothing changes, no new SELECT."""
         from app.services import disabled_nodes_service as svc
 
@@ -323,7 +323,7 @@ class TestInvalidacaoEntreWorkers:
         assert leitura.await_count == 1
 
     @pytest.mark.asyncio
-    async def test_node_desabilitado_em_outro_worker_aparece_na_leitura_seguinte(self):
+    async def test_node_disabled_on_another_worker_shows_up_on_the_next_read(self):
         """The case that matters: the admin disabled it through worker 1; this process
         has a warm cache and a TTL far from expiring. Without the epoch, it would
         keep dispatching the node (and sending the old list in the job envelope)."""
@@ -341,14 +341,14 @@ class TestInvalidacaoEntreWorkers:
         ):
             assert await svc.disabled_names(MagicMock()) == set()
 
-            # Outro worker gravou e incrementou a epoca.
+            # Outro worker gravou e incrementou a epoch.
             mapa["valor"] = {"SendEmail": {"reason": "incidente"}}
-            redis.epoca = "8"
+            redis.epoch = "8"
 
             assert await svc.disabled_names(MagicMock()) == {"SendEmail"}
 
     @pytest.mark.asyncio
-    async def test_reabilitar_em_outro_worker_tambem_propaga(self):
+    async def test_reenabling_on_another_worker_also_propagates(self):
         from app.services import disabled_nodes_service as svc
 
         redis = _RedisFake("1")
@@ -363,11 +363,11 @@ class TestInvalidacaoEntreWorkers:
         ):
             assert await svc.disabled_names(MagicMock()) == {"SendEmail"}
             mapa["valor"] = {}
-            redis.epoca = "2"
+            redis.epoch = "2"
             assert await svc.disabled_names(MagicMock()) == set()
 
     @pytest.mark.asyncio
-    async def test_escrita_publica_a_epoca_depois_do_commit(self):
+    async def test_write_publishes_the_epoch_after_the_commit(self):
         from app.services import disabled_nodes_service as svc
 
         redis = _RedisFake("3")
@@ -391,7 +391,7 @@ class TestInvalidacaoEntreWorkers:
             assert redis.incrs == 2
 
     @pytest.mark.asyncio
-    async def test_redis_fora_do_ar_degrada_para_o_ttl_local(self):
+    async def test_redis_down_degrades_to_the_local_ttl(self):
         """Redis being unavailable must not take down the dispatch: the old staleness
         ceiling applies again, with no SELECT per trigger."""
         from app.services import disabled_nodes_service as svc

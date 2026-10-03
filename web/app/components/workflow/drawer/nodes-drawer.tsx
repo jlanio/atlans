@@ -12,7 +12,7 @@ import { getTypeIcon } from "@/utils/getTypeIconsUtils"
 import IconDrawer from "./components/icon-drawer"
 import { getCandidateKeys, resolveFromKey, portaDeEntradaPadrao } from "../utils/resolve-edge-keys"
 import { contratoDoNo } from "../utils/node-ports"
-import { estiloDoTipo, nomeDoTipo } from "@/consts/NodeTypeStyles"
+import { typeStyle, typeName } from "@/consts/NodeTypeStyles"
 import { cn } from "@/lib/utils"
 
 export interface INodesItemsDrawer extends INodesAPI<string> {
@@ -41,9 +41,9 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
   // (here) and "where is the node the + came from?" (inside addNode, via
   // getNode). Subscribing to `useNodes()` refiltered the whole catalog on every
   // drag frame, with the drawer closed and off screen.
-  const canvasVazio = useStore(s => s.nodeLookup.size === 0)
+  const canvasEmpty = useStore(s => s.nodeLookup.size === 0)
 
-  const drawerType = canvasVazio ? "trigger" : nodesDrawerState
+  const drawerType = canvasEmpty ? "trigger" : nodesDrawerState
   const hasTypeFilter = drawerType !== "closed" && drawerType !== "opened"
 
   // Derived, not state + effect: the computation is synchronous and `setItems`
@@ -157,13 +157,13 @@ const NodesDrawer = ({ aliasFilter }: NodesDrawerProps) => {
   return (
     <div className="flex flex-col gap-1 py-2">
       {grouped ? (
-        // Modo agrupado (busca global)
+        // Modo grouped (busca global)
         Object.entries(grouped).map(([type, groupItems]) => (
           <div key={type} className="mb-1">
             <div className="flex items-center gap-2 px-4 py-1.5">
-              <IconDrawer type={type} fontSize={12} className={estiloDoTipo(type).icon} />
+              <IconDrawer type={type} fontSize={12} className={typeStyle(type).icon} />
               <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {nomeDoTipo(type)}
+                {typeName(type)}
               </span>
               <div className="flex-1 border-t border-border/50" />
             </div>
@@ -197,7 +197,7 @@ function NodeCard({ item, onAdd, mostrarTipo }: {
    *  filter they are all the same, and repeating it on every row is noise. */
   mostrarTipo: boolean
 }) {
-  const estilo = estiloDoTipo(item.type as string)
+  const estilo = typeStyle(item.type as string)
 
   return (
     <div
@@ -224,7 +224,7 @@ function NodeCard({ item, onAdd, mostrarTipo }: {
               "text-[10px] font-medium px-1.5 py-0.5 rounded-full shrink-0",
               estilo.bg, estilo.icon,
             )}>
-              {nomeDoTipo(item.type as string)}
+              {typeName(item.type as string)}
             </span>
           )}
         </div>

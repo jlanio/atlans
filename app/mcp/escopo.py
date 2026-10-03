@@ -1,6 +1,6 @@
 # app/mcp/escopo.py
 """
-`EscopoEfetivo` — who owns the call and how far it reaches.
+`EffectiveScope` — who owns the call and how far it reaches.
 
 The PAT middleware resolves the token ONCE per request and distills the result
 into this immutable object: user, token, granted scopes and the workspaces it
@@ -14,7 +14,7 @@ Two channels, because there are two consumers:
 - `ESCOPO_ATUAL`, a `ContextVar`, because `list_tools()` receives no `ctx` at
   all and still needs to filter the catalog by the token's scope.
 
-`como_usuario()` exists for a security reason: the observability services
+`as_user()` exists for a security reason: the observability services
 decide what to show based on a `user` object, and some still look at
 `user.role`. Handing them the raw `User` from the database would give MCP an
 administrator's global reach. The substitute carries only what they read and
@@ -31,7 +31,7 @@ from app.mcp.erros import erro
 
 
 @dataclass(frozen=True)
-class EscopoEfetivo:
+class EffectiveScope:
     """The reach of a call — frozen at authentication time."""
 
     user_id: str
@@ -51,14 +51,14 @@ class EscopoEfetivo:
     # "assistente" only for the Home assistant's scope. It is an origin stamp,
     # NOT a privilege: it widens no reach, it only marks who created the workflow
     # so the listings can hide it. Default at the end of the class: the
-    # existing constructors (PAT, assistant, `escopo_falso`) remain intact.
+    # existing constructors (PAT, assistant, `fake_scope`) remain intact.
     origem_dos_fluxos: str = "usuario"
 
     def tem(self, escopo: str) -> bool:
         """True if the token carries this scope."""
         return escopo in self.scopes
 
-    def como_usuario(self) -> SimpleNamespace:
+    def as_user(self) -> SimpleNamespace:
         """The minimum the services ask for as `user` — NEVER the database `User`.
 
         Always `role="user"`: a PAT does not confer administrator privilege,
@@ -66,7 +66,7 @@ class EscopoEfetivo:
         """
         return SimpleNamespace(id_hash=self.user_id, username=self.username, role="user")
 
-    def workspace_unico(self) -> str | None:
+    def single_workspace(self) -> str | None:
         """The workspace when there is exactly one — which makes `workspace_id` optional."""
         if len(self.workspace_ids) == 1:
             return next(iter(self.workspace_ids))
@@ -76,18 +76,18 @@ class EscopoEfetivo:
 # Filled in by the middleware and reset at the end of the request. `list_tools()`
 # is the consumer that has no other channel; the handler runs in a task created
 # inside the request, and `create_task` copies the context, so the value gets there.
-ESCOPO_ATUAL: ContextVar[EscopoEfetivo | None] = ContextVar("ESCOPO_ATUAL", default=None)
+ESCOPO_ATUAL: ContextVar[EffectiveScope | None] = ContextVar("ESCOPO_ATUAL", default=None)
 
 
 # ── Assistant ───────────────────────────────────────────────────────────────────
 # The web assistant calls the same tools, but what authenticates it is the JWT
-# session, not a PAT. It still needs an `EscopoEfetivo` — it is the format all of
+# session, not a PAT. It still needs an `EffectiveScope` — it is the format all of
 # MCP's authorization consumes —, and the synthetic `token_id` below has two
 # deliberate effects: the quota buckets (`ratelimit:mcp:assistente-editor:…`) are
 # born separate from the PATs' buckets, and the audit line immediately
 # distinguishes what came from the screen from what came from an external client.
 
-PREFIXO_DO_EDITOR = "assistente-editor"
+EDITOR_PREFIX = "assistente-editor"
 
 # These are NOT the PAT's six scopes. `triggers:manage` and `drive:write` were
 # left out of the first version by the owner's decision: deleting a schedule or a
@@ -96,7 +96,7 @@ PREFIXO_DO_EDITOR = "assistente-editor"
 # ("limpa os agendamentos antigos" (clean up the old schedules) is a sentence
 # someone types without thinking). Widening it here is one line — and it is a
 # product decision, not an implementation one.
-ESCOPOS_DO_EDITOR: frozenset[str] = frozenset(
+EDITOR_SCOPES: frozenset[str] = frozenset(
     {
         "workflows:read",
         "workflows:write",
@@ -106,12 +106,12 @@ ESCOPOS_DO_EDITOR: frozenset[str] = frozenset(
 )
 
 
-def escopo_do_editor(
+def editor_scope(
     *,
     user_id: str,
     username: str | None,
     workspace_ids: frozenset[str] | set[str] | list[str],
-) -> EscopoEfetivo:
+) -> EffectiveScope:
     """The scope of an assistant conversation — the session's user, no PAT.
 
     Pure on purpose: `workspace_ids` arrives resolved by the caller (with
@@ -123,12 +123,12 @@ def escopo_do_editor(
     `todos_os_workspaces=True` because there is no token restricting anything:
     the reach is exactly the user's, today and when they join a new workspace.
     """
-    return EscopoEfetivo(
+    return EffectiveScope(
         user_id=user_id,
         username=username,
-        token_id=f"{PREFIXO_DO_EDITOR}:{user_id}",
-        token_prefix=PREFIXO_DO_EDITOR,
-        scopes=ESCOPOS_DO_EDITOR,
+        token_id=f"{EDITOR_PREFIX}:{user_id}",
+        token_prefix=EDITOR_PREFIX,
+        scopes=EDITOR_SCOPES,
         workspace_ids=frozenset(workspace_ids),
         todos_os_workspaces=True,
     )
@@ -142,52 +142,52 @@ def escopo_do_editor(
 # not the absence of a scope. The difference in reach lives here, in the
 # IDENTITY, and not in a list scattered across the loop.
 
-PREFIXO_DO_ASSISTENTE = "assistente"
+ASSISTANT_PREFIX = "assistente"
 
 # The PAT's SIX scopes, `pat.ESCOPOS` — including `triggers:manage` and
 # `drive:write`, which the editor assistant does NOT carry. They come in here
 # because deleting a schedule or a Drive file is an action the assistant can
 # take, as long as the person clicks to confirm; removing the scope would make
 # the confirmation useless (there would be nothing to confirm).
-ESCOPOS_DO_ASSISTENTE: frozenset[str] = frozenset(pat.ESCOPOS)
+ASSISTANT_SCOPES: frozenset[str] = frozenset(pat.ESCOPOS)
 
 
-def escopo_do_assistente(
+def assistant_scope(
     *,
     user_id: str,
     username: str | None,
     workspace_ids: frozenset[str] | set[str] | list[str],
-) -> EscopoEfetivo:
+) -> EffectiveScope:
     """The scope of a Home assistant conversation — the session's user, full reach.
 
-    Modeled on `escopo_do_assistente`, with three deliberate differences:
+    Modeled on `assistant_scope`, with three deliberate differences:
 
     - `token_id`/`token_prefix` "assistente:…": the quota buckets
       (`ratelimit:mcp:assistente:{user}`) and the audit line are born separate
       from the PAT's and the editor assistant's, for free — everything is keyed
       by `token_id`;
-    - the SIX scopes (`ESCOPOS_DO_ASSISTENTE`), not the editor's four;
+    - the SIX scopes (`ASSISTANT_SCOPES`), not the editor's four;
     - `origem_dos_fluxos="assistente"`: every workflow it creates is born
       marked, and the listings hide it by default. It is an origin stamp, not
       a privilege — it widens no reach.
 
     The model's TOKEN quota stays on the `assistente:tokens:{user}` key
-    (`cotas.chave_de_tokens`), SHARED with the editor: the model is the same and
+    (`cotas.tokens_key`), SHARED with the editor: the model is the same and
     the per-person budget is a single one.
     """
-    return EscopoEfetivo(
+    return EffectiveScope(
         user_id=user_id,
         username=username,
-        token_id=f"{PREFIXO_DO_ASSISTENTE}:{user_id}",
-        token_prefix=PREFIXO_DO_ASSISTENTE,
-        scopes=ESCOPOS_DO_ASSISTENTE,
+        token_id=f"{ASSISTANT_PREFIX}:{user_id}",
+        token_prefix=ASSISTANT_PREFIX,
+        scopes=ASSISTANT_SCOPES,
         workspace_ids=frozenset(workspace_ids),
         todos_os_workspaces=True,
         origem_dos_fluxos="assistente",
     )
 
 
-def escopo_da_chamada(ctx) -> EscopoEfetivo:
+def escopo_da_chamada(ctx) -> EffectiveScope:
     """The scope of this call, via the tool's `ctx` or via the `ContextVar`.
 
     The order matters: `request.state` is per request and does not get mixed up
@@ -197,11 +197,11 @@ def escopo_da_chamada(ctx) -> EscopoEfetivo:
     """
     requisicao = getattr(getattr(ctx, "request_context", None), "request", None)
     escopo = getattr(getattr(requisicao, "state", None), "escopo", None)
-    if isinstance(escopo, EscopoEfetivo):
+    if isinstance(escopo, EffectiveScope):
         return escopo
-    do_contexto = ESCOPO_ATUAL.get()
-    if do_contexto is not None:
-        return do_contexto
+    from_context = ESCOPO_ATUAL.get()
+    if from_context is not None:
+        return from_context
     raise erro(
         "forbidden",
         "Chamada sem identidade: nenhum token pessoal de acesso foi resolvido.",
@@ -209,7 +209,7 @@ def escopo_da_chamada(ctx) -> EscopoEfetivo:
     )
 
 
-def exigir_escopo(escopo: EscopoEfetivo, *necessarios: str) -> None:
+def exigir_escopo(escopo: EffectiveScope, *required: str) -> None:
     """Refuses the call, naming the missing scope.
 
     Naming it is deliberate: the caller has no way to guess which box to tick
@@ -217,7 +217,7 @@ def exigir_escopo(escopo: EscopoEfetivo, *necessarios: str) -> None:
     The hint says WHO ticks it: the tokens screen only opens for the system
     administrator (`web/proxy.ts` sends non-admins to `/`).
     """
-    faltando = [e for e in necessarios if not escopo.tem(e)]
+    faltando = [e for e in required if not escopo.tem(e)]
     if not faltando:
         return
     raise erro(

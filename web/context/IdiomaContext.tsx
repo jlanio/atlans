@@ -3,9 +3,9 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Cookies from "js-cookie";
-import { COOKIE_DO_IDIOMA, IDIOMA_PADRAO, type Idioma, type IdiomaResolvido } from "@/lib/idioma";
+import { LANGUAGE_COOKIE, DEFAULT_LANGUAGE, type Idioma, type ResolvedLanguage } from "@/lib/idioma";
 
-interface EstadoDoIdioma extends IdiomaResolvido {
+interface LanguageState extends ResolvedLanguage {
   /** Stores the choice (365-day cookie, like the theme); `null` goes back to automatic. */
   escolher: (idioma: Idioma | null) => void;
 }
@@ -13,14 +13,14 @@ interface EstadoDoIdioma extends IdiomaResolvido {
 // Without a provider (component tests, the /share portal) Portuguese applies:
 // it is the language the Home was written in, and the tests that check text
 // keep checking the same text.
-const IdiomaContext = createContext<EstadoDoIdioma>({
-  idioma: IDIOMA_PADRAO,
-  detectado: IDIOMA_PADRAO,
+const IdiomaContext = createContext<LanguageState>({
+  idioma: DEFAULT_LANGUAGE,
+  detectado: DEFAULT_LANGUAGE,
   escolhido: null,
   escolher: () => {},
 });
 
-export const useIdioma = () => useContext(IdiomaContext);
+export const useLanguage = () => useContext(IdiomaContext);
 
 /**
  * Starts with the language the server resolved (`resolverIdioma` in the
@@ -28,29 +28,29 @@ export const useIdioma = () => useContext(IdiomaContext);
  * Changing it in Preferences re-renders right away, without reloading: the
  * cookie is for the NEXT request, the state is for this screen.
  */
-export function IdiomaProvider({
+export function LanguageProvider({
   inicial,
   children,
 }: {
-  inicial: IdiomaResolvido;
+  inicial: ResolvedLanguage;
   children: React.ReactNode;
 }) {
-  const [escolhido, setEscolhido] = useState<Idioma | null>(inicial.escolhido);
+  const [escolhido, setChosen] = useState<Idioma | null>(inicial.escolhido);
   // The layout resolves again on every `router.refresh()`, and the cookie may
   // have changed in another tab. Without this, the provider (which does not
   // remount) kept the old choice while `detectado` was already new: the screen,
   // the cookie and Preferences disagreed until the next F5. A choice made in
   // THIS tab is not lost: the refresh returns the same value it stored.
-  const [escolhidoDoServidor, setEscolhidoDoServidor] = useState(inicial.escolhido);
-  if (escolhidoDoServidor !== inicial.escolhido) {
-    setEscolhidoDoServidor(inicial.escolhido);
-    setEscolhido(inicial.escolhido);
+  const [serverChoice, setServerChoice] = useState(inicial.escolhido);
+  if (serverChoice !== inicial.escolhido) {
+    setServerChoice(inicial.escolhido);
+    setChosen(inicial.escolhido);
   }
 
   const escolher = useCallback((idioma: Idioma | null) => {
-    setEscolhido(idioma);
-    if (idioma) Cookies.set(COOKIE_DO_IDIOMA, idioma, { expires: 365, sameSite: "lax" });
-    else Cookies.remove(COOKIE_DO_IDIOMA);
+    setChosen(idioma);
+    if (idioma) Cookies.set(LANGUAGE_COOKIE, idioma, { expires: 365, sameSite: "lax" });
+    else Cookies.remove(LANGUAGE_COOKIE);
   }, []);
 
   const value = useMemo(
@@ -73,7 +73,7 @@ const NaHome = createContext(true);
 export const useNaHome = () => useContext(NaHome);
 
 /** The same criterion as `ShellSidebar`: the Home is the exact `/` route. */
-export function EscopoPelaRota({ children }: { children: React.ReactNode }) {
+export function ScopeByRoute({ children }: { children: React.ReactNode }) {
   const naHome = usePathname() === "/";
   return <NaHome.Provider value={naHome}>{children}</NaHome.Provider>;
 }

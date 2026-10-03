@@ -17,7 +17,7 @@ OpenAPI.
 from __future__ import annotations
 
 
-def rotas_efetivas(app) -> list:
+def effective_routes(app) -> list:
     """Every route of the app with `path` and `endpoint`, including those of included routers."""
     try:
         from fastapi.routing import iter_route_contexts
@@ -32,6 +32,6 @@ def rotas_efetivas(app) -> list:
         ]
     # Without this, a future format change would silently empty the paths again,
     # and an `assert "/x" not in caminhos` would pass without checking anything.
-    sem_caminho = [rota for rota in rotas if not getattr(rota, "path", None)]
-    assert not sem_caminho, f"rota sem caminho no app (o FastAPI mudou o app.routes?): {sem_caminho[:3]}"
+    without_path = [rota for rota in rotas if not getattr(rota, "path", None)]
+    assert not without_path, f"rota sem caminho no app (o FastAPI mudou o app.routes?): {without_path[:3]}"
     return rotas

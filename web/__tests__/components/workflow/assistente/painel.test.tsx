@@ -42,8 +42,8 @@ vi.mock("@xyflow/react", async (original) => ({
   useNodes: vi.fn(() => []),
 }))
 
-import AssistentePainel from "@/app/components/workflow/assistente"
-import { useAssistenteEditorStore } from "@/app/stores/assistenteEditorStore"
+import AssistantPanel from "@/app/components/workflow/assistente"
+import { useAssistantEditorStore } from "@/app/stores/assistenteEditorStore"
 import { useWorkflowCatalogStore } from "@/app/stores/workflowCatalogStore"
 import type { INodesAPI } from "@/service/types"
 
@@ -72,7 +72,7 @@ const quadro = (evento: string, dados: unknown) =>
   `event: ${evento}\ndata: ${JSON.stringify(dados)}\n\n`
 
 /** The frames of a conversation that builds and validates a workflow. */
-function corpoDaConversa(): string {
+function conversationBody(): string {
   return (
     quadro("pensando", { texto: "preciso do catálogo" }) +
     quadro("texto", { texto: "Vou montar " }) +
@@ -98,7 +98,7 @@ function corpoDaConversa(): string {
  * the next, which is what the network (and a loaded CI runner) do. With a
  * synchronous `pull` the whole stream drained inside one `waitFor` and hid any
  * race between the test and the frames — including the one that broke CI on #137. */
-function streamPicado(corpo: string, pedacos = 7): ReadableStream<Uint8Array> {
+function chunkedStream(corpo: string, pedacos = 7): ReadableStream<Uint8Array> {
   const bytes = new TextEncoder().encode(corpo)
   const tamanho = Math.ceil(bytes.length / pedacos)
   let i = 0
@@ -115,21 +115,21 @@ function streamPicado(corpo: string, pedacos = 7): ReadableStream<Uint8Array> {
   })
 }
 
-let fetchFalso: ReturnType<typeof vi.fn>
+let fakeFetch: ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   cleanup()
   servico.estadoDoAssistente.mockClear()
   servico.esquecerConversaDoAssistente.mockClear()
-  useAssistenteEditorStore.setState({ aberto: true })
+  useAssistantEditorStore.setState({ aberto: true })
   useWorkflowCatalogStore.setState({ nodesAPI: catalogo })
   localStorage.clear()
 
-  fetchFalso = vi.fn(async () => new Response(streamPicado(corpoDaConversa()), {
+  fakeFetch = vi.fn(async () => new Response(chunkedStream(conversationBody()), {
     status: 200,
     headers: { "Content-Type": "text/event-stream" },
   }))
-  vi.stubGlobal("fetch", fetchFalso)
+  vi.stubGlobal("fetch", fakeFetch)
 })
 
 afterEach(() => {
@@ -137,7 +137,7 @@ afterEach(() => {
 })
 
 async function conversar() {
-  render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
+  render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
   const campo = await screen.findByLabelText("Mensagem para o assistente")
   fireEvent.change(campo, { target: { value: "monta um buffer de 500m" } })
   fireEvent.submit(campo.closest("form")!)
@@ -145,10 +145,10 @@ async function conversar() {
   await waitFor(() => expect(screen.queryByLabelText("Parar")).toBeNull())
 }
 
-const aplicou = vi.fn()
+const onApplied = vi.fn()
 
 describe("gaveta do assistente", () => {
-  beforeEach(() => aplicou.mockClear())
+  beforeEach(() => onApplied.mockClear())
 
   it("desenha a conversa a partir do stream, quadro a quadro", async () => {
     await conversar()
@@ -168,7 +168,7 @@ describe("gaveta do assistente", () => {
     // workflow grows while the model builds it.
     await conversar()
 
-    expect(aplicou).toHaveBeenCalled()
+    expect(onApplied).toHaveBeenCalled()
     expect(screen.getByText("Desenhado no canvas")).toBeTruthy()
     expect(screen.getByText("montei o buffer")).toBeTruthy()
     expect(screen.queryByRole("button", { name: /Desenhar no canvas/ })).toBeNull()
@@ -181,27 +181,27 @@ describe("gaveta do assistente", () => {
     await conversar()
 
     expect(screen.getByText("Validação limpa")).toBeTruthy()
-    expect(aplicou).toHaveBeenCalledTimes(1)
+    expect(onApplied).toHaveBeenCalledTimes(1)
   })
 
   it("desenhar leva a definição ao canvas — e NÃO chama a rede", async () => {
     await conversar()
 
     // What the network has done so far: the state on mount and the conversation's POST.
-    const antesFetch = fetchFalso.mock.calls.length
-    const antesServico =
+    const fetchCallsBefore = fakeFetch.mock.calls.length
+    const serviceCallsBefore =
       servico.estadoDoAssistente.mock.calls.length + servico.esquecerConversaDoAssistente.mock.calls.length
 
-    expect(aplicou).toHaveBeenCalledTimes(1)
-    const resultado = aplicou.mock.calls[0][0]
+    expect(onApplied).toHaveBeenCalledTimes(1)
+    const resultado = onApplied.mock.calls[0][0]
     expect(resultado.nodes.map((n: { id: string }) => n.id)).toEqual(["a", "b"])
     expect(resultado.edges).toHaveLength(1)
 
     // The assertion that matters: applying is local. Saving is Save's job.
-    expect(fetchFalso.mock.calls.length).toBe(antesFetch)
+    expect(fakeFetch.mock.calls.length).toBe(fetchCallsBefore)
     expect(
       servico.estadoDoAssistente.mock.calls.length + servico.esquecerConversaDoAssistente.mock.calls.length,
-    ).toBe(antesServico)
+    ).toBe(serviceCallsBefore)
   })
 
   it("manda só a mensagem nova — o transcrito é do servidor", async () => {
@@ -209,7 +209,7 @@ describe("gaveta do assistente", () => {
     // `tool_result` is the SERVER's word on what happened. The route rejects
     // an extra field with 422; the panel must not try to send it.
     await conversar()
-    const [, init] = fetchFalso.mock.calls[0] as [string, RequestInit]
+    const [, init] = fakeFetch.mock.calls[0] as [string, RequestInit]
     expect(JSON.parse(String(init.body))).toEqual({
       mensagem: "monta um buffer de 500m",
       workflow_id: "wf1",
@@ -220,8 +220,8 @@ describe("gaveta do assistente", () => {
     // The workflow with errors STAYS on the screen: that's where the person sees
     // the problem. What the card does is say that validation failed, so the
     // model fixes and redraws — this used to disable a button; now it's information.
-    fetchFalso.mockImplementation(async () => new Response(
-      streamPicado(
+    fakeFetch.mockImplementation(async () => new Response(
+      chunkedStream(
         quadro("proposta", { definicao: DEFINICAO, nos: 2, arestas: 1, ok: false, erros: 2, avisos: 0 }) +
         quadro("fim", { transcrito: [], uso: {}, voltas: 1, ok: true }),
       ),
@@ -232,7 +232,7 @@ describe("gaveta do assistente", () => {
     expect(screen.getByText("Validação com pendências")).toBeTruthy()
     expect(screen.getByText(/A validação apontou 2 erros/)).toBeTruthy()
     // A verdict doesn't draw: nothing was applied to the canvas because of it.
-    expect(aplicou).not.toHaveBeenCalled()
+    expect(onApplied).not.toHaveBeenCalled()
   })
 
   it("num canvas com trabalho, o primeiro desenho espera o clique", async () => {
@@ -248,10 +248,10 @@ describe("gaveta do assistente", () => {
       await conversar()
 
       const botao = screen.getByRole("button", { name: /Desenhar no canvas/ })
-      expect(aplicou).not.toHaveBeenCalled()
+      expect(onApplied).not.toHaveBeenCalled()
 
       fireEvent.click(botao)
-      expect(aplicou).toHaveBeenCalledTimes(1)
+      expect(onApplied).toHaveBeenCalledTimes(1)
     } finally {
       vi.mocked(useNodes).mockReturnValue([] as never)
     }
@@ -263,8 +263,8 @@ describe("gaveta do assistente", () => {
     // old one — and the panel would show twice what the model said once.
     await conversar()
 
-    fetchFalso.mockImplementation(async () => new Response(
-      streamPicado(
+    fakeFetch.mockImplementation(async () => new Response(
+      chunkedStream(
         quadro("texto", { texto: "Agora o segundo." }) +
         quadro("fim", { transcrito: [], uso: {}, voltas: 1, ok: true }),
       ),
@@ -286,9 +286,9 @@ describe("gaveta do assistente", () => {
     })
     // Open in the store on purpose: even so the drawer can't exist — nor can
     // the button that opens it, which is what remains when it's closed.
-    useAssistenteEditorStore.setState({ aberto: true })
+    useAssistantEditorStore.setState({ aberto: true })
 
-    const { container } = render(<AssistentePainel onAplicar={aplicou} />)
+    const { container } = render(<AssistantPanel onAplicar={onApplied} />)
     await waitFor(() => expect(servico.estadoDoAssistente).toHaveBeenCalled())
 
     expect(container.querySelector("aside")).toBeNull()
@@ -297,12 +297,12 @@ describe("gaveta do assistente", () => {
   })
 
   it("falha na rota vira um erro na conversa, e não uma tela quebrada", async () => {
-    fetchFalso.mockImplementation(async () => new Response(
+    fakeFetch.mockImplementation(async () => new Response(
       JSON.stringify({ error: "recusado", message: "Já há uma conversa em andamento neste fluxo." }),
       { status: 409 },
     ))
 
-    render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
+    render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
     const campo = await screen.findByLabelText("Mensagem para o assistente")
     fireEvent.change(campo, { target: { value: "oi" } })
     fireEvent.submit(campo.closest("form")!)
@@ -334,8 +334,8 @@ describe("gaveta do assistente", () => {
     fireEvent.click(document.querySelector("summary")!)
     expect(screen.getByText("preciso do catálogo")).toBeVisible()
 
-    fetchFalso.mockImplementation(async () => new Response(
-      streamPicado(
+    fakeFetch.mockImplementation(async () => new Response(
+      chunkedStream(
         quadro("texto", { texto: "Agora o segundo." }) +
         quadro("fim", { transcrito: [], uso: {}, voltas: 1, ok: true }),
       ),
@@ -350,7 +350,7 @@ describe("gaveta do assistente", () => {
   })
 
   it("a gaveta tem teto de altura — é o que faz a conversa rolar", async () => {
-    const { container } = render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
+    const { container } = render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
     await screen.findByLabelText("Mensagem para o assistente")
 
     // The PAIR, not half of it. `h-full` alone hangs from a chain whose top is
@@ -369,7 +369,7 @@ describe("gaveta do assistente", () => {
     // invitation plus header and form push the send field off the screen and
     // there's nothing to scroll — precisely on `/workflow/create`, where the
     // drawer starts out open.
-    const { container } = render(<AssistentePainel abrirPorPadrao onAplicar={aplicou} />)
+    const { container } = render(<AssistantPanel abrirPorPadrao onAplicar={onApplied} />)
     await screen.findByText("Descreva o fluxo que você quer")
 
     const rolagem = container.querySelectorAll("aside [class*='overflow-y-auto']")
@@ -385,7 +385,7 @@ describe("gaveta do assistente", () => {
       data: { ativo: true, motivo: null, cota: { gasto: 1_230_000, teto: 1_500_000, reabre_em_segundos: 10_800 } },
       error: null,
     } as unknown as Awaited<ReturnType<typeof servico.estadoDoAssistente>>)
-    render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
+    render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
 
     const donut = await screen.findByTestId("uso-da-cota")
     expect(donut.textContent).toBe("82%")
@@ -399,7 +399,7 @@ describe("gaveta do assistente", () => {
       data: { ativo: true, motivo: null, cota: { gasto: 2_000_000, teto: 1_500_000, reabre_em: null } },
       error: null,
     } as unknown as Awaited<ReturnType<typeof servico.estadoDoAssistente>>)
-    render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
+    render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
     // By `data-testid`, not by text: the notice became the shared component,
     // and the text lives in a `<span>` INSIDE the paragraph. Searching by text
     // would return the child, whose class isn't the one holding the layout —
@@ -424,10 +424,10 @@ describe("gaveta do assistente — a cota durante o turno", () => {
     const aberto = new ReadableStream<Uint8Array>({
       start(c) { c.enqueue(new TextEncoder().encode('event: cota\ndata: {"gasto":300000,"teto":1000000}\n\n')) },
     })
-    fetchFalso.mockImplementationOnce(async () => new Response(aberto, {
+    fakeFetch.mockImplementationOnce(async () => new Response(aberto, {
       status: 200, headers: { "Content-Type": "text/event-stream" },
     }))
-    render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
+    render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
     const campo = await screen.findByLabelText("Mensagem para o assistente")
     expect((await screen.findByTestId("uso-da-cota")).textContent).toBe("0%")
 
@@ -450,7 +450,7 @@ describe("gaveta do assistente — a cota durante o turno", () => {
 // component exists to prevent.
 
 describe("cota cheia na gaveta do editor", () => {
-  function comCota(over: Record<string, unknown> = {}) {
+  function withQuota(over: Record<string, unknown> = {}) {
     servico.estadoDoAssistente.mockResolvedValueOnce({
       data: {
         ativo: true,
@@ -465,16 +465,16 @@ describe("cota cheia na gaveta do editor", () => {
   }
 
   it("a oferta da extensão chega aqui, com o plano da pessoa, como na Home", async () => {
-    comCota()
-    render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
+    withQuota()
+    render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
 
     expect(await screen.findByTestId("aviso-de-cota")).toBeTruthy()
     expect(screen.getByRole("button", { name: "oferta free true" })).toBeTruthy()
   })
 
   it("diz o prazo REAL, não «algumas horas»", async () => {
-    comCota()
-    render(<AssistentePainel workflowId="wf1" abrirPorPadrao onAplicar={aplicou} />)
+    withQuota()
+    render(<AssistantPanel workflowId="wf1" abrirPorPadrao onAplicar={onApplied} />)
 
     const aviso = await screen.findByTestId("aviso-de-cota")
     expect(aviso.textContent).toContain("reabre em")

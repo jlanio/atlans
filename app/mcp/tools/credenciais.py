@@ -7,7 +7,7 @@ from mcp.server.mcpserver import Context
 from app.mcp import infra
 from app.mcp.erros import erro
 from app.mcp.escopo import escopo_da_chamada, exigir_escopo
-from app.mcp.resolucao import resolver_workspace
+from app.mcp.resolucao import resolve_workspace
 from app.mcp.saida import envelope, iso
 from app.mcp.tools.base import anotacoes, ferramenta
 from app.services.credential_service import list_credential_metadata
@@ -33,7 +33,7 @@ async def list_credentials(ctx: Context, workspace_id: str | None = None) -> dic
 
     alcance = sorted(escopo.workspace_ids)
     if not alcance:
-        # Refuse early, with the same sentence as `resolver_workspace`. It is
+        # Refuse early, with the same sentence as `resolve_workspace`. It is
         # not redundant zeal: `list_credential_metadata` understands
         # `workspace_ids=None` as "no workspace filter" and would return all of
         # the owner's credentials. A token that reaches no workspace cannot be
@@ -47,7 +47,7 @@ async def list_credentials(ctx: Context, workspace_id: str | None = None) -> dic
 
     async with infra.sessao() as db:
         alvo = (
-            await resolver_workspace(db, escopo, workspace_id)
+            await resolve_workspace(db, escopo, workspace_id)
             if workspace_id is not None
             else None
         )

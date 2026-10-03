@@ -4,8 +4,8 @@ import { memo, useMemo } from "react"
 import dynamic from "next/dynamic"
 import { Skeleton } from "@/app/components/ui/skeleton"
 import type { IRunsByDay } from "@/service/types"
-import { formatarDiaCurto, formatarInteiro } from "@/lib/formatos"
-import type { Periodo } from "./historico-url"
+import { formatShortDay, formatInteger } from "@/lib/formatos"
+import type { Period } from "./historico-url"
 
 /**
  * The four stacked series, in the status colors — the same as
@@ -30,23 +30,23 @@ const Barras = dynamic(() => import("./grafico-por-dia-barras"), {
 
 interface Props {
   dias: IRunsByDay[]
-  periodo: Periodo
+  periodo: Period
   carregando: boolean
   /** Notice when `/runs-by-day` failed and what is on screen is from the previous load. */
   falha?: string
 }
 
 /** "de 8 ago a 6 set · pico de 70 em 2 set" — what the axis does not say at once. */
-export function subtituloDoGrafico(dias: IRunsByDay[]): string | null {
+export function chartSubtitle(dias: IRunsByDay[]): string | null {
   if (dias.length === 0) return null
   const primeiro = dias[0]
   const ultimo = dias[dias.length - 1]
   const pico = dias.reduce((m, d) => (d.total > m.total ? d : m), primeiro)
   const faixa = dias.length === 1
-    ? formatarDiaCurto(primeiro.day)
-    : `de ${formatarDiaCurto(primeiro.day)} a ${formatarDiaCurto(ultimo.day)}`
+    ? formatShortDay(primeiro.day)
+    : `de ${formatShortDay(primeiro.day)} a ${formatShortDay(ultimo.day)}`
   if (pico.total <= 0) return faixa
-  return `${faixa} · pico de ${formatarInteiro(pico.total)} em ${formatarDiaCurto(pico.day)}`
+  return `${faixa} · pico de ${formatInteger(pico.total)} em ${formatShortDay(pico.day)}`
 }
 
 /**
@@ -55,7 +55,7 @@ export function subtituloDoGrafico(dias: IRunsByDay[]): string | null {
  * purpose — it governed the whole page and looked local.
  */
 export const GraficoPorDia = memo(function GraficoPorDia({ dias, periodo, carregando, falha }: Props) {
-  const subtitulo = useMemo(() => subtituloDoGrafico(dias), [dias])
+  const subtitulo = useMemo(() => chartSubtitle(dias), [dias])
   const vazio = dias.length === 0 || dias.every(d => d.total === 0)
 
   return (

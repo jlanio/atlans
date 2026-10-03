@@ -20,7 +20,7 @@ const AddConnectionHandle = ({ connectionVisible: open, children, label, nodeId,
   // In the sub-workflow viewer the "+" would create a node on the EDITOR canvas
   // linked to an id that only exists inside the child. The line and the port
   // label stay: they're information, and it's the only place that names the free port.
-  const somenteLeitura = useSubflowReadOnly()
+  const readOnly = useSubflowReadOnly()
 
   function handleOpenDrawerState() {
 
@@ -53,7 +53,7 @@ const AddConnectionHandle = ({ connectionVisible: open, children, label, nodeId,
           }
         </div>
 
-        {!somenteLeitura && <button
+        {!readOnly && <button
           data-active={`${(!handleId && linkNodeIdParam === nodeId) || (handleId === linkHandleIdParam && linkNodeIdParam === nodeId)}`}
           // The platform accent is `--primary` (orange); this button used raw
           // `blue-500`, and since it wasn't a token it needed a whole `dark:`

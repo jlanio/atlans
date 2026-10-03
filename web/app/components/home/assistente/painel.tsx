@@ -17,33 +17,33 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { useResizablePanel } from "@/app/hooks/useResizablePanel"
 import { useHomeStore } from "@/app/stores/homeStore"
 import Conversa from "@/app/components/home/assistente/conversa"
-import type { TurnoDoAssistente } from "@/app/components/home/assistente/quadros"
-import type { IAssistenteEstado } from "@/service/types"
-import type { ResultadoDaDecisao } from "@/app/hooks/home/useAssistente"
+import type { AssistantTurn } from "@/app/components/home/assistente/quadros"
+import type { IAssistantState } from "@/service/types"
+import type { DecisionResult } from "@/app/hooks/home/useAssistente"
 import BadgeArtefatos from "./badge-artefatos"
 import {
-  AvisoDeAnexosRecusados, ChipsDeAnexo, ConviteDeSoltura,
-  anexosProntos, comReferencia, sugestaoParaAnexos,
+  RejectedAttachmentsNotice, AttachmentChips, DropPrompt,
+  anexosProntos, comReferencia, suggestionForAttachments,
 } from "@/app/components/home/assistente/anexos"
 import { BotaoMais, ChipDeLocalizacao } from "@/app/components/home/assistente/mais"
-import { AvisoDeCotaCheia } from "@/app/components/home/assistente/aviso-de-cota"
-import UsoDaCota from "@/app/components/home/assistente/uso-da-cota"
-import { useExtrasDoAssistente } from "./extras"
+import { QuotaFullNotice } from "@/app/components/home/assistente/aviso-de-cota"
+import QuotaUsage from "@/app/components/home/assistente/uso-da-cota"
+import { useAssistantExtras } from "./extras"
 import MarcaAnimada from "./marca-animada"
-import { useIdiomaDaTela, useTextos } from "../i18n"
+import { useScreenLanguage, useTexts } from "../i18n"
 
-const CHAVE_LARGURA = "atlans:home:largura"
+const WIDTH_KEY = "atlans:home:largura"
 
 interface Props {
-  estado: IAssistenteEstado | null
-  turnos: TurnoDoAssistente[]
+  estado: IAssistantState | null
+  turnos: AssistantTurn[]
   correndo: boolean
   /** The replay of the selected conversation is still coming in. */
   carregandoReplay?: boolean
   /** Returns focus to the field when the panel was opened by shortcut/button. */
   autoFoco?: boolean
   enviar: (mensagem: string) => Promise<void> | void
-  confirmar: (toolUseId: string, token: string, decisao: "confirmar" | "recusar") => Promise<ResultadoDaDecisao> | void
+  confirmar: (toolUseId: string, token: string, decisao: "confirmar" | "recusar") => Promise<DecisionResult> | void
   parar: () => void
   /** Attaches files chosen in the "+" (the same path as dragging). */
   aoAnexar?: (arquivos: File[]) => void
@@ -60,10 +60,10 @@ export default function Painel({
   // The cards (confirmation, layer, quick replies) and the "clicked, locked"
   // rule live in the hook shared with the center strip: they are the SAME
   // conversation in two views.
-  const extras = useExtrasDoAssistente({ confirmar, correndo, enviar })
+  const extras = useAssistantExtras({ confirmar, correndo, enviar })
   const isMobile = useIsMobile()
-  const idioma = useIdiomaDaTela()
-  const t = useTextos().assistente
+  const idioma = useScreenLanguage()
+  const t = useTexts().assistente
 
   // The draft also lives in the store: Ctrl+I collapses to the bar and UNMOUNTS
   // this panel — with local state, the shortcut erased what had been typed.
@@ -78,17 +78,17 @@ export default function Painel({
   const removerAnexo = useHomeStore((s) => s.removerAnexo)
   const limparAnexosProntos = useHomeStore((s) => s.limparAnexosProntos)
   const descartarAnexosRecusados = useHomeStore((s) => s.descartarAnexosRecusados)
-  const campoRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
 
   // Toggling unmounts the focused component and focus falls to <body>: the next Tab
   // starts over from the top of the document. Only when the swap was requested
   // (shortcut/button) — stealing focus on page load would be worse.
   useEffect(() => {
-    if (autoFoco) campoRef.current?.focus()
+    if (autoFoco) inputRef.current?.focus()
   }, [autoFoco])
 
   const { width, isResizing, resizeHandleProps } = useResizablePanel({
-    storageKey: CHAVE_LARGURA,
+    storageKey: WIDTH_KEY,
     defaultWidth: 420,
     minWidth: 340,
     maxWidth: 600,
@@ -112,8 +112,8 @@ export default function Painel({
   const estourou = cota != null && cota.gasto >= cota.teto
 
   // The suggested question when there is a ready attachment — the same as the bar's.
-  const sugestaoDeAnexo = sugestaoParaAnexos(anexos, idioma)
-  const temAnexoPronto = sugestaoDeAnexo !== null
+  const attachmentSuggestion = suggestionForAttachments(anexos, idioma)
+  const hasReadyAttachment = attachmentSuggestion !== null
 
   return (
     <aside
@@ -183,7 +183,7 @@ export default function Painel({
         nome={t.nome}
         // The default empty conversation is the EDITOR's: it asks you to describe a
         // workflow and talks about applying it on the canvas, which does not exist here.
-        vazio={carregandoReplay ? <CarregandoConversa /> : <Primeira />}
+        vazio={carregandoReplay ? <LoadingConversation /> : <Primeira />}
         // The pending item with the site's logo: here the one thinking is the site.
         indicador={MarcaAnimada}
         // The terracotta cursor at the end of the paragraph being written.
@@ -191,7 +191,7 @@ export default function Painel({
       />
 
       {estourou && cota && (
-        <AvisoDeCotaCheia
+        <QuotaFullNotice
           cota={cota}
           plano={estado?.plano}
           assinaturasAtivas={estado?.assinaturas_ativas}
@@ -199,7 +199,7 @@ export default function Painel({
         />
       )}
 
-      <AvisoDeAnexosRecusados anexos={anexos} onFechar={descartarAnexosRecusados} className="mx-3 mb-2 shrink-0" />
+      <RejectedAttachmentsNotice anexos={anexos} onFechar={descartarAnexosRecusados} className="mx-3 mb-2 shrink-0" />
 
       <form
         className="shrink-0 border-t border-border p-2"
@@ -208,15 +208,15 @@ export default function Painel({
         data-arraste={arrastando}
         onSubmit={(e) => { e.preventDefault(); submeter() }}
       >
-        {arrastando && <ConviteDeSoltura className="mb-2 px-1" />}
-        <ChipsDeAnexo anexos={anexos} onRemover={removerAnexo} className="mb-2 px-0.5" />
+        {arrastando && <DropPrompt className="mb-2 px-1" />}
+        <AttachmentChips anexos={anexos} onRemover={removerAnexo} className="mb-2 px-0.5" />
         <ChipDeLocalizacao className="mb-2 px-0.5" />
         <div className="flex items-end gap-2">
           {(aoAnexar || aoPedirLocalizacao) && (
             <BotaoMais aoAnexar={aoAnexar} aoLocalizar={aoPedirLocalizacao} className="size-9 max-md:size-10" />
           )}
           <Textarea
-            ref={campoRef}
+            ref={inputRef}
             value={rascunho}
             onChange={(e) => definirRascunho(e.target.value)}
             onKeyDown={(e) => {
@@ -225,7 +225,7 @@ export default function Painel({
             rows={2}
             maxLength={8000}
             disabled={estourou}
-            placeholder={sugestaoDeAnexo ?? t.barra.placeholder}
+            placeholder={attachmentSuggestion ?? t.barra.placeholder}
             className="max-h-40 min-h-[2.75rem] resize-none text-sm"
             aria-label={t.barra.rotuloDoCampo}
           />
@@ -234,14 +234,14 @@ export default function Painel({
               <TbPlayerStopFilled size={14} aria-hidden="true" />
             </Button>
           ) : (
-            <Button type="submit" size="icon" disabled={(!rascunho.trim() && !temAnexoPronto) || estourou} className="size-9 shrink-0 active:scale-90 max-md:size-10" aria-label={t.barra.enviar}>
+            <Button type="submit" size="icon" disabled={(!rascunho.trim() && !hasReadyAttachment) || estourou} className="size-9 shrink-0 active:scale-90 max-md:size-10" aria-label={t.barra.enviar}>
               <TbSend size={15} aria-hidden="true" />
             </Button>
           )}
         </div>
         {cota != null && (
           <div className="mt-1.5 flex justify-end">
-            <UsoDaCota cota={cota} />
+            <QuotaUsage cota={cota} />
           </div>
         )}
       </form>
@@ -255,7 +255,7 @@ export default function Painel({
  * `/` and that also contradicted the placeholder right below ("O que você quer saber?").
  */
 function Primeira() {
-  const t = useTextos().assistente.painel
+  const t = useTexts().assistente.painel
   return (
     <div className="flex min-h-full flex-col items-center justify-center gap-3 px-6 py-10 text-center">
       <span className="rounded-full bg-muted/60 p-4" aria-hidden="true">
@@ -273,8 +273,8 @@ function Primeira() {
 }
 
 /** The conversation replay is on its way — this is not an empty conversation. */
-function CarregandoConversa() {
-  const t = useTextos().assistente.painel
+function LoadingConversation() {
+  const t = useTexts().assistente.painel
   return (
     <div className="flex min-h-full flex-col justify-end gap-3 px-1 py-2" role="status">
       <span className="sr-only">{t.carregandoConversa}</span>

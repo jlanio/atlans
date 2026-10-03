@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import {
-  ROTULO_DO_GATILHO, derivarGatilho, descreverIntervalo, formatarProxima, resumirAgendamento,
+  TRIGGER_LABEL, derivarGatilho, descreverIntervalo, formatarProxima, resumirAgendamento,
 } from "@/app/components/projects/gatilho"
 import type { IWorkflowSchedule } from "@/service/types"
 
@@ -48,7 +48,7 @@ describe("derivarGatilho", () => {
   })
 
   it("tem rótulo para todo tipo", () => {
-    expect(Object.keys(ROTULO_DO_GATILHO).sort()).toEqual(["agendado", "arquivo", "geofence", "manual", "subfluxo", "webhook"])
+    expect(Object.keys(TRIGGER_LABEL).sort()).toEqual(["agendado", "arquivo", "geofence", "manual", "subfluxo", "webhook"])
   })
 })
 
